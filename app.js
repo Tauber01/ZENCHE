@@ -5,10 +5,10 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const camera = new CameraService();
-const storage = await new PhotoStorage().init();
+const storage = new PhotoStorage();
+const storageReady = storage.init();
 
 const body = document.body;
-const appShell = $("#appShell");
 const commandDialog = $("#commandDialog");
 const commandTrigger = $("#commandTrigger");
 const commandSearch = $("#commandSearch");
@@ -189,15 +189,16 @@ const setView = (view) => {
 };
 
 const openDialog = (dialog, firstFocus) => {
-  if (!dialog?.showModal) return;
-  dialog.showModal();
-  appShell.inert = true;
+  if (!dialog || dialog.open) return;
+  if (typeof dialog.showModal === "function") dialog.showModal();
+  else dialog.setAttribute("open", "");
   window.setTimeout(() => firstFocus?.focus(), 0);
 };
 
 const closeDialog = (dialog) => {
-  if (dialog?.open) dialog.close();
-  appShell.inert = false;
+  if (!dialog?.open) return;
+  if (typeof dialog.close === "function") dialog.close();
+  else dialog.removeAttribute("open");
 };
 
 const refreshStorageEstimate = async () => {
@@ -703,10 +704,15 @@ const updateConnectionChoice = (mode) => {
         : "仅在用户点击连接后请求设备权限。";
 };
 
-const openConnectionDialog = async () => {
+const openConnectionDialog = () => {
   updateConnectionChoice(state.connectionMode);
-  await populateVideoDevices(camera.device?.id || "");
   openDialog(connectionDialog, connectionDialog.querySelector(".connection-option.is-selected"));
+  if (state.connectionMode === "media") {
+    populateVideoDevices(camera.device?.id || "").catch((error) => {
+      connectionNotice.textContent = `无法读取视频设备：${error.message}`;
+      connectionNotice.dataset.tone = "error";
+    });
+  }
 };
 
 const connectSelectedSource = async () => {
@@ -1114,7 +1120,6 @@ $$(".dialog-close").forEach((button) => {
     if (event.target === dialog) closeDialog(dialog);
   });
   dialog.addEventListener("close", () => {
-    appShell.inert = false;
     connectionNotice.removeAttribute("data-tone");
   });
 });
@@ -1258,6 +1263,7 @@ if (!window.isSecureContext && !camera.nativeSupported) {
   setRuntimeNotice("视频设备连接需要通过 localhost 或 HTTPS 打开。");
 }
 
+document.documentElement.dataset.appReady = "true";
 setMode(safeRead("nikon-link-mode") || "simple");
 setView("capture");
 setDisconnectedUi();
@@ -1272,5 +1278,6 @@ if (camera.nativeSupported) {
   );
 }
 updateConnectionChoice(state.connectionMode);
+await storageReady;
 await renderLibrary();
 refreshStorageEstimate();

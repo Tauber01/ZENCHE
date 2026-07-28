@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.3.0
+VERSION=0.3.1
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
@@ -31,11 +31,7 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$RESOURCES/AppIcon.icns"
 
-for asset in index.html tokens.css styles.css app.js camera-service.js native-bridge.js \
-  storage-service.js manifest.webmanifest sw.js; do
-  cp "$PROJECT_ROOT/$asset" "$RESOURCES/Web/$asset"
-done
-cp -R "$PROJECT_ROOT/icons" "$RESOURCES/Web/icons"
+node "$PROJECT_ROOT/scripts/prepare-native-web.mjs" "$RESOURCES/Web"
 if [[ -d "$PROJECT_ROOT/third_party/licenses" ]]; then
   cp -R "$PROJECT_ROOT/third_party/licenses" "$RESOURCES/Licenses"
 fi

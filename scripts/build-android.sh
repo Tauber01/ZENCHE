@@ -2,19 +2,14 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.3.0
+VERSION=0.3.1
 ANDROID_ROOT="$PROJECT_ROOT/native/android"
 ASSET_ROOT="$ANDROID_ROOT/app/src/main/assets/web"
 DIST_ROOT="$PROJECT_ROOT/dist"
 
 rm -rf "$ASSET_ROOT"
-mkdir -p "$ASSET_ROOT/icons" "$DIST_ROOT"
-for asset in index.html tokens.css styles.css app.js camera-service.js native-bridge.js \
-  storage-service.js manifest.webmanifest sw.js; do
-  cp "$PROJECT_ROOT/$asset" "$ASSET_ROOT/$asset"
-done
-cp "$PROJECT_ROOT/icons/icon-192.png" "$ASSET_ROOT/icons/icon-192.png"
-cp "$PROJECT_ROOT/icons/icon-512.png" "$ASSET_ROOT/icons/icon-512.png"
+mkdir -p "$ASSET_ROOT" "$DIST_ROOT"
+node "$PROJECT_ROOT/scripts/prepare-native-web.mjs" "$ASSET_ROOT"
 
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}"
 export ANDROID_HOME="${ANDROID_HOME:-$PROJECT_ROOT/.toolchains/android-sdk}"

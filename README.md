@@ -20,13 +20,13 @@ PTP，因 Nikon 当前公开的 Remote Module SDK 未提供 Android 版本。
 
 ### macOS
 
-打开 `NikonLink-0.3.0-macOS-arm64.dmg`，将 **Nikon Link** 拖入“应用程序”。
+打开 `NikonLink-0.3.1-macOS-arm64.dmg`，将 **Nikon Link** 拖入“应用程序”。
 当前社区构建为 ad-hoc 签名，未使用 Apple Developer ID 公证；首次打开时可能
 需要在“系统设置 → 隐私与安全性”中确认。
 
 ### Android
 
-安装 `NikonLink-0.3.0-android.apk`。这是使用 Android 调试证书签名的直接安装
+安装 `NikonLink-0.3.1-android.apk`。这是使用 Android 调试证书签名的直接安装
 版本，适合侧载验证，不用于 Play 商店发布。
 
 ## 连接 Z8

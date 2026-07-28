@@ -314,6 +314,28 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDe
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        webView.evaluateJavaScript("document.documentElement.dataset.appReady === 'true'") {
+            value,
+            error in
+            if error == nil, value as? Bool == true {
+                print("Nikon Link UI ready")
+                return
+            }
+            webView.evaluateJavaScript("""
+                document.documentElement.removeAttribute('inert');
+                document.body?.removeAttribute('inert');
+                document.querySelector('#appShell')?.removeAttribute('inert');
+                const notice = document.querySelector('#runtimeNotice');
+                const message = document.querySelector('#runtimeNoticeText');
+                if (notice && message) {
+                  notice.hidden = false;
+                  message.textContent = '界面启动失败，请重新打开 Nikon Link。';
+                }
+                """)
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 

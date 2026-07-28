@@ -19,7 +19,7 @@ export class PhotoStorage {
     this.usingMemoryFallback = false;
   }
 
-  async init() {
+  async init(timeoutMs = 1500) {
     if (!("indexedDB" in globalThis)) {
       this.usingMemoryFallback = true;
       return this;
@@ -27,14 +27,34 @@ export class PhotoStorage {
 
     try {
       const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
-      request.addEventListener("upgradeneeded", () => {
-        const database = request.result;
-        if (!database.objectStoreNames.contains(STORE_NAME)) {
-          const store = database.createObjectStore(STORE_NAME, { keyPath: "id" });
-          store.createIndex("capturedAt", "capturedAt");
-        }
+      this.database = await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (callback, value) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          callback(value);
+        };
+        const timer = window.setTimeout(() => {
+          finish(reject, new Error("本地照片库初始化超时。"));
+        }, timeoutMs);
+
+        request.addEventListener("upgradeneeded", () => {
+          const database = request.result;
+          if (!database.objectStoreNames.contains(STORE_NAME)) {
+            const store = database.createObjectStore(STORE_NAME, { keyPath: "id" });
+            store.createIndex("capturedAt", "capturedAt");
+          }
+        });
+        request.addEventListener("success", () => {
+          if (settled) {
+            request.result.close();
+            return;
+          }
+          finish(resolve, request.result);
+        });
+        request.addEventListener("error", () => finish(reject, request.error));
       });
-      this.database = await requestToPromise(request);
     } catch {
       this.usingMemoryFallback = true;
     }

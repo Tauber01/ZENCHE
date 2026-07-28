@@ -3,6 +3,17 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [0.3.1] - 2026-07-28
+
+### Fixed
+
+- Fixed unresponsive controls in the packaged macOS and Android apps.
+- Bundled native WebView scripts into a classic single-file entry point to avoid
+  local `file://` ES module restrictions.
+- Removed redundant global `inert` locking and made the connection dialog open
+  immediately.
+- Added a timeout and memory fallback for local photo-library initialization.
+
 ## [0.3.0] - 2026-07-28
 
 ### Added

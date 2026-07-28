@@ -17,6 +17,7 @@ import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import org.json.JSONObject;
 
@@ -57,6 +58,26 @@ public final class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                view.evaluateJavascript(
+                        "document.documentElement.dataset.appReady === 'true'",
+                        result -> {
+                            if ("true".equals(result)) return;
+                            view.evaluateJavascript(
+                                    "document.documentElement.removeAttribute('inert');"
+                                            + "document.body&&document.body.removeAttribute('inert');"
+                                            + "var shell=document.querySelector('#appShell');"
+                                            + "if(shell)shell.removeAttribute('inert');"
+                                            + "var notice=document.querySelector('#runtimeNotice');"
+                                            + "var message=document.querySelector('#runtimeNoticeText');"
+                                            + "if(notice&&message){notice.hidden=false;"
+                                            + "message.textContent='界面启动失败，请重新打开 Nikon Link。';}",
+                                    null);
+                        });
+            }
+        });
         webView.setBackgroundColor(Color.TRANSPARENT);
         webView.addJavascriptInterface(new CameraBridge(), "NikonAndroid");
         setContentView(webView);
