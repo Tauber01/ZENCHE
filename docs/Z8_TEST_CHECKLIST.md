@@ -15,7 +15,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.3.1 packages pass compilation, signature/container validation, native
-WebView startup checks, bridge tests and browser capture/storage tests. A
-physical Z8 was not attached to the build machine, so the checklist above
-remains the release-candidate gate.
+The 0.4.0 packages pass compilation, signature/container validation, native UI
+startup checks and package scans confirming that DMG/APK contain no WebView or
+web assets. A physical Z8 was not attached to the build machine, so the
+checklist above remains the release-candidate gate.

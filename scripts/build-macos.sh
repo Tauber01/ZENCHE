@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.3.1
+VERSION=0.4.0
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
@@ -11,11 +11,11 @@ CONTENTS="$APP_ROOT/Contents"
 RESOURCES="$CONTENTS/Resources"
 
 rm -rf "$BUILD_ROOT"
-mkdir -p "$CONTENTS/MacOS" "$RESOURCES/Web" "$RESOURCES/bin" "$RESOURCES/lib" \
+mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \
   "$RESOURCES/camlibs" "$RESOURCES/iolibs" "$DIST_ROOT"
 
 xcrun swiftc -swift-version 5 -O \
-  -framework AppKit -framework WebKit \
+  -framework AppKit -framework SwiftUI \
   "$PROJECT_ROOT/native/macos/Sources/NikonLink/main.swift" \
   -o "$CONTENTS/MacOS/NikonLink"
 cp "$PROJECT_ROOT/native/macos/Info.plist" "$CONTENTS/Info.plist"
@@ -31,7 +31,6 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$RESOURCES/AppIcon.icns"
 
-node "$PROJECT_ROOT/scripts/prepare-native-web.mjs" "$RESOURCES/Web"
 if [[ -d "$PROJECT_ROOT/third_party/licenses" ]]; then
   cp -R "$PROJECT_ROOT/third_party/licenses" "$RESOURCES/Licenses"
 fi

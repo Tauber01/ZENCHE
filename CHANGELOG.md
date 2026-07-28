@@ -3,6 +3,18 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [0.4.0] - 2026-07-28
+
+### Changed
+
+- Replaced the packaged macOS WebView shell with a native SwiftUI/AppKit
+  application.
+- Replaced the packaged Android WebView shell with native Android Views.
+- Connected native controls directly to the existing Z8 USB/PTP camera cores.
+- Added native live-view, capture, professional parameter and local file
+  management screens on both platforms.
+- Removed HTML, CSS and JavaScript assets from DMG and APK builds.
+
 ## [0.3.1] - 2026-07-28
 
 ### Fixed

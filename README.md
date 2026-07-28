@@ -1,8 +1,10 @@
 # Nikon Link
 
-面向 macOS 与 Android 的 Nikon Z8 联机控制应用，同时保留可安装的 Web/PWA
-版本。界面提供“普通 / 专业”双模式，覆盖联机拍摄、参数控制、实时监看、自动
-导入与本地文件管理。
+面向 macOS 与 Android 的 Nikon Z8 原生联机控制应用。安装版不包含 WebView、
+HTML 或 JavaScript 运行时：macOS 使用 SwiftUI/AppKit，Android 使用系统原生
+View 与 USB Host API。仓库中的 Web/PWA 仅作为独立演示版本，不参与 DMG 或
+APK 运行。界面提供“普通 / 专业”双模式，覆盖联机拍摄、参数控制、实时监看、
+自动导入与本地文件管理。
 
 ## Z8 原生能力
 
@@ -11,7 +13,7 @@
 - Nikon 实时取景：`StartLiveView` / `GetLiveViewImg` / `EndLiveView`
 - Nikon SDRAM 拍摄并下载原图 JPEG
 - 快门、光圈、ISO、曝光补偿、白平衡、对焦与曝光模式
-- 拍摄文件存入设备本地照片库，可预览、下载、删除和撤销
+- 拍摄文件存入设备本地照片库，可预览、定位和删除
 
 macOS 使用 `libgphoto2` 的 Z8 后端；Android 使用系统 USB Host API 直接实现
 PTP，因 Nikon 当前公开的 Remote Module SDK 未提供 Android 版本。
@@ -20,13 +22,13 @@ PTP，因 Nikon 当前公开的 Remote Module SDK 未提供 Android 版本。
 
 ### macOS
 
-打开 `NikonLink-0.3.1-macOS-arm64.dmg`，将 **Nikon Link** 拖入“应用程序”。
+打开 `NikonLink-0.4.0-macOS-arm64.dmg`，将 **Nikon Link** 拖入“应用程序”。
 当前社区构建为 ad-hoc 签名，未使用 Apple Developer ID 公证；首次打开时可能
 需要在“系统设置 → 隐私与安全性”中确认。
 
 ### Android
 
-安装 `NikonLink-0.3.1-android.apk`。这是使用 Android 调试证书签名的直接安装
+安装 `NikonLink-0.4.0-android.apk`。这是使用 Android 调试证书签名的直接安装
 版本，适合侧载验证，不用于 Play 商店发布。
 
 ## 连接 Z8
@@ -34,7 +36,7 @@ PTP，因 Nikon 当前公开的 Remote Module SDK 未提供 Android 版本。
 1. 将 Z8 更新到较新的稳定固件，关闭 NX Tether、Camera Control Pro 和其他会
    占用相机的程序。
 2. 使用支持数据传输的 USB-C 线直连电脑或 Android USB Host 设备，避免扩展坞。
-3. 打开 Nikon Link，选择“**Nikon Z8 原生 USB**”，允许 USB 访问。
+3. 打开 Nikon Link，点击“**连接 Z8**”，允许 USB 访问。
 4. 等待实时取景出现，再进行拍摄或参数调整。
 
 > 当前构建完成了协议与软件侧验证，但构建机器上未连接 Z8，因此仍需一次实机
@@ -43,8 +45,8 @@ PTP，因 Nikon 当前公开的 Remote Module SDK 未提供 Android 版本。
 
 ## 本地构建
 
-要求：macOS 14+、Apple Silicon、Swift Command Line Tools、Homebrew、
-OpenJDK 17、Android SDK 35、Gradle。
+要求：macOS 14+、Apple Silicon、SwiftUI/AppKit Command Line Tools、
+Homebrew、OpenJDK 17、Android SDK 35、Gradle。
 
 ```sh
 ./scripts/build-all.sh
