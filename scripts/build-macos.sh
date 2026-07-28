@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.6.0
+VERSION=0.7.0
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
@@ -27,6 +27,8 @@ xcrun swiftc -swift-version 5 -O \
   "$PROJECT_ROOT/native/macos/Sources/NikonLink/"*.swift \
   -o "$CONTENTS/MacOS/NikonLink"
 cp "$PROJECT_ROOT/native/macos/Info.plist" "$CONTENTS/Info.plist"
+cp "$PROJECT_ROOT/native/macos/Resources/wechat-donation.png" \
+  "$RESOURCES/wechat-donation.png"
 
 ICONSET="$BUILD_ROOT/AppIcon.iconset"
 mkdir -p "$ICONSET"

@@ -198,10 +198,39 @@ final class PtpCamera {
     synchronized Object setParameter(String name, Object rawValue) throws Exception {
         ensureConnected();
         if ("bulbDuration".equals(name)) {
+            if (!"bulb".equals(exposureMode)) {
+                throw new Exception("B门曝光时长仅能在 M 拍摄模式的 B门快门速度下调整。");
+            }
             bulbDurationSeconds = Math.max(
                     1,
                     Math.min(900, ((Number) rawValue).intValue()));
             return bulbDurationSeconds;
+        }
+        if (!canAdjustExposureParameter(name)) {
+            throw new Exception("当前拍摄模式下此参数由相机控制。");
+        }
+        if ("focusMode".equals(name)) {
+            String mode = String.valueOf(rawValue);
+            int stillFocusMode = "manual".equals(mode)
+                    ? 0x0001
+                    : "continuous".equals(mode) ? 0x8011 : 0x8010;
+            try {
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500a},
+                        littleEndian16(stillFocusMode),
+                        10_000);
+            } catch (Exception stillFocusError) {
+                int liveViewFocusMode = "manual".equals(mode)
+                        ? 4
+                        : "continuous".equals(mode) ? 1 : 0;
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0xd061},
+                        new byte[]{(byte) liveViewFocusMode},
+                        10_000);
+            }
+            return rawValue;
         }
         int property;
         byte[] value;
@@ -225,11 +254,21 @@ final class PtpCamera {
                 break;
             case "whiteBalanceMode":
                 property = 0x5005;
-                value = littleEndian16("continuous".equals(rawValue) ? 2 : 1);
+                value = littleEndian16("continuous".equals(rawValue) ? 0x0002 : 0x8013);
                 break;
-            case "focusMode":
-                property = 0x500a;
-                value = littleEndian16("manual".equals(rawValue) ? 1 : "continuous".equals(rawValue) ? 4 : 2);
+            case "pictureControl":
+                property = 0xd200;
+                String pictureControl = String.valueOf(rawValue);
+                int control;
+                if ("neutral".equals(pictureControl)) control = 2;
+                else if ("vivid".equals(pictureControl)) control = 3;
+                else if ("monochrome".equals(pictureControl)) control = 4;
+                else if ("portrait".equals(pictureControl)) control = 5;
+                else if ("landscape".equals(pictureControl)) control = 6;
+                else if ("flat".equals(pictureControl)) control = 7;
+                else if ("auto".equals(pictureControl)) control = 8;
+                else control = 1;
+                value = littleEndian16(control);
                 break;
             case "exposureMode":
                 exposureMode = String.valueOf(rawValue);
@@ -260,6 +299,25 @@ final class PtpCamera {
         }
         transact(SET_DEVICE_PROP, new long[]{property}, value, 10_000);
         return rawValue;
+    }
+
+    private boolean canAdjustExposureParameter(String name) {
+        switch (name) {
+            case "exposureTime":
+                return "manual".equals(exposureMode) || "shutterPriority".equals(exposureMode);
+            case "aperture":
+                return "manual".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "bulb".equals(exposureMode);
+            case "iso":
+                return true;
+            case "exposureCompensation":
+                return "program".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "shutterPriority".equals(exposureMode);
+            default:
+                return true;
+        }
     }
 
     synchronized void disconnect() {
@@ -402,7 +460,8 @@ final class PtpCamera {
                 "exposureCompensation", 0.0,
                 "focusMode", "single-shot",
                 "whiteBalanceMode", "continuous",
-                "exposureMode", "manual");
+                "exposureMode", "manual",
+                "pictureControl", "standard");
     }
 
     private static Map<String, Object> capabilities(CameraProfile profile) {
@@ -413,6 +472,15 @@ final class PtpCamera {
                 "exposureCompensation", mapOf("min", -5.0, "max", 5.0),
                 "focusMode", new String[]{"single-shot", "continuous", "manual"},
                 "whiteBalanceMode", new String[]{"continuous", "manual"},
+                "pictureControl", new String[]{
+                        "auto",
+                        "standard",
+                        "neutral",
+                        "vivid",
+                        "monochrome",
+                        "portrait",
+                        "landscape",
+                        "flat"},
                 "exposureMode", new String[]{
                         "program",
                         "manual",
