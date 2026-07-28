@@ -77,13 +77,19 @@ public final class MainActivity extends Activity {
     private TextView previewPlaceholder;
     private Button shutterButton;
     private Button liveViewButton;
+    private Button wirelessButton;
+    private TextView wirelessStatusText;
+    private TextView wirelessAddressText;
     private Bitmap latestFrame;
     private File photoDirectory;
+    private WirelessFtpServer wirelessServer;
 
     private volatile boolean connected;
     private volatile boolean connecting;
     private volatile boolean liveViewEnabled;
     private volatile boolean capturing;
+    private volatile boolean wirelessRequested;
+    private volatile String wirelessStatus = "无线收件箱未开启";
     private volatile int previewGeneration;
     private volatile String connectedCameraName = "Nikon 相机";
     private boolean professionalMode;
@@ -104,6 +110,37 @@ public final class MainActivity extends Activity {
         if (base == null) base = getFilesDir();
         photoDirectory = new File(base, "Nikon Link");
         if (!photoDirectory.exists()) photoDirectory.mkdirs();
+        wirelessServer = new WirelessFtpServer(
+                photoDirectory,
+                new WirelessFtpServer.Listener() {
+                    @Override
+                    public void onStatus(String status) {
+                        mainHandler.post(() -> {
+                            wirelessStatus = status;
+                            updateWirelessUi();
+                        });
+                    }
+
+                    @Override
+                    public void onFileReceived(File file) {
+                        mainHandler.post(() -> {
+                            wirelessStatus = "已接收 " + file.getName();
+                            updateWirelessUi();
+                            updateFileCount();
+                            showToast("无线图片已保存：" + file.getName());
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        mainHandler.post(() -> {
+                            wirelessRequested = false;
+                            wirelessStatus = message;
+                            updateWirelessUi();
+                            showError(message);
+                        });
+                    }
+                });
 
         setContentView(buildApplication());
         showSection("capture");
@@ -420,10 +457,22 @@ public final class MainActivity extends Activity {
         addSpinnerControl(
                 panel,
                 "曝光模式",
-                new String[]{"P", "M"},
-                new Object[]{"continuous", "manual"},
+                new String[]{"P", "M", "A", "S", "B"},
+                new Object[]{
+                        "program",
+                        "manual",
+                        "aperturePriority",
+                        "shutterPriority",
+                        "bulb"},
                 1,
                 "exposureMode");
+        addSpinnerControl(
+                panel,
+                "B 门时长（仅 B 模式）",
+                new String[]{"1 秒", "2 秒", "5 秒", "10 秒", "30 秒", "60 秒"},
+                new Object[]{1, 2, 5, 10, 30, 60},
+                2,
+                "bulbDuration");
 
         TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, MUTED);
         LinearLayout.LayoutParams labelParams = marginParams(-1, -2, 0, 12, 0, 2);
@@ -502,7 +551,7 @@ public final class MainActivity extends Activity {
         List<File> files = photoFiles();
         content.addView(text("文件管理", 30, Typeface.BOLD, INK));
         content.addView(text(
-                files.size() + " 个本地 JPEG 文件",
+                files.size() + " 个本地图像文件",
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -572,11 +621,12 @@ public final class MainActivity extends Activity {
     }
 
     private View buildTransferView() {
+        ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(text("传输队列", 30, Typeface.BOLD, INK));
+        content.addView(text("无线传输", 30, Typeface.BOLD, INK));
         content.addView(text(
-                "相机拍摄完成后，JPEG 会直接写入 Android 本地照片库。",
+                "通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。",
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -585,8 +635,53 @@ public final class MainActivity extends Activity {
                 "本地照片库",
                 photoFiles().size() + " 个文件"));
         content.addView(infoCard(
-                "相机通道",
-                connected ? connectedCameraName + " · USB/PTP 已连接" : "等待 Nikon 相机"));
+                "无线收件箱",
+                wirelessStatus));
+
+        LinearLayout settings = panel();
+        settings.addView(text("相机 FTP 设置", 18, Typeface.BOLD, INK));
+        settings.addView(text(
+                "适用于相机直连热点或同一局域网",
+                13,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 3, 0, 12));
+
+        wirelessAddressText = text(
+                wirelessSettingsText(),
+                13,
+                Typeface.NORMAL,
+                INK);
+        wirelessAddressText.setTextIsSelectable(true);
+        settings.addView(wirelessAddressText);
+
+        wirelessButton = nativeButton(
+                wirelessRequested ? "停止接收" : "开启无线接收",
+                !wirelessRequested);
+        wirelessButton.setOnClickListener(view -> {
+            if (wirelessRequested) {
+                wirelessRequested = false;
+                wirelessServer.stop();
+            } else {
+                wirelessRequested = true;
+                wirelessStatus = "正在开启无线收件箱…";
+                wirelessServer.start();
+            }
+            updateWirelessUi();
+        });
+        settings.addView(
+                wirelessButton,
+                marginParams(-1, dp(48), 0, 16, 0, 0));
+        content.addView(settings);
+
+        wirelessStatusText = text(
+                "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启，然后选择照片上传或开启自动上传。",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        content.addView(
+                wirelessStatusText,
+                marginParams(-1, -2, 0, 4, 0, 14));
         TextView path = text(
                 "保存位置\n" + photoDirectory.getAbsolutePath(),
                 12,
@@ -594,7 +689,36 @@ public final class MainActivity extends Activity {
                 MUTED);
         path.setTextIsSelectable(true);
         content.addView(path, marginParams(-1, -2, 0, 18, 0, 0));
-        return content;
+        scroll.addView(content);
+        return scroll;
+    }
+
+    private String wirelessSettingsText() {
+        return "服务器类型：FTP"
+                + "\n服务器地址：" + wirelessServer.getLocalAddress()
+                + "\n端口：" + WirelessFtpServer.PORT
+                + "\n用户名：" + WirelessFtpServer.USERNAME
+                + "\n密码：" + WirelessFtpServer.PASSWORD
+                + "\nPASV 模式：开启";
+    }
+
+    private void updateWirelessUi() {
+        if (wirelessButton != null) {
+            wirelessButton.setText(wirelessRequested ? "停止接收" : "开启无线接收");
+            wirelessButton.setTextColor(wirelessRequested ? INK : Color.WHITE);
+            wirelessButton.setBackground(rounded(
+                    wirelessRequested ? SURFACE : COBALT,
+                    9,
+                    wirelessRequested ? RULE : 0));
+        }
+        if (wirelessAddressText != null) {
+            wirelessAddressText.setText(wirelessSettingsText());
+        }
+        if (wirelessStatusText != null) {
+            wirelessStatusText.setText(
+                    (wirelessRequested ? wirelessStatus + "\n" : "")
+                            + "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启。");
+        }
     }
 
     private View infoCard(String title, String value) {
@@ -850,7 +974,14 @@ public final class MainActivity extends Activity {
     private List<File> photoFiles() {
         File[] files = photoDirectory.listFiles((dir, name) -> {
             String lower = name.toLowerCase(Locale.ROOT);
-            return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png");
+            return lower.endsWith(".jpg")
+                    || lower.endsWith(".jpeg")
+                    || lower.endsWith(".png")
+                    || lower.endsWith(".nef")
+                    || lower.endsWith(".heif")
+                    || lower.endsWith(".heic")
+                    || lower.endsWith(".tif")
+                    || lower.endsWith(".tiff");
         });
         if (files == null) return Collections.emptyList();
         List<File> result = new ArrayList<>(Arrays.asList(files));
@@ -987,6 +1118,8 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         previewGeneration++;
+        wirelessRequested = false;
+        wirelessServer.stop();
         cameraExecutor.submit(camera::disconnect);
         cameraExecutor.shutdown();
         super.onDestroy();

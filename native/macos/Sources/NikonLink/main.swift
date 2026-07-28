@@ -195,7 +195,11 @@ private final class GPhotoCamera {
         liveView = false
     }
 
-    private func imageData(prefix: String, preview: Bool) throws -> Data {
+    private func imageData(
+        prefix: String,
+        preview: Bool,
+        bulbSeconds: Int? = nil
+    ) throws -> Data {
         guard connected else { throw CameraError.noCamera }
         if preview && !liveView {
             throw CameraError.command("实时取景尚未开启。")
@@ -208,10 +212,31 @@ private final class GPhotoCamera {
         )
         let stem = "\(prefix)-\(UUID().uuidString)"
         let target = folder.appendingPathComponent("\(stem).%C")
-        let arguments = preview
-            ? ["--capture-preview", "--filename", target.path, "--force-overwrite"]
-            : ["--capture-image-and-download", "--filename", target.path, "--force-overwrite"]
-        _ = try run(arguments, timeout: preview ? 15 : 60)
+        let arguments: [String]
+        let timeout: TimeInterval
+        if preview {
+            arguments = ["--capture-preview", "--filename", target.path, "--force-overwrite"]
+            timeout = 15
+        } else if let bulbSeconds {
+            let duration = max(1, min(bulbSeconds, 900))
+            arguments = [
+                "--filename", target.path,
+                "--force-overwrite",
+                "--set-config", "bulb=1",
+                "--wait-event=\(duration)s",
+                "--set-config", "bulb=0",
+                "--wait-event-and-download=20s"
+            ]
+            timeout = TimeInterval(duration + 45)
+        } else {
+            arguments = [
+                "--capture-image-and-download",
+                "--filename", target.path,
+                "--force-overwrite"
+            ]
+            timeout = 60
+        }
+        _ = try run(arguments, timeout: timeout)
         let files = try FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: nil
@@ -236,8 +261,8 @@ private final class GPhotoCamera {
         try imageData(prefix: "preview", preview: true)
     }
 
-    func capture() throws -> Data {
-        try imageData(prefix: "capture", preview: false)
+    func capture(bulbSeconds: Int? = nil) throws -> Data {
+        try imageData(prefix: "capture", preview: false, bulbSeconds: bulbSeconds)
     }
 
     func setParameter(name: String, value: Any) throws {
@@ -268,8 +293,19 @@ private final class GPhotoCamera {
                 ? "Continuous-servo AF"
                 : mode == "manual" ? "Manual" : "Single-servo AF"
         case "exposureMode":
+            let mode = String(describing: value)
+            if mode == "bulb" {
+                _ = try run(["--set-config", "expprogram=M"])
+                _ = try run(["--set-config", "shutterspeed=Bulb"])
+                return
+            }
             key = "expprogram"
-            formatted = String(describing: value) == "manual" ? "M" : "P"
+            switch mode {
+            case "manual": formatted = "M"
+            case "aperturePriority": formatted = "A"
+            case "shutterPriority": formatted = "S"
+            default: formatted = "P"
+            }
         default:
             throw CameraError.command("\(cameraName) 不支持此参数：\(name)")
         }
@@ -334,6 +370,7 @@ private final class CameraModel: ObservableObject {
     @Published var focusMode = "single-shot"
     @Published var whiteBalance = "continuous"
     @Published var exposureMode = "manual"
+    @Published var bulbSeconds = 5
 
     private let camera = GPhotoCamera()
     private let cameraQueue = DispatchQueue(
@@ -342,6 +379,12 @@ private final class CameraModel: ObservableObject {
     )
     private var previewToken = UUID()
     private let photoDirectory: URL
+    lazy var wirelessTransfer = WirelessTransferServer(
+        directory: photoDirectory
+    ) { [weak self] _ in
+        self?.reloadPhotos()
+        self?.selectedPhoto = self?.photos.first
+    }
 
     var activeCameraName: String {
         cameraName ?? "Nikon 相机"
@@ -485,7 +528,8 @@ private final class CameraModel: ObservableObject {
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
-                let data = try self.camera.capture()
+                let duration = self.exposureMode == "bulb" ? self.bulbSeconds : nil
+                let data = try self.camera.capture(bulbSeconds: duration)
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
                 let filename = "NIKON_\(formatter.string(from: Date())).JPG"
@@ -517,7 +561,10 @@ private final class CameraModel: ObservableObject {
             options: [.skipsHiddenFiles]
         )) ?? []
         photos = urls
-            .filter { ["jpg", "jpeg", "png"].contains($0.pathExtension.lowercased()) }
+            .filter {
+                ["jpg", "jpeg", "png", "nef", "heif", "heic", "tif", "tiff"]
+                    .contains($0.pathExtension.lowercased())
+            }
             .map { url in
                 let values = try? url.resourceValues(forKeys: keys)
                 return PhotoRecord(
@@ -567,6 +614,7 @@ private final class CameraModel: ObservableObject {
 
     func shutdown() {
         previewToken = UUID()
+        wirelessTransfer.stop()
         camera.disconnect()
     }
 }
@@ -966,10 +1014,26 @@ private struct ParameterInspector: View {
                                 }
                             )
                         ) {
-                            Text("P").tag("continuous")
+                            Text("P").tag("program")
                             Text("M").tag("manual")
+                            Text("A").tag("aperturePriority")
+                            Text("S").tag("shutterPriority")
+                            Text("B").tag("bulb")
                         }
                         .pickerStyle(.segmented)
+                    }
+                    if model.exposureMode == "bulb" {
+                        nativeControl("B 门时长") {
+                            Picker("B 门时长", selection: $model.bulbSeconds) {
+                                Text("1 秒").tag(1)
+                                Text("2 秒").tag(2)
+                                Text("5 秒").tag(5)
+                                Text("10 秒").tag(10)
+                                Text("30 秒").tag(30)
+                                Text("60 秒").tag(60)
+                            }
+                            .labelsHidden()
+                        }
                     }
                 }
             }
@@ -1120,29 +1184,91 @@ private struct LibraryView: View {
 
 private struct TransferView: View {
     @ObservedObject var model: CameraModel
+    @ObservedObject private var wireless: WirelessTransferServer
+
+    init(model: CameraModel) {
+        self.model = model
+        _wireless = ObservedObject(wrappedValue: model.wirelessTransfer)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("传输队列").font(.system(size: 34, weight: .bold))
-            Text("联机拍摄完成后，JPEG 会直接进入 macOS 本地照片库。")
-                .foregroundStyle(Palette.muted)
-            HStack(spacing: 22) {
-                statusCard(
-                    icon: "internaldrive",
-                    title: "本地照片库",
-                    value: "\(model.photos.count) 个文件"
-                )
-                statusCard(
-                    icon: "cable.connector",
-                    title: "相机通道",
-                    value: model.connected ? "USB/PTP 已连接" : "等待连接"
-                )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                Text("无线传输").font(.system(size: 34, weight: .bold))
+                Text("通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
+                    .foregroundStyle(Palette.muted)
+                HStack(spacing: 22) {
+                    statusCard(
+                        icon: "internaldrive",
+                        title: "本地照片库",
+                        value: "\(model.photos.count) 个文件"
+                    )
+                    statusCard(
+                        icon: wireless.isRunning ? "wifi" : "wifi.slash",
+                        title: "无线收件箱",
+                        value: wireless.status
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("相机 FTP 设置").font(.title3.bold())
+                            Text("适用于相机直连热点或同一局域网")
+                                .foregroundStyle(Palette.muted)
+                        }
+                        Spacer()
+                        Button(wireless.isRunning ? "停止接收" : "开启无线接收") {
+                            if wireless.isRunning {
+                                wireless.stop()
+                            } else {
+                                wireless.refreshAddress()
+                                wireless.start()
+                            }
+                        }
+                        .buttonStyle(NativeButtonStyle(primary: !wireless.isRunning))
+                    }
+
+                    Divider()
+                    transferRow("服务器类型", "FTP")
+                    transferRow("服务器地址", wireless.hostAddress)
+                    transferRow("端口", "\(WirelessTransferServer.port)")
+                    transferRow("用户名", WirelessTransferServer.username)
+                    transferRow("密码", WirelessTransferServer.password)
+                    transferRow("PASV 模式", "开启")
+
+                    Text("在相机“网络菜单 → 连接到 FTP 服务器”中填写以上信息，选择照片上传或开启自动上传。首次启动时请允许 macOS 接受传入网络连接。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+                .background(Palette.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14).stroke(Palette.rule)
+                }
+
+                HStack {
+                    Button("刷新网络地址") { wireless.refreshAddress() }
+                        .buttonStyle(NativeButtonStyle())
+                    Button("打开保存位置") { model.revealLibrary() }
+                        .buttonStyle(NativeButtonStyle())
+                }
             }
-            Button("打开保存位置") { model.revealLibrary() }
-                .buttonStyle(NativeButtonStyle(primary: true))
-            Spacer()
+            .padding(28)
         }
-        .padding(28)
+    }
+
+    private func transferRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(Palette.muted)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .textSelection(.enabled)
+        }
     }
 
     private func statusCard(icon: String, title: String, value: String) -> some View {

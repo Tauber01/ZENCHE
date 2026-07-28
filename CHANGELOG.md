@@ -3,6 +3,24 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [0.6.0] - 2026-07-28
+
+### Added
+
+- Added P, M, A, S and B exposure programs on macOS and Android.
+- Added selectable 1–60 second Nikon bulb capture durations.
+- Added a native passive-mode FTP receiver for direct Wi-Fi image transfer
+  from supported Nikon cameras.
+- Added automatic local-library import for JPEG, NEF, HEIF, HEIC and TIFF
+  uploads.
+
+### Changed
+
+- Rebuilt the macOS disk image with both the app and an Applications shortcut
+  for standard drag-to-install behavior.
+- Expanded the transfer screen with live server address, port and camera setup
+  instructions.
+
 ## [0.5.0] - 2026-07-28
 
 ### Added

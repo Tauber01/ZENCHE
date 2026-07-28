@@ -31,12 +31,14 @@ final class PtpCamera {
     private static final int CLOSE_SESSION = 0x1003;
     private static final int GET_OBJECT = 0x1009;
     private static final int SET_DEVICE_PROP = 0x1016;
+    private static final int CHANGE_CAMERA_MODE = 0x90c2;
     private static final int DEVICE_READY = 0x90c8;
     private static final int GET_EVENT = 0x90c7;
     private static final int START_LIVE_VIEW = 0x9201;
     private static final int END_LIVE_VIEW = 0x9202;
     private static final int GET_LIVE_VIEW_IMAGE = 0x9203;
     private static final int CAPTURE_TO_SDRAM = 0x9207;
+    private static final int TERMINATE_CAPTURE = 0x920c;
     private static final int OBJECT_ADDED_IN_SDRAM = 0xc101;
 
     private final MainActivity activity;
@@ -46,6 +48,8 @@ final class PtpCamera {
     private UsbEndpoint bulkOut;
     private int transaction = 0;
     private boolean liveView;
+    private String exposureMode = "manual";
+    private int bulbDurationSeconds = 5;
     private CameraProfile profile;
 
     PtpCamera(MainActivity activity) {
@@ -147,7 +151,24 @@ final class PtpCamera {
         boolean resumeLiveView = liveView;
         if (resumeLiveView) stopLiveView();
         try {
-            transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+            if ("bulb".equals(exposureMode)) {
+                transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500e},
+                        littleEndian16(1),
+                        10_000);
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500d},
+                        littleEndian32(0xffffffffL),
+                        10_000);
+                transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+                Thread.sleep(Math.max(1, Math.min(bulbDurationSeconds, 900)) * 1000L);
+                transact(TERMINATE_CAPTURE, new long[]{0, 0}, null, 15_000);
+            } else {
+                transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+            }
             long handle = 0xffff0001L;
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
@@ -176,6 +197,12 @@ final class PtpCamera {
 
     synchronized Object setParameter(String name, Object rawValue) throws Exception {
         ensureConnected();
+        if ("bulbDuration".equals(name)) {
+            bulbDurationSeconds = Math.max(
+                    1,
+                    Math.min(900, ((Number) rawValue).intValue()));
+            return bulbDurationSeconds;
+        }
         int property;
         byte[] value;
         double number = rawValue instanceof Number ? ((Number) rawValue).doubleValue() : 0;
@@ -205,8 +232,28 @@ final class PtpCamera {
                 value = littleEndian16("manual".equals(rawValue) ? 1 : "continuous".equals(rawValue) ? 4 : 2);
                 break;
             case "exposureMode":
+                exposureMode = String.valueOf(rawValue);
                 property = 0x500e;
-                value = littleEndian16("manual".equals(rawValue) ? 1 : 2);
+                if ("bulb".equals(exposureMode)) {
+                    transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{property},
+                            littleEndian16(1),
+                            10_000);
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0x500d},
+                            littleEndian32(0xffffffffL),
+                            10_000);
+                    return rawValue;
+                }
+                int program;
+                if ("manual".equals(exposureMode)) program = 1;
+                else if ("aperturePriority".equals(exposureMode)) program = 3;
+                else if ("shutterPriority".equals(exposureMode)) program = 4;
+                else program = 2;
+                value = littleEndian16(program);
                 break;
             default:
                 throw new Exception(cameraName() + " 不支持此参数：" + name);
@@ -366,7 +413,12 @@ final class PtpCamera {
                 "exposureCompensation", mapOf("min", -5.0, "max", 5.0),
                 "focusMode", new String[]{"single-shot", "continuous", "manual"},
                 "whiteBalanceMode", new String[]{"continuous", "manual"},
-                "exposureMode", new String[]{"continuous", "manual"});
+                "exposureMode", new String[]{
+                        "program",
+                        "manual",
+                        "aperturePriority",
+                        "shutterPriority",
+                        "bulb"});
     }
 
     static Map<String, Object> mapOf(Object... values) {
