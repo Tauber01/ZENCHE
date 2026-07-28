@@ -2,13 +2,21 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.4.0
+VERSION=0.7.0
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
 APP_ROOT="$BUILD_ROOT/Nikon Link.app"
 CONTENTS="$APP_ROOT/Contents"
 RESOURCES="$CONTENTS/Resources"
+DMG_ROOT="$BUILD_ROOT/dmg"
+
+# Keep local packaging usable when a newly installed Xcode is selected but its
+# license has not been accepted yet. The Command Line Tools are sufficient here.
+if ! /usr/bin/xcrun --find swiftc >/dev/null 2>&1 &&
+  [[ -x /Library/Developer/CommandLineTools/usr/bin/swiftc ]]; then
+  export DEVELOPER_DIR=/Library/Developer/CommandLineTools
+fi
 
 rm -rf "$BUILD_ROOT"
 mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \
@@ -16,9 +24,11 @@ mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \
 
 xcrun swiftc -swift-version 5 -O \
   -framework AppKit -framework SwiftUI \
-  "$PROJECT_ROOT/native/macos/Sources/NikonLink/main.swift" \
+  "$PROJECT_ROOT/native/macos/Sources/NikonLink/"*.swift \
   -o "$CONTENTS/MacOS/NikonLink"
 cp "$PROJECT_ROOT/native/macos/Info.plist" "$CONTENTS/Info.plist"
+cp "$PROJECT_ROOT/native/macos/Resources/wechat-donation.png" \
+  "$RESOURCES/wechat-donation.png"
 
 ICONSET="$BUILD_ROOT/AppIcon.iconset"
 mkdir -p "$ICONSET"
@@ -80,7 +90,10 @@ codesign --force --deep --sign - --timestamp=none \
 
 DMG_PATH="$DIST_ROOT/NikonLink-$VERSION-macOS-$ARCH.dmg"
 rm -f "$DMG_PATH"
-hdiutil create -volname "Nikon Link $VERSION" -srcfolder "$APP_ROOT" \
+mkdir -p "$DMG_ROOT"
+cp -R "$APP_ROOT" "$DMG_ROOT/"
+ln -s /Applications "$DMG_ROOT/Applications"
+hdiutil create -volname "Nikon Link $VERSION" -srcfolder "$DMG_ROOT" \
   -format UDZO -ov "$DMG_PATH"
 codesign --verify --deep --strict "$APP_ROOT"
 shasum -a 256 "$DMG_PATH" > "$DMG_PATH.sha256"

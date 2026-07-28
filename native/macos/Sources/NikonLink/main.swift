@@ -1,6 +1,55 @@
 import AppKit
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
+
+private struct SupportedCamera: Equatable {
+    let name: String
+    let productID: Int
+    let detectionTokens: [String]
+
+    static let all = [
+        SupportedCamera(
+            name: "Nikon Z8",
+            productID: 0x0451,
+            detectionTokens: ["nikon z8"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z f",
+            productID: 0x0453,
+            detectionTokens: ["nikon zf", "nikon z f"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z6III",
+            productID: 0x0454,
+            detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z5II",
+            productID: 0x0456,
+            detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"]
+        )
+    ]
+
+    static let summary = "Z8 · Z f · Z6III · Z5II"
+
+    static func matching(detection: String) -> SupportedCamera? {
+        let normalized = detection
+            .lowercased()
+            .replacingOccurrences(of: ":", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return all.first { camera in
+            camera.detectionTokens.contains { normalized.contains($0) }
+        }
+    }
+
+    static func matching(productID: Int) -> SupportedCamera? {
+        all.first { $0.productID == productID }
+    }
+}
 
 private enum CameraError: LocalizedError {
     case command(String)
@@ -12,9 +61,9 @@ private enum CameraError: LocalizedError {
         switch self {
         case .command(let value): return value
         case .noCamera:
-            return "没有检测到 Nikon Z8。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
+            return "没有检测到支持的 Nikon 相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
         case .wrongCamera(let value):
-            return "检测到 \(value)，当前安装包仅按 Nikon Z8 验证。"
+            return "检测到 \(value)，当前版本支持 \(SupportedCamera.summary)。"
         case .noImage:
             return "相机没有返回可用的 JPEG 图像。"
         }
@@ -25,6 +74,11 @@ private final class GPhotoCamera {
     private let resources = Bundle.main.resourceURL!
     private var connected = false
     private var liveView = false
+    private(set) var profile: SupportedCamera?
+
+    private var cameraName: String {
+        profile?.name ?? "Nikon 相机"
+    }
 
     private var executable: URL {
         let bundled = resources.appendingPathComponent("bin/gphoto2")
@@ -53,28 +107,84 @@ private final class GPhotoCamera {
         }
         if process.isRunning {
             process.terminate()
-            throw CameraError.command("相机操作超时，请重新连接 Z8。")
+            throw CameraError.command("相机操作超时，请重新连接 \(cameraName)。")
         }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         let text = String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard process.terminationStatus == 0 else {
-            throw CameraError.command(text.isEmpty ? "Z8 返回了错误状态。" : text)
+            throw CameraError.command(text.isEmpty ? "\(cameraName) 返回了错误状态。" : text)
         }
         return text
     }
 
-    func connect() throws {
-        let detected = try run(["--auto-detect"])
-        guard detected.localizedCaseInsensitiveContains("nikon") else {
-            throw CameraError.noCamera
+    private func detectedUSBProfile() -> SupportedCamera? {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = ["SPUSBDataType", "-json"]
+        process.standardOutput = output
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            let root = try JSONSerialization.jsonObject(with: data)
+            return findUSBProfile(in: root)
+        } catch {
+            return nil
         }
-        guard detected.localizedCaseInsensitiveContains("z8") else {
+    }
+
+    private func findUSBProfile(in value: Any) -> SupportedCamera? {
+        if let dictionary = value as? [String: Any] {
+            let vendor = hexValue(dictionary["vendor_id"])
+            let product = hexValue(dictionary["product_id"])
+            if vendor == 0x04b0,
+               let product,
+               let match = SupportedCamera.matching(productID: product) {
+                return match
+            }
+            for child in dictionary.values {
+                if let match = findUSBProfile(in: child) { return match }
+            }
+        } else if let array = value as? [Any] {
+            for child in array {
+                if let match = findUSBProfile(in: child) { return match }
+            }
+        }
+        return nil
+    }
+
+    private func hexValue(_ value: Any?) -> Int? {
+        guard let text = value as? String,
+              let range = text.range(
+                of: #"0x[0-9a-fA-F]+"#,
+                options: .regularExpression
+              ) else {
+            return nil
+        }
+        return Int(text[range].dropFirst(2), radix: 16)
+    }
+
+    func connect() throws -> SupportedCamera {
+        let detected = try run(["--auto-detect"])
+        let matchedProfile =
+            SupportedCamera.matching(detection: detected)
+            ?? detectedUSBProfile()
+        guard let matchedProfile else {
+            if !detected.localizedCaseInsensitiveContains("nikon"),
+               !detected.localizedCaseInsensitiveContains("ptp class camera") {
+                throw CameraError.noCamera
+            }
             let name = detected.split(separator: "\n").last.map(String.init) ?? "其他 Nikon 相机"
             throw CameraError.wrongCamera(name)
         }
+        profile = matchedProfile
         _ = try run(["--summary"])
         connected = true
+        return matchedProfile
     }
 
     func startLiveView() throws {
@@ -86,7 +196,11 @@ private final class GPhotoCamera {
         liveView = false
     }
 
-    private func imageData(prefix: String, preview: Bool) throws -> Data {
+    private func imageData(
+        prefix: String,
+        preview: Bool,
+        bulbSeconds: Int? = nil
+    ) throws -> Data {
         guard connected else { throw CameraError.noCamera }
         if preview && !liveView {
             throw CameraError.command("实时取景尚未开启。")
@@ -99,10 +213,31 @@ private final class GPhotoCamera {
         )
         let stem = "\(prefix)-\(UUID().uuidString)"
         let target = folder.appendingPathComponent("\(stem).%C")
-        let arguments = preview
-            ? ["--capture-preview", "--filename", target.path, "--force-overwrite"]
-            : ["--capture-image-and-download", "--filename", target.path, "--force-overwrite"]
-        _ = try run(arguments, timeout: preview ? 15 : 60)
+        let arguments: [String]
+        let timeout: TimeInterval
+        if preview {
+            arguments = ["--capture-preview", "--filename", target.path, "--force-overwrite"]
+            timeout = 15
+        } else if let bulbSeconds {
+            let duration = max(1, min(bulbSeconds, 900))
+            arguments = [
+                "--filename", target.path,
+                "--force-overwrite",
+                "--set-config", "bulb=1",
+                "--wait-event=\(duration)s",
+                "--set-config", "bulb=0",
+                "--wait-event-and-download=20s"
+            ]
+            timeout = TimeInterval(duration + 45)
+        } else {
+            arguments = [
+                "--capture-image-and-download",
+                "--filename", target.path,
+                "--force-overwrite"
+            ]
+            timeout = 60
+        }
+        _ = try run(arguments, timeout: timeout)
         let files = try FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: nil
@@ -127,8 +262,8 @@ private final class GPhotoCamera {
         try imageData(prefix: "preview", preview: true)
     }
 
-    func capture() throws -> Data {
-        try imageData(prefix: "capture", preview: false)
+    func capture(bulbSeconds: Int? = nil) throws -> Data {
+        try imageData(prefix: "capture", preview: false, bulbSeconds: bulbSeconds)
     }
 
     func setParameter(name: String, value: Any) throws {
@@ -148,21 +283,79 @@ private final class GPhotoCamera {
             formatted = String(Int((value as? NSNumber)?.doubleValue ?? 400))
         case "exposureCompensation":
             key = "exposurecompensation"
-            formatted = String(describing: value)
+            let thirds = Int(
+                (((value as? NSNumber)?.doubleValue ?? 0) * 3).rounded()
+            )
+            formatted = thirds.isMultiple(of: 3)
+                ? String(thirds / 3)
+                : String(format: "%.3f", Double(thirds) / 3)
         case "whiteBalanceMode":
             key = "whitebalance"
-            formatted = String(describing: value) == "continuous" ? "Automatic" : "Manual"
+            formatted = String(describing: value) == "continuous" ? "Automatic" : "Preset"
         case "focusMode":
-            key = "focusmode"
             let mode = String(describing: value)
-            formatted = mode == "continuous"
+            let stillValue = mode == "continuous"
                 ? "Continuous-servo AF"
                 : mode == "manual" ? "Manual" : "Single-servo AF"
+            let liveViewValue = mode == "continuous"
+                ? "Continuous-servo AF"
+                : mode == "manual" ? "Manual Focus (selection)" : "Single-servo AF"
+            var finalError: Error?
+            for attempt in [
+                "focusmode=\(stillValue)",
+                "liveviewaffocus=\(liveViewValue)"
+            ] {
+                do {
+                    _ = try run(["--set-config", attempt])
+                    return
+                } catch {
+                    finalError = error
+                }
+            }
+            throw finalError ?? CameraError.command("\(cameraName) 不支持远程切换对焦模式。")
         case "exposureMode":
+            let mode = String(describing: value)
+            if mode == "bulb" {
+                _ = try run(["--set-config", "expprogram=M"])
+                _ = try run(["--set-config", "shutterspeed=Bulb"])
+                return
+            }
             key = "expprogram"
-            formatted = String(describing: value) == "manual" ? "M" : "P"
+            switch mode {
+            case "manual": formatted = "M"
+            case "aperturePriority": formatted = "A"
+            case "shutterPriority": formatted = "S"
+            default: formatted = "P"
+            }
+        case "pictureControl":
+            let modes = [
+                "standard": ("Standard", "1"),
+                "neutral": ("Neutral", "2"),
+                "vivid": ("Vivid", "3"),
+                "monochrome": ("Monochrome", "4"),
+                "portrait": ("Portrait", "5"),
+                "landscape": ("Landscape", "6"),
+                "flat": ("Flat", "7"),
+                "auto": ("Auto", "8")
+            ]
+            let selected = modes[String(describing: value)] ?? modes["standard"]!
+            let attempts = [
+                "picturecontrol=\(selected.0)",
+                "activepicctrlitem=\(selected.1)",
+                "d200=\(selected.1)"
+            ]
+            var finalError: Error?
+            for attempt in attempts {
+                do {
+                    _ = try run(["--set-config", attempt])
+                    return
+                } catch {
+                    finalError = error
+                }
+            }
+            throw finalError ?? CameraError.command("\(cameraName) 不支持“设定优化校准”远程设置。")
         default:
-            throw CameraError.command("Z8 不支持此参数：\(name)")
+            throw CameraError.command("\(cameraName) 不支持此参数：\(name)")
         }
         _ = try run(["--set-config", "\(key)=\(formatted)"])
     }
@@ -170,6 +363,7 @@ private final class GPhotoCamera {
     func disconnect() {
         stopLiveView()
         connected = false
+        profile = nil
     }
 }
 
@@ -203,6 +397,30 @@ private enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+private enum MonitorVideoProfile: String, CaseIterable, Identifiable {
+    case source
+    case hd720
+    case hd1080
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .source: return "实时取景原始尺寸"
+        case .hd720: return "1280 × 720"
+        case .hd1080: return "1920 × 1080"
+        }
+    }
+
+    var targetSize: NSSize? {
+        switch self {
+        case .source: return nil
+        case .hd720: return NSSize(width: 1280, height: 720)
+        case .hd1080: return NSSize(width: 1920, height: 1080)
+        }
+    }
+}
+
 private final class CameraModel: ObservableObject {
     @Published var connected = false
     @Published var connecting = false
@@ -210,7 +428,8 @@ private final class CameraModel: ObservableObject {
     @Published var capturing = false
     @Published var frame: NSImage?
     @Published var status = "未连接"
-    @Published var detail = "USB/PTP · 等待 Nikon Z8"
+    @Published var detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
+    @Published var cameraName: String?
     @Published var mode: ExperienceMode = .simple
     @Published var section: AppSection = .capture
     @Published var photos: [PhotoRecord] = []
@@ -223,6 +442,15 @@ private final class CameraModel: ObservableObject {
     @Published var focusMode = "single-shot"
     @Published var whiteBalance = "continuous"
     @Published var exposureMode = "manual"
+    @Published var bulbSeconds = 5
+    @Published var pictureControl = "standard"
+    @Published var zebraEnabled = false
+    @Published var zebraThreshold = 95.0
+    @Published var zebraMask: NSImage?
+    @Published var lutEnabled = false
+    @Published var lutName: String?
+    @Published var monitorSupersampling = false
+    @Published var monitorVideoProfile: MonitorVideoProfile = .source
 
     private let camera = GPhotoCamera()
     private let cameraQueue = DispatchQueue(
@@ -230,7 +458,19 @@ private final class CameraModel: ObservableObject {
         qos: .userInitiated
     )
     private var previewToken = UUID()
+    private var previewLUT: ColorCubeLUT?
+    private var sourceFrame: NSImage?
     private let photoDirectory: URL
+    lazy var wirelessTransfer = WirelessTransferServer(
+        directory: photoDirectory
+    ) { [weak self] _ in
+        self?.reloadPhotos()
+        self?.selectedPhoto = self?.photos.first
+    }
+
+    var activeCameraName: String {
+        cameraName ?? "Nikon 相机"
+    }
 
     init() {
         let pictures = FileManager.default.urls(
@@ -242,6 +482,14 @@ private final class CameraModel: ObservableObject {
             at: photoDirectory,
             withIntermediateDirectories: true
         )
+        monitorSupersampling = UserDefaults.standard.bool(
+            forKey: "monitorSupersampling"
+        )
+        if let savedProfile = UserDefaults.standard.string(
+            forKey: "monitorVideoProfile"
+        ), let profile = MonitorVideoProfile(rawValue: savedProfile) {
+            monitorVideoProfile = profile
+        }
         reloadPhotos()
     }
 
@@ -249,19 +497,31 @@ private final class CameraModel: ObservableObject {
         guard !connecting else { return }
         connecting = true
         status = "正在连接"
-        detail = "正在检测 Nikon Z8 USB/PTP…"
+        detail = "正在检测 \(SupportedCamera.summary)…"
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
-                try self.camera.connect()
-                try self.camera.startLiveView()
+                let profile = try self.camera.connect()
+                var liveViewStarted = false
+                do {
+                    try self.camera.startLiveView()
+                    liveViewStarted = true
+                } catch {
+                    liveViewStarted = false
+                }
+                let initialLiveView = liveViewStarted
                 DispatchQueue.main.async {
                     self.connected = true
                     self.connecting = false
-                    self.liveViewEnabled = true
-                    self.status = "Nikon Z8"
-                    self.detail = "USB/PTP · 原生连接"
-                    self.startPreviewLoop()
+                    self.liveViewEnabled = initialLiveView
+                    self.cameraName = profile.name
+                    self.status = profile.name
+                    self.detail = initialLiveView
+                        ? "USB/PTP · 原生连接"
+                        : "USB/PTP 已连接 · 实时取景需实机确认"
+                    if initialLiveView {
+                        self.startPreviewLoop()
+                    }
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -283,13 +543,14 @@ private final class CameraModel: ObservableObject {
         }
         connected = false
         frame = nil
+        cameraName = nil
         status = "未连接"
-        detail = "USB/PTP · 等待 Nikon Z8"
+        detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
     }
 
     func toggleLiveView() {
         guard connected else {
-            errorMessage = "请先连接 Nikon Z8。"
+            errorMessage = "请先连接支持的 Nikon 相机。"
             return
         }
         if liveViewEnabled {
@@ -327,9 +588,13 @@ private final class CameraModel: ObservableObject {
             do {
                 let data = try self.camera.preview()
                 let image = NSImage(data: data)
+                let output = image.map { self.processedPreview(from: $0) }
                 DispatchQueue.main.async {
                     guard token == self.previewToken else { return }
-                    if let image { self.frame = image }
+                    if let output {
+                        self.frame = output.image
+                        self.zebraMask = output.zebraMask
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
                         self.pullPreview(token: token)
                     }
@@ -348,26 +613,31 @@ private final class CameraModel: ObservableObject {
 
     func capture() {
         guard connected else {
-            errorMessage = "请先连接 Nikon Z8。"
+            errorMessage = "请先连接支持的 Nikon 相机。"
             return
         }
         guard !capturing else { return }
         capturing = true
-        detail = "正在触发 Z8 快门…"
+        detail = "正在触发 \(activeCameraName) 快门…"
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
-                let data = try self.camera.capture()
+                let duration = self.exposureMode == "bulb" ? self.bulbSeconds : nil
+                let data = try self.camera.capture(bulbSeconds: duration)
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
                 let filename = "NIKON_\(formatter.string(from: Date())).JPG"
                 let url = self.photoDirectory.appendingPathComponent(filename)
                 try data.write(to: url, options: .atomic)
                 let image = NSImage(data: data)
+                let output = image.map { self.processedPreview(from: $0) }
                 DispatchQueue.main.async {
                     self.capturing = false
                     self.detail = "拍摄完成 · 已保存到本地照片库"
-                    if let image { self.frame = image }
+                    if let output {
+                        self.frame = output.image
+                        self.zebraMask = output.zebraMask
+                    }
                     self.reloadPhotos()
                     self.selectedPhoto = self.photos.first
                 }
@@ -389,7 +659,10 @@ private final class CameraModel: ObservableObject {
             options: [.skipsHiddenFiles]
         )) ?? []
         photos = urls
-            .filter { ["jpg", "jpeg", "png"].contains($0.pathExtension.lowercased()) }
+            .filter {
+                ["jpg", "jpeg", "png", "nef", "heif", "heic", "tif", "tiff"]
+                    .contains($0.pathExtension.lowercased())
+            }
             .map { url in
                 let values = try? url.resourceValues(forKeys: keys)
                 return PhotoRecord(
@@ -415,9 +688,134 @@ private final class CameraModel: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([photoDirectory])
     }
 
+    func canAdjustExposureParameter(_ name: String) -> Bool {
+        switch name {
+        case "exposureTime":
+            return exposureMode == "manual" || exposureMode == "shutterPriority"
+        case "aperture":
+            return exposureMode == "manual"
+                || exposureMode == "aperturePriority"
+                || exposureMode == "bulb"
+        case "iso":
+            return true
+        case "exposureCompensation":
+            return exposureMode == "program"
+                || exposureMode == "aperturePriority"
+                || exposureMode == "shutterPriority"
+        case "bulbDuration":
+            return exposureMode == "bulb"
+        default:
+            return true
+        }
+    }
+
+    func exposureLockReason(_ name: String) -> String? {
+        guard !canAdjustExposureParameter(name) else { return nil }
+        let mode = [
+            "program": "P",
+            "manual": "M",
+            "aperturePriority": "A",
+            "shutterPriority": "S",
+            "bulb": "M（B门）"
+        ][exposureMode] ?? exposureMode
+        return "\(mode) 拍摄模式下由相机控制"
+    }
+
+    func setZebraEnabled(_ enabled: Bool) {
+        zebraEnabled = enabled
+        if !enabled { zebraMask = nil }
+        refreshPreviewProcessing()
+    }
+
+    func setZebraThreshold(_ threshold: Double) {
+        zebraThreshold = max(70, min(100, threshold))
+        if zebraEnabled { refreshPreviewProcessing() }
+    }
+
+    func setLUTEnabled(_ enabled: Bool) {
+        lutEnabled = enabled && previewLUT != nil
+        refreshPreviewProcessing()
+    }
+
+    func setMonitorSupersampling(_ enabled: Bool) {
+        monitorSupersampling = enabled
+        UserDefaults.standard.set(enabled, forKey: "monitorSupersampling")
+        detail = enabled
+            ? "本地 2× 超采样已开启"
+            : "本地 2× 超采样已关闭"
+        refreshPreviewProcessing()
+    }
+
+    func setMonitorVideoProfile(_ profile: MonitorVideoProfile) {
+        monitorVideoProfile = profile
+        UserDefaults.standard.set(profile.rawValue, forKey: "monitorVideoProfile")
+        detail = "监看显示尺寸 · \(profile.label)"
+        refreshPreviewProcessing()
+    }
+
+    func importLUT(from url: URL) {
+        detail = "正在导入 LUT…"
+        cameraQueue.async { [weak self] in
+            guard let self else { return }
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing { url.stopAccessingSecurityScopedResource() }
+            }
+            do {
+                let lut = try ColorCubeLUT(contentsOf: url)
+                self.previewLUT = lut
+                let output = self.sourceFrame.map { source in
+                    (
+                        image: lut.applying(to: source) ?? source,
+                        zebraMask: self.zebraEnabled
+                            ? PreviewProcessor.zebraMask(
+                                for: source,
+                                threshold: self.zebraThreshold
+                            )
+                            : nil
+                    )
+                }
+                DispatchQueue.main.async {
+                    self.lutName = lut.title
+                    self.lutEnabled = true
+                    self.detail = "LUT 已载入 · 仅用于监看"
+                    if let output {
+                        self.frame = output.image
+                        self.zebraMask = output.zebraMask
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.detail = "LUT 导入失败"
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func clearLUT() {
+        cameraQueue.async { [weak self] in
+            guard let self else { return }
+            self.previewLUT = nil
+            let output = self.sourceFrame.map { self.processedPreview(from: $0) }
+            DispatchQueue.main.async {
+                self.lutName = nil
+                self.lutEnabled = false
+                if let output {
+                    self.frame = output.image
+                    self.zebraMask = output.zebraMask
+                }
+            }
+        }
+    }
+
     func applyParameter(_ name: String, value: Any, label: String) {
         guard connected else {
-            errorMessage = "连接 Z8 后才能调整参数。"
+            errorMessage = "连接支持的 Nikon 相机后才能调整参数。"
+            return
+        }
+        guard canAdjustExposureParameter(name) else {
+            errorMessage = "\(label)在当前拍摄模式下由相机控制。"
             return
         }
         detail = "正在设置 \(label)…"
@@ -437,8 +835,38 @@ private final class CameraModel: ObservableObject {
         }
     }
 
+    private func processedPreview(from image: NSImage) -> (image: NSImage, zebraMask: NSImage?) {
+        sourceFrame = image
+        let graded = lutEnabled
+            ? previewLUT?.applying(to: image) ?? image
+            : image
+        let display = monitorVideoProfile.targetSize.flatMap {
+            PreviewProcessor.resampledImage(
+                graded,
+                fitting: $0,
+                supersampling: monitorSupersampling
+            )
+        } ?? graded
+        let zebra = zebraEnabled
+            ? PreviewProcessor.zebraMask(for: image, threshold: zebraThreshold)
+            : nil
+        return (display, zebra)
+    }
+
+    private func refreshPreviewProcessing() {
+        cameraQueue.async { [weak self] in
+            guard let self, let sourceFrame = self.sourceFrame else { return }
+            let output = self.processedPreview(from: sourceFrame)
+            DispatchQueue.main.async {
+                self.frame = output.image
+                self.zebraMask = output.zebraMask
+            }
+        }
+    }
+
     func shutdown() {
         previewToken = UUID()
+        wirelessTransfer.stop()
         camera.disconnect()
     }
 }
@@ -483,12 +911,19 @@ private struct PreviewStage: View {
             if let frame = model.frame {
                 Image(nsImage: frame)
                     .resizable()
+                    .interpolation(model.monitorSupersampling ? .high : .medium)
                     .scaledToFit()
+                if model.zebraEnabled, let zebraMask = model.zebraMask {
+                    Image(nsImage: zebraMask)
+                        .resizable()
+                        .scaledToFit()
+                        .allowsHitTesting(false)
+                }
             } else {
                 VStack(spacing: 14) {
                     Image(systemName: "camera.aperture")
                         .font(.system(size: compact ? 38 : 54, weight: .light))
-                    Text(model.connected ? "等待实时取景画面" : "连接 Nikon Z8 开始监看")
+                    Text(model.connected ? "等待实时取景画面" : "连接支持的 Nikon 相机后开启实时取景")
                         .font(.system(size: 15, weight: .medium))
                 }
                 .foregroundStyle(Color.white.opacity(0.48))
@@ -502,18 +937,36 @@ private struct PreviewStage: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(model.liveViewEnabled ? Color.red : Color.white.opacity(0.5))
                     Spacer()
-                    Text("Z8 · USB/PTP")
+                    Text("\(model.cameraName ?? SupportedCamera.summary) · USB/PTP")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.64))
+                }
+                if model.mode == .professional,
+                   model.zebraEnabled || (model.lutEnabled && model.lutName != nil) {
+                    HStack(spacing: 8) {
+                        if model.monitorSupersampling {
+                            Text("2× SS")
+                        }
+                        if model.zebraEnabled {
+                            Text("条纹 \(Int(model.zebraThreshold))")
+                        }
+                        if model.lutEnabled, let lutName = model.lutName {
+                            Text("LUT · \(lutName)")
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                    }
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.78))
                 }
                 Spacer()
                 if model.mode == .professional {
                     HStack {
-                        Text("1/125")
+                        Text(shutterLabel)
                         Text("F\(model.aperture, specifier: "%.1f")")
                         Text("ISO \(model.iso)")
                         Spacer()
-                        Text("JPEG · 1024×680 PREVIEW")
+                        Text("JPEG实时取景 · \(model.monitorVideoProfile.label)")
                     }
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.78))
@@ -528,11 +981,20 @@ private struct PreviewStage: View {
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         }
     }
+
+    private var shutterLabel: String {
+        if model.exposureMode == "bulb" { return "B门" }
+        if model.shutter < 1 {
+            return "1/\(Int((1 / model.shutter).rounded()))"
+        }
+        return String(format: "%.1fs", model.shutter)
+    }
 }
 
 private struct TopBar: View {
     @ObservedObject var model: CameraModel
     @Binding var showConnection: Bool
+    @Binding var showSettings: Bool
 
     var body: some View {
         HStack(spacing: 16) {
@@ -582,12 +1044,13 @@ private struct TopBar: View {
             .frame(width: 190)
 
             Button {
-                showConnection = true
+                showSettings = true
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .semibold))
             }
             .buttonStyle(NativeButtonStyle())
+            .help("设置")
         }
         .padding(.horizontal, 20)
         .frame(height: 74)
@@ -679,12 +1142,17 @@ private struct CaptureView: View {
 
 private struct ParameterInspector: View {
     @ObservedObject var model: CameraModel
+    @State private var showLUTImporter = false
 
     private let shutterOptions: [(String, Double)] = [
         ("1/8000", 0.000125), ("1/1000", 0.001), ("1/250", 0.004),
         ("1/125", 0.008), ("1/60", 0.0167), ("1/15", 0.0667), ("1 秒", 1.0)
     ]
-    private let isoOptions = [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+    private var isoOptions: [Int] {
+        model.cameraName == "Nikon Z8"
+            ? [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+            : [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000]
+    }
     private let apertureOptions = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0]
 
     var body: some View {
@@ -703,9 +1171,9 @@ private struct ParameterInspector: View {
                         Text("自然 · 自动曝光")
                             .foregroundStyle(Palette.muted)
                     }
-                    nativeControl("自动对焦") {
+                    nativeControl("对焦模式") {
                         Toggle(
-                            "轻触画面选择主体",
+                            "AF-S 单次AF（关闭为MF手动对焦）",
                             isOn: Binding(
                                 get: { model.focusMode != "manual" },
                                 set: { enabled in
@@ -713,7 +1181,7 @@ private struct ParameterInspector: View {
                                     model.applyParameter(
                                         "focusMode",
                                         value: model.focusMode,
-                                        label: "自动对焦"
+                                        label: "对焦模式"
                                     )
                                 }
                             )
@@ -727,7 +1195,10 @@ private struct ParameterInspector: View {
                         .buttonStyle(.link)
                     }
                 } else {
-                    nativeControl("快门速度") {
+                    nativeControl(
+                        "快门速度",
+                        lockedReason: model.exposureLockReason("exposureTime")
+                    ) {
                         Picker(
                             "",
                             selection: Binding(
@@ -746,8 +1217,15 @@ private struct ParameterInspector: View {
                                 Text(option.0).tag(option.1)
                             }
                         }
+                        .disabled(
+                            !model.connected
+                                || !model.canAdjustExposureParameter("exposureTime")
+                        )
                     }
-                    nativeControl("光圈") {
+                    nativeControl(
+                        "光圈",
+                        lockedReason: model.exposureLockReason("aperture")
+                    ) {
                         Picker(
                             "",
                             selection: Binding(
@@ -762,15 +1240,19 @@ private struct ParameterInspector: View {
                                 Text("F\(value, specifier: "%.1f")").tag(value)
                             }
                         }
+                        .disabled(
+                            !model.connected
+                                || !model.canAdjustExposureParameter("aperture")
+                        )
                     }
-                    nativeControl("ISO") {
+                    nativeControl("ISO感光度") {
                         Picker(
                             "",
                             selection: Binding(
                                 get: { model.iso },
                                 set: { value in
                                     model.iso = value
-                                    model.applyParameter("iso", value: value, label: "ISO")
+                                    model.applyParameter("iso", value: value, label: "ISO感光度")
                                 }
                             )
                         ) {
@@ -778,8 +1260,12 @@ private struct ParameterInspector: View {
                                 Text("\(value)").tag(value)
                             }
                         }
+                        .disabled(!model.connected)
                     }
-                    nativeControl("曝光补偿") {
+                    nativeControl(
+                        "曝光补偿",
+                        lockedReason: model.exposureLockReason("exposureCompensation")
+                    ) {
                         HStack {
                             Slider(
                                 value: Binding(
@@ -787,12 +1273,16 @@ private struct ParameterInspector: View {
                                     set: { model.compensation = $0 }
                                 ),
                                 in: -5...5,
-                                step: 0.3
+                                step: 1.0 / 3.0
                             )
                             Text("\(model.compensation, specifier: "%+.1f") EV")
                                 .font(.system(size: 12, design: .monospaced))
                                 .frame(width: 62)
                         }
+                        .disabled(
+                            !model.connected
+                                || !model.canAdjustExposureParameter("exposureCompensation")
+                        )
                         Button("应用曝光补偿") {
                             model.applyParameter(
                                 "exposureCompensation",
@@ -801,6 +1291,10 @@ private struct ParameterInspector: View {
                             )
                         }
                         .buttonStyle(.link)
+                        .disabled(
+                            !model.connected
+                                || !model.canAdjustExposureParameter("exposureCompensation")
+                        )
                     }
                     nativeControl("对焦模式") {
                         Picker(
@@ -813,13 +1307,14 @@ private struct ParameterInspector: View {
                                 }
                             )
                         ) {
-                            Text("AF-S").tag("single-shot")
-                            Text("AF-C").tag("continuous")
-                            Text("MF").tag("manual")
+                            Text("AF-S 单次AF").tag("single-shot")
+                            Text("AF-C 连续AF").tag("continuous")
+                            Text("MF 手动对焦").tag("manual")
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.menu)
+                        .disabled(!model.connected)
                     }
-                    nativeControl("曝光模式") {
+                    nativeControl("拍摄模式") {
                         Picker(
                             "",
                             selection: Binding(
@@ -829,15 +1324,110 @@ private struct ParameterInspector: View {
                                     model.applyParameter(
                                         "exposureMode",
                                         value: value,
-                                        label: "曝光模式"
+                                        label: "拍摄模式"
                                     )
                                 }
                             )
                         ) {
-                            Text("P").tag("continuous")
+                            Text("P").tag("program")
+                            Text("S").tag("shutterPriority")
+                            Text("A").tag("aperturePriority")
                             Text("M").tag("manual")
+                            Text("M · B门").tag("bulb")
                         }
                         .pickerStyle(.segmented)
+                        .disabled(!model.connected)
+                    }
+                    if model.exposureMode == "bulb" {
+                        nativeControl("B门曝光时长（由应用控制）") {
+                            Picker("B门曝光时长", selection: $model.bulbSeconds) {
+                                Text("1 秒").tag(1)
+                                Text("2 秒").tag(2)
+                                Text("5 秒").tag(5)
+                                Text("10 秒").tag(10)
+                                Text("30 秒").tag(30)
+                                Text("60 秒").tag(60)
+                            }
+                            .labelsHidden()
+                            .disabled(!model.connected)
+                        }
+                    }
+                    nativeControl("设定优化校准") {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.pictureControl },
+                                set: { value in
+                                    model.pictureControl = value
+                                    model.applyParameter(
+                                        "pictureControl",
+                                        value: value,
+                                        label: "设定优化校准"
+                                    )
+                                }
+                            )
+                        ) {
+                            Text("自动").tag("auto")
+                            Text("标准").tag("standard")
+                            Text("自然").tag("neutral")
+                            Text("鲜艳").tag("vivid")
+                            Text("单色").tag("monochrome")
+                            Text("人像").tag("portrait")
+                            Text("风景").tag("landscape")
+                            Text("平面").tag("flat")
+                        }
+                        .disabled(!model.connected)
+                    }
+                    nativeControl("条纹图案（本地）") {
+                        Toggle(
+                            "加亮显示",
+                            isOn: Binding(
+                                get: { model.zebraEnabled },
+                                set: { model.setZebraEnabled($0) }
+                            )
+                        )
+                        .toggleStyle(.switch)
+                        HStack {
+                            Slider(
+                                value: Binding(
+                                    get: { model.zebraThreshold },
+                                    set: { model.setZebraThreshold($0) }
+                                ),
+                                in: 70...100,
+                                step: 1
+                            )
+                            Text("\(Int(model.zebraThreshold)) IRE")
+                                .font(.system(size: 12, design: .monospaced))
+                                .frame(width: 58)
+                        }
+                        .disabled(!model.zebraEnabled)
+                    }
+                    nativeControl("监看 LUT（本地）") {
+                        Toggle(
+                            "应用到实时取景",
+                            isOn: Binding(
+                                get: { model.lutEnabled },
+                                set: { model.setLUTEnabled($0) }
+                            )
+                        )
+                        .toggleStyle(.switch)
+                        .disabled(model.lutName == nil)
+                        HStack {
+                            Button("导入 .cube") {
+                                showLUTImporter = true
+                            }
+                            .buttonStyle(.link)
+                            if model.lutName != nil {
+                                Button("移除") {
+                                    model.clearLUT()
+                                }
+                                .buttonStyle(.link)
+                            }
+                        }
+                        Text(model.lutName ?? "尚未导入；LUT 只影响监看，不写入原片。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(2)
                     }
                 }
             }
@@ -847,16 +1437,38 @@ private struct ParameterInspector: View {
         .overlay(alignment: .leading) {
             Rectangle().fill(Palette.rule).frame(width: 1)
         }
+        .fileImporter(
+            isPresented: $showLUTImporter,
+            allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first { model.importLUT(from: url) }
+            case .failure(let error):
+                model.errorMessage = "无法打开 LUT：\(error.localizedDescription)"
+            }
+        }
     }
 
     private func nativeControl<Content: View>(
         _ title: String,
+        lockedReason: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Palette.muted)
+            HStack(spacing: 6) {
+                Text(title)
+                if let lockedReason {
+                    Label(lockedReason, systemImage: "lock.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(size: 10, weight: .medium))
+                        .help(lockedReason)
+                }
+                Spacer()
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Palette.muted)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -871,23 +1483,166 @@ private struct MonitorView: View {
     @ObservedObject var model: CameraModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("实时监看").font(.system(size: 34, weight: .bold))
-                    Text("Nikon Z8 原生 JPEG 实时取景")
-                        .foregroundStyle(Palette.muted)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("实时取景").font(.system(size: 34, weight: .bold))
+                        Text("\(model.cameraName ?? SupportedCamera.summary) · JPEG 实时取景")
+                            .foregroundStyle(Palette.muted)
+                    }
+                    Spacer()
+                    Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
+                        model.toggleLiveView()
+                    }
+                    .buttonStyle(NativeButtonStyle(primary: !model.liveViewEnabled))
                 }
-                Spacer()
-                Button(model.liveViewEnabled ? "停止监看" : "开始监看") {
-                    model.toggleLiveView()
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 20) {
+                        PreviewStage(model: model)
+                            .frame(minWidth: 520)
+                        MonitorControlDeck(model: model)
+                            .frame(width: 320)
+                    }
+                    VStack(alignment: .leading, spacing: 20) {
+                        PreviewStage(model: model)
+                        MonitorControlDeck(model: model)
+                    }
                 }
-                .buttonStyle(NativeButtonStyle(primary: !model.liveViewEnabled))
             }
-            PreviewStage(model: model)
-            Spacer()
+            .padding(28)
         }
-        .padding(28)
+    }
+}
+
+private struct MonitorControlDeck: View {
+    @ObservedObject var model: CameraModel
+
+    private var isoOptions: [Int] {
+        model.cameraName == "Nikon Z8"
+            ? [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+            : [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("参数调节")
+                    .font(.system(size: 19, weight: .bold))
+                Text("高频参数直接写入当前 Nikon 相机。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+
+                Picker(
+                    "ISO感光度",
+                    selection: Binding(
+                        get: { model.iso },
+                        set: { value in
+                            model.iso = value
+                            model.applyParameter("iso", value: value, label: "ISO感光度")
+                        }
+                    )
+                ) {
+                    ForEach(isoOptions, id: \.self) { value in
+                        Text("\(value)").tag(value)
+                    }
+                }
+                .disabled(!model.connected)
+
+                Picker(
+                    "白平衡",
+                    selection: Binding(
+                        get: { model.whiteBalance },
+                        set: { value in
+                            model.whiteBalance = value
+                            model.applyParameter(
+                                "whiteBalanceMode",
+                                value: value,
+                                label: "白平衡"
+                            )
+                        }
+                    )
+                ) {
+                    Text("自动").tag("continuous")
+                    Text("手动预设").tag("manual")
+                }
+                .disabled(!model.connected)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("曝光补偿")
+                        Spacer()
+                        Text("\(model.compensation, specifier: "%+.1f") EV")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(Palette.cobalt)
+                    }
+                    Slider(
+                        value: $model.compensation,
+                        in: -5...5,
+                        step: 1.0 / 3.0
+                    )
+                    Button("应用曝光补偿") {
+                        model.applyParameter(
+                            "exposureCompensation",
+                            value: model.compensation,
+                            label: "曝光补偿"
+                        )
+                    }
+                    .buttonStyle(.link)
+                    .disabled(
+                        !model.connected
+                            || !model.canAdjustExposureParameter("exposureCompensation")
+                    )
+                }
+            }
+            .padding(18)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text("监看输出")
+                    .font(.system(size: 19, weight: .bold))
+
+                Toggle(
+                    "本地 2× 超采样",
+                    isOn: Binding(
+                        get: { model.monitorSupersampling },
+                        set: { model.setMonitorSupersampling($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                Picker(
+                    "监看显示尺寸",
+                    selection: Binding(
+                        get: { model.monitorVideoProfile },
+                        set: { model.setMonitorVideoProfile($0) }
+                    )
+                ) {
+                    ForEach(MonitorVideoProfile.allCases) { profile in
+                        Text(profile.label).tag(profile)
+                    }
+                }
+
+                Picker("实时取景格式", selection: .constant("jpeg")) {
+                    Text("JPEG（相机输出）").tag("jpeg")
+                }
+                .disabled(true)
+
+                Text("Nikon PTP 返回 JPEG 实时取景帧。显示尺寸和本地 2× 超采样仅处理监看画面，不等同于机身的“视频文件类型”“画面尺寸/帧频”或“扩展过采样”。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(18)
+        }
+        .background(Palette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Palette.rule, lineWidth: 1)
+        }
     }
 }
 
@@ -988,29 +1743,91 @@ private struct LibraryView: View {
 
 private struct TransferView: View {
     @ObservedObject var model: CameraModel
+    @ObservedObject private var wireless: WirelessTransferServer
+
+    init(model: CameraModel) {
+        self.model = model
+        _wireless = ObservedObject(wrappedValue: model.wirelessTransfer)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("传输队列").font(.system(size: 34, weight: .bold))
-            Text("联机拍摄完成后，JPEG 会直接进入 macOS 本地照片库。")
-                .foregroundStyle(Palette.muted)
-            HStack(spacing: 22) {
-                statusCard(
-                    icon: "internaldrive",
-                    title: "本地照片库",
-                    value: "\(model.photos.count) 个文件"
-                )
-                statusCard(
-                    icon: "cable.connector",
-                    title: "相机通道",
-                    value: model.connected ? "USB/PTP 已连接" : "等待连接"
-                )
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                Text("无线传输").font(.system(size: 34, weight: .bold))
+                Text("通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
+                    .foregroundStyle(Palette.muted)
+                HStack(spacing: 22) {
+                    statusCard(
+                        icon: "internaldrive",
+                        title: "本地照片库",
+                        value: "\(model.photos.count) 个文件"
+                    )
+                    statusCard(
+                        icon: wireless.isRunning ? "wifi" : "wifi.slash",
+                        title: "无线收件箱",
+                        value: wireless.status
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("相机 FTP 设置").font(.title3.bold())
+                            Text("适用于相机直连热点或同一局域网")
+                                .foregroundStyle(Palette.muted)
+                        }
+                        Spacer()
+                        Button(wireless.isRunning ? "停止接收" : "开启无线接收") {
+                            if wireless.isRunning {
+                                wireless.stop()
+                            } else {
+                                wireless.refreshAddress()
+                                wireless.start()
+                            }
+                        }
+                        .buttonStyle(NativeButtonStyle(primary: !wireless.isRunning))
+                    }
+
+                    Divider()
+                    transferRow("服务器类型", "FTP")
+                    transferRow("服务器地址", wireless.hostAddress)
+                    transferRow("端口", "\(WirelessTransferServer.port)")
+                    transferRow("用户名", WirelessTransferServer.username)
+                    transferRow("密码", WirelessTransferServer.password)
+                    transferRow("PASV 模式", "开启")
+
+                    Text("在相机“网络菜单 → 连接到 FTP 服务器”中填写以上信息，选择照片上传或开启自动上传。首次启动时请允许 macOS 接受传入网络连接。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Palette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+                .background(Palette.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14).stroke(Palette.rule)
+                }
+
+                HStack {
+                    Button("刷新网络地址") { wireless.refreshAddress() }
+                        .buttonStyle(NativeButtonStyle())
+                    Button("打开保存位置") { model.revealLibrary() }
+                        .buttonStyle(NativeButtonStyle())
+                }
             }
-            Button("打开保存位置") { model.revealLibrary() }
-                .buttonStyle(NativeButtonStyle(primary: true))
-            Spacer()
+            .padding(28)
         }
-        .padding(28)
+    }
+
+    private func transferRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .foregroundStyle(Palette.muted)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .textSelection(.enabled)
+        }
     }
 
     private func statusCard(icon: String, title: String, value: String) -> some View {
@@ -1057,8 +1874,11 @@ private struct ConnectionSheet: View {
                     .background(Palette.cobaltSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Nikon Z8 原生 USB")
+                    Text("Nikon Z 系列原生 USB")
                         .font(.system(size: 17, weight: .bold))
+                    Text(SupportedCamera.summary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.cobalt)
                     Text("联机拍摄、参数控制、实时监看和文件传输")
                         .foregroundStyle(Palette.muted)
                 }
@@ -1069,14 +1889,14 @@ private struct ConnectionSheet: View {
             .padding(16)
             .background(Palette.cobaltSoft.opacity(0.55))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            Text("请打开 Z8，使用支持数据传输的 USB 线直连，并退出 NX Tether。")
+            Text("请打开相机，使用支持数据传输的 USB 线直连，并退出 NX Tether。")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.muted)
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }
                     .buttonStyle(NativeButtonStyle())
-                Button(model.connecting ? "正在连接…" : "连接 Nikon Z8") {
+                Button(model.connecting ? "正在连接…" : "连接 Nikon 相机") {
                     model.connect()
                     dismiss()
                 }
@@ -1091,11 +1911,17 @@ private struct ConnectionSheet: View {
 
 private struct RootView: View {
     @ObservedObject var model: CameraModel
+    @StateObject private var updater = UpdateController()
     @State private var showConnection = false
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
-            TopBar(model: model, showConnection: $showConnection)
+            TopBar(
+                model: model,
+                showConnection: $showConnection,
+                showSettings: $showSettings
+            )
             HStack(spacing: 0) {
                 Sidebar(model: model)
                 Group {
@@ -1128,6 +1954,12 @@ private struct RootView: View {
         .background(Palette.paper)
         .sheet(isPresented: $showConnection) {
             ConnectionSheet(model: model)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet(updater: updater)
+        }
+        .onAppear {
+            updater.checkAutomaticallyIfNeeded()
         }
         .alert(
             "Nikon Link",

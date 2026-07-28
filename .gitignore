@@ -10,6 +10,8 @@ native/android/.gradle/
 native/android/app/build/
 native/android/app/src/main/assets/web/
 native/android/local.properties
+native/ios/**/*.xcuserstate
+native/ios/**/xcuserdata/
 
 # Nikon's proprietary SDK is intentionally not redistributed.
 NikonSDK/

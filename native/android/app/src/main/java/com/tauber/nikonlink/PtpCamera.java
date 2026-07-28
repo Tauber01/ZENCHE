@@ -16,7 +16,12 @@ import java.util.Map;
 
 final class PtpCamera {
     static final int NIKON_VENDOR_ID = 0x04b0;
-    static final int Z8_PRODUCT_ID = 0x0451;
+    private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
+            new CameraProfile("Nikon Z8", 0x0451, 64, 25600),
+            new CameraProfile("Nikon Z f", 0x0453, 100, 64000),
+            new CameraProfile("Nikon Z6III", 0x0454, 100, 64000),
+            new CameraProfile("Nikon Z5II", 0x0456, 100, 64000)
+    };
 
     private static final int TYPE_COMMAND = 1;
     private static final int TYPE_DATA = 2;
@@ -26,12 +31,14 @@ final class PtpCamera {
     private static final int CLOSE_SESSION = 0x1003;
     private static final int GET_OBJECT = 0x1009;
     private static final int SET_DEVICE_PROP = 0x1016;
+    private static final int CHANGE_CAMERA_MODE = 0x90c2;
     private static final int DEVICE_READY = 0x90c8;
     private static final int GET_EVENT = 0x90c7;
     private static final int START_LIVE_VIEW = 0x9201;
     private static final int END_LIVE_VIEW = 0x9202;
     private static final int GET_LIVE_VIEW_IMAGE = 0x9203;
     private static final int CAPTURE_TO_SDRAM = 0x9207;
+    private static final int TERMINATE_CAPTURE = 0x920c;
     private static final int OBJECT_ADDED_IN_SDRAM = 0xc101;
 
     private final MainActivity activity;
@@ -41,6 +48,9 @@ final class PtpCamera {
     private UsbEndpoint bulkOut;
     private int transaction = 0;
     private boolean liveView;
+    private String exposureMode = "manual";
+    private int bulbDurationSeconds = 5;
+    private CameraProfile profile;
 
     PtpCamera(MainActivity activity) {
         this.activity = activity;
@@ -50,17 +60,27 @@ final class PtpCamera {
         disconnect();
         UsbManager manager = (UsbManager) activity.getSystemService(MainActivity.USB_SERVICE);
         UsbDevice device = null;
+        UsbDevice unsupportedNikon = null;
         for (UsbDevice candidate : manager.getDeviceList().values()) {
-            if (candidate.getVendorId() == NIKON_VENDOR_ID && candidate.getProductId() == Z8_PRODUCT_ID) {
+            if (candidate.getVendorId() != NIKON_VENDOR_ID) continue;
+            CameraProfile candidateProfile = profileFor(candidate.getProductId());
+            if (candidateProfile != null) {
                 device = candidate;
+                profile = candidateProfile;
                 break;
             }
+            unsupportedNikon = candidate;
         }
         if (device == null) {
-            throw new Exception("没有检测到 Nikon Z8。请使用支持数据传输的 USB 线直连手机或平板。");
+            if (unsupportedNikon != null) {
+                throw new Exception(String.format(
+                        "检测到未支持的 Nikon USB 设备 04b0:%04x。当前支持 Z8、Z f、Z6III、Z5II。",
+                        unsupportedNikon.getProductId()));
+            }
+            throw new Exception("没有检测到支持的 Nikon 相机。请连接 Z8、Z f、Z6III 或 Z5II。");
         }
         if (!activity.ensureUsbPermission(manager, device)) {
-            throw new Exception("未获得 Nikon Z8 的 USB 访问权限。");
+            throw new Exception("未获得 " + cameraName() + " 的 USB 访问权限。");
         }
         for (int index = 0; index < device.getInterfaceCount(); index++) {
             UsbInterface candidate = device.getInterface(index);
@@ -80,12 +100,15 @@ final class PtpCamera {
                 break;
             }
         }
-        if (cameraInterface == null) throw new Exception("Z8 没有提供可用的 PTP USB 接口。");
+        if (cameraInterface == null) {
+            throw new Exception(cameraName() + " 没有提供可用的 PTP USB 接口。");
+        }
 
         connection = manager.openDevice(device);
         if (connection == null || !connection.claimInterface(cameraInterface, true)) {
+            String failedCamera = cameraName();
             disconnect();
-            throw new Exception("无法打开 Z8。请关闭 NX MobileAir 等正在占用相机的应用。");
+            throw new Exception("无法打开 " + failedCamera + "。请关闭 NX MobileAir 等占用相机的应用。");
         }
         transaction = 0;
         transact(OPEN_SESSION, new long[]{1}, null, 10_000);
@@ -93,9 +116,9 @@ final class PtpCamera {
         Map<String, Object> result = new HashMap<>();
         result.put("device", mapOf(
                 "id", String.format("%04x:%04x", device.getVendorId(), device.getProductId()),
-                "label", "Nikon Z8",
+                "label", cameraName(),
                 "transport", "USB/PTP"));
-        result.put("capabilities", capabilities());
+        result.put("capabilities", capabilities(profile));
         result.put("settings", defaultSettings());
         return result;
     }
@@ -128,7 +151,24 @@ final class PtpCamera {
         boolean resumeLiveView = liveView;
         if (resumeLiveView) stopLiveView();
         try {
-            transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+            if ("bulb".equals(exposureMode)) {
+                transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500e},
+                        littleEndian16(1),
+                        10_000);
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500d},
+                        littleEndian32(0xffffffffL),
+                        10_000);
+                transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+                Thread.sleep(Math.max(1, Math.min(bulbDurationSeconds, 900)) * 1000L);
+                transact(TERMINATE_CAPTURE, new long[]{0, 0}, null, 15_000);
+            } else {
+                transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
+            }
             long handle = 0xffff0001L;
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
@@ -157,6 +197,41 @@ final class PtpCamera {
 
     synchronized Object setParameter(String name, Object rawValue) throws Exception {
         ensureConnected();
+        if ("bulbDuration".equals(name)) {
+            if (!"bulb".equals(exposureMode)) {
+                throw new Exception("B门曝光时长仅能在 M 拍摄模式的 B门快门速度下调整。");
+            }
+            bulbDurationSeconds = Math.max(
+                    1,
+                    Math.min(900, ((Number) rawValue).intValue()));
+            return bulbDurationSeconds;
+        }
+        if (!canAdjustExposureParameter(name)) {
+            throw new Exception("当前拍摄模式下此参数由相机控制。");
+        }
+        if ("focusMode".equals(name)) {
+            String mode = String.valueOf(rawValue);
+            int stillFocusMode = "manual".equals(mode)
+                    ? 0x0001
+                    : "continuous".equals(mode) ? 0x8011 : 0x8010;
+            try {
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0x500a},
+                        littleEndian16(stillFocusMode),
+                        10_000);
+            } catch (Exception stillFocusError) {
+                int liveViewFocusMode = "manual".equals(mode)
+                        ? 4
+                        : "continuous".equals(mode) ? 1 : 0;
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{0xd061},
+                        new byte[]{(byte) liveViewFocusMode},
+                        10_000);
+            }
+            return rawValue;
+        }
         int property;
         byte[] value;
         double number = rawValue instanceof Number ? ((Number) rawValue).doubleValue() : 0;
@@ -179,21 +254,70 @@ final class PtpCamera {
                 break;
             case "whiteBalanceMode":
                 property = 0x5005;
-                value = littleEndian16("continuous".equals(rawValue) ? 2 : 1);
+                value = littleEndian16("continuous".equals(rawValue) ? 0x0002 : 0x8013);
                 break;
-            case "focusMode":
-                property = 0x500a;
-                value = littleEndian16("manual".equals(rawValue) ? 1 : "continuous".equals(rawValue) ? 4 : 2);
+            case "pictureControl":
+                property = 0xd200;
+                String pictureControl = String.valueOf(rawValue);
+                int control;
+                if ("neutral".equals(pictureControl)) control = 2;
+                else if ("vivid".equals(pictureControl)) control = 3;
+                else if ("monochrome".equals(pictureControl)) control = 4;
+                else if ("portrait".equals(pictureControl)) control = 5;
+                else if ("landscape".equals(pictureControl)) control = 6;
+                else if ("flat".equals(pictureControl)) control = 7;
+                else if ("auto".equals(pictureControl)) control = 8;
+                else control = 1;
+                value = littleEndian16(control);
                 break;
             case "exposureMode":
+                exposureMode = String.valueOf(rawValue);
                 property = 0x500e;
-                value = littleEndian16("manual".equals(rawValue) ? 1 : 2);
+                if ("bulb".equals(exposureMode)) {
+                    transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{property},
+                            littleEndian16(1),
+                            10_000);
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0x500d},
+                            littleEndian32(0xffffffffL),
+                            10_000);
+                    return rawValue;
+                }
+                int program;
+                if ("manual".equals(exposureMode)) program = 1;
+                else if ("aperturePriority".equals(exposureMode)) program = 3;
+                else if ("shutterPriority".equals(exposureMode)) program = 4;
+                else program = 2;
+                value = littleEndian16(program);
                 break;
             default:
-                throw new Exception("Z8 不支持此参数：" + name);
+                throw new Exception(cameraName() + " 不支持此参数：" + name);
         }
         transact(SET_DEVICE_PROP, new long[]{property}, value, 10_000);
         return rawValue;
+    }
+
+    private boolean canAdjustExposureParameter(String name) {
+        switch (name) {
+            case "exposureTime":
+                return "manual".equals(exposureMode) || "shutterPriority".equals(exposureMode);
+            case "aperture":
+                return "manual".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "bulb".equals(exposureMode);
+            case "iso":
+                return true;
+            case "exposureCompensation":
+                return "program".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "shutterPriority".equals(exposureMode);
+            default:
+                return true;
+        }
     }
 
     synchronized void disconnect() {
@@ -210,6 +334,7 @@ final class PtpCamera {
         cameraInterface = null;
         bulkIn = null;
         bulkOut = null;
+        profile = null;
     }
 
     private byte[] transact(int operation, long[] params, byte[] outgoingData, int timeout) throws Exception {
@@ -225,9 +350,15 @@ final class PtpCamera {
             data = first.payload;
             response = receiveContainer(timeout);
         }
-        if (response.type != TYPE_RESPONSE) throw new Exception("Z8 返回了无效的 PTP 数据。");
+        if (response.type != TYPE_RESPONSE) {
+            throw new Exception(cameraName() + " 返回了无效的 PTP 数据。");
+        }
         if (response.code != RESPONSE_OK) {
-            throw new Exception(String.format("Z8 PTP 错误 0x%04X（操作 0x%04X）", response.code, operation));
+            throw new Exception(String.format(
+                    "%s PTP 错误 0x%04X（操作 0x%04X）",
+                    cameraName(),
+                    response.code,
+                    operation));
         }
         return data;
     }
@@ -244,7 +375,7 @@ final class PtpCamera {
         int offset = 0;
         while (offset < bytes.length) {
             int sent = connection.bulkTransfer(bulkOut, bytes, offset, bytes.length - offset, timeout);
-            if (sent <= 0) throw new Exception("向 Z8 发送 USB 数据失败。");
+            if (sent <= 0) throw new Exception("向 " + cameraName() + " 发送 USB 数据失败。");
             offset += sent;
         }
     }
@@ -252,20 +383,22 @@ final class PtpCamera {
     private Container receiveContainer(int timeout) throws Exception {
         byte[] first = new byte[1024 * 1024];
         int received = connection.bulkTransfer(bulkIn, first, first.length, timeout);
-        if (received < 12) throw new Exception("读取 Z8 USB 数据失败。");
+        if (received < 12) throw new Exception("读取 " + cameraName() + " USB 数据失败。");
         ByteBuffer header = ByteBuffer.wrap(first, 0, received).order(ByteOrder.LITTLE_ENDIAN);
         int total = header.getInt();
         int type = header.getShort() & 0xffff;
         int code = header.getShort() & 0xffff;
         header.getInt();
-        if (total < 12 || total > 256 * 1024 * 1024) throw new Exception("Z8 返回的数据长度无效。");
+        if (total < 12 || total > 256 * 1024 * 1024) {
+            throw new Exception(cameraName() + " 返回的数据长度无效。");
+        }
         ByteArrayOutputStream all = new ByteArrayOutputStream(total);
         all.write(first, 0, received);
         while (all.size() < total) {
             int remaining = total - all.size();
             byte[] chunk = new byte[Math.min(1024 * 1024, remaining)];
             int count = connection.bulkTransfer(bulkIn, chunk, chunk.length, timeout);
-            if (count <= 0) throw new Exception("Z8 图像传输中断。");
+            if (count <= 0) throw new Exception(cameraName() + " 图像传输中断。");
             all.write(chunk, 0, count);
         }
         byte[] container = all.toByteArray();
@@ -284,7 +417,7 @@ final class PtpCamera {
         return 0;
     }
 
-    private static byte[] extractJpeg(byte[] source) throws Exception {
+    private byte[] extractJpeg(byte[] source) throws Exception {
         int start = -1;
         int end = -1;
         for (int index = 0; index < source.length - 1; index++) {
@@ -295,7 +428,9 @@ final class PtpCamera {
                 end = index + 2;
             }
         }
-        if (start < 0 || end <= start) throw new Exception("Z8 返回的数据中没有 JPEG 图像。");
+        if (start < 0 || end <= start) {
+            throw new Exception(cameraName() + " 返回的数据中没有 JPEG 图像。");
+        }
         return Arrays.copyOfRange(source, start, end);
     }
 
@@ -325,18 +460,33 @@ final class PtpCamera {
                 "exposureCompensation", 0.0,
                 "focusMode", "single-shot",
                 "whiteBalanceMode", "continuous",
-                "exposureMode", "manual");
+                "exposureMode", "manual",
+                "pictureControl", "standard");
     }
 
-    private static Map<String, Object> capabilities() {
+    private static Map<String, Object> capabilities(CameraProfile profile) {
         return mapOf(
                 "exposureTime", mapOf("min", 0.000125, "max", 30.0),
                 "aperture", mapOf("min", 1.2, "max", 22.0),
-                "iso", mapOf("min", 64, "max", 25600),
+                "iso", mapOf("min", profile.minIso, "max", profile.maxIso),
                 "exposureCompensation", mapOf("min", -5.0, "max", 5.0),
                 "focusMode", new String[]{"single-shot", "continuous", "manual"},
                 "whiteBalanceMode", new String[]{"continuous", "manual"},
-                "exposureMode", new String[]{"continuous", "manual"});
+                "pictureControl", new String[]{
+                        "auto",
+                        "standard",
+                        "neutral",
+                        "vivid",
+                        "monochrome",
+                        "portrait",
+                        "landscape",
+                        "flat"},
+                "exposureMode", new String[]{
+                        "program",
+                        "manual",
+                        "aperturePriority",
+                        "shutterPriority",
+                        "bulb"});
     }
 
     static Map<String, Object> mapOf(Object... values) {
@@ -348,12 +498,41 @@ final class PtpCamera {
     }
 
     private void ensureConnected() throws Exception {
-        if (connection == null) throw new Exception("请先连接 Nikon Z8。");
+        if (connection == null) throw new Exception("请先连接支持的 Nikon 相机。");
     }
 
     private void ensureConnectedForOperation(int operation) throws Exception {
         if (operation != OPEN_SESSION) ensureConnected();
-        else if (connection == null) throw new Exception("无法打开 Z8 USB 连接。");
+        else if (connection == null) throw new Exception("无法打开 Nikon USB 连接。");
+    }
+
+    synchronized String getConnectedCameraName() {
+        return cameraName();
+    }
+
+    private String cameraName() {
+        return profile == null ? "Nikon 相机" : profile.name;
+    }
+
+    private static CameraProfile profileFor(int productId) {
+        for (CameraProfile candidate : SUPPORTED_CAMERAS) {
+            if (candidate.productId == productId) return candidate;
+        }
+        return null;
+    }
+
+    private static final class CameraProfile {
+        final String name;
+        final int productId;
+        final int minIso;
+        final int maxIso;
+
+        CameraProfile(String name, int productId, int minIso, int maxIso) {
+            this.name = name;
+            this.productId = productId;
+            this.minIso = minIso;
+            this.maxIso = maxIso;
+        }
     }
 
     private static final class Container {

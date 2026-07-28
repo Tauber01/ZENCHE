@@ -3,6 +3,71 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [Unreleased]
+
+## [0.7.0] - 2026-07-28
+
+### Added
+
+- Added exposure-program-aware control locking on macOS and Android.
+- Added adjustable highlight zebra overlays for native live view.
+- Added custom 3D `.cube` LUT import for non-destructive live-view monitoring.
+- Added Nikon Picture Control presets to the native professional controls.
+- Added native monitor-page parameter controls, 2× supersampling, codec preferences
+  and selectable video specifications across macOS, Android and iOS/iPadOS.
+- Added a native SwiftUI iOS/iPadOS app with selectable AVFoundation cameras,
+  responsive iPhone/iPad layouts, capture, focus, exposure and zoom controls.
+- Added iOS foreground FTP receiving, local photo management, system Photos
+  export, native sharing, unsigned CI packaging and a signed IPA workflow.
+
+### Changed
+
+- Aligned native controls with Nikon Simplified Chinese menu terminology,
+  represented Bulb as an M-mode shutter speed, and corrected Android AF-S,
+  AF-C and preset white-balance PTP values.
+- iOS now negotiates supported video specifications with the active system video
+  device. Nikon PTP monitoring keeps its camera-native JPEG source and clearly
+  limits codec selection while applying local resampling options.
+- Added iOS lifecycle handling so camera sessions pause cleanly and local
+  network receiving stops when the app moves to the background.
+
+## [0.6.0] - 2026-07-28
+
+### Added
+
+- Added P, M, A, S and B exposure programs on macOS and Android.
+- Added selectable 1–60 second Nikon bulb capture durations.
+- Added a native passive-mode FTP receiver for direct Wi-Fi image transfer
+  from supported Nikon cameras.
+- Added automatic local-library import for JPEG, NEF, HEIF, HEIC and TIFF
+  uploads.
+
+### Changed
+
+- Rebuilt the macOS disk image with both the app and an Applications shortcut
+  for standard drag-to-install behavior.
+- Expanded the transfer screen with live server address, port and camera setup
+  instructions.
+
+## [0.5.0] - 2026-07-28
+
+### Added
+
+- Added native USB/PTP detection for Nikon Z f (`0x0453`), Z6III (`0x0454`)
+  and Z5II (`0x0456`) alongside the existing Z8 (`0x0451`).
+- Added per-camera identity throughout connection, live-view, capture and error
+  states on macOS and Android.
+- Added a macOS USB Product ID fallback for Z5II when libgphoto2 reports it as
+  a generic PTP camera.
+- Added per-model ISO ranges and graceful connection when live view is not
+  exposed by the current camera firmware.
+
+### Changed
+
+- Replaced Z8-only UI copy and USB filtering with a strict supported-camera
+  registry.
+- Expanded hardware acceptance checks to cover all four supported models.
+
 ## [0.4.0] - 2026-07-28
 
 ### Changed

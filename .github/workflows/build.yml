@@ -7,6 +7,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/build-ios.sh --unsigned
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NikonLink-iOS-unsigned
+          path: dist/NikonLink-*-ios-unsigned.ipa*
+
   android:
     runs-on: macos-15
     steps:
