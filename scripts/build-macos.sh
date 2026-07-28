@@ -2,13 +2,20 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.4.0
+VERSION=0.5.0
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
 APP_ROOT="$BUILD_ROOT/Nikon Link.app"
 CONTENTS="$APP_ROOT/Contents"
 RESOURCES="$CONTENTS/Resources"
+
+# Keep local packaging usable when a newly installed Xcode is selected but its
+# license has not been accepted yet. The Command Line Tools are sufficient here.
+if ! /usr/bin/xcrun --find swiftc >/dev/null 2>&1 &&
+  [[ -x /Library/Developer/CommandLineTools/usr/bin/swiftc ]]; then
+  export DEVELOPER_DIR=/Library/Developer/CommandLineTools
+fi
 
 rm -rf "$BUILD_ROOT"
 mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \

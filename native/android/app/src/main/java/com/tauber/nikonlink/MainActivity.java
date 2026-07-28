@@ -44,7 +44,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -86,6 +85,7 @@ public final class MainActivity extends Activity {
     private volatile boolean liveViewEnabled;
     private volatile boolean capturing;
     private volatile int previewGeneration;
+    private volatile String connectedCameraName = "Nikon 相机";
     private boolean professionalMode;
     private String currentSection = "capture";
 
@@ -154,7 +154,7 @@ public final class MainActivity extends Activity {
         brand.addView(text("Android 原生版", 11, Typeface.NORMAL, MUTED));
         top.addView(brand, new LinearLayout.LayoutParams(dp(96), dp(44)));
 
-        connectButton = nativeButton("连接 Z8", false);
+        connectButton = nativeButton("连接相机", false);
         connectButton.setOnClickListener(view -> {
             if (connected) disconnectCamera();
             else showConnectionDialog();
@@ -284,7 +284,9 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
         content.addView(text("实时监看", 30, Typeface.BOLD, INK));
         content.addView(text(
-                "Nikon Z8 原生 JPEG 实时取景",
+                connected
+                        ? connectedCameraName + " · 原生 JPEG 实时取景"
+                        : "支持 Z8 · Z f · Z6III · Z5II",
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -317,7 +319,7 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         previewPlaceholder = text(
-                connected ? "等待实时取景画面" : "连接 Nikon Z8 开始监看",
+                connected ? "等待实时取景画面" : "连接支持的 Nikon 相机开始监看",
                 15,
                 Typeface.NORMAL,
                 Color.rgb(132, 140, 153));
@@ -374,7 +376,9 @@ public final class MainActivity extends Activity {
         LinearLayout panel = panel();
         panel.addView(text("专业参数", 18, Typeface.BOLD, INK));
         panel.addView(text(
-                "参数直接通过 USB/PTP 写入 Nikon Z8",
+                connected
+                        ? "参数通过 USB/PTP 写入 " + connectedCameraName
+                        : "连接相机后启用原生参数控制",
                 13,
                 Typeface.NORMAL,
                 MUTED),
@@ -394,12 +398,17 @@ public final class MainActivity extends Activity {
                 new Object[]{1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0},
                 3,
                 "aperture");
+        boolean z8IsoRange = "Nikon Z8".equals(connectedCameraName);
         addSpinnerControl(
                 panel,
                 "ISO",
-                new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"},
-                new Object[]{64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600},
-                3,
+                z8IsoRange
+                        ? new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"}
+                        : new String[]{"100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600", "51200", "64000"},
+                z8IsoRange
+                        ? new Object[]{64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600}
+                        : new Object[]{100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000},
+                z8IsoRange ? 3 : 2,
                 "iso");
         addSpinnerControl(
                 panel,
@@ -577,7 +586,7 @@ public final class MainActivity extends Activity {
                 photoFiles().size() + " 个文件"));
         content.addView(infoCard(
                 "相机通道",
-                connected ? "USB/PTP 已连接" : "等待 Nikon Z8"));
+                connected ? connectedCameraName + " · USB/PTP 已连接" : "等待 Nikon 相机"));
         TextView path = text(
                 "保存位置\n" + photoDirectory.getAbsolutePath(),
                 12,
@@ -599,7 +608,13 @@ public final class MainActivity extends Activity {
     private void showConnectionDialog() {
         LinearLayout content = panel();
         content.setPadding(dp(18), dp(16), dp(18), dp(16));
-        content.addView(text("Nikon Z8 原生 USB", 18, Typeface.BOLD, INK));
+        content.addView(text("Nikon Z 系列原生 USB", 18, Typeface.BOLD, INK));
+        content.addView(text(
+                "Z8 · Z f · Z6III · Z5II",
+                12,
+                Typeface.BOLD,
+                COBALT),
+                marginParams(-1, -2, 0, 4, 0, 4));
         content.addView(text(
                 "联机拍摄、参数控制、实时监看和文件管理",
                 13,
@@ -607,7 +622,7 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 14));
         content.addView(text(
-                "请打开 Z8，使用支持数据传输的 USB 线连接，并授权 Nikon Link 访问 USB 设备。",
+                "请打开相机，使用支持数据传输的 USB 线连接，并授权 Nikon Link 访问 USB 设备。",
                 13,
                 Typeface.NORMAL,
                 MUTED));
@@ -615,7 +630,7 @@ public final class MainActivity extends Activity {
                 .setTitle("连接相机")
                 .setView(content)
                 .setNegativeButton("取消", null)
-                .setPositiveButton("连接 Nikon Z8", (dialog, which) -> connectCamera())
+                .setPositiveButton("连接 Nikon 相机", (dialog, which) -> connectCamera())
                 .show();
     }
 
@@ -625,15 +640,30 @@ public final class MainActivity extends Activity {
         updateConnectionUi();
         cameraExecutor.submit(() -> {
             try {
-                Map<String, Object> ignored = camera.connect();
-                camera.startLiveView();
+                camera.connect();
+                String detectedCameraName = camera.getConnectedCameraName();
+                boolean liveViewStarted;
+                try {
+                    camera.startLiveView();
+                    liveViewStarted = true;
+                } catch (Exception ignored) {
+                    liveViewStarted = false;
+                }
+                boolean initialLiveView = liveViewStarted;
                 mainHandler.post(() -> {
+                    connectedCameraName = detectedCameraName;
                     connected = true;
                     connecting = false;
-                    liveViewEnabled = true;
+                    liveViewEnabled = initialLiveView;
+                    showSection(currentSection);
                     updateConnectionUi();
-                    startPreviewLoop();
-                    showToast("Nikon Z8 已通过原生 USB/PTP 连接。");
+                    if (initialLiveView) {
+                        startPreviewLoop();
+                        showToast(connectedCameraName + " 已通过原生 USB/PTP 连接。");
+                    } else {
+                        statusText.setText(connectedCameraName + " 已连接 · 实时取景需实机确认");
+                        showToast(connectedCameraName + " 已连接，可拍摄和调整参数。");
+                    }
                 });
             } catch (Exception error) {
                 mainHandler.post(() -> {
@@ -652,6 +682,7 @@ public final class MainActivity extends Activity {
         connected = false;
         liveViewEnabled = false;
         cameraExecutor.submit(camera::disconnect);
+        connectedCameraName = "Nikon 相机";
         latestFrame = null;
         updateConnectionUi();
         showSection(currentSection);
@@ -700,7 +731,7 @@ public final class MainActivity extends Activity {
                     latestFrame = bitmap;
                     if (previewImage != null) previewImage.setImageBitmap(bitmap);
                     if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
-                    statusText.setText("Z8 LIVE · USB/PTP");
+                    statusText.setText(connectedCameraName + " LIVE · USB/PTP");
                     mainHandler.postDelayed(() -> pullPreview(generation), 220);
                 });
             } catch (Exception error) {
@@ -760,7 +791,7 @@ public final class MainActivity extends Activity {
 
     private void applyParameter(String name, Object value, String label) {
         if (!connected) {
-            showToast("连接 Z8 后才能调整参数。");
+            showToast("连接支持的 Nikon 相机后才能调整参数。");
             return;
         }
         cameraExecutor.submit(() -> {
@@ -790,13 +821,16 @@ public final class MainActivity extends Activity {
 
     private void updateConnectionUi() {
         if (connectButton != null) {
-            connectButton.setText(connecting ? "正在连接…" : connected ? "断开 Z8" : "连接 Z8");
+            connectButton.setText(
+                    connecting
+                            ? "正在连接…"
+                            : connected ? "断开 " + connectedCameraName.replace("Nikon ", "") : "连接相机");
             connectButton.setEnabled(!connecting);
         }
         if (statusText != null) {
             statusText.setText(connecting
-                    ? "正在连接 Nikon Z8"
-                    : connected ? "Nikon Z8 · USB/PTP" : "未连接");
+                    ? "正在检测 Nikon 相机"
+                    : connected ? connectedCameraName + " · USB/PTP" : "未连接");
         }
         if (liveViewButton != null) {
             liveViewButton.setText(liveViewEnabled ? "停止实时取景" : "开启实时取景");

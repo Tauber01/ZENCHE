@@ -3,6 +3,25 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [0.5.0] - 2026-07-28
+
+### Added
+
+- Added native USB/PTP detection for Nikon Z f (`0x0453`), Z6III (`0x0454`)
+  and Z5II (`0x0456`) alongside the existing Z8 (`0x0451`).
+- Added per-camera identity throughout connection, live-view, capture and error
+  states on macOS and Android.
+- Added a macOS USB Product ID fallback for Z5II when libgphoto2 reports it as
+  a generic PTP camera.
+- Added per-model ISO ranges and graceful connection when live view is not
+  exposed by the current camera firmware.
+
+### Changed
+
+- Replaced Z8-only UI copy and USB filtering with a strict supported-camera
+  registry.
+- Expanded hardware acceptance checks to cover all four supported models.
+
 ## [0.4.0] - 2026-07-28
 
 ### Changed

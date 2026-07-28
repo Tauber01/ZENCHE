@@ -2,6 +2,54 @@ import AppKit
 import Foundation
 import SwiftUI
 
+private struct SupportedCamera: Equatable {
+    let name: String
+    let productID: Int
+    let detectionTokens: [String]
+
+    static let all = [
+        SupportedCamera(
+            name: "Nikon Z8",
+            productID: 0x0451,
+            detectionTokens: ["nikon z8"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z f",
+            productID: 0x0453,
+            detectionTokens: ["nikon zf", "nikon z f"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z6III",
+            productID: 0x0454,
+            detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"]
+        ),
+        SupportedCamera(
+            name: "Nikon Z5II",
+            productID: 0x0456,
+            detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"]
+        )
+    ]
+
+    static let summary = "Z8 · Z f · Z6III · Z5II"
+
+    static func matching(detection: String) -> SupportedCamera? {
+        let normalized = detection
+            .lowercased()
+            .replacingOccurrences(of: ":", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return all.first { camera in
+            camera.detectionTokens.contains { normalized.contains($0) }
+        }
+    }
+
+    static func matching(productID: Int) -> SupportedCamera? {
+        all.first { $0.productID == productID }
+    }
+}
+
 private enum CameraError: LocalizedError {
     case command(String)
     case noCamera
@@ -12,9 +60,9 @@ private enum CameraError: LocalizedError {
         switch self {
         case .command(let value): return value
         case .noCamera:
-            return "没有检测到 Nikon Z8。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
+            return "没有检测到支持的 Nikon 相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
         case .wrongCamera(let value):
-            return "检测到 \(value)，当前安装包仅按 Nikon Z8 验证。"
+            return "检测到 \(value)，当前版本支持 \(SupportedCamera.summary)。"
         case .noImage:
             return "相机没有返回可用的 JPEG 图像。"
         }
@@ -25,6 +73,11 @@ private final class GPhotoCamera {
     private let resources = Bundle.main.resourceURL!
     private var connected = false
     private var liveView = false
+    private(set) var profile: SupportedCamera?
+
+    private var cameraName: String {
+        profile?.name ?? "Nikon 相机"
+    }
 
     private var executable: URL {
         let bundled = resources.appendingPathComponent("bin/gphoto2")
@@ -53,28 +106,84 @@ private final class GPhotoCamera {
         }
         if process.isRunning {
             process.terminate()
-            throw CameraError.command("相机操作超时，请重新连接 Z8。")
+            throw CameraError.command("相机操作超时，请重新连接 \(cameraName)。")
         }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         let text = String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard process.terminationStatus == 0 else {
-            throw CameraError.command(text.isEmpty ? "Z8 返回了错误状态。" : text)
+            throw CameraError.command(text.isEmpty ? "\(cameraName) 返回了错误状态。" : text)
         }
         return text
     }
 
-    func connect() throws {
-        let detected = try run(["--auto-detect"])
-        guard detected.localizedCaseInsensitiveContains("nikon") else {
-            throw CameraError.noCamera
+    private func detectedUSBProfile() -> SupportedCamera? {
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
+        process.arguments = ["SPUSBDataType", "-json"]
+        process.standardOutput = output
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            let root = try JSONSerialization.jsonObject(with: data)
+            return findUSBProfile(in: root)
+        } catch {
+            return nil
         }
-        guard detected.localizedCaseInsensitiveContains("z8") else {
+    }
+
+    private func findUSBProfile(in value: Any) -> SupportedCamera? {
+        if let dictionary = value as? [String: Any] {
+            let vendor = hexValue(dictionary["vendor_id"])
+            let product = hexValue(dictionary["product_id"])
+            if vendor == 0x04b0,
+               let product,
+               let match = SupportedCamera.matching(productID: product) {
+                return match
+            }
+            for child in dictionary.values {
+                if let match = findUSBProfile(in: child) { return match }
+            }
+        } else if let array = value as? [Any] {
+            for child in array {
+                if let match = findUSBProfile(in: child) { return match }
+            }
+        }
+        return nil
+    }
+
+    private func hexValue(_ value: Any?) -> Int? {
+        guard let text = value as? String,
+              let range = text.range(
+                of: #"0x[0-9a-fA-F]+"#,
+                options: .regularExpression
+              ) else {
+            return nil
+        }
+        return Int(text[range].dropFirst(2), radix: 16)
+    }
+
+    func connect() throws -> SupportedCamera {
+        let detected = try run(["--auto-detect"])
+        let matchedProfile =
+            SupportedCamera.matching(detection: detected)
+            ?? detectedUSBProfile()
+        guard let matchedProfile else {
+            if !detected.localizedCaseInsensitiveContains("nikon"),
+               !detected.localizedCaseInsensitiveContains("ptp class camera") {
+                throw CameraError.noCamera
+            }
             let name = detected.split(separator: "\n").last.map(String.init) ?? "其他 Nikon 相机"
             throw CameraError.wrongCamera(name)
         }
+        profile = matchedProfile
         _ = try run(["--summary"])
         connected = true
+        return matchedProfile
     }
 
     func startLiveView() throws {
@@ -162,7 +271,7 @@ private final class GPhotoCamera {
             key = "expprogram"
             formatted = String(describing: value) == "manual" ? "M" : "P"
         default:
-            throw CameraError.command("Z8 不支持此参数：\(name)")
+            throw CameraError.command("\(cameraName) 不支持此参数：\(name)")
         }
         _ = try run(["--set-config", "\(key)=\(formatted)"])
     }
@@ -170,6 +279,7 @@ private final class GPhotoCamera {
     func disconnect() {
         stopLiveView()
         connected = false
+        profile = nil
     }
 }
 
@@ -210,7 +320,8 @@ private final class CameraModel: ObservableObject {
     @Published var capturing = false
     @Published var frame: NSImage?
     @Published var status = "未连接"
-    @Published var detail = "USB/PTP · 等待 Nikon Z8"
+    @Published var detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
+    @Published var cameraName: String?
     @Published var mode: ExperienceMode = .simple
     @Published var section: AppSection = .capture
     @Published var photos: [PhotoRecord] = []
@@ -232,6 +343,10 @@ private final class CameraModel: ObservableObject {
     private var previewToken = UUID()
     private let photoDirectory: URL
 
+    var activeCameraName: String {
+        cameraName ?? "Nikon 相机"
+    }
+
     init() {
         let pictures = FileManager.default.urls(
             for: .picturesDirectory,
@@ -249,19 +364,31 @@ private final class CameraModel: ObservableObject {
         guard !connecting else { return }
         connecting = true
         status = "正在连接"
-        detail = "正在检测 Nikon Z8 USB/PTP…"
+        detail = "正在检测 \(SupportedCamera.summary)…"
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
-                try self.camera.connect()
-                try self.camera.startLiveView()
+                let profile = try self.camera.connect()
+                var liveViewStarted = false
+                do {
+                    try self.camera.startLiveView()
+                    liveViewStarted = true
+                } catch {
+                    liveViewStarted = false
+                }
+                let initialLiveView = liveViewStarted
                 DispatchQueue.main.async {
                     self.connected = true
                     self.connecting = false
-                    self.liveViewEnabled = true
-                    self.status = "Nikon Z8"
-                    self.detail = "USB/PTP · 原生连接"
-                    self.startPreviewLoop()
+                    self.liveViewEnabled = initialLiveView
+                    self.cameraName = profile.name
+                    self.status = profile.name
+                    self.detail = initialLiveView
+                        ? "USB/PTP · 原生连接"
+                        : "USB/PTP 已连接 · 实时取景需实机确认"
+                    if initialLiveView {
+                        self.startPreviewLoop()
+                    }
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -283,13 +410,14 @@ private final class CameraModel: ObservableObject {
         }
         connected = false
         frame = nil
+        cameraName = nil
         status = "未连接"
-        detail = "USB/PTP · 等待 Nikon Z8"
+        detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
     }
 
     func toggleLiveView() {
         guard connected else {
-            errorMessage = "请先连接 Nikon Z8。"
+            errorMessage = "请先连接支持的 Nikon 相机。"
             return
         }
         if liveViewEnabled {
@@ -348,12 +476,12 @@ private final class CameraModel: ObservableObject {
 
     func capture() {
         guard connected else {
-            errorMessage = "请先连接 Nikon Z8。"
+            errorMessage = "请先连接支持的 Nikon 相机。"
             return
         }
         guard !capturing else { return }
         capturing = true
-        detail = "正在触发 Z8 快门…"
+        detail = "正在触发 \(activeCameraName) 快门…"
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
@@ -417,7 +545,7 @@ private final class CameraModel: ObservableObject {
 
     func applyParameter(_ name: String, value: Any, label: String) {
         guard connected else {
-            errorMessage = "连接 Z8 后才能调整参数。"
+            errorMessage = "连接支持的 Nikon 相机后才能调整参数。"
             return
         }
         detail = "正在设置 \(label)…"
@@ -488,7 +616,7 @@ private struct PreviewStage: View {
                 VStack(spacing: 14) {
                     Image(systemName: "camera.aperture")
                         .font(.system(size: compact ? 38 : 54, weight: .light))
-                    Text(model.connected ? "等待实时取景画面" : "连接 Nikon Z8 开始监看")
+                    Text(model.connected ? "等待实时取景画面" : "连接支持的 Nikon 相机开始监看")
                         .font(.system(size: 15, weight: .medium))
                 }
                 .foregroundStyle(Color.white.opacity(0.48))
@@ -502,7 +630,7 @@ private struct PreviewStage: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(model.liveViewEnabled ? Color.red : Color.white.opacity(0.5))
                     Spacer()
-                    Text("Z8 · USB/PTP")
+                    Text("\(model.cameraName ?? SupportedCamera.summary) · USB/PTP")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.64))
                 }
@@ -684,7 +812,11 @@ private struct ParameterInspector: View {
         ("1/8000", 0.000125), ("1/1000", 0.001), ("1/250", 0.004),
         ("1/125", 0.008), ("1/60", 0.0167), ("1/15", 0.0667), ("1 秒", 1.0)
     ]
-    private let isoOptions = [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+    private var isoOptions: [Int] {
+        model.cameraName == "Nikon Z8"
+            ? [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
+            : [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000]
+    }
     private let apertureOptions = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0]
 
     var body: some View {
@@ -875,7 +1007,7 @@ private struct MonitorView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("实时监看").font(.system(size: 34, weight: .bold))
-                    Text("Nikon Z8 原生 JPEG 实时取景")
+                    Text("\(model.cameraName ?? SupportedCamera.summary) · 原生 JPEG 实时取景")
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -1057,8 +1189,11 @@ private struct ConnectionSheet: View {
                     .background(Palette.cobaltSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Nikon Z8 原生 USB")
+                    Text("Nikon Z 系列原生 USB")
                         .font(.system(size: 17, weight: .bold))
+                    Text(SupportedCamera.summary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.cobalt)
                     Text("联机拍摄、参数控制、实时监看和文件传输")
                         .foregroundStyle(Palette.muted)
                 }
@@ -1069,14 +1204,14 @@ private struct ConnectionSheet: View {
             .padding(16)
             .background(Palette.cobaltSoft.opacity(0.55))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            Text("请打开 Z8，使用支持数据传输的 USB 线直连，并退出 NX Tether。")
+            Text("请打开相机，使用支持数据传输的 USB 线直连，并退出 NX Tether。")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.muted)
             HStack {
                 Spacer()
                 Button("取消") { dismiss() }
                     .buttonStyle(NativeButtonStyle())
-                Button(model.connecting ? "正在连接…" : "连接 Nikon Z8") {
+                Button(model.connecting ? "正在连接…" : "连接 Nikon 相机") {
                     model.connect()
                     dismiss()
                 }

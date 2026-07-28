@@ -12,4 +12,4 @@ device access.
 
 Nikon Link keeps its photo library on the local device. It does not implement
 cloud upload or analytics. USB access is requested only after the user chooses
-the native Nikon Z8 connection.
+the native Nikon camera connection.

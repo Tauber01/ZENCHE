@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Nikon Z8 -->
     <usb-device vendor-id="1200" product-id="1105" />
+    <!-- Nikon Z f -->
+    <usb-device vendor-id="1200" product-id="1107" />
+    <!-- Nikon Z6III -->
+    <usb-device vendor-id="1200" product-id="1108" />
+    <!-- Nikon Z5II -->
+    <usb-device vendor-id="1200" product-id="1110" />
 </resources>
