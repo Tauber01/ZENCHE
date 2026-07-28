@@ -3,6 +3,34 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [Unreleased]
+
+## [0.7.0] - 2026-07-28
+
+### Added
+
+- Added exposure-program-aware control locking on macOS and Android.
+- Added adjustable highlight zebra overlays for native live view.
+- Added custom 3D `.cube` LUT import for non-destructive live-view monitoring.
+- Added Nikon Picture Control presets to the native professional controls.
+- Added native monitor-page parameter controls, 2× supersampling, codec preferences
+  and selectable video specifications across macOS, Android and iOS/iPadOS.
+- Added a native SwiftUI iOS/iPadOS app with selectable AVFoundation cameras,
+  responsive iPhone/iPad layouts, capture, focus, exposure and zoom controls.
+- Added iOS foreground FTP receiving, local photo management, system Photos
+  export, native sharing, unsigned CI packaging and a signed IPA workflow.
+
+### Changed
+
+- Aligned native controls with Nikon Simplified Chinese menu terminology,
+  represented Bulb as an M-mode shutter speed, and corrected Android AF-S,
+  AF-C and preset white-balance PTP values.
+- iOS now negotiates supported video specifications with the active system video
+  device. Nikon PTP monitoring keeps its camera-native JPEG source and clearly
+  limits codec selection while applying local resampling options.
+- Added iOS lifecycle handling so camera sessions pause cleanly and local
+  network receiving stops when the app moves to the background.
+
 ## [0.6.0] - 2026-07-28
 
 ### Added

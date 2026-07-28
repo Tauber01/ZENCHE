@@ -14,6 +14,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -37,13 +38,16 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,6 +56,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
     private static final String USB_PERMISSION_ACTION = "com.tauber.nikonlink.USB_PERMISSION";
+    private static final int REQUEST_IMPORT_LUT = 4102;
     private static final int PAPER = Color.rgb(246, 248, 252);
     private static final int SURFACE = Color.WHITE;
     private static final int INK = Color.rgb(20, 24, 32);
@@ -65,6 +70,8 @@ public final class MainActivity extends Activity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<View> cameraControls = new ArrayList<>();
     private final List<Button> navigationButtons = new ArrayList<>();
+    private final Map<String, View> parameterControls = new HashMap<>();
+    private final Map<String, TextView> parameterLabels = new HashMap<>();
 
     private PtpCamera camera;
     private FrameLayout contentHost;
@@ -74,13 +81,19 @@ public final class MainActivity extends Activity {
     private Button simpleModeButton;
     private Button professionalModeButton;
     private ImageView previewImage;
+    private ImageView zebraImage;
     private TextView previewPlaceholder;
     private Button shutterButton;
     private Button liveViewButton;
     private Button wirelessButton;
     private TextView wirelessStatusText;
     private TextView wirelessAddressText;
+    private TextView lutStatusText;
+    private Switch lutSwitch;
+    private SeekBar zebraThresholdControl;
     private Bitmap latestFrame;
+    private Bitmap latestSourceFrame;
+    private Bitmap latestZebraMask;
     private File photoDirectory;
     private WirelessFtpServer wirelessServer;
 
@@ -92,6 +105,13 @@ public final class MainActivity extends Activity {
     private volatile String wirelessStatus = "无线收件箱未开启";
     private volatile int previewGeneration;
     private volatile String connectedCameraName = "Nikon 相机";
+    private volatile String exposureMode = "manual";
+    private volatile boolean zebraEnabled;
+    private volatile int zebraThreshold = 95;
+    private volatile boolean lutEnabled;
+    private volatile CubeLut previewLut;
+    private volatile boolean monitorSupersampling;
+    private volatile String monitorVideoProfile = "source";
     private boolean professionalMode;
     private String currentSection = "capture";
 
@@ -106,6 +126,10 @@ public final class MainActivity extends Activity {
         }
 
         camera = new PtpCamera(this);
+        monitorSupersampling = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("monitorSupersampling", false);
+        monitorVideoProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("monitorVideoProfile", "source");
         File base = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         if (base == null) base = getFilesDir();
         photoDirectory = new File(base, "Nikon Link");
@@ -146,6 +170,62 @@ public final class MainActivity extends Activity {
         showSection("capture");
         updateConnectionUi();
         System.out.println("Nikon Link native Android UI ready");
+    }
+
+    private void chooseLutFile() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                new String[]{"text/plain", "application/octet-stream", "application/x-cube"});
+        startActivityForResult(intent, REQUEST_IMPORT_LUT);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_IMPORT_LUT
+                || resultCode != RESULT_OK
+                || data == null
+                || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        try {
+            getContentResolver().takePersistableUriPermission(
+                    uri,
+                    data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (RuntimeException ignored) {
+        }
+        String fallbackName = uri.getLastPathSegment();
+        if (lutStatusText != null) lutStatusText.setText("正在读取 LUT…");
+        cameraExecutor.submit(() -> {
+            try (InputStream stream = getContentResolver().openInputStream(uri)) {
+                CubeLut lut = CubeLut.parse(stream, fallbackName);
+                previewLut = lut;
+                lutEnabled = true;
+                Bitmap source = latestSourceFrame;
+                ProcessedPreview output = source == null ? null : processPreview(source);
+                mainHandler.post(() -> {
+                    if (output != null) showProcessedPreview(source, output);
+                    if (lutSwitch != null) {
+                        lutSwitch.setEnabled(true);
+                        lutSwitch.setChecked(true);
+                    }
+                    if (lutStatusText != null) {
+                        lutStatusText.setText("已载入 · " + lut.getTitle());
+                    }
+                });
+            } catch (Exception error) {
+                mainHandler.post(() -> {
+                    if (lutStatusText != null) {
+                        lutStatusText.setText("导入失败；请选择有效的 3D .cube 文件。");
+                    }
+                    showError("LUT 导入失败：" + error.getMessage());
+                });
+            }
+        });
     }
 
     private View buildApplication() {
@@ -252,6 +332,11 @@ public final class MainActivity extends Activity {
     private void showSection(String section) {
         currentSection = section;
         cameraControls.clear();
+        parameterControls.clear();
+        parameterLabels.clear();
+        zebraThresholdControl = null;
+        lutStatusText = null;
+        lutSwitch = null;
         contentHost.removeAllViews();
         View content;
         switch (section) {
@@ -317,12 +402,13 @@ public final class MainActivity extends Activity {
     }
 
     private View buildMonitorView() {
+        ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(text("实时监看", 30, Typeface.BOLD, INK));
+        content.addView(text("实时取景", 30, Typeface.BOLD, INK));
         content.addView(text(
                 connected
-                        ? connectedCameraName + " · 原生 JPEG 实时取景"
+                        ? connectedCameraName + " · JPEG 实时取景"
                         : "支持 Z8 · Z f · Z6III · Z5II",
                 14,
                 Typeface.NORMAL,
@@ -330,9 +416,10 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 3, 0, 18));
         content.addView(buildPreviewStage(true), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f));
-        liveViewButton = nativeButton(liveViewEnabled ? "停止监看" : "开始监看", true);
+                dp(300)));
+        liveViewButton = nativeButton(
+                liveViewEnabled ? "停止实时取景" : "开启实时取景",
+                true);
         liveViewButton.setOnClickListener(view -> toggleLiveView());
         cameraControls.add(liveViewButton);
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
@@ -340,7 +427,10 @@ public final class MainActivity extends Activity {
                 dp(50));
         buttonParams.setMargins(0, dp(16), 0, 0);
         content.addView(liveViewButton, buttonParams);
-        return content;
+        content.addView(buildMonitorParameterControls());
+        content.addView(buildMonitorOutputControls());
+        scroll.addView(content);
+        return scroll;
     }
 
     private View buildPreviewStage(boolean fillHeight) {
@@ -355,8 +445,16 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        zebraImage = new ImageView(this);
+        zebraImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        zebraImage.setImageBitmap(zebraEnabled ? latestZebraMask : null);
+        zebraImage.setContentDescription("本地条纹图案加亮显示");
+        stage.addView(zebraImage, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
         previewPlaceholder = text(
-                connected ? "等待实时取景画面" : "连接支持的 Nikon 相机开始监看",
+                connected ? "等待实时取景画面" : "连接支持的 Nikon 相机后开启实时取景",
                 15,
                 Typeface.NORMAL,
                 Color.rgb(132, 140, 153));
@@ -378,12 +476,192 @@ public final class MainActivity extends Activity {
         badgeParams.setMargins(dp(14), dp(10), 0, 0);
         stage.addView(badge, badgeParams);
 
+        TextView outputBadge = text(
+                "JPEG实时取景 · " + monitorProfileLabel(),
+                11,
+                Typeface.BOLD,
+                Color.rgb(194, 200, 211));
+        outputBadge.setContentDescription(
+                "实时取景格式 JPEG，监看显示尺寸 " + monitorProfileLabel());
+        FrameLayout.LayoutParams outputBadgeParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(32),
+                Gravity.BOTTOM | Gravity.END);
+        outputBadgeParams.setMargins(0, 0, dp(14), dp(10));
+        stage.addView(outputBadge, outputBadgeParams);
+
         if (!fillHeight) {
             stage.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     dp(380)));
         }
         return stage;
+    }
+
+    private View buildMonitorParameterControls() {
+        LinearLayout panel = panel();
+        panel.addView(text("参数调节", 18, Typeface.BOLD, INK));
+        panel.addView(text(
+                connected
+                        ? "高频参数通过 USB/PTP 写入 " + connectedCameraName
+                        : "连接 Nikon 相机后启用参数控制",
+                13,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 3, 0, 14));
+
+        boolean z8IsoRange = "Nikon Z8".equals(connectedCameraName);
+        addSpinnerControl(
+                panel,
+                "ISO感光度",
+                z8IsoRange
+                        ? new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"}
+                        : new String[]{"100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600", "51200", "64000"},
+                z8IsoRange
+                        ? new Object[]{64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600}
+                        : new Object[]{100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000},
+                z8IsoRange ? 3 : 2,
+                "iso");
+        addSpinnerControl(
+                panel,
+                "白平衡",
+                new String[]{"自动", "手动预设"},
+                new Object[]{"continuous", "manual"},
+                0,
+                "whiteBalanceMode");
+
+        TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, MUTED);
+        compensationLabel.setTag("曝光补偿");
+        panel.addView(compensationLabel, marginParams(-1, -2, 0, 12, 0, 2));
+        SeekBar compensation = new SeekBar(this);
+        compensation.setMax(30);
+        compensation.setProgress(15);
+        compensation.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                double value = (progress - 15) / 3.0;
+                compensationLabel.setText(String.format(
+                        Locale.CHINA,
+                        "曝光补偿 · %+.1f EV",
+                        value));
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                double value = (seekBar.getProgress() - 15) / 3.0;
+                applyParameter("exposureCompensation", value, "曝光补偿");
+            }
+        });
+        cameraControls.add(compensation);
+        parameterControls.put("exposureCompensation", compensation);
+        parameterLabels.put("exposureCompensation", compensationLabel);
+        panel.addView(compensation);
+        return panel;
+    }
+
+    private View buildMonitorOutputControls() {
+        LinearLayout panel = panel();
+        panel.addView(text("监看输出", 18, Typeface.BOLD, INK));
+        panel.addView(text(
+                "本地显示处理不改变相机的视频录制设定。",
+                13,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 3, 0, 12));
+
+        Switch supersampling = new Switch(this);
+        supersampling.setText("本地 2× 超采样");
+        supersampling.setTextColor(INK);
+        supersampling.setChecked(monitorSupersampling);
+        supersampling.setOnCheckedChangeListener((button, checked) -> {
+            monitorSupersampling = checked;
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("monitorSupersampling", checked)
+                    .apply();
+            refreshPreviewProcessing();
+            statusText.setText(checked
+                    ? "本地 2× 超采样已开启"
+                    : "本地 2× 超采样已关闭");
+        });
+        panel.addView(supersampling);
+
+        panel.addView(
+                text("实时取景格式", 13, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 12, 0, 4));
+        Spinner codec = monitorSpinner(new String[]{"JPEG（相机输出）"});
+        codec.setEnabled(false);
+        codec.setAlpha(0.56f);
+        panel.addView(codec, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+
+        panel.addView(
+                text("监看显示尺寸", 13, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 12, 0, 4));
+        String[] profileValues = new String[]{"source", "hd720", "hd1080"};
+        Spinner profile = monitorSpinner(new String[]{
+                "实时取景原始尺寸",
+                "1280 × 720",
+                "1920 × 1080"});
+        profile.setSelection(Math.max(0, Arrays.asList(profileValues).indexOf(
+                monitorVideoProfile)), false);
+        profile.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            private boolean initialized;
+
+            @Override
+            public void onItemSelected(
+                    android.widget.AdapterView<?> parent,
+                    View view,
+                    int position,
+                    long id) {
+                if (!initialized) {
+                    initialized = true;
+                    return;
+                }
+                monitorVideoProfile = profileValues[position];
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putString("monitorVideoProfile", monitorVideoProfile)
+                        .apply();
+                refreshPreviewProcessing();
+                statusText.setText("监看显示尺寸 · " + monitorProfileLabel());
+            }
+
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        panel.addView(profile, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+
+        panel.addView(text(
+                "Nikon PTP 返回 JPEG 实时取景帧。显示尺寸和本地 2× 超采样仅处理监看画面，不等同于机身的“视频文件类型”“画面尺寸/帧频”或“扩展过采样”。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 10, 0, 0));
+        return panel;
+    }
+
+    private Spinner monitorSpinner(String[] labels) {
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
+        spinner.setPadding(dp(10), 0, dp(8), 0);
+        return spinner;
+    }
+
+    private String monitorProfileLabel() {
+        if ("hd720".equals(monitorVideoProfile)) return "1280×720";
+        if ("hd1080".equals(monitorVideoProfile)) return "1920×1080";
+        return "实时取景原始尺寸";
     }
 
     private View buildSimpleControls() {
@@ -396,7 +674,7 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 14));
         Switch autofocus = new Switch(this);
-        autofocus.setText("自动对焦 AF-S");
+        autofocus.setText("AF-S 单次AF（关闭为MF手动对焦）");
         autofocus.setTextColor(INK);
         autofocus.setChecked(true);
         autofocus.setOnCheckedChangeListener((button, enabled) ->
@@ -438,7 +716,7 @@ public final class MainActivity extends Activity {
         boolean z8IsoRange = "Nikon Z8".equals(connectedCameraName);
         addSpinnerControl(
                 panel,
-                "ISO",
+                "ISO感光度",
                 z8IsoRange
                         ? new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"}
                         : new String[]{"100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600", "51200", "64000"},
@@ -450,40 +728,61 @@ public final class MainActivity extends Activity {
         addSpinnerControl(
                 panel,
                 "对焦模式",
-                new String[]{"AF-S", "AF-C", "MF"},
+                new String[]{"AF-S 单次AF", "AF-C 连续AF", "MF 手动对焦"},
                 new Object[]{"single-shot", "continuous", "manual"},
                 0,
                 "focusMode");
         addSpinnerControl(
                 panel,
-                "曝光模式",
-                new String[]{"P", "M", "A", "S", "B"},
+                "拍摄模式",
+                new String[]{
+                        "P 程序自动",
+                        "S 快门优先自动",
+                        "A 光圈优先自动",
+                        "M 手动",
+                        "M · B门"},
                 new Object[]{
                         "program",
-                        "manual",
-                        "aperturePriority",
                         "shutterPriority",
+                        "aperturePriority",
+                        "manual",
                         "bulb"},
-                1,
+                exposureModeIndex(),
                 "exposureMode");
         addSpinnerControl(
                 panel,
-                "B 门时长（仅 B 模式）",
+                "B门曝光时长（由应用控制）",
                 new String[]{"1 秒", "2 秒", "5 秒", "10 秒", "30 秒", "60 秒"},
                 new Object[]{1, 2, 5, 10, 30, 60},
                 2,
                 "bulbDuration");
+        addSpinnerControl(
+                panel,
+                "设定优化校准",
+                new String[]{"自动", "标准", "自然", "鲜艳", "单色", "人像", "风景", "平面"},
+                new Object[]{
+                        "auto",
+                        "standard",
+                        "neutral",
+                        "vivid",
+                        "monochrome",
+                        "portrait",
+                        "landscape",
+                        "flat"},
+                1,
+                "pictureControl");
 
         TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, MUTED);
+        compensationLabel.setTag("曝光补偿");
         LinearLayout.LayoutParams labelParams = marginParams(-1, -2, 0, 12, 0, 2);
         panel.addView(compensationLabel, labelParams);
         SeekBar compensation = new SeekBar(this);
-        compensation.setMax(100);
-        compensation.setProgress(50);
+        compensation.setMax(30);
+        compensation.setProgress(15);
         compensation.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                double value = (progress - 50) / 10.0;
+                double value = (progress - 15) / 3.0;
                 compensationLabel.setText(String.format(Locale.CHINA, "曝光补偿 · %+.1f EV", value));
             }
 
@@ -491,12 +790,18 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                double value = (seekBar.getProgress() - 50) / 10.0;
+                double value = (seekBar.getProgress() - 15) / 3.0;
                 applyParameter("exposureCompensation", value, "曝光补偿");
             }
         });
         cameraControls.add(compensation);
+        parameterControls.put("exposureCompensation", compensation);
+        parameterLabels.put("exposureCompensation", compensationLabel);
         panel.addView(compensation);
+
+        addZebraControls(panel);
+        addLutControls(panel);
+        updateCameraControls();
         return panel;
     }
 
@@ -507,9 +812,9 @@ public final class MainActivity extends Activity {
             Object[] values,
             int selected,
             String parameter) {
-        parent.addView(
-                text(label, 13, Typeface.BOLD, MUTED),
-                marginParams(-1, -2, 0, 12, 0, 4));
+        TextView labelView = text(label, 13, Typeface.BOLD, MUTED);
+        labelView.setTag(label);
+        parent.addView(labelView, marginParams(-1, -2, 0, 12, 0, 4));
         Spinner spinner = new Spinner(this);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this,
@@ -533,15 +838,117 @@ public final class MainActivity extends Activity {
                     initialized = true;
                     return;
                 }
+                if ("exposureMode".equals(parameter)) {
+                    exposureMode = String.valueOf(values[position]);
+                    updateCameraControls();
+                }
                 applyParameter(parameter, values[position], label);
             }
 
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
         });
         cameraControls.add(spinner);
+        parameterControls.put(parameter, spinner);
+        parameterLabels.put(parameter, labelView);
         parent.addView(spinner, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(48)));
+    }
+
+    private void addZebraControls(LinearLayout parent) {
+        TextView title = text("条纹图案（本地）", 13, Typeface.BOLD, MUTED);
+        parent.addView(title, marginParams(-1, -2, 0, 12, 0, 4));
+
+        Switch enabled = new Switch(this);
+        enabled.setText("加亮显示");
+        enabled.setTextColor(INK);
+        enabled.setChecked(zebraEnabled);
+        enabled.setOnCheckedChangeListener((button, checked) -> {
+            zebraEnabled = checked;
+            if (zebraThresholdControl != null) zebraThresholdControl.setEnabled(checked);
+            if (!checked) {
+                latestZebraMask = null;
+                if (zebraImage != null) zebraImage.setImageDrawable(null);
+            }
+            refreshPreviewProcessing();
+        });
+        parent.addView(enabled);
+
+        TextView thresholdLabel = text(
+                "加亮显示阈值 · " + zebraThreshold + " IRE",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        parent.addView(thresholdLabel, marginParams(-1, -2, 0, 5, 0, 0));
+        zebraThresholdControl = new SeekBar(this);
+        zebraThresholdControl.setMax(30);
+        zebraThresholdControl.setProgress(zebraThreshold - 70);
+        zebraThresholdControl.setEnabled(zebraEnabled);
+        zebraThresholdControl.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                zebraThreshold = 70 + progress;
+                thresholdLabel.setText("加亮显示阈值 · " + zebraThreshold + " IRE");
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                if (zebraEnabled) refreshPreviewProcessing();
+            }
+        });
+        parent.addView(zebraThresholdControl);
+    }
+
+    private void addLutControls(LinearLayout parent) {
+        parent.addView(
+                text("监看 LUT（本地）", 13, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 12, 0, 4));
+
+        lutSwitch = new Switch(this);
+        lutSwitch.setText("应用到实时取景");
+        lutSwitch.setTextColor(INK);
+        lutSwitch.setChecked(lutEnabled && previewLut != null);
+        lutSwitch.setEnabled(previewLut != null);
+        lutSwitch.setOnCheckedChangeListener((button, checked) -> {
+            lutEnabled = checked && previewLut != null;
+            refreshPreviewProcessing();
+        });
+        parent.addView(lutSwitch);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button importButton = nativeButton("导入 .cube", false);
+        importButton.setOnClickListener(view -> chooseLutFile());
+        actions.addView(importButton, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button clearButton = nativeButton("移除", false);
+        clearButton.setOnClickListener(view -> {
+            previewLut = null;
+            lutEnabled = false;
+            if (lutSwitch != null) {
+                lutSwitch.setChecked(false);
+                lutSwitch.setEnabled(false);
+            }
+            if (lutStatusText != null) {
+                lutStatusText.setText("尚未导入；LUT 只影响监看，不写入原片。");
+            }
+            refreshPreviewProcessing();
+        });
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        clearParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(clearButton, clearParams);
+        parent.addView(actions, marginParams(-1, 44, 0, 6, 0, 0));
+
+        lutStatusText = text(
+                previewLut == null
+                        ? "尚未导入；LUT 只影响监看，不写入原片。"
+                        : "已载入 · " + previewLut.getTitle(),
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        lutStatusText.setMaxLines(2);
+        parent.addView(lutStatusText, marginParams(-1, -2, 0, 5, 0, 2));
     }
 
     private View buildLibraryView() {
@@ -808,6 +1215,8 @@ public final class MainActivity extends Activity {
         cameraExecutor.submit(camera::disconnect);
         connectedCameraName = "Nikon 相机";
         latestFrame = null;
+        latestSourceFrame = null;
+        latestZebraMask = null;
         updateConnectionUi();
         showSection(currentSection);
     }
@@ -822,7 +1231,7 @@ public final class MainActivity extends Activity {
             liveViewEnabled = false;
             cameraExecutor.submit(camera::stopLiveView);
             updateConnectionUi();
-            if (liveViewButton != null) liveViewButton.setText("开始监看");
+            if (liveViewButton != null) liveViewButton.setText("开启实时取景");
         } else {
             cameraExecutor.submit(() -> {
                 try {
@@ -849,12 +1258,11 @@ public final class MainActivity extends Activity {
         cameraExecutor.submit(() -> {
             try {
                 byte[] jpeg = camera.getLiveViewFrame();
-                Bitmap bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                Bitmap source = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                ProcessedPreview output = processPreview(source);
                 mainHandler.post(() -> {
                     if (generation != previewGeneration) return;
-                    latestFrame = bitmap;
-                    if (previewImage != null) previewImage.setImageBitmap(bitmap);
-                    if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
+                    showProcessedPreview(source, output);
                     statusText.setText(connectedCameraName + " LIVE · USB/PTP");
                     mainHandler.postDelayed(() -> pullPreview(generation), 220);
                 });
@@ -880,12 +1288,11 @@ public final class MainActivity extends Activity {
             try {
                 byte[] jpeg = camera.capture();
                 File file = savePhoto(jpeg);
-                Bitmap bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                Bitmap source = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                ProcessedPreview output = processPreview(source);
                 mainHandler.post(() -> {
                     capturing = false;
-                    latestFrame = bitmap;
-                    if (previewImage != null) previewImage.setImageBitmap(bitmap);
-                    if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
+                    showProcessedPreview(source, output);
                     if (shutterButton != null) shutterButton.setText("拍摄");
                     updateFileCount();
                     statusText.setText("已保存 " + file.getName());
@@ -899,6 +1306,107 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private ProcessedPreview processPreview(Bitmap source) {
+        CubeLut lut = previewLut;
+        Bitmap graded = lutEnabled && lut != null ? lut.apply(source) : source;
+        Bitmap display = resampleMonitorPreview(graded);
+        Bitmap zebra = zebraEnabled ? createZebraMask(source, zebraThreshold) : null;
+        return new ProcessedPreview(display, zebra);
+    }
+
+    private Bitmap resampleMonitorPreview(Bitmap source) {
+        int boundWidth;
+        int boundHeight;
+        if ("hd720".equals(monitorVideoProfile)) {
+            boundWidth = 1280;
+            boundHeight = 720;
+        } else if ("hd1080".equals(monitorVideoProfile)) {
+            boundWidth = 1920;
+            boundHeight = 1080;
+        } else {
+            boundWidth = source.getWidth();
+            boundHeight = source.getHeight();
+        }
+
+        double fit = Math.min(
+                boundWidth / (double) source.getWidth(),
+                boundHeight / (double) source.getHeight());
+        int targetWidth = Math.max(1, (int) Math.round(source.getWidth() * fit));
+        int targetHeight = Math.max(1, (int) Math.round(source.getHeight() * fit));
+        if (!monitorSupersampling) {
+            if (targetWidth == source.getWidth() && targetHeight == source.getHeight()) return source;
+            return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
+        }
+
+        int supersampledWidth = Math.min(4096, targetWidth * 2);
+        int supersampledHeight = Math.max(
+                1,
+                (int) Math.round(
+                        supersampledWidth * (source.getHeight() / (double) source.getWidth())));
+        Bitmap intermediate = Bitmap.createScaledBitmap(
+                source,
+                supersampledWidth,
+                supersampledHeight,
+                true);
+        Bitmap output = Bitmap.createScaledBitmap(
+                intermediate,
+                targetWidth,
+                targetHeight,
+                true);
+        if (intermediate != source && intermediate != output) intermediate.recycle();
+        return output;
+    }
+
+    private void showProcessedPreview(Bitmap source, ProcessedPreview output) {
+        latestSourceFrame = source;
+        latestFrame = output.display;
+        latestZebraMask = output.zebra;
+        if (previewImage != null) previewImage.setImageBitmap(output.display);
+        if (zebraImage != null) zebraImage.setImageBitmap(zebraEnabled ? output.zebra : null);
+        if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
+    }
+
+    private void refreshPreviewProcessing() {
+        Bitmap source = latestSourceFrame;
+        if (source == null) return;
+        cameraExecutor.submit(() -> {
+            ProcessedPreview output = processPreview(source);
+            mainHandler.post(() -> showProcessedPreview(source, output));
+        });
+    }
+
+    private Bitmap createZebraMask(Bitmap source, int threshold) {
+        int sourceWidth = source.getWidth();
+        int sourceHeight = source.getHeight();
+        double scale = Math.min(1.0, 384.0 / Math.max(sourceWidth, sourceHeight));
+        int width = Math.max(1, (int) Math.round(sourceWidth * scale));
+        int height = Math.max(1, (int) Math.round(sourceHeight * scale));
+        Bitmap working = scale < 1.0
+                ? Bitmap.createScaledBitmap(source, width, height, false)
+                : source;
+        int[] pixels = new int[width * height];
+        int[] overlay = new int[width * height];
+        working.getPixels(pixels, 0, width, 0, 0, width, height);
+        int limit = Math.max(0, Math.min(255, Math.round(threshold * 2.55f)));
+        int zebraColor = Color.argb(190, 255, 205, 36);
+        for (int y = 0; y < height; y++) {
+            int row = y * width;
+            for (int x = 0; x < width; x++) {
+                int color = pixels[row + x];
+                int luminance = (
+                        54 * Color.red(color)
+                                + 183 * Color.green(color)
+                                + 19 * Color.blue(color)) >> 8;
+                if (luminance >= limit && ((x + y) / 5) % 2 == 0) {
+                    overlay[row + x] = zebraColor;
+                }
+            }
+        }
+        Bitmap result = Bitmap.createBitmap(overlay, width, height, Bitmap.Config.ARGB_8888);
+        if (working != source) working.recycle();
+        return result;
     }
 
     private File savePhoto(byte[] jpeg) throws Exception {
@@ -916,6 +1424,10 @@ public final class MainActivity extends Activity {
     private void applyParameter(String name, Object value, String label) {
         if (!connected) {
             showToast("连接支持的 Nikon 相机后才能调整参数。");
+            return;
+        }
+        if (!canAdjustExposureParameter(name)) {
+            showToast(label + "在当前拍摄模式下由相机控制。");
             return;
         }
         cameraExecutor.submit(() -> {
@@ -965,6 +1477,62 @@ public final class MainActivity extends Activity {
 
     private void updateCameraControls() {
         for (View control : cameraControls) control.setEnabled(connected);
+        for (Map.Entry<String, View> entry : parameterControls.entrySet()) {
+            boolean enabled = connected && canAdjustExposureParameter(entry.getKey());
+            entry.getValue().setEnabled(enabled);
+            entry.getValue().setAlpha(enabled ? 1f : 0.48f);
+        }
+        for (Map.Entry<String, TextView> entry : parameterLabels.entrySet()) {
+            Object tag = entry.getValue().getTag();
+            String base = tag == null ? entry.getValue().getText().toString() : String.valueOf(tag);
+            String reason = exposureLockReason(entry.getKey());
+            entry.getValue().setText(reason == null ? base : base + " · " + reason);
+            entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
+        }
+    }
+
+    private boolean canAdjustExposureParameter(String name) {
+        switch (name) {
+            case "exposureTime":
+                return "manual".equals(exposureMode) || "shutterPriority".equals(exposureMode);
+            case "aperture":
+                return "manual".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "bulb".equals(exposureMode);
+            case "iso":
+                return true;
+            case "exposureCompensation":
+                return "program".equals(exposureMode)
+                        || "aperturePriority".equals(exposureMode)
+                        || "shutterPriority".equals(exposureMode);
+            case "bulbDuration":
+                return "bulb".equals(exposureMode);
+            default:
+                return true;
+        }
+    }
+
+    private int exposureModeIndex() {
+        switch (exposureMode) {
+            case "program": return 0;
+            case "shutterPriority": return 1;
+            case "aperturePriority": return 2;
+            case "bulb": return 4;
+            default: return 3;
+        }
+    }
+
+    private String exposureLockReason(String name) {
+        if (canAdjustExposureParameter(name)) return null;
+        String mode;
+        switch (exposureMode) {
+            case "program": mode = "P"; break;
+            case "aperturePriority": mode = "A"; break;
+            case "shutterPriority": mode = "S"; break;
+            case "bulb": mode = "M（B门）"; break;
+            default: mode = "M"; break;
+        }
+        return mode + " 拍摄模式下由相机控制";
     }
 
     private void updateFileCount() {
@@ -1113,6 +1681,16 @@ public final class MainActivity extends Activity {
                 .setMessage(message == null ? "原生相机操作失败。" : message)
                 .setPositiveButton("好", null)
                 .show();
+    }
+
+    private static final class ProcessedPreview {
+        final Bitmap display;
+        final Bitmap zebra;
+
+        ProcessedPreview(Bitmap display, Bitmap zebra) {
+            this.display = display;
+            this.zebra = zebra;
+        }
     }
 
     @Override

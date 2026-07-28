@@ -1,0 +1,64 @@
+name: Build signed iOS package
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "可选：同时上传到已有 Release，例如 v0.7.0"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  signed-ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Import Apple signing assets
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          test -n "$IOS_CERTIFICATE_P12_BASE64"
+          test -n "$IOS_PROVISIONING_PROFILE_BASE64"
+          CERTIFICATE_PATH="$RUNNER_TEMP/nikonlink.p12"
+          PROFILE_PATH="$RUNNER_TEMP/nikonlink.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/nikonlink-signing.keychain-db"
+          echo -n "$IOS_CERTIFICATE_P12_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+          echo -n "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode -o "$PROFILE_PATH"
+          security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "IOS_PROFILE_SPECIFIER=$PROFILE_NAME" >> "$GITHUB_ENV"
+
+      - name: Build signed IPA
+        env:
+          IOS_DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
+          IOS_SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
+        run: ./scripts/build-ios.sh --signed
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NikonLink-iOS-signed
+          path: dist/NikonLink-*-ios-signed.ipa*
+
+      - name: Upload to existing GitHub Release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: gh release upload "$RELEASE_TAG" dist/NikonLink-*-ios-signed.ipa* --clobber
