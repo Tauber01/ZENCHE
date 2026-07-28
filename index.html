@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Nikon Link 跨平台相机控制软件，支持视频设备连接、实时监看、拍摄、参数控制与本地文件管理。"
+    />
+    <meta name="theme-color" content="#f5f7fb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Nikon Link" />
+    <title>Nikon Link — 相机控制中心</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./tokens.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-experience="simple" data-view="capture">
+    <svg class="svg-defs" aria-hidden="true">
+      <symbol id="icon-camera" viewBox="0 0 24 24">
+        <path d="M4 7.5h3l1.3-2h7.4l1.3 2h3a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9.5a2 2 0 0 1 2-2Z" />
+        <circle cx="12" cy="13.5" r="4" />
+      </symbol>
+      <symbol id="icon-monitor" viewBox="0 0 24 24">
+        <rect x="2.5" y="3.5" width="19" height="13" rx="1.5" />
+        <path d="M8 20.5h8M12 16.5v4" />
+      </symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="m4 17 4.5-4.5 3 3 2.5-2.5 6 6" />
+      </symbol>
+      <symbol id="icon-send" viewBox="0 0 24 24">
+        <path d="m21 3-7.4 18-3.4-7.2L3 10.4 21 3Z" />
+        <path d="m10.2 13.8 4.1-4.1" />
+      </symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      </symbol>
+      <symbol id="icon-wifi" viewBox="0 0 24 24">
+        <path d="M3 8.5a14 14 0 0 1 18 0M6.5 12a9 9 0 0 1 11 0M9.5 15.5a4.5 4.5 0 0 1 5 0" />
+        <circle cx="12" cy="19" r="1" />
+      </symbol>
+      <symbol id="icon-battery" viewBox="0 0 24 24">
+        <rect x="3" y="7" width="17" height="10" rx="2" />
+        <path d="M22 10v4M6 10h9v4H6z" />
+      </symbol>
+      <symbol id="icon-grid" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="1" />
+        <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+      </symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24">
+        <path d="M3 19V5M3 19h18M6 16l3-5 3 2 4-7 5 6" />
+      </symbol>
+      <symbol id="icon-focus" viewBox="0 0 24 24">
+        <path d="M8 3H4a1 1 0 0 0-1 1v4M16 3h4a1 1 0 0 1 1 1v4M8 21H4a1 1 0 0 1-1-1v-4M16 21h4a1 1 0 0 0 1-1v-4" />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+      </symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24">
+        <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+      </symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16M9 3h6l1 4H8l1-4ZM7 7l1 14h8l1-14M10 11v6M14 11v6" />
+      </symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24">
+        <path d="m5 12 4 4L19 6" />
+      </symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24">
+        <circle cx="5" cy="12" r="1" />
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+      </symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="icon-x" viewBox="0 0 24 24">
+        <path d="m5 5 14 14M19 5 5 19" />
+      </symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24">
+        <path d="m9 6 6 6-6 6" />
+      </symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path d="M3 6h7l2 2h9v11H3V6Z" />
+      </symbol>
+      <symbol id="icon-info" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v6M12 7h.01" />
+      </symbol>
+    </svg>
+
+    <div class="app-shell" id="appShell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Nikon Link 首页">
+          <span class="brand__mark" aria-hidden="true">N</span>
+          <span class="brand__name">Nikon Link</span>
+          <span class="brand__tag">本地版</span>
+        </a>
+
+        <button class="camera-chip" id="cameraChip" type="button" aria-haspopup="dialog">
+          <span class="camera-chip__icon">
+            <svg class="icon"><use href="#icon-camera"></use></svg>
+          </span>
+          <span class="camera-chip__copy">
+            <strong id="cameraName">未连接</strong>
+            <small id="cameraConnection">选择视频设备</small>
+          </span>
+          <span class="camera-chip__battery" id="cameraMeta">
+            <svg class="icon"><use href="#icon-monitor"></use></svg>
+            <span>—</span>
+          </span>
+        </button>
+
+        <button class="command-trigger" id="commandTrigger" type="button" aria-haspopup="dialog">
+          <svg class="icon"><use href="#icon-search"></use></svg>
+          <span>查找功能或设置</span>
+          <kbd>⌘ K</kbd>
+        </button>
+
+        <div class="experience-switch" role="group" aria-label="操作模式">
+          <button class="experience-switch__option is-active" data-experience-value="simple" type="button" aria-pressed="true">
+            普通
+          </button>
+          <button class="experience-switch__option" data-experience-value="pro" type="button" aria-pressed="false">
+            专业
+          </button>
+        </div>
+
+        <div class="topbar__actions">
+          <span class="live-status" aria-label="实时监看已开启" hidden>
+            <span class="live-status__dot"></span>
+            <span id="liveStatusText">LIVE</span>
+          </span>
+          <button class="icon-button" id="installButton" type="button" aria-label="安装 Nikon Link" hidden>
+            <svg class="icon"><use href="#icon-download"></use></svg>
+          </button>
+          <button class="icon-button topbar__settings" id="settingsButton" type="button" aria-label="打开连接设置">
+            <svg class="icon"><use href="#icon-settings"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="runtime-notice" id="runtimeNotice" role="status" hidden>
+        <svg class="icon"><use href="#icon-info"></use></svg>
+        <span id="runtimeNoticeText"></span>
+        <button type="button" id="runtimeNoticeAction" hidden>了解</button>
+      </div>
+
+      <div class="main-grid">
+        <nav class="side-nav" aria-label="主要功能">
+          <button class="side-nav__item is-active" data-view-target="capture" type="button" aria-current="page">
+            <svg class="icon"><use href="#icon-camera"></use></svg>
+            <span>拍摄</span>
+          </button>
+          <button class="side-nav__item" data-view-target="monitor" type="button">
+            <svg class="icon"><use href="#icon-monitor"></use></svg>
+            <span>监看</span>
+          </button>
+          <button class="side-nav__item" data-view-target="library" type="button">
+            <svg class="icon"><use href="#icon-image"></use></svg>
+            <span>文件</span>
+            <span class="side-nav__badge" id="fileBadge">0</span>
+          </button>
+          <button class="side-nav__item" data-view-target="transfer" type="button">
+            <svg class="icon"><use href="#icon-send"></use></svg>
+            <span>传输</span>
+            <span class="side-nav__status" id="transferStatus" hidden></span>
+          </button>
+        </nav>
+
+        <main class="workspace">
+          <section class="view-panel is-active" data-view-panel="capture" aria-labelledby="captureTitle">
+            <div class="workspace-heading">
+              <div>
+                <h1 id="captureTitle">联机拍摄</h1>
+                <p id="modeDescription">只保留常用控制，拿起相机就能拍。</p>
+              </div>
+              <div class="workspace-heading__actions">
+                <button class="button button--quiet" id="folderButton" type="button">
+                  <svg class="icon"><use href="#icon-folder"></use></svg>
+                  <span>本次拍摄</span>
+                </button>
+                <button class="icon-button" id="moreCaptureButton" type="button" aria-label="更多拍摄选项">
+                  <svg class="icon"><use href="#icon-more"></use></svg>
+                </button>
+              </div>
+            </div>
+
+            <figure class="viewfinder" id="viewfinder" aria-label="相机实时取景">
+              <div class="viewfinder__status">
+                <span><span class="status-dot"></span><span id="viewfinderStatus">NO SOURCE</span></span>
+                <span id="viewfinderFormat">—</span>
+                <span class="pro-only" id="viewfinderCodec">浏览器视频流</span>
+              </div>
+
+              <div class="camera-scene" id="cameraScene">
+                <div class="scene__wall"></div>
+                <div class="scene__table"></div>
+                <div class="scene__bottle">
+                  <span class="scene__bottle-cap"></span>
+                  <span class="scene__bottle-label">N•01</span>
+                </div>
+                <div class="scene__fruit"></div>
+                <div class="scene__leaf scene__leaf--one"></div>
+                <div class="scene__leaf scene__leaf--two"></div>
+              </div>
+              <video class="live-video" id="liveVideo" autoplay muted playsinline hidden></video>
+              <img class="live-video native-preview" id="nativePreview" alt="Nikon Z8 实时取景" hidden />
+
+              <div class="grid-overlay" aria-hidden="true"></div>
+              <div class="focus-box" aria-label="对焦点">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <div class="horizon pro-only" aria-label="电子水平仪">
+                <span></span>
+              </div>
+              <div class="histogram pro-only" aria-label="RGB 直方图">
+                <svg viewBox="0 0 120 54" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="M2 52 8 48 13 47 18 39 24 43 30 34 36 37 43 17 49 29 56 8 62 24 68 31 74 21 80 38 88 32 94 43 101 40 108 49 118 51" />
+                </svg>
+              </div>
+              <div class="viewfinder__readout">
+                <span id="readoutShutter">—</span>
+                <span id="readoutAperture">—</span>
+                <span id="readoutIso">—</span>
+                <span id="readoutExposure">—</span>
+              </div>
+              <div class="capture-flash" id="captureFlash" aria-hidden="true"></div>
+            </figure>
+
+            <div class="capture-dock">
+              <div class="capture-dock__tools">
+                <button class="tool-button is-active" id="liveToggle" type="button" aria-label="切换实时监看" aria-pressed="true">
+                  <svg class="icon"><use href="#icon-monitor"></use></svg>
+                  <span>实时</span>
+                </button>
+                <button class="tool-button is-active" id="gridToggle" type="button" aria-label="切换网格辅助" aria-pressed="true">
+                  <svg class="icon"><use href="#icon-grid"></use></svg>
+                  <span>网格</span>
+                </button>
+                <button class="tool-button pro-only" id="histogramToggle" type="button" aria-label="切换直方图" aria-pressed="true">
+                  <svg class="icon"><use href="#icon-chart"></use></svg>
+                  <span>直方图</span>
+                </button>
+                <button class="tool-button pro-only" id="peakingToggle" type="button" aria-label="切换峰值对焦" aria-pressed="false">
+                  <svg class="icon"><use href="#icon-focus"></use></svg>
+                  <span>峰值</span>
+                </button>
+              </div>
+
+              <button class="shutter-button" id="shutterButton" type="button" aria-label="拍摄照片" disabled>
+                <span class="shutter-button__ring">
+                  <span class="shutter-button__core"></span>
+                </span>
+                <span class="shutter-button__label">拍摄</span>
+              </button>
+
+              <div class="zoom-control" aria-label="实时取景缩放">
+                <button class="icon-button" id="zoomOut" type="button" aria-label="缩小">−</button>
+                <span id="zoomValue">100%</span>
+                <button class="icon-button" id="zoomIn" type="button" aria-label="放大">+</button>
+              </div>
+            </div>
+
+            <div class="quick-strip simple-only">
+              <button class="quick-card" type="button" data-focus-param="aperture">
+                <span>背景虚化</span>
+                <strong>适中</strong>
+                <small>设备对焦距离</small>
+              </button>
+              <button class="quick-card" type="button" data-focus-param="brightness">
+                <span>画面亮度</span>
+                <strong>稍亮</strong>
+                <small>设备曝光补偿</small>
+              </button>
+              <button class="quick-card" type="button" data-focus-param="whitebalance">
+                <span>画面色调</span>
+                <strong>自然</strong>
+                <small>设备白平衡</small>
+              </button>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="monitor" aria-labelledby="monitorTitle" hidden>
+            <div class="workspace-heading">
+              <div>
+                <h1 id="monitorTitle">实时监看</h1>
+                <p>为导演、灯光与客户保留一块干净的画面。</p>
+              </div>
+              <button class="button button--primary" type="button" id="fullscreenButton">全屏监看</button>
+            </div>
+            <div class="monitor-stage">
+              <div class="monitor-stage__frame">
+                <div class="monitor-stage__scene">
+                  <div class="scene__wall"></div>
+                  <div class="scene__table"></div>
+                  <div class="scene__bottle"><span class="scene__bottle-cap"></span><span class="scene__bottle-label">N•01</span></div>
+                  <div class="scene__fruit"></div>
+                </div>
+                <video class="monitor-video" id="monitorVideo" autoplay muted playsinline hidden></video>
+                <img class="monitor-video native-preview" id="nativeMonitorPreview" alt="Nikon Z8 监看画面" hidden />
+                <div class="monitor-stage__label" id="monitorDeviceLabel">未连接视频设备</div>
+              </div>
+            </div>
+            <div class="monitor-options">
+              <label class="switch-row">
+                <span><strong>仅显示画面</strong><small>隐藏参数和辅助线</small></span>
+                <input id="cleanFeedSwitch" type="checkbox" role="switch" />
+              </label>
+              <label class="switch-row">
+                <span><strong>保持屏幕唤醒</strong><small>监看时避免设备自动锁屏</small></span>
+                <input id="wakeLockSwitch" type="checkbox" role="switch" />
+              </label>
+              <label class="switch-row pro-only">
+                <span><strong>镜像预览</strong><small>只影响监看，不改变照片</small></span>
+                <input id="mirrorSwitch" type="checkbox" role="switch" />
+              </label>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="library" aria-labelledby="libraryTitle" hidden>
+            <div class="workspace-heading">
+              <div>
+                <h1 id="libraryTitle">拍摄文件</h1>
+                <p>拍摄与导入的素材保存在当前设备，并按时间整理。</p>
+              </div>
+              <div class="workspace-heading__actions">
+                <button class="button button--quiet" id="selectAllButton" type="button">全选</button>
+                <button class="button button--quiet" id="importFilesButton" type="button">
+                  <svg class="icon"><use href="#icon-folder"></use></svg>
+                  <span>导入文件</span>
+                </button>
+                <button class="button button--primary" id="downloadButton" type="button" disabled>
+                  <svg class="icon"><use href="#icon-download"></use></svg>
+                  <span>下载所选</span>
+                </button>
+                <input id="fileInput" type="file" accept="image/*,.nef,.nrw" multiple hidden />
+              </div>
+            </div>
+            <div class="library-filter">
+              <div class="segmented" role="tablist" aria-label="文件来源">
+                <button class="segmented__item is-active" type="button" role="tab" aria-selected="true">全部</button>
+                <button class="segmented__item" type="button" role="tab" aria-selected="false">相机</button>
+                <button class="segmented__item" type="button" role="tab" aria-selected="false">已导入</button>
+              </div>
+              <span class="selection-count" id="selectionCount">未选择文件</span>
+            </div>
+            <div class="file-grid" id="fileGrid">
+              <div class="empty-state" id="libraryEmptyState">
+                <svg class="icon"><use href="#icon-image"></use></svg>
+                <strong>还没有照片</strong>
+                <span>连接相机拍摄，或从本机导入照片。</span>
+                <button class="button button--quiet" id="emptyImportButton" type="button">导入文件</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="transfer" aria-labelledby="transferTitle" hidden>
+            <div class="workspace-heading">
+              <div>
+                <h1 id="transferTitle">传输队列</h1>
+                <p>拍摄不中断，素材在后台自动导入。</p>
+              </div>
+              <button class="button button--quiet" type="button" id="pauseQueueButton">暂停队列</button>
+            </div>
+            <div class="queue-summary">
+              <div>
+                <span class="queue-summary__value" id="activeTransferCount">0</span>
+                <span>正在传输</span>
+              </div>
+              <div>
+                <span class="queue-summary__value" id="waitingTransferCount">0</span>
+                <span>等待中</span>
+              </div>
+              <div>
+                <span class="queue-summary__value" id="sessionBytes">0 MB</span>
+                <span>本次已导入</span>
+              </div>
+            </div>
+            <div class="transfer-list" id="transferList">
+              <div class="empty-state empty-state--compact" id="transferEmptyState">
+                <svg class="icon"><use href="#icon-send"></use></svg>
+                <strong>传输队列为空</strong>
+                <span>新拍摄和导入的照片会显示在这里。</span>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside class="inspector" aria-label="控制面板">
+          <div class="inspector-panel is-active" data-inspector-panel="capture">
+            <div class="inspector__header">
+              <div>
+                <h2>拍摄设置</h2>
+                <span id="inspectorModeLabel">普通模式</span>
+              </div>
+              <button class="icon-button" id="resetParametersButton" type="button" aria-label="重置参数">
+                <svg class="icon"><use href="#icon-settings"></use></svg>
+              </button>
+            </div>
+
+            <div class="simple-controls simple-only">
+              <label class="field-group">
+                <span class="field-label">拍摄风格</span>
+                <select id="scenePreset">
+                  <option>产品静物</option>
+                  <option>人像</option>
+                  <option>风景</option>
+                  <option>运动</option>
+                  <option>手动控制</option>
+                </select>
+                <small>根据设备能力切换曝光、对焦与白平衡策略。</small>
+              </label>
+
+              <div class="friendly-control">
+                <div><span>背景虚化</span><strong id="blurValue">适中</strong></div>
+                <input id="blurSlider" type="range" min="0" max="4" value="2" aria-label="背景虚化程度" />
+                <div class="range-labels"><span>更多环境</span><span>更虚化</span></div>
+              </div>
+
+              <div class="friendly-control">
+                <div><span>画面亮度</span><strong id="brightnessValue">稍亮</strong></div>
+                <input id="brightnessSlider" type="range" min="0" max="4" value="3" aria-label="画面亮度" />
+                <div class="range-labels"><span>更暗</span><span>更亮</span></div>
+              </div>
+
+              <label class="switch-row">
+                <span><strong>自动对焦</strong><small>轻触画面选择主体</small></span>
+                <input id="simpleAutofocusSwitch" type="checkbox" role="switch" checked />
+              </label>
+              <label class="switch-row">
+                <span><strong>保存到本地照片库</strong><small>照片仅保存在当前设备</small></span>
+                <input id="autoSaveSwitch" type="checkbox" role="switch" checked />
+              </label>
+            </div>
+
+            <div class="pro-controls pro-only">
+              <div class="parameter-grid">
+                <div class="parameter" data-capability="exposureTime">
+                  <span>快门</span>
+                  <div class="stepper" data-constraint="exposureTime" data-values="1/60,1/80,1/100,1/125,1/160,1/200" data-constraint-values="0.016667,0.0125,0.01,0.008,0.00625,0.005" data-index="3">
+                    <button type="button" aria-label="降低快门速度">−</button>
+                    <strong>1/125</strong>
+                    <button type="button" aria-label="提高快门速度">+</button>
+                  </div>
+                </div>
+                <div class="parameter" data-capability="aperture">
+                  <span>光圈</span>
+                  <div class="stepper" data-constraint="aperture" data-values="F2.8,F3.2,F3.5,F4.0,F4.5,F5.6" data-constraint-values="2.8,3.2,3.5,4,4.5,5.6" data-index="3">
+                    <button type="button" aria-label="增大光圈">−</button>
+                    <strong>F4.0</strong>
+                    <button type="button" aria-label="缩小光圈">+</button>
+                  </div>
+                </div>
+                <div class="parameter" data-capability="iso">
+                  <span>ISO</span>
+                  <div class="stepper" data-constraint="iso" data-values="100,200,320,400,500,640,800" data-constraint-values="100,200,320,400,500,640,800" data-index="3">
+                    <button type="button" aria-label="降低 ISO">−</button>
+                    <strong>400</strong>
+                    <button type="button" aria-label="提高 ISO">+</button>
+                  </div>
+                </div>
+                <div class="parameter" data-capability="exposureCompensation">
+                  <span>曝光补偿</span>
+                  <div class="stepper" data-constraint="exposureCompensation" data-values="-0.7,-0.3,0.0,+0.3,+0.7,+1.0" data-constraint-values="-0.7,-0.3,0,0.3,0.7,1" data-index="3">
+                    <button type="button" aria-label="降低曝光补偿">−</button>
+                    <strong>+0.3</strong>
+                    <button type="button" aria-label="提高曝光补偿">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="control-list">
+                <label class="select-row" data-capability="whiteBalanceMode"><span>白平衡</span><select data-constraint="whiteBalanceMode"><option value="continuous">自动</option><option value="manual">手动</option></select></label>
+                <label class="select-row" data-capability="focusMode"><span>对焦模式</span><select data-constraint="focusMode"><option value="continuous">连续</option><option value="single-shot">单次</option><option value="manual">手动</option></select></label>
+                <label class="select-row" data-capability="focusDistance"><span>对焦距离</span><select data-constraint="focusDistance"><option value="">由设备决定</option></select></label>
+                <label class="select-row" data-capability="exposureMode"><span>曝光模式</span><select data-constraint="exposureMode"><option value="continuous">自动</option><option value="manual">手动</option></select></label>
+                <label class="select-row" data-capability="torch"><span>持续补光</span><select data-constraint="torch"><option value="false">关闭</option><option value="true">开启</option></select></label>
+              </div>
+
+            </div>
+
+            <div class="inspector__footer">
+              <div><span>保存位置</span><strong id="storageLocation">浏览器本地照片库</strong></div>
+              <div><span>可用空间</span><strong id="storageRemaining">正在计算</strong></div>
+            </div>
+          </div>
+
+          <div class="inspector-panel" data-inspector-panel="monitor" hidden>
+            <div class="inspector__header">
+              <div><h2>监看输出</h2><span id="monitorStatus">等待设备连接</span></div>
+            </div>
+            <div class="detail-stack">
+              <div><span>输出分辨率</span><strong id="monitorResolution">—</strong></div>
+              <div><span>帧率</span><strong id="monitorFrameRate">—</strong></div>
+              <div><span>设备状态</span><strong id="monitorTrackState">未连接</strong></div>
+            </div>
+            <button class="button button--primary button--full" type="button" id="pictureInPictureButton" disabled>画中画监看</button>
+          </div>
+
+          <div class="inspector-panel" data-inspector-panel="library" hidden>
+            <div class="inspector__header">
+              <div><h2>文件操作</h2><span>选择照片以开始</span></div>
+            </div>
+            <div class="detail-stack">
+              <div><span>所选文件</span><strong id="selectedFilesValue">0 项</strong></div>
+              <div><span>预计大小</span><strong id="selectedSizeValue">—</strong></div>
+              <div><span>保存到</span><strong>浏览器本地照片库</strong></div>
+            </div>
+            <button class="button button--primary button--full" id="inspectorDownload" type="button" disabled>
+              <svg class="icon"><use href="#icon-download"></use></svg>
+              <span>下载所选</span>
+            </button>
+            <button class="button button--danger button--full" id="deleteButton" type="button" disabled>
+              <svg class="icon"><use href="#icon-trash"></use></svg>
+              <span>移除所选</span>
+            </button>
+          </div>
+
+          <div class="inspector-panel" data-inspector-panel="transfer" hidden>
+            <div class="inspector__header">
+              <div><h2>队列状态</h2><span>本地照片库</span></div>
+            </div>
+            <div class="detail-stack">
+              <div><span>保存方式</span><strong>IndexedDB 本地存储</strong></div>
+              <div><span>网络上传</span><strong>未启用</strong></div>
+              <div><span>文件命名</span><strong>NIKON_日期时间</strong></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="statusbar">
+        <span id="connectionStatus"><svg class="icon"><use href="#icon-wifi"></use></svg> 未连接</span>
+        <span class="statusbar__center" id="lastCapture">尚未拍摄</span>
+        <span>本次会话 · <strong id="captureCount">0</strong> 张</span>
+      </footer>
+    </div>
+
+    <dialog class="dialog command-dialog" id="commandDialog" aria-labelledby="commandTitle">
+      <div class="dialog__header">
+        <svg class="icon"><use href="#icon-search"></use></svg>
+        <input id="commandSearch" type="search" placeholder="输入功能或设置名称" aria-label="查找功能或设置" autocomplete="off" />
+        <kbd>ESC</kbd>
+      </div>
+      <div class="command-results" role="listbox" aria-labelledby="commandTitle">
+        <h2 id="commandTitle">快捷操作</h2>
+        <button class="command-item is-selected" type="button" data-command="capture" role="option" aria-selected="true">
+          <svg class="icon"><use href="#icon-camera"></use></svg><span><strong>拍摄照片</strong><small>立即触发快门</small></span><kbd>C</kbd>
+        </button>
+        <button class="command-item" type="button" data-command="library" role="option" aria-selected="false">
+          <svg class="icon"><use href="#icon-image"></use></svg><span><strong>打开文件管理</strong><small>查看相机与已导入素材</small></span><kbd>G F</kbd>
+        </button>
+        <button class="command-item" type="button" data-command="mode" role="option" aria-selected="false">
+          <svg class="icon"><use href="#icon-settings"></use></svg><span><strong>切换普通 / 专业模式</strong><small>改变控制密度</small></span><kbd>⇧ M</kbd>
+        </button>
+        <button class="command-item" type="button" data-command="monitor" role="option" aria-selected="false">
+          <svg class="icon"><use href="#icon-monitor"></use></svg><span><strong>打开实时监看</strong><small>进入干净画面输出</small></span><kbd>G M</kbd>
+        </button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog connection-dialog" id="connectionDialog" aria-labelledby="connectionTitle">
+      <div class="dialog__titlebar">
+        <div>
+          <h2 id="connectionTitle">连接相机</h2>
+          <p>原生安装版支持 Nikon Z8 USB 联机；浏览器版也可连接系统视频设备。</p>
+        </div>
+        <button class="icon-button dialog-close" type="button" aria-label="关闭连接窗口">
+          <svg class="icon"><use href="#icon-x"></use></svg>
+        </button>
+      </div>
+      <div class="connection-options">
+        <button class="connection-option" type="button" aria-pressed="false" data-connection="native" data-native-only hidden>
+          <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
+          <span><strong>Nikon Z8 原生 USB</strong><small>联机拍摄、实时取景与相机参数控制</small></span>
+          <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
+        </button>
+        <button class="connection-option is-selected" type="button" aria-pressed="true" data-connection="media">
+          <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
+          <span><strong>系统视频设备</strong><small>USB/UVC、网络摄像头或手机镜头</small></span>
+          <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
+        </button>
+        <button class="connection-option" type="button" aria-pressed="false" data-connection="webusb">
+          <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
+          <span><strong>检测 Nikon USB</strong><small>实验性设备识别，不发送相机控制指令</small></span>
+          <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
+        </button>
+        <button class="connection-option" type="button" aria-pressed="false" data-connection="demo">
+          <span class="connection-option__icon"><svg class="icon"><use href="#icon-image"></use></svg></span>
+          <span><strong>演示场景</strong><small>无需设备，用于体验拍摄和文件流程</small></span>
+          <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
+        </button>
+      </div>
+      <div class="connection-device">
+        <label class="field-group" id="deviceField">
+          <span class="field-label">视频设备</span>
+          <select id="videoDeviceSelect">
+            <option value="">由系统选择</option>
+          </select>
+          <small id="deviceHelper">连接时浏览器会请求相机权限。</small>
+        </label>
+        <p class="connection-notice" id="connectionNotice" role="status">
+          仅在用户点击连接后请求设备权限。
+        </p>
+      </div>
+      <div class="dialog__actions">
+        <button class="button button--quiet dialog-close" type="button">取消</button>
+        <button class="button button--primary" id="connectButton" type="button">连接所选相机</button>
+      </div>
+    </dialog>
+
+    <div class="toast-region" aria-live="polite" aria-atomic="true">
+      <div class="toast" id="undoToast" role="status" hidden>
+        <span id="toastMessage">已移除 1 个文件。</span>
+        <button type="button" id="undoButton">撤销</button>
+      </div>
+    </div>
+
+    <script src="./native-bridge.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

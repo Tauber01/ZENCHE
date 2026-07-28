@@ -1,0 +1,28 @@
+.DS_Store
+.idea/
+.hallmark/
+.gradle/
+.toolchains/
+.signing/
+build/
+dist/
+native/android/.gradle/
+native/android/app/build/
+native/android/app/src/main/assets/web/
+native/android/local.properties
+
+# Nikon's proprietary SDK is intentionally not redistributed.
+NikonSDK/
+*.framework
+
+# Generated promotional media and review frames.
+NikonLink_BGM_*
+NikonLink_PV*.mp4
+NikonLink_PV*.m4a
+NikonLink_PV*.m4s
+NikonLink_PV*.webm
+NikonLink_PV*.jpg
+build_nikonlink_pv.py
+nikonlink_pv.html
+pv_*.png
+pv_review_frames/

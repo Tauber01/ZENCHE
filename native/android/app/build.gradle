@@ -1,0 +1,23 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.tauber.nikonlink"
+    compileSdk 35
+    buildToolsVersion "35.0.1"
+
+    defaultConfig {
+        applicationId "com.tauber.nikonlink"
+        minSdk 26
+        targetSdk 35
+        versionCode 3
+        versionName "0.3.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
