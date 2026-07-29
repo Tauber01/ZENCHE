@@ -2,8 +2,18 @@
 
 Record the camera firmware, lens, USB cable and host OS before testing.
 
+- [ ] Z7 (`04b0:0442`) is identified by its correct model name.
+- [ ] Z6 (`04b0:0443`) is identified by its correct model name.
+- [ ] Z50 (`04b0:0444`) is identified by its correct model name.
+- [ ] D780 (`04b0:0446`) is identified by its correct model name.
+- [ ] D6 (`04b0:0447`) is identified by its correct model name.
+- [ ] Z5 (`04b0:0448`) is identified by its correct model name.
+- [ ] Z7II (`04b0:044b`) is identified by its correct model name.
+- [ ] Z6II (`04b0:044c`) is identified by its correct model name.
+- [ ] Z fc (`04b0:044f`) is identified by its correct model name.
 - [ ] Z9 (`04b0:0450`) is identified by its correct model name.
 - [ ] Z8 (`04b0:0451`) is identified by its correct model name.
+- [ ] Z30 (`04b0:0452`) is identified by its correct model name.
 - [ ] Z f (`04b0:0453`) is identified by its correct model name.
 - [ ] Z6III (`04b0:0454`) is identified by its correct model name.
 - [ ] Z50II (`04b0:0455`) is identified by its correct model name.
@@ -84,10 +94,9 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.7.3 stable release passes compilation, signature/container validation,
+The 0.8.0 stable release passes compilation, signature/container validation,
 native UI startup checks and package scans. Windows passes .NET compilation and
-PE/ZIP package checks. HarmonyOS source, resources, and packaging entry points
-pass static validation, but native compilation, signing, startup, and hardware
-checks are still pending. No supported EXPEED 7 body was attached to the build
-machine, so this checklist remains the release gate for every platform and
-camera.
+PE/ZIP package checks. HarmonyOS source, resources, and unsigned HAP compilation
+pass, but signing, startup, and hardware checks are still pending. No supported
+EXPEED 6 / 7 body was attached to the build machine, so this checklist remains
+the release gate for every platform and camera.

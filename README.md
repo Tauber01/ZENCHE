@@ -1,16 +1,16 @@
 # Nikon Link
 
-给 Nikon Z 系列相机用的联机拍摄与无线传图工具。
+给 Nikon 相机用的联机拍摄与无线传图工具。
 
 Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
 拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
 无线传图则使用相机自带的 FTP 功能。
 
-> 当前版本：**0.7.3 正式版**
+> 当前版本：**0.8.0 正式版**
 >
 > 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
 >
-> 支持机型：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
+> 支持机型：**EXPEED 6：Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30；EXPEED 7：Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
 
 项目仍在实机测试阶段，重要拍摄请保留机内存储卡，不要把应用当作唯一备份。
 
@@ -46,26 +46,31 @@ iOS/iPadOS 的公开接口没有向普通应用开放 Nikon USB/PTP 厂商控制
 
 ## 支持的相机
 
-目前内置了以下机型的设备档案：
+目前内置了 17 款机型的设备档案：
 
-- Nikon Z9
-- Nikon Z8
-- Nikon Z f
-- Nikon Z6III
-- Nikon Z50II
-- Nikon Z5II
-- Nikon ZR
+- EXPEED 6：Nikon Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
+- EXPEED 7：Nikon Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 
-不同固件、镜头和 USB 环境可能带来差异。Z5II 与 ZR 在部分 `libgphoto2` 版本中
-会被识别为通用 PTP 相机，macOS 版会再读取 USB 信息确认机型。
+不同固件、镜头和 USB 环境可能带来差异。部分机型在旧版 `libgphoto2` 中会被
+识别为通用 PTP 相机，macOS 版会再读取 USB 信息确认机型。
 
 <details>
 <summary>USB Product ID</summary>
 
 | 机型 | Product ID |
 | --- | --- |
+| Z7 | `0x0442` |
+| Z6 | `0x0443` |
+| Z50 | `0x0444` |
+| D780 | `0x0446` |
+| D6 | `0x0447` |
+| Z5 | `0x0448` |
+| Z7II | `0x044b` |
+| Z6II | `0x044c` |
+| Z fc | `0x044f` |
 | Z9 | `0x0450` |
 | Z8 | `0x0451` |
+| Z30 | `0x0452` |
 | Z f | `0x0453` |
 | Z6III | `0x0454` |
 | Z50II | `0x0455` |
@@ -83,7 +88,7 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### macOS
 
-1. 打开 `NikonLink-0.7.3-macOS-arm64.dmg`。
+1. 打开 `NikonLink-0.8.0-macOS-arm64.dmg`。
 2. 将 **Nikon Link** 拖到镜像内的 **Applications** 快捷入口。
 3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
 
@@ -91,12 +96,12 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### Android
 
-安装 `NikonLink-0.7.3-android.apk`。当前 APK 使用 Android 调试证书签名，
+安装 `NikonLink-0.8.0-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
 ### Windows
 
-解压 `NikonLink-0.7.3-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
+解压 `NikonLink-0.8.0-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
 同目录下的 `libusb-1.0.dll`。相机接口可能需要切换到 WinUSB，操作前请先阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
 
@@ -163,9 +168,9 @@ FTP 服务。
 默认生成：
 
 ```text
-dist/NikonLink-0.7.3-macOS-arm64.dmg
-dist/NikonLink-0.7.3-android.apk
-dist/NikonLink-0.7.3-ios-unsigned.ipa
+dist/NikonLink-0.8.0-macOS-arm64.dmg
+dist/NikonLink-0.8.0-android.apk
+dist/NikonLink-0.8.0-ios-unsigned.ipa
 ```
 
 Windows 需要在 Windows 主机单独构建：
@@ -190,10 +195,10 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 
 ## 遇到问题
 
-0.7.3 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
+0.8.0 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
 扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
-源码、资源和打包入口已通过静态检查，原生编译、签名、启动和真机测试仍待完成。
-由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合仍以
+源码、资源和未签名 HAP 构建已通过，签名、启动和真机测试仍待完成。
+由于构建机器当前未连接全部 EXPEED 6 / 7 机型，USB/PTP、不同固件和镜头组合仍以
 实机验收为发布门槛。
 
 提交 Issue 前，建议先记录相机型号、固件、镜头、数据线和主机系统版本，并按
@@ -229,8 +234,8 @@ docs/              构建、签名、术语和实机测试文档
 项目源码使用 [MIT License](LICENSE)。第三方组件许可见
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商标。
-本项目与 Nikon Corporation 无隶属、合作或背书关系。
+Nikon 及文中机型名为 Nikon Corporation 的商标。本项目与 Nikon Corporation
+无隶属、合作或背书关系。
 
 ---
 
@@ -239,11 +244,13 @@ Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商
 ## English
 
 Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
-monitoring, controlling, and transferring files from Nikon Z-series cameras.
+monitoring, controlling, and transferring files from Nikon cameras.
 
-> Current version: **0.7.3 Stable Release**
+> Current version: **0.8.0 Stable Release**
 >
 > Platforms: **macOS · Android · iOS / iPadOS**
+>
+> EXPEED 6 cameras: **Nikon Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30**
 >
 > EXPEED 7 cameras: **Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
 
@@ -291,14 +298,24 @@ ordinary applications. Nikon shutter, aperture, ISO, and original-file
 download therefore require Nikon protocol authorization or an official SDK;
 Nikon Link does not present a UVC stream as native Nikon control.
 
-### Supported EXPEED 7 cameras
+### Supported EXPEED 6 and 7 cameras
 
 All listed cameras use Nikon USB Vendor ID `0x04b0`.
 
 | Camera | USB Product ID | macOS | Android | iOS / iPadOS |
 | --- | --- | --- | --- | --- |
+| Nikon Z7 | `0x0442` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z6 | `0x0443` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z50 | `0x0444` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon D780 | `0x0446` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon D6 | `0x0447` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z5 | `0x0448` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z7II | `0x044b` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z6II | `0x044c` | Native USB/PTP | Native USB/PTP | No PTP |
+| Nikon Z fc | `0x044f` | Native USB/PTP | Native USB/PTP | No PTP |
 | Nikon Z9 | `0x0450` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
 | Nikon Z8 | `0x0451` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z30 | `0x0452` | Native USB/PTP | Native USB/PTP | No PTP |
 | Nikon Z f | `0x0453` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
 | Nikon Z6III | `0x0454` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
 | Nikon Z50II | `0x0455` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
@@ -354,12 +371,14 @@ with, endorsed by, or sponsored by Nikon Corporation.
 
 ## 日本語
 
-Nikon Link は、Nikon Z シリーズの接続、モニタリング、撮影制御、ファイル転送を
+Nikon Link は、Nikon カメラの接続、モニタリング、撮影制御、ファイル転送を
 行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
 
-> 現在のバージョン：**0.7.3 正式リリース**
+> 現在のバージョン：**0.8.0 正式リリース**
 >
 > 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
+>
+> EXPEED 6 対応機種：**Nikon Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30**
 >
 > EXPEED 7 対応機種：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
 
@@ -406,14 +425,24 @@ Nikon のシャッター、絞り、ISO、原本ダウンロードには、Nikon
 または公式 SDK が必要です。Nikon Link は UVC 入力を Nikon ネイティブ制御と
 して表示しません。
 
-### EXPEED 7 対応機種
+### EXPEED 6 / 7 対応機種
 
 全機種の Nikon USB Vendor ID は `0x04b0` です。
 
 | 機種 | USB Product ID | macOS | Android | iOS / iPadOS |
 | --- | --- | --- | --- | --- |
+| Nikon Z7 | `0x0442` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z6 | `0x0443` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z50 | `0x0444` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon D780 | `0x0446` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon D6 | `0x0447` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z5 | `0x0448` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z7II | `0x044b` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z6II | `0x044c` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
+| Nikon Z fc | `0x044f` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
 | Nikon Z9 | `0x0450` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
 | Nikon Z8 | `0x0451` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z30 | `0x0452` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
 | Nikon Z f | `0x0453` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
 | Nikon Z6III | `0x0454` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
 | Nikon Z50II | `0x0455` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |

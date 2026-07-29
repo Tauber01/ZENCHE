@@ -2,8 +2,8 @@
   app: {
     bundleName: "com.tauber.nikonlink",
     vendor: "Nikon Link contributors",
-    versionCode: 11,
-    versionName: "0.7.3",
+    versionCode: 12,
+    versionName: "0.8.0",
     icon: "$media:app_icon",
     label: "$string:app_name"
   }

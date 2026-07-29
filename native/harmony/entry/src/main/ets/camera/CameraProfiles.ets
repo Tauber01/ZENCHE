@@ -20,8 +20,18 @@ export class CameraProfile {
 export const NIKON_VENDOR_ID: number = 0x04b0;
 
 export const SUPPORTED_CAMERAS: Array<CameraProfile> = [
+  new CameraProfile('Nikon Z7', 0x0442, 64, 25600),
+  new CameraProfile('Nikon Z6', 0x0443, 100, 51200),
+  new CameraProfile('Nikon Z50', 0x0444, 100, 51200),
+  new CameraProfile('Nikon D780', 0x0446, 100, 51200),
+  new CameraProfile('Nikon D6', 0x0447, 100, 102400),
+  new CameraProfile('Nikon Z5', 0x0448, 100, 51200),
+  new CameraProfile('Nikon Z7II', 0x044b, 64, 25600),
+  new CameraProfile('Nikon Z6II', 0x044c, 100, 51200),
+  new CameraProfile('Nikon Z fc', 0x044f, 100, 51200),
   new CameraProfile('Nikon Z9', 0x0450, 64, 25600),
   new CameraProfile('Nikon Z8', 0x0451, 64, 25600),
+  new CameraProfile('Nikon Z30', 0x0452, 100, 51200),
   new CameraProfile('Nikon Z f', 0x0453, 100, 64000),
   new CameraProfile('Nikon Z6III', 0x0454, 100, 64000),
   new CameraProfile('Nikon Z50II', 0x0455, 100, 51200),

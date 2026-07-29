@@ -64,7 +64,10 @@ const ISO_VALUES: Array<SelectEntry> = [
   new SelectEntry('ISO 3200', '3200'),
   new SelectEntry('ISO 6400', '6400'),
   new SelectEntry('ISO 12800', '12800'),
-  new SelectEntry('ISO 25600', '25600')
+  new SelectEntry('ISO 25600', '25600'),
+  new SelectEntry('ISO 51200', '51200'),
+  new SelectEntry('ISO 64000', '64000'),
+  new SelectEntry('ISO 102400', '102400')
 ];
 const EXPOSURE_COMPENSATIONS: Array<SelectEntry> = [
   new SelectEntry('-2 EV', '-2'),
@@ -108,7 +111,7 @@ struct Index {
   @State private busy: boolean = false;
   @State private cameraName: string = '未连接';
   @State private status: string = '就绪';
-  @State private preview?: image.PixelMap;
+  @State private preview: image.PixelMap | undefined = undefined;
   @State private photos: Array<PhotoItem> = [];
   @State private wirelessRunning: boolean = false;
   @State private wirelessStatus: string = '无线收件箱未开启';
@@ -296,7 +299,7 @@ struct Index {
         this.NavButton('无线传输', 'transfer')
         this.NavButton('诊断日志', 'diagnostics')
         Blank()
-        Text('NIKON LINK 0.7.3')
+        Text('NIKON LINK 0.8.0')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -739,7 +742,7 @@ struct Index {
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
-      entries.map((entry: SelectEntry) => {
+      entries.map((entry: SelectEntry): SelectOption => {
         return { value: entry.label };
       })
     )

@@ -490,7 +490,7 @@ public final class MainActivity extends Activity {
         content.addView(text(
                 connected
                         ? connectedCameraName + " · 视频取景与本地监看处理"
-                        : "EXPEED 7 · " + PtpCamera.SUPPORTED_CAMERA_SUMMARY,
+                        : "EXPEED 6 / 7 · " + PtpCamera.SUPPORTED_CAMERA_SUMMARY,
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -893,22 +893,19 @@ public final class MainActivity extends Activity {
     }
 
     private Object[] isoValues() {
-        if ("Nikon Z9".equals(connectedCameraName)
-                || "Nikon Z8".equals(connectedCameraName)) {
-            return new Object[]{
-                    64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600
-            };
-        }
-        if ("Nikon Z50II".equals(connectedCameraName)
-                || "Nikon ZR".equals(connectedCameraName)) {
-            return new Object[]{
-                    100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200
-            };
-        }
-        return new Object[]{
-                100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200,
-                64000
+        int minimum = camera.getMinimumIso();
+        int maximum = camera.getMaximumIso();
+        Integer[] candidates = new Integer[]{
+                64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
+                51200, 64000, 102400
         };
+        List<Object> supported = new ArrayList<>();
+        for (int candidate : candidates) {
+            if (candidate >= minimum && candidate <= maximum) {
+                supported.add(candidate);
+            }
+        }
+        return supported.toArray();
     }
 
     private int defaultIsoIndex() {

@@ -151,7 +151,10 @@ export class PhotoLibrary {
       return incoming.commit();
     } catch (error) {
       incoming.abort();
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Failed to save the received photo.');
     }
   }
 
