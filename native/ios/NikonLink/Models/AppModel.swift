@@ -12,8 +12,8 @@ enum ExperienceMode: String, CaseIterable, Identifiable {
 }
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case capture = "拍摄"
-    case monitor = "监看"
+    case capture = "照片"
+    case monitor = "视频"
     case library = "文件"
     case transfer = "传输"
 
@@ -21,8 +21,8 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .capture: return "camera"
-        case .monitor: return "display"
+        case .capture: return "camera.fill"
+        case .monitor: return "video.fill"
         case .library: return "photo.on.rectangle.angled"
         case .transfer: return "arrow.up.arrow.down"
         }

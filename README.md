@@ -1,12 +1,16 @@
 # Nikon Link
 
+[简体中文](#简体中文) · [English](#english) · [日本語](#日本語)
+
+<a id="简体中文"></a>
+
 面向 Nikon Z 系列相机的三端原生连接、监看、拍摄与无线传图工具。
 
 > 当前版本：**0.7.0 Release Candidate**
 >
 > 支持平台：**macOS · Android · iOS / iPadOS**
 >
-> 支持机型：**Nikon Z8 · Z f · Z6III · Z5II**
+> 支持机型：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
 
 ![Nikon Link macOS 原生实时取景与参数控制界面](docs/images/macos-monitor.png)
 
@@ -15,14 +19,17 @@ Nikon Link 把联机拍摄、实时取景、常用曝光控制、监看辅助、
 HTML 或 JavaScript 运行时；仓库中的 Web/PWA 只保留为历史演示，不参与安装包
 构建。
 
+界面将创作功能明确分成“照片”和“视频”两个工作区：照片区集中快门、曝光、
+对焦、白平衡与本地照片保存；视频区集中实时监看、条纹图案、LUT、超采样及输出
+规格。文件管理和无线传输则单独归入“管理”分组。
+
 ## 功能概览
 
 | 工作流 | 主要能力 |
 | --- | --- |
-| 联机拍摄 | USB/PTP 相机识别、实时取景、SDRAM 拍摄与 JPEG 下载 |
-| 曝光控制 | P、S、A、M 与 B门；快门、光圈、ISO感光度、曝光补偿 |
-| 对焦与色彩 | AF-S、AF-C、MF、白平衡与 Nikon 设定优化校准 |
-| 监看辅助 | 加亮显示条纹图案、自定义 3D `.cube` LUT、本地 2× 超采样 |
+| 照片拍摄 | USB/PTP 相机识别、照片取景、SDRAM 拍摄与 JPEG 下载 |
+| 照片控制 | P、S、A、M 与 B门；快门、光圈、ISO、曝光补偿、对焦与白平衡 |
+| 视频监看 | 视频取景、加亮显示条纹图案、自定义 3D `.cube` LUT、本地 2× 超采样 |
 | 无线传图 | 内置 FTP/PASV 收件箱，接收 JPEG、NEF、HEIF/HEIC 与 TIFF |
 | 文件管理 | 本地预览、导入、分享、定位、删除及写入系统“照片” |
 | 使用模式 | “普通”模式保留常用操作，“专业”模式展开完整参数 |
@@ -71,14 +78,18 @@ iPad 不会把 UVC 视频输入伪装成 Nikon 快门、光圈、ISO 或原图�
 
 | 机型 | USB Product ID | macOS | Android | iOS / iPadOS |
 | --- | --- | --- | --- | --- |
+| Nikon Z9 | `0x0450` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
 | Nikon Z8 | `0x0451` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
 | Nikon Z f | `0x0453` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
 | Nikon Z6III | `0x0454` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
+| Nikon Z50II | `0x0455` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
 | Nikon Z5II | `0x0456` | PTP 兼容模式 | 原生 USB/PTP | FTP；无 PTP |
+| Nikon ZR | `0x0457` | PTP 兼容模式 | 原生 USB/PTP | FTP；无 PTP |
 
-应用严格匹配上表设备。检测到其他 Nikon USB 型号时会显示实际 Product ID，
-不会误报为受支持相机。Z5II 在部分 `libgphoto2` 正式版中可能显示为通用 PTP
-相机，macOS 版会通过 USB Product ID 二次确认。
+应用优先匹配上表 Product ID，并以 USB 产品名称作为 ZR 等新机型的兼容回退。
+检测到其他 Nikon USB 型号时会显示实际 Product ID，不会误报为受支持相机。
+Z5II 与 ZR 在部分 `libgphoto2` 正式版中可能显示为通用 PTP 相机，macOS 版会
+通过 USB 描述符二次确认。
 
 ## 安装
 
@@ -176,8 +187,8 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 ## 验证状态
 
 0.7.0 候选版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
-扫描。由于构建机器当前未连接 Nikon Z8、Z f、Z6III 或 Z5II，USB/PTP、不同固件
-和镜头组合仍以实机验收为发布门槛。
+扫描。由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合
+仍以实机验收为发布门槛。
 
 请按 [相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md) 逐项记录机型、固件、镜头、
 数据线和主机系统版本。机身拒绝的参数会在界面中显示错误，不会静默伪装成功。
@@ -205,5 +216,236 @@ docs/              签名、术语、验收清单与 README 配图
 应用源码使用 [MIT License](LICENSE)。macOS 安装包中的 gphoto2/libgphoto2 许可
 见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库不包含 Nikon 专有 SDK。
 
-Nikon、Z8、Z f、Z6III 与 Z5II 为 Nikon Corporation 的商标。本项目与 Nikon
-Corporation 无隶属、合作或背书关系。
+Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商标。
+本项目与 Nikon Corporation 无隶属、合作或背书关系。
+
+---
+
+<a id="english"></a>
+
+## English
+
+Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
+monitoring, controlling, and transferring files from Nikon Z-series cameras.
+
+> Current version: **0.7.0 Release Candidate**
+>
+> Platforms: **macOS · Android · iOS / iPadOS**
+>
+> EXPEED 7 cameras: **Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
+
+The interface separates creation into two clear workspaces. **Photo** contains
+the shutter, exposure, focus, white balance, Picture Control, and local photo
+workflow. **Video** contains live monitoring, zebra overlays, local 3D LUTs,
+supersampling, and output controls. Files and wireless transfer live in a
+separate management group.
+
+### Features
+
+| Workflow | Capabilities |
+| --- | --- |
+| Photo | USB/PTP detection, photo live view, SDRAM capture, and JPEG download |
+| Photo controls | P/S/A/M and Bulb; shutter, aperture, ISO, exposure compensation, focus, and white balance |
+| Video monitoring | Live view, zebra overlay, custom `.cube` LUT, and local 2× supersampling |
+| Wireless transfer | Built-in FTP/PASV inbox for JPEG, NEF, HEIF/HEIC, and TIFF |
+| File management | Local preview, import, share, reveal, delete, and save to Photos |
+| Experience modes | Simple mode for common actions; Pro mode for full controls |
+
+LUTs, zebra overlays, and supersampling affect only the monitoring image. They
+do not modify the original file or the camera's recording settings.
+
+### Platform capabilities
+
+| Capability | macOS | Android | iOS / iPadOS |
+| --- | :---: | :---: | :---: |
+| Nikon USB/PTP connection | ✓ | ✓ | — |
+| Nikon live view and shutter control | ✓ | ✓ | — |
+| Exposure, focus, and white-balance control | ✓ | ✓ | — |
+| Custom `.cube` LUT and zebra overlay | ✓ | ✓ | — |
+| FTP wireless inbox | ✓ | ✓ | ✓ |
+| Local photo library | ✓ | ✓ | ✓ |
+| System-camera capture | — | — | ✓ |
+| External UVC video on iPadOS | — | — | ✓ |
+
+- **macOS** uses SwiftUI/AppKit and the Nikon PTP backend from `libgphoto2`.
+- **Android** uses native Android Views, USB Host, and the in-project PTP
+  implementation.
+- **iOS/iPadOS** uses SwiftUI, AVFoundation, and PhotoKit for system cameras,
+  external UVC input on iPadOS, and foreground FTP receiving.
+
+Public iOS APIs do not expose general Nikon vendor-specific USB/PTP control to
+ordinary applications. Nikon shutter, aperture, ISO, and original-file
+download therefore require Nikon protocol authorization or an official SDK;
+Nikon Link does not present a UVC stream as native Nikon control.
+
+### Supported EXPEED 7 cameras
+
+All listed cameras use Nikon USB Vendor ID `0x04b0`.
+
+| Camera | USB Product ID | macOS | Android | iOS / iPadOS |
+| --- | --- | --- | --- | --- |
+| Nikon Z9 | `0x0450` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z8 | `0x0451` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z f | `0x0453` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z6III | `0x0454` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z50II | `0x0455` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
+| Nikon Z5II | `0x0456` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
+| Nikon ZR | `0x0457` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
+
+Nikon Link matches the Product ID first and can fall back to the USB product
+name for newer profiles such as the ZR. An unsupported Nikon device is reported
+with its actual Product ID instead of being presented as a supported camera.
+
+### Install and connect
+
+Download release artifacts and matching `.sha256` files from
+[GitHub Releases](https://github.com/Tauber01/NikonLink/releases).
+
+1. Update the camera to a recent stable firmware.
+2. Quit NX Tether, Camera Control Pro, Photos, Image Capture, and any software
+   that may claim the PTP interface.
+3. Connect the camera directly with a data-capable USB-C cable.
+4. Open Nikon Link, choose **Connect camera**, and grant USB access.
+5. Start live view, adjust supported controls, and capture.
+
+Nikon PTP live view supplies JPEG frames. Display resolution, LUT, zebra, and
+local 2× supersampling change only preview rendering, not the camera's video
+file type, resolution, or codec.
+
+### Local build
+
+Requirements include macOS 14+ on Apple Silicon, Homebrew with `libgphoto2`,
+OpenJDK 17, Android SDK 35, Gradle, and a complete Xcode installation.
+
+```sh
+./scripts/build-all.sh
+```
+
+The build produces macOS DMG, Android APK, and unsigned iOS IPA artifacts in
+`dist/`, each with a matching SHA-256 checksum. See
+[iOS signing](docs/IOS_SIGNING.md) for a device-installable IPA.
+
+Hardware verification across every camera, firmware, lens, cable, and host
+combination remains a release gate. Record results with the
+[camera test checklist](docs/CAMERA_TEST_CHECKLIST.md).
+
+The source is licensed under the [MIT License](LICENSE). Nikon and the camera
+model names are trademarks of Nikon Corporation. This project is not affiliated
+with, endorsed by, or sponsored by Nikon Corporation.
+
+[Back to language selection](#nikon-link)
+
+---
+
+<a id="日本語"></a>
+
+## 日本語
+
+Nikon Link は、Nikon Z シリーズの接続、モニタリング、撮影制御、ファイル転送を
+行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
+
+> 現在のバージョン：**0.7.0 Release Candidate**
+>
+> 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
+>
+> EXPEED 7 対応機種：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
+
+画面は **写真** と **動画** の二つの制作ワークスペースに分かれています。
+写真にはシャッター、露出、フォーカス、ホワイトバランス、ピクチャーコントロール、
+ローカル保存を集約し、動画にはライブビュー、ゼブラ表示、3D LUT、スーパー
+サンプリング、出力設定を集約しています。ファイルとワイヤレス転送は管理グループ
+から操作します。
+
+### 主な機能
+
+| ワークフロー | 機能 |
+| --- | --- |
+| 写真 | USB/PTP 検出、写真ライブビュー、SDRAM 撮影、JPEG ダウンロード |
+| 写真制御 | P/S/A/M・バルブ、シャッター、絞り、ISO、露出補正、AF、ホワイトバランス |
+| 動画モニター | ライブビュー、ゼブラ表示、カスタム `.cube` LUT、ローカル 2× スーパーサンプリング |
+| ワイヤレス転送 | JPEG、NEF、HEIF/HEIC、TIFF を受信する FTP/PASV 受信ボックス |
+| ファイル管理 | ローカル表示、読み込み、共有、場所表示、削除、「写真」への保存 |
+| 操作モード | よく使う操作だけの「普通」と、全設定を表示する「プロ」 |
+
+LUT、ゼブラ表示、スーパーサンプリングはモニター画像だけに適用されます。原本や
+カメラ本体の動画記録設定は変更しません。
+
+### プラットフォーム別機能
+
+| 機能 | macOS | Android | iOS / iPadOS |
+| --- | :---: | :---: | :---: |
+| Nikon USB/PTP 接続 | ✓ | ✓ | — |
+| Nikon ライブビュー・シャッター制御 | ✓ | ✓ | — |
+| 露出・フォーカス・ホワイトバランス | ✓ | ✓ | — |
+| カスタム `.cube` LUT・ゼブラ表示 | ✓ | ✓ | — |
+| FTP ワイヤレス受信 | ✓ | ✓ | ✓ |
+| ローカル写真ライブラリ | ✓ | ✓ | ✓ |
+| システムカメラ撮影 | — | — | ✓ |
+| iPadOS 外付け UVC ビデオ | — | — | ✓ |
+
+- **macOS**：SwiftUI/AppKit と `libgphoto2` の Nikon PTP バックエンド。
+- **Android**：ネイティブ Android View、USB Host、内蔵 PTP 実装。
+- **iOS/iPadOS**：SwiftUI、AVFoundation、PhotoKit。本体カメラ、iPadOS の
+  外付け UVC、フォアグラウンド FTP 受信に対応。
+
+iOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御を提供していません。
+Nikon のシャッター、絞り、ISO、原本ダウンロードには、Nikon のプロトコル認可
+または公式 SDK が必要です。Nikon Link は UVC 入力を Nikon ネイティブ制御と
+して表示しません。
+
+### EXPEED 7 対応機種
+
+全機種の Nikon USB Vendor ID は `0x04b0` です。
+
+| 機種 | USB Product ID | macOS | Android | iOS / iPadOS |
+| --- | --- | --- | --- | --- |
+| Nikon Z9 | `0x0450` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z8 | `0x0451` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z f | `0x0453` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z6III | `0x0454` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z50II | `0x0455` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon Z5II | `0x0456` | PTP 互換モード | ネイティブ USB/PTP | FTP、PTP 非対応 |
+| Nikon ZR | `0x0457` | PTP 互換モード | ネイティブ USB/PTP | FTP、PTP 非対応 |
+
+Product ID を優先して照合し、ZR などの新しい機種では USB 製品名もフォール
+バックとして利用します。未対応の Nikon USB 機器は、対応機種として誤表示せず、
+実際の Product ID を表示します。
+
+### インストールと接続
+
+[GitHub Releases](https://github.com/Tauber01/NikonLink/releases) から
+インストールファイルと同名の `.sha256` をダウンロードしてください。
+
+1. カメラを新しい安定版ファームウェアへ更新します。
+2. NX Tether、Camera Control Pro、「写真」、「イメージキャプチャ」など、
+   PTP インターフェースを使用するアプリを終了します。
+3. データ通信対応 USB-C ケーブルでカメラを直接接続します。
+4. Nikon Link で「カメラを接続」を選び、USB アクセスを許可します。
+5. ライブビューを開始し、利用可能な設定を調整して撮影します。
+
+Nikon PTP ライブビューは JPEG フレームを返します。表示サイズ、LUT、ゼブラ、
+ローカル 2× スーパーサンプリングはプレビュー表示だけを変更し、カメラ本体の
+動画ファイル形式、解像度、コーデックは変更しません。
+
+### ローカルビルド
+
+macOS 14+（Apple Silicon）、Homebrew と `libgphoto2`、OpenJDK 17、
+Android SDK 35、Gradle、完全な Xcode 環境が必要です。
+
+```sh
+./scripts/build-all.sh
+```
+
+`dist/` に macOS DMG、Android APK、未署名 iOS IPA と各 SHA-256 チェックサムを
+生成します。実機へインストールできる IPA については
+[iOS 署名手順](docs/IOS_SIGNING.md)を参照してください。
+
+すべての機種、ファームウェア、レンズ、ケーブル、ホスト環境の組み合わせは実機
+検証がリリース条件です。[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
+に結果を記録してください。
+
+ソースコードは [MIT License](LICENSE) で提供されます。Nikon および各機種名は
+Nikon Corporation の商標です。本プロジェクトは Nikon Corporation との提携、
+承認、スポンサー関係を持ちません。
+
+[言語選択へ戻る](#nikon-link)

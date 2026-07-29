@@ -7,31 +7,67 @@ private struct SupportedCamera: Equatable {
     let name: String
     let productID: Int
     let detectionTokens: [String]
+    let minimumISO: Int
+    let maximumISO: Int
 
     static let all = [
         SupportedCamera(
+            name: "Nikon Z9",
+            productID: 0x0450,
+            detectionTokens: ["nikon z9", "nikon z 9"],
+            minimumISO: 64,
+            maximumISO: 25600
+        ),
+        SupportedCamera(
             name: "Nikon Z8",
             productID: 0x0451,
-            detectionTokens: ["nikon z8"]
+            detectionTokens: ["nikon z8", "nikon z 8"],
+            minimumISO: 64,
+            maximumISO: 25600
         ),
         SupportedCamera(
             name: "Nikon Z f",
             productID: 0x0453,
-            detectionTokens: ["nikon zf", "nikon z f"]
+            detectionTokens: ["nikon zf", "nikon z f"],
+            minimumISO: 100,
+            maximumISO: 64000
         ),
         SupportedCamera(
             name: "Nikon Z6III",
             productID: 0x0454,
-            detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"]
+            detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"],
+            minimumISO: 100,
+            maximumISO: 64000
+        ),
+        SupportedCamera(
+            name: "Nikon Z50II",
+            productID: 0x0455,
+            detectionTokens: [
+                "nikon z50 2", "nikon z50 ii", "nikon z50ii", "nikon z50_2"
+            ],
+            minimumISO: 100,
+            maximumISO: 51200
         ),
         SupportedCamera(
             name: "Nikon Z5II",
             productID: 0x0456,
-            detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"]
+            detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"],
+            minimumISO: 100,
+            maximumISO: 64000
+        ),
+        SupportedCamera(
+            name: "Nikon ZR",
+            productID: 0x0457,
+            detectionTokens: ["nikon zr", "nikon z r"],
+            minimumISO: 100,
+            maximumISO: 51200
         )
     ]
 
-    static let summary = "Z8 · Z f · Z6III · Z5II"
+    static var summary: String {
+        all.map { $0.name.replacingOccurrences(of: "Nikon ", with: "") }
+            .joined(separator: " · ")
+    }
 
     static func matching(detection: String) -> SupportedCamera? {
         let normalized = detection
@@ -48,6 +84,16 @@ private struct SupportedCamera: Equatable {
 
     static func matching(productID: Int) -> SupportedCamera? {
         all.first { $0.productID == productID }
+    }
+
+    static func isoOptions(for cameraName: String?) -> [Int] {
+        let profile = all.first { $0.name == cameraName }
+        let minimum = profile?.minimumISO ?? 100
+        let maximum = profile?.maximumISO ?? 64000
+        return [
+            64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
+            51200, 64000
+        ].filter { $0 >= minimum && $0 <= maximum }
     }
 }
 
@@ -141,10 +187,17 @@ private final class GPhotoCamera {
         if let dictionary = value as? [String: Any] {
             let vendor = hexValue(dictionary["vendor_id"])
             let product = hexValue(dictionary["product_id"])
-            if vendor == 0x04b0,
-               let product,
-               let match = SupportedCamera.matching(productID: product) {
-                return match
+            if vendor == 0x04b0 {
+                if let product,
+                   let match = SupportedCamera.matching(productID: product) {
+                    return match
+                }
+                let descriptor = dictionary.values
+                    .compactMap { $0 as? String }
+                    .joined(separator: " ")
+                if let match = SupportedCamera.matching(detection: descriptor) {
+                    return match
+                }
             }
             for child in dictionary.values {
                 if let match = findUSBProfile(in: child) { return match }
@@ -381,16 +434,16 @@ private enum ExperienceMode: String, CaseIterable, Identifiable {
 }
 
 private enum AppSection: String, CaseIterable, Identifiable {
-    case capture = "拍摄"
-    case monitor = "监看"
+    case capture = "照片"
+    case monitor = "视频"
     case library = "文件"
     case transfer = "传输"
 
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .capture: return "camera"
-        case .monitor: return "display"
+        case .capture: return "camera.fill"
+        case .monitor: return "video.fill"
         case .library: return "photo.on.rectangle.angled"
         case .transfer: return "paperplane"
         }
@@ -427,6 +480,7 @@ private final class CameraModel: ObservableObject {
     @Published var liveViewEnabled = false
     @Published var capturing = false
     @Published var frame: NSImage?
+    @Published var photoFrame: NSImage?
     @Published var status = "未连接"
     @Published var detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
     @Published var cameraName: String?
@@ -543,6 +597,7 @@ private final class CameraModel: ObservableObject {
         }
         connected = false
         frame = nil
+        photoFrame = nil
         cameraName = nil
         status = "未连接"
         detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
@@ -591,6 +646,9 @@ private final class CameraModel: ObservableObject {
                 let output = image.map { self.processedPreview(from: $0) }
                 DispatchQueue.main.async {
                     guard token == self.previewToken else { return }
+                    if let image {
+                        self.photoFrame = image
+                    }
                     if let output {
                         self.frame = output.image
                         self.zebraMask = output.zebraMask
@@ -634,6 +692,9 @@ private final class CameraModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.capturing = false
                     self.detail = "拍摄完成 · 已保存到本地照片库"
+                    if let image {
+                        self.photoFrame = image
+                    }
                     if let output {
                         self.frame = output.image
                         self.zebraMask = output.zebraMask
@@ -878,12 +939,15 @@ private enum Palette {
     static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
     static let cobalt = Color(red: 0.02, green: 0.35, blue: 0.82)
     static let cobaltSoft = Color(red: 0.88, green: 0.93, blue: 1.0)
+    static let video = Color(red: 0.82, green: 0.12, blue: 0.16)
+    static let videoSoft = Color(red: 1.0, green: 0.90, blue: 0.91)
     static let graphite = Color(red: 0.045, green: 0.055, blue: 0.075)
     static let rule = Color.black.opacity(0.10)
 }
 
 private struct NativeButtonStyle: ButtonStyle {
     var primary = false
+    var accent = Palette.cobalt
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -891,7 +955,7 @@ private struct NativeButtonStyle: ButtonStyle {
             .foregroundStyle(primary ? Color.white : Palette.ink)
             .padding(.horizontal, 16)
             .frame(minHeight: 40)
-            .background(primary ? Palette.cobalt : Palette.surface)
+            .background(primary ? accent : Palette.surface)
             .clipShape(RoundedRectangle(cornerRadius: 9))
             .overlay {
                 RoundedRectangle(cornerRadius: 9)
@@ -904,16 +968,24 @@ private struct NativeButtonStyle: ButtonStyle {
 private struct PreviewStage: View {
     @ObservedObject var model: CameraModel
     var compact = false
+    var showsMonitorEffects = false
 
     var body: some View {
+        let previewFrame = showsMonitorEffects ? model.frame : model.photoFrame
         ZStack {
             Palette.graphite
-            if let frame = model.frame {
+            if let frame = previewFrame {
                 Image(nsImage: frame)
                     .resizable()
-                    .interpolation(model.monitorSupersampling ? .high : .medium)
+                    .interpolation(
+                        showsMonitorEffects && model.monitorSupersampling
+                            ? .high
+                            : .medium
+                    )
                     .scaledToFit()
-                if model.zebraEnabled, let zebraMask = model.zebraMask {
+                if showsMonitorEffects,
+                   model.zebraEnabled,
+                   let zebraMask = model.zebraMask {
                     Image(nsImage: zebraMask)
                         .resizable()
                         .scaledToFit()
@@ -941,7 +1013,8 @@ private struct PreviewStage: View {
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.64))
                 }
-                if model.mode == .professional,
+                if showsMonitorEffects,
+                   model.mode == .professional,
                    model.zebraEnabled || (model.lutEnabled && model.lutName != nil) {
                     HStack(spacing: 8) {
                         if model.monitorSupersampling {
@@ -966,7 +1039,11 @@ private struct PreviewStage: View {
                         Text("F\(model.aperture, specifier: "%.1f")")
                         Text("ISO \(model.iso)")
                         Spacer()
-                        Text("JPEG实时取景 · \(model.monitorVideoProfile.label)")
+                        Text(
+                            showsMonitorEffects
+                                ? "JPEG实时取景 · \(model.monitorVideoProfile.label)"
+                                : "照片实时取景 · JPEG"
+                        )
                     }
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.78))
@@ -1065,22 +1142,15 @@ private struct Sidebar: View {
     @ObservedObject var model: CameraModel
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(AppSection.allCases) { section in
-                Button {
-                    model.section = section
-                } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: section.icon).font(.system(size: 19))
-                        Text(section.rawValue).font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundStyle(model.section == section ? Palette.cobalt : Palette.muted)
-                    .frame(width: 72, height: 70)
-                    .background(model.section == section ? Palette.cobaltSoft : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-            }
+        VStack(spacing: 6) {
+            groupLabel("创作")
+            navigationButton(.capture)
+            navigationButton(.monitor)
+            Divider()
+                .padding(.vertical, 6)
+            groupLabel("管理")
+            navigationButton(.library)
+            navigationButton(.transfer)
             Spacer()
         }
         .padding(.vertical, 16)
@@ -1089,6 +1159,33 @@ private struct Sidebar: View {
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.rule).frame(width: 1)
         }
+    }
+
+    private func groupLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundStyle(Palette.muted)
+            .frame(width: 72, alignment: .leading)
+            .padding(.leading, 4)
+    }
+
+    private func navigationButton(_ section: AppSection) -> some View {
+        let active = model.section == section
+        let accent = section == .monitor ? Palette.video : Palette.cobalt
+        let background = section == .monitor ? Palette.videoSoft : Palette.cobaltSoft
+        return Button {
+            model.section = section
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: section.icon).font(.system(size: 19))
+                Text(section.rawValue).font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(active ? accent : Palette.muted)
+            .frame(width: 72, height: 62)
+            .background(active ? background : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -1101,12 +1198,12 @@ private struct CaptureView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("联机拍摄")
+                        Text("照片拍摄")
                             .font(.system(size: 34, weight: .bold))
                         Text(
                             model.mode == .simple
-                                ? "只保留常用控制，连接相机即可拍摄。"
-                                : "原生 USB/PTP 控制台 · 曝光、对焦与实时取景。"
+                                ? "连接相机、确认构图，然后完成照片拍摄。"
+                                : "照片控制台 · 曝光、对焦、白平衡与快门。"
                         )
                         .foregroundStyle(Palette.muted)
                     }
@@ -1142,16 +1239,13 @@ private struct CaptureView: View {
 
 private struct ParameterInspector: View {
     @ObservedObject var model: CameraModel
-    @State private var showLUTImporter = false
 
     private let shutterOptions: [(String, Double)] = [
         ("1/8000", 0.000125), ("1/1000", 0.001), ("1/250", 0.004),
         ("1/125", 0.008), ("1/60", 0.0167), ("1/15", 0.0667), ("1 秒", 1.0)
     ]
     private var isoOptions: [Int] {
-        model.cameraName == "Nikon Z8"
-            ? [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
-            : [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000]
+        SupportedCamera.isoOptions(for: model.cameraName)
     }
     private let apertureOptions = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0]
 
@@ -1159,7 +1253,7 @@ private struct ParameterInspector: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    Text("拍摄设置").font(.system(size: 21, weight: .bold))
+                    Text("照片设置").font(.system(size: 21, weight: .bold))
                     Spacer()
                     Text(model.mode == .simple ? "普通" : "PRO")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
@@ -1378,57 +1472,6 @@ private struct ParameterInspector: View {
                         }
                         .disabled(!model.connected)
                     }
-                    nativeControl("条纹图案（本地）") {
-                        Toggle(
-                            "加亮显示",
-                            isOn: Binding(
-                                get: { model.zebraEnabled },
-                                set: { model.setZebraEnabled($0) }
-                            )
-                        )
-                        .toggleStyle(.switch)
-                        HStack {
-                            Slider(
-                                value: Binding(
-                                    get: { model.zebraThreshold },
-                                    set: { model.setZebraThreshold($0) }
-                                ),
-                                in: 70...100,
-                                step: 1
-                            )
-                            Text("\(Int(model.zebraThreshold)) IRE")
-                                .font(.system(size: 12, design: .monospaced))
-                                .frame(width: 58)
-                        }
-                        .disabled(!model.zebraEnabled)
-                    }
-                    nativeControl("监看 LUT（本地）") {
-                        Toggle(
-                            "应用到实时取景",
-                            isOn: Binding(
-                                get: { model.lutEnabled },
-                                set: { model.setLUTEnabled($0) }
-                            )
-                        )
-                        .toggleStyle(.switch)
-                        .disabled(model.lutName == nil)
-                        HStack {
-                            Button("导入 .cube") {
-                                showLUTImporter = true
-                            }
-                            .buttonStyle(.link)
-                            if model.lutName != nil {
-                                Button("移除") {
-                                    model.clearLUT()
-                                }
-                                .buttonStyle(.link)
-                            }
-                        }
-                        Text(model.lutName ?? "尚未导入；LUT 只影响监看，不写入原片。")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.muted)
-                            .lineLimit(2)
-                    }
                 }
             }
             .padding(24)
@@ -1436,18 +1479,6 @@ private struct ParameterInspector: View {
         .background(Palette.surface)
         .overlay(alignment: .leading) {
             Rectangle().fill(Palette.rule).frame(width: 1)
-        }
-        .fileImporter(
-            isPresented: $showLUTImporter,
-            allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first { model.importLUT(from: url) }
-            case .failure(let error):
-                model.errorMessage = "无法打开 LUT：\(error.localizedDescription)"
-            }
         }
     }
 
@@ -1487,26 +1518,31 @@ private struct MonitorView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("实时取景").font(.system(size: 34, weight: .bold))
-                        Text("\(model.cameraName ?? SupportedCamera.summary) · JPEG 实时取景")
+                        Text("视频监看").font(.system(size: 34, weight: .bold))
+                        Text("\(model.cameraName ?? SupportedCamera.summary) · 视频取景与本地监看处理")
                             .foregroundStyle(Palette.muted)
                     }
                     Spacer()
                     Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
                         model.toggleLiveView()
                     }
-                    .buttonStyle(NativeButtonStyle(primary: !model.liveViewEnabled))
+                    .buttonStyle(
+                        NativeButtonStyle(
+                            primary: !model.liveViewEnabled,
+                            accent: Palette.video
+                        )
+                    )
                 }
 
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 20) {
-                        PreviewStage(model: model)
+                        PreviewStage(model: model, showsMonitorEffects: true)
                             .frame(minWidth: 520)
                         MonitorControlDeck(model: model)
                             .frame(width: 320)
                     }
                     VStack(alignment: .leading, spacing: 20) {
-                        PreviewStage(model: model)
+                        PreviewStage(model: model, showsMonitorEffects: true)
                         MonitorControlDeck(model: model)
                     }
                 }
@@ -1518,11 +1554,10 @@ private struct MonitorView: View {
 
 private struct MonitorControlDeck: View {
     @ObservedObject var model: CameraModel
+    @State private var showLUTImporter = false
 
     private var isoOptions: [Int] {
-        model.cameraName == "Nikon Z8"
-            ? [64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600]
-            : [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000]
+        SupportedCamera.isoOptions(for: model.cameraName)
     }
 
     var body: some View {
@@ -1575,7 +1610,7 @@ private struct MonitorControlDeck: View {
                         Spacer()
                         Text("\(model.compensation, specifier: "%+.1f") EV")
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(Palette.cobalt)
+                            .foregroundStyle(Palette.video)
                     }
                     Slider(
                         value: $model.compensation,
@@ -1636,12 +1671,83 @@ private struct MonitorControlDeck: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text("监看辅助")
+                    .font(.system(size: 19, weight: .bold))
+
+                Toggle(
+                    "加亮显示条纹图案",
+                    isOn: Binding(
+                        get: { model.zebraEnabled },
+                        set: { model.setZebraEnabled($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                HStack {
+                    Slider(
+                        value: Binding(
+                            get: { model.zebraThreshold },
+                            set: { model.setZebraThreshold($0) }
+                        ),
+                        in: 70...100,
+                        step: 1
+                    )
+                    Text("\(Int(model.zebraThreshold)) IRE")
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(width: 58)
+                }
+                .disabled(!model.zebraEnabled)
+
+                Toggle(
+                    "应用本地 LUT",
+                    isOn: Binding(
+                        get: { model.lutEnabled },
+                        set: { model.setLUTEnabled($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+                .disabled(model.lutName == nil)
+
+                HStack {
+                    Button("导入 .cube") {
+                        showLUTImporter = true
+                    }
+                    .buttonStyle(.link)
+                    if model.lutName != nil {
+                        Button("移除 LUT") {
+                            model.clearLUT()
+                        }
+                        .buttonStyle(.link)
+                    }
+                }
+                Text(model.lutName ?? "尚未导入；LUT 只影响视频监看，不写入原片。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(18)
         }
         .background(Palette.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Palette.rule, lineWidth: 1)
+        }
+        .fileImporter(
+            isPresented: $showLUTImporter,
+            allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first { model.importLUT(from: url) }
+            case .failure(let error):
+                model.errorMessage = "无法打开 LUT：\(error.localizedDescription)"
+            }
         }
     }
 }

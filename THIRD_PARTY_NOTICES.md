@@ -7,6 +7,6 @@ license text and release information are available from the upstream project:
 - https://github.com/gphoto/gphoto2
 - https://github.com/gphoto/libgphoto2
 
-Nikon Link does not contain or redistribute Nikon's proprietary SDK. Nikon and
-Z8 are trademarks of Nikon Corporation. This project is independent and is not
-endorsed by Nikon Corporation.
+Nikon Link does not contain or redistribute Nikon's proprietary SDK. Nikon,
+EXPEED and Nikon camera model names are trademarks of Nikon Corporation. This
+project is independent and is not endorsed by Nikon Corporation.

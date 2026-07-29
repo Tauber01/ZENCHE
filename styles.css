@@ -1,4 +1,4 @@
-/* Hallmark · macrostructure: Workbench · genre: modern-minimal · theme: Cobalt · tone: technical + friendly · anchor hue: cobalt · enrichment: none · nav: N13 · footer: Ft2 · pre-emit critique: P5 H5 E5 S5 R5 V5 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
+/* Hallmark · macrostructure: Index-First · genre: modern-minimal · theme: Cobalt · tone: technical + utilitarian · anchor hue: cobalt + video red · enrichment: none · nav: N3 grouped side-rail · footer: Ft2 status line · pre-emit critique: P5 H5 E5 S5 R5 V5 · contrast: pass (40–41) · slop: pass (42–45) · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pass (49) · icons: pass (30) · mobile: pass (34, 49, 50–57) */
 
 *,
 *::before,
@@ -421,6 +421,14 @@ kbd {
   backdrop-filter: blur(var(--space-md));
 }
 
+.side-nav__group {
+  display: contents;
+}
+
+.side-nav__group-label {
+  display: none;
+}
+
 .side-nav__item {
   position: relative;
   min-width: 0;
@@ -444,6 +452,22 @@ kbd {
   background: var(--color-accent-soft);
   color: var(--color-accent);
   font-weight: 700;
+}
+
+.side-nav__item--video.is-active {
+  background: var(--color-video-soft);
+  color: var(--color-video);
+}
+
+[data-view="monitor"] .view-panel[data-view-panel="monitor"] .button--primary {
+  background: var(--color-video);
+  color: var(--color-video-ink);
+  border-color: var(--color-video);
+}
+
+[data-view="monitor"] .view-panel[data-view-panel="monitor"] input[type="checkbox"][role="switch"]:checked {
+  background: var(--color-video);
+  border-color: var(--color-video);
 }
 
 .side-nav__badge {
@@ -887,12 +911,6 @@ kbd {
   fill: color-mix(in oklch, var(--color-accent) 22%, transparent);
   stroke: var(--color-accent);
   stroke-width: 1.5;
-}
-
-.viewfinder.is-peaking .scene__bottle,
-.viewfinder.is-peaking .scene__fruit {
-  outline: var(--rule-focus) solid var(--color-peaking);
-  outline-offset: var(--space-3xs);
 }
 
 .capture-flash {
@@ -1437,6 +1455,21 @@ input[type="checkbox"][role="switch"]:checked::after {
 
 .monitor-stage__frame.is-clean-feed .monitor-stage__label {
   display: none;
+}
+
+.monitor-stage__frame.is-clean-feed .monitor-focus-box,
+.monitor-stage__frame.is-clean-feed .monitor-histogram {
+  opacity: 0;
+}
+
+.monitor-stage__frame.is-peaking .monitor-focus-box span {
+  border-color: var(--color-peaking);
+}
+
+.monitor-stage__frame.is-peaking .scene__bottle,
+.monitor-stage__frame.is-peaking .scene__fruit {
+  outline: var(--rule-focus) solid var(--color-peaking);
+  outline-offset: var(--space-3xs);
 }
 
 .monitor-stage__frame.is-mirrored .monitor-video,
@@ -2014,7 +2047,7 @@ body[data-experience="pro"] .viewfinder__status .pro-only {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #08090b;
+  background: var(--color-graphite);
 }
 
 .dialog__actions {
@@ -2218,6 +2251,28 @@ body[data-experience="pro"] .viewfinder__status .pro-only {
     border-block-start: 0;
     border-inline-end: var(--rule-thin) solid var(--color-rule);
     backdrop-filter: none;
+  }
+
+  .side-nav__group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+  }
+
+  .side-nav__group + .side-nav__group {
+    margin-block-start: var(--space-xs);
+    padding-block-start: var(--space-sm);
+    border-block-start: var(--rule-thin) solid var(--color-rule);
+  }
+
+  .side-nav__group-label {
+    display: block;
+    padding-inline: var(--space-2xs);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   .side-nav__item {

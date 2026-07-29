@@ -63,6 +63,8 @@ public final class MainActivity extends Activity {
     private static final int MUTED = Color.rgb(91, 102, 119);
     private static final int COBALT = Color.rgb(5, 90, 210);
     private static final int COBALT_SOFT = Color.rgb(225, 237, 255);
+    private static final int VIDEO = Color.rgb(202, 31, 42);
+    private static final int VIDEO_SOFT = Color.rgb(255, 230, 232);
     private static final int GRAPHITE = Color.rgb(12, 15, 21);
     private static final int RULE = Color.rgb(220, 225, 234);
 
@@ -298,8 +300,8 @@ public final class MainActivity extends Activity {
         navigation.setGravity(Gravity.CENTER);
         navigation.setPadding(dp(8), dp(7), dp(8), dp(7));
         navigation.setBackgroundColor(SURFACE);
-        navigation.addView(navButton("拍摄", "capture"));
-        navigation.addView(navButton("监看", "monitor"));
+        navigation.addView(navButton("照片", "capture"));
+        navigation.addView(navButton("视频", "monitor"));
         navigation.addView(navButton("文件", "library"));
         navigation.addView(navButton("传输", "transfer"));
         return navigation;
@@ -358,8 +360,11 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         for (Button button : navigationButtons) {
             boolean active = section.equals(button.getTag());
-            button.setTextColor(active ? COBALT : MUTED);
-            button.setBackground(rounded(active ? COBALT_SOFT : SURFACE, 10, 0));
+            boolean videoSection = "monitor".equals(section);
+            int activeColor = videoSection ? VIDEO : COBALT;
+            int activeBackground = videoSection ? VIDEO_SOFT : COBALT_SOFT;
+            button.setTextColor(active ? activeColor : MUTED);
+            button.setBackground(rounded(active ? activeBackground : SURFACE, 10, 0));
         }
         updateCameraControls();
     }
@@ -368,11 +373,11 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
-        content.addView(text("联机拍摄", 30, Typeface.BOLD, INK));
+        content.addView(text("照片拍摄", 30, Typeface.BOLD, INK));
         content.addView(text(
                 professionalMode
-                        ? "原生 USB/PTP 控制台 · 曝光、对焦与实时取景"
-                        : "只保留常用控制，连接相机即可拍摄",
+                        ? "照片控制台 · 曝光、对焦、白平衡与快门"
+                        : "连接相机、确认构图，然后完成照片拍摄",
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -405,11 +410,11 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(text("实时取景", 30, Typeface.BOLD, INK));
+        content.addView(text("视频监看", 30, Typeface.BOLD, INK));
         content.addView(text(
                 connected
-                        ? connectedCameraName + " · JPEG 实时取景"
-                        : "支持 Z8 · Z f · Z6III · Z5II",
+                        ? connectedCameraName + " · 视频取景与本地监看处理"
+                        : "EXPEED 7 · " + PtpCamera.SUPPORTED_CAMERA_SUMMARY,
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -433,21 +438,24 @@ public final class MainActivity extends Activity {
         return scroll;
     }
 
-    private View buildPreviewStage(boolean fillHeight) {
+    private View buildPreviewStage(boolean monitoring) {
         FrameLayout stage = new FrameLayout(this);
         stage.setBackground(rounded(GRAPHITE, 14, 0));
 
         previewImage = new ImageView(this);
         previewImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
         previewImage.setBackgroundColor(GRAPHITE);
-        if (latestFrame != null) previewImage.setImageBitmap(latestFrame);
+        Bitmap previewFrame = monitoring ? latestFrame : latestSourceFrame;
+        if (previewFrame != null) previewImage.setImageBitmap(previewFrame);
         stage.addView(previewImage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         zebraImage = new ImageView(this);
         zebraImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        zebraImage.setImageBitmap(zebraEnabled ? latestZebraMask : null);
+        zebraImage.setImageBitmap(
+                monitoring && zebraEnabled ? latestZebraMask : null);
+        zebraImage.setVisibility(monitoring ? View.VISIBLE : View.GONE);
         zebraImage.setContentDescription("本地条纹图案加亮显示");
         stage.addView(zebraImage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -477,12 +485,16 @@ public final class MainActivity extends Activity {
         stage.addView(badge, badgeParams);
 
         TextView outputBadge = text(
-                "JPEG实时取景 · " + monitorProfileLabel(),
+                monitoring
+                        ? "JPEG实时取景 · " + monitorProfileLabel()
+                        : "照片实时取景 · JPEG",
                 11,
                 Typeface.BOLD,
                 Color.rgb(194, 200, 211));
         outputBadge.setContentDescription(
-                "实时取景格式 JPEG，监看显示尺寸 " + monitorProfileLabel());
+                monitoring
+                        ? "实时取景格式 JPEG，监看显示尺寸 " + monitorProfileLabel()
+                        : "照片实时取景格式 JPEG");
         FrameLayout.LayoutParams outputBadgeParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(32),
@@ -490,7 +502,7 @@ public final class MainActivity extends Activity {
         outputBadgeParams.setMargins(0, 0, dp(14), dp(10));
         stage.addView(outputBadge, outputBadgeParams);
 
-        if (!fillHeight) {
+        if (!monitoring) {
             stage.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     dp(380)));
@@ -510,17 +522,12 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 14));
 
-        boolean z8IsoRange = "Nikon Z8".equals(connectedCameraName);
         addSpinnerControl(
                 panel,
                 "ISO感光度",
-                z8IsoRange
-                        ? new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"}
-                        : new String[]{"100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600", "51200", "64000"},
-                z8IsoRange
-                        ? new Object[]{64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600}
-                        : new Object[]{100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000},
-                z8IsoRange ? 3 : 2,
+                isoLabels(),
+                isoValues(),
+                defaultIsoIndex(),
                 "iso");
         addSpinnerControl(
                 panel,
@@ -642,6 +649,8 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 10, 0, 0));
+        addZebraControls(panel);
+        addLutControls(panel);
         return panel;
     }
 
@@ -713,17 +722,12 @@ public final class MainActivity extends Activity {
                 new Object[]{1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0},
                 3,
                 "aperture");
-        boolean z8IsoRange = "Nikon Z8".equals(connectedCameraName);
         addSpinnerControl(
                 panel,
                 "ISO感光度",
-                z8IsoRange
-                        ? new String[]{"64", "100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600"}
-                        : new String[]{"100", "200", "400", "800", "1600", "3200", "6400", "12800", "25600", "51200", "64000"},
-                z8IsoRange
-                        ? new Object[]{64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600}
-                        : new Object[]{100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200, 64000},
-                z8IsoRange ? 3 : 2,
+                isoLabels(),
+                isoValues(),
+                defaultIsoIndex(),
                 "iso");
         addSpinnerControl(
                 panel,
@@ -799,10 +803,44 @@ public final class MainActivity extends Activity {
         parameterLabels.put("exposureCompensation", compensationLabel);
         panel.addView(compensation);
 
-        addZebraControls(panel);
-        addLutControls(panel);
         updateCameraControls();
         return panel;
+    }
+
+    private String[] isoLabels() {
+        Object[] values = isoValues();
+        String[] labels = new String[values.length];
+        for (int index = 0; index < values.length; index++) {
+            labels[index] = String.valueOf(values[index]);
+        }
+        return labels;
+    }
+
+    private Object[] isoValues() {
+        if ("Nikon Z9".equals(connectedCameraName)
+                || "Nikon Z8".equals(connectedCameraName)) {
+            return new Object[]{
+                    64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600
+            };
+        }
+        if ("Nikon Z50II".equals(connectedCameraName)
+                || "Nikon ZR".equals(connectedCameraName)) {
+            return new Object[]{
+                    100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200
+            };
+        }
+        return new Object[]{
+                100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 51200,
+                64000
+        };
+    }
+
+    private int defaultIsoIndex() {
+        Object[] values = isoValues();
+        for (int index = 0; index < values.length; index++) {
+            if (((Number) values[index]).intValue() == 400) return index;
+        }
+        return 0;
     }
 
     private void addSpinnerControl(
@@ -1141,13 +1179,13 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(18), dp(16), dp(18), dp(16));
         content.addView(text("Nikon Z 系列原生 USB", 18, Typeface.BOLD, INK));
         content.addView(text(
-                "Z8 · Z f · Z6III · Z5II",
+                PtpCamera.SUPPORTED_CAMERA_SUMMARY.replace("、", " · "),
                 12,
                 Typeface.BOLD,
                 COBALT),
                 marginParams(-1, -2, 0, 4, 0, 4));
         content.addView(text(
-                "联机拍摄、参数控制、实时监看和文件管理",
+                "照片拍摄、视频监看、参数控制和文件管理",
                 13,
                 Typeface.NORMAL,
                 MUTED),
@@ -1363,8 +1401,14 @@ public final class MainActivity extends Activity {
         latestSourceFrame = source;
         latestFrame = output.display;
         latestZebraMask = output.zebra;
-        if (previewImage != null) previewImage.setImageBitmap(output.display);
-        if (zebraImage != null) zebraImage.setImageBitmap(zebraEnabled ? output.zebra : null);
+        boolean monitoring = "monitor".equals(currentSection);
+        if (previewImage != null) {
+            previewImage.setImageBitmap(monitoring ? output.display : source);
+        }
+        if (zebraImage != null) {
+            zebraImage.setImageBitmap(
+                    monitoring && zebraEnabled ? output.zebra : null);
+        }
         if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
     }
 

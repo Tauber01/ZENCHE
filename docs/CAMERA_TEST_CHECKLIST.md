@@ -2,10 +2,13 @@
 
 Record the camera firmware, lens, USB cable and host OS before testing.
 
+- [ ] Z9 (`04b0:0450`) is identified by its correct model name.
 - [ ] Z8 (`04b0:0451`) is identified by its correct model name.
 - [ ] Z f (`04b0:0453`) is identified by its correct model name.
 - [ ] Z6III (`04b0:0454`) is identified by its correct model name.
+- [ ] Z50II (`04b0:0455`) is identified by its correct model name.
 - [ ] Z5II (`04b0:0456`) is identified by its correct model name.
+- [ ] ZR (`04b0:0457`) is identified by its correct model name or descriptor fallback.
 - [ ] Other Nikon USB models are rejected with their actual Product ID.
 - [ ] Android displays a USB permission prompt once and reconnects after relaunch.
 - [ ] Live view starts, refreshes continuously and stops when disabled.
@@ -57,6 +60,6 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 The 0.7.0 release candidate passes compilation, signature/container validation,
 native UI startup checks and package scans confirming that DMG/APK contain no
-WebView or web assets. A physical Z8 was not attached to the build machine, so
-the checklist above remains the release-candidate gate for Z8, Z f, Z6III and
-Z5II.
+WebView or web assets. No supported EXPEED 7 body was attached to the build
+machine, so the checklist above remains the release-candidate gate for Z9, Z8,
+Z f, Z6III, Z50II, Z5II and ZR.

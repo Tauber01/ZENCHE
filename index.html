@@ -164,32 +164,38 @@
 
       <div class="main-grid">
         <nav class="side-nav" aria-label="主要功能">
-          <button class="side-nav__item is-active" data-view-target="capture" type="button" aria-current="page">
-            <svg class="icon"><use href="#icon-camera"></use></svg>
-            <span>拍摄</span>
-          </button>
-          <button class="side-nav__item" data-view-target="monitor" type="button">
-            <svg class="icon"><use href="#icon-monitor"></use></svg>
-            <span>监看</span>
-          </button>
-          <button class="side-nav__item" data-view-target="library" type="button">
-            <svg class="icon"><use href="#icon-image"></use></svg>
-            <span>文件</span>
-            <span class="side-nav__badge" id="fileBadge">0</span>
-          </button>
-          <button class="side-nav__item" data-view-target="transfer" type="button">
-            <svg class="icon"><use href="#icon-send"></use></svg>
-            <span>传输</span>
-            <span class="side-nav__status" id="transferStatus" hidden></span>
-          </button>
+          <div class="side-nav__group">
+            <span class="side-nav__group-label">创作</span>
+            <button class="side-nav__item is-active" data-view-target="capture" type="button" aria-current="page">
+              <svg class="icon"><use href="#icon-camera"></use></svg>
+              <span>照片</span>
+            </button>
+            <button class="side-nav__item side-nav__item--video" data-view-target="monitor" type="button">
+              <svg class="icon"><use href="#icon-monitor"></use></svg>
+              <span>视频</span>
+            </button>
+          </div>
+          <div class="side-nav__group">
+            <span class="side-nav__group-label">管理</span>
+            <button class="side-nav__item" data-view-target="library" type="button">
+              <svg class="icon"><use href="#icon-image"></use></svg>
+              <span>文件</span>
+              <span class="side-nav__badge" id="fileBadge">0</span>
+            </button>
+            <button class="side-nav__item" data-view-target="transfer" type="button">
+              <svg class="icon"><use href="#icon-send"></use></svg>
+              <span>传输</span>
+              <span class="side-nav__status" id="transferStatus" hidden></span>
+            </button>
+          </div>
         </nav>
 
         <main class="workspace">
           <section class="view-panel is-active" data-view-panel="capture" aria-labelledby="captureTitle">
             <div class="workspace-heading">
               <div>
-                <h1 id="captureTitle">联机拍摄</h1>
-                <p id="modeDescription">只保留常用控制，拿起相机就能拍。</p>
+                <h1 id="captureTitle">照片拍摄</h1>
+                <p id="modeDescription">连接相机、确认构图，然后完成照片拍摄。</p>
               </div>
               <div class="workspace-heading__actions">
                 <button class="button button--quiet" id="folderButton" type="button">
@@ -221,7 +227,7 @@
                 <div class="scene__leaf scene__leaf--two"></div>
               </div>
               <video class="live-video" id="liveVideo" autoplay muted playsinline hidden></video>
-              <img class="live-video native-preview" id="nativePreview" alt="Nikon Z8 实时取景" hidden />
+              <img class="live-video native-preview" id="nativePreview" alt="Nikon 相机实时取景" hidden />
 
               <div class="grid-overlay" aria-hidden="true"></div>
               <div class="focus-box" aria-label="对焦点">
@@ -229,11 +235,6 @@
               </div>
               <div class="horizon pro-only" aria-label="电子水平仪">
                 <span></span>
-              </div>
-              <div class="histogram pro-only" aria-label="RGB 直方图">
-                <svg viewBox="0 0 120 54" preserveAspectRatio="none" aria-hidden="true">
-                  <path d="M2 52 8 48 13 47 18 39 24 43 30 34 36 37 43 17 49 29 56 8 62 24 68 31 74 21 80 38 88 32 94 43 101 40 108 49 118 51" />
-                </svg>
               </div>
               <div class="viewfinder__readout">
                 <span id="readoutShutter">—</span>
@@ -253,14 +254,6 @@
                 <button class="tool-button is-active" id="gridToggle" type="button" aria-label="切换网格辅助" aria-pressed="true">
                   <svg class="icon"><use href="#icon-grid"></use></svg>
                   <span>网格</span>
-                </button>
-                <button class="tool-button pro-only" id="histogramToggle" type="button" aria-label="切换直方图" aria-pressed="true">
-                  <svg class="icon"><use href="#icon-chart"></use></svg>
-                  <span>直方图</span>
-                </button>
-                <button class="tool-button pro-only" id="peakingToggle" type="button" aria-label="切换峰值对焦" aria-pressed="false">
-                  <svg class="icon"><use href="#icon-focus"></use></svg>
-                  <span>峰值</span>
                 </button>
               </div>
 
@@ -300,8 +293,8 @@
           <section class="view-panel" data-view-panel="monitor" aria-labelledby="monitorTitle" hidden>
             <div class="workspace-heading">
               <div>
-                <h1 id="monitorTitle">实时监看</h1>
-                <p>为导演、灯光与客户保留一块干净的画面。</p>
+                <h1 id="monitorTitle">视频监看</h1>
+                <p>视频取景、画面辅助与输出控制集中在这里。</p>
               </div>
               <button class="button button--primary" type="button" id="fullscreenButton">全屏监看</button>
             </div>
@@ -314,7 +307,15 @@
                   <div class="scene__fruit"></div>
                 </div>
                 <video class="monitor-video" id="monitorVideo" autoplay muted playsinline hidden></video>
-                <img class="monitor-video native-preview" id="nativeMonitorPreview" alt="Nikon Z8 监看画面" hidden />
+                <img class="monitor-video native-preview" id="nativeMonitorPreview" alt="Nikon 相机视频监看画面" hidden />
+                <div class="focus-box monitor-focus-box" aria-label="视频对焦区域">
+                  <span></span><span></span><span></span><span></span>
+                </div>
+                <div class="histogram monitor-histogram pro-only" aria-label="视频 RGB 直方图">
+                  <svg viewBox="0 0 120 54" preserveAspectRatio="none" aria-hidden="true">
+                    <path d="M2 52 8 48 13 47 18 39 24 43 30 34 36 37 43 17 49 29 56 8 62 24 68 31 74 21 80 38 88 32 94 43 101 40 108 49 118 51" />
+                  </svg>
+                </div>
                 <div class="monitor-stage__label" id="monitorDeviceLabel">未连接视频设备</div>
               </div>
             </div>
@@ -331,6 +332,14 @@
                 <span><strong>镜像预览</strong><small>只影响监看，不改变照片</small></span>
                 <input id="mirrorSwitch" type="checkbox" role="switch" />
               </label>
+              <button class="tool-button pro-only" id="histogramToggle" type="button" aria-label="切换视频直方图" aria-pressed="true">
+                <svg class="icon"><use href="#icon-chart"></use></svg>
+                <span>视频直方图</span>
+              </button>
+              <button class="tool-button pro-only" id="peakingToggle" type="button" aria-label="切换视频峰值对焦" aria-pressed="false">
+                <svg class="icon"><use href="#icon-focus"></use></svg>
+                <span>峰值对焦</span>
+              </button>
             </div>
           </section>
 
@@ -491,7 +500,6 @@
                 <label class="select-row" data-capability="focusMode"><span>对焦模式</span><select data-constraint="focusMode"><option value="continuous">连续</option><option value="single-shot">单次</option><option value="manual">手动</option></select></label>
                 <label class="select-row" data-capability="focusDistance"><span>对焦距离</span><select data-constraint="focusDistance"><option value="">由设备决定</option></select></label>
                 <label class="select-row" data-capability="exposureMode"><span>曝光模式</span><select data-constraint="exposureMode"><option value="continuous">自动</option><option value="manual">手动</option></select></label>
-                <label class="select-row" data-capability="torch"><span>持续补光</span><select data-constraint="torch"><option value="false">关闭</option><option value="true">开启</option></select></label>
               </div>
 
             </div>
@@ -504,12 +512,15 @@
 
           <div class="inspector-panel" data-inspector-panel="monitor" hidden>
             <div class="inspector__header">
-              <div><h2>监看输出</h2><span id="monitorStatus">等待设备连接</span></div>
+              <div><h2>视频输出</h2><span id="monitorStatus">等待设备连接</span></div>
             </div>
             <div class="detail-stack">
               <div><span>输出分辨率</span><strong id="monitorResolution">—</strong></div>
               <div><span>帧率</span><strong id="monitorFrameRate">—</strong></div>
               <div><span>设备状态</span><strong id="monitorTrackState">未连接</strong></div>
+            </div>
+            <div class="control-list pro-only">
+              <label class="select-row" data-capability="torch"><span>持续补光</span><select data-constraint="torch"><option value="false">关闭</option><option value="true">开启</option></select></label>
             </div>
             <button class="button button--primary button--full" type="button" id="pictureInPictureButton" disabled>画中画监看</button>
           </div>
@@ -580,7 +591,7 @@
       <div class="dialog__titlebar">
         <div>
           <h2 id="connectionTitle">连接相机</h2>
-          <p>原生安装版支持 Nikon Z8 USB 联机；浏览器版也可连接系统视频设备。</p>
+          <p>原生安装版支持 7 款 Nikon EXPEED 7 相机 USB 联机；浏览器版也可连接系统视频设备。</p>
         </div>
         <button class="icon-button dialog-close" type="button" aria-label="关闭连接窗口">
           <svg class="icon"><use href="#icon-x"></use></svg>
@@ -589,7 +600,7 @@
       <div class="connection-options">
         <button class="connection-option" type="button" aria-pressed="false" data-connection="native" data-native-only hidden>
           <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
-          <span><strong>Nikon Z8 原生 USB</strong><small>联机拍摄、实时取景与相机参数控制</small></span>
+          <span><strong>Nikon EXPEED 7 原生 USB</strong><small>Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR</small></span>
           <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
         </button>
         <button class="connection-option is-selected" type="button" aria-pressed="true" data-connection="media">

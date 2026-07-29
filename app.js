@@ -65,11 +65,11 @@ const state = {
 const modeCopy = {
   simple: {
     label: "普通模式",
-    description: "只保留常用控制，拿起相机就能拍。",
+    description: "连接相机、确认构图，然后完成照片拍摄。",
   },
   pro: {
     label: "专业模式",
-    description: "按设备能力开放曝光、对焦与监看控制。",
+    description: "照片控制 · 曝光、对焦、白平衡与快门。",
   },
 };
 
@@ -452,7 +452,7 @@ const updateMonitorDetails = () => {
     camera.mode === "demo"
       ? "演示源就绪"
       : camera.mode === "native"
-        ? "Z8 PTP 会话正常"
+        ? "Nikon PTP 会话正常"
         : camera.track?.readyState === "live"
           ? "视频流正常"
           : "未连接";
@@ -541,7 +541,7 @@ const setSourceUi = (mode) => {
   cameraScene.classList.remove("is-off");
   shutterButton.disabled = !(realStream || native || demo);
   liveStatus.hidden = !(realStream || native || demo) || !state.liveEnabled;
-  $("#liveStatusText").textContent = demo ? "DEMO" : native ? "Z8 LIVE" : "LIVE";
+  $("#liveStatusText").textContent = demo ? "DEMO" : native ? "NIKON LIVE" : "LIVE";
   $("#pictureInPictureButton").disabled = !realStream || !document.pictureInPictureEnabled;
 
   const label = camera.device?.label || (demo ? "内置演示场景" : "未连接");
@@ -555,10 +555,11 @@ const setSourceUi = (mode) => {
   $("#monitorStatus").textContent = demo
     ? "演示画面已就绪"
     : native
-      ? "Z8 实时取景已就绪"
+      ? "Nikon 实时取景已就绪"
       : "实时视频流已就绪";
   $("#connectionStatus").lastChild.textContent = demo ? " 演示源已连接" : ` ${label}`;
-  $("#viewfinderStatus").textContent = demo ? "DEMO READY" : native ? "Z8 · PTP LIVE" : "LIVE READY";
+  $("#viewfinderStatus").textContent =
+    demo ? "DEMO READY" : native ? "NIKON · PTP LIVE" : "LIVE READY";
 
   const width = camera.settings.width;
   const height = camera.settings.height;
@@ -587,7 +588,7 @@ const setDisconnectedUi = (message = "未连接") => {
   shutterButton.disabled = true;
   liveStatus.hidden = true;
   $("#cameraName").textContent = "未连接";
-  $("#cameraConnection").textContent = "选择视频设备";
+  $("#cameraConnection").textContent = "选择相机设备";
   $("#cameraMeta span").textContent = "—";
   $("#monitorDeviceLabel").textContent = message;
   $("#monitorStatus").textContent = "等待设备连接";
@@ -688,7 +689,7 @@ const updateConnectionChoice = (mode) => {
   });
   deviceField.hidden = mode !== "media";
   const labels = {
-    native: "连接 Nikon Z8",
+    native: "连接 EXPEED 7 相机",
     media: "连接视频设备",
     webusb: "检测 Nikon USB",
     demo: "进入演示",
@@ -696,7 +697,7 @@ const updateConnectionChoice = (mode) => {
   connectButton.textContent = labels[mode];
   connectionNotice.textContent =
     mode === "native"
-      ? "请用 USB 数据线直连 Z8，并在相机中选择 MTP/PTP 模式。"
+      ? "请用 USB 数据线直连支持的 Nikon EXPEED 7 相机，并选择 MTP/PTP 模式。"
       : mode === "webusb"
       ? "只读取设备身份，不会发送拍摄或参数指令。"
       : mode === "demo"
@@ -924,14 +925,14 @@ $("#gridToggle").addEventListener("click", (event) => {
   toggleTool(event.currentTarget, $(".grid-overlay"), "is-hidden");
 });
 $("#histogramToggle").addEventListener("click", (event) => {
-  toggleTool(event.currentTarget, $(".histogram"), "is-hidden");
+  toggleTool(event.currentTarget, $(".monitor-histogram"), "is-hidden");
 });
 $("#peakingToggle").addEventListener("click", (event) => {
   const button = event.currentTarget;
   const active = button.getAttribute("aria-pressed") !== "true";
   button.setAttribute("aria-pressed", String(active));
   button.classList.toggle("is-active", active);
-  viewfinder.classList.toggle("is-peaking", active);
+  monitorFrame.classList.toggle("is-peaking", active);
 });
 
 $("#zoomOut").addEventListener("click", () => updateDigitalZoom(-1));
@@ -1200,7 +1201,7 @@ camera.addEventListener("disconnected", () => {
 camera.addEventListener("previewerror", (event) => {
   $("#monitorStatus").textContent = "实时取景正在重试";
   if (event.detail?.error?.code === "DEVICE_DISCONNECTED") {
-    setDisconnectedUi("Z8 已断开");
+    setDisconnectedUi("Nikon 相机已断开");
   }
 });
 liveVideo.addEventListener("loadedmetadata", () => {
@@ -1274,7 +1275,7 @@ if (camera.nativeSupported) {
   state.connectionMode = "native";
   $("#storageLocation").textContent = "Nikon Link 本地照片库";
   setRuntimeNotice(
-    `${window.NikonNativeBridge.platform === "android" ? "Android" : "macOS"} 原生版已就绪，可连接 Nikon Z8。`,
+    `${window.NikonNativeBridge.platform === "android" ? "Android" : "macOS"} 原生版已就绪，可连接支持的 Nikon EXPEED 7 相机。`,
   );
 }
 updateConnectionChoice(state.connectionMode);
