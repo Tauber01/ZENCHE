@@ -96,5 +96,7 @@ ln -s /Applications "$DMG_ROOT/Applications"
 hdiutil create -volname "Nikon Link $VERSION" -srcfolder "$DMG_ROOT" \
   -format UDZO -ov "$DMG_PATH"
 codesign --verify --deep --strict "$APP_ROOT"
-shasum -a 256 "$DMG_PATH" > "$DMG_PATH.sha256"
+shasum -a 256 "$DMG_PATH" |
+  awk -v name="${DMG_PATH:t}" '{print $1 "  " name}' \
+  > "$DMG_PATH.sha256"
 echo "$DMG_PATH"

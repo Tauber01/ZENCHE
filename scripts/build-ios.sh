@@ -123,5 +123,7 @@ else
   cp "$IPA_SOURCE" "$IPA_TARGET"
 fi
 
-shasum -a 256 "$IPA_TARGET" > "$IPA_TARGET.sha256"
+shasum -a 256 "$IPA_TARGET" |
+  awk -v name="${IPA_TARGET:t}" '{print $1 "  " name}' \
+  > "$IPA_TARGET.sha256"
 echo "$IPA_TARGET"
