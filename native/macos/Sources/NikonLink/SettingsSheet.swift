@@ -16,6 +16,7 @@ struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
+    @State private var showLogViewer = false
     @State private var logExportMessage: String?
 
     var body: some View {
@@ -112,13 +113,16 @@ struct SettingsSheet: View {
                         .foregroundStyle(SettingsPalette.muted)
                     HStack(spacing: 10) {
                         Spacer()
+                        actionButton("查询日志") {
+                            showLogViewer = true
+                        }
                         actionButton("打开日志目录") {
                             openLogDirectory()
                         }
                         actionButton("导出诊断包") {
                             exportDiagnostics()
                         }
-                        actionButton("提交 GitHub Issue", primary: true) {
+                        actionButton("上传脱敏日志", primary: true) {
                             openGithubIssue()
                         }
                     }
@@ -166,6 +170,9 @@ struct SettingsSheet: View {
         .frame(width: 620)
         .sheet(isPresented: $showDonation) {
             DonationSheet()
+        }
+        .sheet(isPresented: $showLogViewer) {
+            DiagnosticLogViewer()
         }
         .alert(
             "诊断日志",
@@ -269,6 +276,45 @@ struct SettingsSheet: View {
             return
         }
         NSWorkspace.shared.open(url)
+    }
+}
+
+private struct DiagnosticLogViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var logText = DiagnosticLogger.shared.recentText(
+        maxCharacters: 12_000
+    )
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("诊断日志查询")
+                        .font(.system(size: 23, weight: .bold))
+                    Text("显示近期脱敏日志；刷新可读取最新记录。")
+                        .foregroundStyle(SettingsPalette.muted)
+                }
+                Spacer()
+                Button("刷新") {
+                    logText = DiagnosticLogger.shared.recentText(
+                        maxCharacters: 12_000
+                    )
+                }
+                Button("关闭") { dismiss() }
+            }
+
+            ScrollView([.horizontal, .vertical]) {
+                Text(logText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .padding(14)
+            }
+            .background(Color.black.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .padding(22)
+        .frame(width: 760, height: 520)
     }
 }
 

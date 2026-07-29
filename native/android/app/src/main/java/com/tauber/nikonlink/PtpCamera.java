@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 final class PtpCamera {
@@ -43,6 +44,7 @@ final class PtpCamera {
     private static final int TYPE_DATA = 2;
     private static final int TYPE_RESPONSE = 3;
     private static final int RESPONSE_OK = 0x2001;
+    private static final int RESPONSE_SESSION_ALREADY_OPEN = 0x201e;
     private static final int OPEN_SESSION = 0x1002;
     private static final int CLOSE_SESSION = 0x1003;
     private static final int GET_OBJECT = 0x1009;
@@ -56,6 +58,12 @@ final class PtpCamera {
     private static final int CAPTURE_TO_SDRAM = 0x9207;
     private static final int TERMINATE_CAPTURE = 0x920c;
     private static final int OBJECT_ADDED_IN_SDRAM = 0xc101;
+    private static final int USB_REQUEST_CLEAR_FEATURE = 0x01;
+    private static final int USB_FEATURE_ENDPOINT_HALT = 0x00;
+    private static final int USB_RECIPIENT_INTERFACE = 0x01;
+    private static final int USB_RECIPIENT_ENDPOINT = 0x02;
+    private static final int PTP_USB_REQUEST_RESET = 0x66;
+    private static final int CONNECT_ATTEMPTS = 3;
 
     private final MainActivity activity;
     private UsbDeviceConnection connection;
@@ -130,8 +138,12 @@ final class PtpCamera {
             disconnect();
             throw new Exception("无法打开 " + failedCamera + "。请关闭 NX MobileAir 等占用相机的应用。");
         }
-        transaction = 0;
-        transact(OPEN_SESSION, new long[]{1}, null, 10_000);
+        try {
+            openSessionWithRecovery();
+        } catch (Exception error) {
+            closeTransport();
+            throw error;
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("device", mapOf(
@@ -347,6 +359,35 @@ final class PtpCamera {
                 transact(CLOSE_SESSION, null, null, 2_000);
             } catch (Exception ignored) {
             }
+        }
+        closeTransport();
+    }
+
+    private void openSessionWithRecovery() throws Exception {
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+            transaction = 0;
+            try {
+                transact(OPEN_SESSION, new long[]{1}, null, 10_000);
+                return;
+            } catch (Exception error) {
+                lastError = error;
+                if (attempt == CONNECT_ATTEMPTS) break;
+                resetPtpDevice();
+                Thread.sleep(150);
+            }
+        }
+        throw new Exception(
+                cameraName()
+                        + " USB/PTP 会话初始化失败（已重试 "
+                        + CONNECT_ATTEMPTS
+                        + " 次）："
+                        + (lastError == null ? "未知错误" : lastError.getMessage()),
+                lastError);
+    }
+
+    private void closeTransport() {
+        if (connection != null) {
             if (cameraInterface != null) connection.releaseInterface(cameraInterface);
             connection.close();
         }
@@ -359,7 +400,15 @@ final class PtpCamera {
 
     private byte[] transact(int operation, long[] params, byte[] outgoingData, int timeout) throws Exception {
         ensureConnectedForOperation(operation);
-        int current = ++transaction;
+        // ISO 15740 requires OpenSession to use transaction ID 0. The first
+        // operation inside the newly opened session then starts at ID 1.
+        int current;
+        if (operation == OPEN_SESSION) {
+            transaction = 0;
+            current = 0;
+        } else {
+            current = ++transaction;
+        }
         sendContainer(TYPE_COMMAND, operation, current, parameterBytes(params), timeout);
         if (outgoingData != null) sendContainer(TYPE_DATA, operation, current, outgoingData, timeout);
 
@@ -370,10 +419,20 @@ final class PtpCamera {
             data = first.payload;
             response = receiveContainer(timeout);
         }
+        if (first.transaction != current || response.transaction != current) {
+            throw new Exception(String.format(
+                    "%s 返回了不匹配的 PTP 事务编号（期望 %d，收到 %d/%d）。",
+                    cameraName(),
+                    current,
+                    first.transaction,
+                    response.transaction));
+        }
         if (response.type != TYPE_RESPONSE) {
             throw new Exception(cameraName() + " 返回了无效的 PTP 数据。");
         }
-        if (response.code != RESPONSE_OK) {
+        if (response.code != RESPONSE_OK
+                && !(operation == OPEN_SESSION
+                && response.code == RESPONSE_SESSION_ALREADY_OPEN)) {
             throw new Exception(String.format(
                     "%s PTP 错误 0x%04X（操作 0x%04X）",
                     cameraName(),
@@ -393,36 +452,101 @@ final class PtpCamera {
         packet.put(payload);
         byte[] bytes = packet.array();
         int offset = 0;
+        boolean recovered = false;
         while (offset < bytes.length) {
             int sent = connection.bulkTransfer(bulkOut, bytes, offset, bytes.length - offset, timeout);
-            if (sent <= 0) throw new Exception("向 " + cameraName() + " 发送 USB 数据失败。");
+            if (sent <= 0) {
+                if (!recovered && clearEndpointHalt(bulkOut)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception("向 " + cameraName() + " 发送 USB 数据失败。");
+            }
             offset += sent;
         }
     }
 
     private Container receiveContainer(int timeout) throws Exception {
         byte[] first = new byte[1024 * 1024];
-        int received = connection.bulkTransfer(bulkIn, first, first.length, timeout);
-        if (received < 12) throw new Exception("读取 " + cameraName() + " USB 数据失败。");
+        int received = 0;
+        boolean recovered = false;
+        while (received < 12) {
+            int count = connection.bulkTransfer(
+                    bulkIn,
+                    first,
+                    received,
+                    first.length - received,
+                    timeout);
+            if (count <= 0) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception("读取 " + cameraName() + " USB 数据失败。");
+            }
+            received += count;
+        }
         ByteBuffer header = ByteBuffer.wrap(first, 0, received).order(ByteOrder.LITTLE_ENDIAN);
         int total = header.getInt();
         int type = header.getShort() & 0xffff;
         int code = header.getShort() & 0xffff;
-        header.getInt();
+        int returnedTransaction = header.getInt();
         if (total < 12 || total > 256 * 1024 * 1024) {
             throw new Exception(cameraName() + " 返回的数据长度无效。");
         }
         ByteArrayOutputStream all = new ByteArrayOutputStream(total);
-        all.write(first, 0, received);
+        all.write(first, 0, Math.min(received, total));
         while (all.size() < total) {
             int remaining = total - all.size();
             byte[] chunk = new byte[Math.min(1024 * 1024, remaining)];
             int count = connection.bulkTransfer(bulkIn, chunk, chunk.length, timeout);
-            if (count <= 0) throw new Exception(cameraName() + " 图像传输中断。");
-            all.write(chunk, 0, count);
+            if (count <= 0) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(cameraName() + " 图像传输中断。");
+            }
+            all.write(chunk, 0, Math.min(count, remaining));
         }
         byte[] container = all.toByteArray();
-        return new Container(type, code, Arrays.copyOfRange(container, 12, total));
+        return new Container(
+                type,
+                code,
+                returnedTransaction,
+                Arrays.copyOfRange(container, 12, total));
+    }
+
+    private boolean clearEndpointHalt(UsbEndpoint endpoint) {
+        if (connection == null || endpoint == null) return false;
+        int requestType =
+                UsbConstants.USB_DIR_OUT
+                        | UsbConstants.USB_TYPE_STANDARD
+                        | USB_RECIPIENT_ENDPOINT;
+        return connection.controlTransfer(
+                requestType,
+                USB_REQUEST_CLEAR_FEATURE,
+                USB_FEATURE_ENDPOINT_HALT,
+                endpoint.getAddress(),
+                null,
+                0,
+                1_000) >= 0;
+    }
+
+    private boolean resetPtpDevice() {
+        if (connection == null || cameraInterface == null) return false;
+        int requestType =
+                UsbConstants.USB_DIR_OUT
+                        | UsbConstants.USB_TYPE_CLASS
+                        | USB_RECIPIENT_INTERFACE;
+        return connection.controlTransfer(
+                requestType,
+                PTP_USB_REQUEST_RESET,
+                0,
+                cameraInterface.getId(),
+                null,
+                0,
+                2_000) >= 0;
     }
 
     private static long findSdramObject(byte[] events) {
@@ -555,7 +679,7 @@ final class PtpCamera {
         String descriptor = device.getProductName();
         if (descriptor == null) return null;
         String normalized = descriptor
-                .toLowerCase()
+                .toLowerCase(Locale.ROOT)
                 .replace("_", "")
                 .replace("-", "")
                 .replace(" ", "");
@@ -566,7 +690,7 @@ final class PtpCamera {
         int bestMatchLength = 0;
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
             String candidateName = candidate.name
-                    .toLowerCase()
+                    .toLowerCase(Locale.ROOT)
                     .replace("nikon", "")
                     .replace(" ", "");
             String candidateAlias = candidateName
@@ -599,11 +723,13 @@ final class PtpCamera {
     private static final class Container {
         final int type;
         final int code;
+        final int transaction;
         final byte[] payload;
 
-        Container(int type, int code, byte[] payload) {
+        Container(int type, int code, int transaction, byte[] payload) {
             this.type = type;
             this.code = code;
+            this.transaction = transaction;
             this.payload = payload;
         }
     }

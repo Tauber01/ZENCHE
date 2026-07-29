@@ -38,6 +38,11 @@ struct RootView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $model.showingSettings) {
+            AppSettingsSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 DiagnosticLogger.shared.info("app", "应用进入前台")
@@ -59,22 +64,18 @@ private struct AppHeader: View {
     var body: some View {
         Group {
             if horizontalSizeClass == .compact {
-                VStack(spacing: 10) {
-                    HStack(spacing: 12) {
-                        brand
-                        Spacer(minLength: 8)
-                        connectionButton
-                    }
-                    modePicker
-                        .frame(maxWidth: .infinity)
+                HStack(spacing: 10) {
+                    brand
+                    Spacer(minLength: 8)
+                    connectionButton
+                    settingsButton
                 }
             } else {
                 HStack(spacing: 12) {
                     brand
                     Spacer(minLength: 8)
-                    modePicker
-                        .frame(maxWidth: 190)
                     connectionButton
+                    settingsButton
                 }
             }
         }
@@ -103,15 +104,6 @@ private struct AppHeader: View {
         }
     }
 
-    private var modePicker: some View {
-        Picker("使用模式", selection: $model.mode) {
-            ForEach(ExperienceMode.allCases) { mode in
-                Text(mode.rawValue).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
-    }
-
     private var connectionButton: some View {
         Button {
             model.showingConnection = true
@@ -128,6 +120,18 @@ private struct AppHeader: View {
             .frame(height: 38)
         }
         .buttonStyle(.bordered)
+    }
+
+    private var settingsButton: some View {
+        Button {
+            model.showingSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 17, weight: .semibold))
+                .frame(width: 38, height: 38)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityLabel("打开设置")
     }
 
     private var connectionColor: Color {
@@ -151,7 +155,6 @@ private struct SideNavigation: View {
             Divider().padding(.vertical, 6)
             groupLabel("管理")
             navigationButton(.library)
-            navigationButton(.transfer)
             Spacer()
         }
         .padding(.horizontal, 10)
@@ -227,7 +230,6 @@ private struct CurrentPage: View {
         case .capture: CapturePage()
         case .monitor: MonitorPage()
         case .library: LibraryPage()
-        case .transfer: TransferPage()
         }
     }
 }
@@ -240,18 +242,12 @@ private struct CapturePage: View {
             VStack(alignment: .leading, spacing: 18) {
                 PageTitle(
                     title: "照片拍摄",
-                    subtitle: model.mode == .simple
-                    ? "连接设备、确认构图，然后按下快门。"
-                    : "照片控制 · 对焦、曝光补偿、变焦与构图辅助。"
+                    subtitle: "快门、曝光、对焦、变焦与构图辅助集中在当前页面。"
                 )
 
                 CameraStage()
-
-                if model.mode == .professional {
-                    ProfessionalControls()
-                } else {
-                    SimpleControls()
-                }
+                CaptureActionBar()
+                CaptureParameterDeck()
             }
             .padding(20)
         }
@@ -331,39 +327,52 @@ private struct CameraStage: View {
     }
 }
 
-private struct SimpleControls: View {
+private struct CaptureActionBar: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        HStack(spacing: 14) {
-            Button {
-                model.camera.capturePhoto()
-            } label: {
-                Label("拍摄", systemImage: "camera.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                captureButton
+                guideToggles
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(model.camera.state != .ready)
-
-            Button {
-                model.showGrid.toggle()
-            } label: {
-                Label("构图网格", systemImage: "grid")
-                    .frame(height: 52)
+            VStack(spacing: 12) {
+                captureButton
+                guideToggles
             }
-            .buttonStyle(.bordered)
         }
+    }
+
+    private var captureButton: some View {
+        Button {
+            model.camera.capturePhoto()
+        } label: {
+            Label("拍摄", systemImage: "camera.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(model.camera.state != .ready)
+    }
+
+    private var guideToggles: some View {
+        HStack(spacing: 10) {
+            Toggle("网格", isOn: $model.showGrid)
+                .toggleStyle(.button)
+            Toggle("安全框", isOn: $model.showSafeGuide)
+                .toggleStyle(.button)
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
-private struct ProfessionalControls: View {
+private struct CaptureParameterDeck: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("专业控制")
+            Text("相机参数")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 9) {
@@ -419,37 +428,9 @@ private struct ProfessionalControls: View {
                 )
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    captureButton
-                    guideToggles
-                }
-                VStack(spacing: 12) {
-                    captureButton
-                    guideToggles
-                }
-            }
         }
         .padding(18)
         .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    private var captureButton: some View {
-        Button {
-            model.camera.capturePhoto()
-        } label: {
-            Label("立即拍摄", systemImage: "camera.fill")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(model.camera.state != .ready)
-    }
-
-    private var guideToggles: some View {
-        Toggle("构图网格", isOn: $model.showGrid)
-            .toggleStyle(.button)
     }
 }
 
@@ -501,6 +482,75 @@ private struct MonitorParameterDeck: View {
                 .font(.headline)
             Text("按当前视频设备公开的能力调整。")
                 .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("快门角度", systemImage: "circle.lefthalf.filled")
+                    Spacer()
+                    Text(String(format: "%.1f° · %.0fp", model.camera.shutterAngle, model.camera.activeFrameRate))
+                        .monospacedDigit()
+                        .foregroundStyle(.red)
+                }
+                Picker(
+                    "快门角度",
+                    selection: Binding(
+                        get: {
+                            let options = [45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0]
+                            return options.min {
+                                abs($0 - model.camera.shutterAngle)
+                                    < abs($1 - model.camera.shutterAngle)
+                            } ?? 180
+                        },
+                        set: { model.camera.setVideoShutterAngle($0) }
+                    )
+                ) {
+                    ForEach([45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0], id: \.self) {
+                        Text(String(format: "%.1f°", $0)).tag($0)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(model.camera.state != .ready || !model.camera.supportsCustomExposure)
+                if !model.camera.supportsCustomExposure {
+                    Text("当前设备未通过 AVFoundation 提供自定义曝光；快门角度和 ISO 保持只读。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("ISO 感光度", systemImage: "camera.metering.center.weighted")
+                    Spacer()
+                    Text("ISO \(Int(model.camera.exposureISO.rounded()))")
+                        .monospacedDigit()
+                        .foregroundStyle(.red)
+                }
+                Slider(
+                    value: Binding(
+                        get: { Double(model.camera.exposureISO) },
+                        set: { model.camera.setVideoISO(Float($0)) }
+                    ),
+                    in: Double(model.camera.minISO)...Double(
+                        max(model.camera.minISO + 1, model.camera.maxISO)
+                    ),
+                    step: 1
+                )
+                .disabled(model.camera.state != .ready || !model.camera.supportsCustomExposure)
+            }
+
+            LabeledContent {
+                Text(
+                    model.camera.lensAperture > 0
+                        ? String(format: "f/%.1f", model.camera.lensAperture)
+                        : "—"
+                )
+                .monospacedDigit()
+            } label: {
+                Label("光圈", systemImage: "camera.aperture")
+            }
+            Text("AVFoundation 仅公开当前镜头光圈读数，不允许应用直接改写；请在镜头或相机端调整。")
+                .font(.caption)
                 .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 8) {
@@ -562,15 +612,6 @@ private struct MonitorOutputDeck: View {
             Text("系统视频输出")
                 .font(.headline)
 
-            Toggle(
-                "2× 超采样（系统视频）",
-                isOn: Binding(
-                    get: { model.monitorSupersampling },
-                    set: { model.setMonitorSupersampling($0) }
-                )
-            )
-            .toggleStyle(.switch)
-
             Picker(
                 "输出编码偏好",
                 selection: Binding(
@@ -595,7 +636,7 @@ private struct MonitorOutputDeck: View {
                 }
             }
 
-            Text("画面尺寸/帧频会切换 AVFoundation 的采集格式；编码仅保存为输出偏好，不改变实时取景输入。这里不是 Nikon 机身的“视频文件类型”或“扩展过采样”。")
+            Text("画面尺寸/帧频会切换 AVFoundation 的采集格式；编码仅保存为输出偏好，不改变实时取景输入，也不会修改 Nikon 机身的视频文件类型。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -611,66 +652,72 @@ private struct LibraryPage: View {
     @State private var showingImporter = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                PageTitle(title: "文件管理", subtitle: "\(model.library.items.count) 个本地文件")
-                Spacer()
-                Button {
-                    showingImporter = true
-                } label: {
-                    Label("导入", systemImage: "square.and.arrow.down")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    PageTitle(
+                        title: "文件与传输",
+                        subtitle: "\(model.library.items.count) 个本地文件 · 无线收件箱与文件管理"
+                    )
+                    Spacer()
+                    Button {
+                        showingImporter = true
+                    } label: {
+                        Label("导入", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
-            }
 
-            if model.library.items.isEmpty {
-                ContentUnavailableView(
-                    "暂无照片",
-                    systemImage: "photo.on.rectangle.angled",
-                    description: Text("拍摄或导入的文件会显示在这里。")
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                GeometryReader { proxy in
-                    ScrollView {
-                        let columns = max(2, Int(proxy.size.width / 180))
-                        LazyVGrid(
-                            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columns),
-                            spacing: 12
-                        ) {
-                            ForEach(model.library.items) { item in
-                                LibraryThumbnail(
-                                    item: item,
-                                    selected: model.library.selectedItemID == item.id
-                                )
-                                .onTapGesture {
-                                    model.library.selectedItemID = item.id
-                                }
+                WirelessTransferCard()
+
+                HStack {
+                    Text("本地文件")
+                        .font(.headline)
+                    Spacer()
+                    if let selected = model.library.selectedItem {
+                        Text(selected.filename)
+                            .font(.caption.monospaced())
+                            .lineLimit(1)
+                        ShareLink(item: selected.url) {
+                            Label("分享", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.bordered)
+                        Button(role: .destructive) {
+                            model.library.deleteSelected()
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                if model.library.items.isEmpty {
+                    ContentUnavailableView(
+                        "暂无照片",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text("拍摄、导入或无线接收的文件会显示在这里。")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 260)
+                } else {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 150), spacing: 12)],
+                        spacing: 12
+                    ) {
+                        ForEach(model.library.items) { item in
+                            LibraryThumbnail(
+                                item: item,
+                                selected: model.library.selectedItemID == item.id
+                            )
+                            .onTapGesture {
+                                model.library.selectedItemID = item.id
                             }
                         }
                     }
                 }
             }
-
-            if let selected = model.library.selectedItem {
-                HStack {
-                    Text(selected.filename)
-                        .font(.caption.monospaced())
-                        .lineLimit(1)
-                    Spacer()
-                    ShareLink(item: selected.url) {
-                        Label("分享", systemImage: "square.and.arrow.up")
-                    }
-                    Button(role: .destructive) {
-                        model.library.deleteSelected()
-                    } label: {
-                        Label("删除", systemImage: "trash")
-                    }
-                }
-                .buttonStyle(.bordered)
-            }
+            .padding(20)
         }
-        .padding(20)
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: [.image],
@@ -723,142 +770,226 @@ private struct LibraryThumbnail: View {
     }
 }
 
-private struct TransferPage: View {
+private struct WirelessTransferCard: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageTitle(title: "传输", subtitle: "文件默认保留在应用内，是否写入系统照片库由你决定。")
+        SettingsCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Label("Nikon 无线收件箱", systemImage: "wifi")
+                        .font(.headline)
+                    Spacer()
+                    Circle()
+                        .fill(model.wireless.isRunning ? Color.green : Color.secondary)
+                        .frame(width: 8, height: 8)
+                    Text(model.wireless.isRunning ? "接收中" : "已停止")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
 
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
-                            Label("Nikon 无线收件箱", systemImage: "wifi")
+                Text(model.wireless.status)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if model.wireless.isRunning {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(model.wireless.hostAddress):\(WirelessTransferServer.port)")
+                            .font(.body.monospaced().weight(.semibold))
+                            .textSelection(.enabled)
+                        Text("用户名 / 密码：\(WirelessTransferServer.username) / \(WirelessTransferServer.password)")
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
+                }
+
+                Button {
+                    if model.wireless.isRunning {
+                        model.wireless.stop()
+                    } else {
+                        model.wireless.refreshAddress()
+                        model.wireless.start()
+                    }
+                } label: {
+                    Label(
+                        model.wireless.isRunning ? "停止接收" : "开启无线接收",
+                        systemImage: model.wireless.isRunning
+                            ? "stop.fill"
+                            : "antenna.radiowaves.left.and.right"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(model.wireless.isRunning ? .red : .accentColor)
+
+                Text("相机 FTP 端口设为 2121，用户名与密码均为 nikonlink，并开启 PASV。服务只在 Nikon Link 位于前台时运行。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct AppSettingsSheet: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingLogs = false
+    @State private var showingDonation = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    SettingsCard {
+                        Toggle(isOn: $model.autoSaveToPhotos) {
+                            Label("拍摄后自动存入“照片”", systemImage: "photo.badge.plus")
+                        }
+                    }
+
+                    SettingsCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("诊断日志", systemImage: "doc.text.magnifyingglass")
                                 .font(.headline)
-                            Spacer()
-                            Circle()
-                                .fill(model.wireless.isRunning ? Color.green : Color.secondary)
-                                .frame(width: 8, height: 8)
-                            Text(model.wireless.isRunning ? "接收中" : "已停止")
-                                .font(.caption.weight(.semibold))
+                            Text("按日写入、5 MB 滚动并保留 14 天；查询与上传前会自动脱敏。")
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 10) {
+                                    logButtons
+                                }
+                                VStack(spacing: 10) {
+                                    logButtons
+                                }
+                            }
                         }
+                    }
 
-                        Text(model.wireless.status)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        if model.wireless.isRunning {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("服务器")
-                                    .font(.caption)
+                    SettingsCard {
+                        HStack(spacing: 14) {
+                            Image(systemName: "cup.and.saucer.fill")
+                                .font(.title2)
+                                .foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("喜欢 Nikon Link？")
+                                    .font(.headline)
+                                Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
+                                    .font(.subheadline)
                                     .foregroundStyle(.secondary)
-                                Text("\(model.wireless.hostAddress):\(WirelessTransferServer.port)")
-                                    .font(.body.monospaced().weight(.semibold))
-                                    .textSelection(.enabled)
-                                Text("用户名 / 密码：\(WirelessTransferServer.username) / \(WirelessTransferServer.password)")
-                                    .font(.caption.monospaced())
-                                    .textSelection(.enabled)
                             }
+                            Spacer()
+                            Button("请作者喝奶茶") {
+                                showingDonation = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.orange)
                         }
-
-                        Button {
-                            if model.wireless.isRunning {
-                                model.wireless.stop()
-                            } else {
-                                model.wireless.refreshAddress()
-                                model.wireless.start()
-                            }
-                        } label: {
-                            Label(
-                                model.wireless.isRunning ? "停止接收" : "开启无线接收",
-                                systemImage: model.wireless.isRunning ? "stop.fill" : "antenna.radiowaves.left.and.right"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(model.wireless.isRunning ? .red : .accentColor)
-
-                        Text("相机 FTP 端口设为 2121，开启 PASV。接收服务仅在 Nikon Link 位于前台时运行，首次开启需允许“本地网络”访问。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                }
 
-                SettingsCard {
-                    Toggle(isOn: $model.autoSaveToPhotos) {
-                        Label("拍摄后自动存入“照片”", systemImage: "photo.badge.plus")
-                    }
-                }
-
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("最近文件", systemImage: "clock")
-                            .font(.headline)
-                        if let latest = model.library.items.first {
-                            Text(latest.filename)
-                                .font(.subheadline.monospaced())
-                                .foregroundStyle(.secondary)
-                            HStack {
-                                Button("存入系统照片库") {
-                                    model.library.saveToSystemPhotos(latest.url) { message in
-                                        model.statusMessage = message
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-
-                                ShareLink(item: latest.url) {
-                                    Label("分享或隔空投送", systemImage: "square.and.arrow.up")
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                        } else {
-                            Text("拍摄完成后可在此快速传输。")
+                    SettingsCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("隐私", systemImage: "lock.shield")
+                                .font(.headline)
+                            Text("Nikon Link 不上传照片，也不包含分析服务。只有你点击上传并在 GitHub 确认时，预览中的脱敏日志才会发送。")
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("诊断日志", systemImage: "doc.text.magnifyingglass")
-                            .font(.headline)
-                        Text("日志保存在应用沙盒的 Library/Logs/Nikon Link，按日写入、5 MB 滚动并保留 14 天。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Button {
-                            DiagnosticLogger.shared.info(
-                                "diagnostics",
-                                "用户打开 GitHub Issue 提交页"
-                            )
-                            guard let url = DiagnosticLogger.shared.githubIssueURL() else {
-                                model.statusMessage = "无法生成 GitHub Issue 地址"
-                                return
-                            }
-                            UIApplication.shared.open(url)
-                        } label: {
-                            Label(
-                                "提交 GitHub Issue",
-                                systemImage: "arrow.up.right.square"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-
-                SettingsCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("隐私", systemImage: "lock.shield")
-                            .font(.headline)
-                        Text("Nikon Link 不上传照片、不包含分析服务。只有你点击“提交 GitHub Issue”并在 GitHub 确认提交时，预览中的脱敏日志才会发送。")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                .padding(20)
+            }
+            .navigationTitle("设置")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
                 }
             }
-            .padding(20)
+        }
+        .sheet(isPresented: $showingLogs) {
+            DiagnosticLogViewer()
+        }
+        .sheet(isPresented: $showingDonation) {
+            DonationSheet()
+        }
+    }
+
+    @ViewBuilder
+    private var logButtons: some View {
+        Button {
+            showingLogs = true
+        } label: {
+            Label("查询最近日志", systemImage: "doc.text")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+
+        Button {
+            DiagnosticLogger.shared.info("diagnostics", "用户打开 GitHub Issue 提交页")
+            guard let url = DiagnosticLogger.shared.githubIssueURL() else {
+                model.statusMessage = "无法生成 GitHub Issue 地址"
+                return
+            }
+            UIApplication.shared.open(url)
+        } label: {
+            Label("上传脱敏日志", systemImage: "arrow.up.doc")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+}
+
+private struct DiagnosticLogViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var logText = DiagnosticLogger.shared.recentText(maxCharacters: 12_000)
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(logText)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+            }
+            .navigationTitle("最近诊断日志")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("刷新") {
+                        logText = DiagnosticLogger.shared.recentText(maxCharacters: 12_000)
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct DonationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let image = UIImage(named: "wechat-donation") {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(20)
+                } else {
+                    ContentUnavailableView(
+                        "二维码未找到",
+                        systemImage: "qrcode",
+                        description: Text("请重新安装 Nikon Link 后再试。")
+                    )
+                }
+            }
+            .navigationTitle("请作者喝奶茶")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
         }
     }
 }

@@ -101,8 +101,9 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### Windows
 
-解压 `NikonLink-0.8.0-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
-同目录下的 `libusb-1.0.dll`。相机接口可能需要切换到 WinUSB，操作前请先阅读
+运行 `NikonLink-0.8.0-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
+解压后运行 `NikonLink.exe`，不要单独移动同目录下的 `libusb-1.0.dll`。
+相机接口可能需要切换到 WinUSB，操作前请先阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
 
 ### HarmonyOS
@@ -178,6 +179,8 @@ Windows 需要在 Windows 主机单独构建：
 ```powershell
 .\scripts\build-windows.ps1 -LibUsbDll C:\path\to\libusb-1.0.dll
 ```
+
+该命令同时生成 `NikonLink-0.8.0-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
 
 HarmonyOS 可单独构建：
 

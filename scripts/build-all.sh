@@ -30,4 +30,4 @@ else
   echo "未检测到 DevEco Studio hvigor，跳过 HarmonyOS 构建。"
 fi
 
-echo "Windows 包需在 Windows 主机运行 scripts/build-windows.ps1。"
+echo "Windows EXE 安装包需在 Windows 主机运行 scripts/build-windows.ps1。"

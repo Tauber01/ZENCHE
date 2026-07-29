@@ -23,6 +23,7 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <StackPanel VerticalAlignment="Center">
           <TextBlock Style="{StaticResource DisplayText}" Text="Nikon Link" />
@@ -36,6 +37,13 @@
                 Style="{StaticResource PrimaryButton}"
                 Content="连接相机"
                 Click="ConnectButton_Click" />
+        <Button x:Name="SettingsButton"
+                Grid.Column="2"
+                Width="76"
+                Margin="10,0,0,0"
+                Style="{StaticResource ButtonBase}"
+                Content="设置"
+                Click="SettingsButton_Click" />
       </Grid>
     </Border>
 
@@ -75,12 +83,7 @@
             <Button x:Name="LibraryNav"
                     Style="{StaticResource NavButton}"
                     Tag="library"
-                    Content="本地照片"
-                    Click="Navigate_Click" />
-            <Button x:Name="TransferNav"
-                    Style="{StaticResource NavButton}"
-                    Tag="transfer"
-                    Content="无线传输"
+                    Content="文件与传输"
                     Click="Navigate_Click" />
           </StackPanel>
         </DockPanel>
@@ -158,19 +161,53 @@
         <Grid x:Name="LibraryPanel" Visibility="Collapsed">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <Grid>
-            <TextBlock Style="{StaticResource DisplayText}" Text="本地照片" />
+            <TextBlock Style="{StaticResource DisplayText}" Text="文件与传输" />
             <Button HorizontalAlignment="Right"
                     Width="118"
                     Style="{StaticResource ButtonBase}"
                     Content="打开目录"
                     Click="OpenPhotoFolder_Click" />
           </Grid>
+          <Border Grid.Row="1"
+                  Margin="0,18,0,0"
+                  Padding="16"
+                  Style="{StaticResource PanelCard}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="无线 FTP 收件箱" />
+                <TextBlock x:Name="WirelessStatusText"
+                           FontWeight="SemiBold"
+                           Text="无线收件箱未开启" />
+                <TextBlock x:Name="WirelessAddressText"
+                           Margin="0,6,0,0"
+                           FontFamily="{StaticResource MonoFont}"
+                           Foreground="{StaticResource AccentBrush}"
+                           Text="—" />
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="端口 2121 · 用户名 nikonlink · 密码 nikonlink · PASV 开启" />
+              </StackPanel>
+              <Button x:Name="WirelessButton"
+                      Grid.Column="1"
+                      Width="150"
+                      Margin="18,0,0,0"
+                      VerticalAlignment="Center"
+                      Style="{StaticResource PrimaryButton}"
+                      Content="开启无线接收"
+                      Click="WirelessButton_Click" />
+            </Grid>
+          </Border>
           <ListBox x:Name="PhotoList"
-                   Grid.Row="1"
+                   Grid.Row="2"
                    Margin="0,20,0,12"
                    Background="Transparent"
                    BorderBrush="{StaticResource RuleBrush}"
@@ -198,7 +235,7 @@
             </ListBox.ItemTemplate>
           </ListBox>
           <Button x:Name="DeletePhotoButton"
-                  Grid.Row="2"
+                  Grid.Row="3"
                   Width="118"
                   HorizontalAlignment="Right"
                   Style="{StaticResource DangerButton}"
@@ -207,41 +244,14 @@
                   Click="DeletePhotoButton_Click" />
         </Grid>
 
-        <Grid x:Name="TransferPanel" Visibility="Collapsed">
+        <Grid x:Name="SettingsPanel" Visibility="Collapsed">
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="680" HorizontalAlignment="Left">
-              <TextBlock Style="{StaticResource DisplayText}" Text="无线传输" />
+              <TextBlock Style="{StaticResource DisplayText}" Text="设置" />
               <TextBlock Margin="0,12,0,24"
                          Foreground="{StaticResource MutedBrush}"
-                         Text="在可信局域网中临时开启 FTP 收件箱，相机上传完成后请停止接收。" />
+                         Text="诊断、日志上传与应用支持。" />
               <Border Style="{StaticResource PanelCard}">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource SectionTitle}" Text="FTP 收件箱" />
-                  <TextBlock x:Name="WirelessStatusText"
-                             FontWeight="SemiBold"
-                             Text="无线收件箱未开启" />
-                  <TextBlock x:Name="WirelessAddressText"
-                             Margin="0,8,0,20"
-                             FontFamily="{StaticResource MonoFont}"
-                             Foreground="{StaticResource AccentBrush}"
-                             Text="—" />
-                  <Button x:Name="WirelessButton"
-                          Width="158"
-                          HorizontalAlignment="Left"
-                          Style="{StaticResource PrimaryButton}"
-                          Content="开启无线接收"
-                          Click="WirelessButton_Click" />
-                </StackPanel>
-              </Border>
-              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource SectionTitle}" Text="相机配置" />
-                  <TextBlock FontFamily="{StaticResource MonoFont}"
-                             LineHeight="24"
-                             Text="服务器类型  FTP&#x0a;端口        2121&#x0a;用户名      nikonlink&#x0a;密码        nikonlink&#x0a;PASV 模式   开启" />
-                </StackPanel>
-              </Border>
-              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
                 <StackPanel>
                   <TextBlock Style="{StaticResource SectionTitle}" Text="诊断日志" />
                   <TextBlock x:Name="DiagnosticLogPathText"
@@ -250,6 +260,11 @@
                              Foreground="{StaticResource MutedBrush}"
                              TextWrapping="Wrap" />
                   <WrapPanel>
+                    <Button Width="112"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource ButtonBase}"
+                            Content="查询日志"
+                            Click="ViewLogs_Click" />
                     <Button Width="132"
                             Margin="0,0,8,0"
                             Style="{StaticResource ButtonBase}"
@@ -257,7 +272,7 @@
                             Click="OpenLogFolder_Click" />
                     <Button Width="168"
                             Style="{StaticResource PrimaryButton}"
-                            Content="提交 GitHub Issue"
+                            Content="上传脱敏日志"
                             Click="ReportIssue_Click" />
                   </WrapPanel>
                   <TextBlock Margin="0,12,0,0"
@@ -265,6 +280,25 @@
                              TextWrapping="Wrap"
                              Text="将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。" />
                 </StackPanel>
+              </Border>
+              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="喜欢 Nikon Link？" />
+                    <TextBlock Foreground="{StaticResource MutedBrush}"
+                               Text="请作者喝杯奶茶，支持维护和新机型适配。" />
+                  </StackPanel>
+                  <Button Grid.Column="1"
+                          Width="160"
+                          Margin="18,0,0,0"
+                          Style="{StaticResource PrimaryButton}"
+                          Content="请作者喝奶茶"
+                          Click="DonationButton_Click" />
+                </Grid>
               </Border>
             </StackPanel>
           </ScrollViewer>
@@ -278,7 +312,9 @@
               BorderThickness="1,0,0,0">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Margin="20">
-            <TextBlock Style="{StaticResource SectionTitle}" Text="相机参数" />
+            <TextBlock x:Name="ParameterPanelTitle"
+                       Style="{StaticResource SectionTitle}"
+                       Text="照片曝光与参数" />
             <TextBlock Text="拍摄模式" />
             <ComboBox x:Name="ExposureModeBox"
                       SelectionChanged="ExposureModeBox_SelectionChanged">
@@ -289,7 +325,20 @@
               <ComboBoxItem Tag="bulb" Content="M · B门" />
             </ComboBox>
 
-            <TextBlock Text="快门速度" />
+            <TextBlock x:Name="VideoFrameRateLabel"
+                       Text="快门角度换算帧率"
+                       Visibility="Collapsed" />
+            <ComboBox x:Name="VideoFrameRateBox"
+                      Visibility="Collapsed"
+                      SelectionChanged="VideoFrameRateBox_SelectionChanged">
+              <ComboBoxItem Tag="24" Content="24 fps" />
+              <ComboBoxItem Tag="25" Content="25 fps" />
+              <ComboBoxItem Tag="30" Content="30 fps" IsSelected="True" />
+              <ComboBoxItem Tag="50" Content="50 fps" />
+              <ComboBoxItem Tag="60" Content="60 fps" />
+            </ComboBox>
+
+            <TextBlock x:Name="ShutterLabel" Text="快门速度" />
             <ComboBox x:Name="ShutterBox"
                       SelectionChanged="ParameterBox_SelectionChanged">
               <ComboBoxItem Tag="0.000125" Content="1/8000 s" />

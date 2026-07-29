@@ -23,6 +23,11 @@ public partial class MainWindow : Window
     private bool _operationInProgress;
     private bool _initializing = true;
     private bool _shutdownStarted;
+    private bool _configuringVideoControls;
+    private bool _videoMode;
+    private double _videoFrameRate = 30;
+    private double _videoShutterAngle = 180;
+    private double _photoShutterSeconds = 0.008;
 
     public MainWindow()
     {
@@ -133,6 +138,7 @@ public partial class MainWindow : Window
         SelectionChangedEventArgs e)
     {
         if (_initializing ||
+            _configuringVideoControls ||
             !_camera.IsConnected ||
             _operationInProgress ||
             sender is not ComboBox combo ||
@@ -155,6 +161,27 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(parameter))
         {
             return;
+        }
+        if (combo == ShutterBox)
+        {
+            if (_videoMode &&
+                double.TryParse(
+                    item.Uid,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var angle))
+            {
+                _videoShutterAngle = angle;
+            }
+            else if (!_videoMode &&
+                     double.TryParse(
+                         Convert.ToString(item.Tag),
+                         NumberStyles.Float,
+                         CultureInfo.InvariantCulture,
+                         out var seconds))
+            {
+                _photoShutterSeconds = seconds;
+            }
         }
         object value = parameter is
             "exposureTime" or "aperture" or "iso" or "exposureCompensation"
@@ -197,8 +224,18 @@ public partial class MainWindow : Window
         {
             return;
         }
-        SetCurrentNavigation(button);
         var destination = Convert.ToString(button.Tag);
+        ShowDestination(button, destination);
+    }
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowDestination(null, "settings");
+    }
+
+    private void ShowDestination(Button? navigation, string? destination)
+    {
+        SetCurrentNavigation(navigation);
         CapturePanel.Visibility =
             destination is "capture" or "monitor"
                 ? Visibility.Visible
@@ -207,8 +244,8 @@ public partial class MainWindow : Window
             destination == "library"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-        TransferPanel.Visibility =
-            destination == "transfer"
+        SettingsPanel.Visibility =
+            destination == "settings"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         var cameraWorkspace = destination is "capture" or "monitor";
@@ -223,6 +260,136 @@ public partial class MainWindow : Window
         PreviewDetailText.Text = destination == "monitor"
             ? "相机原生 JPEG · 监看输出 · 不修改原片"
             : "相机原生 JPEG · 本地预览";
+        ShutterButton.Content = destination == "monitor"
+            ? "抓取照片"
+            : "拍摄照片";
+        ConfigureShutterControl(destination == "monitor");
+    }
+
+    private async void VideoFrameRateBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            _configuringVideoControls ||
+            VideoFrameRateBox.SelectedItem is not ComboBoxItem item ||
+            !double.TryParse(
+                Convert.ToString(item.Tag),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var frameRate))
+        {
+            return;
+        }
+        _videoFrameRate = frameRate;
+        if (!_videoMode)
+        {
+            return;
+        }
+        ConfigureShutterControl(true);
+        if (!_camera.IsConnected || _operationInProgress)
+        {
+            OperationStatusText.Text =
+                $"视频曝光参考：{_videoShutterAngle:g}° · {_videoFrameRate:g} fps";
+            return;
+        }
+        var seconds = _videoShutterAngle / (360 * _videoFrameRate);
+        await RunOperationAsync(
+            $"正在按 {_videoShutterAngle:g}° 换算曝光时间…",
+            async token =>
+            {
+                await _camera.SetParameterAsync(
+                    "exposureTime",
+                    seconds,
+                    token);
+                OperationStatusText.Text =
+                    $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps";
+            });
+    }
+
+    private void ConfigureShutterControl(bool videoMode)
+    {
+        _videoMode = videoMode;
+        _configuringVideoControls = true;
+        try
+        {
+            ParameterPanelTitle.Text =
+                videoMode ? "视频曝光三要素与参数" : "照片曝光与参数";
+            VideoFrameRateLabel.Visibility =
+                videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoFrameRateBox.Visibility =
+                videoMode ? Visibility.Visible : Visibility.Collapsed;
+            ShutterLabel.Text = videoMode ? "快门角度" : "快门速度";
+            ShutterBox.Items.Clear();
+            if (videoMode)
+            {
+                foreach (var angle in new[]
+                         {
+                             45.0,
+                             90.0,
+                             144.0,
+                             172.8,
+                             180.0,
+                             270.0,
+                             360.0
+                         })
+                {
+                    var seconds = angle / (360 * _videoFrameRate);
+                    var denominator = Math.Round(1 / seconds);
+                    var option = new ComboBoxItem
+                    {
+                        Tag = seconds.ToString(
+                            "G17",
+                            CultureInfo.InvariantCulture),
+                        Uid = angle.ToString(
+                            "G",
+                            CultureInfo.InvariantCulture),
+                        Content = $"{angle:g}° · 约 1/{denominator:g} s"
+                    };
+                    ShutterBox.Items.Add(option);
+                    if (Math.Abs(angle - _videoShutterAngle) < 0.01)
+                    {
+                        ShutterBox.SelectedItem = option;
+                    }
+                }
+            }
+            else
+            {
+                foreach (var option in new (string Label, double Seconds)[]
+                         {
+                             ("1/8000 s", 0.000125),
+                             ("1/1000 s", 0.001),
+                             ("1/250 s", 0.004),
+                             ("1/125 s", 0.008),
+                             ("1/60 s", 0.016667),
+                             ("1 s", 1),
+                             ("30 s", 30)
+                         })
+                {
+                    var item = new ComboBoxItem
+                    {
+                        Tag = option.Seconds.ToString(
+                            "G17",
+                            CultureInfo.InvariantCulture),
+                        Content = option.Label
+                    };
+                    ShutterBox.Items.Add(item);
+                    if (Math.Abs(option.Seconds - _photoShutterSeconds) < 0.000001)
+                    {
+                        ShutterBox.SelectedItem = item;
+                    }
+                }
+            }
+            if (ShutterBox.SelectedItem is null && ShutterBox.Items.Count > 0)
+            {
+                ShutterBox.SelectedIndex = 0;
+            }
+        }
+        finally
+        {
+            _configuringVideoControls = false;
+        }
+        UpdateExposureAvailability();
     }
 
     private async void WirelessButton_Click(object sender, RoutedEventArgs e)
@@ -261,6 +428,34 @@ public partial class MainWindow : Window
         _diagnostics.OpenDirectory();
     }
 
+    private void ViewLogs_Click(object sender, RoutedEventArgs e)
+    {
+        _diagnostics.Info("diagnostics", "用户查询近期日志");
+        var viewer = new Window
+        {
+            Owner = this,
+            Title = "Nikon Link · 诊断日志查询",
+            Width = 820,
+            Height = 560,
+            MinWidth = 560,
+            MinHeight = 360,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new TextBox
+            {
+                Text = _diagnostics.RecentText(12_000),
+                Margin = new Thickness(18),
+                FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+                FontSize = 12,
+                IsReadOnly = true,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            }
+        };
+        viewer.ShowDialog();
+    }
+
     private void ReportIssue_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -273,6 +468,41 @@ public partial class MainWindow : Window
                 "diagnostics",
                 $"无法打开 GitHub Issue 提交页：{error.Message}");
             ShowError("无法打开浏览器，请访问 github.com/Tauber01/NikonLink/issues");
+        }
+    }
+
+    private void DonationButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var image = new BitmapImage(
+                new Uri(
+                    "pack://application:,,,/Assets/wechat-donation.png",
+                    UriKind.Absolute));
+            var dialog = new Window
+            {
+                Owner = this,
+                Title = "请作者喝奶茶",
+                Width = 500,
+                Height = 700,
+                MinWidth = 360,
+                MinHeight = 520,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Content = new Image
+                {
+                    Source = image,
+                    Margin = new Thickness(24),
+                    Stretch = Stretch.Uniform
+                }
+            };
+            dialog.ShowDialog();
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "support",
+                $"无法显示赞助二维码：{error.Message}");
+            ShowError("无法显示赞助二维码，请稍后重试。");
         }
     }
 
@@ -501,21 +731,23 @@ public partial class MainWindow : Window
         DeletePhotoButton.IsEnabled = false;
     }
 
-    private void SetCurrentNavigation(Button current)
+    private void SetCurrentNavigation(Button? current)
     {
+        var videoActive = current == MonitorNav;
         foreach (var button in new[]
                  {
                      CaptureNav,
                      MonitorNav,
-                     LibraryNav,
-                     TransferNav
+                     LibraryNav
                  })
         {
             button.Background = button == current
-                ? (Brush)FindResource("AccentSoftBrush")
+                ? (Brush)FindResource(
+                    videoActive ? "VideoSoftBrush" : "AccentSoftBrush")
                 : Brushes.Transparent;
             button.Foreground = button == current
-                ? (Brush)FindResource("AccentBrush")
+                ? (Brush)FindResource(
+                    videoActive ? "VideoBrush" : "AccentBrush")
                 : (Brush)FindResource("InkBrush");
             button.FontWeight = button == current
                 ? FontWeights.Bold

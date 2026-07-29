@@ -10,6 +10,7 @@ Nikon Vendor PTP 会话，包含相机识别、实时取景、SDRAM 拍摄、曝
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - 与目标架构一致的官方
   [libusb 1.0](https://github.com/libusb/libusb/releases) Windows DLL
+- [NSIS 3](https://nsis.sourceforge.io/Download)
 - PowerShell 7 或 Windows PowerShell 5.1
 
 从 libusb 官方发布压缩包选择对应架构的 `libusb-1.0.dll`。x64 构建通常使用
@@ -35,12 +36,19 @@ $env:NIKONLINK_LIBUSB_DLL = "C:\path\to\libusb-1.0.dll"
 输出：
 
 ```text
+dist/NikonLink-0.8.0-Windows-x64-Setup.exe
+dist/NikonLink-0.8.0-Windows-x64-Setup.exe.sha256
 dist/NikonLink-0.8.0-Windows-x64.zip
 dist/NikonLink-0.8.0-Windows-x64.zip.sha256
 ```
 
-默认是自包含 .NET 发布。传入 `-FrameworkDependent` 可减小包体，但目标电脑必须
-安装 .NET 8 Desktop Runtime。
+`Setup.exe` 是默认交付物，安装到 `Program Files\Nikon Link`，创建开始菜单和
+桌面快捷方式，并注册到 Windows“已安装的应用”以支持卸载和覆盖升级。ZIP
+保留为便携版。两者默认都是自包含 .NET 发布；传入 `-FrameworkDependent`
+可减小包体，但目标电脑必须安装 .NET 8 Desktop Runtime。
+
+当前社区安装包未使用代码签名证书，Windows SmartScreen 可能在首次运行时提示
+“未知发布者”。正式分发前应使用受信任的代码签名证书签署应用和安装程序。
 
 ## Nikon USB 接口
 
@@ -60,7 +68,8 @@ GitHub Issue 预填页面。
 
 ## 验收
 
-1. 在 x64/ARM64 目标主机启动打包目录中的 `NikonLink.exe`。
+1. 在干净的 x64/ARM64 目标主机运行 `Setup.exe`，确认安装、启动、覆盖升级和
+   “已安装的应用”卸载均正常。
 2. 验证缺少 DLL、USB 权限和驱动冲突时均显示可操作的错误。
 3. 按 [相机实机验收清单](CAMERA_TEST_CHECKLIST.md) 验证连接、取景、参数和拍摄。
 4. 在可信局域网内验证端口 `2121` 的 PASV 上传，并在应用退出后确认端口关闭。

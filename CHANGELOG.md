@@ -5,6 +5,19 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Added a versioned Windows NSIS `Setup.exe` with shortcuts, in-place upgrades,
+  registered uninstall support, portable ZIP output, and SHA-256 checksums.
+
+### Fixed
+
+- Fixed Android USB permission completion on Android 13–16 devices whose
+  privileged permission component does not reliably deliver fill-in extras.
+- Fixed Nikon Z30 USB/PTP session startup by using transaction ID zero for
+  `OpenSession`, recovering stalled endpoints, and retrying with a PTP device
+  reset when initial transport setup fails.
+
 ## [0.8.0] - 2026-07-29
 
 ### Added
