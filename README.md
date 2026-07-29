@@ -6,7 +6,7 @@ Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画
 拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
 无线传图则使用相机自带的 FTP 功能。
 
-> 当前版本：**0.7.2 正式版**
+> 当前版本：**0.7.3 正式版**
 >
 > 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
 >
@@ -83,7 +83,7 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### macOS
 
-1. 打开 `NikonLink-0.7.2-macOS-arm64.dmg`。
+1. 打开 `NikonLink-0.7.3-macOS-arm64.dmg`。
 2. 将 **Nikon Link** 拖到镜像内的 **Applications** 快捷入口。
 3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
 
@@ -91,12 +91,12 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### Android
 
-安装 `NikonLink-0.7.2-android.apk`。当前 APK 使用 Android 调试证书签名，
+安装 `NikonLink-0.7.3-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
 ### Windows
 
-解压 `NikonLink-0.7.2-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
+解压 `NikonLink-0.7.3-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
 同目录下的 `libusb-1.0.dll`。相机接口可能需要切换到 WinUSB，操作前请先阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
 
@@ -163,9 +163,9 @@ FTP 服务。
 默认生成：
 
 ```text
-dist/NikonLink-0.7.2-macOS-arm64.dmg
-dist/NikonLink-0.7.2-android.apk
-dist/NikonLink-0.7.2-ios-unsigned.ipa
+dist/NikonLink-0.7.3-macOS-arm64.dmg
+dist/NikonLink-0.7.3-android.apk
+dist/NikonLink-0.7.3-ios-unsigned.ipa
 ```
 
 Windows 需要在 Windows 主机单独构建：
@@ -190,7 +190,7 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 
 ## 遇到问题
 
-0.7.2 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
+0.7.3 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
 扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
 源码、资源和打包入口已通过静态检查，原生编译、签名、启动和真机测试仍待完成。
 由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合仍以
@@ -241,7 +241,7 @@ Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商
 Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
 monitoring, controlling, and transferring files from Nikon Z-series cameras.
 
-> Current version: **0.7.2 Stable Release**
+> Current version: **0.7.3 Stable Release**
 >
 > Platforms: **macOS · Android · iOS / iPadOS**
 >
@@ -357,7 +357,7 @@ with, endorsed by, or sponsored by Nikon Corporation.
 Nikon Link は、Nikon Z シリーズの接続、モニタリング、撮影制御、ファイル転送を
 行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
 
-> 現在のバージョン：**0.7.2 正式リリース**
+> 現在のバージョン：**0.7.3 正式リリース**
 >
 > 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
 >

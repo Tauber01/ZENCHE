@@ -296,7 +296,7 @@ struct Index {
         this.NavButton('无线传输', 'transfer')
         this.NavButton('诊断日志', 'diagnostics')
         Blank()
-        Text('NIKON LINK 0.7.0')
+        Text('NIKON LINK 0.7.3')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))

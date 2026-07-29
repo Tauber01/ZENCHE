@@ -5,14 +5,7 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
-## [0.7.2] - 2026-07-29
-
-### Fixed
-
-- Prevented the Android header and connection status from overlapping system
-  bars, display cutouts and HyperOS capsule notifications.
-
-## [0.7.1] - 2026-07-29
+## [0.7.3] - 2026-07-29
 
 ### Added
 
@@ -26,6 +19,18 @@ the project uses semantic versioning.
   an app-private photo library, and a foreground FTP/PASV inbox.
 - Added reproducible Windows and HarmonyOS packaging scripts plus platform
   setup, signing, driver, permission, and hardware-acceptance documentation.
+
+## [0.7.2] - 2026-07-29
+
+### Fixed
+
+- Prevented the Android header and connection status from overlapping system
+  bars, display cutouts and HyperOS capsule notifications.
+
+## [0.7.1] - 2026-07-29
+
+### Added
+
 - Added native USB/PTP profiles for every current EXPEED 7 body: Z9, Z8, Z f,
   Z6III, Z50II, Z5II and ZR, with exact Product IDs plus a Nikon descriptor
   fallback for firmware or platform USB-reporting differences.

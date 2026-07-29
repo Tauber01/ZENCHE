@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_ROOT=${0:A:h:h}
 HARMONY_ROOT="$PROJECT_ROOT/native/harmony"
 DIST_DIR="$PROJECT_ROOT/dist"
-VERSION=0.7.0
+VERSION=0.7.3
 
 if [[ -n "${NIKONLINK_HVIGORW:-}" ]]; then
   HVIGOR_COMMAND=("$NIKONLINK_HVIGORW")
@@ -43,7 +43,7 @@ mkdir -p "$DIST_DIR"
 OUTPUT="$DIST_DIR/NikonLink-${VERSION}-HarmonyOS.hap"
 cp "$HAP_PATH" "$OUTPUT"
 shasum -a 256 "$OUTPUT" |
-  awk '{print $1 "  NikonLink-0.7.0-HarmonyOS.hap"}' \
+  awk '{print $1 "  NikonLink-0.7.3-HarmonyOS.hap"}' \
   > "$OUTPUT.sha256"
 
 echo "HarmonyOS package: $OUTPUT"

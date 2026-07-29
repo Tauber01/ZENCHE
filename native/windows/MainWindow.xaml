@@ -52,7 +52,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="16">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.7.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.7.3" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"

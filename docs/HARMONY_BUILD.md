@@ -37,8 +37,8 @@ NIKONLINK_HVIGORW=/path/to/hvigorw ./scripts/build-harmony.sh
 输出：
 
 ```text
-dist/NikonLink-0.7.0-HarmonyOS.hap
-dist/NikonLink-0.7.0-HarmonyOS.hap.sha256
+dist/NikonLink-0.7.3-HarmonyOS.hap
+dist/NikonLink-0.7.3-HarmonyOS.hap.sha256
 ```
 
 ## 权限与行为
