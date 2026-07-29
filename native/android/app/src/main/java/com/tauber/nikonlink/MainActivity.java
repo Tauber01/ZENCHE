@@ -24,6 +24,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -123,9 +124,11 @@ public final class MainActivity extends Activity {
         Window window = getWindow();
         window.setStatusBarColor(PAPER);
         window.setNavigationBarColor(GRAPHITE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 
         camera = new PtpCamera(this);
         monitorSupersampling = getSharedPreferences("nikon-link", MODE_PRIVATE)
@@ -235,7 +238,8 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(PAPER);
 
-        root.addView(buildTopBar(), new LinearLayout.LayoutParams(
+        View topBar = buildTopBar();
+        root.addView(topBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(72)));
 
@@ -248,10 +252,73 @@ public final class MainActivity extends Activity {
         root.addView(buildBottomNavigation(), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(70)));
-        root.addView(buildStatusBar(), new LinearLayout.LayoutParams(
+        View statusBar = buildStatusBar();
+        root.addView(statusBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(30)));
+        applySystemBarInsets(root, topBar, statusBar);
         return root;
+    }
+
+    private void applySystemBarInsets(
+            LinearLayout root,
+            View topBar,
+            View statusBar) {
+        int rootPaddingLeft = root.getPaddingLeft();
+        int rootPaddingRight = root.getPaddingRight();
+        int topPaddingLeft = topBar.getPaddingLeft();
+        int topPaddingTop = topBar.getPaddingTop();
+        int topPaddingRight = topBar.getPaddingRight();
+        int topPaddingBottom = topBar.getPaddingBottom();
+        int statusPaddingLeft = statusBar.getPaddingLeft();
+        int statusPaddingTop = statusBar.getPaddingTop();
+        int statusPaddingRight = statusBar.getPaddingRight();
+        int statusPaddingBottom = statusBar.getPaddingBottom();
+        int topBarHeight = dp(72);
+        int statusBarHeight = dp(30);
+
+        root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            int left;
+            int top;
+            int right;
+            int bottom;
+            left = windowInsets.getSystemWindowInsetLeft();
+            top = windowInsets.getSystemWindowInsetTop();
+            right = windowInsets.getSystemWindowInsetRight();
+            bottom = windowInsets.getSystemWindowInsetBottom();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    && windowInsets.getDisplayCutout() != null) {
+                left = Math.max(left, windowInsets.getDisplayCutout().getSafeInsetLeft());
+                top = Math.max(top, windowInsets.getDisplayCutout().getSafeInsetTop());
+                right = Math.max(right, windowInsets.getDisplayCutout().getSafeInsetRight());
+                bottom = Math.max(bottom, windowInsets.getDisplayCutout().getSafeInsetBottom());
+            }
+
+            root.setPadding(
+                    rootPaddingLeft + left,
+                    root.getPaddingTop(),
+                    rootPaddingRight + right,
+                    root.getPaddingBottom());
+            topBar.setPadding(
+                    topPaddingLeft,
+                    topPaddingTop + top,
+                    topPaddingRight,
+                    topPaddingBottom);
+            statusBar.setPadding(
+                    statusPaddingLeft,
+                    statusPaddingTop,
+                    statusPaddingRight,
+                    statusPaddingBottom + bottom);
+
+            ViewGroup.LayoutParams topParams = topBar.getLayoutParams();
+            topParams.height = topBarHeight + top;
+            topBar.setLayoutParams(topParams);
+            ViewGroup.LayoutParams statusParams = statusBar.getLayoutParams();
+            statusParams.height = statusBarHeight + bottom;
+            statusBar.setLayoutParams(statusParams);
+            return windowInsets;
+        });
+        root.requestApplyInsets();
     }
 
     private View buildTopBar() {
