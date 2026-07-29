@@ -6,7 +6,7 @@
 
 面向 Nikon Z 系列相机的三端原生连接、监看、拍摄与无线传图工具。
 
-> 当前版本：**0.7.0 Release Candidate**
+> 当前版本：**0.7.1 正式版**
 >
 > 支持平台：**macOS · Android · iOS / iPadOS**
 >
@@ -99,7 +99,7 @@ Z5II 与 ZR 在部分 `libgphoto2` 正式版中可能显示为通用 PTP 相机�
 
 ### macOS
 
-1. 打开 `NikonLink-0.7.0-macOS-arm64.dmg`。
+1. 打开 `NikonLink-0.7.1-macOS-arm64.dmg`。
 2. 将 **Nikon Link** 拖到镜像内的 **Applications** 快捷入口。
 3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
 
@@ -107,12 +107,12 @@ Z5II 与 ZR 在部分 `libgphoto2` 正式版中可能显示为通用 PTP 相机�
 
 ### Android
 
-安装 `NikonLink-0.7.0-android.apk`。当前 APK 使用 Android 调试证书签名，
+安装 `NikonLink-0.7.1-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
 ### iOS / iPadOS
 
-`NikonLink-0.7.0-ios-signed.ipa` 必须使用有效的 Apple Developer 证书和描述
+`NikonLink-0.7.1-ios-signed.ipa` 必须使用有效的 Apple Developer 证书和描述
 文件生成，才能安装到授权设备。文件名包含 `ios-unsigned` 的 IPA 只用于验证
 应用内容和 CI 构建，不能安装到真机。
 
@@ -171,9 +171,9 @@ Nikon PTP 实时取景由相机返回原生 JPEG 帧。界面中的显示尺寸�
 默认生成：
 
 ```text
-dist/NikonLink-0.7.0-macOS-arm64.dmg
-dist/NikonLink-0.7.0-android.apk
-dist/NikonLink-0.7.0-ios-unsigned.ipa
+dist/NikonLink-0.7.1-macOS-arm64.dmg
+dist/NikonLink-0.7.1-android.apk
+dist/NikonLink-0.7.1-ios-unsigned.ipa
 ```
 
 每个安装包都附带同名 `.sha256` 校验文件。生成可安装的签名 IPA：
@@ -186,7 +186,7 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 
 ## 验证状态
 
-0.7.0 候选版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
+0.7.1 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
 扫描。由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合
 仍以实机验收为发布门槛。
 
@@ -228,7 +228,7 @@ Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商
 Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
 monitoring, controlling, and transferring files from Nikon Z-series cameras.
 
-> Current version: **0.7.0 Release Candidate**
+> Current version: **0.7.1 Stable Release**
 >
 > Platforms: **macOS · Android · iOS / iPadOS**
 >
@@ -344,7 +344,7 @@ with, endorsed by, or sponsored by Nikon Corporation.
 Nikon Link は、Nikon Z シリーズの接続、モニタリング、撮影制御、ファイル転送を
 行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
 
-> 現在のバージョン：**0.7.0 Release Candidate**
+> 現在のバージョン：**0.7.1 正式リリース**
 >
 > 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
 >

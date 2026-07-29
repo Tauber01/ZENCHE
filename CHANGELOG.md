@@ -5,6 +5,8 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-29
+
 ### Added
 
 - Added native USB/PTP profiles for every current EXPEED 7 body: Z9, Z8, Z f,
