@@ -38,5 +38,7 @@ fi
 APK_SOURCE="$ANDROID_ROOT/app/build/outputs/apk/debug/app-debug.apk"
 APK_TARGET="$DIST_ROOT/NikonLink-$VERSION-android.apk"
 cp "$APK_SOURCE" "$APK_TARGET"
-shasum -a 256 "$APK_TARGET" > "$APK_TARGET.sha256"
+shasum -a 256 "$APK_TARGET" |
+  awk -v name="${APK_TARGET:t}" '{print $1 "  " name}' \
+  > "$APK_TARGET.sha256"
 echo "$APK_TARGET"
