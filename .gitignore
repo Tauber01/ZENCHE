@@ -12,6 +12,12 @@ native/android/app/src/main/assets/web/
 native/android/local.properties
 native/ios/**/*.xcuserstate
 native/ios/**/xcuserdata/
+native/windows/bin/
+native/windows/obj/
+native/harmony/.hvigor/
+native/harmony/oh_modules/
+native/harmony/entry/build/
+native/harmony/entry/oh_modules/
 
 # Nikon's proprietary SDK is intentionally not redistributed.
 NikonSDK/

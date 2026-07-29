@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -99,6 +100,9 @@ private struct SupportedCamera: Equatable {
 
 private enum CameraError: LocalizedError {
     case command(String)
+    case timeout(String)
+    case thermal(String)
+    case liveViewBusy(String)
     case noCamera
     case wrongCamera(String)
     case noImage
@@ -106,6 +110,12 @@ private enum CameraError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .command(let value): return value
+        case .timeout(let value):
+            return "\(value) 的 PTP 会话超时。Nikon Link 已尝试复位 USB 连接，请重新连接相机。"
+        case .thermal(let value):
+            return "\(value) 温度过高，已停止实时取景。请关闭相机并等待冷却后再试。"
+        case .liveViewBusy(let value):
+            return "\(value) 正在处理拍摄操作，已暂停实时取景。请等待存储卡写入、间隔拍摄或长曝光结束后再开启。"
         case .noCamera:
             return "没有检测到支持的 Nikon 相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
         case .wrongCamera(let value):
@@ -117,9 +127,25 @@ private enum CameraError: LocalizedError {
 }
 
 private final class GPhotoCamera {
+    private struct CommandResult {
+        let status: Int32
+        let output: String
+    }
+
     private let resources = Bundle.main.resourceURL!
+    private let logger = DiagnosticLogger.shared
     private var connected = false
     private var liveView = false
+    private var activeProcess: Process?
+    private var liveViewProcess: Process?
+    private var liveViewOutput: Pipe?
+    private var liveViewErrors: Pipe?
+    private var liveViewDecoder = MJPEGFrameDecoder()
+    private var liveViewStartedAt: Date?
+    private var lastPreviewAt: Date?
+    private var previewReadAttempts = 0
+    private var previewFrameWindowStartedAt: Date?
+    private var previewFramesInWindow = 0
     private(set) var profile: SupportedCamera?
 
     private var cameraName: String {
@@ -133,35 +159,258 @@ private final class GPhotoCamera {
             : URL(fileURLWithPath: "/opt/homebrew/bin/gphoto2")
     }
 
-    private func run(_ arguments: [String], timeout: TimeInterval = 45) throws -> String {
+    private var processEnvironment: [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        environment["CAMLIBS"] = resources.appendingPathComponent("camlibs").path
+        environment["IOLIBS"] = resources.appendingPathComponent("iolibs").path
+        environment["DYLD_LIBRARY_PATH"] = resources.appendingPathComponent("lib").path
+        environment["LC_ALL"] = "C"
+        return environment
+    }
+
+    private func execute(
+        _ arguments: [String],
+        timeout: TimeInterval,
+        guardUSBClaim: Bool
+    ) throws -> CommandResult {
+        let command = diagnosticCommandName(arguments)
+        let isPreviewCommand = arguments.contains("--capture-preview")
+        let startedAt = Date()
+        if !isPreviewCommand {
+            logger.debug(
+                "gphoto",
+                "执行 \(command)；超时=\(Int(timeout)) 秒；USB保护=\(guardUSBClaim)"
+            )
+        }
         let process = Process()
         let output = Pipe()
         process.executableURL = executable
         process.arguments = ["--quiet"] + arguments
         process.standardOutput = output
         process.standardError = output
-        var environment = ProcessInfo.processInfo.environment
-        environment["CAMLIBS"] = resources.appendingPathComponent("camlibs").path
-        environment["IOLIBS"] = resources.appendingPathComponent("iolibs").path
-        environment["DYLD_LIBRARY_PATH"] = resources.appendingPathComponent("lib").path
-        process.environment = environment
-        try process.run()
+        process.environment = processEnvironment
+        if let filenameIndex = arguments.firstIndex(of: "--filename"),
+           arguments.indices.contains(filenameIndex + 1) {
+            process.currentDirectoryURL = URL(
+                fileURLWithPath: arguments[filenameIndex + 1]
+            ).deletingLastPathComponent()
+        } else {
+            process.currentDirectoryURL = FileManager.default.temporaryDirectory
+        }
+        if guardUSBClaim {
+            releaseSystemPTPCamera()
+        }
+        do {
+            try process.run()
+        } catch {
+            logger.error(
+                "gphoto",
+                "无法启动 \(command)：\(error.localizedDescription)"
+            )
+            throw error
+        }
+        activeProcess = process
+        defer {
+            if activeProcess === process {
+                activeProcess = nil
+            }
+        }
 
+        if guardUSBClaim {
+            let claimDeadline = Date().addingTimeInterval(0.35)
+            while process.isRunning && Date() < claimDeadline {
+                releaseSystemPTPCamera()
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning && Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
         }
         if process.isRunning {
-            process.terminate()
-            throw CameraError.command("相机操作超时，请重新连接 \(cameraName)。")
+            _ = Darwin.kill(process.processIdentifier, SIGKILL)
+            process.waitUntilExit()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            let text = String(decoding: data, as: UTF8.self)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            logger.error(
+                "gphoto",
+                "\(command) 超时；耗时=\(elapsed(from: startedAt)) 秒；输出=\(text.isEmpty ? "<无>" : text)"
+            )
+            throw CameraError.timeout(cameraName)
         }
         let data = output.fileHandleForReading.readDataToEndOfFile()
         let text = String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard process.terminationStatus == 0 else {
-            throw CameraError.command(text.isEmpty ? "\(cameraName) 返回了错误状态。" : text)
+        let result = CommandResult(
+            status: process.terminationStatus,
+            output: text
+        )
+        if result.status != 0 {
+            logger.error(
+                "gphoto",
+                "\(command) 失败；状态=\(result.status)；耗时=\(elapsed(from: startedAt)) 秒；输出=\(text.isEmpty ? "<无>" : text)"
+            )
+        } else if !isPreviewCommand {
+            logger.debug(
+                "gphoto",
+                "\(command) 完成；耗时=\(elapsed(from: startedAt)) 秒"
+            )
         }
-        return text
+        return result
+    }
+
+    private func run(
+        _ arguments: [String],
+        timeout: TimeInterval = 45,
+        reclaimUSB: Bool = true
+    ) throws -> String {
+        for attempt in 0..<2 {
+            let result: CommandResult
+            do {
+                result = try execute(
+                    arguments,
+                    timeout: timeout,
+                    guardUSBClaim: reclaimUSB
+                )
+            } catch let error as CameraError {
+                if attempt == 0, reclaimUSB, case .timeout = error {
+                    logger.warning(
+                        "camera",
+                        "\(diagnosticCommandName(arguments)) 超时，准备复位 USB 后重试"
+                    )
+                    resetUSBConnection()
+                    continue
+                }
+                throw error
+            }
+            if result.status == 0 {
+                return result.output
+            }
+            if isThermalFailure(result.output) {
+                throw CameraError.thermal(cameraName)
+            }
+            if attempt == 0,
+               reclaimUSB,
+               isUSBClaimFailure(result.output)
+                || isPTPTimeoutFailure(result.output) {
+                let reason = isUSBClaimFailure(result.output)
+                    ? "USB/PTP 接口被占用"
+                    : "PTP 会话超时"
+                logger.warning(
+                    "camera",
+                    "\(diagnosticCommandName(arguments)) 检测到\(reason)，准备第 2 次尝试"
+                )
+                if isPTPTimeoutFailure(result.output) {
+                    resetUSBConnection()
+                }
+                continue
+            }
+            throw CameraError.command(userFacingError(for: result.output))
+        }
+        throw CameraError.command("\(cameraName) 返回了错误状态。")
+    }
+
+    private func resetUSBConnection() {
+        logger.warning("usb", "开始复位相机 USB/PTP 连接")
+        _ = try? execute(
+            ["--reset"],
+            timeout: 8,
+            guardUSBClaim: true
+        )
+        Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    private func diagnosticCommandName(_ arguments: [String]) -> String {
+        if arguments.contains("--auto-detect") { return "检测相机" }
+        if arguments.contains("--summary") { return "读取相机摘要" }
+        if arguments.contains("--capture-preview") { return "获取实时取景帧" }
+        if arguments.contains("--capture-image-and-download") { return "拍摄并下载" }
+        if arguments.contains("--wait-event-and-download=20s") { return "B 门拍摄并下载" }
+        if arguments.contains("--reset") { return "复位 USB/PTP" }
+        if let index = arguments.firstIndex(of: "--set-config"),
+           arguments.indices.contains(index + 1) {
+            let setting = arguments[index + 1]
+                .split(separator: "=", maxSplits: 1)
+                .first
+                .map(String.init) ?? "未知参数"
+            return "设置相机参数 \(setting)"
+        }
+        return arguments.first ?? "gphoto2"
+    }
+
+    private func elapsed(from date: Date) -> String {
+        String(format: "%.2f", Date().timeIntervalSince(date))
+    }
+
+    private func isPTPTimeoutFailure(_ output: String) -> Bool {
+        let normalized = output.lowercased()
+        return normalized.contains("ptp timeout")
+            || normalized.contains("timeout reading from or writing to the port")
+            || normalized.contains("error (-10")
+    }
+
+    private func isThermalFailure(_ output: String) -> Bool {
+        let normalized = output.lowercased()
+        return normalized.contains("temperature too high")
+            || normalized.contains("温度过高")
+    }
+
+    private func isUSBClaimFailure(_ output: String) -> Bool {
+        let normalized = output.lowercased()
+        return normalized.contains("could not claim interface")
+            || normalized.contains("could not claim the usb device")
+            || normalized.contains("unable to claim usb")
+            || normalized.contains("无法获取 usb 设备的控制权")
+            || normalized.contains("error (-53")
+            || normalized.contains("错误 (-53")
+    }
+
+    private func userFacingError(for output: String) -> String {
+        guard !output.isEmpty else {
+            return "\(cameraName) 返回了错误状态。"
+        }
+        if isUSBClaimFailure(output) {
+            return """
+            \(cameraName) 的 USB/PTP 接口仍被其他程序占用。Nikon Link 已尝试释放 \
+            macOS 相机服务；请退出“照片”“图像捕捉”、NX Tether 和 Camera Control \
+            Pro，重新插拔相机后再连接。
+            """
+        }
+        if isPTPTimeoutFailure(output) {
+            return "\(cameraName) 的 PTP 会话超时。请重新连接相机。"
+        }
+        return output
+    }
+
+    private func releaseSystemPTPCamera() {
+        let expectedCount = proc_listallpids(nil, 0)
+        guard expectedCount > 0 else { return }
+        var pids = [pid_t](
+            repeating: 0,
+            count: Int(expectedCount) + 32
+        )
+        let count = proc_listallpids(
+            &pids,
+            Int32(pids.count * MemoryLayout<pid_t>.stride)
+        )
+        guard count > 0 else { return }
+
+        for pid in pids.prefix(Int(count)) {
+            var name = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+            guard proc_name(pid, &name, UInt32(name.count)) > 0 else {
+                continue
+            }
+            let processName = String(cString: name)
+            if processName == "ptpcamerad" || processName == "PTPCamera" {
+                if Darwin.kill(pid, SIGKILL) == 0 {
+                    logger.info(
+                        "usb",
+                        "已停止占用相机接口的 macOS 服务 \(processName)"
+                    )
+                }
+            }
+        }
     }
 
     private func detectedUSBProfile() -> SupportedCamera? {
@@ -222,31 +471,342 @@ private final class GPhotoCamera {
     }
 
     func connect() throws -> SupportedCamera {
-        let detected = try run(["--auto-detect"])
+        logger.info("camera", "开始连接相机")
+        let detected = try run(["--auto-detect"], reclaimUSB: false)
         let matchedProfile =
             SupportedCamera.matching(detection: detected)
             ?? detectedUSBProfile()
         guard let matchedProfile else {
             if !detected.localizedCaseInsensitiveContains("nikon"),
                !detected.localizedCaseInsensitiveContains("ptp class camera") {
+                logger.error("camera", "连接失败：未检测到支持的相机")
                 throw CameraError.noCamera
             }
             let name = detected.split(separator: "\n").last.map(String.init) ?? "其他 Nikon 相机"
+            logger.error("camera", "连接失败：检测到不支持的相机 \(name)")
             throw CameraError.wrongCamera(name)
         }
         profile = matchedProfile
         _ = try run(["--summary"])
         connected = true
+        logger.info("camera", "已连接 \(matchedProfile.name)")
         return matchedProfile
     }
 
     func startLiveView() throws {
         guard connected else { throw CameraError.noCamera }
         liveView = true
+        do {
+            try startLiveViewProcessIfNeeded()
+            logger.info("liveview", "已启动持续实时取景会话")
+        } catch {
+            liveView = false
+            throw error
+        }
     }
 
     func stopLiveView() {
+        if liveView {
+            logger.info("liveview", "正在停止持续实时取景会话")
+        }
         liveView = false
+        stopLiveViewProcess()
+    }
+
+    private func startLiveViewProcessIfNeeded() throws {
+        if let liveViewProcess, liveViewProcess.isRunning {
+            return
+        }
+        stopLiveViewProcess()
+
+        let process = Process()
+        let output = Pipe()
+        let errors = Pipe()
+        process.executableURL = executable
+        process.arguments = [
+            "--quiet",
+            "--capture-movie",
+            "--stdout"
+        ]
+        process.standardOutput = output
+        process.standardError = errors
+        process.environment = processEnvironment
+        process.currentDirectoryURL = FileManager.default.temporaryDirectory
+
+        releaseSystemPTPCamera()
+        do {
+            try process.run()
+        } catch {
+            logger.error(
+                "liveview",
+                "无法启动持续实时取景进程：\(error.localizedDescription)"
+            )
+            throw error
+        }
+
+        liveViewProcess = process
+        liveViewOutput = output
+        liveViewErrors = errors
+        liveViewDecoder.reset()
+        liveViewStartedAt = Date()
+        lastPreviewAt = nil
+        previewReadAttempts = 0
+        previewFrameWindowStartedAt = Date()
+        previewFramesInWindow = 0
+
+        let claimDeadline = Date().addingTimeInterval(0.35)
+        while process.isRunning && Date() < claimDeadline {
+            releaseSystemPTPCamera()
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        guard process.isRunning else {
+            let error = liveViewProcessError()
+            clearLiveViewProcess()
+            throw error
+        }
+        logger.info(
+            "liveview",
+            "持续实时取景进程已就绪；PID=\(process.processIdentifier)"
+        )
+    }
+
+    private func stopLiveViewProcess() {
+        guard let process = liveViewProcess else {
+            clearLiveViewProcess()
+            return
+        }
+
+        if process.isRunning {
+            process.interrupt()
+            let deadline = Date().addingTimeInterval(1.5)
+            while process.isRunning && Date() < deadline {
+                discardAvailableLiveViewOutput()
+                Thread.sleep(forTimeInterval: 0.02)
+            }
+        }
+        if process.isRunning {
+            _ = Darwin.kill(process.processIdentifier, SIGKILL)
+        }
+        process.waitUntilExit()
+
+        let errorText = readLiveViewErrors()
+        if process.terminationStatus != 0,
+           process.terminationReason != .uncaughtSignal,
+           !errorText.isEmpty {
+            logger.warning(
+                "liveview",
+                "持续实时取景进程结束；状态=\(process.terminationStatus)；输出=\(errorText)"
+            )
+        }
+        clearLiveViewProcess()
+    }
+
+    private func discardAvailableLiveViewOutput() {
+        guard let output = liveViewOutput else { return }
+        var descriptor = pollfd(
+            fd: output.fileHandleForReading.fileDescriptor,
+            events: Int16(POLLIN),
+            revents: 0
+        )
+        var chunksRead = 0
+        while chunksRead < 8,
+              Darwin.poll(&descriptor, 1, 0) > 0,
+              descriptor.revents & Int16(POLLIN) != 0 {
+            guard readAvailableLiveViewChunk(from: output) != nil else {
+                break
+            }
+            chunksRead += 1
+            descriptor.revents = 0
+        }
+    }
+
+    private func appendAvailableLiveViewOutput() {
+        guard let output = liveViewOutput else { return }
+        var descriptor = pollfd(
+            fd: output.fileHandleForReading.fileDescriptor,
+            events: Int16(POLLIN),
+            revents: 0
+        )
+        var chunksRead = 0
+        while chunksRead < 8,
+              Darwin.poll(&descriptor, 1, 0) > 0,
+              descriptor.revents & Int16(POLLIN) != 0 {
+            guard let data = readAvailableLiveViewChunk(from: output) else {
+                break
+            }
+            liveViewDecoder.append(data)
+            chunksRead += 1
+            descriptor.revents = 0
+        }
+    }
+
+    private func readAvailableLiveViewChunk(from output: Pipe) -> Data? {
+        var data = Data(count: 64 * 1024)
+        let bytesRead = data.withUnsafeMutableBytes { buffer in
+            Darwin.read(
+                output.fileHandleForReading.fileDescriptor,
+                buffer.baseAddress,
+                buffer.count
+            )
+        }
+        guard bytesRead > 0 else { return nil }
+        data.count = bytesRead
+        return data
+    }
+
+    private func recordDeliveredPreviewFrame(_ frame: Data) {
+        previewFramesInWindow += 1
+        guard let startedAt = previewFrameWindowStartedAt else {
+            previewFrameWindowStartedAt = Date()
+            return
+        }
+        let duration = Date().timeIntervalSince(startedAt)
+        guard duration >= 10 else { return }
+        let framesPerSecond = Double(previewFramesInWindow) / duration
+        logger.debug(
+            "liveview",
+            "显示帧率=\(String(format: "%.1f", framesPerSecond)) fps；最近帧=\(frame.count) 字节；缓存=\(liveViewDecoder.bufferedByteCount) 字节"
+        )
+        previewFrameWindowStartedAt = Date()
+        previewFramesInWindow = 0
+    }
+
+    private func clearLiveViewProcess() {
+        try? liveViewOutput?.fileHandleForReading.close()
+        try? liveViewErrors?.fileHandleForReading.close()
+        liveViewProcess = nil
+        liveViewOutput = nil
+        liveViewErrors = nil
+        liveViewDecoder.reset()
+        liveViewStartedAt = nil
+        lastPreviewAt = nil
+        previewReadAttempts = 0
+        previewFrameWindowStartedAt = nil
+        previewFramesInWindow = 0
+    }
+
+    private func readLiveViewErrors() -> String {
+        guard let errors = liveViewErrors else { return "" }
+        let data = errors.fileHandleForReading.readDataToEndOfFile()
+        return String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func liveViewProcessError() -> CameraError {
+        let output = readLiveViewErrors()
+        if isThermalFailure(output) {
+            return .thermal(cameraName)
+        }
+        if isShootingOperationFailure(output) {
+            return .liveViewBusy(cameraName)
+        }
+        if output.isEmpty {
+            return .command("\(cameraName) 的实时取景进程意外结束。")
+        }
+        return .command(userFacingError(for: output))
+    }
+
+    private func isShootingOperationFailure(_ output: String) -> Bool {
+        output.localizedCaseInsensitiveContains(
+            "processing of shooting operation"
+        )
+    }
+
+    private func readPreviewFrame() throws -> Data {
+        guard liveView else {
+            throw CameraError.command("实时取景尚未开启。")
+        }
+        try startLiveViewProcessIfNeeded()
+        guard let process = liveViewProcess,
+              let output = liveViewOutput else {
+            throw CameraError.command("\(cameraName) 的实时取景进程未启动。")
+        }
+
+        let timeout: TimeInterval = previewReadAttempts == 0 ? 8 : 3
+        previewReadAttempts += 1
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            appendAvailableLiveViewOutput()
+            if let frame = liveViewDecoder.latestFrame() {
+                let firstFrame = lastPreviewAt == nil
+                lastPreviewAt = Date()
+                recordDeliveredPreviewFrame(frame)
+                if firstFrame {
+                    let startupTime = liveViewStartedAt.map {
+                        String(format: "%.2f", Date().timeIntervalSince($0))
+                    } ?? "未知"
+                    logger.info(
+                        "liveview",
+                        "收到首帧；耗时=\(startupTime) 秒；大小=\(frame.count) 字节"
+                    )
+                }
+                return frame
+            }
+
+            if !process.isRunning {
+                let error = liveViewProcessError()
+                logger.error(
+                    "liveview",
+                    "持续实时取景进程意外结束：\(error.localizedDescription)"
+                )
+                clearLiveViewProcess()
+                throw error
+            }
+
+            var descriptor = pollfd(
+                fd: output.fileHandleForReading.fileDescriptor,
+                events: Int16(POLLIN | POLLHUP | POLLERR),
+                revents: 0
+            )
+            let remaining = max(0, deadline.timeIntervalSinceNow)
+            let waitMilliseconds = Int32(
+                min(200, max(1, Int(remaining * 1_000)))
+            )
+            let ready = Darwin.poll(&descriptor, 1, waitMilliseconds)
+            if ready < 0 {
+                if errno == EINTR { continue }
+                throw CameraError.command(
+                    "读取 \(cameraName) 实时取景数据失败。"
+                )
+            }
+            if ready == 0 { continue }
+
+            if descriptor.revents & Int16(POLLIN) != 0 {
+                if let data = readAvailableLiveViewChunk(from: output) {
+                    liveViewDecoder.append(data)
+                }
+            }
+        }
+
+        logger.warning(
+            "liveview",
+            "等待实时取景帧超时；进程运行=\(process.isRunning)；缓存=\(liveViewDecoder.bufferedByteCount) 字节"
+        )
+        throw CameraError.noImage
+    }
+
+    private func performWithoutLiveView<T>(
+        _ operation: () throws -> T
+    ) throws -> T {
+        let shouldResume = liveView
+        if shouldResume {
+            stopLiveViewProcess()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        defer {
+            if shouldResume {
+                Thread.sleep(forTimeInterval: 0.2)
+                do {
+                    try startLiveViewProcessIfNeeded()
+                } catch {
+                    logger.error(
+                        "liveview",
+                        "独占相机操作后恢复实时取景失败：\(error.localizedDescription)"
+                    )
+                }
+            }
+        }
+        return try operation()
     }
 
     private func imageData(
@@ -265,12 +825,14 @@ private final class GPhotoCamera {
             withIntermediateDirectories: true
         )
         let stem = "\(prefix)-\(UUID().uuidString)"
-        let target = folder.appendingPathComponent("\(stem).%C")
+        let target = folder.appendingPathComponent(
+            preview ? "\(stem).jpg" : "\(stem).%C"
+        )
         let arguments: [String]
         let timeout: TimeInterval
         if preview {
             arguments = ["--capture-preview", "--filename", target.path, "--force-overwrite"]
-            timeout = 15
+            timeout = 6
         } else if let bulbSeconds {
             let duration = max(1, min(bulbSeconds, 900))
             arguments = [
@@ -284,19 +846,21 @@ private final class GPhotoCamera {
             timeout = TimeInterval(duration + 45)
         } else {
             arguments = [
-                "--capture-image-and-download",
                 "--filename", target.path,
-                "--force-overwrite"
+                "--force-overwrite",
+                "--capture-image-and-download"
             ]
             timeout = 60
         }
-        _ = try run(arguments, timeout: timeout)
+        let commandOutput = try run(arguments, timeout: timeout)
         let files = try FileManager.default.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: nil
         )
-        guard let image = files
-            .filter({ $0.lastPathComponent.hasPrefix(stem) })
+        let candidateFiles = files.filter {
+            $0.lastPathComponent.contains(stem)
+        }
+        guard let image = candidateFiles
             .sorted(by: {
                 $0.pathExtension.lowercased() == "jpg"
                     && $1.pathExtension.lowercased() != "jpg"
@@ -305,21 +869,52 @@ private final class GPhotoCamera {
             let data = try? Data(contentsOf: image),
             !data.isEmpty
         else {
+            let candidates = candidateFiles
+                .map {
+                    $0.pathExtension.isEmpty
+                        ? "<无扩展名>"
+                        : $0.pathExtension
+                }
+                .joined(separator: ", ")
+            logger.error(
+                preview ? "liveview" : "capture",
+                "命令成功但未找到可用图像；候选文件=\(candidates.isEmpty ? "<无>" : candidates)；gphoto输出=\(commandOutput.isEmpty ? "<无>" : commandOutput)"
+            )
             throw CameraError.noImage
         }
-        try? FileManager.default.removeItem(at: image)
+        for candidate in candidateFiles {
+            try? FileManager.default.removeItem(at: candidate)
+        }
+        if !preview {
+            logger.info("capture", "已从相机接收照片；大小=\(data.count) 字节")
+        }
         return data
     }
 
     func preview() throws -> Data {
-        try imageData(prefix: "preview", preview: true)
+        try readPreviewFrame()
     }
 
     func capture(bulbSeconds: Int? = nil) throws -> Data {
-        try imageData(prefix: "capture", preview: false, bulbSeconds: bulbSeconds)
+        try performWithoutLiveView {
+            try imageData(
+                prefix: "capture",
+                preview: false,
+                bulbSeconds: bulbSeconds
+            )
+        }
     }
 
     func setParameter(name: String, value: Any) throws {
+        try performWithoutLiveView {
+            try setParameterWithoutLiveView(name: name, value: value)
+        }
+    }
+
+    private func setParameterWithoutLiveView(
+        name: String,
+        value: Any
+    ) throws {
         guard connected else { throw CameraError.noCamera }
         let key: String
         let formatted: String
@@ -414,9 +1009,14 @@ private final class GPhotoCamera {
     }
 
     func disconnect() {
+        logger.info("camera", "正在断开相机")
         stopLiveView()
+        if let activeProcess, activeProcess.isRunning {
+            _ = Darwin.kill(activeProcess.processIdentifier, SIGKILL)
+        }
         connected = false
         profile = nil
+        logger.info("camera", "相机已断开")
     }
 }
 
@@ -507,6 +1107,7 @@ private final class CameraModel: ObservableObject {
     @Published var monitorVideoProfile: MonitorVideoProfile = .source
 
     private let camera = GPhotoCamera()
+    private let logger = DiagnosticLogger.shared
     private let cameraQueue = DispatchQueue(
         label: "com.tauber.nikonlink.camera",
         qos: .userInitiated
@@ -514,6 +1115,8 @@ private final class CameraModel: ObservableObject {
     private var previewToken = UUID()
     private var previewLUT: ColorCubeLUT?
     private var sourceFrame: NSImage?
+    private var lastPreviewError: String?
+    private var previewFailureCount = 0
     private let photoDirectory: URL
     lazy var wirelessTransfer = WirelessTransferServer(
         directory: photoDirectory
@@ -549,6 +1152,7 @@ private final class CameraModel: ObservableObject {
 
     func connect() {
         guard !connecting else { return }
+        logger.info("workflow", "用户请求连接相机")
         connecting = true
         status = "正在连接"
         detail = "正在检测 \(SupportedCamera.summary)…"
@@ -557,12 +1161,22 @@ private final class CameraModel: ObservableObject {
             do {
                 let profile = try self.camera.connect()
                 var liveViewStarted = false
+                var liveViewStartError: Error?
                 do {
                     try self.camera.startLiveView()
                     liveViewStarted = true
                 } catch {
                     liveViewStarted = false
+                    liveViewStartError = error
+                    self.logger.warning(
+                        "liveview",
+                        "相机已连接，但实时取景启动失败：\(error.localizedDescription)"
+                    )
                 }
+                self.logger.info(
+                    "workflow",
+                    "连接流程完成；相机=\(profile.name)；实时取景=\(liveViewStarted)"
+                )
                 let initialLiveView = liveViewStarted
                 DispatchQueue.main.async {
                     self.connected = true
@@ -573,11 +1187,18 @@ private final class CameraModel: ObservableObject {
                     self.detail = initialLiveView
                         ? "USB/PTP · 原生连接"
                         : "USB/PTP 已连接 · 实时取景需实机确认"
+                    if let liveViewStartError {
+                        self.errorMessage = liveViewStartError.localizedDescription
+                    }
                     if initialLiveView {
                         self.startPreviewLoop()
                     }
                 }
             } catch {
+                self.logger.error(
+                    "workflow",
+                    "连接流程失败：\(error.localizedDescription)"
+                )
                 DispatchQueue.main.async {
                     self.connected = false
                     self.connecting = false
@@ -590,6 +1211,7 @@ private final class CameraModel: ObservableObject {
     }
 
     func disconnect() {
+        logger.info("workflow", "用户请求断开相机")
         previewToken = UUID()
         liveViewEnabled = false
         cameraQueue.async { [weak self] in
@@ -609,10 +1231,12 @@ private final class CameraModel: ObservableObject {
             return
         }
         if liveViewEnabled {
+            logger.info("workflow", "用户关闭实时取景")
             previewToken = UUID()
             liveViewEnabled = false
             cameraQueue.async { [weak self] in self?.camera.stopLiveView() }
         } else {
+            logger.info("workflow", "用户开启实时取景")
             cameraQueue.async { [weak self] in
                 guard let self else { return }
                 do {
@@ -622,6 +1246,10 @@ private final class CameraModel: ObservableObject {
                         self.startPreviewLoop()
                     }
                 } catch {
+                    self.logger.error(
+                        "liveview",
+                        "开启实时取景失败：\(error.localizedDescription)"
+                    )
                     DispatchQueue.main.async {
                         self.errorMessage = error.localizedDescription
                     }
@@ -633,6 +1261,8 @@ private final class CameraModel: ObservableObject {
     private func startPreviewLoop() {
         let token = UUID()
         previewToken = token
+        lastPreviewError = nil
+        previewFailureCount = 0
         pullPreview(token: token)
     }
 
@@ -640,10 +1270,24 @@ private final class CameraModel: ObservableObject {
         guard token == previewToken, connected, liveViewEnabled else { return }
         cameraQueue.async { [weak self] in
             guard let self, token == self.previewToken else { return }
+            let pullStartedAt = Date()
             do {
                 let data = try self.camera.preview()
                 let image = NSImage(data: data)
                 let output = image.map { self.processedPreview(from: $0) }
+                let nextFrameDelay = max(
+                    0,
+                    (1.0 / 30.0) - Date().timeIntervalSince(pullStartedAt)
+                )
+                let recoveredFrom = self.lastPreviewError
+                self.lastPreviewError = nil
+                self.previewFailureCount = 0
+                if let recoveredFrom {
+                    self.logger.info(
+                        "liveview",
+                        "实时取景已恢复；上次错误=\(recoveredFrom)"
+                    )
+                }
                 DispatchQueue.main.async {
                     guard token == self.previewToken else { return }
                     if let image {
@@ -653,14 +1297,69 @@ private final class CameraModel: ObservableObject {
                         self.frame = output.image
                         self.zebraMask = output.zebraMask
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    if self.detail.hasPrefix("实时取景重试") {
+                        self.detail = "USB/PTP · 原生连接"
+                    }
+                    DispatchQueue.main.asyncAfter(
+                        deadline: .now() + nextFrameDelay
+                    ) {
                         self.pullPreview(token: token)
                     }
                 }
             } catch {
+                let message = error.localizedDescription
+                self.previewFailureCount += 1
+                let thermalFailure = (error as? CameraError).map {
+                    if case .thermal = $0 { return true }
+                    return false
+                } ?? false
+                let busyFailure = (error as? CameraError).map {
+                    if case .liveViewBusy = $0 { return true }
+                    return false
+                } ?? false
+                let repeatedFailure = self.previewFailureCount >= 5
+                let shouldStop =
+                    thermalFailure
+                    || (busyFailure && self.previewFailureCount >= 3)
+                    || repeatedFailure
+                if shouldStop {
+                    self.logger.warning(
+                        "liveview",
+                        "连续失败 \(self.previewFailureCount) 次，停止自动重试"
+                    )
+                    self.camera.stopLiveView()
+                }
+                if message != self.lastPreviewError {
+                    self.lastPreviewError = message
+                    self.logger.error(
+                        "liveview",
+                        "实时取景取帧失败：\(message)"
+                    )
+                }
+                let summary = message
+                    .split(whereSeparator: \.isNewline)
+                    .map {
+                        $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    .first {
+                        !$0.isEmpty
+                            && !$0.hasPrefix("***")
+                            && !$0.hasPrefix("For debugging")
+                    }
+                    .map { String($0.prefix(90)) }
+                    ?? "相机未返回画面"
                 DispatchQueue.main.async {
                     guard token == self.previewToken else { return }
-                    self.detail = "实时取景正在重试"
+                    if shouldStop {
+                        self.previewToken = UUID()
+                        self.liveViewEnabled = false
+                        self.detail = thermalFailure
+                            ? "相机温度过高 · 实时取景已停止"
+                            : "实时取景已暂停 · 请检查相机状态"
+                        self.errorMessage = message
+                        return
+                    }
+                    self.detail = "实时取景重试 · \(summary)"
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                         self.pullPreview(token: token)
                     }
@@ -675,6 +1374,7 @@ private final class CameraModel: ObservableObject {
             return
         }
         guard !capturing else { return }
+        logger.info("workflow", "用户请求拍摄")
         capturing = true
         detail = "正在触发 \(activeCameraName) 快门…"
         cameraQueue.async { [weak self] in
@@ -687,6 +1387,10 @@ private final class CameraModel: ObservableObject {
                 let filename = "NIKON_\(formatter.string(from: Date())).JPG"
                 let url = self.photoDirectory.appendingPathComponent(filename)
                 try data.write(to: url, options: .atomic)
+                self.logger.info(
+                    "capture",
+                    "照片已保存；文件=\(filename)；大小=\(data.count) 字节"
+                )
                 let image = NSImage(data: data)
                 let output = image.map { self.processedPreview(from: $0) }
                 DispatchQueue.main.async {
@@ -703,6 +1407,10 @@ private final class CameraModel: ObservableObject {
                     self.selectedPhoto = self.photos.first
                 }
             } catch {
+                self.logger.error(
+                    "capture",
+                    "拍摄失败：\(error.localizedDescription)"
+                )
                 DispatchQueue.main.async {
                     self.capturing = false
                     self.detail = "拍摄失败"
@@ -741,6 +1449,10 @@ private final class CameraModel: ObservableObject {
             self.selectedPhoto = nil
             reloadPhotos()
         } catch {
+            logger.error(
+                "library",
+                "照片移到废纸篓失败：\(error.localizedDescription)"
+            )
             errorMessage = "无法移到废纸篓：\(error.localizedDescription)"
         }
     }
@@ -846,6 +1558,10 @@ private final class CameraModel: ObservableObject {
                     }
                 }
             } catch {
+                self.logger.error(
+                    "monitor",
+                    "LUT 导入失败：\(error.localizedDescription)"
+                )
                 DispatchQueue.main.async {
                     self.detail = "LUT 导入失败"
                     self.errorMessage = error.localizedDescription
@@ -888,6 +1604,10 @@ private final class CameraModel: ObservableObject {
                     self.detail = "\(label)已应用"
                 }
             } catch {
+                self.logger.error(
+                    "settings",
+                    "\(label)设置失败：\(error.localizedDescription)"
+                )
                 DispatchQueue.main.async {
                     self.detail = "\(label)设置失败"
                     self.errorMessage = error.localizedDescription
@@ -926,6 +1646,7 @@ private final class CameraModel: ObservableObject {
     }
 
     func shutdown() {
+        logger.info("app", "正在停止相机与传输服务")
         previewToken = UUID()
         wirelessTransfer.stop()
         camera.disconnect()
@@ -2074,6 +2795,16 @@ private struct RootView: View {
                 set: { if !$0 { model.errorMessage = nil } }
             )
         ) {
+            Button("打开日志") {
+                DiagnosticLogger.shared.info(
+                    "diagnostics",
+                    "用户从错误提示打开日志目录"
+                )
+                NSWorkspace.shared.open(
+                    DiagnosticLogger.shared.directoryURL
+                )
+                model.errorMessage = nil
+            }
             Button("好") { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
@@ -2086,6 +2817,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = CameraModel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DiagnosticLogger.shared.startSession()
         let root = RootView(model: model)
         let hostingView = NSHostingView(rootView: root)
         window = NSWindow(
@@ -2106,6 +2838,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         model.shutdown()
+        DiagnosticLogger.shared.endSession()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

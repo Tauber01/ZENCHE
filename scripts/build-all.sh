@@ -20,3 +20,14 @@ if command -v xcodebuild >/dev/null &&
 else
   echo "未检测到完整 Xcode/iPhoneOS SDK，跳过 iOS 未签名构建。"
 fi
+
+if [[ -n "${NIKONLINK_HVIGORW:-}" ]] ||
+   [[ -x "$PROJECT_ROOT/native/harmony/hvigorw" ]] ||
+   command -v hvigorw >/dev/null 2>&1 ||
+   command -v hvigor >/dev/null 2>&1; then
+  "$PROJECT_ROOT/scripts/build-harmony.sh"
+else
+  echo "未检测到 DevEco Studio hvigor，跳过 HarmonyOS 构建。"
+fi
+
+echo "Windows 包需在 Windows 主机运行 scripts/build-windows.ps1。"

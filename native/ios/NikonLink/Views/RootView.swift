@@ -40,9 +40,11 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                DiagnosticLogger.shared.info("app", "应用进入前台")
                 model.camera.refreshDevices()
                 model.camera.resume()
             } else {
+                DiagnosticLogger.shared.info("app", "应用离开前台")
                 model.camera.suspend()
                 model.wireless.stop()
             }
@@ -820,9 +822,37 @@ private struct TransferPage: View {
 
                 SettingsCard {
                     VStack(alignment: .leading, spacing: 8) {
+                        Label("诊断日志", systemImage: "doc.text.magnifyingglass")
+                            .font(.headline)
+                        Text("日志保存在应用沙盒的 Library/Logs/Nikon Link，按日写入、5 MB 滚动并保留 14 天。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            DiagnosticLogger.shared.info(
+                                "diagnostics",
+                                "用户打开 GitHub Issue 提交页"
+                            )
+                            guard let url = DiagnosticLogger.shared.githubIssueURL() else {
+                                model.statusMessage = "无法生成 GitHub Issue 地址"
+                                return
+                            }
+                            UIApplication.shared.open(url)
+                        } label: {
+                            Label(
+                                "提交 GitHub Issue",
+                                systemImage: "arrow.up.right.square"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+
+                SettingsCard {
+                    VStack(alignment: .leading, spacing: 8) {
                         Label("隐私", systemImage: "lock.shield")
                             .font(.headline)
-                        Text("Nikon Link 不上传照片、不包含分析服务；只有在你选择分享或写入系统照片库时，文件才会离开应用文件库。")
+                        Text("Nikon Link 不上传照片、不包含分析服务。只有你点击“提交 GitHub Issue”并在 GitHub 确认提交时，预览中的脱敏日志才会发送。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

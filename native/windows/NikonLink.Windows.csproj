@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>NikonLink</AssemblyName>
+    <RootNamespace>NikonLink.Windows</RootNamespace>
+    <ApplicationIcon />
+    <Version>0.7.0</Version>
+    <Company>Nikon Link contributors</Company>
+    <Product>Nikon Link</Product>
+    <Description>Native Nikon Z-series tethering and wireless transfer for Windows.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\icons\icon-512.png">
+      <Link>Assets\icon-512.png</Link>
+    </Resource>
+    <Content Include="native\libusb-1.0.dll" Condition="Exists('native\libusb-1.0.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

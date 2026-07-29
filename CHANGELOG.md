@@ -16,6 +16,16 @@ the project uses semantic versioning.
 
 ### Added
 
+- Added privacy-redacted, rolling local diagnostic logs and a prefilled GitHub
+  Issue reporting action to every native client.
+- Added native Windows 11 support with a WPF workbench, direct libusb Nikon
+  USB/PTP transport, live view, SDRAM capture, camera controls, a local photo
+  library, and a foreground FTP/PASV inbox.
+- Added a native HarmonyOS Stage/ArkUI application with USB Host permission
+  handling, chunked Nikon PTP transport, live view, capture, camera controls,
+  an app-private photo library, and a foreground FTP/PASV inbox.
+- Added reproducible Windows and HarmonyOS packaging scripts plus platform
+  setup, signing, driver, permission, and hardware-acceptance documentation.
 - Added native USB/PTP profiles for every current EXPEED 7 body: Z9, Z8, Z f,
   Z6III, Z50II, Z5II and ZR, with exact Product IDs plus a Nikon descriptor
   fallback for firmware or platform USB-reporting differences.

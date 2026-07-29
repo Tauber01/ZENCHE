@@ -1,101 +1,85 @@
 # Nikon Link
 
-[简体中文](#简体中文) · [English](#english) · [日本語](#日本語)
+给 Nikon Z 系列相机用的联机拍摄与无线传图工具。
 
-<a id="简体中文"></a>
-
-面向 Nikon Z 系列相机的三端原生连接、监看、拍摄与无线传图工具。
+Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
+拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
+无线传图则使用相机自带的 FTP 功能。
 
 > 当前版本：**0.7.2 正式版**
 >
-> 支持平台：**macOS · Android · iOS / iPadOS**
+> 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
 >
 > 支持机型：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
 
-![Nikon Link macOS 原生实时取景与参数控制界面](docs/images/macos-monitor.png)
+项目仍在实机测试阶段，重要拍摄请保留机内存储卡，不要把应用当作唯一备份。
 
-Nikon Link 把联机拍摄、实时取景、常用曝光控制、监看辅助、FTP 无线收件箱和本地
-照片管理放进一个统一工作流。安装包全部采用平台原生技术栈，不包含 WebView、
-HTML 或 JavaScript 运行时；仓库中的 Web/PWA 只保留为历史演示，不参与安装包
-构建。
+![macOS 上的实时取景与参数控制](docs/images/macos-monitor.png)
 
-界面将创作功能明确分成“照片”和“视频”两个工作区：照片区集中快门、曝光、
-对焦、白平衡与本地照片保存；视频区集中实时监看、条纹图案、LUT、超采样及输出
-规格。文件管理和无线传输则单独归入“管理”分组。
+## 目前能做什么
 
-## 功能概览
+- 通过 USB 识别相机，打开实时取景并拍摄照片
+- 调整快门、光圈、ISO、曝光补偿、对焦模式和白平衡
+- 支持 P、S、A、M 以及 M 模式下的 B 门拍摄
+- 将拍摄结果下载到本地照片库
+- 在监看画面上使用条纹图案、自定义 `.cube` LUT 和 2× 超采样
+- 通过内置 FTP 收件箱接收 JPEG、NEF、HEIF/HEIC 和 TIFF
+- 保存本地诊断日志，方便排查连接、拍摄和传输问题
 
-| 工作流 | 主要能力 |
+LUT、条纹图案和超采样只作用于预览画面，不会改动原片，也不会写入相机的视频设置。
+
+## 平台支持
+
+各平台并不是同一套功能的简单移植，当前进度如下：
+
+| 平台 | USB 联机拍摄 | FTP 收图 | 说明 |
+| --- | :---: | :---: | --- |
+| macOS | 可用 | 可用 | SwiftUI/AppKit；通过 `libgphoto2` 连接相机 |
+| Android | 可用 | 可用 | 原生 Android 应用；使用 USB Host |
+| Windows | 待验收 | 待验收 | WPF/.NET 8；代码已完成，仍需原生工具链和真机验证 |
+| HarmonyOS | 待验收 | 待验收 | Stage/ArkUI；代码已完成，仍需原生工具链和真机验证 |
+| iOS / iPadOS | 不支持 | 可用 | 可使用本机镜头；iPadOS 支持外接 UVC 视频设备 |
+
+iOS/iPadOS 的公开接口没有向普通应用开放 Nikon USB/PTP 厂商控制，因此 iPhone
+和 iPad 目前不能通过 Nikon Link 调节机身参数或下载 USB 原片。UVC 视频输入也只
+作为视频源使用，不会被显示成 Nikon 相机控制。
+
+## 支持的相机
+
+目前内置了以下机型的设备档案：
+
+- Nikon Z9
+- Nikon Z8
+- Nikon Z f
+- Nikon Z6III
+- Nikon Z50II
+- Nikon Z5II
+- Nikon ZR
+
+不同固件、镜头和 USB 环境可能带来差异。Z5II 与 ZR 在部分 `libgphoto2` 版本中
+会被识别为通用 PTP 相机，macOS 版会再读取 USB 信息确认机型。
+
+<details>
+<summary>USB Product ID</summary>
+
+| 机型 | Product ID |
 | --- | --- |
-| 照片拍摄 | USB/PTP 相机识别、照片取景、SDRAM 拍摄与 JPEG 下载 |
-| 照片控制 | P、S、A、M 与 B门；快门、光圈、ISO、曝光补偿、对焦与白平衡 |
-| 视频监看 | 视频取景、加亮显示条纹图案、自定义 3D `.cube` LUT、本地 2× 超采样 |
-| 无线传图 | 内置 FTP/PASV 收件箱，接收 JPEG、NEF、HEIF/HEIC 与 TIFF |
-| 文件管理 | 本地预览、导入、分享、定位、删除及写入系统“照片” |
-| 使用模式 | “普通”模式保留常用操作，“专业”模式展开完整参数 |
+| Z9 | `0x0450` |
+| Z8 | `0x0451` |
+| Z f | `0x0453` |
+| Z6III | `0x0454` |
+| Z50II | `0x0455` |
+| Z5II | `0x0456` |
+| ZR | `0x0457` |
 
-应用会根据 P、S、A、M/B门拍摄模式锁定当前不可调的曝光参数，避免把无效设置
-写入机身。LUT、加亮显示条纹图案和超采样只处理监看画面，不修改原片或相机设置。
+Nikon USB Vendor ID 为 `0x04b0`。
 
-## 平台能力
+</details>
 
-| 能力 | macOS | Android | iOS / iPadOS |
-| --- | :---: | :---: | :---: |
-| Nikon USB/PTP 连接 | ✓ | ✓ | — |
-| Nikon 实时取景与快门控制 | ✓ | ✓ | — |
-| 曝光、对焦与白平衡控制 | ✓ | ✓ | — |
-| 自定义 `.cube` LUT 与加亮显示 | ✓ | ✓ | — |
-| FTP 无线收件箱 | ✓ | ✓ | ✓ |
-| 本地照片库 | ✓ | ✓ | ✓ |
-| 系统镜头拍摄 | — | — | ✓ |
-| iPadOS 外接 UVC 视频设备 | — | — | ✓ |
+## 下载与安装
 
-- **macOS** 使用 SwiftUI/AppKit 与 `libgphoto2` 的 Nikon PTP 后端。
-- **Android** 使用原生 Android View、USB Host API 和项目内 PTP 实现。
-- **iOS/iPadOS** 使用 SwiftUI、AVFoundation 与 PhotoKit；支持本机镜头、
-  iPadOS 外接 UVC 视频设备和前台 FTP 接收。
-
-iOS 的公开接口不向普通应用提供通用 Nikon USB/PTP 厂商控制，因此 iPhone 和
-iPad 不会把 UVC 视频输入伪装成 Nikon 快门、光圈、ISO 或原图下载能力。接入
-这些能力需要 Nikon 提供 iOS 协议授权或官方 SDK。
-
-## 原生界面
-
-### macOS：无线收件箱
-
-![Nikon Link macOS 原生 FTP 无线传输界面](docs/images/macos-transfer.png)
-
-### iPhone：联机拍摄与移动端导航
-
-![Nikon Link iPhone 原生拍摄界面](docs/images/ios-capture.png)
-
-以上截图来自当前原生应用在未连接相机时的实际运行界面。不同系统版本、屏幕尺寸
-和连接状态下，控件布局与可用参数会按设备能力调整。
-
-## 支持机型
-
-所有支持机型使用 Nikon Vendor ID `0x04b0`。
-
-| 机型 | USB Product ID | macOS | Android | iOS / iPadOS |
-| --- | --- | --- | --- | --- |
-| Nikon Z9 | `0x0450` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
-| Nikon Z8 | `0x0451` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
-| Nikon Z f | `0x0453` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
-| Nikon Z6III | `0x0454` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
-| Nikon Z50II | `0x0455` | 原生 USB/PTP | 原生 USB/PTP | FTP；无 PTP |
-| Nikon Z5II | `0x0456` | PTP 兼容模式 | 原生 USB/PTP | FTP；无 PTP |
-| Nikon ZR | `0x0457` | PTP 兼容模式 | 原生 USB/PTP | FTP；无 PTP |
-
-应用优先匹配上表 Product ID，并以 USB 产品名称作为 ZR 等新机型的兼容回退。
-检测到其他 Nikon USB 型号时会显示实际 Product ID，不会误报为受支持相机。
-Z5II 与 ZR 在部分 `libgphoto2` 正式版中可能显示为通用 PTP 相机，macOS 版会
-通过 USB 描述符二次确认。
-
-## 安装
-
-正式安装包应从
-[GitHub Releases](https://github.com/Tauber01/NikonLink/releases) 下载，并
-使用同名 `.sha256` 文件核对完整性。
+安装包和对应的 `.sha256` 校验文件发布在
+[GitHub Releases](https://github.com/Tauber01/NikonLink/releases)。
 
 ### macOS
 
@@ -110,63 +94,71 @@ Z5II 与 ZR 在部分 `libgphoto2` 正式版中可能显示为通用 PTP 相机�
 安装 `NikonLink-0.7.2-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
+### Windows
+
+解压 `NikonLink-0.7.2-Windows-x64.zip` 后运行 `NikonLink.exe`，不要单独移动
+同目录下的 `libusb-1.0.dll`。相机接口可能需要切换到 WinUSB，操作前请先阅读
+[Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
+
+### HarmonyOS
+
+HAP 需要经过有效签名才能安装到支持 USB Host 的真机。环境、权限和签名配置见
+[HarmonyOS 构建与部署](docs/HARMONY_BUILD.md)。
+
 ### iOS / iPadOS
 
-`NikonLink-0.7.2-ios-signed.ipa` 必须使用有效的 Apple Developer 证书和描述
-文件生成，才能安装到授权设备。文件名包含 `ios-unsigned` 的 IPA 只用于验证
-应用内容和 CI 构建，不能安装到真机。
-
-详细签名步骤见 [iOS 签名与发布](docs/IOS_SIGNING.md)。
+IPA 必须使用有效的 Apple Developer 证书和描述文件签名。名称中带有
+`ios-unsigned` 的文件只是 CI 构建产物，不能直接安装。具体步骤见
+[iOS 签名与发布](docs/IOS_SIGNING.md)。
 
 ## USB 联机拍摄
 
-1. 将相机更新到较新的稳定固件。
-2. 关闭 NX Tether、Camera Control Pro 和其他可能占用相机的软件。
-3. 使用支持数据传输的 USB-C 线直连 Mac 或 Android USB Host 设备，避免扩展坞。
-4. 打开 Nikon Link，点击“连接相机”，并允许系统授予 USB 访问权限。
-5. 等待实时取景出现，再调整参数或拍摄。
+1. 关闭 NX Tether、Camera Control Pro、“照片”、“图像捕捉”等可能占用相机的
+   软件。
+2. 使用支持数据传输的 USB-C 线直连设备，第一次排查时尽量不要经过扩展坞。
+3. 打开 Nikon Link，选择“连接相机”，并允许系统访问 USB 设备。
+4. 实时取景出现后再调整参数或拍摄。
 
-Nikon PTP 实时取景由相机返回原生 JPEG 帧。界面中的显示尺寸、LUT、加亮显示和
-本地 2× 超采样只影响预览渲染，不等同于更改机身视频文件类型、分辨率或编码。
+macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重新连接；如果仍然失败，
+请退出其他相机软件，重新插拔相机后再试。
+
+实时取景由相机返回 JPEG 帧。拍摄或修改参数时，画面短暂停顿属于正常现象。若机身
+报告温度过高，应用会停止实时取景，此时应关闭相机并等待机身冷却。
 
 ## Wi-Fi 无线传图
 
-1. 让 Mac、Android、iPhone 或 iPad 与相机处于同一可信 Wi-Fi 网络；也可以
-   使用相机直连热点。
-2. 打开 Nikon Link 的“传输”页，点击“开启无线接收”，记下页面显示的服务器
-   地址。
-3. 在相机“网络菜单 → 连接到 FTP 服务器”中创建配置：
+先让相机和接收设备连到同一个可信局域网，然后在 Nikon Link 的“传输”页开启
+无线接收。相机端的 FTP 配置为：
 
-   | 项目 | 值 |
-   | --- | --- |
-   | 服务器类型 | `FTP` |
-   | 服务器地址 | Nikon Link 显示的局域网 IPv4 地址 |
-   | 端口 | `2121` |
-   | 用户名 | `nikonlink` |
-   | 密码 | `nikonlink` |
-   | PASV 模式 | 开启 |
+| 项目 | 设置 |
+| --- | --- |
+| 服务器地址 | 应用中显示的局域网 IPv4 地址 |
+| 端口 | `2121` |
+| 用户名 | `nikonlink` |
+| 密码 | `nikonlink` |
+| PASV 模式 | 开启 |
 
-4. 在相机中选择照片上传，或开启自动上传。收到的文件会自动进入 Nikon Link
-   本地照片库。
+这套 FTP 服务没有加密，也没有独立账户体系，只适合在可信局域网内临时使用。
+传输完成后请关闭接收，不要把端口暴露到公网。iOS/iPadOS 进入后台时会自动停止
+FTP 服务。
 
-如果机身中没有“连接到 FTP 服务器”，请先确认机型能力并更新相机固件。FTP
-收件箱未提供互联网级加密或账户隔离，只应在可信局域网中临时开启；传输完成后
-请停止接收。iOS/iPadOS 进入后台时会自动停止收件箱。
+![macOS 上的无线传图页面](docs/images/macos-transfer.png)
 
 ## 本地构建
 
-### 环境要求
-
-- macOS 14+、Apple Silicon
-- Homebrew 与 `libgphoto2`
-- OpenJDK 17、Android SDK 35、Gradle
-- 完整 Xcode、iPhoneOS SDK 与已安装的 iOS 平台组件
-
-### 一次构建三个平台
+在 macOS 上构建 macOS、Android 和可用的 iOS 产物：
 
 ```sh
 ./scripts/build-all.sh
 ```
+
+常用环境包括：
+
+- macOS 14+、Apple Silicon、Homebrew、`libgphoto2`
+- OpenJDK 17、Android SDK 35
+- 完整 Xcode 和 iOS SDK
+- Windows 11、.NET 8 SDK、对应架构的 `libusb-1.0.dll`
+- DevEco Studio 5.x、HarmonyOS SDK API 12+ 和应用签名
 
 默认生成：
 
@@ -176,45 +168,66 @@ dist/NikonLink-0.7.2-android.apk
 dist/NikonLink-0.7.2-ios-unsigned.ipa
 ```
 
-每个安装包都附带同名 `.sha256` 校验文件。生成可安装的签名 IPA：
+Windows 需要在 Windows 主机单独构建：
+
+```powershell
+.\scripts\build-windows.ps1 -LibUsbDll C:\path\to\libusb-1.0.dll
+```
+
+HarmonyOS 可单独构建：
+
+```sh
+./scripts/build-harmony.sh
+```
+
+生成已签名的 iOS 安装包：
 
 ```sh
 IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 ```
 
-构建脚本和 CI 不会把历史 Web/PWA 资源复制进 DMG、APK 或 IPA。
+构建结果位于 `dist/`，每个安装包旁边会生成同名的 SHA-256 校验文件。
 
-## 验证状态
+## 遇到问题
 
 0.7.2 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
-扫描。由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合
-仍以实机验收为发布门槛。
+扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
+源码、资源和打包入口已通过静态检查，原生编译、签名、启动和真机测试仍待完成。
+由于构建机器当前未连接全部 EXPEED 7 机型，USB/PTP、不同固件和镜头组合仍以
+实机验收为发布门槛。
 
-请按 [相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md) 逐项记录机型、固件、镜头、
-数据线和主机系统版本。机身拒绝的参数会在界面中显示错误，不会静默伪装成功。
+提交 Issue 前，建议先记录相机型号、固件、镜头、数据线和主机系统版本，并按
+[相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md)复现一次。
 
-## 项目结构
+应用内的“提交 GitHub Issue”会预填版本信息和一小段脱敏日志，最后仍由用户检查
+并手动提交。照片和完整日志不会自动上传。各平台日志目录、保留时间和安全说明见
+[安全策略](SECURITY.md)。
+
+## 仓库结构
 
 ```text
-native/macos/      SwiftUI / AppKit 应用与 libgphoto2 集成
-native/android/    原生 Android 应用与 USB Host PTP 实现
-native/ios/        SwiftUI / AVFoundation / PhotoKit 应用
-scripts/           DMG、APK、IPA 三端构建脚本
-docs/              签名、术语、验收清单与 README 配图
+native/macos/      macOS 应用
+native/windows/    Windows 应用
+native/android/    Android 应用
+native/harmony/    HarmonyOS 应用
+native/ios/        iOS / iPadOS 应用
+scripts/           各平台构建脚本
+docs/              构建、签名、术语和实机测试文档
 ```
 
-更多资料：
+相关文档：
 
 - [Nikon 中文术语与 PTP 映射](docs/NIKON_TERMINOLOGY.md)
 - [相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md)
+- [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)
+- [HarmonyOS 构建与部署](docs/HARMONY_BUILD.md)
 - [iOS 签名与发布](docs/IOS_SIGNING.md)
-- [安全说明](SECURITY.md)
 - [版本记录](CHANGELOG.md)
 
-## 许可与商标
+## 许可
 
-应用源码使用 [MIT License](LICENSE)。macOS 安装包中的 gphoto2/libgphoto2 许可
-见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库不包含 Nikon 专有 SDK。
+项目源码使用 [MIT License](LICENSE)。第三方组件许可见
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 Nikon、Z9、Z8、Z f、Z6III、Z50II、Z5II 与 ZR 为 Nikon Corporation 的商标。
 本项目与 Nikon Corporation 无隶属、合作或背书关系。

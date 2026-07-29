@@ -1,0 +1,394 @@
+<Window x:Class="NikonLink.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nikon Link"
+        Icon="Assets/icon-512.png"
+        Width="1280"
+        Height="820"
+        MinWidth="860"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="68" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="34" />
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource RuleBrush}"
+            BorderThickness="0,0,0,1">
+      <Grid Margin="24,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Style="{StaticResource DisplayText}" Text="Nikon Link" />
+          <TextBlock x:Name="CameraStatusText"
+                     Style="{StaticResource MetaText}"
+                     Text="未连接 · WINDOWS USB/PTP" />
+        </StackPanel>
+        <Button x:Name="ConnectButton"
+                Grid.Column="1"
+                Width="142"
+                Style="{StaticResource PrimaryButton}"
+                Content="连接相机"
+                Click="ConnectButton_Click" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="160" />
+        <ColumnDefinition Width="*" MinWidth="380" />
+        <ColumnDefinition x:Name="ParameterColumn" Width="300" />
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0"
+              Background="{StaticResource Paper2Brush}"
+              BorderBrush="{StaticResource RuleBrush}"
+              BorderThickness="0,0,1,0">
+        <DockPanel Margin="16">
+          <StackPanel DockPanel.Dock="Bottom">
+            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.7.0" />
+            <TextBlock Margin="0,4,0,0"
+                       Foreground="{StaticResource MutedBrush}"
+                       FontSize="12"
+                       Text="照片保存在“图片\Nikon Link”" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Margin="12,0,0,12"
+                       Style="{StaticResource MetaText}"
+                       Text="工作区" />
+            <Button x:Name="CaptureNav"
+                    Style="{StaticResource NavButton}"
+                    Tag="capture"
+                    Content="照片拍摄"
+                    Click="Navigate_Click" />
+            <Button x:Name="MonitorNav"
+                    Style="{StaticResource NavButton}"
+                    Tag="monitor"
+                    Content="视频监看"
+                    Click="Navigate_Click" />
+            <Button x:Name="LibraryNav"
+                    Style="{StaticResource NavButton}"
+                    Tag="library"
+                    Content="本地照片"
+                    Click="Navigate_Click" />
+            <Button x:Name="TransferNav"
+                    Style="{StaticResource NavButton}"
+                    Tag="transfer"
+                    Content="无线传输"
+                    Click="Navigate_Click" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Column="1" Margin="20">
+        <Grid x:Name="CapturePanel">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Border Background="{StaticResource GraphiteBrush}"
+                  BorderBrush="{StaticResource GraphiteRuleBrush}"
+                  BorderThickness="1"
+                  CornerRadius="10"
+                  ClipToBounds="True">
+            <Grid>
+              <Image x:Name="PreviewImage"
+                     Stretch="Uniform"
+                     RenderOptions.BitmapScalingMode="HighQuality" />
+              <StackPanel x:Name="PreviewEmpty"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                <TextBlock HorizontalAlignment="Center"
+                           Foreground="{StaticResource GraphiteInkBrush}"
+                           FontFamily="{StaticResource DisplayFont}"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Text="等待相机画面" />
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="{StaticResource GraphiteMutedBrush}"
+                           Text="连接相机后开启实时取景" />
+              </StackPanel>
+              <Border HorizontalAlignment="Left"
+                      VerticalAlignment="Top"
+                      Margin="16"
+                      Padding="8,4"
+                      CornerRadius="5"
+                      Background="{StaticResource Graphite2Brush}">
+                <TextBlock x:Name="LiveBadge"
+                           Style="{StaticResource MetaText}"
+                           Foreground="{StaticResource GraphiteMutedBrush}"
+                           Text="LIVE VIEW OFF" />
+              </Border>
+            </Grid>
+          </Border>
+          <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="PreviewDetailText"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource MutedBrush}"
+                       Text="相机原生 JPEG · 本地预览" />
+            <Button x:Name="LiveViewButton"
+                    Grid.Column="1"
+                    Width="132"
+                    Margin="8,0"
+                    Style="{StaticResource ButtonBase}"
+                    Content="开启取景"
+                    IsEnabled="False"
+                    Click="LiveViewButton_Click" />
+            <Button x:Name="ShutterButton"
+                    Grid.Column="2"
+                    Width="132"
+                    Style="{StaticResource PrimaryButton}"
+                    Content="拍摄照片"
+                    IsEnabled="False"
+                    Click="ShutterButton_Click" />
+          </Grid>
+        </Grid>
+
+        <Grid x:Name="LibraryPanel" Visibility="Collapsed">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Grid>
+            <TextBlock Style="{StaticResource DisplayText}" Text="本地照片" />
+            <Button HorizontalAlignment="Right"
+                    Width="118"
+                    Style="{StaticResource ButtonBase}"
+                    Content="打开目录"
+                    Click="OpenPhotoFolder_Click" />
+          </Grid>
+          <ListBox x:Name="PhotoList"
+                   Grid.Row="1"
+                   Margin="0,20,0,12"
+                   Background="Transparent"
+                   BorderBrush="{StaticResource RuleBrush}"
+                   BorderThickness="1"
+                   SelectionChanged="PhotoList_SelectionChanged">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="8">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                    <TextBlock Margin="0,4,0,0"
+                               Style="{StaticResource MetaText}"
+                               Text="{Binding Detail}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1"
+                             VerticalAlignment="Center"
+                             Foreground="{StaticResource MutedBrush}"
+                             Text="›" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <Button x:Name="DeletePhotoButton"
+                  Grid.Row="2"
+                  Width="118"
+                  HorizontalAlignment="Right"
+                  Style="{StaticResource DangerButton}"
+                  Content="删除所选"
+                  IsEnabled="False"
+                  Click="DeletePhotoButton_Click" />
+        </Grid>
+
+        <Grid x:Name="TransferPanel" Visibility="Collapsed">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="680" HorizontalAlignment="Left">
+              <TextBlock Style="{StaticResource DisplayText}" Text="无线传输" />
+              <TextBlock Margin="0,12,0,24"
+                         Foreground="{StaticResource MutedBrush}"
+                         Text="在可信局域网中临时开启 FTP 收件箱，相机上传完成后请停止接收。" />
+              <Border Style="{StaticResource PanelCard}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitle}" Text="FTP 收件箱" />
+                  <TextBlock x:Name="WirelessStatusText"
+                             FontWeight="SemiBold"
+                             Text="无线收件箱未开启" />
+                  <TextBlock x:Name="WirelessAddressText"
+                             Margin="0,8,0,20"
+                             FontFamily="{StaticResource MonoFont}"
+                             Foreground="{StaticResource AccentBrush}"
+                             Text="—" />
+                  <Button x:Name="WirelessButton"
+                          Width="158"
+                          HorizontalAlignment="Left"
+                          Style="{StaticResource PrimaryButton}"
+                          Content="开启无线接收"
+                          Click="WirelessButton_Click" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitle}" Text="相机配置" />
+                  <TextBlock FontFamily="{StaticResource MonoFont}"
+                             LineHeight="24"
+                             Text="服务器类型  FTP&#x0a;端口        2121&#x0a;用户名      nikonlink&#x0a;密码        nikonlink&#x0a;PASV 模式   开启" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitle}" Text="诊断日志" />
+                  <TextBlock x:Name="DiagnosticLogPathText"
+                             Margin="0,0,0,16"
+                             FontFamily="{StaticResource MonoFont}"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap" />
+                  <WrapPanel>
+                    <Button Width="132"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource ButtonBase}"
+                            Content="打开日志目录"
+                            Click="OpenLogFolder_Click" />
+                    <Button Width="168"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="提交 GitHub Issue"
+                            Click="ReportIssue_Click" />
+                  </WrapPanel>
+                  <TextBlock Margin="0,12,0,0"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Grid>
+
+      <Border x:Name="ParameterPanelShell"
+              Grid.Column="2"
+              Background="{StaticResource SurfaceBrush}"
+              BorderBrush="{StaticResource RuleBrush}"
+              BorderThickness="1,0,0,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="20">
+            <TextBlock Style="{StaticResource SectionTitle}" Text="相机参数" />
+            <TextBlock Text="拍摄模式" />
+            <ComboBox x:Name="ExposureModeBox"
+                      SelectionChanged="ExposureModeBox_SelectionChanged">
+              <ComboBoxItem Tag="program" Content="P · 程序自动" />
+              <ComboBoxItem Tag="shutterPriority" Content="S · 快门优先" />
+              <ComboBoxItem Tag="aperturePriority" Content="A · 光圈优先" />
+              <ComboBoxItem Tag="manual" Content="M · 手动" IsSelected="True" />
+              <ComboBoxItem Tag="bulb" Content="M · B门" />
+            </ComboBox>
+
+            <TextBlock Text="快门速度" />
+            <ComboBox x:Name="ShutterBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="0.000125" Content="1/8000 s" />
+              <ComboBoxItem Tag="0.001" Content="1/1000 s" />
+              <ComboBoxItem Tag="0.004" Content="1/250 s" />
+              <ComboBoxItem Tag="0.008" Content="1/125 s" IsSelected="True" />
+              <ComboBoxItem Tag="0.016667" Content="1/60 s" />
+              <ComboBoxItem Tag="1" Content="1 s" />
+              <ComboBoxItem Tag="30" Content="30 s" />
+            </ComboBox>
+
+            <TextBlock Text="光圈" />
+            <ComboBox x:Name="ApertureBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="1.4" Content="f/1.4" />
+              <ComboBoxItem Tag="2.8" Content="f/2.8" />
+              <ComboBoxItem Tag="4" Content="f/4" IsSelected="True" />
+              <ComboBoxItem Tag="5.6" Content="f/5.6" />
+              <ComboBoxItem Tag="8" Content="f/8" />
+              <ComboBoxItem Tag="11" Content="f/11" />
+              <ComboBoxItem Tag="16" Content="f/16" />
+            </ComboBox>
+
+            <TextBlock Text="ISO 感光度" />
+            <ComboBox x:Name="IsoBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="64" Content="ISO 64" />
+              <ComboBoxItem Tag="100" Content="ISO 100" />
+              <ComboBoxItem Tag="200" Content="ISO 200" />
+              <ComboBoxItem Tag="400" Content="ISO 400" IsSelected="True" />
+              <ComboBoxItem Tag="800" Content="ISO 800" />
+              <ComboBoxItem Tag="1600" Content="ISO 1600" />
+              <ComboBoxItem Tag="3200" Content="ISO 3200" />
+              <ComboBoxItem Tag="6400" Content="ISO 6400" />
+              <ComboBoxItem Tag="12800" Content="ISO 12800" />
+              <ComboBoxItem Tag="25600" Content="ISO 25600" />
+            </ComboBox>
+
+            <TextBlock Text="曝光补偿" />
+            <ComboBox x:Name="ExposureCompensationBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="-2" Content="-2 EV" />
+              <ComboBoxItem Tag="-1" Content="-1 EV" />
+              <ComboBoxItem Tag="0" Content="0 EV" IsSelected="True" />
+              <ComboBoxItem Tag="1" Content="+1 EV" />
+              <ComboBoxItem Tag="2" Content="+2 EV" />
+            </ComboBox>
+
+            <TextBlock Text="对焦模式" />
+            <ComboBox x:Name="FocusModeBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="single-shot" Content="AF-S · 单次自动对焦" IsSelected="True" />
+              <ComboBoxItem Tag="continuous" Content="AF-C · 连续自动对焦" />
+              <ComboBoxItem Tag="manual" Content="MF · 手动对焦" />
+            </ComboBox>
+
+            <TextBlock Text="白平衡" />
+            <ComboBox x:Name="WhiteBalanceBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="continuous" Content="自动" IsSelected="True" />
+              <ComboBoxItem Tag="manual" Content="预设手动" />
+            </ComboBox>
+
+            <TextBlock Text="优化校准" />
+            <ComboBox x:Name="PictureControlBox"
+                      SelectionChanged="ParameterBox_SelectionChanged">
+              <ComboBoxItem Tag="auto" Content="自动" />
+              <ComboBoxItem Tag="standard" Content="标准" IsSelected="True" />
+              <ComboBoxItem Tag="neutral" Content="自然" />
+              <ComboBoxItem Tag="vivid" Content="鲜艳" />
+              <ComboBoxItem Tag="monochrome" Content="单色" />
+              <ComboBoxItem Tag="portrait" Content="人像" />
+              <ComboBoxItem Tag="landscape" Content="风景" />
+              <ComboBoxItem Tag="flat" Content="平面" />
+            </ComboBox>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2"
+            Background="{StaticResource GraphiteBrush}"
+            BorderBrush="{StaticResource GraphiteRuleBrush}"
+            BorderThickness="0,1,0,0">
+      <Grid Margin="16,0">
+        <TextBlock x:Name="OperationStatusText"
+                   VerticalAlignment="Center"
+                   Foreground="{StaticResource GraphiteInkBrush}"
+                   FontFamily="{StaticResource MonoFont}"
+                   FontSize="11"
+                   Text="就绪" />
+        <TextBlock x:Name="PhotoCountText"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Foreground="{StaticResource GraphiteMutedBrush}"
+                   FontFamily="{StaticResource MonoFont}"
+                   FontSize="11"
+                   Text="0 张照片" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

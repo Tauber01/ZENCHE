@@ -13,6 +13,7 @@
 		A10000000000000000000004 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* RootView.swift */; };
 		A10000000000000000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* Assets.xcassets */; };
 		A10000000000000000000006 /* WirelessTransferServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* WirelessTransferServer.swift */; };
+		A10000000000000000000007 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* DiagnosticLogger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		B10000000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B10000000000000000000007 /* Nikon Link.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nikon Link.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000008 /* WirelessTransferServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WirelessTransferServer.swift; sourceTree = "<group>"; };
+		B10000000000000000000009 /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -79,6 +81,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000002 /* AppModel.swift */,
+				B10000000000000000000009 /* DiagnosticLogger.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -183,6 +186,7 @@
 				A10000000000000000000003 /* CameraService.swift in Sources */,
 				A10000000000000000000004 /* RootView.swift in Sources */,
 				A10000000000000000000006 /* WirelessTransferServer.swift in Sources */,
+				A10000000000000000000007 /* DiagnosticLogger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
