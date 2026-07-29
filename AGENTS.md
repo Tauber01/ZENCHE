@@ -33,3 +33,19 @@
 - Do not substitute the former `澈` character tile for the canonical `Z` mark.
 - Promotional materials must not substitute `完整创作流` or another variation for
   the canonical slogan.
+
+## Documentation and release language
+
+- `README.md` must always contain complete Simplified Chinese, English, and
+  Japanese versions in that order.
+- The three README language sections must remain materially equivalent. Any
+  product, platform, compatibility, installation, usage, build, security, or
+  release-status change documented in one language must be synchronized to the
+  other two in the same change.
+- Every GitHub Release description must be written in detailed Simplified
+  Chinese. Do not publish an empty body, a terse commit list, or automatically
+  generated notes as the final release description.
+- A detailed Release description must cover the version highlights, platform
+  changes, supported-camera or compatibility changes, package and signing
+  status, validation performed, known limitations, upgrade guidance, and
+  SHA-256 verification where applicable.
