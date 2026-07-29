@@ -58,7 +58,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.7.0 release candidate passes compilation, signature/container validation,
+The 0.7.1 stable release passes compilation, signature/container validation,
 native UI startup checks and package scans confirming that DMG/APK contain no
 WebView or web assets. No supported EXPEED 7 body was attached to the build
 machine, so the checklist above remains the release-candidate gate for Z9, Z8,
