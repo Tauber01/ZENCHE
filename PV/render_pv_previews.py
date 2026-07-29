@@ -13,7 +13,7 @@ OUTPUT_DIR = PV_ROOT / "work" / "qa-beat-sync"
 REVIEW_TIMES = {
     "brand-mark": 1.25,
     "brand-lockup": 2.75,
-    "first-transition": 5.016,
+    "first-transition": 5.16,
     "direct-control": 6.45,
     "monitoring": 26.95,
     "desktop-platforms": 54.25,
