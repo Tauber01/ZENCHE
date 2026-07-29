@@ -77,6 +77,7 @@ public final class MainActivity extends Activity {
     private final Map<String, TextView> parameterLabels = new HashMap<>();
 
     private PtpCamera camera;
+    private DiagnosticLogger diagnostics;
     private FrameLayout contentHost;
     private TextView statusText;
     private TextView countText;
@@ -121,6 +122,8 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        diagnostics = new DiagnosticLogger(this);
+        diagnostics.startSession();
         Window window = getWindow();
         window.setStatusBarColor(PAPER);
         window.setNavigationBarColor(GRAPHITE);
@@ -144,6 +147,7 @@ public final class MainActivity extends Activity {
                 new WirelessFtpServer.Listener() {
                     @Override
                     public void onStatus(String status) {
+                        diagnostics.info("wireless", status);
                         mainHandler.post(() -> {
                             wirelessStatus = status;
                             updateWirelessUi();
@@ -152,6 +156,10 @@ public final class MainActivity extends Activity {
 
                     @Override
                     public void onFileReceived(File file) {
+                        diagnostics.info(
+                                "wireless",
+                                "已接收文件；名称=" + file.getName()
+                                        + "；大小=" + file.length());
                         mainHandler.post(() -> {
                             wirelessStatus = "已接收 " + file.getName();
                             updateWirelessUi();
@@ -162,6 +170,7 @@ public final class MainActivity extends Activity {
 
                     @Override
                     public void onError(String message) {
+                        diagnostics.error("wireless", message);
                         mainHandler.post(() -> {
                             wirelessRequested = false;
                             wirelessStatus = message;
@@ -174,7 +183,7 @@ public final class MainActivity extends Activity {
         setContentView(buildApplication());
         showSection("capture");
         updateConnectionUi();
-        System.out.println("Nikon Link native Android UI ready");
+        diagnostics.info("app", "Android 原生界面已就绪");
     }
 
     private void chooseLutFile() {
@@ -1186,6 +1195,33 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(48), 0, 16, 0, 0));
         content.addView(settings);
 
+        LinearLayout diagnosticsPanel = panel();
+        diagnosticsPanel.addView(text("诊断日志", 18, Typeface.BOLD, INK));
+        TextView logPath = text(
+                "日志按日保存、单个文件达到 5 MB 后滚动，保留 14 天。\n"
+                        + diagnostics.getDirectory().getAbsolutePath(),
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        logPath.setTextIsSelectable(true);
+        diagnosticsPanel.addView(
+                logPath,
+                marginParams(-1, -2, 0, 5, 0, 12));
+        Button reportIssue = nativeButton("提交 GitHub Issue", true);
+        reportIssue.setOnClickListener(view -> openGithubIssue());
+        diagnosticsPanel.addView(
+                reportIssue,
+                marginParams(-1, dp(48), 0, 8, 0, 0));
+        diagnosticsPanel.addView(text(
+                "将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。",
+                11,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 8, 0, 0));
+        content.addView(
+                diagnosticsPanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
         wirelessStatusText = text(
                 "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启，然后选择照片上传或开启自动上传。",
                 12,
@@ -1272,17 +1308,22 @@ public final class MainActivity extends Activity {
 
     private void connectCamera() {
         if (connecting || connected) return;
+        diagnostics.info("camera", "用户请求连接相机");
         connecting = true;
         updateConnectionUi();
         cameraExecutor.submit(() -> {
             try {
                 camera.connect();
                 String detectedCameraName = camera.getConnectedCameraName();
+                diagnostics.info("camera", "已连接 " + detectedCameraName);
                 boolean liveViewStarted;
                 try {
                     camera.startLiveView();
                     liveViewStarted = true;
                 } catch (Exception ignored) {
+                    diagnostics.warning(
+                            "liveview",
+                            "连接后自动开启实时取景失败：" + ignored.getMessage());
                     liveViewStarted = false;
                 }
                 boolean initialLiveView = liveViewStarted;
@@ -1302,6 +1343,7 @@ public final class MainActivity extends Activity {
                     }
                 });
             } catch (Exception error) {
+                diagnostics.error("camera", "连接失败：" + error.getMessage());
                 mainHandler.post(() -> {
                     connected = false;
                     connecting = false;
@@ -1314,6 +1356,7 @@ public final class MainActivity extends Activity {
     }
 
     private void disconnectCamera() {
+        diagnostics.info("camera", "用户请求断开相机");
         previewGeneration++;
         connected = false;
         liveViewEnabled = false;
@@ -1347,6 +1390,9 @@ public final class MainActivity extends Activity {
                         startPreviewLoop();
                     });
                 } catch (Exception error) {
+                    diagnostics.error(
+                            "liveview",
+                            "开启实时取景失败：" + error.getMessage());
                     mainHandler.post(() -> showError(error.getMessage()));
                 }
             });
@@ -1372,6 +1418,9 @@ public final class MainActivity extends Activity {
                     mainHandler.postDelayed(() -> pullPreview(generation), 220);
                 });
             } catch (Exception error) {
+                diagnostics.warning(
+                        "liveview",
+                        "获取实时取景帧失败，将重试：" + error.getMessage());
                 mainHandler.post(() -> {
                     if (generation != previewGeneration) return;
                     statusText.setText("实时取景正在重试");
@@ -1393,6 +1442,10 @@ public final class MainActivity extends Activity {
             try {
                 byte[] jpeg = camera.capture();
                 File file = savePhoto(jpeg);
+                diagnostics.info(
+                        "capture",
+                        "拍摄完成；文件=" + file.getName()
+                                + "；大小=" + file.length());
                 Bitmap source = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
                 ProcessedPreview output = processPreview(source);
                 mainHandler.post(() -> {
@@ -1404,6 +1457,7 @@ public final class MainActivity extends Activity {
                     showToast("拍摄完成，已保存到本地照片库。");
                 });
             } catch (Exception error) {
+                diagnostics.error("capture", "拍摄失败：" + error.getMessage());
                 mainHandler.post(() -> {
                     capturing = false;
                     if (shutterButton != null) shutterButton.setText("拍摄");
@@ -1544,8 +1598,14 @@ public final class MainActivity extends Activity {
         cameraExecutor.submit(() -> {
             try {
                 camera.setParameter(name, value);
+                diagnostics.info(
+                        "camera",
+                        "已设置参数；名称=" + name + "；值=" + value);
                 mainHandler.post(() -> statusText.setText(label + "已应用"));
             } catch (Exception error) {
+                diagnostics.error(
+                        "camera",
+                        "设置参数失败；名称=" + name + "；错误=" + error.getMessage());
                 mainHandler.post(() -> showError(error.getMessage()));
             }
         });
@@ -1787,11 +1847,25 @@ public final class MainActivity extends Activity {
     }
 
     private void showError(String message) {
+        diagnostics.error("ui", message);
         new AlertDialog.Builder(this)
                 .setTitle("Nikon Link")
                 .setMessage(message == null ? "原生相机操作失败。" : message)
                 .setPositiveButton("好", null)
                 .show();
+    }
+
+    private void openGithubIssue() {
+        diagnostics.info("diagnostics", "用户打开 GitHub Issue 提交页");
+        Intent intent = new Intent(Intent.ACTION_VIEW, diagnostics.githubIssueUri());
+        try {
+            startActivity(intent);
+        } catch (RuntimeException error) {
+            diagnostics.error(
+                    "diagnostics",
+                    "无法打开 GitHub Issue 提交页：" + error.getMessage());
+            showToast("无法打开浏览器，请访问 github.com/Tauber01/NikonLink/issues");
+        }
     }
 
     private static final class ProcessedPreview {
@@ -1806,6 +1880,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        diagnostics.endSession();
         previewGeneration++;
         wirelessRequested = false;
         wirelessServer.stop();

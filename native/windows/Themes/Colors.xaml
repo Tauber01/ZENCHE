@@ -1,0 +1,63 @@
+<!-- Hallmark · genre: modern-minimal · macrostructure: Split Studio ·
+     theme: Cobalt · enrichment: none · nav: N3 · footer: Ft2
+     Pre-emit critique: P5 H5 E5 S5 R5 V5 · contrast: pass (40–41)
+     Static slop review: pass (native-applicable gates) -->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Centralised sRGB equivalents of the repository's OKLCH Cobalt tokens. -->
+  <Color x:Key="ColorPaper">#F7F9FC</Color>
+  <Color x:Key="ColorPaper2">#EFF3F8</Color>
+  <Color x:Key="ColorPaper3">#E5EBF3</Color>
+  <Color x:Key="ColorSurface">#FCFDFE</Color>
+  <Color x:Key="ColorRule">#D8DFE9</Color>
+  <Color x:Key="ColorRuleStrong">#AEB8C7</Color>
+  <Color x:Key="ColorNeutral">#6D7787</Color>
+  <Color x:Key="ColorMuted">#525D6D</Color>
+  <Color x:Key="ColorInk2">#343B48</Color>
+  <Color x:Key="ColorInk">#171C26</Color>
+  <Color x:Key="ColorFocus">#050914</Color>
+  <Color x:Key="ColorAccent">#055AD2</Color>
+  <Color x:Key="ColorAccentSoft">#E1EDFF</Color>
+  <Color x:Key="ColorAccentInk">#F8FAFD</Color>
+  <Color x:Key="ColorVideo">#CA1F2A</Color>
+  <Color x:Key="ColorVideoSoft">#FFE6E8</Color>
+  <Color x:Key="ColorGraphite">#0C0F15</Color>
+  <Color x:Key="ColorGraphite2">#171B24</Color>
+  <Color x:Key="ColorGraphiteRule">#414856</Color>
+  <Color x:Key="ColorGraphiteMuted">#ADB5C1</Color>
+  <Color x:Key="ColorGraphiteInk">#F0F3F8</Color>
+  <Color x:Key="ColorError">#B4232D</Color>
+  <Color x:Key="ColorErrorSoft">#FCE9EA</Color>
+  <Color x:Key="ColorSuccess">#247A53</Color>
+
+  <SolidColorBrush x:Key="PaperBrush" Color="{StaticResource ColorPaper}" />
+  <SolidColorBrush x:Key="Paper2Brush" Color="{StaticResource ColorPaper2}" />
+  <SolidColorBrush x:Key="Paper3Brush" Color="{StaticResource ColorPaper3}" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource ColorSurface}" />
+  <SolidColorBrush x:Key="RuleBrush" Color="{StaticResource ColorRule}" />
+  <SolidColorBrush x:Key="RuleStrongBrush" Color="{StaticResource ColorRuleStrong}" />
+  <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource ColorNeutral}" />
+  <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource ColorMuted}" />
+  <SolidColorBrush x:Key="Ink2Brush" Color="{StaticResource ColorInk2}" />
+  <SolidColorBrush x:Key="InkBrush" Color="{StaticResource ColorInk}" />
+  <SolidColorBrush x:Key="FocusBrush" Color="{StaticResource ColorFocus}" />
+  <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource ColorAccent}" />
+  <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource ColorAccentSoft}" />
+  <SolidColorBrush x:Key="AccentInkBrush" Color="{StaticResource ColorAccentInk}" />
+  <SolidColorBrush x:Key="VideoBrush" Color="{StaticResource ColorVideo}" />
+  <SolidColorBrush x:Key="VideoSoftBrush" Color="{StaticResource ColorVideoSoft}" />
+  <SolidColorBrush x:Key="GraphiteBrush" Color="{StaticResource ColorGraphite}" />
+  <SolidColorBrush x:Key="Graphite2Brush" Color="{StaticResource ColorGraphite2}" />
+  <SolidColorBrush x:Key="GraphiteRuleBrush" Color="{StaticResource ColorGraphiteRule}" />
+  <SolidColorBrush x:Key="GraphiteMutedBrush" Color="{StaticResource ColorGraphiteMuted}" />
+  <SolidColorBrush x:Key="GraphiteInkBrush" Color="{StaticResource ColorGraphiteInk}" />
+  <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
+  <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ColorErrorSoft}" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource ColorSuccess}" />
+
+  <FontFamily x:Key="DisplayFont">Bahnschrift</FontFamily>
+  <FontFamily x:Key="BodyFont">Segoe UI Variable Text</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono</FontFamily>
+</ResourceDictionary>

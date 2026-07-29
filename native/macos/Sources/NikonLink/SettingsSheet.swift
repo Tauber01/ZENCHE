@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private enum SettingsPalette {
     static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
@@ -15,6 +16,7 @@ struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
+    @State private var logExportMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -83,6 +85,47 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
+                HStack(alignment: .top, spacing: 14) {
+                    settingIcon(
+                        "doc.text.magnifyingglass",
+                        color: SettingsPalette.cobalt
+                    )
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("诊断日志")
+                            .font(.system(size: 16, weight: .bold))
+                        Text("记录相机连接、USB/PTP 命令、实时取景重试及错误详情，默认保留 14 天。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("~/Library/Logs/Nikon Link")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(SettingsPalette.muted)
+                    }
+                    Spacer()
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("导出和提交前会自动隐藏相机序列号和用户名路径；在 GitHub 确认后才会提交。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(SettingsPalette.muted)
+                    HStack(spacing: 10) {
+                        Spacer()
+                        actionButton("打开日志目录") {
+                            openLogDirectory()
+                        }
+                        actionButton("导出诊断包") {
+                            exportDiagnostics()
+                        }
+                        actionButton("提交 GitHub Issue", primary: true) {
+                            openGithubIssue()
+                        }
+                    }
+                }
+            }
+
+            settingsCard {
                 HStack(spacing: 14) {
                     settingIcon("cup.and.saucer.fill", color: SettingsPalette.support)
                     VStack(alignment: .leading, spacing: 4) {
@@ -123,6 +166,17 @@ struct SettingsSheet: View {
         .frame(width: 620)
         .sheet(isPresented: $showDonation) {
             DonationSheet()
+        }
+        .alert(
+            "诊断日志",
+            isPresented: Binding(
+                get: { logExportMessage != nil },
+                set: { if !$0 { logExportMessage = nil } }
+            )
+        ) {
+            Button("好") { logExportMessage = nil }
+        } message: {
+            Text(logExportMessage ?? "")
         }
     }
 
@@ -171,6 +225,50 @@ struct SettingsSheet: View {
                     .stroke(primary ? Color.clear : SettingsPalette.rule, lineWidth: 1)
             }
             .buttonStyle(.plain)
+    }
+
+    private func openLogDirectory() {
+        DiagnosticLogger.shared.info("diagnostics", "用户打开日志目录")
+        NSWorkspace.shared.open(DiagnosticLogger.shared.directoryURL)
+    }
+
+    private func exportDiagnostics() {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+
+        let panel = NSSavePanel()
+        panel.title = "导出 Nikon Link 诊断日志"
+        panel.nameFieldStringValue =
+            "NikonLink-Diagnostics-\(formatter.string(from: Date())).zip"
+        panel.allowedContentTypes = [.zip]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let destination = panel.url else {
+            return
+        }
+
+        do {
+            try DiagnosticLogger.shared.exportArchive(to: destination)
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+        } catch {
+            DiagnosticLogger.shared.error(
+                "diagnostics",
+                "导出诊断日志失败：\(error.localizedDescription)"
+            )
+            logExportMessage = error.localizedDescription
+        }
+    }
+
+    private func openGithubIssue() {
+        DiagnosticLogger.shared.info(
+            "diagnostics",
+            "用户打开 GitHub Issue 提交页"
+        )
+        guard let url = DiagnosticLogger.shared.githubIssueURL() else {
+            logExportMessage = "无法生成 GitHub Issue 地址。"
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 }
 

@@ -1,0 +1,8 @@
+{
+  modelVersion: "5.0.0",
+  description: "Nikon Link native HarmonyOS application",
+  dependencies: {},
+  devDependencies: {
+    "@ohos/hvigor-ohos-plugin": "5.0.0"
+  }
+}

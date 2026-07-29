@@ -79,11 +79,19 @@ final class MediaLibrary: ObservableObject {
 
         do {
             try data.write(to: url, options: .atomic)
+            DiagnosticLogger.shared.info(
+                "capture",
+                "照片已保存；文件=\(url.lastPathComponent)；大小=\(data.count)"
+            )
             reload()
             selectedItemID = url.path
             message = "照片已保存到 Nikon Link 文件库"
             return url
         } catch {
+            DiagnosticLogger.shared.error(
+                "capture",
+                "保存照片失败：\(error.localizedDescription)"
+            )
             message = "保存失败：\(error.localizedDescription)"
             return nil
         }
@@ -110,6 +118,10 @@ final class MediaLibrary: ObservableObject {
                 try fileManager.copyItem(at: sourceURL, to: destination)
                 imported += 1
             } catch {
+                DiagnosticLogger.shared.error(
+                    "library",
+                    "导入文件失败：\(error.localizedDescription)"
+                )
                 message = "部分文件导入失败：\(error.localizedDescription)"
             }
         }
@@ -127,6 +139,10 @@ final class MediaLibrary: ObservableObject {
             reload()
             message = "文件已删除"
         } catch {
+            DiagnosticLogger.shared.error(
+                "library",
+                "删除文件失败：\(error.localizedDescription)"
+            )
             message = "删除失败：\(error.localizedDescription)"
         }
     }
@@ -244,6 +260,16 @@ final class AppModel: ObservableObject {
                 UIApplication.shared.isIdleTimerDisabled = isRunning
             }
             .store(in: &subscriptions)
+        wireless.$status
+            .dropFirst()
+            .sink { status in
+                if status.contains("失败") || status.contains("错误") {
+                    DiagnosticLogger.shared.error("wireless", status)
+                } else {
+                    DiagnosticLogger.shared.info("wireless", status)
+                }
+            }
+            .store(in: &subscriptions)
 
         camera.onPhotoCaptured = { [weak self] data, fileExtension in
             Task { @MainActor in
@@ -261,6 +287,11 @@ final class AppModel: ObservableObject {
         }
 
         camera.onMessage = { [weak self] message in
+            if message.contains("失败") || message.contains("错误") {
+                DiagnosticLogger.shared.error("camera", message)
+            } else {
+                DiagnosticLogger.shared.info("camera", message)
+            }
             Task { @MainActor in
                 self?.statusMessage = message
             }

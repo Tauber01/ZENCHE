@@ -11,6 +11,10 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] ZR (`04b0:0457`) is identified by its correct model name or descriptor fallback.
 - [ ] Other Nikon USB models are rejected with their actual Product ID.
 - [ ] Android displays a USB permission prompt once and reconnects after relaunch.
+- [ ] HarmonyOS displays the system USB permission prompt and reconnects after
+      unplug/replug without retaining stale endpoints.
+- [ ] Windows reports a clear WinUSB/libusb driver action when the PTP interface
+      is owned by the system or another application.
 - [ ] Live view starts, refreshes continuously and stops when disabled.
 - [ ] One shutter press creates exactly one file in the local library.
 - [ ] Captured JPEG opens at full resolution and has a valid EXIF timestamp.
@@ -47,6 +51,28 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] NEF and HEIF uploads keep their original filename and extension.
 - [ ] Auto upload receives consecutive captures without overwriting an existing file.
 - [ ] Stopping the wireless inbox rejects new camera connections.
+- [ ] Windows chooses a free PASV data port and streams large files to a temporary
+      `.part` file before the final atomic move.
+- [ ] HarmonyOS listens on PASV data port 2122 only while the inbox is enabled,
+      and closes both ports after leaving the page.
+
+## Windows
+
+- [ ] `NikonLink.exe` starts on a clean Windows 11 x64 machine with the packaged
+      `libusb-1.0.dll`.
+- [ ] The x64 package rejects x86/ARM64 libusb DLLs with an actionable message.
+- [ ] Only the Nikon Still Image/PTP interface is bound to WinUSB or libusbK.
+- [ ] Keyboard focus, window resizing at 1024×640, and 200% display scaling keep
+      all critical controls operable.
+
+## HarmonyOS
+
+- [ ] The signed HAP installs on an API 12+ USB Host phone, tablet, and 2-in-1.
+- [ ] The app remains usable at 320, 375, 414, and 768 vp widths.
+- [ ] A PTP payload larger than 200 KB is reassembled correctly from 192 KB
+      `bulkTransfer` calls.
+- [ ] Removing the USB device during live view exits the loop and leaves the local
+      photo library intact.
 
 ## iOS / iPadOS monitor output
 
@@ -58,8 +84,10 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.7.2 stable release passes compilation, signature/container validation,
-native UI startup checks and package scans confirming that DMG/APK contain no
-WebView or web assets. No supported EXPEED 7 body was attached to the build
-machine, so the checklist above remains the release-candidate gate for Z9, Z8,
-Z f, Z6III, Z50II, Z5II and ZR.
+The 0.7.3 stable release passes compilation, signature/container validation,
+native UI startup checks and package scans. Windows passes .NET compilation and
+PE/ZIP package checks. HarmonyOS source, resources, and packaging entry points
+pass static validation, but native compilation, signing, startup, and hardware
+checks are still pending. No supported EXPEED 7 body was attached to the build
+machine, so this checklist remains the release gate for every platform and
+camera.

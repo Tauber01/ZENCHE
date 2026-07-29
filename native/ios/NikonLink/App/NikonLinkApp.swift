@@ -4,6 +4,10 @@ import SwiftUI
 struct NikonLinkApp: App {
     @StateObject private var model = AppModel()
 
+    init() {
+        DiagnosticLogger.shared.startSession()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

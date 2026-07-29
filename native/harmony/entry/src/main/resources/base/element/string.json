@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Nikon Z 系列联机拍摄与无线传图"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Nikon Link"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Nikon Link"
+    },
+    {
+      "name": "permission_internet",
+      "value": "用于在可信局域网中接收相机 FTP 图片"
+    },
+    {
+      "name": "permission_wifi",
+      "value": "用于显示相机 FTP 配置所需的局域网地址"
+    }
+  ]
+}
