@@ -65,15 +65,19 @@
       }
 
       .logo {
-        display: grid;
         width: 68px;
         height: 68px;
-        place-items: center;
         border-radius: 17px;
-        background: #111722;
-        color: white;
-        font-size: 38px;
-        font-weight: 900;
+        overflow: hidden;
+        background: #18202d;
+        box-shadow: 0 7px 18px rgba(24, 32, 45, 0.18);
+      }
+
+      .logo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
       }
 
       .brand strong {
@@ -582,7 +586,7 @@
       <div class="mobile-status"><span>09:41</span><span>●●●  Wi-Fi  100%</span></div>
       <header class="mobile-header">
         <div class="brand">
-          <div class="logo">澈</div>
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
           <div><strong>帧澈 ZENCHE</strong><small>Android 原生版</small></div>
         </div>
         <div class="native-button">连接相机</div>
@@ -621,7 +625,7 @@
       <div class="mobile-status"><span>09:41</span><span>HarmonyOS · 100%</span></div>
       <header class="mobile-header">
         <div class="brand">
-          <div class="logo">澈</div>
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
           <div>
             <strong>帧澈 ZENCHE <span class="harmony-tag">ArkUI</span></strong>
             <small>HarmonyOS 原生版</small>
@@ -663,7 +667,7 @@
       <div class="mobile-status"><span>09:41</span><span>5G　Wi-Fi　100%</span></div>
       <header class="mobile-header">
         <div class="brand">
-          <div class="logo">澈</div>
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
           <div><strong>帧澈 ZENCHE</strong><small>iOS / iPadOS 原生版</small></div>
         </div>
         <div class="native-button primary">选择相机</div>

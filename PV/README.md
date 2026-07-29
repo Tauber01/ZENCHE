@@ -9,11 +9,13 @@
 - 产品说明：`跨平台相机控制与影像传输工具`
 - 英文品牌语：`Capture · Connect · Flow`
 - 标语：`连接相机，也连接完整工作流`
+- 商标：`assets/branding/zenche-z-mark.svg`（蓝色几何 Z 正式标识）
 
 ## 当前正式版
 
 - 版本标识：`V1 正式版`
 - 画幅：1920 × 1080，30 fps，102.7 秒
+- 节奏：105.47 BPM；镜头切点、标题和卡片进场吸附四拍小节
 - 项目网页：`https://github.com/Tauber01/ZENCHE`
 - 版本下载：`https://github.com/Tauber01/ZENCHE/releases`
 - BGM：弧光作战 PV（本地素材 `assets/bgm/ZENCHE_BGM_BATTLEPLAN_ARCLIGHT.m4s`）
@@ -58,6 +60,9 @@ macOS 与 Android 当前提供原生 USB/PTP；Windows 与 HarmonyOS 的控制�
 - `zenche_pv_v1.html`：Web VFX 时间线与视觉源文件
 - `platform_screenshots.html`：五个原生平台的界面预览源文件
 - `render_platform_screenshots.py`：生成五端等比例界面预览图
+- `render_pv_previews.py`：按节拍时间点生成宣传片审阅帧
+- `analyze_bgm_beats.py`：分析 BGM 主拍、强起音与四拍小节落点
+- `render_pv_previews.py`：按确定时间点生成节奏与版式审阅帧
 - `assets/`：BGM 与界面画面
 - `work/`：渲染中间文件
 - `output/`：最终交付文件

@@ -76,6 +76,7 @@ REQUIRED_ASSETS = [
     HTML_PATH,
     PLATFORM_SCREENSHOT_RENDERER,
     BGM_SOURCE,
+    PV_ROOT / "assets" / "branding" / "zenche-z-mark.svg",
     PV_ROOT / "assets" / "screens" / "current" / "macos-transfer.png",
     PV_ROOT / "assets" / "screens" / "platforms" / "macos.png",
     PV_ROOT / "assets" / "screens" / "platforms" / "android.png",
@@ -348,6 +349,12 @@ def write_delivery_metadata(draft_result, probe):
         "duration_seconds": DURATION,
         "resolution": f"{WIDTH}x{HEIGHT}",
         "fps": FPS,
+        "beat_sync": {
+            "tempo_bpm": 105.469,
+            "beat_period_seconds": 0.5689,
+            "first_beat_seconds": 0.4644,
+            "edit_pattern": "scene changes on four-beat bar starts; internal reveals on beat subdivisions",
+        },
         "bgm": {
             "label": "弧光作战 PV",
             "source": str(BGM_SOURCE.resolve()),
