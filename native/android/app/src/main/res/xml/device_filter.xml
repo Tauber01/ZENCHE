@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Nikon Z9 -->
+    <usb-device vendor-id="1200" product-id="1104" />
     <!-- Nikon Z8 -->
     <usb-device vendor-id="1200" product-id="1105" />
     <!-- Nikon Z f -->
     <usb-device vendor-id="1200" product-id="1107" />
     <!-- Nikon Z6III -->
     <usb-device vendor-id="1200" product-id="1108" />
+    <!-- Nikon Z50II -->
+    <usb-device vendor-id="1200" product-id="1109" />
     <!-- Nikon Z5II -->
     <usb-device vendor-id="1200" product-id="1110" />
+    <!-- Nikon ZR -->
+    <usb-device vendor-id="1200" product-id="1111" />
+    <!-- Name-based fallback for newly reported Nikon still-image interfaces. -->
+    <usb-device vendor-id="1200" class="6" subclass="1" protocol="1" />
 </resources>

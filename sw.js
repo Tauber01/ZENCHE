@@ -1,4 +1,4 @@
-const CACHE_NAME = "nikon-link-v7";
+const CACHE_NAME = "nikon-link-v8";
 const APP_ASSETS = [
   "./",
   "./index.html",

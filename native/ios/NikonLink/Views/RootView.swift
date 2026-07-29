@@ -142,32 +142,50 @@ private struct SideNavigation: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(AppSection.allCases) { section in
-                Button {
-                    model.section = section
-                } label: {
-                    VStack(spacing: 7) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 20, weight: .medium))
-                        Text(section.rawValue)
-                            .font(.caption.weight(.medium))
-                    }
-                    .foregroundStyle(model.section == section ? Color.accentColor : .secondary)
-                    .frame(width: 78, height: 70)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(model.section == section ? Color.accentColor.opacity(0.14) : .clear)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
+        VStack(spacing: 6) {
+            groupLabel("创作")
+            navigationButton(.capture)
+            navigationButton(.monitor)
+            Divider().padding(.vertical, 6)
+            groupLabel("管理")
+            navigationButton(.library)
+            navigationButton(.transfer)
             Spacer()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 16)
         .frame(width: 100)
         .background(Color.black.opacity(0.12))
+    }
+
+    private func groupLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.monospaced().weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 78, alignment: .leading)
+            .padding(.leading, 4)
+    }
+
+    private func navigationButton(_ section: AppSection) -> some View {
+        let active = model.section == section
+        let accent = section == .monitor ? Color.red : Color.accentColor
+        return Button {
+            model.section = section
+        } label: {
+            VStack(spacing: 7) {
+                Image(systemName: section.icon)
+                    .font(.system(size: 20, weight: .medium))
+                Text(section.rawValue)
+                    .font(.caption.weight(.medium))
+            }
+            .foregroundStyle(active ? accent : .secondary)
+            .frame(width: 78, height: 62)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(active ? accent.opacity(0.14) : .clear)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -219,10 +237,10 @@ private struct CapturePage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 PageTitle(
-                    title: "联机拍摄",
+                    title: "照片拍摄",
                     subtitle: model.mode == .simple
-                    ? "连接设备、确认画面，然后按下快门。"
-                    : "按系统公开能力控制视频设备；不支持的项目会明确标记。"
+                    ? "连接设备、确认构图，然后按下快门。"
+                    : "照片控制 · 对焦、曝光补偿、变焦与构图辅助。"
                 )
 
                 CameraStage()
@@ -269,7 +287,7 @@ private struct CameraStage: View {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 46, weight: .light))
                         .foregroundStyle(.secondary)
-                    Text("等待视频设备")
+                    Text("等待相机画面")
                         .font(.title3.weight(.semibold))
                     Text("iPad 可搜索外接 UVC 相机；iPhone 可使用本机镜头。")
                         .font(.subheadline)
@@ -397,10 +415,6 @@ private struct ProfessionalControls: View {
                     title: "曝光控制",
                     available: model.camera.supportsExposureBias
                 )
-                CapabilityChip(
-                    title: "外接视频",
-                    available: model.camera.isExternalCamera
-                )
             }
 
             ViewThatFits(in: .horizontal) {
@@ -432,12 +446,8 @@ private struct ProfessionalControls: View {
     }
 
     private var guideToggles: some View {
-        HStack(spacing: 10) {
-            Toggle("网格", isOn: $model.showGrid)
-                .toggleStyle(.button)
-            Toggle("安全框", isOn: $model.showSafeGuide)
-                .toggleStyle(.button)
-        }
+        Toggle("构图网格", isOn: $model.showGrid)
+            .toggleStyle(.button)
     }
 }
 
@@ -461,7 +471,10 @@ private struct MonitorPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                PageTitle(title: "实时取景", subtitle: "系统视频设备预览；点按画面可设置对焦点。")
+                PageTitle(
+                    title: "视频监看",
+                    subtitle: "系统视频设备预览、监看参数与输出规格。"
+                )
                 CameraStage()
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 280), spacing: 14)],
@@ -897,7 +910,7 @@ private struct ConnectionSheet: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.yellow)
                         }
-                        Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要实现 Z8、Z f、Z6III 或 Z5II 的快门、光圈、ISO 和原图下载，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
+                        Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要实现 Z9、Z8、Z f、Z6III、Z50II、Z5II 或 ZR 的快门、光圈、ISO 和原图下载，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

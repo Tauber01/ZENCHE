@@ -5,6 +5,20 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Added native USB/PTP profiles for every current EXPEED 7 body: Z9, Z8, Z f,
+  Z6III, Z50II, Z5II and ZR, with exact Product IDs plus a Nikon descriptor
+  fallback for firmware or platform USB-reporting differences.
+- Added complete English and Japanese README documentation alongside Chinese.
+
+### Changed
+
+- Separated photo capture and video monitoring into clearly grouped workspaces
+  across the web, macOS, Android and iOS/iPadOS interfaces.
+- Moved zebra, peaking, histogram, LUT and monitor-output controls into the
+  video workspace while keeping exposure and still-capture controls in photo.
+
 ## [0.7.0] - 2026-07-28
 
 ### Added

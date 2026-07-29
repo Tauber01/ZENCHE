@@ -16,11 +16,16 @@ import java.util.Map;
 
 final class PtpCamera {
     static final int NIKON_VENDOR_ID = 0x04b0;
+    static final String SUPPORTED_CAMERA_SUMMARY =
+            "Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR";
     private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
+            new CameraProfile("Nikon Z9", 0x0450, 64, 25600),
             new CameraProfile("Nikon Z8", 0x0451, 64, 25600),
             new CameraProfile("Nikon Z f", 0x0453, 100, 64000),
             new CameraProfile("Nikon Z6III", 0x0454, 100, 64000),
-            new CameraProfile("Nikon Z5II", 0x0456, 100, 64000)
+            new CameraProfile("Nikon Z50II", 0x0455, 100, 51200),
+            new CameraProfile("Nikon Z5II", 0x0456, 100, 64000),
+            new CameraProfile("Nikon ZR", 0x0457, 100, 51200)
     };
 
     private static final int TYPE_COMMAND = 1;
@@ -63,7 +68,7 @@ final class PtpCamera {
         UsbDevice unsupportedNikon = null;
         for (UsbDevice candidate : manager.getDeviceList().values()) {
             if (candidate.getVendorId() != NIKON_VENDOR_ID) continue;
-            CameraProfile candidateProfile = profileFor(candidate.getProductId());
+            CameraProfile candidateProfile = profileFor(candidate);
             if (candidateProfile != null) {
                 device = candidate;
                 profile = candidateProfile;
@@ -74,10 +79,14 @@ final class PtpCamera {
         if (device == null) {
             if (unsupportedNikon != null) {
                 throw new Exception(String.format(
-                        "检测到未支持的 Nikon USB 设备 04b0:%04x。当前支持 Z8、Z f、Z6III、Z5II。",
-                        unsupportedNikon.getProductId()));
+                        "检测到未支持的 Nikon USB 设备 04b0:%04x。当前支持 %s。",
+                        unsupportedNikon.getProductId(),
+                        SUPPORTED_CAMERA_SUMMARY));
             }
-            throw new Exception("没有检测到支持的 Nikon 相机。请连接 Z8、Z f、Z6III 或 Z5II。");
+            throw new Exception(
+                    "没有检测到支持的 Nikon 相机。请连接 "
+                            + SUPPORTED_CAMERA_SUMMARY
+                            + "。");
         }
         if (!activity.ensureUsbPermission(manager, device)) {
             throw new Exception("未获得 " + cameraName() + " 的 USB 访问权限。");
@@ -517,6 +526,26 @@ final class PtpCamera {
     private static CameraProfile profileFor(int productId) {
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
             if (candidate.productId == productId) return candidate;
+        }
+        return null;
+    }
+
+    private static CameraProfile profileFor(UsbDevice device) {
+        CameraProfile byProductId = profileFor(device.getProductId());
+        if (byProductId != null) return byProductId;
+        String descriptor = device.getProductName();
+        if (descriptor == null) return null;
+        String normalized = descriptor
+                .toLowerCase()
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "");
+        for (CameraProfile candidate : SUPPORTED_CAMERAS) {
+            String candidateName = candidate.name
+                    .toLowerCase()
+                    .replace("nikon", "")
+                    .replace(" ", "");
+            if (normalized.contains(candidateName)) return candidate;
         }
         return null;
     }
