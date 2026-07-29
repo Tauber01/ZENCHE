@@ -1,6 +1,6 @@
 {
-  "name": "Nikon Link 相机控制中心",
-  "short_name": "Nikon Link",
+  "name": "帧澈 ZENCHE — 跨平台相机控制与影像传输工具",
+  "short_name": "帧澈 ZENCHE",
   "description": "连接视频设备，实时监看、拍摄并管理本地照片。",
   "lang": "zh-CN",
   "start_url": "./",

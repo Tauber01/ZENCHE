@@ -168,7 +168,7 @@ final class WirelessTransferServer: ObservableObject {
         var acceptedUser = false
         var passiveListener: Int32 = -1
 
-        sendLine("220 Nikon Link Wireless Inbox ready", to: descriptor)
+        sendLine("220 ZENCHE Wireless Inbox ready", to: descriptor)
         DispatchQueue.main.async {
             self.status = "相机已连接，等待图片"
         }

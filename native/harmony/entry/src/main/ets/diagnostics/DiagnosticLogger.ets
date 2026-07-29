@@ -5,7 +5,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const MAX_FILE_BYTES: number = 5 * 1024 * 1024;
 const RETENTION_MILLIS: number = 14 * 24 * 60 * 60 * 1000;
 const ISSUE_URL: string =
-  'https://github.com/Tauber01/NikonLink/issues/new';
+  'https://github.com/Tauber01/ZENCHE/issues/new';
 
 export class DiagnosticLogger {
   readonly directoryPath: string;
@@ -23,7 +23,7 @@ export class DiagnosticLogger {
   startSession(): void {
     this.info(
       'app',
-      `会话启动；版本=0.8.1 (16)；系统=HarmonyOS；会话=${this.sessionId}`
+      `会话启动；版本=0.8.3 (18)；系统=HarmonyOS；会话=${this.sessionId}`
     );
   }
 
@@ -48,7 +48,7 @@ export class DiagnosticLogger {
       '## 问题描述\n\n请描述发生了什么，以及如何复现。\n\n' +
       '## 环境\n\n' +
       '- 平台：HarmonyOS\n' +
-      '- Nikon Link：0.8.1 (16)\n' +
+      '- 帧澈 ZENCHE：0.8.3 (18)\n' +
       `- 会话：${this.sessionId}\n\n` +
       '## 最近诊断日志（已脱敏）\n\n```text\n' +
       this.recentText(2500) +
@@ -104,7 +104,7 @@ export class DiagnosticLogger {
     try {
       if (fs.accessSync(target) && fs.statSync(target).size >= MAX_FILE_BYTES) {
         const rotated: string =
-          `${this.directoryPath}/NikonLink-${filenameTimestamp()}` +
+          `${this.directoryPath}/ZENCHE-${filenameTimestamp()}` +
           `-${this.sessionId}.log`;
         fs.renameSync(target, rotated);
       }
@@ -144,7 +144,7 @@ export class DiagnosticLogger {
   }
 
   private currentLogPath(): string {
-    return `${this.directoryPath}/NikonLink-${dateStamp()}.log`;
+    return `${this.directoryPath}/ZENCHE-${dateStamp()}.log`;
   }
 
   private redact(value: string): string {

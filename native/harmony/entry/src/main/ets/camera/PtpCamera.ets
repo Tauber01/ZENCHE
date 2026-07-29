@@ -21,6 +21,8 @@ const START_LIVE_VIEW: number = 0x9201;
 const END_LIVE_VIEW: number = 0x9202;
 const GET_LIVE_VIEW_IMAGE: number = 0x9203;
 const CAPTURE_TO_SDRAM: number = 0x9207;
+const START_MOVIE_RECORDING: number = 0x920a;
+const END_MOVIE_RECORDING: number = 0x920b;
 const TERMINATE_CAPTURE: number = 0x920c;
 const OBJECT_ADDED_IN_SDRAM: number = 0xc101;
 const STILL_IMAGE_CLASS: number = 6;
@@ -56,10 +58,12 @@ export class PtpCamera {
   private bulkOut?: usbManager.USBEndpoint;
   private transaction: number = 0;
   private liveView: boolean = false;
+  private movieRecording: boolean = false;
   private exposureMode: string = 'manual';
   private bulbDurationSeconds: number = 5;
   private activeProfile?: CameraProfile;
   private transferTail: Promise<void> = Promise.resolve();
+  private deniedParameters: Set<string> = new Set<string>();
 
   get isConnected(): boolean {
     return this.pipe !== undefined;
@@ -67,6 +71,10 @@ export class PtpCamera {
 
   get isLiveView(): boolean {
     return this.liveView;
+  }
+
+  get isMovieRecording(): boolean {
+    return this.movieRecording;
   }
 
   get profile(): CameraProfile | undefined {
@@ -204,6 +212,40 @@ export class PtpCamera {
     return this.extractJpeg(data);
   }
 
+  async startMovieRecording(): Promise<void> {
+    this.ensureConnected();
+    if (this.movieRecording) {
+      return;
+    }
+    if (!this.liveView) {
+      await this.startLiveView();
+    }
+    await this.transact(
+      START_MOVIE_RECORDING,
+      [],
+      undefined,
+      15000
+    );
+    this.movieRecording = true;
+  }
+
+  async stopMovieRecording(): Promise<void> {
+    this.ensureConnected();
+    if (!this.movieRecording) {
+      return;
+    }
+    try {
+      await this.transact(
+        END_MOVIE_RECORDING,
+        [],
+        undefined,
+        15000
+      );
+    } finally {
+      this.movieRecording = false;
+    }
+  }
+
   async capture(): Promise<Uint8Array> {
     this.ensureConnected();
     const resumeLiveView: boolean = this.liveView;
@@ -280,6 +322,28 @@ export class PtpCamera {
   }
 
   async setParameter(name: string, rawValue: string | number): Promise<void> {
+    if (!this.canAdjustParameter(name)) {
+      throw new Error(this.parameterLockReason(name));
+    }
+    try {
+      await this.setParameterCore(name, rawValue);
+    } catch (error) {
+      const message: string = (error as Error).message;
+      if (message.includes('0x200F')) {
+        this.deniedParameters.add(name);
+        throw new Error(
+          `${this.cameraName()} 报告此参数当前只读；` +
+          '帧澈 ZENCHE 已锁定该控件以防止重复报错。'
+        );
+      }
+      throw new Error(message);
+    }
+  }
+
+  private async setParameterCore(
+    name: string,
+    rawValue: string | number
+  ): Promise<void> {
     this.ensureConnected();
     if (name === 'bulbDuration') {
       if (this.exposureMode !== 'bulb') {
@@ -343,31 +407,53 @@ export class PtpCamera {
         value = this.littleEndian16(this.pictureControlValue(String(rawValue)));
         break;
       case 'exposureMode':
-        this.exposureMode = String(rawValue);
+        const requestedExposureMode: string = String(rawValue);
         property = 0x500e;
-        if (this.exposureMode === 'bulb') {
+        if (requestedExposureMode === 'bulb') {
           await this.transact(CHANGE_CAMERA_MODE, [1], undefined, 10000);
           await this.setProperty(property, this.littleEndian16(1));
           await this.setProperty(
             0x500d,
             this.littleEndian32(0xffffffff)
           );
+          this.exposureMode = requestedExposureMode;
           return;
         }
         value = this.littleEndian16(
-          this.exposureMode === 'aperturePriority' ? 3 :
-          this.exposureMode === 'shutterPriority' ? 4 :
-          this.exposureMode === 'program' ? 2 : 1
+          requestedExposureMode === 'aperturePriority' ? 3 :
+          requestedExposureMode === 'shutterPriority' ? 4 :
+          requestedExposureMode === 'program' ? 2 : 1
         );
         break;
       default:
         throw new Error(`${this.cameraName()} 不支持此参数：${name}`);
     }
     await this.setProperty(property, value);
+    if (name === 'exposureMode') {
+      this.exposureMode = String(rawValue);
+    }
+  }
+
+  canAdjustParameter(name: string): boolean {
+    return !this.deniedParameters.has(name) && this.canAdjust(name);
+  }
+
+  parameterLockReason(name: string): string {
+    if (this.deniedParameters.has(name)) {
+      return '相机已拒绝此参数，本次连接内保持锁定';
+    }
+    return '当前拍摄模式下由相机控制';
   }
 
   async disconnect(): Promise<void> {
     if (this.pipe !== undefined) {
+      if (this.movieRecording) {
+        try {
+          await this.stopMovieRecording();
+        } catch (error) {
+          this.movieRecording = false;
+        }
+      }
       try {
         await this.stopLiveView();
       } catch (error) {
@@ -393,7 +479,9 @@ export class PtpCamera {
     this.bulkOut = undefined;
     this.activeProfile = undefined;
     this.liveView = false;
+    this.movieRecording = false;
     this.transaction = 0;
+    this.deniedParameters.clear();
   }
 
   private findStillImageInterface(

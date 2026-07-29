@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.8.1
+VERSION=0.8.3
 ANDROID_ROOT="$PROJECT_ROOT/native/android"
 ASSET_ROOT="$ANDROID_ROOT/app/src/main/assets/web"
 DIST_ROOT="$PROJECT_ROOT/dist"
@@ -36,7 +36,7 @@ else
 fi
 
 APK_SOURCE="$ANDROID_ROOT/app/build/outputs/apk/debug/app-debug.apk"
-APK_TARGET="$DIST_ROOT/NikonLink-$VERSION-android.apk"
+APK_TARGET="$DIST_ROOT/ZENCHE-$VERSION-android.apk"
 cp "$APK_SOURCE" "$APK_TARGET"
 shasum -a 256 "$APK_TARGET" |
   awk -v name="${APK_TARGET:t}" '{print $1 "  " name}' \

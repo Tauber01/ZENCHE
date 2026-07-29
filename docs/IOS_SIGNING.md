@@ -19,7 +19,7 @@ IOS_SIGNING_IDENTITY="Apple Development" \
 ./scripts/build-ios.sh --signed
 ```
 
-结果为 `dist/NikonLink-0.8.1-ios-signed.ipa`，并附带 SHA-256 校验文件。
+结果为 `dist/ZENCHE-0.8.3-ios-signed.ipa`，并附带 SHA-256 校验文件。
 
 ## GitHub Actions
 
@@ -41,6 +41,6 @@ IPA 不能安装到真机，也不能冒充正式安装包。
 ## Nikon USB/PTP 说明
 
 iPadOS 的公开 AVFoundation 接口可以发现兼容的外接 UVC 视频设备，但不提供
-通用 USB/PTP 厂商控制。Nikon Link 已适配的 EXPEED 6 / 7 相机，其快门、光圈、
+通用 USB/PTP 厂商控制。帧澈 ZENCHE 已适配的 EXPEED 6 / 7 相机，其快门、光圈、
 ISO 和原图下载只有在 Nikon 提供 iOS 协议授权或官方 SDK 后才能接入；当前 iOS
 界面会如实标记这一能力边界。

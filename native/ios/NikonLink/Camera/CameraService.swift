@@ -87,7 +87,7 @@ enum MonitorVideoSpec: String, CaseIterable, Identifiable {
     }
 }
 
-final class CameraService: NSObject, ObservableObject {
+final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate {
     @Published private(set) var state: CameraConnectionState = .disconnected
     @Published private(set) var deviceName = "未选择相机"
     @Published private(set) var availableDevices: [CameraDeviceOption] = []
@@ -104,6 +104,8 @@ final class CameraService: NSObject, ObservableObject {
     @Published private(set) var activeFrameRate: Double = 30
     @Published private(set) var maxZoomFactor: CGFloat = 1
     @Published private(set) var activeVideoSpecLabel = "—"
+    @Published private(set) var supportsMovieRecording = false
+    @Published private(set) var isRecording = false
     @Published var exposureBias: Float = 0
     @Published var exposureISO: Float = 100
     @Published var shutterAngle: Double = 180
@@ -111,10 +113,12 @@ final class CameraService: NSObject, ObservableObject {
 
     let session = AVCaptureSession()
     var onPhotoCaptured: ((Data, String) -> Void)?
+    var onVideoRecorded: ((URL) -> Void)?
     var onMessage: ((String) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "com.tauber.nikonlink.camera")
     private let photoOutput = AVCapturePhotoOutput()
+    private let movieOutput = AVCaptureMovieFileOutput()
     private var currentDevice: AVCaptureDevice?
     private var captureDelegates: [Int64: PhotoCaptureDelegate] = [:]
     private var shouldResumeSession = false
@@ -200,6 +204,8 @@ final class CameraService: NSObject, ObservableObject {
                 self.supportsFocusPoint = false
                 self.supportsExposureBias = false
                 self.supportsCustomExposure = false
+                self.supportsMovieRecording = false
+                self.isRecording = false
                 self.state = .disconnected
                 self.onMessage?("相机已断开")
             }
@@ -266,6 +272,73 @@ final class CameraService: NSObject, ObservableObject {
             self.captureDelegates[uniqueID] = delegate
             self.photoOutput.capturePhoto(with: settings, delegate: delegate)
             self.onMessage?("正在拍摄…")
+        }
+    }
+
+    func toggleVideoRecording() {
+        isRecording ? stopVideoRecording() : startVideoRecording()
+    }
+
+    func startVideoRecording() {
+        sessionQueue.async { [weak self] in
+            guard let self,
+                  self.currentDevice != nil,
+                  self.session.isRunning,
+                  self.session.outputs.contains(where: { $0 === self.movieOutput })
+            else {
+                self?.onMessage?("当前视频设备不支持录制")
+                return
+            }
+            guard !self.movieOutput.isRecording else { return }
+
+            let folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("NikonLinkRecording", isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(
+                    at: folder,
+                    withIntermediateDirectories: true
+                )
+                let target = folder
+                    .appendingPathComponent(UUID().uuidString)
+                    .appendingPathExtension("mov")
+                try? FileManager.default.removeItem(at: target)
+                self.movieOutput.startRecording(
+                    to: target,
+                    recordingDelegate: self
+                )
+                DispatchQueue.main.async {
+                    self.isRecording = true
+                    self.onMessage?("视频录制中 · 再按一次停止")
+                }
+            } catch {
+                self.onMessage?("开始录制失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    func stopVideoRecording() {
+        sessionQueue.async { [weak self] in
+            guard let self, self.movieOutput.isRecording else { return }
+            self.movieOutput.stopRecording()
+            self.onMessage?("正在停止并保存视频…")
+        }
+    }
+
+    func fileOutput(
+        _ output: AVCaptureFileOutput,
+        didFinishRecordingTo outputFileURL: URL,
+        from connections: [AVCaptureConnection],
+        error: Error?
+    ) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isRecording = false
+            if let error {
+                try? FileManager.default.removeItem(at: outputFileURL)
+                self.onMessage?("视频录制失败：\(error.localizedDescription)")
+                return
+            }
+            self.onVideoRecorded?(outputFileURL)
         }
     }
 
@@ -482,7 +555,7 @@ final class CameraService: NSObject, ObservableObject {
             do {
                 let input = try AVCaptureDeviceInput(device: device)
                 self.session.beginConfiguration()
-                self.session.sessionPreset = .photo
+                self.session.sessionPreset = .high
                 self.session.inputs.forEach(self.session.removeInput)
                 self.session.outputs.forEach(self.session.removeOutput)
 
@@ -494,6 +567,10 @@ final class CameraService: NSObject, ObservableObject {
                 self.session.addInput(input)
                 self.session.addOutput(self.photoOutput)
                 self.photoOutput.maxPhotoQualityPrioritization = .quality
+                let canRecordMovie = self.session.canAddOutput(self.movieOutput)
+                if canRecordMovie {
+                    self.session.addOutput(self.movieOutput)
+                }
                 self.session.commitConfiguration()
                 self.currentDevice = device
                 self.session.startRunning()
@@ -506,6 +583,7 @@ final class CameraService: NSObject, ObservableObject {
                     self.supportsExposureBias =
                         device.minExposureTargetBias < device.maxExposureTargetBias
                     self.supportsCustomExposure = device.isExposureModeSupported(.custom)
+                    self.supportsMovieRecording = canRecordMovie
                     self.minExposureBias = device.minExposureTargetBias
                     self.maxExposureBias = device.maxExposureTargetBias
                     self.minISO = device.activeFormat.minISO

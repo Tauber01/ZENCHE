@@ -37,7 +37,7 @@ const call = (method, params = {}, timeout = 30_000) =>
     if (!send({ id, method, params })) {
       window.clearTimeout(timer);
       pending.delete(id);
-      reject(new Error("当前不是 Nikon Link 原生安装版。"));
+      reject(new Error("当前不是 帧澈 ZENCHE 原生安装版。"));
     }
   });
 

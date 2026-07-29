@@ -1,6 +1,6 @@
 {
   modelVersion: "5.0.0",
-  description: "Nikon Link native HarmonyOS application",
+  description: "帧澈 ZENCHE · 跨平台相机控制与影像传输工具 · Capture · Connect · Flow",
   dependencies: {},
   devDependencies: {
     "@ohos/hvigor-ohos-plugin": "5.0.0"

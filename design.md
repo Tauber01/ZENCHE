@@ -1,6 +1,8 @@
-# Design — Nikon Link Native
+<!-- Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 -->
 
-A locked native design system for Nikon Link. Every native platform reads this
+# Design — 帧澈 ZENCHE Native
+
+A locked native design system for 帧澈 ZENCHE. Every native platform reads this
 file before changing product UI. Extend this system when a platform needs a new
 capability; do not create a separate visual language per platform.
 
@@ -73,6 +75,53 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - Zebra, LUT, peaking, supersampling, codec, resolution, and frame-rate controls
   appear only where the native pipeline genuinely implements them.
 - Clearly distinguish local preview processing from settings written to the camera.
+
+## System album and cloud drives
+
+- File management uses one native disclosure hierarchy on every platform:
+  source → media type → file. Sources include System Album, Wireless Transfer,
+  and 帧澈 ZENCHE Library; media types are Photos and Videos.
+- Source and media-type rows are independently collapsible, retain their expanded
+  state while the page is active, and show counts before the user expands them.
+- The file page reads the owner's system photo library directly after native
+  permission is granted. It does not require a separate import step.
+- System-album media is read-only inside 帧澈 ZENCHE. Label its source and keep
+  destructive actions limited to files stored in the 帧澈 ZENCHE library.
+- Photos and videos share one recent-media strip or grid; video items always carry
+  an explicit video or duration indicator.
+- The cloud-drive entry opens a second-level native guide before leaving 帧澈 ZENCHE.
+  The guide names the provider, explains the three-step connection flow, and offers
+  both the provider's official service and the platform file picker.
+- Cloud credentials remain in the provider's app or browser. 帧澈 ZENCHE never asks
+  users to enter a cloud-drive password.
+- The supported guide set is Baidu Netdisk, Aliyun Drive, Tencent Weiyun, Quark
+  Cloud Drive, Xunlei Cloud Drive, and 115.
+
+## Immersive preview
+
+- Photo and video workspaces provide an explicit full-screen action with a minimum
+  44 × 44 point/dp/vp target.
+- Full-screen mode uses an edge-to-edge live image as the primary surface. Controls
+  form sparse edge rails: status and exit at the top, mode and connection at the
+  left, photo/video capture at the right, and exposure readouts at the bottom.
+- Preserve the live image's focal area. Controls use compact dark translucent
+  surfaces or native material so they remain legible without obscuring the frame.
+- Full-screen camera parameters live in a collapsible, horizontally scrollable
+  bottom tray. It exposes every genuinely writable core parameter without forcing
+  the image to shrink.
+- Exposure time, aperture, ISO, exposure compensation, and shutter angle advance
+  in camera-standard fine increments (normally 1/3 stop). Values outside the
+  connected camera's enumerated or ranged capabilities never become selectable.
+- A parameter reported read-only by the camera is visibly locked before a write is
+  attempted. Its control exposes a short mode- or firmware-specific reason.
+- Photo capture uses cobalt; active video capture uses signal red. Text and icons
+  remain white or platform-high-contrast against the dark overlay.
+- Every visible control performs a real action. Unsupported camera functions are
+  omitted or visibly disabled with a reason.
+- The reference-derived composition is 帧澈 ZENCHE chrome, not a reproduction of
+  another camera application's branding, labels, or ornamental controls.
+- Full-screen exit, system back gestures, keyboard Escape, and accessibility focus
+  must all return to the previous workspace without losing the live session.
 
 ## Motion and feedback
 

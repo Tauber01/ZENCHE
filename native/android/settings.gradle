@@ -18,5 +18,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "NikonLink"
+rootProject.name = "ZENCHE"
 include(":app")

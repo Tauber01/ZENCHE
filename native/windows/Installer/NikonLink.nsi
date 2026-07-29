@@ -20,11 +20,11 @@
 !include "MUI2.nsh"
 
 Unicode true
-Name "Nikon Link"
-Caption "Nikon Link ${PRODUCT_VERSION} 安装程序"
-BrandingText "Nikon Link"
+Name "帧澈 ZENCHE"
+Caption "帧澈 ZENCHE ${PRODUCT_VERSION} 安装程序"
+BrandingText "帧澈 ZENCHE"
 OutFile "${OUTPUT_FILE}"
-InstallDir "$PROGRAMFILES64\Nikon Link"
+InstallDir "$PROGRAMFILES64\帧澈 ZENCHE"
 InstallDirRegKey HKLM "Software\NikonLink" "InstallDir"
 RequestExecutionLevel admin
 ManifestDPIAware true
@@ -32,18 +32,18 @@ SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 
 VIProductVersion "${FILE_VERSION}"
-VIAddVersionKey /LANG=2052 "ProductName" "Nikon Link"
+VIAddVersionKey /LANG=2052 "ProductName" "帧澈 ZENCHE"
 VIAddVersionKey /LANG=2052 "ProductVersion" "${PRODUCT_VERSION}"
-VIAddVersionKey /LANG=2052 "FileDescription" "Nikon Link ${APP_ARCHITECTURE} 安装程序"
+VIAddVersionKey /LANG=2052 "FileDescription" "帧澈 ZENCHE ${APP_ARCHITECTURE} 安装程序"
 VIAddVersionKey /LANG=2052 "FileVersion" "${PRODUCT_VERSION}"
-VIAddVersionKey /LANG=2052 "CompanyName" "Nikon Link contributors"
+VIAddVersionKey /LANG=2052 "CompanyName" "帧澈 ZENCHE contributors"
 VIAddVersionKey /LANG=2052 "LegalCopyright" "Copyright (c) 2026 Tauber01"
 
 !define MUI_ABORTWARNING
 !define MUI_ICON "${PROJECT_ROOT}/native/windows/Assets/app-icon.ico"
 !define MUI_UNICON "${PROJECT_ROOT}/native/windows/Assets/app-icon.ico"
-!define MUI_FINISHPAGE_RUN "$INSTDIR\NikonLink.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "启动 Nikon Link"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\ZENCHE.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "启动 帧澈 ZENCHE"
 
 Var StartMenuFolder
 
@@ -67,17 +67,17 @@ Var StartMenuFolder
 
 Function .onInit
 check_running:
-  FindWindow $0 "" "Nikon Link"
+  FindWindow $0 "" "帧澈 ZENCHE"
   IntCmp $0 0 app_closed
   MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION \
-    "请先关闭正在运行的 Nikon Link，然后选择“重试”继续安装。" \
+    "请先关闭正在运行的 帧澈 ZENCHE，然后选择“重试”继续安装。" \
     IDRETRY check_running
   Abort
 
 app_closed:
 FunctionEnd
 
-Section "Nikon Link" SecApplication
+Section "帧澈 ZENCHE" SecApplication
   SectionIn RO
   SetShellVarContext all
   SetRegView 64
@@ -89,15 +89,15 @@ Section "Nikon Link" SecApplication
   WriteRegStr HKLM "Software\NikonLink" "InstallDir" "$INSTDIR"
 
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
-    "DisplayName" "Nikon Link"
+    "DisplayName" "帧澈 ZENCHE"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
     "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
-    "Publisher" "Nikon Link contributors"
+    "Publisher" "帧澈 ZENCHE contributors"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
     "InstallLocation" "$INSTDIR"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
-    "DisplayIcon" "$INSTDIR\NikonLink.exe"
+    "DisplayIcon" "$INSTDIR\ZENCHE.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
     "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink" \
@@ -109,14 +109,14 @@ Section "Nikon Link" SecApplication
 
   !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
     CreateDirectory "$SMPROGRAMS\$StartMenuFolder"
-    CreateShortcut "$SMPROGRAMS\$StartMenuFolder\Nikon Link.lnk" \
-      "$INSTDIR\NikonLink.exe" "" "$INSTDIR\NikonLink.exe"
-    CreateShortcut "$SMPROGRAMS\$StartMenuFolder\卸载 Nikon Link.lnk" \
+    CreateShortcut "$SMPROGRAMS\$StartMenuFolder\帧澈 ZENCHE.lnk" \
+      "$INSTDIR\ZENCHE.exe" "" "$INSTDIR\ZENCHE.exe"
+    CreateShortcut "$SMPROGRAMS\$StartMenuFolder\卸载 帧澈 ZENCHE.lnk" \
       "$INSTDIR\Uninstall.exe"
   !insertmacro MUI_STARTMENU_WRITE_END
 
-  CreateShortcut "$DESKTOP\Nikon Link.lnk" \
-    "$INSTDIR\NikonLink.exe" "" "$INSTDIR\NikonLink.exe"
+  CreateShortcut "$DESKTOP\帧澈 ZENCHE.lnk" \
+    "$INSTDIR\ZENCHE.exe" "" "$INSTDIR\ZENCHE.exe"
 SectionEnd
 
 Section "Uninstall"
@@ -124,10 +124,10 @@ Section "Uninstall"
   SetRegView 64
 
   !insertmacro MUI_STARTMENU_GETFOLDER Application $StartMenuFolder
-  Delete "$SMPROGRAMS\$StartMenuFolder\Nikon Link.lnk"
-  Delete "$SMPROGRAMS\$StartMenuFolder\卸载 Nikon Link.lnk"
+  Delete "$SMPROGRAMS\$StartMenuFolder\帧澈 ZENCHE.lnk"
+  Delete "$SMPROGRAMS\$StartMenuFolder\卸载 帧澈 ZENCHE.lnk"
   RMDir "$SMPROGRAMS\$StartMenuFolder"
-  Delete "$DESKTOP\Nikon Link.lnk"
+  Delete "$DESKTOP\帧澈 ZENCHE.lnk"
 
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\NikonLink"
   DeleteRegKey HKLM "Software\NikonLink"

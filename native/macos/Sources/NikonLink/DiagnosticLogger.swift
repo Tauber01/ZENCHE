@@ -14,7 +14,7 @@ enum DiagnosticLogError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            return "日志目录暂时不可用，请重新启动 Nikon Link 后再试。"
+            return "日志目录暂时不可用，请重新启动 帧澈 ZENCHE 后再试。"
         case .exportFailed(let reason):
             return reason.isEmpty
                 ? "无法创建诊断日志包。"
@@ -26,7 +26,7 @@ enum DiagnosticLogError: LocalizedError {
 final class DiagnosticLogger {
     static let shared = DiagnosticLogger()
     private static let issueURL =
-        "https://github.com/Tauber01/NikonLink/issues/new"
+        "https://github.com/Tauber01/ZENCHE/issues/new"
 
     let directoryURL: URL
 
@@ -50,7 +50,7 @@ final class DiagnosticLogger {
             ).first ?? FileManager.default.homeDirectoryForCurrentUser
             directoryURL = library
                 .appendingPathComponent("Logs", isDirectory: true)
-                .appendingPathComponent("Nikon Link", isDirectory: true)
+                .appendingPathComponent("ZENCHE", isDirectory: true)
         }
 
         queue.sync {
@@ -113,11 +113,11 @@ final class DiagnosticLogger {
 
         let stagingRoot = fileManager.temporaryDirectory
             .appendingPathComponent(
-                "NikonLink-Diagnostics-\(UUID().uuidString)",
+                "ZENCHE-Diagnostics-\(UUID().uuidString)",
                 isDirectory: true
             )
         let staging = stagingRoot.appendingPathComponent(
-            "NikonLink-Diagnostics",
+            "ZENCHE-Diagnostics",
             isDirectory: true
         )
         defer { try? fileManager.removeItem(at: stagingRoot) }
@@ -185,7 +185,7 @@ final class DiagnosticLogger {
 
         - 平台：\(ProcessInfo.processInfo.operatingSystemVersionString)
         - 架构：\(machineArchitecture())
-        - Nikon Link：\(appVersion())
+        - 帧澈 ZENCHE：\(appVersion())
         - 会话：\(sessionID)
 
         ## 最近诊断日志（已脱敏）
@@ -390,7 +390,7 @@ final class DiagnosticLogger {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
         return directoryURL.appendingPathComponent(
-            "NikonLink-\(formatter.string(from: Date())).log"
+            "ZENCHE-\(formatter.string(from: Date())).log"
         )
     }
 
@@ -432,7 +432,7 @@ final class DiagnosticLogger {
                 forInfoDictionaryKey: "CFBundleVersion"
             ) as? String ?? "unknown"
         return """
-        Nikon Link 诊断信息
+        帧澈 ZENCHE 诊断信息
         导出时间：\(timestamp())
         应用版本：\(version) (\(build))
         macOS：\(ProcessInfo.processInfo.operatingSystemVersionString)

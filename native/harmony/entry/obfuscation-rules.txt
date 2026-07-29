@@ -1,2 +1,2 @@
-# Nikon Link intentionally keeps ArkTS symbols in release candidates so
+# 帧澈 ZENCHE intentionally keeps ArkTS symbols in release candidates so
 # hardware diagnostic stacks remain readable.

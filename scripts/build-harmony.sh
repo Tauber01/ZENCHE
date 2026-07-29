@@ -4,7 +4,7 @@ set -euo pipefail
 PROJECT_ROOT=${0:A:h:h}
 HARMONY_ROOT="$PROJECT_ROOT/native/harmony"
 DIST_DIR="$PROJECT_ROOT/dist"
-VERSION=0.8.1
+VERSION=0.8.3
 
 if [[ -z "${DEVECO_HOME:-}" ]]; then
   for candidate in \
@@ -64,10 +64,10 @@ if [[ -z "$HAP_PATH" ]]; then
 fi
 
 mkdir -p "$DIST_DIR"
-OUTPUT="$DIST_DIR/NikonLink-${VERSION}-HarmonyOS.hap"
+OUTPUT="$DIST_DIR/ZENCHE-${VERSION}-HarmonyOS.hap"
 cp "$HAP_PATH" "$OUTPUT"
 shasum -a 256 "$OUTPUT" |
-  awk '{print $1 "  NikonLink-0.8.1-HarmonyOS.hap"}' \
+  awk '{print $1 "  ZENCHE-0.8.3-HarmonyOS.hap"}' \
   > "$OUTPUT.sha256"
 
 echo "HarmonyOS package: $OUTPUT"

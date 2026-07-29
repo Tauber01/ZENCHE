@@ -1,7 +1,7 @@
 {
   name: "entry",
-  version: "0.8.1",
-  description: "Nikon Link HarmonyOS entry module",
+  version: "0.8.3",
+  description: "帧澈 ZENCHE · 跨平台相机控制与影像传输工具",
   main: "",
   author: "",
   license: "MIT",

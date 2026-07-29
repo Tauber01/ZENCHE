@@ -31,9 +31,9 @@ struct AvailableUpdate {
 
 @MainActor
 final class UpdateController: ObservableObject {
-    static let repositoryURL = URL(string: "https://github.com/Tauber01/NikonLink")!
+    static let repositoryURL = URL(string: "https://github.com/Tauber01/ZENCHE")!
     private static let latestReleaseAPI = URL(
-        string: "https://api.github.com/repos/Tauber01/NikonLink/releases/latest"
+        string: "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest"
     )!
     private static let automaticUpdateKey = "NikonLink.automaticallyChecksForUpdates"
 
@@ -53,7 +53,7 @@ final class UpdateController: ObservableObject {
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "0.8.1"
+            ?? "0.8.3"
     }
 
     init() {
@@ -88,7 +88,7 @@ final class UpdateController: ObservableObject {
                     forHTTPHeaderField: "Accept"
                 )
                 request.setValue(
-                    "NikonLink/\(currentVersion)",
+                    "ZENCHE/\(currentVersion)",
                     forHTTPHeaderField: "User-Agent"
                 )
                 let (data, response) = try await URLSession.shared.data(for: request)

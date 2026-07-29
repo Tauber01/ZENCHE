@@ -64,7 +64,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] WebDAV `OPTIONS`, `PROPFIND`, `MKCOL`, and authenticated `PUT` complete
       with standards-compatible status codes.
 - [ ] Missing or incorrect HTTP Basic Auth receives `401` without creating a file.
-- [ ] Manual JPEG upload appears in the Nikon Link library without restarting.
+- [ ] Manual JPEG upload appears in the 帧澈 ZENCHE library without restarting.
 - [ ] NEF and HEIF uploads keep their original filename and extension.
 - [ ] Auto upload receives consecutive captures without overwriting an existing file.
 - [ ] Stopping the wireless inbox rejects new FTP, HTTP, and WebDAV connections.
@@ -75,7 +75,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Windows
 
-- [ ] `NikonLink.exe` starts on a clean Windows 11 x64 machine with the packaged
+- [ ] `ZENCHE.exe` starts on a clean Windows 11 x64 machine with the packaged
       `libusb-1.0.dll`.
 - [ ] The x64 package rejects x86/ARM64 libusb DLLs with an actionable message.
 - [ ] Only the Nikon Still Image/PTP interface is bound to WinUSB or libusbK.
@@ -101,7 +101,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.8.1 stable release passes compilation, signature/container validation,
+The 0.8.3 stable release passes compilation, signature/container validation,
 native UI startup checks and package scans. Windows passes .NET compilation and
 PE/ZIP package checks. HarmonyOS source, resources, and unsigned HAP compilation
 pass, but signing, startup, and hardware checks are still pending. No supported

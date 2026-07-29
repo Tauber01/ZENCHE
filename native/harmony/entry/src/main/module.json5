@@ -50,6 +50,14 @@
           abilities: ["EntryAbility"],
           when: "inuse"
         }
+      },
+      {
+        name: "ohos.permission.READ_IMAGEVIDEO",
+        reason: "$string:permission_album",
+        usedScene: {
+          abilities: ["EntryAbility"],
+          when: "inuse"
+        }
       }
     ]
   }

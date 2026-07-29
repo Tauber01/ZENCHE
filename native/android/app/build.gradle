@@ -11,8 +11,8 @@ android {
         applicationId "com.tauber.nikonlink"
         minSdk 26
         targetSdk 35
-        versionCode 16
-        versionName "0.8.1"
+        versionCode 18
+        versionName "0.8.3"
     }
 
     buildTypes {
@@ -26,4 +26,8 @@ android {
             assets.srcDir "../../macos/Resources"
         }
     }
+}
+
+dependencies {
+    implementation "androidx.core:core:1.15.0"
 }

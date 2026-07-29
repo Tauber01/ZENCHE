@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D10000000000000000000001"
-               BuildableName = "Nikon Link.app"
+               BuildableName = "帧澈 ZENCHE.app"
                BlueprintName = "NikonLink"
                ReferencedContainer = "container:NikonLink.xcodeproj">
             </BuildableReference>
@@ -45,7 +45,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D10000000000000000000001"
-            BuildableName = "Nikon Link.app"
+            BuildableName = "帧澈 ZENCHE.app"
             BlueprintName = "NikonLink"
             ReferencedContainer = "container:NikonLink.xcodeproj">
          </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "D10000000000000000000001"
-            BuildableName = "Nikon Link.app"
+            BuildableName = "帧澈 ZENCHE.app"
             BlueprintName = "NikonLink"
             ReferencedContainer = "container:NikonLink.xcodeproj">
          </BuildableReference>

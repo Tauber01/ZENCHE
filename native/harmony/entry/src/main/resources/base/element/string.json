@@ -2,23 +2,27 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "Nikon Z 系列联机拍摄与无线传图"
+      "value": "跨平台相机控制与影像传输工具 · Capture · Connect · Flow"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "Nikon Link"
+      "value": "帧澈 ZENCHE"
     },
     {
       "name": "EntryAbility_label",
-      "value": "Nikon Link"
+      "value": "帧澈 ZENCHE"
     },
     {
       "name": "permission_internet",
-      "value": "用于在可信局域网中通过 FTP、HTTP 或 WebDAV 接收图片"
+      "value": "用于检查软件更新，以及在可信局域网中通过 FTP、HTTP 或 WebDAV 接收图片"
     },
     {
       "name": "permission_wifi",
       "value": "用于显示无线图片传输所需的局域网地址"
+    },
+    {
+      "name": "permission_album",
+      "value": "用于在文件页面直接显示系统相册中的照片和视频"
     }
   ]
 }

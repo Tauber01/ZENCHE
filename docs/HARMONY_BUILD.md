@@ -40,8 +40,8 @@ NIKONLINK_HVIGORW=/path/to/hvigorw ./scripts/build-harmony.sh
 输出：
 
 ```text
-dist/NikonLink-0.8.1-HarmonyOS.hap
-dist/NikonLink-0.8.1-HarmonyOS.hap.sha256
+dist/ZENCHE-0.8.3-HarmonyOS.hap
+dist/ZENCHE-0.8.3-HarmonyOS.hap.sha256
 ```
 
 未配置 `signingConfigs` 时，Hvigor 会生成可用于编译验证的未签名 HAP；真机安装

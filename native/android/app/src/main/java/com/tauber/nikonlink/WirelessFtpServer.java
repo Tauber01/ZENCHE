@@ -36,7 +36,7 @@ final class WirelessFtpServer {
     private final File directory;
     private final Listener listener;
     private final ExecutorService clients = Executors.newCachedThreadPool(task -> {
-        Thread thread = new Thread(task, "NikonLink-FTP-Client");
+        Thread thread = new Thread(task, "ZENCHE-FTP-Client");
         thread.setDaemon(true);
         return thread;
     });
@@ -53,7 +53,7 @@ final class WirelessFtpServer {
     synchronized void start() {
         if (running) return;
         running = true;
-        Thread acceptThread = new Thread(this::runServer, "NikonLink-FTP");
+        Thread acceptThread = new Thread(this::runServer, "ZENCHE-FTP");
         acceptThread.setDaemon(true);
         acceptThread.start();
     }
@@ -151,7 +151,7 @@ final class WirelessFtpServer {
                      client.getOutputStream(),
                      StandardCharsets.UTF_8))) {
             client.setSoTimeout(120_000);
-            reply(output, "220 Nikon Link Wireless Inbox ready");
+            reply(output, "220 ZENCHE Wireless Inbox ready");
             listener.onStatus("相机已连接，等待图片");
             boolean acceptedUser = false;
             boolean authenticated = false;

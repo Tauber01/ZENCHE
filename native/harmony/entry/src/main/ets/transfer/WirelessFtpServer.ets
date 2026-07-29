@@ -344,7 +344,7 @@ export class WirelessFtpServer {
         this.statusCallback('等待相机无线传输');
       }
     });
-    sendReply('220 Nikon Link Wireless Inbox ready').then((): void => {
+    sendReply('220 ZENCHE Wireless Inbox ready').then((): void => {
       this.statusCallback('相机已连接，等待图片');
     });
   }

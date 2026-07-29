@@ -2,11 +2,11 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.8.1
+VERSION=0.8.3
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
-APP_ROOT="$BUILD_ROOT/Nikon Link.app"
+APP_ROOT="$BUILD_ROOT/帧澈 ZENCHE.app"
 CONTENTS="$APP_ROOT/Contents"
 RESOURCES="$CONTENTS/Resources"
 DMG_ROOT="$BUILD_ROOT/dmg"
@@ -23,9 +23,9 @@ mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \
   "$RESOURCES/camlibs" "$RESOURCES/iolibs" "$DIST_ROOT"
 
 xcrun swiftc -swift-version 5 -O \
-  -framework AppKit -framework SwiftUI \
+  -framework AppKit -framework SwiftUI -framework Photos -framework AVKit \
   "$PROJECT_ROOT/native/macos/Sources/NikonLink/"*.swift \
-  -o "$CONTENTS/MacOS/NikonLink"
+  -o "$CONTENTS/MacOS/ZENCHE"
 cp "$PROJECT_ROOT/native/macos/Info.plist" "$CONTENTS/Info.plist"
 cp "$PROJECT_ROOT/native/macos/Resources/wechat-donation.png" \
   "$RESOURCES/wechat-donation.png"
@@ -88,12 +88,12 @@ find "$RESOURCES" -type f \( -name "*.dylib" -o -name "*.so" -o -name "gphoto2" 
 codesign --force --deep --sign - --timestamp=none \
   --entitlements "$PROJECT_ROOT/native/macos/Entitlements.plist" "$APP_ROOT"
 
-DMG_PATH="$DIST_ROOT/NikonLink-$VERSION-macOS-$ARCH.dmg"
+DMG_PATH="$DIST_ROOT/ZENCHE-$VERSION-macOS-$ARCH.dmg"
 rm -f "$DMG_PATH"
 mkdir -p "$DMG_ROOT"
 cp -R "$APP_ROOT" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
-hdiutil create -volname "Nikon Link $VERSION" -srcfolder "$DMG_ROOT" \
+hdiutil create -volname "帧澈 ZENCHE $VERSION" -srcfolder "$DMG_ROOT" \
   -format UDZO -ov "$DMG_PATH"
 codesign --verify --deep --strict "$APP_ROOT"
 shasum -a 256 "$DMG_PATH" |

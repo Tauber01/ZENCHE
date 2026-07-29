@@ -1,13 +1,17 @@
-# Nikon Link
+# 帧澈 ZENCHE
 
-给 Nikon 相机用的联机拍摄与无线传图工具。
+**跨平台相机控制与影像传输工具**
 
-Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
+*Capture · Connect · Flow*
+
+> 连接相机，也连接完整工作流
+
+帧澈 ZENCHE 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
 拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
 无线传图既可使用相机自带的 FTP 功能，也可通过 HTTP 或 WebDAV 接收
 其他手机、电脑和自动化工具发送的图片。
 
-> 当前版本：**0.8.1 正式版**
+> 当前版本：**0.8.3 正式版**
 >
 > 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
 >
@@ -26,6 +30,7 @@ Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画
 - 在监看画面上使用条纹图案、自定义 `.cube` LUT 和 2× 超采样
 - 通过内置 FTP/PASV、HTTP 上传和 WebDAV 收件箱接收 JPEG、NEF、HEIF/HEIC 和 TIFF
 - 保存本地诊断日志，方便排查连接、拍摄和传输问题
+- 各平台设置页统一提供软件更新、诊断日志和打赏支持入口
 
 LUT、条纹图案和超采样只作用于预览画面，不会改动原片，也不会写入相机的视频设置。
 
@@ -42,7 +47,7 @@ LUT、条纹图案和超采样只作用于预览画面，不会改动原片，�
 | iOS / iPadOS | 不支持 | FTP、HTTP、WebDAV | 可使用本机镜头；iPadOS 支持外接 UVC 视频设备 |
 
 iOS/iPadOS 的公开接口没有向普通应用开放 Nikon USB/PTP 厂商控制，因此 iPhone
-和 iPad 目前不能通过 Nikon Link 调节机身参数或下载 USB 原片。UVC 视频输入也只
+和 iPad 目前不能通过 帧澈 ZENCHE 调节机身参数或下载 USB 原片。UVC 视频输入也只
 作为视频源使用，不会被显示成 Nikon 相机控制。
 
 ## 支持的相机
@@ -85,25 +90,25 @@ Nikon USB Vendor ID 为 `0x04b0`。
 ## 下载与安装
 
 安装包和对应的 `.sha256` 校验文件发布在
-[GitHub Releases](https://github.com/Tauber01/NikonLink/releases)。
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)。
 
 ### macOS
 
-1. 打开 `NikonLink-0.8.1-macOS-arm64.dmg`。
-2. 将 **Nikon Link** 拖到镜像内的 **Applications** 快捷入口。
+1. 打开 `ZENCHE-0.8.3-macOS-arm64.dmg`。
+2. 将 **帧澈 ZENCHE** 拖到镜像内的 **Applications** 快捷入口。
 3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
 
 当前社区 DMG 使用 ad-hoc 签名，尚未使用 Apple Developer ID 公证。
 
 ### Android
 
-安装 `NikonLink-0.8.1-android.apk`。当前 APK 使用 Android 调试证书签名，
+安装 `ZENCHE-0.8.3-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
 ### Windows
 
-运行 `NikonLink-0.8.1-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
-解压后运行 `NikonLink.exe`，不要单独移动同目录下的 `libusb-1.0.dll`。
+运行 `ZENCHE-0.8.3-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
+解压后运行 `ZENCHE.exe`，不要单独移动同目录下的 `libusb-1.0.dll`。
 相机接口可能需要切换到 WinUSB，操作前请先阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
 
@@ -123,7 +128,7 @@ IPA 必须使用有效的 Apple Developer 证书和描述文件签名。名称�
 1. 关闭 NX Tether、Camera Control Pro、“照片”、“图像捕捉”等可能占用相机的
    软件。
 2. 使用支持数据传输的 USB-C 线直连设备，第一次排查时尽量不要经过扩展坞。
-3. 打开 Nikon Link，选择“连接相机”，并允许系统访问 USB 设备。
+3. 打开 帧澈 ZENCHE，选择“连接相机”，并允许系统访问 USB 设备。
 4. 实时取景出现后再调整参数或拍摄。
 
 macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重新连接；如果仍然失败，
@@ -134,7 +139,7 @@ macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重
 
 ## Wi-Fi 无线传图
 
-先让相机和接收设备连到同一个可信局域网，然后在 Nikon Link 的“传输”页开启
+先让相机和接收设备连到同一个可信局域网，然后在 帧澈 ZENCHE 的“传输”页开启
 无线接收。相机端仍使用 FTP：
 
 | 项目 | 设置 |
@@ -187,9 +192,9 @@ curl --user nikonlink:nikonlink \
 默认生成：
 
 ```text
-dist/NikonLink-0.8.1-macOS-arm64.dmg
-dist/NikonLink-0.8.1-android.apk
-dist/NikonLink-0.8.1-ios-unsigned.ipa
+dist/ZENCHE-0.8.3-macOS-arm64.dmg
+dist/ZENCHE-0.8.3-android.apk
+dist/ZENCHE-0.8.3-ios-unsigned.ipa
 ```
 
 Windows 需要在 Windows 主机单独构建：
@@ -198,7 +203,7 @@ Windows 需要在 Windows 主机单独构建：
 .\scripts\build-windows.ps1 -LibUsbDll C:\path\to\libusb-1.0.dll
 ```
 
-该命令同时生成 `NikonLink-0.8.1-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
+该命令同时生成 `ZENCHE-0.8.3-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
 
 HarmonyOS 可单独构建：
 
@@ -216,7 +221,7 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 
 ## 遇到问题
 
-0.8.1 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
+0.8.3 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和原生安装包
 扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
 源码、资源和未签名 HAP 构建已通过，签名、启动和真机测试仍待完成。
 由于构建机器当前未连接全部 EXPEED 6 / 7 机型，USB/PTP、不同固件和镜头组合仍以
@@ -264,10 +269,10 @@ Nikon 及文中机型名为 Nikon Corporation 的商标。本项目与 Nikon Cor
 
 ## English
 
-Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
+帧澈 ZENCHE is a native macOS, Android, and iOS/iPadOS utility for connecting,
 monitoring, controlling, and transferring files from Nikon cameras.
 
-> Current version: **0.8.1 Stable Release**
+> Current version: **0.8.3 Stable Release**
 >
 > Platforms: **macOS · Android · iOS / iPadOS**
 >
@@ -290,6 +295,7 @@ separate management group.
 | Video monitoring | Live view, zebra overlay, custom `.cube` LUT, and local 2× supersampling |
 | Wireless transfer | FTP/PASV plus HTTP and WebDAV inboxes for JPEG, NEF, HEIF/HEIC, and TIFF |
 | File management | Local preview, import, share, reveal, delete, and save to Photos |
+| Settings | Software updates, diagnostic logs, and donation/support access on every platform |
 | Experience modes | Simple mode for common actions; Pro mode for full controls |
 
 LUTs, zebra overlays, and supersampling affect only the monitoring image. They
@@ -318,7 +324,7 @@ do not modify the original file or the camera's recording settings.
 Public iOS APIs do not expose general Nikon vendor-specific USB/PTP control to
 ordinary applications. Nikon shutter, aperture, ISO, and original-file
 download therefore require Nikon protocol authorization or an official SDK;
-Nikon Link does not present a UVC stream as native Nikon control.
+帧澈 ZENCHE does not present a UVC stream as native Nikon control.
 
 ### Supported EXPEED 6 and 7 cameras
 
@@ -344,20 +350,20 @@ All listed cameras use Nikon USB Vendor ID `0x04b0`.
 | Nikon Z5II | `0x0456` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
 | Nikon ZR | `0x0457` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
 
-Nikon Link matches the Product ID first and can fall back to the USB product
+帧澈 ZENCHE matches the Product ID first and can fall back to the USB product
 name for newer profiles such as the ZR. An unsupported Nikon device is reported
 with its actual Product ID instead of being presented as a supported camera.
 
 ### Install and connect
 
 Download release artifacts and matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/NikonLink/releases).
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases).
 
 1. Update the camera to a recent stable firmware.
 2. Quit NX Tether, Camera Control Pro, Photos, Image Capture, and any software
    that may claim the PTP interface.
 3. Connect the camera directly with a data-capable USB-C cable.
-4. Open Nikon Link, choose **Connect camera**, and grant USB access.
+4. Open 帧澈 ZENCHE, choose **Connect camera**, and grant USB access.
 5. Start live view, adjust supported controls, and capture.
 
 Nikon PTP live view supplies JPEG frames. Display resolution, LUT, zebra, and
@@ -393,10 +399,10 @@ with, endorsed by, or sponsored by Nikon Corporation.
 
 ## 日本語
 
-Nikon Link は、Nikon カメラの接続、モニタリング、撮影制御、ファイル転送を
+帧澈 ZENCHE は、Nikon カメラの接続、モニタリング、撮影制御、ファイル転送を
 行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
 
-> 現在のバージョン：**0.8.1 正式リリース**
+> 現在のバージョン：**0.8.3 正式リリース**
 >
 > 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
 >
@@ -419,6 +425,7 @@ Nikon Link は、Nikon カメラの接続、モニタリング、撮影制御、
 | 動画モニター | ライブビュー、ゼブラ表示、カスタム `.cube` LUT、ローカル 2× スーパーサンプリング |
 | ワイヤレス転送 | JPEG、NEF、HEIF/HEIC、TIFF を受信する FTP/PASV、HTTP、WebDAV 受信ボックス |
 | ファイル管理 | ローカル表示、読み込み、共有、場所表示、削除、「写真」への保存 |
+| 設定 | 全プラットフォーム共通の更新、診断ログ、寄付・サポート |
 | 操作モード | よく使う操作だけの「普通」と、全設定を表示する「プロ」 |
 
 LUT、ゼブラ表示、スーパーサンプリングはモニター画像だけに適用されます。原本や
@@ -445,7 +452,7 @@ LUT、ゼブラ表示、スーパーサンプリングはモニター画像だ�
 
 iOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御を提供していません。
 Nikon のシャッター、絞り、ISO、原本ダウンロードには、Nikon のプロトコル認可
-または公式 SDK が必要です。Nikon Link は UVC 入力を Nikon ネイティブ制御と
+または公式 SDK が必要です。帧澈 ZENCHE は UVC 入力を Nikon ネイティブ制御と
 して表示しません。
 
 ### EXPEED 6 / 7 対応機種
@@ -478,14 +485,14 @@ Product ID を優先して照合し、ZR などの新しい機種では USB 製�
 
 ### インストールと接続
 
-[GitHub Releases](https://github.com/Tauber01/NikonLink/releases) から
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から
 インストールファイルと同名の `.sha256` をダウンロードしてください。
 
 1. カメラを新しい安定版ファームウェアへ更新します。
 2. NX Tether、Camera Control Pro、「写真」、「イメージキャプチャ」など、
    PTP インターフェースを使用するアプリを終了します。
 3. データ通信対応 USB-C ケーブルでカメラを直接接続します。
-4. Nikon Link で「カメラを接続」を選び、USB アクセスを許可します。
+4. 帧澈 ZENCHE で「カメラを接続」を選び、USB アクセスを許可します。
 5. ライブビューを開始し、利用可能な設定を調整して撮影します。
 
 Nikon PTP ライブビューは JPEG フレームを返します。表示サイズ、LUT、ゼブラ、

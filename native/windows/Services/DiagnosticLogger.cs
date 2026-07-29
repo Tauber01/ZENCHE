@@ -12,7 +12,7 @@ public sealed class DiagnosticLogger
     private const long MaxFileBytes = 5L * 1024L * 1024L;
     private static readonly TimeSpan Retention = TimeSpan.FromDays(14);
     private static readonly Uri IssueBase =
-        new("https://github.com/Tauber01/NikonLink/issues/new");
+        new("https://github.com/Tauber01/ZENCHE/issues/new");
     private readonly object _gate = new();
     private readonly string _sessionId = Guid.NewGuid().ToString("N")[..8];
 
@@ -21,7 +21,7 @@ public sealed class DiagnosticLogger
         DirectoryPath = Path.Combine(
             Environment.GetFolderPath(
                 Environment.SpecialFolder.LocalApplicationData),
-            "Nikon Link",
+            "帧澈 ZENCHE",
             "Logs");
         try
         {
@@ -31,7 +31,7 @@ public sealed class DiagnosticLogger
         catch (Exception error)
         {
             Debug.WriteLine(
-                $"NikonLink diagnostics setup failed: {error.Message}");
+                $"ZENCHE diagnostics setup failed: {error.Message}");
         }
     }
 
@@ -80,7 +80,7 @@ public sealed class DiagnosticLogger
             "## 环境\n\n" +
             $"- 平台：{RuntimeInformation.OSDescription}\n" +
             $"- 架构：{RuntimeInformation.ProcessArchitecture}\n" +
-            $"- Nikon Link：{AppVersion()}\n" +
+            $"- 帧澈 ZENCHE：{AppVersion()}\n" +
             $"- 会话：{_sessionId}\n\n" +
             "## 最近诊断日志（已脱敏）\n\n```text\n" +
             RecentText(2_500) +
@@ -124,7 +124,7 @@ public sealed class DiagnosticLogger
             catch (Exception error)
             {
                 Debug.WriteLine(
-                    $"NikonLink diagnostics read failed: {error.Message}");
+                    $"ZENCHE diagnostics read failed: {error.Message}");
                 return "日志暂不可用。";
             }
         }
@@ -143,7 +143,7 @@ public sealed class DiagnosticLogger
                 {
                     var rotated = Path.Combine(
                         DirectoryPath,
-                        $"NikonLink-{DateTime.Now:yyyy-MM-dd-HHmmss}" +
+                        $"ZENCHE-{DateTime.Now:yyyy-MM-dd-HHmmss}" +
                         $"-{_sessionId}.log");
                     File.Move(target, rotated);
                 }
@@ -165,13 +165,13 @@ public sealed class DiagnosticLogger
             catch (Exception error)
             {
                 Debug.WriteLine(
-                    $"NikonLink diagnostics write failed: {error.Message}");
+                    $"ZENCHE diagnostics write failed: {error.Message}");
             }
         }
     }
 
     private string CurrentLogPath() =>
-        Path.Combine(DirectoryPath, $"NikonLink-{DateTime.Now:yyyy-MM-dd}.log");
+        Path.Combine(DirectoryPath, $"ZENCHE-{DateTime.Now:yyyy-MM-dd}.log");
 
     private static string ReadTail(string path, int maxCharacters)
     {
