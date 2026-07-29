@@ -5,6 +5,13 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-29
+
+### Fixed
+
+- Prevented the Android header and connection status from overlapping system
+  bars, display cutouts and HyperOS capsule notifications.
+
 ## [0.7.1] - 2026-07-29
 
 ### Added
