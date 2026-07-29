@@ -1108,17 +1108,10 @@ private struct PhotoRecord: Identifiable, Hashable {
     var name: String { url.lastPathComponent }
 }
 
-private enum ExperienceMode: String, CaseIterable, Identifiable {
-    case simple = "普通"
-    case professional = "专业"
-    var id: String { rawValue }
-}
-
 private enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
     case monitor = "视频"
-    case library = "文件"
-    case transfer = "传输"
+    case library = "文件与传输"
 
     var id: String { rawValue }
     var icon: String {
@@ -1126,7 +1119,6 @@ private enum AppSection: String, CaseIterable, Identifiable {
         case .capture: return "camera.fill"
         case .monitor: return "video.fill"
         case .library: return "photo.on.rectangle.angled"
-        case .transfer: return "paperplane"
         }
     }
 }
@@ -1165,7 +1157,6 @@ private final class CameraModel: ObservableObject {
     @Published var status = "未连接"
     @Published var detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
     @Published var cameraName: String?
-    @Published var mode: ExperienceMode = .simple
     @Published var section: AppSection = .capture
     @Published var photos: [PhotoRecord] = []
     @Published var selectedPhoto: PhotoRecord?
@@ -1184,8 +1175,9 @@ private final class CameraModel: ObservableObject {
     @Published var zebraMask: NSImage?
     @Published var lutEnabled = false
     @Published var lutName: String?
-    @Published var monitorSupersampling = false
     @Published var monitorVideoProfile: MonitorVideoProfile = .source
+    @Published var videoFrameRate = 30.0
+    @Published var videoShutterAngle = 180.0
 
     private let camera = GPhotoCamera()
     private let logger = DiagnosticLogger.shared
@@ -1220,14 +1212,20 @@ private final class CameraModel: ObservableObject {
             at: photoDirectory,
             withIntermediateDirectories: true
         )
-        monitorSupersampling = UserDefaults.standard.bool(
-            forKey: "monitorSupersampling"
-        )
         if let savedProfile = UserDefaults.standard.string(
             forKey: "monitorVideoProfile"
         ), let profile = MonitorVideoProfile(rawValue: savedProfile) {
             monitorVideoProfile = profile
         }
+        let savedFrameRate = UserDefaults.standard.double(forKey: "videoFrameRate")
+        if savedFrameRate > 0 {
+            videoFrameRate = savedFrameRate
+        }
+        let savedShutterAngle = UserDefaults.standard.double(forKey: "videoShutterAngle")
+        if savedShutterAngle > 0 {
+            videoShutterAngle = savedShutterAngle
+        }
+        shutter = videoShutterAngle / (360 * videoFrameRate)
         reloadPhotos()
     }
 
@@ -1591,20 +1589,32 @@ private final class CameraModel: ObservableObject {
         refreshPreviewProcessing()
     }
 
-    func setMonitorSupersampling(_ enabled: Bool) {
-        monitorSupersampling = enabled
-        UserDefaults.standard.set(enabled, forKey: "monitorSupersampling")
-        detail = enabled
-            ? "本地 2× 超采样已开启"
-            : "本地 2× 超采样已关闭"
-        refreshPreviewProcessing()
-    }
-
     func setMonitorVideoProfile(_ profile: MonitorVideoProfile) {
         monitorVideoProfile = profile
         UserDefaults.standard.set(profile.rawValue, forKey: "monitorVideoProfile")
         detail = "监看显示尺寸 · \(profile.label)"
         refreshPreviewProcessing()
+    }
+
+    func setVideoFrameRate(_ rate: Double) {
+        videoFrameRate = rate
+        UserDefaults.standard.set(rate, forKey: "videoFrameRate")
+        setVideoShutterAngle(videoShutterAngle)
+    }
+
+    func setVideoShutterAngle(_ angle: Double) {
+        videoShutterAngle = angle
+        UserDefaults.standard.set(angle, forKey: "videoShutterAngle")
+        shutter = angle / (360 * videoFrameRate)
+        guard connected else {
+            detail = "视频曝光 · \(angle.formatted())° · \(Int(videoFrameRate)) fps"
+            return
+        }
+        applyParameter(
+            "exposureTime",
+            value: shutter,
+            label: "快门角度 \(angle.formatted())°"
+        )
     }
 
     func importLUT(from url: URL) {
@@ -1705,8 +1715,7 @@ private final class CameraModel: ObservableObject {
         let display = monitorVideoProfile.targetSize.flatMap {
             PreviewProcessor.resampledImage(
                 graded,
-                fitting: $0,
-                supersampling: monitorSupersampling
+                fitting: $0
             )
         } ?? graded
         let zebra = zebraEnabled
@@ -1779,11 +1788,7 @@ private struct PreviewStage: View {
             if let frame = previewFrame {
                 Image(nsImage: frame)
                     .resizable()
-                    .interpolation(
-                        showsMonitorEffects && model.monitorSupersampling
-                            ? .high
-                            : .medium
-                    )
+                    .interpolation(.medium)
                     .scaledToFit()
                 if showsMonitorEffects,
                    model.zebraEnabled,
@@ -1816,12 +1821,8 @@ private struct PreviewStage: View {
                         .foregroundStyle(Color.white.opacity(0.64))
                 }
                 if showsMonitorEffects,
-                   model.mode == .professional,
                    model.zebraEnabled || (model.lutEnabled && model.lutName != nil) {
                     HStack(spacing: 8) {
-                        if model.monitorSupersampling {
-                            Text("2× SS")
-                        }
                         if model.zebraEnabled {
                             Text("条纹 \(Int(model.zebraThreshold))")
                         }
@@ -1835,21 +1836,19 @@ private struct PreviewStage: View {
                     .foregroundStyle(Color.white.opacity(0.78))
                 }
                 Spacer()
-                if model.mode == .professional {
-                    HStack {
-                        Text(shutterLabel)
-                        Text("F\(model.aperture, specifier: "%.1f")")
-                        Text("ISO \(model.iso)")
-                        Spacer()
-                        Text(
-                            showsMonitorEffects
-                                ? "JPEG实时取景 · \(model.monitorVideoProfile.label)"
-                                : "照片实时取景 · JPEG"
-                        )
-                    }
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.78))
+                HStack {
+                    Text(shutterLabel)
+                    Text("F\(model.aperture, specifier: "%.1f")")
+                    Text("ISO \(model.iso)")
+                    Spacer()
+                    Text(
+                        showsMonitorEffects
+                            ? "JPEG实时取景 · \(model.monitorVideoProfile.label)"
+                            : "照片实时取景 · JPEG"
+                    )
                 }
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.78))
             }
             .padding(16)
         }
@@ -1862,6 +1861,9 @@ private struct PreviewStage: View {
     }
 
     private var shutterLabel: String {
+        if showsMonitorEffects {
+            return model.videoShutterAngle.formatted() + "°"
+        }
         if model.exposureMode == "bulb" { return "B门" }
         if model.shutter < 1 {
             return "1/\(Int((1 / model.shutter).rounded()))"
@@ -1914,14 +1916,6 @@ private struct TopBar: View {
 
             Spacer()
 
-            Picker("操作模式", selection: $model.mode) {
-                ForEach(ExperienceMode.allCases) { mode in
-                    Text(mode.rawValue).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 190)
-
             Button {
                 showSettings = true
             } label: {
@@ -1952,7 +1946,6 @@ private struct Sidebar: View {
                 .padding(.vertical, 6)
             groupLabel("管理")
             navigationButton(.library)
-            navigationButton(.transfer)
             Spacer()
         }
         .padding(.vertical, 16)
@@ -2002,11 +1995,7 @@ private struct CaptureView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("照片拍摄")
                             .font(.system(size: 34, weight: .bold))
-                        Text(
-                            model.mode == .simple
-                                ? "连接相机、确认构图，然后完成照片拍摄。"
-                                : "照片控制台 · 曝光、对焦、白平衡与快门。"
-                        )
+                        Text("快门、曝光、对焦、白平衡与拍摄模式集中在当前页面。")
                         .foregroundStyle(Palette.muted)
                     }
                     PreviewStage(model: model)
@@ -2054,43 +2043,9 @@ private struct ParameterInspector: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    Text("照片设置").font(.system(size: 21, weight: .bold))
-                    Spacer()
-                    Text(model.mode == .simple ? "普通" : "PRO")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Palette.cobalt)
-                }
+                Text("照片设置")
+                    .font(.system(size: 21, weight: .bold))
 
-                if model.mode == .simple {
-                    nativeControl("拍摄风格") {
-                        Text("自然 · 自动曝光")
-                            .foregroundStyle(Palette.muted)
-                    }
-                    nativeControl("对焦模式") {
-                        Toggle(
-                            "AF-S 单次AF（关闭为MF手动对焦）",
-                            isOn: Binding(
-                                get: { model.focusMode != "manual" },
-                                set: { enabled in
-                                    model.focusMode = enabled ? "single-shot" : "manual"
-                                    model.applyParameter(
-                                        "focusMode",
-                                        value: model.focusMode,
-                                        label: "对焦模式"
-                                    )
-                                }
-                            )
-                        )
-                        .toggleStyle(.switch)
-                    }
-                    nativeControl("保存位置") {
-                        Button("打开 Nikon Link 照片库") {
-                            model.revealLibrary()
-                        }
-                        .buttonStyle(.link)
-                    }
-                } else {
                     nativeControl(
                         "快门速度",
                         lockedReason: model.exposureLockReason("exposureTime")
@@ -2274,7 +2229,6 @@ private struct ParameterInspector: View {
                         }
                         .disabled(!model.connected)
                     }
-                }
             }
             .padding(24)
         }
@@ -2361,15 +2315,65 @@ private struct MonitorControlDeck: View {
     private var isoOptions: [Int] {
         SupportedCamera.isoOptions(for: model.cameraName)
     }
+    private let apertureOptions = [1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0]
+    private let frameRateOptions = [24.0, 25.0, 30.0, 50.0, 60.0]
+    private let shutterAngleOptions = [45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("参数调节")
+                Text("视频曝光三要素")
                     .font(.system(size: 19, weight: .bold))
-                Text("高频参数直接写入当前 Nikon 相机。")
+                Text("优先使用快门角度；应用会按当前帧率换算为曝光时间并写入相机。")
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
+
+                Picker(
+                    "视频帧率",
+                    selection: Binding(
+                        get: { model.videoFrameRate },
+                        set: { model.setVideoFrameRate($0) }
+                    )
+                ) {
+                    ForEach(frameRateOptions, id: \.self) { value in
+                        Text("\(Int(value)) fps").tag(value)
+                    }
+                }
+
+                Picker(
+                    "快门角度",
+                    selection: Binding(
+                        get: { model.videoShutterAngle },
+                        set: { model.setVideoShutterAngle($0) }
+                    )
+                ) {
+                    ForEach(shutterAngleOptions, id: \.self) { value in
+                        Text(value.formatted() + "°").tag(value)
+                    }
+                }
+                .disabled(
+                    model.connected
+                        && !model.canAdjustExposureParameter("exposureTime")
+                )
+
+                Picker(
+                    "光圈",
+                    selection: Binding(
+                        get: { model.aperture },
+                        set: { value in
+                            model.aperture = value
+                            model.applyParameter("aperture", value: value, label: "光圈")
+                        }
+                    )
+                ) {
+                    ForEach(apertureOptions, id: \.self) { value in
+                        Text("F\(value, specifier: "%.1f")").tag(value)
+                    }
+                }
+                .disabled(
+                    !model.connected
+                        || !model.canAdjustExposureParameter("aperture")
+                )
 
                 Picker(
                     "ISO感光度",
@@ -2441,15 +2445,6 @@ private struct MonitorControlDeck: View {
                 Text("监看输出")
                     .font(.system(size: 19, weight: .bold))
 
-                Toggle(
-                    "本地 2× 超采样",
-                    isOn: Binding(
-                        get: { model.monitorSupersampling },
-                        set: { model.setMonitorSupersampling($0) }
-                    )
-                )
-                .toggleStyle(.switch)
-
                 Picker(
                     "监看显示尺寸",
                     selection: Binding(
@@ -2467,7 +2462,7 @@ private struct MonitorControlDeck: View {
                 }
                 .disabled(true)
 
-                Text("Nikon PTP 返回 JPEG 实时取景帧。显示尺寸和本地 2× 超采样仅处理监看画面，不等同于机身的“视频文件类型”“画面尺寸/帧频”或“扩展过采样”。")
+                Text("Nikon PTP 返回 JPEG 实时取景帧。监看显示尺寸仅处理本地预览，不会改变机身的视频文件类型或画面尺寸。")
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2563,10 +2558,11 @@ private struct LibraryView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
+        HSplitView {
+            VStack(spacing: 0) {
+                HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("文件管理").font(.system(size: 30, weight: .bold))
+                    Text("文件与传输").font(.system(size: 30, weight: .bold))
                     Text("\(model.photos.count) 个本地文件")
                         .foregroundStyle(Palette.muted)
                 }
@@ -2637,6 +2633,10 @@ private struct LibraryView: View {
                     .padding(24)
                 }
             }
+            }
+            .frame(minWidth: 560)
+            TransferView(model: model)
+                .frame(minWidth: 380, idealWidth: 440, maxWidth: 520)
         }
         .alert("将照片移到废纸篓？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
@@ -2662,9 +2662,15 @@ private struct TransferView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Text("无线传输").font(.system(size: 34, weight: .bold))
-                Text("通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
+                Text("通过 FTP、HTTP 或 WebDAV，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
                     .foregroundStyle(Palette.muted)
-                HStack(spacing: 22) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ],
+                    spacing: 12
+                ) {
                     statusCard(
                         icon: "internaldrive",
                         title: "本地照片库",
@@ -2680,8 +2686,8 @@ private struct TransferView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("相机 FTP 设置").font(.title3.bold())
-                            Text("适用于相机直连热点或同一局域网")
+                            Text("多协议无线图片接收").font(.title3.bold())
+                            Text("适用于相机直连热点或同一可信局域网")
                                 .foregroundStyle(Palette.muted)
                         }
                         Spacer()
@@ -2703,8 +2709,17 @@ private struct TransferView: View {
                     transferRow("用户名", WirelessTransferServer.username)
                     transferRow("密码", WirelessTransferServer.password)
                     transferRow("PASV 模式", "开启")
+                    Divider()
+                    transferRow(
+                        "HTTP 上传",
+                        "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/upload/文件名"
+                    )
+                    transferRow(
+                        "WebDAV",
+                        "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/"
+                    )
 
-                    Text("在相机“网络菜单 → 连接到 FTP 服务器”中填写以上信息，选择照片上传或开启自动上传。首次启动时请允许 macOS 接受传入网络连接。")
+                    Text("相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。首次启动时请允许 macOS 接受传入网络连接。")
                         .font(.system(size: 13))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2734,6 +2749,8 @@ private struct TransferView: View {
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
     }
@@ -2749,7 +2766,7 @@ private struct TransferView: View {
                 .foregroundStyle(Palette.muted)
         }
         .padding(20)
-        .frame(width: 250, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Palette.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay {
@@ -2840,8 +2857,6 @@ private struct RootView: View {
                         MonitorView(model: model)
                     case .library:
                         LibraryView(model: model)
-                    case .transfer:
-                        TransferView(model: model)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -179,8 +179,7 @@ enum PreviewProcessor {
 
     static func resampledImage(
         _ image: NSImage,
-        fitting targetSize: NSSize,
-        supersampling: Bool
+        fitting targetSize: NSSize
     ) -> NSImage? {
         guard targetSize.width > 0,
               targetSize.height > 0,
@@ -195,23 +194,13 @@ enum PreviewProcessor {
             targetSize.width / input.extent.width,
             targetSize.height / input.extent.height
         )
-        let firstScale = fitScale * (supersampling ? 2 : 1)
-        let firstPass = input.applyingFilter(
+        let output = input.applyingFilter(
             "CILanczosScaleTransform",
             parameters: [
-                kCIInputScaleKey: firstScale,
+                kCIInputScaleKey: fitScale,
                 kCIInputAspectRatioKey: 1
             ]
         )
-        let output = supersampling
-            ? firstPass.applyingFilter(
-                "CILanczosScaleTransform",
-                parameters: [
-                    kCIInputScaleKey: 0.5,
-                    kCIInputAspectRatioKey: 1
-                ]
-            )
-            : firstPass
         guard let rendered = context.createCGImage(output, from: output.extent) else {
             return nil
         }

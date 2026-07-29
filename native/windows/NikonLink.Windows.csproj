@@ -9,8 +9,8 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>NikonLink</AssemblyName>
     <RootNamespace>NikonLink.Windows</RootNamespace>
-    <ApplicationIcon />
-    <Version>0.8.0</Version>
+    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
+    <Version>0.8.1</Version>
     <Company>Nikon Link contributors</Company>
     <Product>Nikon Link</Product>
     <Description>Native Nikon Z-series tethering and wireless transfer for Windows.</Description>
@@ -19,6 +19,9 @@
   <ItemGroup>
     <Resource Include="..\..\icons\icon-512.png">
       <Link>Assets\icon-512.png</Link>
+    </Resource>
+    <Resource Include="..\macos\Resources\wechat-donation.png">
+      <Link>Assets\wechat-donation.png</Link>
     </Resource>
     <Content Include="native\libusb-1.0.dll" Condition="Exists('native\libusb-1.0.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

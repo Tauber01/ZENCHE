@@ -1,6 +1,6 @@
 {
   name: "entry",
-  version: "0.8.0",
+  version: "0.8.1",
   description: "Nikon Link HarmonyOS entry module",
   main: "",
   author: "",

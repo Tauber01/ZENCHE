@@ -5,6 +5,28 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-29
+
+### Added
+
+- Added concurrent FTP/PASV, authenticated HTTP PUT/POST, and WebDAV image
+  inboxes across macOS, Windows, Android, HarmonyOS, and iOS/iPadOS.
+- Added a versioned Windows NSIS `Setup.exe` with shortcuts, in-place upgrades,
+  registered uninstall support, portable ZIP output, and SHA-256 checksums.
+
+### Changed
+
+- Refined the native mobile and desktop workspaces, monitoring controls,
+  diagnostics, packaging metadata, and responsive layouts.
+
+### Fixed
+
+- Fixed Android USB permission completion on Android 13–16 devices whose
+  privileged permission component does not reliably deliver fill-in extras.
+- Fixed Nikon Z30 USB/PTP session startup by using transaction ID zero for
+  `OpenSession`, recovering stalled endpoints, and retrying with a PTP device
+  reset when initial transport setup fails.
+
 ## [0.8.0] - 2026-07-29
 
 ### Added

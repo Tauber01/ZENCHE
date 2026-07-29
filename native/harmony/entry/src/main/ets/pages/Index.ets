@@ -1,11 +1,3 @@
-/*
- * Hallmark · genre: modern-minimal · macrostructure: Split Studio
- * theme: Cobalt · enrichment: none · nav: N3 · footer: Ft2
- * audience: Nikon Z photographers · use: tether/capture/transfer
- * Pre-emit critique: P5 H5 E5 S5 R5 V5
- * contrast: pass (40–41) · mobile: 320/375/414/768 static pass
- * Static slop review: pass (native-applicable gates)
- */
 import { common } from '@kit.AbilityKit';
 import { image } from '@kit.ImageKit';
 import { promptAction } from '@kit.ArkUI';
@@ -15,8 +7,9 @@ import { PtpCamera } from '../camera/PtpCamera';
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
 import {
   FTP_PORT,
-  WirelessFtpServer
-} from '../transfer/WirelessFtpServer';
+  HTTP_PORT,
+  WirelessTransferServer
+} from '../transfer/WirelessTransferServer';
 import { DiagnosticLogger } from '../diagnostics/DiagnosticLogger';
 
 class SelectEntry {
@@ -44,6 +37,22 @@ const SHUTTER_SPEEDS: Array<SelectEntry> = [
   new SelectEntry('1/60 s', '0.016667'),
   new SelectEntry('1 s', '1'),
   new SelectEntry('30 s', '30')
+];
+const VIDEO_FRAME_RATES: Array<SelectEntry> = [
+  new SelectEntry('24p', '24'),
+  new SelectEntry('25p', '25'),
+  new SelectEntry('30p', '30'),
+  new SelectEntry('50p', '50'),
+  new SelectEntry('60p', '60')
+];
+const SHUTTER_ANGLES: Array<SelectEntry> = [
+  new SelectEntry('45°', '45'),
+  new SelectEntry('90°', '90'),
+  new SelectEntry('144°', '144'),
+  new SelectEntry('172.8°', '172.8'),
+  new SelectEntry('180°', '180'),
+  new SelectEntry('270°', '270'),
+  new SelectEntry('360°', '360')
 ];
 const APERTURES: Array<SelectEntry> = [
   new SelectEntry('f/1.4', '1.4'),
@@ -101,7 +110,7 @@ const PICTURE_CONTROLS: Array<SelectEntry> = [
 struct Index {
   private camera: PtpCamera = new PtpCamera();
   private library?: PhotoLibrary;
-  private wireless?: WirelessFtpServer;
+  private wireless?: WirelessTransferServer;
   private diagnostics?: DiagnosticLogger;
   private previewGeneration: number = 0;
 
@@ -117,6 +126,9 @@ struct Index {
   @State private wirelessStatus: string = '无线收件箱未开启';
   @State private wirelessAddress: string = '—';
   @State private exposureMode: string = 'manual';
+  @State private videoFrameRate: number = 30;
+  @State private videoShutterAngle: number = 180;
+  @State private recentLogs: string = '点击“查询最近日志”后显示。';
   @State private currentBreakpoint: string = 'lg';
 
   aboutToAppear(): void {
@@ -125,7 +137,7 @@ struct Index {
     this.diagnostics = new DiagnosticLogger(context);
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
-    this.wireless = new WirelessFtpServer(
+    this.wireless = new WirelessTransferServer(
       this.library,
       (status: string): void => {
         this.diagnostics?.info('wireless', status);
@@ -198,10 +210,8 @@ struct Index {
       }) {
         if (this.section === 'library') {
           this.LibraryWorkspace()
-        } else if (this.section === 'transfer') {
-          this.TransferWorkspace()
-        } else if (this.section === 'diagnostics') {
-          this.DiagnosticsWorkspace()
+        } else if (this.section === 'settings') {
+          this.SettingsWorkspace()
         } else {
           this.CameraWorkspace()
         }
@@ -240,17 +250,38 @@ struct Index {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      Button(this.connected ? '断开相机' : '连接相机', {
+      Button(
+        this.isCompact()
+          ? (this.connected ? '断开' : '连接')
+          : (this.connected ? '断开相机' : '连接相机'),
+        {
         type: ButtonType.Normal
-      })
+        }
+      )
         .height(44)
-        .padding({ left: 20, right: 20 })
+        .padding({
+          left: this.isCompact() ? 14 : 20,
+          right: this.isCompact() ? 14 : 20
+        })
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
         .borderRadius(6)
         .enabled(!this.busy)
         .onClick((): void => {
           this.toggleCameraConnection();
+        })
+      Button('设置', { type: ButtonType.Normal })
+        .height(44)
+        .padding({ left: 12, right: 12 })
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule_strong'),
+          radius: 6
+        })
+        .onClick((): void => {
+          this.section = 'settings';
         })
     }
     .width('100%')
@@ -270,9 +301,7 @@ struct Index {
         Row({ space: 8 }) {
           this.NavButton('照片拍摄', 'capture')
           this.NavButton('视频监看', 'monitor')
-          this.NavButton('本地照片', 'library')
-          this.NavButton('无线传输', 'transfer')
-          this.NavButton('诊断日志', 'diagnostics')
+          this.NavButton('文件与传输', 'library')
         }
         .padding({ left: 16, right: 16 })
       }
@@ -295,11 +324,9 @@ struct Index {
           .margin({ bottom: 8 })
         this.NavButton('照片拍摄', 'capture')
         this.NavButton('视频监看', 'monitor')
-        this.NavButton('本地照片', 'library')
-        this.NavButton('无线传输', 'transfer')
-        this.NavButton('诊断日志', 'diagnostics')
+        this.NavButton('文件与传输', 'library')
         Blank()
-        Text('NIKON LINK 0.8.0')
+        Text('NIKON LINK 0.8.1')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -434,17 +461,22 @@ struct Index {
   @Builder
   private LibraryWorkspace() {
     Column({ space: 16 }) {
-      Text('本地照片')
+      Text('文件与传输')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
+      Text(`${this.photos.length} 个本地文件 · 多协议无线收件箱`)
+        .fontSize(14)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      this.WirelessTransferCard()
       if (this.photos.length === 0) {
         Column({ space: 12 }) {
           Text('本地图库还是空的')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-          Text('连接相机拍摄，或在无线传输页开启 FTP 收件箱。')
+          Text('连接相机拍摄，或在上方开启无线图片收件箱。')
             .fontSize(14)
             .fontColor($r('app.color.muted'))
         }
@@ -516,20 +548,9 @@ struct Index {
   }
 
   @Builder
-  private TransferWorkspace() {
-    Scroll() {
-      Column({ space: 20 }) {
-        Text('无线传输')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .width('100%')
-        Text('在可信局域网中临时开启 FTP 收件箱，传输完成后请停止接收。')
-          .fontSize(14)
-          .fontColor($r('app.color.muted'))
-          .width('100%')
-        Column({ space: 12 }) {
-          Text('FTP 收件箱')
+  private WirelessTransferCard() {
+    Column({ space: 12 }) {
+          Text('多协议无线图片收件箱')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
@@ -553,61 +574,37 @@ struct Index {
             .onClick((): void => {
               this.toggleWireless();
             })
-        }
-        .width('100%')
-        .padding(20)
-        .alignItems(HorizontalAlign.Start)
-        .backgroundColor($r('app.color.surface'))
-        .border({
-          width: 1,
-          color: $r('app.color.rule'),
-          radius: 8
-        })
-        Column({ space: 8 }) {
-          Text('相机配置')
-            .fontSize(17)
-            .fontWeight(FontWeight.Bold)
-            .width('100%')
           Text(
-            '服务器类型  FTP\n' +
-            `端口        ${FTP_PORT}\n` +
-            '用户名      nikonlink\n' +
-            '密码        nikonlink\n' +
-            'PASV 模式   开启'
+            `FTP/PASV · ${this.wirelessAddress}\n` +
+            `HTTP 上传 · 端口 ${HTTP_PORT} · /upload/文件名\n` +
+            `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink`
           )
-            .fontSize(13)
+            .fontSize(12)
             .fontFamily('monospace')
-            .lineHeight(24)
-            .fontColor($r('app.color.ink_2'))
+            .fontColor($r('app.color.muted'))
             .width('100%')
-        }
-        .width('100%')
-        .padding(20)
-        .alignItems(HorizontalAlign.Start)
-        .backgroundColor($r('app.color.surface'))
-        .border({
-          width: 1,
-          color: $r('app.color.rule'),
-          radius: 8
-        })
-      }
-      .width('100%')
-      .padding(16)
     }
     .width('100%')
-    .height(this.isCompact() ? 'auto' : '100%')
+    .padding(20)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 8
+    })
   }
 
   @Builder
-  private DiagnosticsWorkspace() {
+  private SettingsWorkspace() {
     Scroll() {
       Column({ space: 20 }) {
-        Text('诊断日志')
+        Text('设置')
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text('日志仅保存在本机，按日写入、5 MB 滚动并保留 14 天。')
+        Text('诊断、隐私与支持。')
           .fontSize(14)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -621,14 +618,35 @@ struct Index {
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Button('提交 GitHub Issue', { type: ButtonType.Normal })
-            .height(44)
-            .fontColor($r('app.color.accent_ink'))
-            .backgroundColor($r('app.color.accent'))
-            .borderRadius(6)
-            .onClick((): void => {
-              this.reportIssue();
-            })
+          Row({ space: 8 }) {
+            Button('查询最近日志', { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.recentLogs =
+                  this.diagnostics?.recentText(6000) ?? '日志暂不可用。';
+              })
+            Button('上传脱敏日志', { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.reportIssue();
+              })
+          }
+          .width('100%')
+          Text(this.recentLogs)
+            .fontSize(11)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+            .maxLines(14)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .width('100%')
         }
         .width('100%')
         .padding(20)
@@ -643,6 +661,33 @@ struct Index {
           .fontSize(12)
           .fontColor($r('app.color.muted'))
           .width('100%')
+        Column({ space: 12 }) {
+          Text('喜欢 Nikon Link？')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text('请作者喝杯奶茶，支持后续维护与新机型适配。')
+            .fontSize(14)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Button('请作者喝奶茶', { type: ButtonType.Normal })
+            .height(44)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .borderRadius(6)
+            .onClick((): void => {
+              this.openDonation();
+            })
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
       }
       .width('100%')
       .padding(16)
@@ -661,61 +706,87 @@ struct Index {
           .fontColor($r('app.color.ink'))
           .width('100%')
           .margin({ bottom: 8 })
-        this.ParameterSelect(
-          '拍摄模式',
-          EXPOSURE_MODES,
-          3,
-          true,
-          'exposureMode'
-        )
-        this.ParameterSelect(
-          '快门速度',
-          SHUTTER_SPEEDS,
-          3,
-          this.exposureMode === 'manual' ||
-            this.exposureMode === 'shutterPriority',
-          'exposureTime'
-        )
-        this.ParameterSelect(
-          '光圈',
-          APERTURES,
-          2,
-          this.exposureMode === 'manual' ||
-            this.exposureMode === 'aperturePriority' ||
-            this.exposureMode === 'bulb',
-          'aperture'
-        )
-        this.ParameterSelect('ISO 感光度', ISO_VALUES, 3, true, 'iso')
-        this.ParameterSelect(
-          '曝光补偿',
-          EXPOSURE_COMPENSATIONS,
-          2,
-          this.exposureMode === 'program' ||
-            this.exposureMode === 'aperturePriority' ||
-            this.exposureMode === 'shutterPriority',
-          'exposureCompensation'
-        )
-        this.ParameterSelect(
-          '对焦模式',
-          FOCUS_MODES,
-          0,
-          true,
-          'focusMode'
-        )
-        this.ParameterSelect(
-          '白平衡',
-          WHITE_BALANCES,
-          0,
-          true,
-          'whiteBalanceMode'
-        )
-        this.ParameterSelect(
-          '优化校准',
-          PICTURE_CONTROLS,
-          1,
-          true,
-          'pictureControl'
-        )
+        if (this.section === 'monitor') {
+          Text('视频曝光三要素')
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+            .margin({ bottom: 4 })
+          this.VideoFrameRateSelect()
+          this.VideoShutterAngleSelect()
+          this.ParameterSelect(
+            '光圈',
+            APERTURES,
+            2,
+            this.exposureMode === 'manual' ||
+              this.exposureMode === 'aperturePriority',
+            'aperture'
+          )
+          this.ParameterSelect('ISO 感光度', ISO_VALUES, 3, true, 'iso')
+          this.ParameterSelect(
+            '白平衡',
+            WHITE_BALANCES,
+            0,
+            true,
+            'whiteBalanceMode'
+          )
+        } else {
+          this.ParameterSelect(
+            '拍摄模式',
+            EXPOSURE_MODES,
+            3,
+            true,
+            'exposureMode'
+          )
+          this.ParameterSelect(
+            '快门速度',
+            SHUTTER_SPEEDS,
+            3,
+            this.exposureMode === 'manual' ||
+              this.exposureMode === 'shutterPriority',
+            'exposureTime'
+          )
+          this.ParameterSelect(
+            '光圈',
+            APERTURES,
+            2,
+            this.exposureMode === 'manual' ||
+              this.exposureMode === 'aperturePriority' ||
+              this.exposureMode === 'bulb',
+            'aperture'
+          )
+          this.ParameterSelect('ISO 感光度', ISO_VALUES, 3, true, 'iso')
+          this.ParameterSelect(
+            '曝光补偿',
+            EXPOSURE_COMPENSATIONS,
+            2,
+            this.exposureMode === 'program' ||
+              this.exposureMode === 'aperturePriority' ||
+              this.exposureMode === 'shutterPriority',
+            'exposureCompensation'
+          )
+          this.ParameterSelect(
+            '对焦模式',
+            FOCUS_MODES,
+            0,
+            true,
+            'focusMode'
+          )
+          this.ParameterSelect(
+            '白平衡',
+            WHITE_BALANCES,
+            0,
+            true,
+            'whiteBalanceMode'
+          )
+          this.ParameterSelect(
+            '优化校准',
+            PICTURE_CONTROLS,
+            1,
+            true,
+            'pictureControl'
+          )
+        }
       }
       .width('100%')
       .padding(20)
@@ -766,6 +837,68 @@ struct Index {
           this.exposureMode = entry.value;
         }
         this.setCameraParameter(parameter, entry);
+      })
+  }
+
+  @Builder
+  private VideoFrameRateSelect() {
+    Text('视频帧率基准')
+      .fontSize(13)
+      .fontColor($r('app.color.ink_2'))
+      .width('100%')
+    Select(
+      VIDEO_FRAME_RATES.map((entry: SelectEntry): SelectOption => {
+        return { value: entry.label };
+      })
+    )
+      .selected(2)
+      .width('100%')
+      .height(44)
+      .fontColor($r('app.color.ink'))
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 6
+      })
+      .margin({ bottom: 8 })
+      .onSelect((index: number): void => {
+        this.videoFrameRate = Number(VIDEO_FRAME_RATES[index].value);
+        this.applyVideoShutterAngle();
+      })
+  }
+
+  @Builder
+  private VideoShutterAngleSelect() {
+    Text(`快门角度 · 按 ${this.videoFrameRate}p 换算`)
+      .fontSize(13)
+      .fontColor($r('app.color.ink_2'))
+      .width('100%')
+    Select(
+      SHUTTER_ANGLES.map((entry: SelectEntry): SelectOption => {
+        return { value: entry.label };
+      })
+    )
+      .selected(4)
+      .width('100%')
+      .height(44)
+      .fontColor($r('app.color.ink'))
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 6
+      })
+      .enabled(
+        this.connected &&
+        !this.busy &&
+        (this.exposureMode === 'manual' ||
+          this.exposureMode === 'shutterPriority')
+      )
+      .margin({ bottom: 8 })
+      .onSelect((index: number): void => {
+        this.videoShutterAngle = Number(SHUTTER_ANGLES[index].value);
+        this.applyVideoShutterAngle();
       })
   }
 
@@ -918,6 +1051,18 @@ struct Index {
     });
   }
 
+  private applyVideoShutterAngle(): void {
+    const exposureSeconds: number =
+      this.videoShutterAngle / (360 * this.videoFrameRate);
+    this.setCameraParameter(
+      'exposureTime',
+      new SelectEntry(
+        `快门角度 ${this.videoShutterAngle}°（${this.videoFrameRate}p）`,
+        exposureSeconds.toString()
+      )
+    );
+  }
+
   private async toggleWireless(): Promise<void> {
     if (this.wireless === undefined) {
       return;
@@ -933,7 +1078,8 @@ struct Index {
         await this.wireless.start();
         this.diagnostics?.info(
           'wireless',
-          `无线收件箱已开启；地址=${this.wireless.localAddress}:${FTP_PORT}`
+          `无线收件箱已开启；FTP=${this.wireless.localAddress}:${FTP_PORT}` +
+          `；HTTP/WebDAV=${this.wireless.localAddress}:${HTTP_PORT}`
         );
         this.wirelessRunning = true;
         this.wirelessAddress =
@@ -1045,6 +1191,23 @@ struct Index {
     } catch (error) {
       this.showError(
         `无法打开 GitHub Issue 提交页：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async openDonation(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri:
+          'https://raw.githubusercontent.com/Tauber01/NikonLink/' +
+          'main/native/macos/Resources/wechat-donation.png'
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开赞赏二维码：${(error as BusinessError).message}`
       );
     }
   }

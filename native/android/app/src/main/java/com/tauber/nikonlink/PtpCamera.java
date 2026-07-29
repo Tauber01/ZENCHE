@@ -6,13 +6,16 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
+import android.hardware.usb.UsbRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 final class PtpCamera {
     static final int NIKON_VENDOR_ID = 0x04b0;
@@ -43,6 +46,7 @@ final class PtpCamera {
     private static final int TYPE_DATA = 2;
     private static final int TYPE_RESPONSE = 3;
     private static final int RESPONSE_OK = 0x2001;
+    private static final int RESPONSE_SESSION_ALREADY_OPEN = 0x201e;
     private static final int OPEN_SESSION = 0x1002;
     private static final int CLOSE_SESSION = 0x1003;
     private static final int GET_OBJECT = 0x1009;
@@ -56,8 +60,20 @@ final class PtpCamera {
     private static final int CAPTURE_TO_SDRAM = 0x9207;
     private static final int TERMINATE_CAPTURE = 0x920c;
     private static final int OBJECT_ADDED_IN_SDRAM = 0xc101;
+    private static final int USB_REQUEST_CLEAR_FEATURE = 0x01;
+    private static final int USB_FEATURE_ENDPOINT_HALT = 0x00;
+    private static final int USB_RECIPIENT_INTERFACE = 0x01;
+    private static final int USB_RECIPIENT_ENDPOINT = 0x02;
+    private static final int PTP_USB_REQUEST_RESET = 0x66;
+    private static final int CONNECT_ATTEMPTS = 3;
+    // Keep every asynchronous USB request small enough for conservative OEM
+    // usbfs implementations while bypassing their synchronous bulkTransfer path.
+    private static final int USB_BULK_CHUNK_BYTES = 16 * 1024;
 
     private final MainActivity activity;
+    private final DiagnosticLogger diagnostics;
+    private UsbManager usbManager;
+    private int connectedProductId = -1;
     private UsbDeviceConnection connection;
     private UsbInterface cameraInterface;
     private UsbEndpoint bulkIn;
@@ -68,8 +84,9 @@ final class PtpCamera {
     private int bulbDurationSeconds = 5;
     private CameraProfile profile;
 
-    PtpCamera(MainActivity activity) {
+    PtpCamera(MainActivity activity, DiagnosticLogger diagnostics) {
         this.activity = activity;
+        this.diagnostics = diagnostics;
     }
 
     synchronized Map<String, Object> connect() throws Exception {
@@ -102,36 +119,15 @@ final class PtpCamera {
         if (!activity.ensureUsbPermission(manager, device)) {
             throw new Exception("未获得 " + cameraName() + " 的 USB 访问权限。");
         }
-        for (int index = 0; index < device.getInterfaceCount(); index++) {
-            UsbInterface candidate = device.getInterface(index);
-            if (candidate.getInterfaceClass() != UsbConstants.USB_CLASS_STILL_IMAGE) continue;
-            UsbEndpoint input = null;
-            UsbEndpoint output = null;
-            for (int endpointIndex = 0; endpointIndex < candidate.getEndpointCount(); endpointIndex++) {
-                UsbEndpoint endpoint = candidate.getEndpoint(endpointIndex);
-                if (endpoint.getType() != UsbConstants.USB_ENDPOINT_XFER_BULK) continue;
-                if (endpoint.getDirection() == UsbConstants.USB_DIR_IN) input = endpoint;
-                if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) output = endpoint;
-            }
-            if (input != null && output != null) {
-                cameraInterface = candidate;
-                bulkIn = input;
-                bulkOut = output;
-                break;
-            }
+        usbManager = manager;
+        connectedProductId = device.getProductId();
+        try {
+            openFreshTransport(device);
+            openSessionWithRecovery();
+        } catch (Exception error) {
+            closeTransport();
+            throw error;
         }
-        if (cameraInterface == null) {
-            throw new Exception(cameraName() + " 没有提供可用的 PTP USB 接口。");
-        }
-
-        connection = manager.openDevice(device);
-        if (connection == null || !connection.claimInterface(cameraInterface, true)) {
-            String failedCamera = cameraName();
-            disconnect();
-            throw new Exception("无法打开 " + failedCamera + "。请关闭 NX MobileAir 等占用相机的应用。");
-        }
-        transaction = 0;
-        transact(OPEN_SESSION, new long[]{1}, null, 10_000);
 
         Map<String, Object> result = new HashMap<>();
         result.put("device", mapOf(
@@ -347,19 +343,215 @@ final class PtpCamera {
                 transact(CLOSE_SESSION, null, null, 2_000);
             } catch (Exception ignored) {
             }
-            if (cameraInterface != null) connection.releaseInterface(cameraInterface);
-            connection.close();
         }
-        connection = null;
+        closeTransport();
+    }
+
+    private void openSessionWithRecovery() throws Exception {
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+            transaction = 0;
+            try {
+                diagnostics.info(
+                        "usb",
+                        "正在初始化 " + cameraName()
+                                + " PTP 会话；第 " + attempt
+                                + "/" + CONNECT_ATTEMPTS + " 次");
+                transact(OPEN_SESSION, new long[]{1}, null, 10_000);
+                diagnostics.info("usb", cameraName() + " PTP 会话初始化成功");
+                return;
+            } catch (Exception error) {
+                lastError = error;
+                diagnostics.warning(
+                        "usb",
+                        cameraName() + " PTP 会话初始化失败；第 "
+                                + attempt + " 次；" + error.getMessage());
+                if (attempt == CONNECT_ATTEMPTS) break;
+                recoverUsbTransport(attempt);
+            }
+        }
+        throw new Exception(
+                cameraName()
+                        + " USB/PTP 会话初始化失败（已重试 "
+                        + CONNECT_ATTEMPTS
+                        + " 次）："
+                        + (lastError == null ? "未知错误" : lastError.getMessage()),
+                lastError);
+    }
+
+    private void closeTransport() {
+        closeConnectionOnly();
+        usbManager = null;
+        connectedProductId = -1;
         cameraInterface = null;
         bulkIn = null;
         bulkOut = null;
         profile = null;
     }
 
+    private void closeConnectionOnly() {
+        if (connection != null) {
+            if (cameraInterface != null) {
+                try {
+                    connection.releaseInterface(cameraInterface);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            try {
+                connection.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
+        connection = null;
+        cameraInterface = null;
+        bulkIn = null;
+        bulkOut = null;
+    }
+
+    private void openFreshTransport(UsbDevice device) throws Exception {
+        closeConnectionOnly();
+        if (usbManager == null
+                || (!usbManager.hasPermission(device)
+                && !activity.ensureUsbPermission(usbManager, device))) {
+            throw new Exception("未获得 " + cameraName() + " 的 USB 访问权限。");
+        }
+        UsbInterface selectedInterface = null;
+        UsbEndpoint selectedInput = null;
+        UsbEndpoint selectedOutput = null;
+        for (int index = 0; index < device.getInterfaceCount(); index++) {
+            UsbInterface candidate = device.getInterface(index);
+            if (candidate.getInterfaceClass() != UsbConstants.USB_CLASS_STILL_IMAGE) {
+                continue;
+            }
+            UsbEndpoint input = null;
+            UsbEndpoint output = null;
+            for (int endpointIndex = 0;
+                 endpointIndex < candidate.getEndpointCount();
+                 endpointIndex++) {
+                UsbEndpoint endpoint = candidate.getEndpoint(endpointIndex);
+                if (endpoint.getType() != UsbConstants.USB_ENDPOINT_XFER_BULK) {
+                    continue;
+                }
+                if (endpoint.getDirection() == UsbConstants.USB_DIR_IN) {
+                    input = endpoint;
+                } else if (endpoint.getDirection() == UsbConstants.USB_DIR_OUT) {
+                    output = endpoint;
+                }
+            }
+            if (input != null && output != null) {
+                selectedInterface = candidate;
+                selectedInput = input;
+                selectedOutput = output;
+                break;
+            }
+        }
+        if (selectedInterface == null) {
+            throw new Exception(cameraName() + " 没有提供可用的 PTP USB 接口。");
+        }
+
+        UsbDeviceConnection opened = usbManager == null
+                ? null
+                : usbManager.openDevice(device);
+        if (opened == null || !opened.claimInterface(selectedInterface, true)) {
+            if (opened != null) opened.close();
+            throw new Exception(
+                    "无法打开 " + cameraName()
+                            + "。请关闭 NX MobileAir 等占用相机的应用。");
+        }
+        if (selectedInterface.getAlternateSetting() != 0
+                && !opened.setInterface(selectedInterface)) {
+            opened.releaseInterface(selectedInterface);
+            opened.close();
+            throw new Exception(cameraName() + " 无法切换到 PTP USB 接口。");
+        }
+
+        connection = opened;
+        cameraInterface = selectedInterface;
+        bulkIn = selectedInput;
+        bulkOut = selectedOutput;
+        clearEndpointHalt(bulkIn);
+        clearEndpointHalt(bulkOut);
+        diagnostics.info(
+                "usb",
+                String.format(
+                        Locale.US,
+                        "PTP 传输已打开；interface=%d alt=%d"
+                                + "；bulkIn=0x%02X/%d"
+                                + "；bulkOut=0x%02X/%d"
+                                + "；transport=UsbRequest/%d",
+                        cameraInterface.getId(),
+                        cameraInterface.getAlternateSetting(),
+                        bulkIn.getAddress(),
+                        bulkIn.getMaxPacketSize(),
+                        bulkOut.getAddress(),
+                        bulkOut.getMaxPacketSize(),
+                        USB_BULK_CHUNK_BYTES));
+    }
+
+    private void recoverUsbTransport(int failedAttempt) throws Exception {
+        boolean reset = resetPtpDevice();
+        diagnostics.info(
+                "usb",
+                "正在重建 USB 传输；设备复位="
+                        + (reset ? "成功" : "未确认")
+                        + "；失败轮次=" + failedAttempt);
+        closeConnectionOnly();
+        Thread.sleep(350L * failedAttempt);
+
+        UsbDevice device = waitForCurrentCamera(3_000);
+        if (device == null) {
+            throw new Exception(
+                    cameraName() + " 在 USB 恢复期间断开，请重新连接数据线。");
+        }
+        Exception openError = null;
+        long deadline = System.currentTimeMillis() + 3_000;
+        do {
+            try {
+                openFreshTransport(device);
+                openError = null;
+                break;
+            } catch (Exception error) {
+                openError = error;
+                Thread.sleep(200);
+                UsbDevice refreshed = waitForCurrentCamera(400);
+                if (refreshed != null) device = refreshed;
+            }
+        } while (System.currentTimeMillis() < deadline);
+        if (openError != null) {
+            throw new Exception(
+                    cameraName() + " USB 传输重建失败：" + openError.getMessage(),
+                    openError);
+        }
+        Thread.sleep(150);
+    }
+
+    private UsbDevice waitForCurrentCamera(long timeoutMillis)
+            throws InterruptedException {
+        if (usbManager == null) return null;
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        do {
+            for (UsbDevice candidate : usbManager.getDeviceList().values()) {
+                if (candidate.getVendorId() == NIKON_VENDOR_ID
+                        && candidate.getProductId() == connectedProductId) {
+                    return candidate;
+                }
+            }
+            Thread.sleep(100);
+        } while (System.currentTimeMillis() < deadline);
+        return null;
+    }
+
     private byte[] transact(int operation, long[] params, byte[] outgoingData, int timeout) throws Exception {
         ensureConnectedForOperation(operation);
-        int current = ++transaction;
+        // ISO 15740 requires OpenSession to use transaction ID 0. The first
+        // operation inside the newly opened session then starts at ID 1.
+        int current;
+        if (operation == OPEN_SESSION) {
+            transaction = 0;
+            current = 0;
+        } else {
+            current = ++transaction;
+        }
         sendContainer(TYPE_COMMAND, operation, current, parameterBytes(params), timeout);
         if (outgoingData != null) sendContainer(TYPE_DATA, operation, current, outgoingData, timeout);
 
@@ -370,10 +562,20 @@ final class PtpCamera {
             data = first.payload;
             response = receiveContainer(timeout);
         }
+        if (first.transaction != current || response.transaction != current) {
+            throw new Exception(String.format(
+                    "%s 返回了不匹配的 PTP 事务编号（期望 %d，收到 %d/%d）。",
+                    cameraName(),
+                    current,
+                    first.transaction,
+                    response.transaction));
+        }
         if (response.type != TYPE_RESPONSE) {
             throw new Exception(cameraName() + " 返回了无效的 PTP 数据。");
         }
-        if (response.code != RESPONSE_OK) {
+        if (response.code != RESPONSE_OK
+                && !(operation == OPEN_SESSION
+                && response.code == RESPONSE_SESSION_ALREADY_OPEN)) {
             throw new Exception(String.format(
                     "%s PTP 错误 0x%04X（操作 0x%04X）",
                     cameraName(),
@@ -393,36 +595,252 @@ final class PtpCamera {
         packet.put(payload);
         byte[] bytes = packet.array();
         int offset = 0;
+        boolean recovered = false;
         while (offset < bytes.length) {
-            int sent = connection.bulkTransfer(bulkOut, bytes, offset, bytes.length - offset, timeout);
-            if (sent <= 0) throw new Exception("向 " + cameraName() + " 发送 USB 数据失败。");
+            int requested = Math.min(
+                    USB_BULK_CHUNK_BYTES,
+                    bytes.length - offset);
+            int sent;
+            try {
+                sent = transferWithUsbRequest(
+                        bulkOut,
+                        bytes,
+                        offset,
+                        requested,
+                        timeout);
+            } catch (Exception error) {
+                if (!recovered && clearEndpointHalt(bulkOut)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "向 %s 发送 USB 数据失败"
+                                        + "（端点 0x%02X，UsbRequest）：%s",
+                                cameraName(),
+                                bulkOut.getAddress(),
+                                error.getMessage()),
+                        error);
+            }
+            if (sent <= 0) {
+                if (!recovered && clearEndpointHalt(bulkOut)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "向 %s 发送 USB 数据失败（端点 0x%02X，返回 %d）。",
+                                cameraName(),
+                                bulkOut.getAddress(),
+                                sent));
+            }
             offset += sent;
         }
     }
 
     private Container receiveContainer(int timeout) throws Exception {
-        byte[] first = new byte[1024 * 1024];
-        int received = connection.bulkTransfer(bulkIn, first, first.length, timeout);
-        if (received < 12) throw new Exception("读取 " + cameraName() + " USB 数据失败。");
+        byte[] first = new byte[USB_BULK_CHUNK_BYTES];
+        int received = 0;
+        boolean recovered = false;
+        while (received < 12) {
+            int requested = first.length - received;
+            int count;
+            try {
+                count = transferWithUsbRequest(
+                        bulkIn,
+                        first,
+                        received,
+                        requested,
+                        timeout);
+            } catch (Exception error) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "读取 %s USB 数据失败"
+                                        + "（端点 0x%02X，请求 %d 字节，UsbRequest）：%s",
+                                cameraName(),
+                                bulkIn.getAddress(),
+                                requested,
+                                error.getMessage()),
+                        error);
+            }
+            if (count <= 0) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "读取 %s USB 数据失败"
+                                        + "（端点 0x%02X，请求 %d 字节，返回 %d）。",
+                                cameraName(),
+                                bulkIn.getAddress(),
+                                requested,
+                                count));
+            }
+            received += count;
+        }
         ByteBuffer header = ByteBuffer.wrap(first, 0, received).order(ByteOrder.LITTLE_ENDIAN);
         int total = header.getInt();
         int type = header.getShort() & 0xffff;
         int code = header.getShort() & 0xffff;
-        header.getInt();
+        int returnedTransaction = header.getInt();
         if (total < 12 || total > 256 * 1024 * 1024) {
             throw new Exception(cameraName() + " 返回的数据长度无效。");
         }
         ByteArrayOutputStream all = new ByteArrayOutputStream(total);
-        all.write(first, 0, received);
+        all.write(first, 0, Math.min(received, total));
         while (all.size() < total) {
             int remaining = total - all.size();
-            byte[] chunk = new byte[Math.min(1024 * 1024, remaining)];
-            int count = connection.bulkTransfer(bulkIn, chunk, chunk.length, timeout);
-            if (count <= 0) throw new Exception(cameraName() + " 图像传输中断。");
-            all.write(chunk, 0, count);
+            byte[] chunk = new byte[Math.min(
+                    USB_BULK_CHUNK_BYTES,
+                    remaining)];
+            int count;
+            try {
+                count = transferWithUsbRequest(
+                        bulkIn,
+                        chunk,
+                        0,
+                        chunk.length,
+                        timeout);
+            } catch (Exception error) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "%s 图像传输中断"
+                                        + "（端点 0x%02X，请求 %d 字节，UsbRequest）：%s",
+                                cameraName(),
+                                bulkIn.getAddress(),
+                                chunk.length,
+                                error.getMessage()),
+                        error);
+            }
+            if (count <= 0) {
+                if (!recovered && clearEndpointHalt(bulkIn)) {
+                    recovered = true;
+                    continue;
+                }
+                throw new Exception(
+                        String.format(
+                                Locale.US,
+                                "%s 图像传输中断"
+                                        + "（端点 0x%02X，请求 %d 字节，返回 %d）。",
+                                cameraName(),
+                                bulkIn.getAddress(),
+                                chunk.length,
+                                count));
+            }
+            all.write(chunk, 0, Math.min(count, remaining));
         }
         byte[] container = all.toByteArray();
-        return new Container(type, code, Arrays.copyOfRange(container, 12, total));
+        return new Container(
+                type,
+                code,
+                returnedTransaction,
+                Arrays.copyOfRange(container, 12, total));
+    }
+
+    private int transferWithUsbRequest(
+            UsbEndpoint endpoint,
+            byte[] bytes,
+            int offset,
+            int length,
+            int timeout) throws Exception {
+        UsbDeviceConnection activeConnection = connection;
+        if (activeConnection == null || endpoint == null) {
+            throw new Exception("USB 传输尚未打开。");
+        }
+
+        boolean input = endpoint.getDirection() == UsbConstants.USB_DIR_IN;
+        ByteBuffer buffer = ByteBuffer.allocateDirect(length);
+        if (!input) {
+            buffer.put(bytes, offset, length);
+            buffer.flip();
+        }
+
+        UsbRequest request = new UsbRequest();
+        boolean queued = false;
+        boolean completed = false;
+        try {
+            if (!request.initialize(activeConnection, endpoint)) {
+                throw new Exception("无法初始化异步 USB 请求。");
+            }
+            if (!request.queue(buffer)) {
+                throw new Exception("无法提交异步 USB 请求。");
+            }
+            queued = true;
+
+            UsbRequest finished;
+            try {
+                finished = activeConnection.requestWait(timeout);
+            } catch (TimeoutException error) {
+                throw new Exception(
+                        "等待异步 USB 请求 " + timeout + " 毫秒后超时。",
+                        error);
+            }
+            if (finished != request) {
+                throw new Exception("异步 USB 请求未返回有效的完成结果。");
+            }
+            completed = true;
+
+            int transferred = buffer.position();
+            if (input && transferred > 0) {
+                buffer.flip();
+                buffer.get(bytes, offset, transferred);
+            }
+            return transferred;
+        } finally {
+            if (queued && !completed) {
+                try {
+                    request.cancel();
+                } catch (RuntimeException ignored) {
+                }
+            }
+            request.close();
+        }
+    }
+
+    private boolean clearEndpointHalt(UsbEndpoint endpoint) {
+        if (connection == null || endpoint == null) return false;
+        int requestType =
+                UsbConstants.USB_DIR_OUT
+                        | UsbConstants.USB_TYPE_STANDARD
+                        | USB_RECIPIENT_ENDPOINT;
+        return connection.controlTransfer(
+                requestType,
+                USB_REQUEST_CLEAR_FEATURE,
+                USB_FEATURE_ENDPOINT_HALT,
+                endpoint.getAddress(),
+                null,
+                0,
+                1_000) >= 0;
+    }
+
+    private boolean resetPtpDevice() {
+        if (connection == null || cameraInterface == null) return false;
+        int requestType =
+                UsbConstants.USB_DIR_OUT
+                        | UsbConstants.USB_TYPE_CLASS
+                        | USB_RECIPIENT_INTERFACE;
+        return connection.controlTransfer(
+                requestType,
+                PTP_USB_REQUEST_RESET,
+                0,
+                cameraInterface.getId(),
+                null,
+                0,
+                2_000) >= 0;
     }
 
     private static long findSdramObject(byte[] events) {
@@ -555,7 +973,7 @@ final class PtpCamera {
         String descriptor = device.getProductName();
         if (descriptor == null) return null;
         String normalized = descriptor
-                .toLowerCase()
+                .toLowerCase(Locale.ROOT)
                 .replace("_", "")
                 .replace("-", "")
                 .replace(" ", "");
@@ -566,7 +984,7 @@ final class PtpCamera {
         int bestMatchLength = 0;
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
             String candidateName = candidate.name
-                    .toLowerCase()
+                    .toLowerCase(Locale.ROOT)
                     .replace("nikon", "")
                     .replace(" ", "");
             String candidateAlias = candidateName
@@ -599,11 +1017,13 @@ final class PtpCamera {
     private static final class Container {
         final int type;
         final int code;
+        final int transaction;
         final byte[] payload;
 
-        Container(int type, int code, byte[] payload) {
+        Container(int type, int code, int transaction, byte[] payload) {
             this.type = type;
             this.code = code;
+            this.transaction = transaction;
             this.payload = payload;
         }
     }

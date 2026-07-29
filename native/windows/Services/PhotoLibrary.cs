@@ -8,9 +8,9 @@ public sealed class PhotoLibrary
     private static readonly string[] SupportedExtensions =
         [".jpg", ".jpeg", ".nef", ".nrw", ".heif", ".heic", ".tif", ".tiff"];
 
-    public PhotoLibrary()
+    public PhotoLibrary(string? directoryPath = null)
     {
-        DirectoryPath = Path.Combine(
+        DirectoryPath = directoryPath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
             "Nikon Link");
         Directory.CreateDirectory(DirectoryPath);

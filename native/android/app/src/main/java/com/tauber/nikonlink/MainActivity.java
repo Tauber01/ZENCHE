@@ -49,11 +49,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class MainActivity extends Activity {
     private static final String USB_PERMISSION_ACTION = "com.tauber.nikonlink.USB_PERMISSION";
@@ -82,8 +84,6 @@ public final class MainActivity extends Activity {
     private TextView statusText;
     private TextView countText;
     private Button connectButton;
-    private Button simpleModeButton;
-    private Button professionalModeButton;
     private ImageView previewImage;
     private ImageView zebraImage;
     private TextView previewPlaceholder;
@@ -99,7 +99,7 @@ public final class MainActivity extends Activity {
     private Bitmap latestSourceFrame;
     private Bitmap latestZebraMask;
     private File photoDirectory;
-    private WirelessFtpServer wirelessServer;
+    private WirelessTransferServer wirelessServer;
 
     private volatile boolean connected;
     private volatile boolean connecting;
@@ -114,9 +114,9 @@ public final class MainActivity extends Activity {
     private volatile int zebraThreshold = 95;
     private volatile boolean lutEnabled;
     private volatile CubeLut previewLut;
-    private volatile boolean monitorSupersampling;
     private volatile String monitorVideoProfile = "source";
-    private boolean professionalMode;
+    private volatile int monitorFrameRate = 30;
+    private volatile double monitorShutterAngle = 180;
     private String currentSection = "capture";
 
     @Override
@@ -133,18 +133,23 @@ public final class MainActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 
-        camera = new PtpCamera(this);
-        monitorSupersampling = getSharedPreferences("nikon-link", MODE_PRIVATE)
-                .getBoolean("monitorSupersampling", false);
+        camera = new PtpCamera(this, diagnostics);
         monitorVideoProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("monitorVideoProfile", "source");
+        monitorFrameRate = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getInt("monitorFrameRate", 30);
+        monitorShutterAngle = Double.longBitsToDouble(
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .getLong(
+                                "monitorShutterAngle",
+                                Double.doubleToRawLongBits(180)));
         File base = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         if (base == null) base = getFilesDir();
         photoDirectory = new File(base, "Nikon Link");
         if (!photoDirectory.exists()) photoDirectory.mkdirs();
-        wirelessServer = new WirelessFtpServer(
+        wirelessServer = new WirelessTransferServer(
                 photoDirectory,
-                new WirelessFtpServer.Listener() {
+                new WirelessTransferServer.Listener() {
                     @Override
                     public void onStatus(String status) {
                         diagnostics.info("wireless", status);
@@ -207,9 +212,11 @@ public final class MainActivity extends Activity {
         }
         Uri uri = data.getData();
         try {
-            getContentResolver().takePersistableUriPermission(
-                    uri,
-                    data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
+                getContentResolver().takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
         } catch (RuntimeException ignored) {
         }
         String fallbackName = uri.getLastPathSegment();
@@ -356,17 +363,14 @@ public final class MainActivity extends Activity {
         });
         top.addView(connectButton, new LinearLayout.LayoutParams(0, dp(46), 1f));
 
-        LinearLayout modeSwitch = new LinearLayout(this);
-        modeSwitch.setOrientation(LinearLayout.HORIZONTAL);
-        modeSwitch.setPadding(dp(6), 0, 0, 0);
-        simpleModeButton = nativeButton("普通", false);
-        professionalModeButton = nativeButton("专业", false);
-        simpleModeButton.setOnClickListener(view -> setProfessionalMode(false));
-        professionalModeButton.setOnClickListener(view -> setProfessionalMode(true));
-        modeSwitch.addView(simpleModeButton, new LinearLayout.LayoutParams(dp(50), dp(42)));
-        modeSwitch.addView(professionalModeButton, new LinearLayout.LayoutParams(dp(50), dp(42)));
-        top.addView(modeSwitch);
-        updateModeButtons();
+        Button settingsButton = nativeButton("设置", false);
+        settingsButton.setContentDescription("打开设置");
+        settingsButton.setOnClickListener(view -> showSection("settings"));
+        LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(
+                dp(58),
+                dp(44));
+        settingsParams.setMargins(dp(6), 0, 0, 0);
+        top.addView(settingsButton, settingsParams);
         return top;
     }
 
@@ -379,7 +383,6 @@ public final class MainActivity extends Activity {
         navigation.addView(navButton("照片", "capture"));
         navigation.addView(navButton("视频", "monitor"));
         navigation.addView(navButton("文件", "library"));
-        navigation.addView(navButton("传输", "transfer"));
         return navigation;
     }
 
@@ -424,8 +427,8 @@ public final class MainActivity extends Activity {
             case "library":
                 content = buildLibraryView();
                 break;
-            case "transfer":
-                content = buildTransferView();
+            case "settings":
+                content = buildSettingsView();
                 break;
             default:
                 content = buildCaptureView();
@@ -451,9 +454,7 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         content.addView(text("照片拍摄", 30, Typeface.BOLD, INK));
         content.addView(text(
-                professionalMode
-                        ? "照片控制台 · 曝光、对焦、白平衡与快门"
-                        : "连接相机、确认构图，然后完成照片拍摄",
+                "快门、曝光、对焦、白平衡与拍摄模式集中在当前页面",
                 14,
                 Typeface.NORMAL,
                 MUTED),
@@ -476,8 +477,7 @@ public final class MainActivity extends Activity {
         actions.addView(shutterButton, shutterParams);
         content.addView(actions);
 
-        if (professionalMode) content.addView(buildProfessionalControls());
-        else content.addView(buildSimpleControls());
+        content.addView(buildProfessionalControls());
         scroll.addView(content);
         return scroll;
     }
@@ -591,16 +591,25 @@ public final class MainActivity extends Activity {
         panel.addView(text("参数调节", 18, Typeface.BOLD, INK));
         panel.addView(text(
                 connected
-                        ? "高频参数通过 USB/PTP 写入 " + connectedCameraName
+                        ? "曝光三要素通过 USB/PTP 写入 " + connectedCameraName
                         : "连接 Nikon 相机后启用参数控制",
                 13,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 14));
 
+        addVideoFrameRateControl(panel);
+        addShutterAngleControl(panel);
         addSpinnerControl(
                 panel,
-                "ISO感光度",
+                "光圈",
+                new String[]{"F1.4", "F2.0", "F2.8", "F4.0", "F5.6", "F8", "F11", "F16", "F22"},
+                new Object[]{1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0},
+                3,
+                "aperture");
+        addSpinnerControl(
+                panel,
+                "ISO 感光度",
                 isoLabels(),
                 isoValues(),
                 defaultIsoIndex(),
@@ -654,23 +663,6 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 12));
 
-        Switch supersampling = new Switch(this);
-        supersampling.setText("本地 2× 超采样");
-        supersampling.setTextColor(INK);
-        supersampling.setChecked(monitorSupersampling);
-        supersampling.setOnCheckedChangeListener((button, checked) -> {
-            monitorSupersampling = checked;
-            getSharedPreferences("nikon-link", MODE_PRIVATE)
-                    .edit()
-                    .putBoolean("monitorSupersampling", checked)
-                    .apply();
-            refreshPreviewProcessing();
-            statusText.setText(checked
-                    ? "本地 2× 超采样已开启"
-                    : "本地 2× 超采样已关闭");
-        });
-        panel.addView(supersampling);
-
         panel.addView(
                 text("实时取景格式", 13, Typeface.BOLD, MUTED),
                 marginParams(-1, -2, 0, 12, 0, 4));
@@ -720,7 +712,7 @@ public final class MainActivity extends Activity {
                 dp(48)));
 
         panel.addView(text(
-                "Nikon PTP 返回 JPEG 实时取景帧。显示尺寸和本地 2× 超采样仅处理监看画面，不等同于机身的“视频文件类型”“画面尺寸/帧频”或“扩展过采样”。",
+                "Nikon PTP 返回 JPEG 实时取景帧。显示尺寸仅处理监看画面，不等同于机身的“视频文件类型”或“画面尺寸/帧频”。",
                 12,
                 Typeface.NORMAL,
                 MUTED),
@@ -749,32 +741,109 @@ public final class MainActivity extends Activity {
         return "实时取景原始尺寸";
     }
 
-    private View buildSimpleControls() {
-        LinearLayout panel = panel();
-        panel.addView(text("普通模式", 18, Typeface.BOLD, INK));
-        panel.addView(text(
-                "自动曝光与常用对焦控制",
+    private void addVideoFrameRateControl(LinearLayout parent) {
+        parent.addView(
+                text("视频帧率基准", 13, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 12, 0, 4));
+        Integer[] rates = new Integer[]{24, 25, 30, 50, 60};
+        String[] labels = new String[]{"24p", "25p", "30p", "50p", "60p"};
+        Spinner spinner = monitorSpinner(labels);
+        spinner.setSelection(Math.max(0, Arrays.asList(rates).indexOf(monitorFrameRate)), false);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            private boolean initialized;
+
+            @Override
+            public void onItemSelected(
+                    android.widget.AdapterView<?> parent,
+                    View view,
+                    int position,
+                    long id) {
+                if (!initialized) {
+                    initialized = true;
+                    return;
+                }
+                monitorFrameRate = rates[position];
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putInt("monitorFrameRate", monitorFrameRate)
+                        .apply();
+                applyVideoShutterAngle();
+            }
+
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        parent.addView(spinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+    }
+
+    private void addShutterAngleControl(LinearLayout parent) {
+        TextView label = text(
+                "快门角度 · 按 " + monitorFrameRate + "p 换算曝光时间",
                 13,
-                Typeface.NORMAL,
-                MUTED),
-                marginParams(-1, -2, 0, 3, 0, 14));
-        Switch autofocus = new Switch(this);
-        autofocus.setText("AF-S 单次AF（关闭为MF手动对焦）");
-        autofocus.setTextColor(INK);
-        autofocus.setChecked(true);
-        autofocus.setOnCheckedChangeListener((button, enabled) ->
-                applyParameter(
-                        "focusMode",
-                        enabled ? "single-shot" : "manual",
-                        "对焦模式"));
-        cameraControls.add(autofocus);
-        panel.addView(autofocus);
-        return panel;
+                Typeface.BOLD,
+                MUTED);
+        label.setTag("快门角度");
+        parent.addView(label, marginParams(-1, -2, 0, 12, 0, 4));
+        Double[] angles = new Double[]{45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0};
+        String[] labels = new String[]{"45°", "90°", "144°", "172.8°", "180°", "270°", "360°"};
+        Spinner spinner = monitorSpinner(labels);
+        int selection = 4;
+        for (int index = 0; index < angles.length; index++) {
+            if (Math.abs(angles[index] - monitorShutterAngle) < 0.01) {
+                selection = index;
+                break;
+            }
+        }
+        spinner.setSelection(selection, false);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            private boolean initialized;
+
+            @Override
+            public void onItemSelected(
+                    android.widget.AdapterView<?> parent,
+                    View view,
+                    int position,
+                    long id) {
+                if (!initialized) {
+                    initialized = true;
+                    return;
+                }
+                monitorShutterAngle = angles[position];
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putLong(
+                                "monitorShutterAngle",
+                                Double.doubleToRawLongBits(monitorShutterAngle))
+                        .apply();
+                applyVideoShutterAngle();
+            }
+
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        cameraControls.add(spinner);
+        parameterControls.put("exposureTime", spinner);
+        parameterLabels.put("exposureTime", label);
+        parent.addView(spinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+    }
+
+    private void applyVideoShutterAngle() {
+        double exposureSeconds = monitorShutterAngle / (360.0 * monitorFrameRate);
+        applyParameter(
+                "exposureTime",
+                exposureSeconds,
+                String.format(
+                        Locale.CHINA,
+                        "快门角度 %.1f°（%dp）",
+                        monitorShutterAngle,
+                        monitorFrameRate));
     }
 
     private View buildProfessionalControls() {
         LinearLayout panel = panel();
-        panel.addView(text("专业参数", 18, Typeface.BOLD, INK));
+        panel.addView(text("相机参数", 18, Typeface.BOLD, INK));
         panel.addView(text(
                 connected
                         ? "参数通过 USB/PTP 写入 " + connectedCameraName
@@ -1067,13 +1136,17 @@ public final class MainActivity extends Activity {
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         List<File> files = photoFiles();
-        content.addView(text("文件管理", 30, Typeface.BOLD, INK));
+        content.addView(text("文件与传输", 30, Typeface.BOLD, INK));
         content.addView(text(
-                files.size() + " 个本地图像文件",
+                files.size() + " 个本地图像文件 · 无线收件箱",
                 14,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 18));
+        content.addView(buildWirelessTransferPanel());
+        content.addView(
+                text("本地文件", 18, Typeface.BOLD, INK),
+                marginParams(-1, -2, 0, 22, 0, 12));
         if (files.isEmpty()) {
             TextView empty = text(
                     "还没有联机拍摄文件\n照片将保存在 Nikon Link 本地照片库。",
@@ -1138,28 +1211,11 @@ public final class MainActivity extends Activity {
         return row;
     }
 
-    private View buildTransferView() {
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout content = verticalContainer();
-        content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(text("无线传输", 30, Typeface.BOLD, INK));
-        content.addView(text(
-                "通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。",
-                14,
-                Typeface.NORMAL,
-                MUTED),
-                marginParams(-1, -2, 0, 3, 0, 20));
-        content.addView(infoCard(
-                "本地照片库",
-                photoFiles().size() + " 个文件"));
-        content.addView(infoCard(
-                "无线收件箱",
-                wirelessStatus));
-
+    private View buildWirelessTransferPanel() {
         LinearLayout settings = panel();
-        settings.addView(text("相机 FTP 设置", 18, Typeface.BOLD, INK));
+        settings.addView(text("多协议无线图片收件箱", 18, Typeface.BOLD, INK));
         settings.addView(text(
-                "适用于相机直连热点或同一局域网",
+                wirelessStatus,
                 13,
                 Typeface.NORMAL,
                 MUTED),
@@ -1190,7 +1246,28 @@ public final class MainActivity extends Activity {
         settings.addView(
                 wirelessButton,
                 marginParams(-1, dp(48), 0, 16, 0, 0));
-        content.addView(settings);
+        wirelessStatusText = text(
+                "相机可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP 上传或 WebDAV PUT。",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        settings.addView(
+                wirelessStatusText,
+                marginParams(-1, -2, 0, 10, 0, 0));
+        return settings;
+    }
+
+    private View buildSettingsView() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(20), dp(22), dp(20), dp(24));
+        content.addView(text("设置", 30, Typeface.BOLD, INK));
+        content.addView(text(
+                "诊断、隐私与支持。",
+                14,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 3, 0, 20));
 
         LinearLayout diagnosticsPanel = panel();
         diagnosticsPanel.addView(text("诊断日志", 18, Typeface.BOLD, INK));
@@ -1204,11 +1281,17 @@ public final class MainActivity extends Activity {
         diagnosticsPanel.addView(
                 logPath,
                 marginParams(-1, -2, 0, 5, 0, 12));
-        Button reportIssue = nativeButton("提交 GitHub Issue", true);
+        LinearLayout logActions = new LinearLayout(this);
+        logActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button viewLogs = nativeButton("查询最近日志", false);
+        viewLogs.setOnClickListener(view -> showRecentLogs());
+        logActions.addView(viewLogs, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button reportIssue = nativeButton("上传脱敏日志", true);
         reportIssue.setOnClickListener(view -> openGithubIssue());
-        diagnosticsPanel.addView(
-                reportIssue,
-                marginParams(-1, dp(48), 0, 8, 0, 0));
+        LinearLayout.LayoutParams uploadParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        uploadParams.setMargins(dp(8), 0, 0, 0);
+        logActions.addView(reportIssue, uploadParams);
+        diagnosticsPanel.addView(logActions);
         diagnosticsPanel.addView(text(
                 "将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。",
                 11,
@@ -1219,14 +1302,21 @@ public final class MainActivity extends Activity {
                 diagnosticsPanel,
                 marginParams(-1, -2, 0, 18, 0, 0));
 
-        wirelessStatusText = text(
-                "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启，然后选择照片上传或开启自动上传。",
-                12,
+        LinearLayout supportPanel = panel();
+        supportPanel.addView(text("喜欢 Nikon Link？", 18, Typeface.BOLD, INK));
+        supportPanel.addView(text(
+                "请作者喝杯奶茶，支持后续维护与新机型适配。",
+                13,
                 Typeface.NORMAL,
-                MUTED);
-        content.addView(
-                wirelessStatusText,
-                marginParams(-1, -2, 0, 4, 0, 14));
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 12));
+        Button donate = nativeButton("请作者喝奶茶", true);
+        donate.setOnClickListener(view -> showDonation());
+        supportPanel.addView(donate, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+        content.addView(supportPanel);
+
         TextView path = text(
                 "保存位置\n" + photoDirectory.getAbsolutePath(),
                 12,
@@ -1239,12 +1329,14 @@ public final class MainActivity extends Activity {
     }
 
     private String wirelessSettingsText() {
-        return "服务器类型：FTP"
-                + "\n服务器地址：" + wirelessServer.getLocalAddress()
-                + "\n端口：" + WirelessFtpServer.PORT
-                + "\n用户名：" + WirelessFtpServer.USERNAME
-                + "\n密码：" + WirelessFtpServer.PASSWORD
-                + "\nPASV 模式：开启";
+        String host = wirelessServer.getLocalAddress();
+        return "FTP/PASV：" + host + ":" + WirelessTransferServer.FTP_PORT
+                + "\nHTTP 上传：http://" + host + ":"
+                + WirelessTransferServer.HTTP_PORT + "/upload/文件名"
+                + "\nWebDAV：http://" + host + ":"
+                + WirelessTransferServer.HTTP_PORT + "/"
+                + "\n用户名：" + WirelessTransferServer.USERNAME
+                + "\n密码：" + WirelessTransferServer.PASSWORD;
     }
 
     private void updateWirelessUi() {
@@ -1262,7 +1354,7 @@ public final class MainActivity extends Activity {
         if (wirelessStatusText != null) {
             wirelessStatusText.setText(
                     (wirelessRequested ? wirelessStatus + "\n" : "")
-                            + "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启。");
+                            + "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用 Basic Auth，PUT/POST 请求需提供 Content-Length。");
         }
     }
 
@@ -1491,28 +1583,8 @@ public final class MainActivity extends Activity {
                 boundHeight / (double) source.getHeight());
         int targetWidth = Math.max(1, (int) Math.round(source.getWidth() * fit));
         int targetHeight = Math.max(1, (int) Math.round(source.getHeight() * fit));
-        if (!monitorSupersampling) {
-            if (targetWidth == source.getWidth() && targetHeight == source.getHeight()) return source;
-            return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
-        }
-
-        int supersampledWidth = Math.min(4096, targetWidth * 2);
-        int supersampledHeight = Math.max(
-                1,
-                (int) Math.round(
-                        supersampledWidth * (source.getHeight() / (double) source.getWidth())));
-        Bitmap intermediate = Bitmap.createScaledBitmap(
-                source,
-                supersampledWidth,
-                supersampledHeight,
-                true);
-        Bitmap output = Bitmap.createScaledBitmap(
-                intermediate,
-                targetWidth,
-                targetHeight,
-                true);
-        if (intermediate != source && intermediate != output) intermediate.recycle();
-        return output;
+        if (targetWidth == source.getWidth() && targetHeight == source.getHeight()) return source;
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true);
     }
 
     private void showProcessedPreview(Bitmap source, ProcessedPreview output) {
@@ -1606,21 +1678,6 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> showError(error.getMessage()));
             }
         });
-    }
-
-    private void setProfessionalMode(boolean professional) {
-        if (professionalMode == professional) return;
-        professionalMode = professional;
-        updateModeButtons();
-        if ("capture".equals(currentSection)) showSection("capture");
-    }
-
-    private void updateModeButtons() {
-        if (simpleModeButton == null || professionalModeButton == null) return;
-        simpleModeButton.setTextColor(professionalMode ? MUTED : COBALT);
-        professionalModeButton.setTextColor(professionalMode ? COBALT : MUTED);
-        simpleModeButton.setBackground(rounded(professionalMode ? SURFACE : COBALT_SOFT, 9, 0));
-        professionalModeButton.setBackground(rounded(professionalMode ? COBALT_SOFT : SURFACE, 9, 0));
     }
 
     private void updateConnectionUi() {
@@ -1725,47 +1782,74 @@ public final class MainActivity extends Activity {
         return result;
     }
 
-    boolean ensureUsbPermission(UsbManager manager, UsbDevice device) throws InterruptedException {
+    boolean ensureUsbPermission(UsbManager manager, UsbDevice device) throws Exception {
         if (manager.hasPermission(device)) return true;
+        String permissionAction =
+                USB_PERMISSION_ACTION
+                        + "."
+                        + device.getDeviceId()
+                        + "."
+                        + UUID.randomUUID();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean granted = new AtomicBoolean(false);
+        AtomicBoolean registered = new AtomicBoolean(false);
+        AtomicReference<RuntimeException> requestError = new AtomicReference<>();
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (!USB_PERMISSION_ACTION.equals(intent.getAction())) return;
-                UsbDevice returned = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
-                if (returned != null && returned.getDeviceId() == device.getDeviceId()) {
-                    granted.set(intent.getBooleanExtra(
-                            UsbManager.EXTRA_PERMISSION_GRANTED,
-                            false));
-                    latch.countDown();
-                }
+                if (!permissionAction.equals(intent.getAction())) return;
+                // UsbManager is the source of truth. This also avoids depending on
+                // OEM-specific handling of PendingIntent fill-in extras.
+                granted.set(manager.hasPermission(device));
+                latch.countDown();
             }
         };
 
         runOnUiThread(() -> {
-            IntentFilter filter = new IntentFilter(USB_PERMISSION_ACTION);
-            if (Build.VERSION.SDK_INT >= 33) {
-                registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
-            } else {
-                registerReceiver(receiver, filter);
+            try {
+                IntentFilter filter = new IntentFilter(permissionAction);
+                if (Build.VERSION.SDK_INT >= 33) {
+                    // The result can be dispatched by a privileged USB permission
+                    // component rather than the app process itself.
+                    registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+                } else {
+                    registerReceiver(receiver, filter);
+                }
+                registered.set(true);
+                PendingIntent permissionIntent = PendingIntent.getBroadcast(
+                        this,
+                        device.getDeviceId(),
+                        new Intent(permissionAction).setPackage(getPackageName()),
+                        PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                manager.requestPermission(device, permissionIntent);
+            } catch (RuntimeException error) {
+                requestError.set(error);
+                latch.countDown();
             }
-            PendingIntent permissionIntent = PendingIntent.getBroadcast(
-                    this,
-                    device.getDeviceId(),
-                    new Intent(USB_PERMISSION_ACTION).setPackage(getPackageName()),
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-            manager.requestPermission(device, permissionIntent);
         });
 
-        boolean finished = latch.await(35, TimeUnit.SECONDS);
+        boolean finished = false;
+        long deadline = System.currentTimeMillis() + 35_000;
+        while (!finished && System.currentTimeMillis() < deadline) {
+            if (manager.hasPermission(device)) {
+                granted.set(true);
+                break;
+            }
+            long remaining = deadline - System.currentTimeMillis();
+            finished = latch.await(Math.min(250, Math.max(1, remaining)), TimeUnit.MILLISECONDS);
+        }
+        if (manager.hasPermission(device)) granted.set(true);
         runOnUiThread(() -> {
+            if (!registered.get()) return;
             try {
                 unregisterReceiver(receiver);
             } catch (IllegalArgumentException ignored) {
             }
         });
-        return finished && granted.get();
+        if (requestError.get() != null) {
+            throw new Exception("无法请求 USB 访问权限：" + requestError.get().getMessage());
+        }
+        return granted.get();
     }
 
     private LinearLayout verticalContainer() {
@@ -1862,6 +1946,43 @@ public final class MainActivity extends Activity {
                     "diagnostics",
                     "无法打开 GitHub Issue 提交页：" + error.getMessage());
             showToast("无法打开浏览器，请访问 github.com/Tauber01/NikonLink/issues");
+        }
+    }
+
+    private void showRecentLogs() {
+        TextView logView = text(
+                diagnostics.recentText(12_000),
+                11,
+                Typeface.NORMAL,
+                INK);
+        logView.setTypeface(Typeface.MONOSPACE);
+        logView.setTextIsSelectable(true);
+        logView.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(logView);
+        new AlertDialog.Builder(this)
+                .setTitle("最近诊断日志")
+                .setView(scroll)
+                .setNegativeButton("关闭", null)
+                .setPositiveButton("刷新", (dialog, which) -> showRecentLogs())
+                .show();
+    }
+
+    private void showDonation() {
+        try (InputStream stream = getAssets().open("wechat-donation.png")) {
+            ImageView image = new ImageView(this);
+            image.setImageBitmap(BitmapFactory.decodeStream(stream));
+            image.setAdjustViewBounds(true);
+            image.setPadding(dp(18), dp(12), dp(18), dp(12));
+            new AlertDialog.Builder(this)
+                    .setTitle("请作者喝奶茶")
+                    .setMessage("打开微信扫一扫，感谢支持。")
+                    .setView(image)
+                    .setPositiveButton("完成", null)
+                    .show();
+        } catch (Exception error) {
+            diagnostics.error("support", "无法载入赞赏二维码：" + error.getMessage());
+            showToast("二维码暂不可用，请稍后再试。");
         }
     }
 

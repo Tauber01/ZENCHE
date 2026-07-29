@@ -4,18 +4,10 @@ import Photos
 import SwiftUI
 import UIKit
 
-enum ExperienceMode: String, CaseIterable, Identifiable {
-    case simple = "普通"
-    case professional = "专业"
-
-    var id: String { rawValue }
-}
-
 enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
     case monitor = "视频"
     case library = "文件"
-    case transfer = "传输"
 
     var id: String { rawValue }
 
@@ -23,8 +15,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .capture: return "camera.fill"
         case .monitor: return "video.fill"
-        case .library: return "photo.on.rectangle.angled"
-        case .transfer: return "arrow.up.arrow.down"
+        case .library: return "folder.fill"
         }
     }
 }
@@ -194,13 +185,12 @@ final class MediaLibrary: ObservableObject {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var mode: ExperienceMode = .simple
     @Published var section: AppSection = .capture
     @Published var showingConnection = false
+    @Published var showingSettings = false
     @Published var autoSaveToPhotos = false
     @Published var showGrid = false
     @Published var showSafeGuide = false
-    @Published var monitorSupersampling = false
     @Published var monitorVideoCodec: MonitorVideoCodec = .automatic
     @Published var monitorVideoSpec: MonitorVideoSpec = .automatic
     @Published var statusMessage = "选择相机后即可开始"
@@ -211,9 +201,6 @@ final class AppModel: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
-        monitorSupersampling = UserDefaults.standard.bool(
-            forKey: "monitorSupersampling"
-        )
         if let rawCodec = UserDefaults.standard.string(
             forKey: "monitorVideoCodec"
         ), let codec = MonitorVideoCodec(rawValue: rawCodec) {
@@ -243,8 +230,7 @@ final class AppModel: ObservableObject {
             .sink { [weak self] state in
                 guard let self, state == .ready else { return }
                 self.camera.setMonitorVideoSpec(
-                    self.monitorVideoSpec,
-                    supersampling: self.monitorSupersampling
+                    self.monitorVideoSpec
                 )
             }
             .store(in: &subscriptions)
@@ -298,12 +284,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setMonitorSupersampling(_ enabled: Bool) {
-        monitorSupersampling = enabled
-        UserDefaults.standard.set(enabled, forKey: "monitorSupersampling")
-        camera.setMonitorVideoSpec(monitorVideoSpec, supersampling: enabled)
-    }
-
     func setMonitorVideoCodec(_ codec: MonitorVideoCodec) {
         monitorVideoCodec = codec
         UserDefaults.standard.set(codec.rawValue, forKey: "monitorVideoCodec")
@@ -315,6 +295,6 @@ final class AppModel: ObservableObject {
     func setMonitorVideoSpec(_ spec: MonitorVideoSpec) {
         monitorVideoSpec = spec
         UserDefaults.standard.set(spec.rawValue, forKey: "monitorVideoSpec")
-        camera.setMonitorVideoSpec(spec, supersampling: monitorSupersampling)
+        camera.setMonitorVideoSpec(spec)
     }
 }

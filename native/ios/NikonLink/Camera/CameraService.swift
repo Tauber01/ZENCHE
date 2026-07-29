@@ -95,11 +95,18 @@ final class CameraService: NSObject, ObservableObject {
     @Published private(set) var isExternalCamera = false
     @Published private(set) var supportsFocusPoint = false
     @Published private(set) var supportsExposureBias = false
+    @Published private(set) var supportsCustomExposure = false
     @Published private(set) var minExposureBias: Float = -2
     @Published private(set) var maxExposureBias: Float = 2
+    @Published private(set) var minISO: Float = 100
+    @Published private(set) var maxISO: Float = 800
+    @Published private(set) var lensAperture: Float = 0
+    @Published private(set) var activeFrameRate: Double = 30
     @Published private(set) var maxZoomFactor: CGFloat = 1
     @Published private(set) var activeVideoSpecLabel = "—"
     @Published var exposureBias: Float = 0
+    @Published var exposureISO: Float = 100
+    @Published var shutterAngle: Double = 180
     @Published var zoomFactor: CGFloat = 1
 
     let session = AVCaptureSession()
@@ -192,6 +199,7 @@ final class CameraService: NSObject, ObservableObject {
                 self.isExternalCamera = false
                 self.supportsFocusPoint = false
                 self.supportsExposureBias = false
+                self.supportsCustomExposure = false
                 self.state = .disconnected
                 self.onMessage?("相机已断开")
             }
@@ -278,6 +286,63 @@ final class CameraService: NSObject, ObservableObject {
         }
     }
 
+    func setVideoShutterAngle(_ value: Double) {
+        applyVideoExposure(shutterAngle: value, iso: exposureISO)
+    }
+
+    func setVideoISO(_ value: Float) {
+        applyVideoExposure(shutterAngle: shutterAngle, iso: value)
+    }
+
+    private func applyVideoExposure(shutterAngle: Double, iso: Float) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            guard device.isExposureModeSupported(.custom) else {
+                self.onMessage?("当前视频设备不支持手动快门与 ISO")
+                return
+            }
+
+            let frameRate = max(Self.activeFrameRate(for: device), 1)
+            let requestedSeconds = shutterAngle / (360 * frameRate)
+            let minimumSeconds = CMTimeGetSeconds(device.activeFormat.minExposureDuration)
+            let maximumSeconds = CMTimeGetSeconds(device.activeFormat.maxExposureDuration)
+            let clampedSeconds = min(
+                max(requestedSeconds, minimumSeconds),
+                maximumSeconds
+            )
+            let clampedISO = min(max(iso, device.activeFormat.minISO), device.activeFormat.maxISO)
+            let duration = CMTimeMakeWithSeconds(
+                clampedSeconds,
+                preferredTimescale: 1_000_000_000
+            )
+
+            do {
+                try device.lockForConfiguration()
+                device.setExposureModeCustom(
+                    duration: duration,
+                    iso: clampedISO,
+                    completionHandler: nil
+                )
+                device.unlockForConfiguration()
+                let appliedAngle = clampedSeconds * frameRate * 360
+                DispatchQueue.main.async {
+                    self.activeFrameRate = frameRate
+                    self.shutterAngle = appliedAngle
+                    self.exposureISO = clampedISO
+                    self.onMessage?(
+                        String(
+                            format: "视频曝光已应用 · %.1f° · ISO %.0f",
+                            appliedAngle,
+                            clampedISO
+                        )
+                    )
+                }
+            } catch {
+                self.onMessage?("视频曝光设置失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
     func setZoomFactor(_ value: CGFloat) {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.currentDevice else { return }
@@ -295,17 +360,19 @@ final class CameraService: NSObject, ObservableObject {
         }
     }
 
-    func setMonitorVideoSpec(_ spec: MonitorVideoSpec, supersampling: Bool) {
+    func setMonitorVideoSpec(_ spec: MonitorVideoSpec) {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.currentDevice else {
                 self?.onMessage?("连接视频设备后才能应用采集画面尺寸/帧频")
                 return
             }
 
-            if spec == .automatic && !supersampling {
+            if spec == .automatic {
                 let label = Self.videoSpecLabel(for: device.activeFormat)
+                let frameRate = Self.activeFrameRate(for: device)
                 DispatchQueue.main.async {
                     self.activeVideoSpecLabel = label
+                    self.activeFrameRate = frameRate
                     self.onMessage?("采集画面尺寸/帧频由设备自动管理")
                 }
                 return
@@ -315,8 +382,8 @@ final class CameraService: NSObject, ObservableObject {
                 width: 1920,
                 height: 1080
             )
-            let requestedWidth = Int(requestedDimensions.width) * (supersampling ? 2 : 1)
-            let requestedHeight = Int(requestedDimensions.height) * (supersampling ? 2 : 1)
+            let requestedWidth = Int(requestedDimensions.width)
+            let requestedHeight = Int(requestedDimensions.height)
             let requestedFrameRate = spec.frameRate ?? 30
 
             let formats = device.formats.filter { format in
@@ -360,13 +427,11 @@ final class CameraService: NSObject, ObservableObject {
                 device.unlockForConfiguration()
 
                 let label = Self.videoSpecLabel(for: selected)
+                let frameRate = Self.activeFrameRate(for: device)
                 DispatchQueue.main.async {
                     self.activeVideoSpecLabel = label
-                    self.onMessage?(
-                        supersampling
-                        ? "2× 输入采样优先已应用 · 实际输入 \(label)"
-                        : "采集画面尺寸/帧频已应用 · \(label)"
-                    )
+                    self.activeFrameRate = frameRate
+                    self.onMessage?("采集画面尺寸/帧频已应用 · \(label)")
                 }
             } catch {
                 self.onMessage?("采集画面尺寸/帧频设置失败：\(error.localizedDescription)")
@@ -440,8 +505,14 @@ final class CameraService: NSObject, ObservableObject {
                     self.supportsFocusPoint = device.isFocusPointOfInterestSupported
                     self.supportsExposureBias =
                         device.minExposureTargetBias < device.maxExposureTargetBias
+                    self.supportsCustomExposure = device.isExposureModeSupported(.custom)
                     self.minExposureBias = device.minExposureTargetBias
                     self.maxExposureBias = device.maxExposureTargetBias
+                    self.minISO = device.activeFormat.minISO
+                    self.maxISO = device.activeFormat.maxISO
+                    self.exposureISO = device.iso
+                    self.lensAperture = device.lensAperture
+                    self.activeFrameRate = Self.activeFrameRate(for: device)
                     self.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 8)
                     self.exposureBias = device.exposureTargetBias
                     self.zoomFactor = device.videoZoomFactor
@@ -503,6 +574,14 @@ final class CameraService: NSObject, ObservableObject {
         return frameRate > 0
             ? "\(dimensions.width) × \(dimensions.height) · \(Int(frameRate.rounded()))p"
             : "\(dimensions.width) × \(dimensions.height)"
+    }
+
+    private static func activeFrameRate(for device: AVCaptureDevice) -> Double {
+        let duration = device.activeVideoMinFrameDuration
+        if duration.isValid, duration.seconds > 0 {
+            return 1 / duration.seconds
+        }
+        return device.activeFormat.videoSupportedFrameRateRanges.first?.maxFrameRate ?? 30
     }
 
     private func updateState(_ newState: CameraConnectionState, message: String) {
