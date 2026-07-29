@@ -10,7 +10,7 @@
     <AssemblyName>NikonLink</AssemblyName>
     <RootNamespace>NikonLink.Windows</RootNamespace>
     <ApplicationIcon />
-    <Version>0.7.3</Version>
+    <Version>0.8.0</Version>
     <Company>Nikon Link contributors</Company>
     <Product>Nikon Link</Product>
     <Description>Native Nikon Z-series tethering and wireless transfer for Windows.</Description>

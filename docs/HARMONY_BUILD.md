@@ -6,8 +6,9 @@ HarmonyOS 版使用 Stage 模型和 ArkUI 原生组件，不使用 WebView。USB
 
 ## 环境
 
-- DevEco Studio 5.x
-- HarmonyOS SDK，项目基线为 `5.0.0(12)` / API 12
+- DevEco Studio 6.0.1 或更高版本（Apple Silicon 使用 Mac ARM 安装包）
+- HarmonyOS SDK；项目兼容与目标基线均为 `5.0.0(12)` / API 12，
+  可使用 DevEco Studio 6.0.1 自带的 API 21 SDK 编译
 - 支持 USB Host 的 HarmonyOS NEXT 真机
 - 已配置的应用签名和调试/发布证书
 
@@ -22,24 +23,29 @@ HarmonyOS 版使用 Stage 模型和 ArkUI 原生组件，不使用 WebView。USB
 4. 选择 `entry` 模块和 API 12 或更高的兼容 SDK。
 5. 连接真机，授予系统显示的 USB 访问权限后运行。
 
-命令行构建：
-
-```sh
-NIKONLINK_HVIGORW=/path/to/hvigorw ./scripts/build-harmony.sh
-```
-
-如果 `hvigorw` 已在 `PATH` 或位于 `native/harmony/hvigorw`，可直接运行：
+命令行构建脚本会自动检测 `/Applications/DevEco-Studio.app` 和
+`~/Applications/DevEco-Studio.app`，并使用 Studio 自带的 Node、JBR、SDK 与
+Hvigor：
 
 ```sh
 ./scripts/build-harmony.sh
 ```
 
+也可以显式指定其他 Hvigor：
+
+```sh
+NIKONLINK_HVIGORW=/path/to/hvigorw ./scripts/build-harmony.sh
+```
+
 输出：
 
 ```text
-dist/NikonLink-0.7.3-HarmonyOS.hap
-dist/NikonLink-0.7.3-HarmonyOS.hap.sha256
+dist/NikonLink-0.8.0-HarmonyOS.hap
+dist/NikonLink-0.8.0-HarmonyOS.hap.sha256
 ```
+
+未配置 `signingConfigs` 时，Hvigor 会生成可用于编译验证的未签名 HAP；真机安装
+和发布前，需要在 DevEco Studio 中关联华为开发者证书与 Profile 后重新构建。
 
 ## 权限与行为
 

@@ -12,7 +12,7 @@ $BuildRoot = Join-Path $ProjectRoot "build/windows"
 $PublishDirectory = Join-Path $BuildRoot $Runtime
 $DistDirectory = Join-Path $ProjectRoot "dist"
 $Architecture = if ($Runtime -eq "win-arm64") { "arm64" } else { "x64" }
-$ArchiveName = "NikonLink-0.7.3-Windows-$Architecture.zip"
+$ArchiveName = "NikonLink-0.8.0-Windows-$Architecture.zip"
 $ArchivePath = Join-Path $DistDirectory $ArchiveName
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {

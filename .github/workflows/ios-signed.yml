@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "可选：同时上传到已有 Release，例如 v0.7.3"
+        description: "可选：同时上传到已有 Release，例如 v0.8.0"
         required: false
         type: string
 

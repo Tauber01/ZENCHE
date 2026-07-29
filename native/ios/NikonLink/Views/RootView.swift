@@ -940,7 +940,7 @@ private struct ConnectionSheet: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.yellow)
                         }
-                        Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要实现 Z9、Z8、Z f、Z6III、Z50II、Z5II 或 ZR 的快门、光圈、ISO 和原图下载，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
+                        Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要控制 Nikon Link 已适配的 EXPEED 6 / 7 相机并下载原图，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

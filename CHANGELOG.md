@@ -5,6 +5,16 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-29
+
+### Added
+
+- Added native USB/PTP profiles for all ten Nikon EXPEED 6 bodies: Z7, Z6,
+  Z50, D780, D6, Z5, Z7II, Z6II, Z fc and Z30.
+- Added exact EXPEED 6 USB Product IDs across macOS, Android, Windows and
+  HarmonyOS, including descriptor matching that distinguishes first- and
+  second-generation Z6/Z7 bodies.
+
 ## [0.7.3] - 2026-07-29
 
 ### Added

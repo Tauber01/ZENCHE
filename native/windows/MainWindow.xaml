@@ -52,7 +52,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="16">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.7.3" />
+            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.8.0" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -326,6 +326,9 @@
               <ComboBoxItem Tag="6400" Content="ISO 6400" />
               <ComboBoxItem Tag="12800" Content="ISO 12800" />
               <ComboBoxItem Tag="25600" Content="ISO 25600" />
+              <ComboBoxItem Tag="51200" Content="ISO 51200" />
+              <ComboBoxItem Tag="64000" Content="ISO 64000" />
+              <ComboBoxItem Tag="102400" Content="ISO 102400" />
             </ComboBox>
 
             <TextBlock Text="曝光补偿" />

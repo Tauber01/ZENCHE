@@ -13,6 +13,73 @@ private struct SupportedCamera: Equatable {
 
     static let all = [
         SupportedCamera(
+            name: "Nikon Z7",
+            productID: 0x0442,
+            detectionTokens: ["nikon z7", "nikon z 7"],
+            minimumISO: 64,
+            maximumISO: 25600
+        ),
+        SupportedCamera(
+            name: "Nikon Z6",
+            productID: 0x0443,
+            detectionTokens: ["nikon z6", "nikon z 6"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon Z50",
+            productID: 0x0444,
+            detectionTokens: ["nikon z50", "nikon z 50"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D780",
+            productID: 0x0446,
+            detectionTokens: ["nikon d780", "nikon d 780"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D6",
+            productID: 0x0447,
+            detectionTokens: ["nikon d6", "nikon d 6"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Nikon Z5",
+            productID: 0x0448,
+            detectionTokens: ["nikon z5", "nikon z 5"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon Z7II",
+            productID: 0x044b,
+            detectionTokens: [
+                "nikon z7 2", "nikon z7 ii", "nikon z7ii", "nikon z 7ii"
+            ],
+            minimumISO: 64,
+            maximumISO: 25600
+        ),
+        SupportedCamera(
+            name: "Nikon Z6II",
+            productID: 0x044c,
+            detectionTokens: [
+                "nikon z6 2", "nikon z6 ii", "nikon z6ii", "nikon z 6ii"
+            ],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon Z fc",
+            productID: 0x044f,
+            detectionTokens: ["nikon zfc", "nikon z fc"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
             name: "Nikon Z9",
             productID: 0x0450,
             detectionTokens: ["nikon z9", "nikon z 9"],
@@ -25,6 +92,13 @@ private struct SupportedCamera: Equatable {
             detectionTokens: ["nikon z8", "nikon z 8"],
             minimumISO: 64,
             maximumISO: 25600
+        ),
+        SupportedCamera(
+            name: "Nikon Z30",
+            productID: 0x0452,
+            detectionTokens: ["nikon z30", "nikon z 30"],
+            minimumISO: 100,
+            maximumISO: 51200
         ),
         SupportedCamera(
             name: "Nikon Z f",
@@ -78,9 +152,16 @@ private struct SupportedCamera: Equatable {
             .replacingOccurrences(of: "-", with: " ")
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
-        return all.first { camera in
-            camera.detectionTokens.contains { normalized.contains($0) }
+        return all.compactMap { camera -> (camera: SupportedCamera, length: Int)? in
+            let length = camera.detectionTokens
+                .filter { normalized.contains($0) }
+                .map(\.count)
+                .max()
+            guard let length else { return nil }
+            return (camera, length)
         }
+        .max { $0.length < $1.length }?
+        .camera
     }
 
     static func matching(productID: Int) -> SupportedCamera? {
@@ -93,7 +174,7 @@ private struct SupportedCamera: Equatable {
         let maximum = profile?.maximumISO ?? 64000
         return [
             64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
-            51200, 64000
+            51200, 64000, 102400
         ].filter { $0 >= minimum && $0 <= maximum }
     }
 }

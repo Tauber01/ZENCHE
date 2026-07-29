@@ -4,12 +4,36 @@ set -euo pipefail
 PROJECT_ROOT=${0:A:h:h}
 HARMONY_ROOT="$PROJECT_ROOT/native/harmony"
 DIST_DIR="$PROJECT_ROOT/dist"
-VERSION=0.7.3
+VERSION=0.8.0
+
+if [[ -z "${DEVECO_HOME:-}" ]]; then
+  for candidate in \
+    "/Applications/DevEco-Studio.app/Contents" \
+    "$HOME/Applications/DevEco-Studio.app/Contents" \
+    "/Applications/DevEco Studio.app/Contents" \
+    "$HOME/Applications/DevEco Studio.app/Contents"; do
+    if [[ -d "$candidate" ]]; then
+      DEVECO_HOME="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -n "${DEVECO_HOME:-}" && -d "$DEVECO_HOME" ]]; then
+  export DEVECO_HOME
+  export DEVECO_SDK_HOME="${DEVECO_SDK_HOME:-$DEVECO_HOME/sdk}"
+  export HOS_SDK_HOME="${HOS_SDK_HOME:-$DEVECO_HOME/sdk/default}"
+  export OHOS_SDK_HOME="${OHOS_SDK_HOME:-$DEVECO_HOME/sdk/default/openharmony}"
+  export NODE_HOME="$DEVECO_HOME/tools/node"
+  export JAVA_HOME="$DEVECO_HOME/jbr/Contents/Home"
+fi
 
 if [[ -n "${NIKONLINK_HVIGORW:-}" ]]; then
   HVIGOR_COMMAND=("$NIKONLINK_HVIGORW")
 elif [[ -x "$HARMONY_ROOT/hvigorw" ]]; then
   HVIGOR_COMMAND=("$HARMONY_ROOT/hvigorw")
+elif [[ -n "${DEVECO_HOME:-}" && -x "$DEVECO_HOME/tools/hvigor/bin/hvigorw" ]]; then
+  HVIGOR_COMMAND=("$DEVECO_HOME/tools/hvigor/bin/hvigorw")
 elif command -v hvigorw >/dev/null 2>&1; then
   HVIGOR_COMMAND=("$(command -v hvigorw)")
 elif command -v hvigor >/dev/null 2>&1; then
@@ -43,7 +67,7 @@ mkdir -p "$DIST_DIR"
 OUTPUT="$DIST_DIR/NikonLink-${VERSION}-HarmonyOS.hap"
 cp "$HAP_PATH" "$OUTPUT"
 shasum -a 256 "$OUTPUT" |
-  awk '{print $1 "  NikonLink-0.7.3-HarmonyOS.hap"}' \
+  awk '{print $1 "  NikonLink-0.8.0-HarmonyOS.hap"}' \
   > "$OUTPUT.sha256"
 
 echo "HarmonyOS package: $OUTPUT"

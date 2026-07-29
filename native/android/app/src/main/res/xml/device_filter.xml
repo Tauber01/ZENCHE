@@ -1,9 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Nikon Z7 -->
+    <usb-device vendor-id="1200" product-id="1090" />
+    <!-- Nikon Z6 -->
+    <usb-device vendor-id="1200" product-id="1091" />
+    <!-- Nikon Z50 -->
+    <usb-device vendor-id="1200" product-id="1092" />
+    <!-- Nikon D780 -->
+    <usb-device vendor-id="1200" product-id="1094" />
+    <!-- Nikon D6 -->
+    <usb-device vendor-id="1200" product-id="1095" />
+    <!-- Nikon Z5 -->
+    <usb-device vendor-id="1200" product-id="1096" />
+    <!-- Nikon Z7II -->
+    <usb-device vendor-id="1200" product-id="1099" />
+    <!-- Nikon Z6II -->
+    <usb-device vendor-id="1200" product-id="1100" />
+    <!-- Nikon Z fc -->
+    <usb-device vendor-id="1200" product-id="1103" />
     <!-- Nikon Z9 -->
     <usb-device vendor-id="1200" product-id="1104" />
     <!-- Nikon Z8 -->
     <usb-device vendor-id="1200" product-id="1105" />
+    <!-- Nikon Z30 -->
+    <usb-device vendor-id="1200" product-id="1106" />
     <!-- Nikon Z f -->
     <usb-device vendor-id="1200" product-id="1107" />
     <!-- Nikon Z6III -->

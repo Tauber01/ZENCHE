@@ -35,8 +35,8 @@ $env:NIKONLINK_LIBUSB_DLL = "C:\path\to\libusb-1.0.dll"
 输出：
 
 ```text
-dist/NikonLink-0.7.3-Windows-x64.zip
-dist/NikonLink-0.7.3-Windows-x64.zip.sha256
+dist/NikonLink-0.8.0-Windows-x64.zip
+dist/NikonLink-0.8.0-Windows-x64.zip.sha256
 ```
 
 默认是自包含 .NET 发布。传入 `-FrameworkDependent` 可减小包体，但目标电脑必须
