@@ -1,165 +1,160 @@
-# 帧澈 ZENCHE
+<div align="center">
+  <img src="icons/icon-512.png" width="128" height="128" alt="帧澈 ZENCHE 图标">
+  <h1>帧澈 ZENCHE</h1>
+  <p><strong>跨平台相机控制与影像传输工具</strong></p>
+  <p><em>Capture · Connect · Flow</em></p>
+  <p><strong>连接相机，也连接完整工作流</strong></p>
 
-**跨平台相机控制与影像传输工具**
+  <p>
+    <a href="https://github.com/Tauber01/ZENCHE/actions/workflows/build.yml"><img src="https://github.com/Tauber01/ZENCHE/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+    <a href="https://github.com/Tauber01/ZENCHE/releases"><img src="https://img.shields.io/github/v/release/Tauber01/ZENCHE?display_name=tag&amp;sort=semver" alt="GitHub Release"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/Tauber01/ZENCHE" alt="MIT License"></a>
+    <a href="https://github.com/Tauber01/ZENCHE/issues"><img src="https://img.shields.io/github/issues/Tauber01/ZENCHE" alt="GitHub Issues"></a>
+  </p>
+</div>
 
-*Capture · Connect · Flow*
+帧澈 ZENCHE 是一套本地优先的原生相机工作流工具：通过 USB/PTP 连接并控制
+Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、
+管理、导入与分享。
 
-> 连接相机，也连接完整工作流
+- 当前源码版本：**0.8.3**
+- 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
+- 相机档案：**17 款 Nikon EXPEED 6 / 7 机型**
+- 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
+- 安装包：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
 
-帧澈 ZENCHE 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
-拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
-无线传图既可使用相机自带的 FTP 功能，也可通过 HTTP 或 WebDAV 接收
-其他手机、电脑和自动化工具发送的图片。
+> [!IMPORTANT]
+> 已发布版本和实际可下载文件以 GitHub Releases 为准。项目仍在扩大实机验证范围；
+> 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
 
-> 当前版本：**0.8.3 正式版**
->
-> 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
->
-> 支持机型：**EXPEED 6：Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30；EXPEED 7：Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/macos-monitor.png" alt="macOS 实时取景与参数控制"></td>
+    <td width="50%"><img src="docs/images/macos-transfer.png" alt="macOS 无线影像传输"></td>
+  </tr>
+  <tr>
+    <td align="center">实时取景与原生参数控制</td>
+    <td align="center">FTP / HTTP / WebDAV 无线收件箱</td>
+  </tr>
+</table>
 
-项目仍在实机测试阶段，重要拍摄请保留机内存储卡，不要把应用当作唯一备份。
+## 完整工作流
 
-![macOS 上的实时取景与参数控制](docs/images/macos-monitor.png)
+| 环节 | 能力 |
+| --- | --- |
+| Capture · 拍摄 | USB 识别、实时取景、SDRAM 拍摄、JPEG 下载；支持 P / S / A / M 与 M 模式 B 门 |
+| Control · 控制 | 快门、光圈、ISO、曝光补偿、对焦模式、白平衡与 Picture Control |
+| Monitor · 监看 | 快门角度换算、加亮显示条纹、自定义 3D `.cube` LUT 与本地 2× 超采样 |
+| Connect · 传输 | 内置 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
+| Flow · 管理 | JPEG、NEF、HEIF/HEIC、TIFF 本地图库，支持导入、预览、分享与保存到系统相册 |
+| Diagnose · 诊断 | 隐私脱敏的滚动日志、版本检查与预填 GitHub Issue |
 
-## 目前能做什么
-
-- 通过 USB 识别相机，打开实时取景并拍摄照片
-- 调整快门、光圈、ISO、曝光补偿、对焦模式和白平衡
-- 支持 P、S、A、M 以及 M 模式下的 B 门拍摄
-- 将拍摄结果下载到本地照片库
-- 在监看画面上使用条纹图案、自定义 `.cube` LUT 和 2× 超采样
-- 通过内置 FTP/PASV、HTTP 上传和 WebDAV 收件箱接收 JPEG、NEF、HEIF/HEIC 和 TIFF
-- 保存本地诊断日志，方便排查连接、拍摄和传输问题
-- 各平台设置页统一提供软件更新、诊断日志和打赏支持入口
-
-LUT、条纹图案和超采样只作用于预览画面，不会改动原片，也不会写入相机的视频设置。
+LUT、条纹图案和超采样只影响监看画面，不修改原片，也不写入相机的视频设置。
+具体能力取决于平台、相机固件、镜头和当前拍摄模式。
 
 ## 平台支持
 
-各平台并不是同一套功能的简单移植，当前进度如下：
+五个目标均为原生实现，不使用 WebView 复用界面。
 
-| 平台 | USB 联机拍摄 | 无线收图 | 说明 |
-| --- | :---: | --- | --- |
-| macOS | 可用 | FTP、HTTP、WebDAV | SwiftUI/AppKit；通过 `libgphoto2` 连接相机 |
-| Android | 可用 | FTP、HTTP、WebDAV | 原生 Android 应用；使用 USB Host |
-| Windows | 待验收 | FTP、HTTP、WebDAV | WPF/.NET 8；代码已完成，仍需原生工具链和真机验证 |
-| HarmonyOS | 待验收 | FTP、HTTP、WebDAV | Stage/ArkUI；代码已完成，仍需原生工具链和真机验证 |
-| iOS / iPadOS | 不支持 | FTP、HTTP、WebDAV | 可使用本机镜头；iPadOS 支持外接 UVC 视频设备 |
+| 平台 | Nikon USB/PTP | 无线收图 | 本地工作流 | 当前状态 |
+| --- | :---: | :---: | :---: | --- |
+| macOS | ✅ | FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`，已接通 |
+| Android | ✅ | FTP / HTTP / WebDAV | ✅ | Android Views + USB Host，已接通 |
+| Windows | 🧪 | FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`，实现完成，待扩大真机验收 |
+| HarmonyOS | 🧪 | FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host，实现完成，待扩大真机验收 |
+| iOS / iPadOS | — | FTP / HTTP / WebDAV | ✅ | 支持系统相机；iPadOS 支持兼容的外接 UVC 视频设备 |
 
-iOS/iPadOS 的公开接口没有向普通应用开放 Nikon USB/PTP 厂商控制，因此 iPhone
-和 iPad 目前不能通过 帧澈 ZENCHE 调节机身参数或下载 USB 原片。UVC 视频输入也只
-作为视频源使用，不会被显示成 Nikon 相机控制。
+iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，因此当前不能
+通过 iPhone 或 iPad 调整 Nikon 机身参数或下载 USB 原片。外接 UVC 只作为视频源，
+不会被标记为 Nikon 原生控制。
 
 ## 支持的相机
 
-目前内置了 17 款机型的设备档案：
+项目内置以下 17 款机型的 USB 档案：
 
-- EXPEED 6：Nikon Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
-- EXPEED 7：Nikon Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
-
-不同固件、镜头和 USB 环境可能带来差异。部分机型在旧版 `libgphoto2` 中会被
-识别为通用 PTP 相机，macOS 版会再读取 USB 信息确认机型。
+- **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
+- **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 
 <details>
-<summary>USB Product ID</summary>
+<summary>查看 USB Product ID</summary>
 
-| 机型 | Product ID |
-| --- | --- |
-| Z7 | `0x0442` |
-| Z6 | `0x0443` |
-| Z50 | `0x0444` |
-| D780 | `0x0446` |
-| D6 | `0x0447` |
-| Z5 | `0x0448` |
-| Z7II | `0x044b` |
-| Z6II | `0x044c` |
-| Z fc | `0x044f` |
-| Z9 | `0x0450` |
-| Z8 | `0x0451` |
-| Z30 | `0x0452` |
-| Z f | `0x0453` |
-| Z6III | `0x0454` |
-| Z50II | `0x0455` |
-| Z5II | `0x0456` |
-| ZR | `0x0457` |
+| 机型 | Product ID | 机型 | Product ID |
+| --- | --- | --- | --- |
+| Z7 | `0x0442` | Z6 | `0x0443` |
+| Z50 | `0x0444` | D780 | `0x0446` |
+| D6 | `0x0447` | Z5 | `0x0448` |
+| Z7II | `0x044b` | Z6II | `0x044c` |
+| Z fc | `0x044f` | Z9 | `0x0450` |
+| Z8 | `0x0451` | Z30 | `0x0452` |
+| Z f | `0x0453` | Z6III | `0x0454` |
+| Z50II | `0x0455` | Z5II | `0x0456` |
+| ZR | `0x0457` |  |  |
 
 Nikon USB Vendor ID 为 `0x04b0`。
 
 </details>
 
+机型档案表示应用能够正确识别设备并选择相应参数范围，不代表所有固件、镜头和
+USB 主机组合均已完成实机验证。请使用
+[相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md)记录结果。
+
 ## 下载与安装
 
-安装包和对应的 `.sha256` 校验文件发布在
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)。
+前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
+版本及同名 `.sha256` 校验文件。0.8.3 的交付文件命名如下：
 
-### macOS
+| 平台 | 文件 | 安装说明 |
+| --- | --- | --- |
+| macOS Apple Silicon | `ZENCHE-0.8.3-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-0.8.3-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-0.8.3-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-0.8.3-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-0.8.3-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-0.8.3-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
-1. 打开 `ZENCHE-0.8.3-macOS-arm64.dmg`。
-2. 将 **帧澈 ZENCHE** 拖到镜像内的 **Applications** 快捷入口。
-3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
-
-当前社区 DMG 使用 ad-hoc 签名，尚未使用 Apple Developer ID 公证。
-
-### Android
-
-安装 `ZENCHE-0.8.3-android.apk`。当前 APK 使用 Android 调试证书签名，
-用于侧载和硬件验证，不用于 Play 商店发布。
-
-### Windows
-
-运行 `ZENCHE-0.8.3-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
-解压后运行 `ZENCHE.exe`，不要单独移动同目录下的 `libusb-1.0.dll`。
-相机接口可能需要切换到 WinUSB，操作前请先阅读
-[Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
-
-### HarmonyOS
-
-HAP 需要经过有效签名才能安装到支持 USB Host 的真机。环境、权限和签名配置见
-[HarmonyOS 构建与部署](docs/HARMONY_BUILD.md)。
-
-### iOS / iPadOS
-
-IPA 必须使用有效的 Apple Developer 证书和描述文件签名。名称中带有
-`ios-unsigned` 的文件只是 CI 构建产物，不能直接安装。具体步骤见
+Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
+[Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
+Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分别见
+[HarmonyOS 构建与部署](docs/HARMONY_BUILD.md)和
 [iOS 签名与发布](docs/IOS_SIGNING.md)。
 
-## USB 联机拍摄
+校验下载文件：
 
-1. 关闭 NX Tether、Camera Control Pro、“照片”、“图像捕捉”等可能占用相机的
-   软件。
-2. 使用支持数据传输的 USB-C 线直连设备，第一次排查时尽量不要经过扩展坞。
-3. 打开 帧澈 ZENCHE，选择“连接相机”，并允许系统访问 USB 设备。
-4. 实时取景出现后再调整参数或拍摄。
+```sh
+shasum -a 256 -c ZENCHE-0.8.3-macOS-arm64.dmg.sha256
+```
 
-macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重新连接；如果仍然失败，
-请退出其他相机软件，重新插拔相机后再试。
+Windows PowerShell：
 
-实时取景由相机返回 JPEG 帧。拍摄或修改参数时，画面短暂停顿属于正常现象。若机身
-报告温度过高，应用会停止实时取景，此时应关闭相机并等待机身冷却。
+```powershell
+Get-FileHash .\ZENCHE-0.8.3-Windows-x64-Setup.exe -Algorithm SHA256
+```
+
+## USB 快速开始
+
+1. 关闭 NX Tether、Camera Control Pro、照片、图像捕捉等可能占用 PTP 接口的软件。
+2. 使用支持数据传输的 USB 线直连设备；首次排查时不要经过扩展坞。
+3. 打开帧澈 ZENCHE，选择“连接相机”，并允许系统访问 USB 设备。
+4. 等待实时取景出现，再调整参数或拍摄。
+5. 在“文件”中确认影像已经写入本地图库后，再断开相机。
+
+macOS 的系统 PTP 服务有时会先占用相机；应用会尝试释放并重新连接。拍摄或修改
+参数时，实时取景短暂停顿属于正常现象。若机身报告温度过高，请停止取景并等待
+相机冷却。
 
 ## Wi-Fi 无线传图
 
-先让相机和接收设备连到同一个可信局域网，然后在 帧澈 ZENCHE 的“传输”页开启
-无线接收。相机端仍使用 FTP：
+让相机和接收设备连接到同一个可信局域网，在“传输”页开启无线接收，然后按应用
+显示的地址配置发送端。
 
-| 项目 | 设置 |
+| 协议 | 地址或设置 |
 | --- | --- |
-| 服务器地址 | 应用中显示的局域网 IPv4 地址 |
-| 端口 | `2121` |
-| 用户名 | `nikonlink` |
-| 密码 | `nikonlink` |
-| PASV 模式 | 开启 |
-
-所有原生平台还会同时开启以下入口：
-
-| 协议 | 地址或用法 |
-| --- | --- |
+| FTP/PASV | `设备地址:2121`，用户名 `nikonlink`，密码 `nikonlink`，开启 PASV |
 | HTTP PUT/POST | `http://设备地址:8080/upload/文件名` |
 | WebDAV PUT | `http://设备地址:8080/文件名` |
-| HTTP POST 备用命名 | 请求地址使用 `/upload?filename=文件名`，或发送 `X-Filename` 请求头 |
+| HTTP 备用命名 | `/upload?filename=文件名`，或使用 `X-Filename` 请求头 |
 
-HTTP/WebDAV 使用 Basic Auth，用户名和密码同样是 `nikonlink`，上传请求必须提供
-`Content-Length`。例如：
+HTTP/WebDAV 使用同一组 Basic Auth 凭据，上传请求必须提供 `Content-Length`。
 
 ```sh
 curl --user nikonlink:nikonlink \
@@ -167,357 +162,121 @@ curl --user nikonlink:nikonlink \
   http://192.168.1.20:8080/upload/DSC_0001.NEF
 ```
 
-这些服务不加密，只适合在可信局域网内临时使用。
-传输完成后请关闭接收，不要把端口暴露到公网。iOS/iPadOS 进入后台时会自动停止
-所有无线接收服务。
-
-![macOS 上的无线传图页面](docs/images/macos-transfer.png)
+这些入口没有 TLS 加密，只适合在可信局域网内临时开启。传输完成后请关闭接收，
+不要将端口暴露到公网；iOS/iPadOS 进入后台时会自动停止无线服务。
 
 ## 本地构建
 
-在 macOS 上构建 macOS、Android 和可用的 iOS 产物：
+macOS 主机可统一构建 macOS、Android，并在工具链可用时构建 iOS 与 HarmonyOS：
 
 ```sh
 ./scripts/build-all.sh
 ```
 
-常用环境包括：
+常用环境：
 
 - macOS 14+、Apple Silicon、Homebrew、`libgphoto2`
-- OpenJDK 17、Android SDK 35
-- 完整 Xcode 和 iOS SDK
-- Windows 11、.NET 8 SDK、对应架构的 `libusb-1.0.dll`
-- DevEco Studio 5.x、HarmonyOS SDK API 12+ 和应用签名
+- OpenJDK 17、Android SDK 35、Gradle 8.10.2
+- 完整 Xcode 与 iPhoneOS SDK
+- DevEco Studio 6.0.1+、HarmonyOS SDK API 12+
+- Windows 11、.NET 8 SDK、NSIS 3、对应架构的 `libusb-1.0.dll`
 
-默认生成：
-
-```text
-dist/ZENCHE-0.8.3-macOS-arm64.dmg
-dist/ZENCHE-0.8.3-android.apk
-dist/ZENCHE-0.8.3-ios-unsigned.ipa
-```
-
-Windows 需要在 Windows 主机单独构建：
-
-```powershell
-.\scripts\build-windows.ps1 -LibUsbDll C:\path\to\libusb-1.0.dll
-```
-
-该命令同时生成 `ZENCHE-0.8.3-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
-
-HarmonyOS 可单独构建：
+单平台构建：
 
 ```sh
+./scripts/build-macos.sh
+./scripts/build-android.sh
+./scripts/build-ios.sh --unsigned
 ./scripts/build-harmony.sh
 ```
 
-生成已签名的 iOS 安装包：
+Windows 需在 Windows 主机运行：
+
+```powershell
+.\scripts\build-windows.ps1 `
+  -Runtime win-x64 `
+  -LibUsbDll C:\path\to\libusb-1.0.dll
+```
+
+生成已签名 iOS 包：
 
 ```sh
 IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 ```
 
-构建结果位于 `dist/`，每个安装包旁边会生成同名的 SHA-256 校验文件。
+所有产物写入 `dist/`，并生成 SHA-256 校验文件。运行共享测试：
 
-## 遇到问题
+```sh
+npm test
+```
 
-0.8.3 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和原生安装包
-扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
-源码、资源和未签名 HAP 构建已通过，签名、启动和真机测试仍待完成。
-由于构建机器当前未连接全部 EXPEED 6 / 7 机型，USB/PTP、不同固件和镜头组合仍以
-实机验收为发布门槛。
-
-提交 Issue 前，建议先记录相机型号、固件、镜头、数据线和主机系统版本，并按
-[相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md)复现一次。
-
-应用内的“提交 GitHub Issue”会预填版本信息和一小段脱敏日志，最后仍由用户检查
-并手动提交。照片和完整日志不会自动上传。各平台日志目录、保留时间和安全说明见
-[安全策略](SECURITY.md)。
+> [!NOTE]
+> 为保持已有安装的升级兼容性，部分工程目录、scheme、包名和环境变量仍保留
+> `NikonLink` / `com.tauber.nikonlink` 技术标识；面向用户的产品品牌与交付文件名
+> 均为“帧澈 ZENCHE”。
 
 ## 仓库结构
 
 ```text
-native/macos/      macOS 应用
-native/windows/    Windows 应用
-native/android/    Android 应用
-native/harmony/    HarmonyOS 应用
-native/ios/        iOS / iPadOS 应用
-scripts/           各平台构建脚本
-docs/              构建、签名、术语和实机测试文档
+native/
+  macos/          SwiftUI / AppKit
+  windows/        WPF / .NET 8
+  android/        Android Views / USB Host
+  harmony/        Stage / ArkUI
+  ios/            SwiftUI / AVFoundation / PhotoKit
+scripts/          构建、签名与打包脚本
+docs/             平台、术语、安全与实机验收文档
+icons/            产品图标与品牌资产
+PV/               宣传视频工程与交付说明
 ```
 
-相关文档：
+延伸阅读：
 
+- [版本记录](CHANGELOG.md)
 - [Nikon 中文术语与 PTP 映射](docs/NIKON_TERMINOLOGY.md)
 - [相机实机验收清单](docs/CAMERA_TEST_CHECKLIST.md)
 - [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)
 - [HarmonyOS 构建与部署](docs/HARMONY_BUILD.md)
 - [iOS 签名与发布](docs/IOS_SIGNING.md)
-- [版本记录](CHANGELOG.md)
+- [安全策略](SECURITY.md)
+- [第三方许可](THIRD_PARTY_NOTICES.md)
 
-## 许可
+## 反馈与贡献
 
-项目源码使用 [MIT License](LICENSE)。第三方组件许可见
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+提交问题前，请记录相机型号、固件、镜头、数据线、主机系统和复现步骤，并附上应用
+生成的脱敏诊断信息：
 
-Nikon 及文中机型名为 Nikon Corporation 的商标。本项目与 Nikon Corporation
-无隶属、合作或背书关系。
+- [提交 Issue](https://github.com/Tauber01/ZENCHE/issues/new/choose)
+- [查看现有 Issues](https://github.com/Tauber01/ZENCHE/issues)
+- [安全漏洞报告](SECURITY.md)
 
----
-
-<a id="english"></a>
+应用不会自动上传照片或完整日志。预填 Issue 会先交给用户检查，再由用户手动提交。
 
 ## English
 
-帧澈 ZENCHE is a native macOS, Android, and iOS/iPadOS utility for connecting,
-monitoring, controlling, and transferring files from Nikon cameras.
+**帧澈 ZENCHE** is a local-first, cross-platform camera control and image
+transfer tool for macOS, Windows, Android, HarmonyOS, and iOS/iPadOS.
 
-> Current version: **0.8.3 Stable Release**
->
-> Platforms: **macOS · Android · iOS / iPadOS**
->
-> EXPEED 6 cameras: **Nikon Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30**
->
-> EXPEED 7 cameras: **Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
+It connects supported Nikon EXPEED 6/7 cameras through native USB/PTP
+implementations where the operating system permits it, provides live view and
+capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
+in a local library for review and export.
 
-The interface separates creation into two clear workspaces. **Photo** contains
-the shutter, exposure, focus, white balance, Picture Control, and local photo
-workflow. **Video** contains live monitoring, zebra overlays, local 3D LUTs,
-supersampling, and output controls. Files and wireless transfer live in a
-separate management group.
+- Source version: **0.8.3**
+- Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
+- Camera profiles: **17 Nikon EXPEED 6 / 7 bodies**
+- Downloads: [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
+- Hardware validation: [Camera test checklist](docs/CAMERA_TEST_CHECKLIST.md)
 
-### Features
+Public iOS/iPadOS APIs do not expose Nikon vendor-specific USB/PTP control to
+ordinary apps. On Apple mobile platforms, ZENCHE supports the system camera,
+compatible external UVC video input on iPadOS, local file workflows, and
+foreground FTP/HTTP/WebDAV receiving.
 
-| Workflow | Capabilities |
-| --- | --- |
-| Photo | USB/PTP detection, photo live view, SDRAM capture, and JPEG download |
-| Photo controls | P/S/A/M and Bulb; shutter, aperture, ISO, exposure compensation, focus, and white balance |
-| Video monitoring | Live view, zebra overlay, custom `.cube` LUT, and local 2× supersampling |
-| Wireless transfer | FTP/PASV plus HTTP and WebDAV inboxes for JPEG, NEF, HEIF/HEIC, and TIFF |
-| File management | Local preview, import, share, reveal, delete, and save to Photos |
-| Settings | Software updates, diagnostic logs, and donation/support access on every platform |
-| Experience modes | Simple mode for common actions; Pro mode for full controls |
+## License
 
-LUTs, zebra overlays, and supersampling affect only the monitoring image. They
-do not modify the original file or the camera's recording settings.
+Source code is released under the [MIT License](LICENSE). Third-party notices
+are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-### Platform capabilities
-
-| Capability | macOS | Android | iOS / iPadOS |
-| --- | :---: | :---: | :---: |
-| Nikon USB/PTP connection | ✓ | ✓ | — |
-| Nikon live view and shutter control | ✓ | ✓ | — |
-| Exposure, focus, and white-balance control | ✓ | ✓ | — |
-| Custom `.cube` LUT and zebra overlay | ✓ | ✓ | — |
-| FTP wireless inbox | ✓ | ✓ | ✓ |
-| HTTP / WebDAV wireless inbox | ✓ | ✓ | ✓ |
-| Local photo library | ✓ | ✓ | ✓ |
-| System-camera capture | — | — | ✓ |
-| External UVC video on iPadOS | — | — | ✓ |
-
-- **macOS** uses SwiftUI/AppKit and the Nikon PTP backend from `libgphoto2`.
-- **Android** uses native Android Views, USB Host, and the in-project PTP
-  implementation.
-- **iOS/iPadOS** uses SwiftUI, AVFoundation, and PhotoKit for system cameras,
-  external UVC input on iPadOS, and foreground FTP/HTTP/WebDAV receiving.
-
-Public iOS APIs do not expose general Nikon vendor-specific USB/PTP control to
-ordinary applications. Nikon shutter, aperture, ISO, and original-file
-download therefore require Nikon protocol authorization or an official SDK;
-帧澈 ZENCHE does not present a UVC stream as native Nikon control.
-
-### Supported EXPEED 6 and 7 cameras
-
-All listed cameras use Nikon USB Vendor ID `0x04b0`.
-
-| Camera | USB Product ID | macOS | Android | iOS / iPadOS |
-| --- | --- | --- | --- | --- |
-| Nikon Z7 | `0x0442` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z6 | `0x0443` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z50 | `0x0444` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon D780 | `0x0446` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon D6 | `0x0447` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z5 | `0x0448` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z7II | `0x044b` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z6II | `0x044c` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z fc | `0x044f` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z9 | `0x0450` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
-| Nikon Z8 | `0x0451` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
-| Nikon Z30 | `0x0452` | Native USB/PTP | Native USB/PTP | No PTP |
-| Nikon Z f | `0x0453` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
-| Nikon Z6III | `0x0454` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
-| Nikon Z50II | `0x0455` | Native USB/PTP | Native USB/PTP | FTP; no PTP |
-| Nikon Z5II | `0x0456` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
-| Nikon ZR | `0x0457` | PTP compatibility mode | Native USB/PTP | FTP; no PTP |
-
-帧澈 ZENCHE matches the Product ID first and can fall back to the USB product
-name for newer profiles such as the ZR. An unsupported Nikon device is reported
-with its actual Product ID instead of being presented as a supported camera.
-
-### Install and connect
-
-Download release artifacts and matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases).
-
-1. Update the camera to a recent stable firmware.
-2. Quit NX Tether, Camera Control Pro, Photos, Image Capture, and any software
-   that may claim the PTP interface.
-3. Connect the camera directly with a data-capable USB-C cable.
-4. Open 帧澈 ZENCHE, choose **Connect camera**, and grant USB access.
-5. Start live view, adjust supported controls, and capture.
-
-Nikon PTP live view supplies JPEG frames. Display resolution, LUT, zebra, and
-local 2× supersampling change only preview rendering, not the camera's video
-file type, resolution, or codec.
-
-### Local build
-
-Requirements include macOS 14+ on Apple Silicon, Homebrew with `libgphoto2`,
-OpenJDK 17, Android SDK 35, Gradle, and a complete Xcode installation.
-
-```sh
-./scripts/build-all.sh
-```
-
-The build produces macOS DMG, Android APK, and unsigned iOS IPA artifacts in
-`dist/`, each with a matching SHA-256 checksum. See
-[iOS signing](docs/IOS_SIGNING.md) for a device-installable IPA.
-
-Hardware verification across every camera, firmware, lens, cable, and host
-combination remains a release gate. Record results with the
-[camera test checklist](docs/CAMERA_TEST_CHECKLIST.md).
-
-The source is licensed under the [MIT License](LICENSE). Nikon and the camera
-model names are trademarks of Nikon Corporation. This project is not affiliated
-with, endorsed by, or sponsored by Nikon Corporation.
-
-[Back to language selection](#nikon-link)
-
----
-
-<a id="日本語"></a>
-
-## 日本語
-
-帧澈 ZENCHE は、Nikon カメラの接続、モニタリング、撮影制御、ファイル転送を
-行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
-
-> 現在のバージョン：**0.8.3 正式リリース**
->
-> 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
->
-> EXPEED 6 対応機種：**Nikon Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30**
->
-> EXPEED 7 対応機種：**Nikon Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR**
-
-画面は **写真** と **動画** の二つの制作ワークスペースに分かれています。
-写真にはシャッター、露出、フォーカス、ホワイトバランス、ピクチャーコントロール、
-ローカル保存を集約し、動画にはライブビュー、ゼブラ表示、3D LUT、スーパー
-サンプリング、出力設定を集約しています。ファイルとワイヤレス転送は管理グループ
-から操作します。
-
-### 主な機能
-
-| ワークフロー | 機能 |
-| --- | --- |
-| 写真 | USB/PTP 検出、写真ライブビュー、SDRAM 撮影、JPEG ダウンロード |
-| 写真制御 | P/S/A/M・バルブ、シャッター、絞り、ISO、露出補正、AF、ホワイトバランス |
-| 動画モニター | ライブビュー、ゼブラ表示、カスタム `.cube` LUT、ローカル 2× スーパーサンプリング |
-| ワイヤレス転送 | JPEG、NEF、HEIF/HEIC、TIFF を受信する FTP/PASV、HTTP、WebDAV 受信ボックス |
-| ファイル管理 | ローカル表示、読み込み、共有、場所表示、削除、「写真」への保存 |
-| 設定 | 全プラットフォーム共通の更新、診断ログ、寄付・サポート |
-| 操作モード | よく使う操作だけの「普通」と、全設定を表示する「プロ」 |
-
-LUT、ゼブラ表示、スーパーサンプリングはモニター画像だけに適用されます。原本や
-カメラ本体の動画記録設定は変更しません。
-
-### プラットフォーム別機能
-
-| 機能 | macOS | Android | iOS / iPadOS |
-| --- | :---: | :---: | :---: |
-| Nikon USB/PTP 接続 | ✓ | ✓ | — |
-| Nikon ライブビュー・シャッター制御 | ✓ | ✓ | — |
-| 露出・フォーカス・ホワイトバランス | ✓ | ✓ | — |
-| カスタム `.cube` LUT・ゼブラ表示 | ✓ | ✓ | — |
-| FTP ワイヤレス受信 | ✓ | ✓ | ✓ |
-| HTTP / WebDAV ワイヤレス受信 | ✓ | ✓ | ✓ |
-| ローカル写真ライブラリ | ✓ | ✓ | ✓ |
-| システムカメラ撮影 | — | — | ✓ |
-| iPadOS 外付け UVC ビデオ | — | — | ✓ |
-
-- **macOS**：SwiftUI/AppKit と `libgphoto2` の Nikon PTP バックエンド。
-- **Android**：ネイティブ Android View、USB Host、内蔵 PTP 実装。
-- **iOS/iPadOS**：SwiftUI、AVFoundation、PhotoKit。本体カメラ、iPadOS の
-  外付け UVC、フォアグラウンド FTP/HTTP/WebDAV 受信に対応。
-
-iOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御を提供していません。
-Nikon のシャッター、絞り、ISO、原本ダウンロードには、Nikon のプロトコル認可
-または公式 SDK が必要です。帧澈 ZENCHE は UVC 入力を Nikon ネイティブ制御と
-して表示しません。
-
-### EXPEED 6 / 7 対応機種
-
-全機種の Nikon USB Vendor ID は `0x04b0` です。
-
-| 機種 | USB Product ID | macOS | Android | iOS / iPadOS |
-| --- | --- | --- | --- | --- |
-| Nikon Z7 | `0x0442` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z6 | `0x0443` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z50 | `0x0444` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon D780 | `0x0446` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon D6 | `0x0447` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z5 | `0x0448` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z7II | `0x044b` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z6II | `0x044c` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z fc | `0x044f` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z9 | `0x0450` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon Z8 | `0x0451` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon Z30 | `0x0452` | ネイティブ USB/PTP | ネイティブ USB/PTP | PTP 非対応 |
-| Nikon Z f | `0x0453` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon Z6III | `0x0454` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon Z50II | `0x0455` | ネイティブ USB/PTP | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon Z5II | `0x0456` | PTP 互換モード | ネイティブ USB/PTP | FTP、PTP 非対応 |
-| Nikon ZR | `0x0457` | PTP 互換モード | ネイティブ USB/PTP | FTP、PTP 非対応 |
-
-Product ID を優先して照合し、ZR などの新しい機種では USB 製品名もフォール
-バックとして利用します。未対応の Nikon USB 機器は、対応機種として誤表示せず、
-実際の Product ID を表示します。
-
-### インストールと接続
-
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から
-インストールファイルと同名の `.sha256` をダウンロードしてください。
-
-1. カメラを新しい安定版ファームウェアへ更新します。
-2. NX Tether、Camera Control Pro、「写真」、「イメージキャプチャ」など、
-   PTP インターフェースを使用するアプリを終了します。
-3. データ通信対応 USB-C ケーブルでカメラを直接接続します。
-4. 帧澈 ZENCHE で「カメラを接続」を選び、USB アクセスを許可します。
-5. ライブビューを開始し、利用可能な設定を調整して撮影します。
-
-Nikon PTP ライブビューは JPEG フレームを返します。表示サイズ、LUT、ゼブラ、
-ローカル 2× スーパーサンプリングはプレビュー表示だけを変更し、カメラ本体の
-動画ファイル形式、解像度、コーデックは変更しません。
-
-### ローカルビルド
-
-macOS 14+（Apple Silicon）、Homebrew と `libgphoto2`、OpenJDK 17、
-Android SDK 35、Gradle、完全な Xcode 環境が必要です。
-
-```sh
-./scripts/build-all.sh
-```
-
-`dist/` に macOS DMG、Android APK、未署名 iOS IPA と各 SHA-256 チェックサムを
-生成します。実機へインストールできる IPA については
-[iOS 署名手順](docs/IOS_SIGNING.md)を参照してください。
-
-すべての機種、ファームウェア、レンズ、ケーブル、ホスト環境の組み合わせは実機
-検証がリリース条件です。[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
-に結果を記録してください。
-
-ソースコードは [MIT License](LICENSE) で提供されます。Nikon および各機種名は
-Nikon Corporation の商標です。本プロジェクトは Nikon Corporation との提携、
-承認、スポンサー関係を持ちません。
-
-[言語選択へ戻る](#nikon-link)
+Nikon and all camera model names are trademarks of Nikon Corporation. This
+project is not affiliated with, endorsed by, or sponsored by Nikon Corporation.
