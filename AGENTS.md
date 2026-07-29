@@ -28,5 +28,8 @@
 - Product descriptor: `跨平台相机控制与影像传输工具`
 - English brand line: `Capture · Connect · Flow`
 - Canonical slogan: `连接相机，也连接完整工作流`
+- Canonical brand mark: the blue geometric `Z` in `icons/app-icon.svg`; promotional
+  assets may use the equivalent `PV/assets/branding/zenche-z-mark.svg`.
+- Do not substitute the former `澈` character tile for the canonical `Z` mark.
 - Promotional materials must not substitute `完整创作流` or another variation for
   the canonical slogan.
