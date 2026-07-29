@@ -5,10 +5,19 @@ the project uses semantic versioning.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-29
+
 ### Added
 
+- Added concurrent FTP/PASV, authenticated HTTP PUT/POST, and WebDAV image
+  inboxes across macOS, Windows, Android, HarmonyOS, and iOS/iPadOS.
 - Added a versioned Windows NSIS `Setup.exe` with shortcuts, in-place upgrades,
   registered uninstall support, portable ZIP output, and SHA-256 checksums.
+
+### Changed
+
+- Refined the native mobile and desktop workspaces, monitoring controls,
+  diagnostics, packaging metadata, and responsive layouts.
 
 ### Fixed
 

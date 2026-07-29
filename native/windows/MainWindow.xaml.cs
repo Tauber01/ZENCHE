@@ -15,7 +15,7 @@ public partial class MainWindow : Window
 {
     private readonly PtpCamera _camera = new();
     private readonly PhotoLibrary _library = new();
-    private readonly WirelessFtpServer _wirelessServer;
+    private readonly WirelessTransferServer _wirelessServer;
     private readonly DiagnosticLogger _diagnostics = DiagnosticLogger.Shared;
     private readonly ObservableCollection<PhotoItem> _photos = [];
     private CancellationTokenSource? _previewCancellation;
@@ -32,7 +32,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _wirelessServer = new WirelessFtpServer(_library);
+        _wirelessServer = new WirelessTransferServer(_library);
         _wirelessServer.StatusChanged += (_, status) =>
             Dispatcher.Invoke(() =>
             {
@@ -408,11 +408,17 @@ public partial class MainWindow : Window
             await _wirelessServer.StartAsync();
             _diagnostics.Info(
                 "wireless",
-                $"无线收件箱已开启；地址={_wirelessServer.LocalAddress}:" +
-                $"{WirelessFtpServer.Port}");
+                $"无线收件箱已开启；FTP={_wirelessServer.LocalAddress}:" +
+                $"{WirelessTransferServer.FtpPort}；HTTP/WebDAV=" +
+                $"{_wirelessServer.LocalAddress}:{WirelessTransferServer.HttpPort}");
             WirelessButton.Content = "停止无线接收";
             WirelessAddressText.Text =
-                $"{_wirelessServer.LocalAddress}:{WirelessFtpServer.Port}";
+                $"FTP/PASV  {_wirelessServer.LocalAddress}:" +
+                $"{WirelessTransferServer.FtpPort}\n" +
+                $"HTTP 上传  http://{_wirelessServer.LocalAddress}:" +
+                $"{WirelessTransferServer.HttpPort}/upload/文件名\n" +
+                $"WebDAV  http://{_wirelessServer.LocalAddress}:" +
+                $"{WirelessTransferServer.HttpPort}/";
             OperationStatusText.Text = "无线收件箱已开启";
         }
         catch (Exception error)

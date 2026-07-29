@@ -99,7 +99,7 @@ public final class MainActivity extends Activity {
     private Bitmap latestSourceFrame;
     private Bitmap latestZebraMask;
     private File photoDirectory;
-    private WirelessFtpServer wirelessServer;
+    private WirelessTransferServer wirelessServer;
 
     private volatile boolean connected;
     private volatile boolean connecting;
@@ -133,7 +133,7 @@ public final class MainActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 
-        camera = new PtpCamera(this);
+        camera = new PtpCamera(this, diagnostics);
         monitorVideoProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("monitorVideoProfile", "source");
         monitorFrameRate = getSharedPreferences("nikon-link", MODE_PRIVATE)
@@ -147,9 +147,9 @@ public final class MainActivity extends Activity {
         if (base == null) base = getFilesDir();
         photoDirectory = new File(base, "Nikon Link");
         if (!photoDirectory.exists()) photoDirectory.mkdirs();
-        wirelessServer = new WirelessFtpServer(
+        wirelessServer = new WirelessTransferServer(
                 photoDirectory,
-                new WirelessFtpServer.Listener() {
+                new WirelessTransferServer.Listener() {
                     @Override
                     public void onStatus(String status) {
                         diagnostics.info("wireless", status);
@@ -1213,7 +1213,7 @@ public final class MainActivity extends Activity {
 
     private View buildWirelessTransferPanel() {
         LinearLayout settings = panel();
-        settings.addView(text("相机 FTP 无线收件箱", 18, Typeface.BOLD, INK));
+        settings.addView(text("多协议无线图片收件箱", 18, Typeface.BOLD, INK));
         settings.addView(text(
                 wirelessStatus,
                 13,
@@ -1247,7 +1247,7 @@ public final class MainActivity extends Activity {
                 wirelessButton,
                 marginParams(-1, dp(48), 0, 16, 0, 0));
         wirelessStatusText = text(
-                "相机设置：网络菜单 → 连接到 FTP 服务器；选择 FTP、开启 PASV，再选择照片上传或自动上传。",
+                "相机可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP 上传或 WebDAV PUT。",
                 12,
                 Typeface.NORMAL,
                 MUTED);
@@ -1329,12 +1329,14 @@ public final class MainActivity extends Activity {
     }
 
     private String wirelessSettingsText() {
-        return "服务器类型：FTP"
-                + "\n服务器地址：" + wirelessServer.getLocalAddress()
-                + "\n端口：" + WirelessFtpServer.PORT
-                + "\n用户名：" + WirelessFtpServer.USERNAME
-                + "\n密码：" + WirelessFtpServer.PASSWORD
-                + "\nPASV 模式：开启";
+        String host = wirelessServer.getLocalAddress();
+        return "FTP/PASV：" + host + ":" + WirelessTransferServer.FTP_PORT
+                + "\nHTTP 上传：http://" + host + ":"
+                + WirelessTransferServer.HTTP_PORT + "/upload/文件名"
+                + "\nWebDAV：http://" + host + ":"
+                + WirelessTransferServer.HTTP_PORT + "/"
+                + "\n用户名：" + WirelessTransferServer.USERNAME
+                + "\n密码：" + WirelessTransferServer.PASSWORD;
     }
 
     private void updateWirelessUi() {
@@ -1352,7 +1354,7 @@ public final class MainActivity extends Activity {
         if (wirelessStatusText != null) {
             wirelessStatusText.setText(
                     (wirelessRequested ? wirelessStatus + "\n" : "")
-                            + "相机设置：网络菜单 → 连接到 FTP 服务器；服务器类型选择 FTP，PASV 模式选择开启。");
+                            + "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用 Basic Auth，PUT/POST 请求需提供 Content-Length。");
         }
     }
 

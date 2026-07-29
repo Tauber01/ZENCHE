@@ -2662,7 +2662,7 @@ private struct TransferView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Text("无线传输").font(.system(size: 34, weight: .bold))
-                Text("通过相机内置 Wi-Fi，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
+                Text("通过 FTP、HTTP 或 WebDAV，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
                     .foregroundStyle(Palette.muted)
                 LazyVGrid(
                     columns: [
@@ -2686,8 +2686,8 @@ private struct TransferView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("相机 FTP 设置").font(.title3.bold())
-                            Text("适用于相机直连热点或同一局域网")
+                            Text("多协议无线图片接收").font(.title3.bold())
+                            Text("适用于相机直连热点或同一可信局域网")
                                 .foregroundStyle(Palette.muted)
                         }
                         Spacer()
@@ -2709,8 +2709,17 @@ private struct TransferView: View {
                     transferRow("用户名", WirelessTransferServer.username)
                     transferRow("密码", WirelessTransferServer.password)
                     transferRow("PASV 模式", "开启")
+                    Divider()
+                    transferRow(
+                        "HTTP 上传",
+                        "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/upload/文件名"
+                    )
+                    transferRow(
+                        "WebDAV",
+                        "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/"
+                    )
 
-                    Text("在相机“网络菜单 → 连接到 FTP 服务器”中填写以上信息，选择照片上传或开启自动上传。首次启动时请允许 macOS 接受传入网络连接。")
+                    Text("相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。首次启动时请允许 macOS 接受传入网络连接。")
                         .font(.system(size: 13))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2740,6 +2749,8 @@ private struct TransferView: View {
             Spacer()
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
         }
     }

@@ -4,9 +4,10 @@
 
 Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画面、调参数、按快门，
 拍完以后把照片收回来。它不依赖 Nikon 专有 SDK，USB 联机部分基于 PTP，
-无线传图则使用相机自带的 FTP 功能。
+无线传图既可使用相机自带的 FTP 功能，也可通过 HTTP 或 WebDAV 接收
+其他手机、电脑和自动化工具发送的图片。
 
-> 当前版本：**0.8.0 正式版**
+> 当前版本：**0.8.1 正式版**
 >
 > 支持平台：**macOS · Android · Windows · HarmonyOS · iOS / iPadOS**
 >
@@ -23,7 +24,7 @@ Nikon Link 想解决的事情很简单：拍摄时用电脑或移动设备看画
 - 支持 P、S、A、M 以及 M 模式下的 B 门拍摄
 - 将拍摄结果下载到本地照片库
 - 在监看画面上使用条纹图案、自定义 `.cube` LUT 和 2× 超采样
-- 通过内置 FTP 收件箱接收 JPEG、NEF、HEIF/HEIC 和 TIFF
+- 通过内置 FTP/PASV、HTTP 上传和 WebDAV 收件箱接收 JPEG、NEF、HEIF/HEIC 和 TIFF
 - 保存本地诊断日志，方便排查连接、拍摄和传输问题
 
 LUT、条纹图案和超采样只作用于预览画面，不会改动原片，也不会写入相机的视频设置。
@@ -32,13 +33,13 @@ LUT、条纹图案和超采样只作用于预览画面，不会改动原片，�
 
 各平台并不是同一套功能的简单移植，当前进度如下：
 
-| 平台 | USB 联机拍摄 | FTP 收图 | 说明 |
-| --- | :---: | :---: | --- |
-| macOS | 可用 | 可用 | SwiftUI/AppKit；通过 `libgphoto2` 连接相机 |
-| Android | 可用 | 可用 | 原生 Android 应用；使用 USB Host |
-| Windows | 待验收 | 待验收 | WPF/.NET 8；代码已完成，仍需原生工具链和真机验证 |
-| HarmonyOS | 待验收 | 待验收 | Stage/ArkUI；代码已完成，仍需原生工具链和真机验证 |
-| iOS / iPadOS | 不支持 | 可用 | 可使用本机镜头；iPadOS 支持外接 UVC 视频设备 |
+| 平台 | USB 联机拍摄 | 无线收图 | 说明 |
+| --- | :---: | --- | --- |
+| macOS | 可用 | FTP、HTTP、WebDAV | SwiftUI/AppKit；通过 `libgphoto2` 连接相机 |
+| Android | 可用 | FTP、HTTP、WebDAV | 原生 Android 应用；使用 USB Host |
+| Windows | 待验收 | FTP、HTTP、WebDAV | WPF/.NET 8；代码已完成，仍需原生工具链和真机验证 |
+| HarmonyOS | 待验收 | FTP、HTTP、WebDAV | Stage/ArkUI；代码已完成，仍需原生工具链和真机验证 |
+| iOS / iPadOS | 不支持 | FTP、HTTP、WebDAV | 可使用本机镜头；iPadOS 支持外接 UVC 视频设备 |
 
 iOS/iPadOS 的公开接口没有向普通应用开放 Nikon USB/PTP 厂商控制，因此 iPhone
 和 iPad 目前不能通过 Nikon Link 调节机身参数或下载 USB 原片。UVC 视频输入也只
@@ -88,7 +89,7 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### macOS
 
-1. 打开 `NikonLink-0.8.0-macOS-arm64.dmg`。
+1. 打开 `NikonLink-0.8.1-macOS-arm64.dmg`。
 2. 将 **Nikon Link** 拖到镜像内的 **Applications** 快捷入口。
 3. 首次打开若被系统拦截，请前往“系统设置 → 隐私与安全性”确认。
 
@@ -96,12 +97,12 @@ Nikon USB Vendor ID 为 `0x04b0`。
 
 ### Android
 
-安装 `NikonLink-0.8.0-android.apk`。当前 APK 使用 Android 调试证书签名，
+安装 `NikonLink-0.8.1-android.apk`。当前 APK 使用 Android 调试证书签名，
 用于侧载和硬件验证，不用于 Play 商店发布。
 
 ### Windows
 
-运行 `NikonLink-0.8.0-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
+运行 `NikonLink-0.8.1-Windows-x64-Setup.exe` 完成安装。也可下载便携 ZIP，
 解压后运行 `NikonLink.exe`，不要单独移动同目录下的 `libusb-1.0.dll`。
 相机接口可能需要切换到 WinUSB，操作前请先阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，以免影响 Nikon 官方软件。
@@ -134,7 +135,7 @@ macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重
 ## Wi-Fi 无线传图
 
 先让相机和接收设备连到同一个可信局域网，然后在 Nikon Link 的“传输”页开启
-无线接收。相机端的 FTP 配置为：
+无线接收。相机端仍使用 FTP：
 
 | 项目 | 设置 |
 | --- | --- |
@@ -144,9 +145,26 @@ macOS 的系统 PTP 服务有时会先占用相机。应用会尝试释放并重
 | 密码 | `nikonlink` |
 | PASV 模式 | 开启 |
 
-这套 FTP 服务没有加密，也没有独立账户体系，只适合在可信局域网内临时使用。
+所有原生平台还会同时开启以下入口：
+
+| 协议 | 地址或用法 |
+| --- | --- |
+| HTTP PUT/POST | `http://设备地址:8080/upload/文件名` |
+| WebDAV PUT | `http://设备地址:8080/文件名` |
+| HTTP POST 备用命名 | 请求地址使用 `/upload?filename=文件名`，或发送 `X-Filename` 请求头 |
+
+HTTP/WebDAV 使用 Basic Auth，用户名和密码同样是 `nikonlink`，上传请求必须提供
+`Content-Length`。例如：
+
+```sh
+curl --user nikonlink:nikonlink \
+  --upload-file DSC_0001.NEF \
+  http://192.168.1.20:8080/upload/DSC_0001.NEF
+```
+
+这些服务不加密，只适合在可信局域网内临时使用。
 传输完成后请关闭接收，不要把端口暴露到公网。iOS/iPadOS 进入后台时会自动停止
-FTP 服务。
+所有无线接收服务。
 
 ![macOS 上的无线传图页面](docs/images/macos-transfer.png)
 
@@ -169,9 +187,9 @@ FTP 服务。
 默认生成：
 
 ```text
-dist/NikonLink-0.8.0-macOS-arm64.dmg
-dist/NikonLink-0.8.0-android.apk
-dist/NikonLink-0.8.0-ios-unsigned.ipa
+dist/NikonLink-0.8.1-macOS-arm64.dmg
+dist/NikonLink-0.8.1-android.apk
+dist/NikonLink-0.8.1-ios-unsigned.ipa
 ```
 
 Windows 需要在 Windows 主机单独构建：
@@ -180,7 +198,7 @@ Windows 需要在 Windows 主机单独构建：
 .\scripts\build-windows.ps1 -LibUsbDll C:\path\to\libusb-1.0.dll
 ```
 
-该命令同时生成 `NikonLink-0.8.0-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
+该命令同时生成 `NikonLink-0.8.1-Windows-x64-Setup.exe` 安装程序和便携 ZIP。
 
 HarmonyOS 可单独构建：
 
@@ -198,7 +216,7 @@ IOS_DEVELOPMENT_TEAM=你的TeamID ./scripts/build-ios.sh --signed
 
 ## 遇到问题
 
-0.8.0 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
+0.8.1 正式版本已覆盖编译、容器结构、签名状态、原生 UI 启动和安装包 Web 资源
 扫描。Windows 源码和自包含包已通过 .NET 编译与 PE/ZIP 结构检查；HarmonyOS
 源码、资源和未签名 HAP 构建已通过，签名、启动和真机测试仍待完成。
 由于构建机器当前未连接全部 EXPEED 6 / 7 机型，USB/PTP、不同固件和镜头组合仍以
@@ -249,7 +267,7 @@ Nikon 及文中机型名为 Nikon Corporation 的商标。本项目与 Nikon Cor
 Nikon Link is a native macOS, Android, and iOS/iPadOS utility for connecting,
 monitoring, controlling, and transferring files from Nikon cameras.
 
-> Current version: **0.8.0 Stable Release**
+> Current version: **0.8.1 Stable Release**
 >
 > Platforms: **macOS · Android · iOS / iPadOS**
 >
@@ -270,7 +288,7 @@ separate management group.
 | Photo | USB/PTP detection, photo live view, SDRAM capture, and JPEG download |
 | Photo controls | P/S/A/M and Bulb; shutter, aperture, ISO, exposure compensation, focus, and white balance |
 | Video monitoring | Live view, zebra overlay, custom `.cube` LUT, and local 2× supersampling |
-| Wireless transfer | Built-in FTP/PASV inbox for JPEG, NEF, HEIF/HEIC, and TIFF |
+| Wireless transfer | FTP/PASV plus HTTP and WebDAV inboxes for JPEG, NEF, HEIF/HEIC, and TIFF |
 | File management | Local preview, import, share, reveal, delete, and save to Photos |
 | Experience modes | Simple mode for common actions; Pro mode for full controls |
 
@@ -286,6 +304,7 @@ do not modify the original file or the camera's recording settings.
 | Exposure, focus, and white-balance control | ✓ | ✓ | — |
 | Custom `.cube` LUT and zebra overlay | ✓ | ✓ | — |
 | FTP wireless inbox | ✓ | ✓ | ✓ |
+| HTTP / WebDAV wireless inbox | ✓ | ✓ | ✓ |
 | Local photo library | ✓ | ✓ | ✓ |
 | System-camera capture | — | — | ✓ |
 | External UVC video on iPadOS | — | — | ✓ |
@@ -294,7 +313,7 @@ do not modify the original file or the camera's recording settings.
 - **Android** uses native Android Views, USB Host, and the in-project PTP
   implementation.
 - **iOS/iPadOS** uses SwiftUI, AVFoundation, and PhotoKit for system cameras,
-  external UVC input on iPadOS, and foreground FTP receiving.
+  external UVC input on iPadOS, and foreground FTP/HTTP/WebDAV receiving.
 
 Public iOS APIs do not expose general Nikon vendor-specific USB/PTP control to
 ordinary applications. Nikon shutter, aperture, ISO, and original-file
@@ -377,7 +396,7 @@ with, endorsed by, or sponsored by Nikon Corporation.
 Nikon Link は、Nikon カメラの接続、モニタリング、撮影制御、ファイル転送を
 行う macOS・Android・iOS/iPadOS 向けネイティブアプリです。
 
-> 現在のバージョン：**0.8.0 正式リリース**
+> 現在のバージョン：**0.8.1 正式リリース**
 >
 > 対応プラットフォーム：**macOS · Android · iOS / iPadOS**
 >
@@ -398,7 +417,7 @@ Nikon Link は、Nikon カメラの接続、モニタリング、撮影制御、
 | 写真 | USB/PTP 検出、写真ライブビュー、SDRAM 撮影、JPEG ダウンロード |
 | 写真制御 | P/S/A/M・バルブ、シャッター、絞り、ISO、露出補正、AF、ホワイトバランス |
 | 動画モニター | ライブビュー、ゼブラ表示、カスタム `.cube` LUT、ローカル 2× スーパーサンプリング |
-| ワイヤレス転送 | JPEG、NEF、HEIF/HEIC、TIFF を受信する FTP/PASV 受信ボックス |
+| ワイヤレス転送 | JPEG、NEF、HEIF/HEIC、TIFF を受信する FTP/PASV、HTTP、WebDAV 受信ボックス |
 | ファイル管理 | ローカル表示、読み込み、共有、場所表示、削除、「写真」への保存 |
 | 操作モード | よく使う操作だけの「普通」と、全設定を表示する「プロ」 |
 
@@ -414,6 +433,7 @@ LUT、ゼブラ表示、スーパーサンプリングはモニター画像だ�
 | 露出・フォーカス・ホワイトバランス | ✓ | ✓ | — |
 | カスタム `.cube` LUT・ゼブラ表示 | ✓ | ✓ | — |
 | FTP ワイヤレス受信 | ✓ | ✓ | ✓ |
+| HTTP / WebDAV ワイヤレス受信 | ✓ | ✓ | ✓ |
 | ローカル写真ライブラリ | ✓ | ✓ | ✓ |
 | システムカメラ撮影 | — | — | ✓ |
 | iPadOS 外付け UVC ビデオ | — | — | ✓ |
@@ -421,7 +441,7 @@ LUT、ゼブラ表示、スーパーサンプリングはモニター画像だ�
 - **macOS**：SwiftUI/AppKit と `libgphoto2` の Nikon PTP バックエンド。
 - **Android**：ネイティブ Android View、USB Host、内蔵 PTP 実装。
 - **iOS/iPadOS**：SwiftUI、AVFoundation、PhotoKit。本体カメラ、iPadOS の
-  外付け UVC、フォアグラウンド FTP 受信に対応。
+  外付け UVC、フォアグラウンド FTP/HTTP/WebDAV 受信に対応。
 
 iOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御を提供していません。
 Nikon のシャッター、絞り、ISO、原本ダウンロードには、Nikon のプロトコル認可

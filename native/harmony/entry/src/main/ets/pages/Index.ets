@@ -7,8 +7,9 @@ import { PtpCamera } from '../camera/PtpCamera';
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
 import {
   FTP_PORT,
-  WirelessFtpServer
-} from '../transfer/WirelessFtpServer';
+  HTTP_PORT,
+  WirelessTransferServer
+} from '../transfer/WirelessTransferServer';
 import { DiagnosticLogger } from '../diagnostics/DiagnosticLogger';
 
 class SelectEntry {
@@ -109,7 +110,7 @@ const PICTURE_CONTROLS: Array<SelectEntry> = [
 struct Index {
   private camera: PtpCamera = new PtpCamera();
   private library?: PhotoLibrary;
-  private wireless?: WirelessFtpServer;
+  private wireless?: WirelessTransferServer;
   private diagnostics?: DiagnosticLogger;
   private previewGeneration: number = 0;
 
@@ -136,7 +137,7 @@ struct Index {
     this.diagnostics = new DiagnosticLogger(context);
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
-    this.wireless = new WirelessFtpServer(
+    this.wireless = new WirelessTransferServer(
       this.library,
       (status: string): void => {
         this.diagnostics?.info('wireless', status);
@@ -325,7 +326,7 @@ struct Index {
         this.NavButton('视频监看', 'monitor')
         this.NavButton('文件与传输', 'library')
         Blank()
-        Text('NIKON LINK 0.8.0')
+        Text('NIKON LINK 0.8.1')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -465,7 +466,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
-      Text(`${this.photos.length} 个本地文件 · 无线 FTP 收件箱`)
+      Text(`${this.photos.length} 个本地文件 · 多协议无线收件箱`)
         .fontSize(14)
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -475,7 +476,7 @@ struct Index {
           Text('本地图库还是空的')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-          Text('连接相机拍摄，或在上方开启 FTP 收件箱。')
+          Text('连接相机拍摄，或在上方开启无线图片收件箱。')
             .fontSize(14)
             .fontColor($r('app.color.muted'))
         }
@@ -549,7 +550,7 @@ struct Index {
   @Builder
   private WirelessTransferCard() {
     Column({ space: 12 }) {
-          Text('FTP 无线收件箱')
+          Text('多协议无线图片收件箱')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
@@ -574,7 +575,9 @@ struct Index {
               this.toggleWireless();
             })
           Text(
-            `FTP · 端口 ${FTP_PORT} · 用户名/密码 nikonlink · PASV 开启`
+            `FTP/PASV · ${this.wirelessAddress}\n` +
+            `HTTP 上传 · 端口 ${HTTP_PORT} · /upload/文件名\n` +
+            `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink`
           )
             .fontSize(12)
             .fontFamily('monospace')
@@ -1075,7 +1078,8 @@ struct Index {
         await this.wireless.start();
         this.diagnostics?.info(
           'wireless',
-          `无线收件箱已开启；地址=${this.wireless.localAddress}:${FTP_PORT}`
+          `无线收件箱已开启；FTP=${this.wireless.localAddress}:${FTP_PORT}` +
+          `；HTTP/WebDAV=${this.wireless.localAddress}:${HTTP_PORT}`
         );
         this.wirelessRunning = true;
         this.wirelessAddress =

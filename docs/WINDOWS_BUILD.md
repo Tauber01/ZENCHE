@@ -2,7 +2,7 @@
 
 Windows 版是原生 WPF 应用，不使用 WebView。它通过 `libusb-1.0.dll` 直接实现
 Nikon Vendor PTP 会话，包含相机识别、实时取景、SDRAM 拍摄、曝光/对焦/白平衡
-控制、本地图库和前台 FTP/PASV 收件箱。
+控制、本地图库和前台 FTP/PASV、HTTP、WebDAV 收件箱。
 
 ## 环境
 
@@ -36,10 +36,10 @@ $env:NIKONLINK_LIBUSB_DLL = "C:\path\to\libusb-1.0.dll"
 输出：
 
 ```text
-dist/NikonLink-0.8.0-Windows-x64-Setup.exe
-dist/NikonLink-0.8.0-Windows-x64-Setup.exe.sha256
-dist/NikonLink-0.8.0-Windows-x64.zip
-dist/NikonLink-0.8.0-Windows-x64.zip.sha256
+dist/NikonLink-0.8.1-Windows-x64-Setup.exe
+dist/NikonLink-0.8.1-Windows-x64-Setup.exe.sha256
+dist/NikonLink-0.8.1-Windows-x64.zip
+dist/NikonLink-0.8.1-Windows-x64.zip.sha256
 ```
 
 `Setup.exe` 是默认交付物，安装到 `Program Files\Nikon Link`，创建开始菜单和
@@ -72,7 +72,8 @@ GitHub Issue 预填页面。
    “已安装的应用”卸载均正常。
 2. 验证缺少 DLL、USB 权限和驱动冲突时均显示可操作的错误。
 3. 按 [相机实机验收清单](CAMERA_TEST_CHECKLIST.md) 验证连接、取景、参数和拍摄。
-4. 在可信局域网内验证端口 `2121` 的 PASV 上传，并在应用退出后确认端口关闭。
+4. 在可信局域网内验证端口 `2121` 的 PASV 上传以及端口 `8080` 的 HTTP/WebDAV
+   上传，并在应用退出后确认全部端口关闭。
 
 当前仓库不提交 libusb 二进制文件；打包者需自行从官方发行版取得 DLL，并遵守
 [第三方许可说明](../THIRD_PARTY_NOTICES.md)。

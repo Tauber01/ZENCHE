@@ -23,7 +23,7 @@ export class DiagnosticLogger {
   startSession(): void {
     this.info(
       'app',
-      `会话启动；版本=0.8.0 (12)；系统=HarmonyOS；会话=${this.sessionId}`
+      `会话启动；版本=0.8.1 (16)；系统=HarmonyOS；会话=${this.sessionId}`
     );
   }
 
@@ -48,7 +48,7 @@ export class DiagnosticLogger {
       '## 问题描述\n\n请描述发生了什么，以及如何复现。\n\n' +
       '## 环境\n\n' +
       '- 平台：HarmonyOS\n' +
-      '- Nikon Link：0.8.0 (12)\n' +
+      '- Nikon Link：0.8.1 (16)\n' +
       `- 会话：${this.sessionId}\n\n` +
       '## 最近诊断日志（已脱敏）\n\n```text\n' +
       this.recentText(2500) +

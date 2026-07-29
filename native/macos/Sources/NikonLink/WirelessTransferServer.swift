@@ -4,6 +4,7 @@ import Foundation
 
 final class WirelessTransferServer: ObservableObject {
     static let port: UInt16 = 2121
+    static let httpPort: UInt16 = WirelessHTTPServer.port
     static let username = "nikonlink"
     static let password = "nikonlink"
 
@@ -21,6 +22,19 @@ final class WirelessTransferServer: ObservableObject {
     private let socketLock = NSLock()
     private var listenerFD: Int32 = -1
     private var controlConnections: Set<Int32> = []
+    private lazy var httpServer = WirelessHTTPServer(
+        directory: directory,
+        onStatus: { [weak self] status in
+            guard let self, self.isRunning else { return }
+            self.status = status
+        },
+        onReceive: { [weak self] url in
+            guard let self else { return }
+            self.receivedCount += 1
+            self.status = "已接收 \(url.lastPathComponent)"
+            self.onReceive(url)
+        }
+    )
 
     init(directory: URL, onReceive: @escaping (URL) -> Void) {
         self.directory = directory
@@ -44,12 +58,14 @@ final class WirelessTransferServer: ObservableObject {
         listenerFD = -2
         socketLock.unlock()
 
+        httpServer.start()
         acceptQueue.async { [weak self] in
             self?.runServer()
         }
     }
 
     func stop() {
+        httpServer.stop()
         socketLock.lock()
         let descriptor = listenerFD
         listenerFD = -1
@@ -111,7 +127,7 @@ final class WirelessTransferServer: ObservableObject {
         DispatchQueue.main.async {
             self.hostAddress = addressText
             self.isRunning = true
-            self.status = "等待相机无线传输"
+            self.status = "等待 FTP / HTTP / WebDAV 图片"
         }
 
         while true {
@@ -252,7 +268,7 @@ final class WirelessTransferServer: ObservableObject {
         }
         if passiveListener >= 0 { Darwin.close(passiveListener) }
         DispatchQueue.main.async {
-            if self.isRunning { self.status = "等待相机无线传输" }
+            if self.isRunning { self.status = "等待 FTP / HTTP / WebDAV 图片" }
         }
     }
 

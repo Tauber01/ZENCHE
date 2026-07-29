@@ -4,6 +4,7 @@ import Foundation
 
 final class WirelessTransferServer: ObservableObject {
     static let port: UInt16 = 2121
+    static let httpPort: UInt16 = 8080
     static let username = "nikonlink"
     static let password = "nikonlink"
 
@@ -18,8 +19,13 @@ final class WirelessTransferServer: ObservableObject {
         label: "com.tauber.nikonlink.wireless.ftp",
         qos: .userInitiated
     )
+    private let httpAcceptQueue = DispatchQueue(
+        label: "com.tauber.nikonlink.wireless.http",
+        qos: .userInitiated
+    )
     private let socketLock = NSLock()
     private var listenerFD: Int32 = -1
+    private var httpListenerFD: Int32 = -1
     private var controlConnections: Set<Int32> = []
 
     init(directory: URL, onReceive: @escaping (URL) -> Void) {
@@ -37,28 +43,38 @@ final class WirelessTransferServer: ObservableObject {
 
     func start() {
         socketLock.lock()
-        guard listenerFD == -1 else {
+        guard listenerFD == -1, httpListenerFD == -1 else {
             socketLock.unlock()
             return
         }
         listenerFD = -2
+        httpListenerFD = -2
         socketLock.unlock()
 
         acceptQueue.async { [weak self] in
             self?.runServer()
+        }
+        httpAcceptQueue.async { [weak self] in
+            self?.runHTTPServer()
         }
     }
 
     func stop() {
         socketLock.lock()
         let descriptor = listenerFD
+        let httpDescriptor = httpListenerFD
         listenerFD = -1
+        httpListenerFD = -1
         let clients = controlConnections
         controlConnections.removeAll()
         socketLock.unlock()
         if descriptor >= 0 {
             Darwin.shutdown(descriptor, SHUT_RDWR)
             Darwin.close(descriptor)
+        }
+        if httpDescriptor >= 0 {
+            Darwin.shutdown(httpDescriptor, SHUT_RDWR)
+            Darwin.close(httpDescriptor)
         }
         for client in clients {
             Darwin.shutdown(client, SHUT_RDWR)
@@ -111,7 +127,7 @@ final class WirelessTransferServer: ObservableObject {
         DispatchQueue.main.async {
             self.hostAddress = addressText
             self.isRunning = true
-            self.status = "等待相机无线传输"
+            self.status = "等待 FTP / HTTP / WebDAV 图片"
         }
 
         while true {
@@ -135,9 +151,346 @@ final class WirelessTransferServer: ObservableObject {
         socketLock.lock()
         if listenerFD == descriptor { listenerFD = -1 }
         socketLock.unlock()
+    }
+
+    private func runHTTPServer() {
+        let descriptor = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard descriptor >= 0 else {
+            publishFailure("无法创建 HTTP / WebDAV 无线传输服务。")
+            return
+        }
+        configureSocket(descriptor)
+
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = Self.httpPort.bigEndian
+        address.sin_addr = in_addr(s_addr: INADDR_ANY)
+        let bindResult = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(
+                    descriptor,
+                    $0,
+                    socklen_t(MemoryLayout<sockaddr_in>.size)
+                )
+            }
+        }
+        guard bindResult == 0, Darwin.listen(descriptor, 4) == 0 else {
+            Darwin.close(descriptor)
+            publishFailure(
+                "端口 \(Self.httpPort) 已被占用，无法开启 HTTP / WebDAV 收件箱。"
+            )
+            return
+        }
+
+        socketLock.lock()
+        guard httpListenerFD == -2 else {
+            socketLock.unlock()
+            Darwin.close(descriptor)
+            return
+        }
+        httpListenerFD = descriptor
+        socketLock.unlock()
+
         DispatchQueue.main.async {
-            self.isRunning = false
-            self.status = "无线收件箱已停止"
+            self.isRunning = true
+            self.status = "等待 FTP / HTTP / WebDAV 图片"
+        }
+
+        while true {
+            var peer = sockaddr_storage()
+            var length = socklen_t(MemoryLayout<sockaddr_storage>.size)
+            let client = withUnsafeMutablePointer(to: &peer) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    Darwin.accept(descriptor, $0, &length)
+                }
+            }
+            if client < 0 { break }
+            configureSocket(client)
+            socketLock.lock()
+            controlConnections.insert(client)
+            socketLock.unlock()
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                self?.handleHTTPConnection(client)
+            }
+        }
+
+        socketLock.lock()
+        if httpListenerFD == descriptor { httpListenerFD = -1 }
+        socketLock.unlock()
+    }
+
+    private func handleHTTPConnection(_ descriptor: Int32) {
+        defer {
+            socketLock.lock()
+            let shouldClose = controlConnections.remove(descriptor) != nil
+            socketLock.unlock()
+            if shouldClose { Darwin.close(descriptor) }
+        }
+        guard let request = readHTTPRequest(from: descriptor) else { return }
+        guard request.headers["authorization"] == Self.basicAuthorization else {
+            sendHTTPResponse(
+                status: 401,
+                reason: "Unauthorized",
+                body: "需要使用 Nikon Link 无线收件箱账号。",
+                headers: ["WWW-Authenticate": "Basic realm=\"Nikon Link\""],
+                to: descriptor
+            )
+            return
+        }
+
+        switch request.method {
+        case "OPTIONS":
+            sendHTTPResponse(
+                status: 200,
+                reason: "OK",
+                headers: [
+                    "Allow": "OPTIONS, GET, PUT, POST, MKCOL, PROPFIND",
+                    "DAV": "1"
+                ],
+                to: descriptor
+            )
+        case "GET":
+            sendHTTPResponse(
+                status: 200,
+                reason: "OK",
+                body: "{\"service\":\"Nikon Link\",\"upload\":\"ready\"}",
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+        case "MKCOL":
+            sendHTTPResponse(
+                status: 201,
+                reason: "Created",
+                headers: ["DAV": "1"],
+                to: descriptor
+            )
+        case "PROPFIND":
+            let xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <d:multistatus xmlns:d="DAV:"><d:response><d:href>/</d:href>\
+            <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype>\
+            <d:displayname>Nikon Link</d:displayname></d:prop>\
+            <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>\
+            </d:multistatus>
+            """
+            sendHTTPResponse(
+                status: 207,
+                reason: "Multi-Status",
+                body: xml,
+                headers: [
+                    "Content-Type": "application/xml; charset=utf-8",
+                    "DAV": "1"
+                ],
+                to: descriptor
+            )
+        case "PUT", "POST":
+            receiveHTTPUpload(request, from: descriptor)
+        default:
+            sendHTTPResponse(
+                status: 405,
+                reason: "Method Not Allowed",
+                body: "此无线入口仅支持图片上传。",
+                headers: [
+                    "Allow": "OPTIONS, GET, PUT, POST, MKCOL, PROPFIND"
+                ],
+                to: descriptor
+            )
+        }
+    }
+
+    private func receiveHTTPUpload(
+        _ request: HTTPRequest,
+        from descriptor: Int32
+    ) {
+        guard let lengthText = request.headers["content-length"],
+              let length = Int64(lengthText) else {
+            sendHTTPResponse(
+                status: 411,
+                reason: "Length Required",
+                body: "请提供有效的 Content-Length。",
+                to: descriptor
+            )
+            return
+        }
+        guard length > 0, length <= 16 * 1024 * 1024 * 1024 else {
+            sendHTTPResponse(
+                status: 413,
+                reason: "Content Too Large",
+                body: "图片大小必须在 1 字节到 16 GB 之间。",
+                to: descriptor
+            )
+            return
+        }
+        guard let filename = requestedFilename(for: request), !filename.isEmpty else {
+            sendHTTPResponse(
+                status: 400,
+                reason: "Bad Request",
+                body: "请使用 /upload/文件名，或提供 X-Filename 请求头。",
+                to: descriptor
+            )
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.status = "正在通过 HTTP / WebDAV 接收 \(filename)"
+        }
+        guard let destination = receiveFile(
+            named: filename,
+            from: descriptor,
+            contentLength: length
+        ) else {
+            sendHTTPResponse(
+                status: 500,
+                reason: "Internal Server Error",
+                body: "无线图片保存失败。",
+                to: descriptor
+            )
+            return
+        }
+        let escaped = destination.lastPathComponent
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        sendHTTPResponse(
+            status: 201,
+            reason: "Created",
+            body: "{\"saved\":\"\(escaped)\"}",
+            headers: [
+                "Content-Type": "application/json; charset=utf-8",
+                "Location": "/\(destination.lastPathComponent)"
+            ],
+            to: descriptor
+        )
+    }
+
+    private func receiveFile(
+        named remoteName: String,
+        from descriptor: Int32,
+        contentLength: Int64
+    ) -> URL? {
+        let destination = uniqueDestination(for: Self.safeFilename(remoteName))
+        let temporary = directory.appendingPathComponent(".\(UUID().uuidString).part")
+        FileManager.default.createFile(atPath: temporary.path, contents: nil)
+        guard let output = try? FileHandle(forWritingTo: temporary) else { return nil }
+        defer { try? output.close() }
+
+        var remaining = contentLength
+        var buffer = [UInt8](repeating: 0, count: 256 * 1024)
+        while remaining > 0 {
+            let count = Darwin.recv(
+                descriptor,
+                &buffer,
+                min(buffer.count, Int(remaining)),
+                0
+            )
+            if count <= 0 {
+                try? FileManager.default.removeItem(at: temporary)
+                return nil
+            }
+            output.write(Data(buffer[0..<count]))
+            remaining -= Int64(count)
+        }
+        try? output.synchronize()
+        do {
+            try FileManager.default.moveItem(at: temporary, to: destination)
+            DispatchQueue.main.async {
+                self.receivedCount += 1
+                self.status = "已接收 \(destination.lastPathComponent)"
+                self.onReceive(destination)
+            }
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            return nil
+        }
+    }
+
+    private func readHTTPRequest(from descriptor: Int32) -> HTTPRequest? {
+        var bytes: [UInt8] = []
+        var matched = 0
+        var byte: UInt8 = 0
+        while bytes.count < 32 * 1024 {
+            let count = Darwin.recv(descriptor, &byte, 1, 0)
+            if count <= 0 { return nil }
+            bytes.append(byte)
+            if (matched == 0 || matched == 2), byte == 13 {
+                matched += 1
+            } else if (matched == 1 || matched == 3), byte == 10 {
+                matched += 1
+                if matched == 4 { break }
+            } else {
+                matched = byte == 13 ? 1 : 0
+            }
+        }
+        guard matched == 4 else { return nil }
+        let text = String(decoding: bytes.dropLast(4), as: UTF8.self)
+        let lines = text.components(separatedBy: "\r\n")
+        guard let first = lines.first else { return nil }
+        let requestLine = first.split(separator: " ", maxSplits: 2)
+        guard requestLine.count >= 2 else { return nil }
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            guard let separator = line.firstIndex(of: ":") else { continue }
+            let key = line[..<separator]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let value = line[line.index(after: separator)...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            headers[key] = value
+        }
+        return HTTPRequest(
+            method: requestLine[0].uppercased(),
+            target: String(requestLine[1]),
+            headers: headers
+        )
+    }
+
+    private func requestedFilename(for request: HTTPRequest) -> String? {
+        if let explicit = request.headers["x-filename"], !explicit.isEmpty {
+            return explicit
+        }
+        guard let components = URLComponents(string: request.target) else {
+            return nil
+        }
+        let path = components.percentEncodedPath.removingPercentEncoding
+            ?? components.percentEncodedPath
+        if path != "/", path != "/upload", path != "/upload/" {
+            return (path as NSString).lastPathComponent
+        }
+        return components.queryItems?
+            .first(where: { $0.name.lowercased() == "filename" })?
+            .value
+    }
+
+    private func sendHTTPResponse(
+        status: Int,
+        reason: String,
+        body: String = "",
+        headers: [String: String] = [:],
+        to descriptor: Int32
+    ) {
+        let content = Data(body.utf8)
+        var response = "HTTP/1.1 \(status) \(reason)\r\n"
+        response += "Connection: close\r\n"
+        response += "Content-Length: \(content.count)\r\n"
+        for (name, value) in headers {
+            response += "\(name): \(value)\r\n"
+        }
+        response += "\r\n"
+        sendRaw(response, to: descriptor)
+        content.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress else { return }
+            var offset = 0
+            while offset < raw.count {
+                let sent = Darwin.send(
+                    descriptor,
+                    base.advanced(by: offset),
+                    raw.count - offset,
+                    0
+                )
+                if sent <= 0 { break }
+                offset += sent
+            }
         }
     }
 
@@ -252,7 +605,7 @@ final class WirelessTransferServer: ObservableObject {
         }
         if passiveListener >= 0 { Darwin.close(passiveListener) }
         DispatchQueue.main.async {
-            if self.isRunning { self.status = "等待相机无线传输" }
+            if self.isRunning { self.status = "等待 FTP / HTTP / WebDAV 图片" }
         }
     }
 
@@ -447,13 +800,16 @@ final class WirelessTransferServer: ObservableObject {
     }
 
     private func publishFailure(_ message: String) {
-        socketLock.lock()
-        listenerFD = -1
-        socketLock.unlock()
+        stop()
         DispatchQueue.main.async {
             self.isRunning = false
             self.status = message
         }
+    }
+
+    private static var basicAuthorization: String {
+        let credentials = Data("\(username):\(password)".utf8).base64EncodedString()
+        return "Basic \(credentials)"
     }
 
     private static func safeFilename(_ remoteName: String) -> String {
@@ -499,4 +855,10 @@ final class WirelessTransferServer: ObservableObject {
         }
         return fallback
     }
+}
+
+private struct HTTPRequest {
+    let method: String
+    let target: String
+    let headers: [String: String]
 }

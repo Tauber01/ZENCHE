@@ -777,7 +777,7 @@ private struct WirelessTransferCard: View {
         SettingsCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Label("Nikon 无线收件箱", systemImage: "wifi")
+                    Label("多协议无线图片收件箱", systemImage: "wifi")
                         .font(.headline)
                     Spacer()
                     Circle()
@@ -794,8 +794,14 @@ private struct WirelessTransferCard: View {
 
                 if model.wireless.isRunning {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(model.wireless.hostAddress):\(WirelessTransferServer.port)")
+                        Text("FTP/PASV  \(model.wireless.hostAddress):\(WirelessTransferServer.port)")
                             .font(.body.monospaced().weight(.semibold))
+                            .textSelection(.enabled)
+                        Text("HTTP 上传  http://\(model.wireless.hostAddress):\(WirelessTransferServer.httpPort)/upload/文件名")
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                        Text("WebDAV  http://\(model.wireless.hostAddress):\(WirelessTransferServer.httpPort)/")
+                            .font(.caption.monospaced())
                             .textSelection(.enabled)
                         Text("用户名 / 密码：\(WirelessTransferServer.username) / \(WirelessTransferServer.password)")
                             .font(.caption.monospaced())
@@ -822,7 +828,7 @@ private struct WirelessTransferCard: View {
                 .buttonStyle(.borderedProminent)
                 .tint(model.wireless.isRunning ? .red : .accentColor)
 
-                Text("相机 FTP 端口设为 2121，用户名与密码均为 nikonlink，并开启 PASV。服务只在 Nikon Link 位于前台时运行。")
+                Text("相机端可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP PUT/POST 或 WebDAV PUT。HTTP 请求需提供 Content-Length。服务只在 Nikon Link 位于前台时运行。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -14,11 +14,11 @@
     },
     {
       "name": "permission_internet",
-      "value": "用于在可信局域网中接收相机 FTP 图片"
+      "value": "用于在可信局域网中通过 FTP、HTTP 或 WebDAV 接收图片"
     },
     {
       "name": "permission_wifi",
-      "value": "用于显示相机 FTP 配置所需的局域网地址"
+      "value": "用于显示无线图片传输所需的局域网地址"
     }
   ]
 }

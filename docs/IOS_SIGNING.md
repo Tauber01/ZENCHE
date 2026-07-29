@@ -19,7 +19,7 @@ IOS_SIGNING_IDENTITY="Apple Development" \
 ./scripts/build-ios.sh --signed
 ```
 
-结果为 `dist/NikonLink-0.8.0-ios-signed.ipa`，并附带 SHA-256 校验文件。
+结果为 `dist/NikonLink-0.8.1-ios-signed.ipa`，并附带 SHA-256 校验文件。
 
 ## GitHub Actions
 

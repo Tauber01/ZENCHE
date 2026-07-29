@@ -55,16 +55,23 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Wireless transfer
 
-- [ ] Starting the wireless inbox shows the receiver IPv4 address and port 2121.
+- [ ] Starting the wireless inbox shows the receiver IPv4 address,
+      FTP port 2121, and HTTP/WebDAV port 8080.
 - [ ] Camera FTP profile logs in with `nikonlink` / `nikonlink` and PASV enabled.
+- [ ] HTTP PUT to `/upload/<filename>` with Basic Auth stores byte-identical data.
+- [ ] HTTP POST accepts a filename from the path, `filename` query item, or
+      `X-Filename` header and rejects a missing `Content-Length`.
+- [ ] WebDAV `OPTIONS`, `PROPFIND`, `MKCOL`, and authenticated `PUT` complete
+      with standards-compatible status codes.
+- [ ] Missing or incorrect HTTP Basic Auth receives `401` without creating a file.
 - [ ] Manual JPEG upload appears in the Nikon Link library without restarting.
 - [ ] NEF and HEIF uploads keep their original filename and extension.
 - [ ] Auto upload receives consecutive captures without overwriting an existing file.
-- [ ] Stopping the wireless inbox rejects new camera connections.
+- [ ] Stopping the wireless inbox rejects new FTP, HTTP, and WebDAV connections.
 - [ ] Windows chooses a free PASV data port and streams large files to a temporary
       `.part` file before the final atomic move.
-- [ ] HarmonyOS listens on PASV data port 2122 only while the inbox is enabled,
-      and closes both ports after leaving the page.
+- [ ] HarmonyOS listens on PASV data port 2122 only while FTP is transferring,
+      and closes ports 2121, 2122, and 8080 after leaving the page.
 
 ## Windows
 
@@ -94,7 +101,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.8.0 stable release passes compilation, signature/container validation,
+The 0.8.1 stable release passes compilation, signature/container validation,
 native UI startup checks and package scans. Windows passes .NET compilation and
 PE/ZIP package checks. HarmonyOS source, resources, and unsigned HAP compilation
 pass, but signing, startup, and hardware checks are still pending. No supported

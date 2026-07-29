@@ -60,7 +60,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="16">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.8.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.8.1" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -183,7 +183,7 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Style="{StaticResource SectionTitle}" Text="无线 FTP 收件箱" />
+                <TextBlock Style="{StaticResource SectionTitle}" Text="多协议无线图片收件箱" />
                 <TextBlock x:Name="WirelessStatusText"
                            FontWeight="SemiBold"
                            Text="无线收件箱未开启" />
@@ -194,7 +194,8 @@
                            Text="—" />
                 <TextBlock Margin="0,8,0,0"
                            Foreground="{StaticResource MutedBrush}"
-                           Text="端口 2121 · 用户名 nikonlink · 密码 nikonlink · PASV 开启" />
+                           TextWrapping="Wrap"
+                           Text="FTP/PASV 端口 2121 · HTTP/WebDAV 端口 8080 · 用户名/密码 nikonlink · HTTP 使用 Basic Auth" />
               </StackPanel>
               <Button x:Name="WirelessButton"
                       Grid.Column="1"
