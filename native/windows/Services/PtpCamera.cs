@@ -14,6 +14,7 @@ public sealed class PtpCamera : IDisposable
     private const ushort OpenSession = 0x1002;
     private const ushort CloseSession = 0x1003;
     private const ushort GetObject = 0x1009;
+    private const ushort GetDevicePropertyDescription = 0x1014;
     private const ushort SetDeviceProperty = 0x1016;
     private const ushort ChangeCameraMode = 0x90c2;
     private const ushort DeviceReady = 0x90c8;
@@ -22,6 +23,8 @@ public sealed class PtpCamera : IDisposable
     private const ushort EndLiveViewOperation = 0x9202;
     private const ushort GetLiveViewImage = 0x9203;
     private const ushort CaptureToSdram = 0x9207;
+    private const ushort StartMovieRecordingOperation = 0x920a;
+    private const ushort EndMovieRecordingOperation = 0x920b;
     private const ushort TerminateCapture = 0x920c;
     private const ushort ObjectAddedInSdram = 0xc101;
     private const int StillImageClass = 6;
@@ -35,13 +38,17 @@ public sealed class PtpCamera : IDisposable
     private byte _bulkOut;
     private uint _transaction;
     private bool _liveView;
+    private bool _movieRecording;
     private bool _disposed;
     private string _exposureMode = "manual";
     private int _bulbDurationSeconds = 5;
+    private readonly Dictionary<ushort, bool> _writableProperties = [];
+    private readonly HashSet<string> _deniedParameters = [];
 
     public CameraProfile? Profile { get; private set; }
     public bool IsConnected => _deviceHandle != nint.Zero;
     public bool IsLiveView => _liveView;
+    public bool IsMovieRecording => _movieRecording;
 
     public async Task<CameraProfile> ConnectAsync(
         CancellationToken cancellationToken = default)
@@ -58,6 +65,7 @@ public sealed class PtpCamera : IDisposable
                 null,
                 10_000,
                 cancellationToken);
+            await RefreshParameterCapabilitiesAsync(cancellationToken);
             Profile = profile;
             return profile;
         }
@@ -129,6 +137,72 @@ public sealed class PtpCamera : IDisposable
                 12_000,
                 cancellationToken);
             return ExtractJpeg(data);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task StartMovieRecordingAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureConnected();
+            if (_movieRecording)
+            {
+                return;
+            }
+            if (!_liveView)
+            {
+                await TransactAsync(
+                    StartLiveViewOperation,
+                    null,
+                    null,
+                    10_000,
+                    cancellationToken);
+                _liveView = true;
+            }
+            await TransactAsync(
+                StartMovieRecordingOperation,
+                null,
+                null,
+                15_000,
+                cancellationToken);
+            _movieRecording = true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task StopMovieRecordingAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureConnected();
+            if (!_movieRecording)
+            {
+                return;
+            }
+            try
+            {
+                await TransactAsync(
+                    EndMovieRecordingOperation,
+                    null,
+                    null,
+                    15_000,
+                    cancellationToken);
+            }
+            finally
+            {
+                _movieRecording = false;
+            }
         }
         finally
         {
@@ -279,9 +353,9 @@ public sealed class PtpCamera : IDisposable
                 _bulbDurationSeconds = Math.Clamp(Convert.ToInt32(rawValue), 1, 900);
                 return;
             }
-            if (!CanAdjust(name))
+            if (!CanAdjustParameter(name))
             {
-                throw new InvalidOperationException("当前拍摄模式下此参数由相机控制。");
+                throw new InvalidOperationException(ParameterLockReason(name));
             }
 
             if (name == "focusMode")
@@ -361,9 +435,10 @@ public sealed class PtpCamera : IDisposable
                     });
                     break;
                 case "exposureMode":
-                    _exposureMode = Convert.ToString(rawValue) ?? "manual";
+                    var requestedExposureMode =
+                        Convert.ToString(rawValue) ?? "manual";
                     property = 0x500e;
-                    if (_exposureMode == "bulb")
+                    if (requestedExposureMode == "bulb")
                     {
                         await TransactAsync(
                             ChangeCameraMode,
@@ -379,9 +454,11 @@ public sealed class PtpCamera : IDisposable
                             0x500d,
                             LittleEndian32(uint.MaxValue),
                             cancellationToken);
+                        _exposureMode = requestedExposureMode;
+                        await RefreshParameterCapabilitiesAsync(cancellationToken);
                         return;
                     }
-                    value = LittleEndian16(_exposureMode switch
+                    value = LittleEndian16(requestedExposureMode switch
                     {
                         "aperturePriority" => 3,
                         "shutterPriority" => 4,
@@ -394,6 +471,20 @@ public sealed class PtpCamera : IDisposable
                         $"{CameraName} 不支持此参数：{name}");
             }
             await SetPropertyCoreAsync(property, value, cancellationToken);
+            if (name == "exposureMode")
+            {
+                _exposureMode = Convert.ToString(rawValue) ?? "manual";
+                await RefreshParameterCapabilitiesAsync(cancellationToken);
+            }
+        }
+        catch (CameraProtocolException error)
+            when (error.ResponseCode == 0x200f)
+        {
+            _deniedParameters.Add(name);
+            throw new InvalidOperationException(
+                $"{CameraName} 报告此参数当前只读；" +
+                "帧澈 ZENCHE 已锁定该控件以防止重复报错。",
+                error);
         }
         finally
         {
@@ -407,6 +498,22 @@ public sealed class PtpCamera : IDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            if (_movieRecording)
+            {
+                try
+                {
+                    await TransactAsync(
+                        EndMovieRecordingOperation,
+                        null,
+                        null,
+                        15_000,
+                        cancellationToken);
+                }
+                catch
+                {
+                }
+                _movieRecording = false;
+            }
             await StopLiveViewCoreAsync(cancellationToken);
             if (_deviceHandle != nint.Zero)
             {
@@ -453,7 +560,7 @@ public sealed class PtpCamera : IDisposable
         catch (BadImageFormatException error)
         {
             throw new InvalidOperationException(
-                "libusb-1.0.dll 架构不匹配；64 位 Nikon Link 需要 MS64 DLL。",
+                "libusb-1.0.dll 架构不匹配；64 位 帧澈 ZENCHE 需要 MS64 DLL。",
                 error);
         }
     }
@@ -834,6 +941,34 @@ public sealed class PtpCamera : IDisposable
         }
     }
 
+    public bool CanAdjustParameter(string name)
+    {
+        if (_deniedParameters.Contains(name) || !CanAdjust(name))
+        {
+            return false;
+        }
+        var property = PropertyCode(name);
+        return property == 0 ||
+            !_writableProperties.TryGetValue(property, out var writable) ||
+            writable;
+    }
+
+    public string ParameterLockReason(string name)
+    {
+        if (_deniedParameters.Contains(name))
+        {
+            return "相机已拒绝此参数，本次连接内保持锁定";
+        }
+        if (!CanAdjust(name))
+        {
+            return "当前拍摄模式下由相机控制";
+        }
+        return _writableProperties.TryGetValue(PropertyCode(name), out var writable)
+            && !writable
+                ? "相机固件报告此参数为只读"
+                : "当前不可调整";
+    }
+
     private bool CanAdjust(string name) => name switch
     {
         "exposureTime" =>
@@ -844,6 +979,51 @@ public sealed class PtpCamera : IDisposable
         "exposureCompensation" =>
             _exposureMode is "program" or "aperturePriority" or "shutterPriority",
         _ => true
+    };
+
+    private async Task RefreshParameterCapabilitiesAsync(
+        CancellationToken cancellationToken)
+    {
+        _writableProperties.Clear();
+        _deniedParameters.Clear();
+        ushort[] properties =
+        [
+            0x5005, 0x5007, 0x500a, 0x500d,
+            0x500e, 0x500f, 0x5010, 0xd200
+        ];
+        foreach (var property in properties)
+        {
+            try
+            {
+                var descriptor = await TransactAsync(
+                    GetDevicePropertyDescription,
+                    [property],
+                    null,
+                    5_000,
+                    cancellationToken);
+                if (descriptor.Length >= 5)
+                {
+                    _writableProperties[property] = descriptor[4] != 0;
+                }
+            }
+            catch (CameraProtocolException)
+            {
+                // Older bodies may omit descriptors; mode gating remains.
+            }
+        }
+    }
+
+    private static ushort PropertyCode(string name) => name switch
+    {
+        "whiteBalanceMode" => 0x5005,
+        "aperture" => 0x5007,
+        "focusMode" => 0x500a,
+        "exposureTime" => 0x500d,
+        "exposureMode" => 0x500e,
+        "iso" => 0x500f,
+        "exposureCompensation" => 0x5010,
+        "pictureControl" => 0xd200,
+        _ => 0
     };
 
     private static uint FindSdramObject(byte[] events)
@@ -953,6 +1133,9 @@ public sealed class PtpCamera : IDisposable
         _bulkOut = 0;
         _transaction = 0;
         _liveView = false;
+        _movieRecording = false;
+        _writableProperties.Clear();
+        _deniedParameters.Clear();
         Profile = null;
     }
 

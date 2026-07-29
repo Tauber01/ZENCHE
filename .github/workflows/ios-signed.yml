@@ -53,12 +53,12 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NikonLink-iOS-signed
-          path: dist/NikonLink-*-ios-signed.ipa*
+          name: ZENCHE-iOS-signed
+          path: dist/ZENCHE-*-ios-signed.ipa*
 
       - name: Upload to existing GitHub Release
         if: ${{ inputs.release_tag != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-        run: gh release upload "$RELEASE_TAG" dist/NikonLink-*-ios-signed.ipa* --clobber
+        run: gh release upload "$RELEASE_TAG" dist/ZENCHE-*-ios-signed.ipa* --clobber

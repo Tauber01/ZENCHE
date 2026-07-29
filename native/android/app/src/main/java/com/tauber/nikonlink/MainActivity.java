@@ -1,16 +1,22 @@
 package com.tauber.nikonlink;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.MediaMetadataRetriever;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
@@ -20,7 +26,13 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
+import android.provider.OpenableColumns;
+import android.content.ContentUris;
+import android.util.Size;
 import android.view.Gravity;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -28,18 +40,31 @@ import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.MediaController;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.VideoView;
 
+import androidx.core.content.FileProvider;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -60,6 +85,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class MainActivity extends Activity {
     private static final String USB_PERMISSION_ACTION = "com.tauber.nikonlink.USB_PERMISSION";
     private static final int REQUEST_IMPORT_LUT = 4102;
+    private static final int REQUEST_OWNER_PHOTO = 4103;
+    private static final int REQUEST_CLOUD_PHOTOS = 4104;
+    private static final int REQUEST_MEDIA_LIBRARY = 4105;
     private static final int PAPER = Color.rgb(246, 248, 252);
     private static final int SURFACE = Color.WHITE;
     private static final int INK = Color.rgb(20, 24, 32);
@@ -70,13 +98,20 @@ public final class MainActivity extends Activity {
     private static final int VIDEO_SOFT = Color.rgb(255, 230, 232);
     private static final int GRAPHITE = Color.rgb(12, 15, 21);
     private static final int RULE = Color.rgb(220, 225, 234);
+    private static final String LATEST_RELEASE_API =
+            "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
+    private static final String RELEASES_URL =
+            "https://github.com/Tauber01/ZENCHE/releases";
+    private static final String AUTOMATIC_UPDATE_KEY = "automaticallyCheckForUpdates";
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<View> cameraControls = new ArrayList<>();
     private final List<Button> navigationButtons = new ArrayList<>();
     private final Map<String, View> parameterControls = new HashMap<>();
     private final Map<String, TextView> parameterLabels = new HashMap<>();
+    private final Map<String, Boolean> disclosureStates = new HashMap<>();
 
     private PtpCamera camera;
     private DiagnosticLogger diagnostics;
@@ -93,11 +128,20 @@ public final class MainActivity extends Activity {
     private TextView wirelessStatusText;
     private TextView wirelessAddressText;
     private TextView lutStatusText;
+    private TextView updateStatusText;
+    private Button checkUpdateButton;
+    private Button openUpdateButton;
     private Switch lutSwitch;
     private SeekBar zebraThresholdControl;
     private Bitmap latestFrame;
     private Bitmap latestSourceFrame;
     private Bitmap latestZebraMask;
+    private ImageView immersivePreviewImage;
+    private ImageView immersiveZebraImage;
+    private Dialog immersiveDialog;
+    private Button immersiveRecordButton;
+    private TextView immersiveExposureText;
+    private boolean immersiveMonitoring;
     private File photoDirectory;
     private WirelessTransferServer wirelessServer;
 
@@ -105,9 +149,11 @@ public final class MainActivity extends Activity {
     private volatile boolean connecting;
     private volatile boolean liveViewEnabled;
     private volatile boolean capturing;
+    private volatile boolean videoRecording;
     private volatile boolean wirelessRequested;
     private volatile String wirelessStatus = "无线收件箱未开启";
     private volatile int previewGeneration;
+    private volatile int previewFailureCount;
     private volatile String connectedCameraName = "Nikon 相机";
     private volatile String exposureMode = "manual";
     private volatile boolean zebraEnabled;
@@ -117,6 +163,13 @@ public final class MainActivity extends Activity {
     private volatile String monitorVideoProfile = "source";
     private volatile int monitorFrameRate = 30;
     private volatile double monitorShutterAngle = 180;
+    private volatile double currentShutterSeconds = 0.008;
+    private volatile double currentAperture = 4.0;
+    private volatile int currentIso = 400;
+    private volatile boolean checkingUpdate;
+    private volatile String availableUpdateUrl;
+    private volatile String availableVersion;
+    private volatile String updateStatus = "尚未检查更新";
     private String currentSection = "capture";
 
     @Override
@@ -145,7 +198,11 @@ public final class MainActivity extends Activity {
                                 Double.doubleToRawLongBits(180)));
         File base = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         if (base == null) base = getFilesDir();
-        photoDirectory = new File(base, "Nikon Link");
+        photoDirectory = new File(base, "ZENCHE");
+        File legacyPhotoDirectory = new File(base, "Nikon" + " Link");
+        if (!photoDirectory.exists() && legacyPhotoDirectory.exists()) {
+            legacyPhotoDirectory.renameTo(photoDirectory);
+        }
         if (!photoDirectory.exists()) photoDirectory.mkdirs();
         wirelessServer = new WirelessTransferServer(
                 photoDirectory,
@@ -188,6 +245,10 @@ public final class MainActivity extends Activity {
         setContentView(buildApplication());
         showSection("capture");
         updateConnectionUi();
+        if (getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean(AUTOMATIC_UPDATE_KEY, true)) {
+            checkForUpdates(true);
+        }
         diagnostics.info("app", "Android 原生界面已就绪");
     }
 
@@ -204,12 +265,18 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_IMPORT_LUT
-                || resultCode != RESULT_OK
-                || data == null
-                || data.getData() == null) {
+        if (resultCode != RESULT_OK || data == null) {
             return;
         }
+        if (requestCode == REQUEST_OWNER_PHOTO
+                || requestCode == REQUEST_CLOUD_PHOTOS) {
+            List<Uri> uris = selectedUris(data);
+            if (!uris.isEmpty()) {
+                importSelectedPhotos(uris, requestCode == REQUEST_OWNER_PHOTO);
+            }
+            return;
+        }
+        if (requestCode != REQUEST_IMPORT_LUT || data.getData() == null) return;
         Uri uri = data.getData();
         try {
             if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
@@ -247,6 +314,515 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_MEDIA_LIBRARY) return;
+        if (hasAlbumAccess()) {
+            showSection("library");
+        } else {
+            showToast("未获得系统相册权限；文件页仍可使用 帧澈 ZENCHE 本地文件库。");
+        }
+    }
+
+    private void openOwnerAlbum() {
+        if (!hasAlbumAccess()) {
+            requestAlbumAccess();
+            return;
+        }
+        if ("library".equals(currentSection)) {
+            showSection("library");
+        }
+    }
+
+    private void openCloudDrive() {
+        showCloudDriveGuide();
+    }
+
+    private void openCloudDrivePicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                new String[]{"image/*", "video/*", "application/octet-stream"});
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        intent.addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        try {
+            startActivityForResult(
+                    Intent.createChooser(intent, "从网盘选择照片"),
+                    REQUEST_CLOUD_PHOTOS);
+        } catch (RuntimeException error) {
+            showError("无法打开系统文件提供器：" + error.getMessage());
+        }
+    }
+
+    private boolean hasAlbumAccess() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            boolean images = checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)
+                    == PackageManager.PERMISSION_GRANTED;
+            boolean videos = checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO)
+                    == PackageManager.PERMISSION_GRANTED;
+            if (Build.VERSION.SDK_INT >= 34) {
+                boolean selected = checkSelfPermission(
+                        Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+                        == PackageManager.PERMISSION_GRANTED;
+                return images || videos || selected;
+            }
+            return images || videos;
+        }
+        return checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestAlbumAccess() {
+        if (Build.VERSION.SDK_INT >= 34) {
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.READ_MEDIA_IMAGES,
+                            Manifest.permission.READ_MEDIA_VIDEO,
+                            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+                    },
+                    REQUEST_MEDIA_LIBRARY);
+        } else if (Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.READ_MEDIA_IMAGES,
+                            Manifest.permission.READ_MEDIA_VIDEO
+                    },
+                    REQUEST_MEDIA_LIBRARY);
+        } else {
+            requestPermissions(
+                    new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},
+                    REQUEST_MEDIA_LIBRARY);
+        }
+    }
+
+    private void showCloudDriveGuide() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(22), dp(20), dp(22), dp(24));
+        content.addView(text("链接网盘", 26, Typeface.BOLD, INK));
+        content.addView(
+                text(
+                        "帧澈 ZENCHE 不代管网盘账号或密码。先在对应客户端登录，再通过系统文件选择器安全读取照片和视频。",
+                        13,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 6, 0, 16));
+
+        addCloudProvider(
+                content,
+                "百度网盘",
+                "安装客户端后，从系统文件选择器或“下载”目录选择。",
+                "https://pan.baidu.com/");
+        addCloudProvider(
+                content,
+                "阿里云盘",
+                "把照片下载到设备或桌面同步目录后选择。",
+                "https://www.alipan.com/");
+        addCloudProvider(
+                content,
+                "腾讯微云",
+                "从微云导出到本机，再回到 帧澈 ZENCHE 选择。",
+                "https://www.weiyun.com/");
+        addCloudProvider(
+                content,
+                "夸克网盘",
+                "安装夸克网盘客户端并把媒体下载到设备。",
+                "https://pan.quark.cn/");
+        addCloudProvider(
+                content,
+                "迅雷云盘",
+                "通过迅雷客户端下载到设备，再从系统选择器加入。",
+                "https://pan.xunlei.com/");
+        addCloudProvider(
+                content,
+                "115",
+                "在“存储”中下载文件，再从 帧澈 ZENCHE 选择。",
+                "https://115.com/");
+
+        TextView steps = text(
+                "1  安装并登录网盘客户端\n"
+                        + "2  下载媒体或启用系统文件提供器\n"
+                        + "3  点击“选择文件并加入”，可一次选择多项",
+                13,
+                Typeface.NORMAL,
+                INK);
+        steps.setLineSpacing(0, 1.35f);
+        steps.setPadding(dp(12), dp(12), dp(12), dp(12));
+        steps.setBackground(rounded(COBALT_SOFT, 10, 0));
+        content.addView(steps, marginParams(-1, -2, 0, 10, 0, 14));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button close = nativeButton("关闭", false);
+        close.setOnClickListener(view -> dialog.dismiss());
+        actions.addView(close, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button choose = nativeButton("选择文件并加入", true);
+        choose.setOnClickListener(view -> {
+            dialog.dismiss();
+            openCloudDrivePicker();
+        });
+        LinearLayout.LayoutParams chooseParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1.35f);
+        chooseParams.setMargins(dp(10), 0, 0, 0);
+        actions.addView(choose, chooseParams);
+        content.addView(actions);
+        scroll.addView(content);
+        dialog.setContentView(scroll);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(rounded(PAPER, 18, 0));
+            window.setLayout(
+                    Math.min(getResources().getDisplayMetrics().widthPixels - dp(28), dp(620)),
+                    ViewGroup.LayoutParams.MATCH_PARENT);
+        }
+        dialog.setOnShowListener(ignored -> {
+            Window shown = dialog.getWindow();
+            if (shown != null) {
+                shown.setLayout(
+                        Math.min(
+                                getResources().getDisplayMetrics().widthPixels - dp(28),
+                                dp(620)),
+                        (int) (getResources().getDisplayMetrics().heightPixels * 0.9f));
+            }
+        });
+        dialog.show();
+    }
+
+    private void addCloudProvider(
+            LinearLayout parent,
+            String name,
+            String note,
+            String url) {
+        Button provider = nativeButton(name + "\n" + note + "  ↗", false);
+        provider.setAllCaps(false);
+        provider.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        provider.setTextSize(13);
+        provider.setOnClickListener(view -> openExternalUrl(url));
+        parent.addView(
+                provider,
+                marginParams(-1, dp(64), 0, 0, 0, 8));
+    }
+
+    private void openExternalUrl(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (RuntimeException error) {
+            showError("无法打开网盘页面：" + error.getMessage());
+        }
+    }
+
+    private List<Uri> selectedUris(Intent data) {
+        List<Uri> uris = new ArrayList<>();
+        ClipData clipData = data.getClipData();
+        if (clipData != null) {
+            for (int index = 0; index < clipData.getItemCount(); index++) {
+                Uri uri = clipData.getItemAt(index).getUri();
+                if (uri != null) uris.add(uri);
+            }
+        } else if (data.getData() != null) {
+            uris.add(data.getData());
+        }
+        return uris;
+    }
+
+    private void importSelectedPhotos(List<Uri> uris, boolean ownerAlbum) {
+        cameraExecutor.submit(() -> {
+            int imported = 0;
+            String lastName = null;
+            for (Uri uri : uris) {
+                try {
+                    if (!ownerAlbum) {
+                        try {
+                            getContentResolver().takePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        } catch (RuntimeException ignored) {
+                        }
+                    }
+                    String displayName = displayName(uri);
+                    File destination = uniquePhotoDestination(
+                            displayName == null ? "导入照片.jpg" : displayName);
+                    try (InputStream input = getContentResolver().openInputStream(uri);
+                         FileOutputStream output = new FileOutputStream(destination)) {
+                        if (input == null) throw new IllegalStateException("无法读取所选照片");
+                        byte[] buffer = new byte[64 * 1024];
+                        int count;
+                        long total = 0;
+                        while ((count = input.read(buffer)) >= 0) {
+                            if (count == 0) continue;
+                            output.write(buffer, 0, count);
+                            total += count;
+                        }
+                        if (total == 0) {
+                            destination.delete();
+                            throw new IllegalStateException("所选照片为空");
+                        }
+                    }
+                    imported++;
+                    lastName = destination.getName();
+                } catch (Exception error) {
+                    diagnostics.error(
+                            "library",
+                            "导入照片失败；URI=" + uri + "；错误=" + error.getMessage());
+                }
+            }
+            int finalImported = imported;
+            String finalLastName = lastName;
+            mainHandler.post(() -> {
+                showSection("library");
+                updateFileCount();
+                if (finalImported > 0) {
+                    showToast(
+                            "已从" + (ownerAlbum ? "机主相册" : "网盘")
+                                    + "加入 " + finalImported + " 张照片");
+                    if (finalLastName != null) {
+                        statusText.setText("已加入 " + finalLastName);
+                    }
+                } else {
+                    showError("没有可加入文件库的照片。");
+                }
+            });
+        });
+    }
+
+    private String displayName(Uri uri) {
+        try (Cursor cursor = getContentResolver().query(
+                uri,
+                new String[]{OpenableColumns.DISPLAY_NAME},
+                null,
+                null,
+                null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) return cursor.getString(column);
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return uri.getLastPathSegment();
+    }
+
+    private File uniquePhotoDestination(String requestedName) {
+        String safeName = requestedName == null
+                ? "导入照片.jpg"
+                : requestedName
+                        .replace('\\', '_')
+                        .replace('/', '_')
+                        .replaceAll("[<>:\"|?*]", "_");
+        if (safeName.isEmpty()) safeName = "导入照片.jpg";
+        File initial = new File(photoDirectory, safeName);
+        if (!initial.exists()) return initial;
+        int dot = safeName.lastIndexOf('.');
+        String stem = dot > 0 ? safeName.substring(0, dot) : safeName;
+        String extension = dot > 0 ? safeName.substring(dot) : ".jpg";
+        return new File(
+                photoDirectory,
+                stem + "-" + System.currentTimeMillis() + extension);
+    }
+
+    private void sharePhoto(File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(
+                    this,
+                    getPackageName() + ".files",
+                    file);
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType(isVideoFile(file) ? "video/*" : "image/*");
+            share.putExtra(Intent.EXTRA_STREAM, uri);
+            share.setClipData(ClipData.newRawUri(file.getName(), uri));
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "分享到社交平台"));
+        } catch (RuntimeException error) {
+            diagnostics.error("share", "分享照片失败：" + error.getMessage());
+            showError("无法打开系统分享面板：" + error.getMessage());
+        }
+    }
+
+    private void showLargePhoto(File file) {
+        if (isVideoFile(file)) {
+            showLargeLocalVideo(file);
+            return;
+        }
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        int sample = 1;
+        while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 4096) {
+            sample *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        if (bitmap == null) {
+            showError("当前格式已安全保存，但系统无法显示这张照片的大图。");
+            return;
+        }
+
+        Dialog dialog = new Dialog(
+                this,
+                android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        ImageView imageView = new ImageView(this);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        imageView.setImageBitmap(bitmap);
+        root.addView(
+                imageView,
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+
+        Button close = nativeButton("关闭", false);
+        close.setOnClickListener(view -> dialog.dismiss());
+        FrameLayout.LayoutParams closeParams =
+                new FrameLayout.LayoutParams(dp(88), dp(48), Gravity.TOP | Gravity.START);
+        closeParams.setMargins(dp(16), dp(28), 0, 0);
+        root.addView(close, closeParams);
+
+        Button share = nativeButton("分享", true);
+        share.setOnClickListener(view -> sharePhoto(file));
+        FrameLayout.LayoutParams shareParams =
+                new FrameLayout.LayoutParams(dp(96), dp(48), Gravity.TOP | Gravity.END);
+        shareParams.setMargins(0, dp(28), dp(16), 0);
+        root.addView(share, shareParams);
+        dialog.setContentView(root);
+        dialog.setOnDismissListener(ignored -> {
+            if (!bitmap.isRecycled()) bitmap.recycle();
+        });
+        dialog.show();
+    }
+
+    private void showLargeLocalVideo(File file) {
+        Dialog dialog = new Dialog(
+                this,
+                android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        VideoView video = new VideoView(this);
+        MediaController controls = new MediaController(this);
+        controls.setAnchorView(video);
+        video.setMediaController(controls);
+        video.setVideoURI(Uri.fromFile(file));
+        video.setOnPreparedListener(player -> video.start());
+        root.addView(video, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        Button close = nativeButton("关闭", false);
+        close.setOnClickListener(view -> dialog.dismiss());
+        FrameLayout.LayoutParams closeParams =
+                new FrameLayout.LayoutParams(
+                        dp(88),
+                        dp(48),
+                        Gravity.TOP | Gravity.START);
+        closeParams.setMargins(dp(16), dp(28), 0, 0);
+        root.addView(close, closeParams);
+        Button share = nativeButton("分享", true);
+        share.setOnClickListener(view -> sharePhoto(file));
+        FrameLayout.LayoutParams shareParams =
+                new FrameLayout.LayoutParams(
+                        dp(96),
+                        dp(48),
+                        Gravity.TOP | Gravity.END);
+        shareParams.setMargins(0, dp(28), dp(16), 0);
+        root.addView(share, shareParams);
+        dialog.setContentView(root);
+        dialog.show();
+    }
+
+    private static boolean isVideoFile(File file) {
+        String lower = file.getName().toLowerCase(Locale.ROOT);
+        return lower.endsWith(".mp4")
+                || lower.endsWith(".mov")
+                || lower.endsWith(".m4v");
+    }
+
+    private void showLargeSystemMedia(MediaEntry entry) {
+        Dialog dialog = new Dialog(
+                this,
+                android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        if (entry.video) {
+            VideoView video = new VideoView(this);
+            MediaController controls = new MediaController(this);
+            controls.setAnchorView(video);
+            video.setMediaController(controls);
+            video.setVideoURI(entry.uri);
+            video.setOnPreparedListener(player -> {
+                player.setLooping(false);
+                video.start();
+            });
+            root.addView(video, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+        } else {
+            ImageView imageView = new ImageView(this);
+            imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            try (InputStream input =
+                         getContentResolver().openInputStream(entry.uri)) {
+                imageView.setImageBitmap(BitmapFactory.decodeStream(input));
+            } catch (Exception error) {
+                showError("无法读取系统相册照片：" + error.getMessage());
+                return;
+            }
+            root.addView(imageView, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
+        Button close = nativeButton("关闭", false);
+        close.setOnClickListener(view -> dialog.dismiss());
+        FrameLayout.LayoutParams closeParams =
+                new FrameLayout.LayoutParams(
+                        dp(88),
+                        dp(48),
+                        Gravity.TOP | Gravity.START);
+        closeParams.setMargins(dp(16), dp(28), 0, 0);
+        root.addView(close, closeParams);
+        Button share = nativeButton("分享", true);
+        share.setOnClickListener(view -> shareMediaUri(entry));
+        FrameLayout.LayoutParams shareParams =
+                new FrameLayout.LayoutParams(
+                        dp(96),
+                        dp(48),
+                        Gravity.TOP | Gravity.END);
+        shareParams.setMargins(0, dp(28), dp(16), 0);
+        root.addView(share, shareParams);
+        dialog.setContentView(root);
+        dialog.show();
+    }
+
+    private void shareMediaUri(MediaEntry entry) {
+        try {
+            Intent share = new Intent(Intent.ACTION_SEND);
+            share.setType(entry.video ? "video/*" : "image/*");
+            share.putExtra(Intent.EXTRA_STREAM, entry.uri);
+            share.setClipData(ClipData.newRawUri(entry.name, entry.uri));
+            share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(share, "分享到社交平台"));
+        } catch (RuntimeException error) {
+            showError("无法分享系统相册文件：" + error.getMessage());
+        }
+    }
+
+    private static String formatDuration(long durationMillis) {
+        long seconds = Math.max(0, durationMillis / 1000L);
+        return String.format(
+                Locale.CHINA,
+                "%d:%02d",
+                seconds / 60,
+                seconds % 60);
     }
 
     private View buildApplication() {
@@ -344,7 +920,7 @@ public final class MainActivity extends Activity {
         top.setPadding(dp(12), dp(8), dp(12), dp(8));
         top.setBackgroundColor(SURFACE);
 
-        TextView logo = text("N", 20, Typeface.BOLD, Color.WHITE);
+        TextView logo = text("Z", 20, Typeface.BOLD, Color.WHITE);
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(rounded(GRAPHITE, 10, 0));
         top.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40)));
@@ -352,9 +928,9 @@ public final class MainActivity extends Activity {
         LinearLayout brand = new LinearLayout(this);
         brand.setOrientation(LinearLayout.VERTICAL);
         brand.setPadding(dp(8), 0, 0, 0);
-        brand.addView(text("Nikon Link", 15, Typeface.BOLD, INK));
-        brand.addView(text("Android 原生版", 11, Typeface.NORMAL, MUTED));
-        top.addView(brand, new LinearLayout.LayoutParams(dp(96), dp(44)));
+        brand.addView(text("帧澈 ZENCHE", 15, Typeface.BOLD, INK));
+        brand.addView(text("Capture · Connect · Flow", 10, Typeface.NORMAL, MUTED));
+        top.addView(brand, new LinearLayout.LayoutParams(dp(142), dp(44)));
 
         connectButton = nativeButton("连接相机", false);
         connectButton.setOnClickListener(view -> {
@@ -498,16 +1074,32 @@ public final class MainActivity extends Activity {
         content.addView(buildPreviewStage(true), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(300)));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
         liveViewButton = nativeButton(
                 liveViewEnabled ? "停止实时取景" : "开启实时取景",
-                true);
+                false);
         liveViewButton.setOnClickListener(view -> toggleLiveView());
+        shutterButton = nativeButton(
+                videoRecording ? "停止录制" : "开始录制",
+                true);
+        shutterButton.setBackground(rounded(VIDEO, 9, 0));
+        shutterButton.setOnClickListener(view -> toggleVideoRecording());
         cameraControls.add(liveViewButton);
+        cameraControls.add(shutterButton);
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(50));
+                0,
+                dp(50),
+                1f);
         buttonParams.setMargins(0, dp(16), 0, 0);
-        content.addView(liveViewButton, buttonParams);
+        actions.addView(liveViewButton, buttonParams);
+        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(
+                0,
+                dp(50),
+                1f);
+        recordParams.setMargins(dp(10), dp(16), 0, 0);
+        actions.addView(shutterButton, recordParams);
+        content.addView(actions);
         content.addView(buildMonitorParameterControls());
         content.addView(buildMonitorOutputControls());
         scroll.addView(content);
@@ -560,6 +1152,17 @@ public final class MainActivity extends Activity {
         badgeParams.setMargins(dp(14), dp(10), 0, 0);
         stage.addView(badge, badgeParams);
 
+        Button fullscreen = nativeButton("全屏", false);
+        fullscreen.setContentDescription(
+                monitoring ? "打开视频全屏取景" : "打开照片全屏取景");
+        fullscreen.setOnClickListener(view -> showImmersivePreview(monitoring));
+        FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(
+                dp(82),
+                dp(44),
+                Gravity.TOP | Gravity.END);
+        fullscreenParams.setMargins(0, dp(10), dp(14), 0);
+        stage.addView(fullscreen, fullscreenParams);
+
         TextView outputBadge = text(
                 monitoring
                         ? "JPEG实时取景 · " + monitorProfileLabel()
@@ -584,6 +1187,461 @@ public final class MainActivity extends Activity {
                     dp(380)));
         }
         return stage;
+    }
+
+    private void showImmersivePreview(boolean monitoring) {
+        if (immersiveDialog != null && immersiveDialog.isShowing()) return;
+        immersiveMonitoring = monitoring;
+        Dialog dialog = new Dialog(
+                this,
+                android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        immersiveDialog = dialog;
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+
+        immersivePreviewImage = new ImageView(this);
+        immersivePreviewImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        immersivePreviewImage.setBackgroundColor(Color.BLACK);
+        Bitmap frame = monitoring ? latestFrame : latestSourceFrame;
+        if (frame != null) immersivePreviewImage.setImageBitmap(frame);
+        root.addView(immersivePreviewImage, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        immersiveZebraImage = new ImageView(this);
+        immersiveZebraImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        immersiveZebraImage.setImageBitmap(
+                monitoring && zebraEnabled ? latestZebraMask : null);
+        root.addView(immersiveZebraImage, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        Button close = nativeButton("⌄ 退出全屏", false);
+        close.setTextColor(Color.WHITE);
+        close.setBackground(rounded(Color.argb(165, 0, 0, 0), 12, 0));
+        close.setOnClickListener(view -> closeImmersivePreview(dialog));
+        FrameLayout.LayoutParams closeParams =
+                new FrameLayout.LayoutParams(
+                        dp(126),
+                        dp(48),
+                        Gravity.TOP | Gravity.START);
+        closeParams.setMargins(dp(18), dp(24), 0, 0);
+        root.addView(close, closeParams);
+
+        TextView device = text(
+                (liveViewEnabled ? "● LIVE · " : "● NO SOURCE · ")
+                        + connectedCameraName,
+                11,
+                Typeface.BOLD,
+                Color.WHITE);
+        device.setGravity(Gravity.CENTER);
+        device.setBackground(rounded(Color.argb(150, 0, 0, 0), 22, 0));
+        FrameLayout.LayoutParams deviceParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        dp(44),
+                        Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        deviceParams.setMargins(0, dp(26), 0, 0);
+        root.addView(device, deviceParams);
+
+        LinearLayout leftRail = new LinearLayout(this);
+        leftRail.setOrientation(LinearLayout.VERTICAL);
+        leftRail.setGravity(Gravity.CENTER);
+        TextView mode = text(
+                monitoring ? monitorFrameRate + "P" : exposureMode.toUpperCase(Locale.ROOT),
+                18,
+                Typeface.BOLD,
+                Color.WHITE);
+        mode.setGravity(Gravity.CENTER);
+        mode.setBackground(rounded(Color.argb(155, 0, 0, 0), 12, 0));
+        leftRail.addView(mode, new LinearLayout.LayoutParams(dp(64), dp(56)));
+        TextView protocol = text("USB\nPTP", 11, Typeface.BOLD, Color.WHITE);
+        protocol.setGravity(Gravity.CENTER);
+        protocol.setBackground(rounded(Color.argb(155, 0, 0, 0), 12, 0));
+        LinearLayout.LayoutParams protocolParams =
+                new LinearLayout.LayoutParams(dp(64), dp(56));
+        protocolParams.setMargins(0, dp(12), 0, 0);
+        leftRail.addView(protocol, protocolParams);
+        FrameLayout.LayoutParams leftParams =
+                new FrameLayout.LayoutParams(
+                        dp(72),
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.START | Gravity.CENTER_VERTICAL);
+        leftParams.setMargins(dp(18), 0, 0, 0);
+        root.addView(leftRail, leftParams);
+
+        LinearLayout rightRail = new LinearLayout(this);
+        rightRail.setOrientation(LinearLayout.VERTICAL);
+        rightRail.setGravity(Gravity.CENTER);
+        TextView section = text(
+                monitoring ? "视频" : "照片",
+                17,
+                Typeface.BOLD,
+                monitoring ? Color.rgb(235, 40, 55) : Color.rgb(72, 145, 255));
+        section.setGravity(Gravity.CENTER);
+        rightRail.addView(section, new LinearLayout.LayoutParams(dp(92), dp(44)));
+        Button capture = nativeButton(
+                monitoring
+                        ? (videoRecording ? "■\n停止" : "●\n录制")
+                        : "●\n拍摄",
+                true);
+        capture.setTextSize(15);
+        capture.setTextColor(Color.WHITE);
+        capture.setBackground(rounded(
+                monitoring ? VIDEO : COBALT,
+                48,
+                0));
+        capture.setOnClickListener(view -> {
+            if (monitoring) {
+                toggleVideoRecording();
+            } else {
+                capturePhoto();
+            }
+        });
+        if (monitoring) {
+            immersiveRecordButton = capture;
+        }
+        LinearLayout.LayoutParams captureParams =
+                new LinearLayout.LayoutParams(dp(96), dp(96));
+        captureParams.setMargins(0, dp(8), 0, 0);
+        rightRail.addView(capture, captureParams);
+        FrameLayout.LayoutParams rightParams =
+                new FrameLayout.LayoutParams(
+                        dp(104),
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.END | Gravity.CENTER_VERTICAL);
+        rightParams.setMargins(0, 0, dp(18), 0);
+        root.addView(rightRail, rightParams);
+
+        TextView exposure = text(
+                monitoring
+                        ? String.format(
+                                Locale.CHINA,
+                                "%.1f°   %d fps   JPEG",
+                                monitorShutterAngle,
+                                monitorFrameRate)
+                        : "M   JPEG   帧澈 ZENCHE",
+                13,
+                Typeface.BOLD,
+                Color.WHITE);
+        exposure.setGravity(Gravity.CENTER);
+        exposure.setBackground(rounded(Color.argb(160, 0, 0, 0), 22, 0));
+        FrameLayout.LayoutParams exposureParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        dp(44),
+                        Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        exposureParams.setMargins(0, 0, 0, dp(24));
+        root.addView(exposure, exposureParams);
+        immersiveExposureText = exposure;
+
+        LinearLayout parameterBar = new LinearLayout(this);
+        parameterBar.setOrientation(LinearLayout.HORIZONTAL);
+        parameterBar.setGravity(Gravity.CENTER);
+        if (monitoring) {
+            parameterBar.addView(immersiveParameterStepper("角度"));
+            parameterBar.addView(immersiveParameterStepper("帧率"));
+            parameterBar.addView(immersiveParameterStepper("光圈"));
+            parameterBar.addView(immersiveParameterStepper("ISO"));
+            parameterBar.addView(immersiveParameterStepper("白平衡"));
+            parameterBar.addView(immersiveParameterStepper("优化"));
+        } else {
+            parameterBar.addView(immersiveParameterStepper("模式"));
+            parameterBar.addView(immersiveParameterStepper("快门"));
+            parameterBar.addView(immersiveParameterStepper("光圈"));
+            parameterBar.addView(immersiveParameterStepper("ISO"));
+            parameterBar.addView(immersiveParameterStepper("补偿"));
+            parameterBar.addView(immersiveParameterStepper("对焦"));
+            parameterBar.addView(immersiveParameterStepper("白平衡"));
+            parameterBar.addView(immersiveParameterStepper("优化"));
+        }
+        HorizontalScrollView parameterScroller = new HorizontalScrollView(this);
+        parameterScroller.setHorizontalScrollBarEnabled(false);
+        parameterScroller.setFillViewport(true);
+        parameterScroller.setPadding(dp(104), 0, dp(104), 0);
+        parameterScroller.addView(parameterBar);
+        FrameLayout.LayoutParams parameterParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(64),
+                        Gravity.BOTTOM);
+        parameterParams.setMargins(0, 0, 0, dp(76));
+        root.addView(parameterScroller, parameterParams);
+        Button parameterToggle = nativeButton("参数⌄", false);
+        parameterToggle.setTextColor(Color.WHITE);
+        parameterToggle.setBackground(rounded(Color.argb(165, 0, 0, 0), 10, 0));
+        parameterToggle.setOnClickListener(view -> {
+            boolean show = parameterScroller.getVisibility() != View.VISIBLE;
+            parameterScroller.setVisibility(show ? View.VISIBLE : View.GONE);
+            parameterToggle.setText(show ? "参数⌄" : "参数⌃");
+        });
+        FrameLayout.LayoutParams toggleParams =
+                new FrameLayout.LayoutParams(
+                        dp(96),
+                        dp(44),
+                        Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        toggleParams.setMargins(0, 0, 0, dp(144));
+        root.addView(parameterToggle, toggleParams);
+
+        dialog.setContentView(root);
+        dialog.setOnDismissListener(ignored -> {
+            if (immersiveDialog == dialog) {
+                immersiveDialog = null;
+                immersivePreviewImage = null;
+                immersiveZebraImage = null;
+                immersiveRecordButton = null;
+                immersiveExposureText = null;
+            }
+        });
+        dialog.setOnShowListener(ignored -> {
+            Window window = dialog.getWindow();
+            if (window != null) {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+            }
+        });
+        dialog.show();
+    }
+
+    private void closeImmersivePreview(Dialog dialog) {
+        if (immersiveDialog != dialog) return;
+        immersiveDialog = null;
+        immersivePreviewImage = null;
+        immersiveZebraImage = null;
+        immersiveRecordButton = null;
+        immersiveExposureText = null;
+        dialog.dismiss();
+    }
+
+    private View immersiveParameterStepper(String parameter) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        group.setGravity(Gravity.CENTER);
+        group.setPadding(dp(4), dp(4), dp(4), dp(4));
+        group.setBackground(rounded(Color.argb(165, 0, 0, 0), 10, 0));
+        Button minus = nativeButton("−", false);
+        TextView value = text(
+                immersiveParameterValue(parameter),
+                11,
+                Typeface.BOLD,
+                Color.WHITE);
+        value.setGravity(Gravity.CENTER);
+        Button plus = nativeButton("+", false);
+        String cameraParameter = immersiveCameraParameter(parameter);
+        boolean adjustable = connected
+                && (cameraParameter == null || camera.isParameterWritable(cameraParameter));
+        minus.setEnabled(adjustable);
+        plus.setEnabled(adjustable);
+        group.setAlpha(adjustable ? 1f : 0.48f);
+        if (!adjustable && cameraParameter != null) {
+            String reason = camera.parameterLockReason(cameraParameter);
+            group.setContentDescription(
+                    parameter + "不可调整" + (reason == null ? "" : "：" + reason));
+        }
+        minus.setOnClickListener(view -> {
+            adjustImmersiveParameter(parameter, -1);
+            value.setText(immersiveParameterValue(parameter));
+        });
+        plus.setOnClickListener(view -> {
+            adjustImmersiveParameter(parameter, 1);
+            value.setText(immersiveParameterValue(parameter));
+        });
+        group.addView(minus, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        group.addView(value, new LinearLayout.LayoutParams(dp(76), dp(44)));
+        group.addView(plus, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(dp(172), dp(56));
+        params.setMargins(dp(4), 0, dp(4), 0);
+        group.setLayoutParams(params);
+        return group;
+    }
+
+    private String immersiveParameterValue(String parameter) {
+        switch (parameter) {
+            case "角度":
+                return String.format(Locale.CHINA, "角度\n%.1f°", monitorShutterAngle);
+            case "帧率":
+                return "帧率\n" + monitorFrameRate + "p";
+            case "快门":
+                return currentShutterSeconds < 1
+                        ? "快门\n1/" + Math.round(1 / currentShutterSeconds)
+                        : String.format(Locale.CHINA, "快门\n%.1fs", currentShutterSeconds);
+            case "光圈":
+                return String.format(Locale.CHINA, "光圈\nF%.1f", currentAperture);
+            case "模式":
+                return "模式\n" + exposureMode.toUpperCase(Locale.ROOT);
+            case "补偿":
+                return "补偿\n±1/3 EV";
+            case "对焦":
+                return "对焦\nAF-S/AF-C";
+            case "白平衡":
+                return "白平衡\n自动/保留";
+            case "优化":
+                return "优化\n标准/自然";
+            default:
+                return "ISO\n" + currentIso;
+        }
+    }
+
+    private void adjustImmersiveParameter(String parameter, int direction) {
+        if (!connected || capturing) return;
+        if ("角度".equals(parameter)) {
+            double[] values = new double[]{
+                    45, 60, 72, 90, 108, 120, 144, 150, 172.8, 180,
+                    216, 240, 270, 300, 324, 360
+            };
+            monitorShutterAngle = adjacentValue(values, monitorShutterAngle, direction);
+            applyVideoShutterAngle();
+        } else if ("帧率".equals(parameter)) {
+            int[] values = new int[]{24, 25, 30, 50, 60};
+            monitorFrameRate = adjacentValue(values, monitorFrameRate, direction);
+            applyVideoShutterAngle();
+        } else if ("快门".equals(parameter)) {
+            double[] values = fineShutterValues();
+            currentShutterSeconds =
+                    adjacentValue(values, currentShutterSeconds, direction);
+            applyParameter("exposureTime", currentShutterSeconds, "快门速度");
+        } else if ("光圈".equals(parameter)) {
+            double[] values = fineApertureValues();
+            currentAperture = adjacentValue(values, currentAperture, direction);
+            applyParameter("aperture", currentAperture, "光圈");
+        } else if ("模式".equals(parameter)) {
+            String[] values = new String[]{
+                    "program", "shutterPriority", "aperturePriority", "manual", "bulb"
+            };
+            int index = adjacentIndex(values, exposureMode, direction);
+            applyParameter("exposureMode", values[index], "拍摄模式");
+        } else if ("补偿".equals(parameter)) {
+            applyParameter(
+                    "exposureCompensation",
+                    direction / 3.0,
+                    "曝光补偿");
+        } else if ("对焦".equals(parameter)) {
+            applyParameter(
+                    "focusMode",
+                    direction < 0 ? "single-shot" : "continuous",
+                    "对焦模式");
+        } else if ("白平衡".equals(parameter)) {
+            applyParameter(
+                    "whiteBalanceMode",
+                    direction < 0 ? "continuous" : "preserve",
+                    "白平衡");
+        } else if ("优化".equals(parameter)) {
+            applyParameter(
+                    "pictureControl",
+                    direction < 0 ? "neutral" : "standard",
+                    "优化校准");
+        } else {
+            Object[] supported = isoValues();
+            if (supported.length == 0) return;
+            int index = 0;
+            for (int candidate = 1; candidate < supported.length; candidate++) {
+                if (Math.abs(((Number) supported[candidate]).intValue() - currentIso)
+                        < Math.abs(((Number) supported[index]).intValue() - currentIso)) {
+                    index = candidate;
+                }
+            }
+            index = Math.max(0, Math.min(supported.length - 1, index + direction));
+            currentIso = ((Number) supported[index]).intValue();
+            applyParameter("iso", currentIso, "ISO 感光度");
+        }
+        updateImmersiveExposureText();
+    }
+
+    private String immersiveCameraParameter(String parameter) {
+        switch (parameter) {
+            case "角度":
+            case "帧率":
+            case "快门": return "exposureTime";
+            case "光圈": return "aperture";
+            case "ISO": return "iso";
+            case "模式": return "exposureMode";
+            case "补偿": return "exposureCompensation";
+            case "对焦": return "focusMode";
+            case "白平衡": return "whiteBalanceMode";
+            case "优化": return "pictureControl";
+            default: return null;
+        }
+    }
+
+    private int adjacentIndex(String[] values, String current, int direction) {
+        int index = 0;
+        for (int candidate = 0; candidate < values.length; candidate++) {
+            if (values[candidate].equals(current)) {
+                index = candidate;
+                break;
+            }
+        }
+        return Math.max(0, Math.min(values.length - 1, index + direction));
+    }
+
+    private double[] fineShutterValues() {
+        return new double[]{
+                1.0 / 8000, 1.0 / 6400, 1.0 / 5000, 1.0 / 4000,
+                1.0 / 3200, 1.0 / 2500, 1.0 / 2000, 1.0 / 1600,
+                1.0 / 1250, 1.0 / 1000, 1.0 / 800, 1.0 / 640,
+                1.0 / 500, 1.0 / 400, 1.0 / 320, 1.0 / 250,
+                1.0 / 200, 1.0 / 160, 1.0 / 125, 1.0 / 100,
+                1.0 / 80, 1.0 / 60, 1.0 / 50, 1.0 / 40,
+                1.0 / 30, 1.0 / 25, 1.0 / 20, 1.0 / 15,
+                1.0 / 13, 1.0 / 10, 1.0 / 8, 1.0 / 6,
+                1.0 / 5, 1.0 / 4, 1.0 / 3, 1.0 / 2,
+                1, 1.3, 1.6, 2, 2.5, 3.2, 4, 5, 6, 8,
+                10, 13, 15, 20, 25, 30
+        };
+    }
+
+    private double[] fineApertureValues() {
+        return new double[]{
+                1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8, 3.2, 3.5,
+                4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9, 10, 11, 13, 14,
+                16, 18, 20, 22
+        };
+    }
+
+    private double adjacentValue(double[] values, double current, int direction) {
+        int index = 0;
+        for (int candidate = 1; candidate < values.length; candidate++) {
+            if (Math.abs(values[candidate] - current)
+                    < Math.abs(values[index] - current)) {
+                index = candidate;
+            }
+        }
+        return values[Math.max(0, Math.min(values.length - 1, index + direction))];
+    }
+
+    private int adjacentValue(int[] values, int current, int direction) {
+        int index = 0;
+        for (int candidate = 1; candidate < values.length; candidate++) {
+            if (Math.abs(values[candidate] - current)
+                    < Math.abs(values[index] - current)) {
+                index = candidate;
+            }
+        }
+        return values[Math.max(0, Math.min(values.length - 1, index + direction))];
+    }
+
+    private void updateImmersiveExposureText() {
+        if (immersiveExposureText == null) return;
+        immersiveExposureText.setText(
+                immersiveMonitoring
+                        ? String.format(
+                                Locale.CHINA,
+                                "%.1f°   %d fps   ISO %d",
+                                monitorShutterAngle,
+                                monitorFrameRate,
+                                currentIso)
+                        : String.format(
+                                Locale.CHINA,
+                                "%s   F%.1f   ISO %d",
+                                exposureMode.toUpperCase(Locale.ROOT),
+                                currentAperture,
+                                currentIso));
     }
 
     private View buildMonitorParameterControls() {
@@ -856,16 +1914,16 @@ public final class MainActivity extends Activity {
         addSpinnerControl(
                 panel,
                 "快门速度",
-                new String[]{"1/8000", "1/1000", "1/250", "1/125", "1/60", "1/15", "1 秒"},
-                new Object[]{0.000125, 0.001, 0.004, 0.008, 0.0167, 0.0667, 1.0},
-                3,
+                shutterLabels(),
+                boxedValues(fineShutterValues()),
+                nearestIndex(fineShutterValues(), currentShutterSeconds),
                 "exposureTime");
         addSpinnerControl(
                 panel,
                 "光圈",
-                new String[]{"F1.4", "F2.0", "F2.8", "F4.0", "F5.6", "F8", "F11", "F16", "F22"},
-                new Object[]{1.4, 2.0, 2.8, 4.0, 5.6, 8.0, 11.0, 16.0, 22.0},
-                3,
+                apertureLabels(),
+                boxedValues(fineApertureValues()),
+                nearestIndex(fineApertureValues(), currentAperture),
                 "aperture");
         addSpinnerControl(
                 panel,
@@ -965,8 +2023,10 @@ public final class MainActivity extends Activity {
         int minimum = camera.getMinimumIso();
         int maximum = camera.getMaximumIso();
         Integer[] candidates = new Integer[]{
-                64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
-                51200, 64000, 102400
+                64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640,
+                800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000,
+                6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000,
+                40000, 51200, 64000, 80000, 102400
         };
         List<Object> supported = new ArrayList<>();
         for (int candidate : candidates) {
@@ -975,6 +2035,46 @@ public final class MainActivity extends Activity {
             }
         }
         return supported.toArray();
+    }
+
+    private Object[] boxedValues(double[] values) {
+        Object[] boxed = new Object[values.length];
+        for (int index = 0; index < values.length; index++) {
+            boxed[index] = values[index];
+        }
+        return boxed;
+    }
+
+    private int nearestIndex(double[] values, double current) {
+        int index = 0;
+        for (int candidate = 1; candidate < values.length; candidate++) {
+            if (Math.abs(values[candidate] - current)
+                    < Math.abs(values[index] - current)) {
+                index = candidate;
+            }
+        }
+        return index;
+    }
+
+    private String[] shutterLabels() {
+        double[] values = fineShutterValues();
+        String[] labels = new String[values.length];
+        for (int index = 0; index < values.length; index++) {
+            double value = values[index];
+            labels[index] = value < 1
+                    ? "1/" + Math.round(1 / value)
+                    : String.format(Locale.CHINA, "%.1f 秒", value);
+        }
+        return labels;
+    }
+
+    private String[] apertureLabels() {
+        double[] values = fineApertureValues();
+        String[] labels = new String[values.length];
+        for (int index = 0; index < values.length; index++) {
+            labels[index] = String.format(Locale.CHINA, "F%.1f", values[index]);
+        }
+        return labels;
     }
 
     private int defaultIsoIndex() {
@@ -1018,9 +2118,15 @@ public final class MainActivity extends Activity {
                     initialized = true;
                     return;
                 }
-                if ("exposureMode".equals(parameter)) {
-                    exposureMode = String.valueOf(values[position]);
-                    updateCameraControls();
+                if ("exposureTime".equals(parameter)
+                        && values[position] instanceof Number) {
+                    currentShutterSeconds = ((Number) values[position]).doubleValue();
+                } else if ("aperture".equals(parameter)
+                        && values[position] instanceof Number) {
+                    currentAperture = ((Number) values[position]).doubleValue();
+                } else if ("iso".equals(parameter)
+                        && values[position] instanceof Number) {
+                    currentIso = ((Number) values[position]).intValue();
                 }
                 applyParameter(parameter, values[position], label);
             }
@@ -1136,32 +2242,326 @@ public final class MainActivity extends Activity {
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         List<File> files = photoFiles();
+        List<MediaEntry> systemMedia =
+                hasAlbumAccess() ? systemAlbumEntries() : Collections.emptyList();
         content.addView(text("文件与传输", 30, Typeface.BOLD, INK));
         content.addView(text(
-                files.size() + " 个本地图像文件 · 无线收件箱",
+                files.size() + " 个 帧澈 ZENCHE 文件 · "
+                        + systemMedia.size() + " 个系统相册项目",
                 14,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 18));
-        content.addView(buildWirelessTransferPanel());
+        LinearLayout sourceActions = new LinearLayout(this);
+        sourceActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button albumButton = nativeButton(
+                hasAlbumAccess() ? "刷新系统相册" : "允许相册访问",
+                false);
+        albumButton.setOnClickListener(view -> openOwnerAlbum());
+        sourceActions.addView(
+                albumButton,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button cloudButton = nativeButton("链接网盘", false);
+        cloudButton.setOnClickListener(view -> openCloudDrive());
+        LinearLayout.LayoutParams cloudParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        cloudParams.setMargins(dp(8), 0, 0, 0);
+        sourceActions.addView(cloudButton, cloudParams);
         content.addView(
-                text("本地文件", 18, Typeface.BOLD, INK),
-                marginParams(-1, -2, 0, 22, 0, 12));
+                sourceActions,
+                marginParams(-1, dp(48), 0, 0, 0, 12));
+        content.addView(
+                text(
+                        "系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。",
+                        12,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 0, 0, 16));
+
+        LinearLayout systemBody = verticalContainer();
+        if (!hasAlbumAccess()) {
+            TextView permission = text(
+                    "允许照片和视频访问后，最近媒体会在这里直接显示，无需先导入。",
+                    14,
+                    Typeface.NORMAL,
+                    MUTED);
+            permission.setGravity(Gravity.CENTER);
+            permission.setOnClickListener(view -> requestAlbumAccess());
+            systemBody.addView(permission, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(120)));
+        } else if (systemMedia.isEmpty()) {
+            TextView emptyAlbum = text(
+                    "系统相册暂无可显示的照片或视频。",
+                    14,
+                    Typeface.NORMAL,
+                    MUTED);
+            emptyAlbum.setGravity(Gravity.CENTER);
+            systemBody.addView(emptyAlbum, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(120)));
+        } else {
+            systemBody.addView(systemMediaTypeGroup(
+                    "system-photos",
+                    "照片",
+                    systemMedia,
+                    false));
+            systemBody.addView(systemMediaTypeGroup(
+                    "system-videos",
+                    "视频",
+                    systemMedia,
+                    true));
+        }
+        content.addView(collapsibleGroup(
+                "system-album",
+                "系统相册",
+                systemMedia.size() + " 个项目",
+                systemBody,
+                true));
+
+        content.addView(collapsibleGroup(
+                "wireless-transfer",
+                "无线传输",
+                wirelessRequested ? wirelessStatus : "FTP · HTTP · WebDAV",
+                buildWirelessTransferPanel(),
+                false));
+
+        LinearLayout localBody = verticalContainer();
         if (files.isEmpty()) {
             TextView empty = text(
-                    "还没有联机拍摄文件\n照片将保存在 Nikon Link 本地照片库。",
+                    "还没有联机拍摄文件\n照片将保存在 帧澈 ZENCHE 本地照片库。",
                     15,
                     Typeface.NORMAL,
                     MUTED);
             empty.setGravity(Gravity.CENTER);
-            content.addView(empty, new LinearLayout.LayoutParams(
+            localBody.addView(empty, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     dp(300)));
         } else {
-            for (File file : files) content.addView(photoRow(file));
+            localBody.addView(localFileTypeGroup(
+                    "local-photos",
+                    "照片",
+                    files,
+                    false));
+            localBody.addView(localFileTypeGroup(
+                    "local-videos",
+                    "视频",
+                    files,
+                    true));
         }
+        content.addView(collapsibleGroup(
+                "local-library",
+                "帧澈 ZENCHE 文件库",
+                files.size() + " 个文件",
+                localBody,
+                true));
         scroll.addView(content);
         return scroll;
+    }
+
+    private View collapsibleGroup(
+            String key,
+            String title,
+            String subtitle,
+            View body,
+            boolean initiallyExpanded) {
+        LinearLayout group = panel();
+        boolean expanded = disclosureStates.containsKey(key)
+                ? Boolean.TRUE.equals(disclosureStates.get(key))
+                : initiallyExpanded;
+        disclosureStates.put(key, expanded);
+        Button header = nativeButton("", false);
+        header.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        header.setText((expanded ? "⌄  " : "›  ") + title + " · " + subtitle);
+        body.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        header.setOnClickListener(view -> {
+            boolean next = body.getVisibility() != View.VISIBLE;
+            disclosureStates.put(key, next);
+            body.setVisibility(next ? View.VISIBLE : View.GONE);
+            header.setText((next ? "⌄  " : "›  ") + title + " · " + subtitle);
+        });
+        group.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+        group.addView(body);
+        group.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 12));
+        return group;
+    }
+
+    private View systemMediaTypeGroup(
+            String key,
+            String title,
+            List<MediaEntry> entries,
+            boolean video) {
+        LinearLayout body = verticalContainer();
+        int count = 0;
+        for (MediaEntry entry : entries) {
+            if (entry.video != video) continue;
+            count++;
+            body.addView(systemMediaRow(entry));
+        }
+        if (count == 0) {
+            body.addView(text(
+                    "暂无" + title,
+                    13,
+                    Typeface.NORMAL,
+                    MUTED));
+        }
+        return collapsibleGroup(key, title, count + " 个", body, true);
+    }
+
+    private View localFileTypeGroup(
+            String key,
+            String title,
+            List<File> files,
+            boolean video) {
+        LinearLayout body = verticalContainer();
+        int count = 0;
+        for (File file : files) {
+            if (isVideoFile(file) != video) continue;
+            count++;
+            body.addView(photoRow(file));
+        }
+        if (count == 0) {
+            body.addView(text(
+                    "暂无" + title,
+                    13,
+                    Typeface.NORMAL,
+                    MUTED));
+        }
+        return collapsibleGroup(key, title, count + " 个", body, true);
+    }
+
+    private List<MediaEntry> systemAlbumEntries() {
+        List<MediaEntry> result = new ArrayList<>();
+        Uri collection = MediaStore.Files.getContentUri("external");
+        String[] projection = new String[]{
+                MediaStore.Files.FileColumns._ID,
+                MediaStore.Files.FileColumns.DISPLAY_NAME,
+                MediaStore.Files.FileColumns.MEDIA_TYPE,
+                MediaStore.Files.FileColumns.DATE_ADDED,
+                MediaStore.Files.FileColumns.SIZE,
+                MediaStore.Video.VideoColumns.DURATION
+        };
+        String selection =
+                MediaStore.Files.FileColumns.MEDIA_TYPE + "=? OR "
+                        + MediaStore.Files.FileColumns.MEDIA_TYPE + "=?";
+        String[] args = new String[]{
+                String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE),
+                String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO)
+        };
+        try (Cursor cursor = getContentResolver().query(
+                collection,
+                projection,
+                selection,
+                args,
+                MediaStore.Files.FileColumns.DATE_ADDED + " DESC")) {
+            if (cursor == null) return result;
+            int idIndex = cursor.getColumnIndexOrThrow(
+                    MediaStore.Files.FileColumns._ID);
+            int nameIndex = cursor.getColumnIndexOrThrow(
+                    MediaStore.Files.FileColumns.DISPLAY_NAME);
+            int typeIndex = cursor.getColumnIndexOrThrow(
+                    MediaStore.Files.FileColumns.MEDIA_TYPE);
+            int dateIndex = cursor.getColumnIndexOrThrow(
+                    MediaStore.Files.FileColumns.DATE_ADDED);
+            int sizeIndex = cursor.getColumnIndexOrThrow(
+                    MediaStore.Files.FileColumns.SIZE);
+            int durationIndex = cursor.getColumnIndex(
+                    MediaStore.Video.VideoColumns.DURATION);
+            while (cursor.moveToNext() && result.size() < 60) {
+                long id = cursor.getLong(idIndex);
+                boolean video = cursor.getInt(typeIndex)
+                        == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
+                result.add(new MediaEntry(
+                        ContentUris.withAppendedId(collection, id),
+                        cursor.getString(nameIndex),
+                        video,
+                        Math.max(0, cursor.getLong(dateIndex) * 1000L),
+                        Math.max(0, cursor.getLong(sizeIndex)),
+                        durationIndex >= 0
+                                ? Math.max(0, cursor.getLong(durationIndex))
+                                : 0));
+            }
+        } catch (RuntimeException error) {
+            diagnostics.warning(
+                    "library",
+                    "读取系统相册失败：" + error.getMessage());
+        }
+        return result;
+    }
+
+    private View systemMediaRow(MediaEntry entry) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(10), dp(10), dp(10), dp(10));
+        row.setBackground(rounded(SURFACE, 12, RULE));
+        row.setContentDescription(
+                "系统相册，双击" + (entry.video ? "播放 " : "查看 ") + entry.name);
+        GestureDetector doubleTap = new GestureDetector(
+                this,
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override public boolean onDown(MotionEvent event) { return true; }
+                    @Override
+                    public boolean onDoubleTap(MotionEvent event) {
+                        showLargeSystemMedia(entry);
+                        return true;
+                    }
+                });
+        row.setOnTouchListener((view, event) -> doubleTap.onTouchEvent(event));
+
+        ImageView thumbnail = new ImageView(this);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbnail.setBackgroundColor(GRAPHITE);
+        try {
+            Bitmap bitmap;
+            if (Build.VERSION.SDK_INT >= 29) {
+                bitmap = getContentResolver().loadThumbnail(
+                        entry.uri,
+                        new Size(dp(216), dp(152)),
+                        null);
+            } else {
+                try (InputStream input =
+                             getContentResolver().openInputStream(entry.uri)) {
+                    bitmap = BitmapFactory.decodeStream(input);
+                }
+            }
+            thumbnail.setImageBitmap(bitmap);
+        } catch (Exception ignored) {
+            thumbnail.setImageResource(
+                    entry.video
+                            ? android.R.drawable.ic_media_play
+                            : android.R.drawable.ic_menu_gallery);
+        }
+        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(76)));
+
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
+        details.setPadding(dp(12), 0, dp(8), 0);
+        details.addView(text(entry.name, 13, Typeface.BOLD, INK));
+        String duration = entry.video
+                ? " · " + formatDuration(entry.durationMillis)
+                : "";
+        details.addView(text(
+                "系统相册 · " + humanSize(entry.size) + duration + " · "
+                        + new SimpleDateFormat(
+                                "MM-dd HH:mm",
+                                Locale.CHINA).format(new Date(entry.dateMillis)),
+                11,
+                Typeface.NORMAL,
+                MUTED));
+        details.addView(text(
+                entry.video ? "双击播放视频" : "双击查看大图",
+                11,
+                Typeface.NORMAL,
+                COBALT));
+        row.addView(details, new LinearLayout.LayoutParams(0, dp(76), 1f));
+
+        Button share = nativeButton("分享", false);
+        share.setOnClickListener(view -> shareMediaUri(entry));
+        row.addView(share, new LinearLayout.LayoutParams(dp(78), dp(44)));
+        return row;
     }
 
     private View photoRow(File file) {
@@ -1172,12 +2572,33 @@ public final class MainActivity extends Activity {
         row.setBackground(rounded(SURFACE, 12, RULE));
         LinearLayout.LayoutParams rowParams = marginParams(-1, dp(96), 0, 0, 0, 10);
         row.setLayoutParams(rowParams);
+        row.setContentDescription("双击查看 " + file.getName() + " 大图");
+        GestureDetector doubleTap = new GestureDetector(
+                this,
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDown(MotionEvent event) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent event) {
+                        showLargePhoto(file);
+                        return true;
+                    }
+                });
+        row.setOnTouchListener((view, event) -> doubleTap.onTouchEvent(event));
 
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inSampleSize = 4;
         ImageView thumbnail = new ImageView(this);
         thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        thumbnail.setImageBitmap(BitmapFactory.decodeFile(file.getAbsolutePath(), options));
+        if (isVideoFile(file)) {
+            thumbnail.setImageResource(android.R.drawable.ic_media_play);
+        } else {
+            thumbnail.setImageBitmap(
+                    BitmapFactory.decodeFile(file.getAbsolutePath(), options));
+        }
         thumbnail.setBackgroundColor(GRAPHITE);
         row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(76)));
 
@@ -1192,8 +2613,18 @@ public final class MainActivity extends Activity {
                 11,
                 Typeface.NORMAL,
                 MUTED));
+        details.addView(text(
+                isVideoFile(file) ? "双击播放视频" : "双击查看大图",
+                11,
+                Typeface.NORMAL,
+                COBALT));
         row.addView(details, new LinearLayout.LayoutParams(0, dp(76), 1f));
 
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        Button share = nativeButton("分享", false);
+        share.setOnClickListener(view -> sharePhoto(file));
+        actions.addView(share, new LinearLayout.LayoutParams(dp(72), dp(36)));
         Button delete = nativeButton("删除", false);
         delete.setOnClickListener(view -> new AlertDialog.Builder(this)
                 .setTitle("删除照片？")
@@ -1207,7 +2638,11 @@ public final class MainActivity extends Activity {
                     updateFileCount();
                 })
                 .show());
-        row.addView(delete, new LinearLayout.LayoutParams(dp(72), dp(42)));
+        LinearLayout.LayoutParams deleteParams =
+                new LinearLayout.LayoutParams(dp(72), dp(36));
+        deleteParams.setMargins(0, dp(4), 0, 0);
+        actions.addView(delete, deleteParams);
+        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(76)));
         return row;
     }
 
@@ -1247,7 +2682,7 @@ public final class MainActivity extends Activity {
                 wirelessButton,
                 marginParams(-1, dp(48), 0, 16, 0, 0));
         wirelessStatusText = text(
-                "相机可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP 上传或 WebDAV PUT。",
+                "相机可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP 上传或 WebDAV PUT。接收完成后照片会直接进入文件库。",
                 12,
                 Typeface.NORMAL,
                 MUTED);
@@ -1263,11 +2698,59 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
         content.addView(text("设置", 30, Typeface.BOLD, INK));
         content.addView(text(
-                "诊断、隐私与支持。",
+                "更新、诊断与支持。",
                 14,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 20));
+
+        LinearLayout updatePanel = panel();
+        updatePanel.addView(text("软件更新", 18, Typeface.BOLD, INK));
+        updatePanel.addView(text(
+                "当前版本 " + currentVersion()
+                        + " · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        Switch automaticUpdates = new Switch(this);
+        automaticUpdates.setText("启动时自动检查更新");
+        automaticUpdates.setTextColor(INK);
+        automaticUpdates.setChecked(
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .getBoolean(AUTOMATIC_UPDATE_KEY, true));
+        automaticUpdates.setOnCheckedChangeListener((button, enabled) -> {
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(AUTOMATIC_UPDATE_KEY, enabled)
+                    .apply();
+            if (enabled) checkForUpdates(true);
+        });
+        updatePanel.addView(
+                automaticUpdates,
+                marginParams(-1, -2, 0, 0, 0, 10));
+        updateStatusText = text(updateStatus, 12, Typeface.NORMAL, MUTED);
+        updatePanel.addView(
+                updateStatusText,
+                marginParams(-1, -2, 0, 0, 0, 10));
+        LinearLayout updateActions = new LinearLayout(this);
+        updateActions.setOrientation(LinearLayout.HORIZONTAL);
+        checkUpdateButton = nativeButton("检查更新", false);
+        checkUpdateButton.setOnClickListener(view -> checkForUpdates(false));
+        updateActions.addView(
+                checkUpdateButton,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        openUpdateButton = nativeButton("获取更新", true);
+        openUpdateButton.setOnClickListener(view -> openUpdatePage());
+        LinearLayout.LayoutParams openUpdateParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        openUpdateParams.setMargins(dp(8), 0, 0, 0);
+        updateActions.addView(openUpdateButton, openUpdateParams);
+        updatePanel.addView(updateActions);
+        content.addView(
+                updatePanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+        refreshUpdateUi();
 
         LinearLayout diagnosticsPanel = panel();
         diagnosticsPanel.addView(text("诊断日志", 18, Typeface.BOLD, INK));
@@ -1303,7 +2786,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout supportPanel = panel();
-        supportPanel.addView(text("喜欢 Nikon Link？", 18, Typeface.BOLD, INK));
+        supportPanel.addView(text("喜欢 帧澈 ZENCHE？", 18, Typeface.BOLD, INK));
         supportPanel.addView(text(
                 "请作者喝杯奶茶，支持后续维护与新机型适配。",
                 13,
@@ -1383,7 +2866,7 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 14));
         content.addView(text(
-                "请打开相机，使用支持数据传输的 USB 线连接，并授权 Nikon Link 访问 USB 设备。",
+                "请打开相机，使用支持数据传输的 USB 线连接，并授权 帧澈 ZENCHE 访问 USB 设备。",
                 13,
                 Typeface.NORMAL,
                 MUTED));
@@ -1405,31 +2888,19 @@ public final class MainActivity extends Activity {
                 camera.connect();
                 String detectedCameraName = camera.getConnectedCameraName();
                 diagnostics.info("camera", "已连接 " + detectedCameraName);
-                boolean liveViewStarted;
-                try {
-                    camera.startLiveView();
-                    liveViewStarted = true;
-                } catch (Exception ignored) {
-                    diagnostics.warning(
-                            "liveview",
-                            "连接后自动开启实时取景失败：" + ignored.getMessage());
-                    liveViewStarted = false;
-                }
-                boolean initialLiveView = liveViewStarted;
                 mainHandler.post(() -> {
                     connectedCameraName = detectedCameraName;
                     connected = true;
                     connecting = false;
-                    liveViewEnabled = initialLiveView;
+                    liveViewEnabled = false;
+                    previewFailureCount = 0;
                     showSection(currentSection);
                     updateConnectionUi();
-                    if (initialLiveView) {
-                        startPreviewLoop();
-                        showToast(connectedCameraName + " 已通过原生 USB/PTP 连接。");
-                    } else {
-                        statusText.setText(connectedCameraName + " 已连接 · 实时取景需实机确认");
-                        showToast(connectedCameraName + " 已连接，可拍摄和调整参数。");
-                    }
+                    statusText.setText(
+                            connectedCameraName + " 已连接 · 机身快门可用");
+                    showToast(
+                            connectedCameraName
+                                    + " 已连接；实时取景仅在你主动开启后接管相机。");
                 });
             } catch (Exception error) {
                 diagnostics.error("camera", "连接失败：" + error.getMessage());
@@ -1449,6 +2920,7 @@ public final class MainActivity extends Activity {
         previewGeneration++;
         connected = false;
         liveViewEnabled = false;
+        videoRecording = false;
         cameraExecutor.submit(camera::disconnect);
         connectedCameraName = "Nikon 相机";
         latestFrame = null;
@@ -1489,6 +2961,7 @@ public final class MainActivity extends Activity {
     }
 
     private void startPreviewLoop() {
+        previewFailureCount = 0;
         int generation = ++previewGeneration;
         pullPreview(generation);
     }
@@ -1502,18 +2975,37 @@ public final class MainActivity extends Activity {
                 ProcessedPreview output = processPreview(source);
                 mainHandler.post(() -> {
                     if (generation != previewGeneration) return;
+                    previewFailureCount = 0;
                     showProcessedPreview(source, output);
                     statusText.setText(connectedCameraName + " LIVE · USB/PTP");
                     mainHandler.postDelayed(() -> pullPreview(generation), 220);
                 });
             } catch (Exception error) {
+                int failures = ++previewFailureCount;
                 diagnostics.warning(
                         "liveview",
-                        "获取实时取景帧失败，将重试：" + error.getMessage());
+                        "获取实时取景帧失败（"
+                                + failures
+                                + "/3）："
+                                + error.getMessage());
                 mainHandler.post(() -> {
                     if (generation != previewGeneration) return;
-                    statusText.setText("实时取景正在重试");
-                    mainHandler.postDelayed(() -> pullPreview(generation), 1200);
+                    if (failures >= 3) {
+                        previewGeneration++;
+                        liveViewEnabled = false;
+                        previewFailureCount = 0;
+                        cameraExecutor.submit(camera::stopLiveView);
+                        updateConnectionUi();
+                        statusText.setText("实时取景已安全停止 · 机身控制已释放");
+                        showError(
+                                "连续 3 次未收到实时取景画面，帧澈 ZENCHE 已停止重试并释放相机。"
+                                        + "请检查 USB 线与相机实时取景状态后再开启。");
+                    } else {
+                        statusText.setText("实时取景正在重试 · " + failures + "/3");
+                        mainHandler.postDelayed(
+                                () -> pullPreview(generation),
+                                1200);
+                    }
                 });
             }
         });
@@ -1554,6 +3046,68 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void toggleVideoRecording() {
+        if (!connected) {
+            showConnectionDialog();
+            return;
+        }
+        if (capturing) return;
+        capturing = true;
+        updateRecordingButtons();
+        cameraExecutor.submit(() -> {
+            try {
+                if (videoRecording) {
+                    camera.stopMovieRecording();
+                } else {
+                    camera.startMovieRecording();
+                }
+                boolean nowRecording = camera.isMovieRecording();
+                diagnostics.info(
+                        "recording",
+                        nowRecording
+                                ? "机身视频录制已开始"
+                                : "机身视频录制已停止");
+                mainHandler.post(() -> {
+                    videoRecording = nowRecording;
+                    capturing = false;
+                    updateRecordingButtons();
+                    statusText.setText(
+                            nowRecording
+                                    ? "● REC · 视频正在录制到相机存储卡"
+                                    : "录制已停止 · 视频保存在相机存储卡");
+                });
+            } catch (Exception error) {
+                diagnostics.error(
+                        "recording",
+                        "切换视频录制失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    videoRecording = camera.isMovieRecording();
+                    capturing = false;
+                    updateRecordingButtons();
+                    showError("视频录制失败：" + error.getMessage());
+                });
+            }
+        });
+    }
+
+    private void updateRecordingButtons() {
+        if (shutterButton != null && "monitor".equals(currentSection)) {
+            shutterButton.setText(
+                    capturing
+                            ? "处理中…"
+                            : videoRecording ? "停止录制" : "开始录制");
+            shutterButton.setBackground(rounded(VIDEO, 9, 0));
+            shutterButton.setEnabled(connected && !capturing);
+        }
+        if (immersiveRecordButton != null) {
+            immersiveRecordButton.setText(
+                    capturing
+                            ? "…"
+                            : videoRecording ? "■\n停止" : "●\n录制");
+            immersiveRecordButton.setEnabled(connected && !capturing);
+        }
     }
 
     private ProcessedPreview processPreview(Bitmap source) {
@@ -1598,6 +3152,14 @@ public final class MainActivity extends Activity {
         if (zebraImage != null) {
             zebraImage.setImageBitmap(
                     monitoring && zebraEnabled ? output.zebra : null);
+        }
+        if (immersivePreviewImage != null) {
+            immersivePreviewImage.setImageBitmap(
+                    immersiveMonitoring ? output.display : source);
+        }
+        if (immersiveZebraImage != null) {
+            immersiveZebraImage.setImageBitmap(
+                    immersiveMonitoring && zebraEnabled ? output.zebra : null);
         }
         if (previewPlaceholder != null) previewPlaceholder.setVisibility(View.GONE);
     }
@@ -1645,7 +3207,7 @@ public final class MainActivity extends Activity {
 
     private File savePhoto(byte[] jpeg) throws Exception {
         if (!photoDirectory.exists() && !photoDirectory.mkdirs()) {
-            throw new Exception("无法创建 Nikon Link 照片目录。");
+            throw new Exception("无法创建 帧澈 ZENCHE 照片目录。");
         }
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA).format(new Date());
         File file = new File(photoDirectory, "NIKON_" + stamp + ".JPG");
@@ -1660,8 +3222,12 @@ public final class MainActivity extends Activity {
             showToast("连接支持的 Nikon 相机后才能调整参数。");
             return;
         }
-        if (!canAdjustExposureParameter(name)) {
-            showToast(label + "在当前拍摄模式下由相机控制。");
+        if (!camera.isParameterWritable(name)) {
+            String reason = camera.parameterLockReason(name);
+            showToast(
+                    label
+                            + "不可调整"
+                            + (reason == null ? "。" : "：" + reason));
             return;
         }
         cameraExecutor.submit(() -> {
@@ -1670,12 +3236,21 @@ public final class MainActivity extends Activity {
                 diagnostics.info(
                         "camera",
                         "已设置参数；名称=" + name + "；值=" + value);
-                mainHandler.post(() -> statusText.setText(label + "已应用"));
+                mainHandler.post(() -> {
+                    if ("exposureMode".equals(name)) {
+                        exposureMode = String.valueOf(value);
+                        updateCameraControls();
+                    }
+                    statusText.setText(label + "已应用");
+                });
             } catch (Exception error) {
                 diagnostics.error(
                         "camera",
                         "设置参数失败；名称=" + name + "；错误=" + error.getMessage());
-                mainHandler.post(() -> showError(error.getMessage()));
+                mainHandler.post(() -> {
+                    updateCameraControls();
+                    showError(error.getMessage());
+                });
             }
         });
     }
@@ -1697,44 +3272,30 @@ public final class MainActivity extends Activity {
             liveViewButton.setText(liveViewEnabled ? "停止实时取景" : "开启实时取景");
         }
         updateCameraControls();
+        updateRecordingButtons();
         updateFileCount();
     }
 
     private void updateCameraControls() {
         for (View control : cameraControls) control.setEnabled(connected);
         for (Map.Entry<String, View> entry : parameterControls.entrySet()) {
-            boolean enabled = connected && canAdjustExposureParameter(entry.getKey());
+            boolean enabled = connected && camera.isParameterWritable(entry.getKey());
             entry.getValue().setEnabled(enabled);
             entry.getValue().setAlpha(enabled ? 1f : 0.48f);
         }
         for (Map.Entry<String, TextView> entry : parameterLabels.entrySet()) {
             Object tag = entry.getValue().getTag();
             String base = tag == null ? entry.getValue().getText().toString() : String.valueOf(tag);
-            String reason = exposureLockReason(entry.getKey());
+            String reason = connected
+                    ? camera.parameterLockReason(entry.getKey())
+                    : "连接相机后可调整";
             entry.getValue().setText(reason == null ? base : base + " · " + reason);
             entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
         }
     }
 
     private boolean canAdjustExposureParameter(String name) {
-        switch (name) {
-            case "exposureTime":
-                return "manual".equals(exposureMode) || "shutterPriority".equals(exposureMode);
-            case "aperture":
-                return "manual".equals(exposureMode)
-                        || "aperturePriority".equals(exposureMode)
-                        || "bulb".equals(exposureMode);
-            case "iso":
-                return true;
-            case "exposureCompensation":
-                return "program".equals(exposureMode)
-                        || "aperturePriority".equals(exposureMode)
-                        || "shutterPriority".equals(exposureMode);
-            case "bulbDuration":
-                return "bulb".equals(exposureMode);
-            default:
-                return true;
-        }
+        return camera.isParameterWritable(name);
     }
 
     private int exposureModeIndex() {
@@ -1774,7 +3335,10 @@ public final class MainActivity extends Activity {
                     || lower.endsWith(".heif")
                     || lower.endsWith(".heic")
                     || lower.endsWith(".tif")
-                    || lower.endsWith(".tiff");
+                    || lower.endsWith(".tiff")
+                    || lower.endsWith(".mp4")
+                    || lower.endsWith(".mov")
+                    || lower.endsWith(".m4v");
         });
         if (files == null) return Collections.emptyList();
         List<File> result = new ArrayList<>(Arrays.asList(files));
@@ -1930,7 +3494,7 @@ public final class MainActivity extends Activity {
     private void showError(String message) {
         diagnostics.error("ui", message);
         new AlertDialog.Builder(this)
-                .setTitle("Nikon Link")
+                .setTitle("帧澈 ZENCHE")
                 .setMessage(message == null ? "原生相机操作失败。" : message)
                 .setPositiveButton("好", null)
                 .show();
@@ -1945,7 +3509,141 @@ public final class MainActivity extends Activity {
             diagnostics.error(
                     "diagnostics",
                     "无法打开 GitHub Issue 提交页：" + error.getMessage());
-            showToast("无法打开浏览器，请访问 github.com/Tauber01/NikonLink/issues");
+            showToast("无法打开浏览器，请访问 github.com/Tauber01/ZENCHE/issues");
+        }
+    }
+
+    private void checkForUpdates(boolean silent) {
+        if (checkingUpdate) return;
+        checkingUpdate = true;
+        if (!silent) updateStatus = "正在检查更新…";
+        refreshUpdateUi();
+        updateExecutor.submit(() -> {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(LATEST_RELEASE_API).openConnection();
+                connection.setConnectTimeout(20_000);
+                connection.setReadTimeout(20_000);
+                connection.setRequestProperty("Accept", "application/vnd.github+json");
+                connection.setRequestProperty(
+                        "User-Agent",
+                        "ZENCHE-Android/" + currentVersion());
+                int responseCode = connection.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    throw new IllegalStateException("GitHub HTTP " + responseCode);
+                }
+                StringBuilder body = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(
+                                connection.getInputStream(),
+                                StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        body.append(line);
+                    }
+                }
+                JSONObject release = new JSONObject(body.toString());
+                String version = normalizeVersion(release.getString("tag_name"));
+                String targetUrl = release.getString("html_url");
+                JSONArray assets = release.optJSONArray("assets");
+                if (assets != null) {
+                    for (int index = 0; index < assets.length(); index++) {
+                        JSONObject asset = assets.getJSONObject(index);
+                        String name = asset.optString("name");
+                        if (name.endsWith("-android.apk")) {
+                            targetUrl = asset.optString("browser_download_url", targetUrl);
+                            break;
+                        }
+                    }
+                }
+                boolean newer = isNewerVersion(version, currentVersion());
+                String resolvedTargetUrl = targetUrl;
+                mainHandler.post(() -> {
+                    checkingUpdate = false;
+                    if (newer) {
+                        availableVersion = version;
+                        availableUpdateUrl = resolvedTargetUrl;
+                        updateStatus = "发现新版本 " + version;
+                    } else {
+                        availableVersion = null;
+                        availableUpdateUrl = null;
+                        updateStatus = "已是最新版本";
+                    }
+                    refreshUpdateUi();
+                });
+            } catch (Exception error) {
+                diagnostics.error("update", "检查更新失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    checkingUpdate = false;
+                    if (!silent) updateStatus = "检查失败，请确认网络后重试";
+                    refreshUpdateUi();
+                });
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
+
+    private void refreshUpdateUi() {
+        if (updateStatusText != null) updateStatusText.setText(updateStatus);
+        if (checkUpdateButton != null) {
+            checkUpdateButton.setEnabled(!checkingUpdate);
+            checkUpdateButton.setText(checkingUpdate ? "正在检查…" : "检查更新");
+        }
+        if (openUpdateButton != null) {
+            openUpdateButton.setVisibility(
+                    availableVersion == null ? View.GONE : View.VISIBLE);
+            openUpdateButton.setText(
+                    availableVersion == null ? "获取更新" : "获取 " + availableVersion);
+        }
+    }
+
+    private void openUpdatePage() {
+        String target = availableUpdateUrl == null ? RELEASES_URL : availableUpdateUrl;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(target)));
+        } catch (RuntimeException error) {
+            diagnostics.error("update", "无法打开更新页：" + error.getMessage());
+            showToast("无法打开浏览器，请访问 github.com/Tauber01/ZENCHE/releases");
+        }
+    }
+
+    private static String normalizeVersion(String value) {
+        if (value.startsWith("v") || value.startsWith("V")) {
+            return value.substring(1);
+        }
+        return value;
+    }
+
+    private String currentVersion() {
+        try {
+            String version = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0)
+                    .versionName;
+            return version == null || version.isEmpty() ? "0.8.3" : version;
+        } catch (Exception error) {
+            return "0.8.3";
+        }
+    }
+
+    private static boolean isNewerVersion(String candidate, String current) {
+        String[] left = candidate.split("[.-]");
+        String[] right = current.split("[.-]");
+        int count = Math.max(left.length, right.length);
+        for (int index = 0; index < count; index++) {
+            int candidatePart = versionPart(left, index);
+            int currentPart = versionPart(right, index);
+            if (candidatePart != currentPart) return candidatePart > currentPart;
+        }
+        return false;
+    }
+
+    private static int versionPart(String[] parts, int index) {
+        if (index >= parts.length) return 0;
+        try {
+            return Integer.parseInt(parts[index].replaceAll("[^0-9].*$", ""));
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 
@@ -1996,14 +3694,44 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private static final class MediaEntry {
+        final Uri uri;
+        final String name;
+        final boolean video;
+        final long dateMillis;
+        final long size;
+        final long durationMillis;
+
+        MediaEntry(
+                Uri uri,
+                String name,
+                boolean video,
+                long dateMillis,
+                long size,
+                long durationMillis) {
+            this.uri = uri;
+            this.name = name == null || name.isEmpty()
+                    ? (video ? "系统视频" : "系统照片")
+                    : name;
+            this.video = video;
+            this.dateMillis = dateMillis;
+            this.size = size;
+            this.durationMillis = durationMillis;
+        }
+    }
+
     @Override
     protected void onDestroy() {
         diagnostics.endSession();
         previewGeneration++;
+        if (immersiveDialog != null) {
+            closeImmersivePreview(immersiveDialog);
+        }
         wirelessRequested = false;
         wirelessServer.stop();
         cameraExecutor.submit(camera::disconnect);
         cameraExecutor.shutdown();
+        updateExecutor.shutdownNow();
         super.onDestroy();
     }
 }

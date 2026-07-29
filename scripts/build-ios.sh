@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.8.1
+VERSION=0.8.3
 MODE=${1:---unsigned}
 IOS_ROOT="$PROJECT_ROOT/native/ios"
 BUILD_ROOT="$PROJECT_ROOT/build/ios"
@@ -46,7 +46,7 @@ if [[ "$MODE" == "--unsigned" ]]; then
     CODE_SIGNING_REQUIRED=NO \
     build
 
-  APP_SOURCE="$DERIVED_DATA/Build/Products/Release-iphoneos/Nikon Link.app"
+  APP_SOURCE="$DERIVED_DATA/Build/Products/Release-iphoneos/帧澈 ZENCHE.app"
   [[ -d "$APP_SOURCE" ]] || {
     echo "未找到 iOS 应用构建结果。" >&2
     exit 1
@@ -55,9 +55,9 @@ if [[ "$MODE" == "--unsigned" ]]; then
   PACKAGE_ROOT="$BUILD_ROOT/package"
   PAYLOAD_ROOT="$PACKAGE_ROOT/Payload"
   mkdir -p "$PAYLOAD_ROOT"
-  ditto "$APP_SOURCE" "$PAYLOAD_ROOT/Nikon Link.app"
+  ditto "$APP_SOURCE" "$PAYLOAD_ROOT/帧澈 ZENCHE.app"
 
-  IPA_TARGET="$DIST_ROOT/NikonLink-$VERSION-ios-unsigned.ipa"
+  IPA_TARGET="$DIST_ROOT/ZENCHE-$VERSION-ios-unsigned.ipa"
   rm -f "$IPA_TARGET"
   (
     cd "$PACKAGE_ROOT"
@@ -119,7 +119,7 @@ else
     echo "签名导出完成，但未找到 IPA。" >&2
     exit 1
   }
-  IPA_TARGET="$DIST_ROOT/NikonLink-$VERSION-ios-signed.ipa"
+  IPA_TARGET="$DIST_ROOT/ZENCHE-$VERSION-ios-signed.ipa"
   cp "$IPA_SOURCE" "$IPA_TARGET"
 fi
 

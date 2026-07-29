@@ -1,7 +1,16 @@
-import { common } from '@kit.AbilityKit';
+import {
+  abilityAccessCtrl,
+  common,
+  Permissions
+} from '@kit.AbilityKit';
+import { dataSharePredicates } from '@kit.ArkData';
+import { picker } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { http } from '@kit.NetworkKit';
+import { systemShare } from '@kit.ShareKit';
 import { CameraProfile } from '../camera/CameraProfiles';
 import { PtpCamera } from '../camera/PtpCamera';
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
@@ -22,6 +31,89 @@ class SelectEntry {
   }
 }
 
+class SystemMediaItem {
+  readonly id: string;
+  readonly uri: string;
+  readonly name: string;
+  readonly isVideo: boolean;
+  readonly duration: number;
+
+  constructor(
+    uri: string,
+    name: string,
+    isVideo: boolean,
+    duration: number
+  ) {
+    this.id = uri;
+    this.uri = uri;
+    this.name = name;
+    this.isVideo = isVideo;
+    this.duration = duration;
+  }
+}
+
+class CloudProvider {
+  readonly name: string;
+  readonly note: string;
+  readonly url: string;
+
+  constructor(name: string, note: string, url: string) {
+    this.name = name;
+    this.note = note;
+    this.url = url;
+  }
+}
+
+const DOMESTIC_CLOUDS: Array<CloudProvider> = [
+  new CloudProvider(
+    '百度网盘',
+    '安装客户端后，从下载目录或系统文件选择器选择。',
+    'https://pan.baidu.com/'
+  ),
+  new CloudProvider(
+    '阿里云盘',
+    '把照片或视频下载到设备后再选择。',
+    'https://www.alipan.com/'
+  ),
+  new CloudProvider(
+    '腾讯微云',
+    '从微云导出到本机文件，再回到 帧澈 ZENCHE。',
+    'https://www.weiyun.com/'
+  ),
+  new CloudProvider(
+    '夸克网盘',
+    '安装夸克网盘客户端并下载需要的媒体。',
+    'https://pan.quark.cn/'
+  ),
+  new CloudProvider(
+    '迅雷云盘',
+    '通过迅雷客户端下载到设备后选择。',
+    'https://pan.xunlei.com/'
+  ),
+  new CloudProvider(
+    '115',
+    '在“存储”中下载文件，再从 帧澈 ZENCHE 选择。',
+    'https://115.com/'
+  )
+];
+
+interface GitHubAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface GitHubRelease {
+  tag_name: string;
+  html_url: string;
+  assets: Array<GitHubAsset>;
+}
+
+const CURRENT_VERSION: string = '0.8.3';
+const LATEST_RELEASE_API: string =
+  'https://api.github.com/repos/Tauber01/ZENCHE/releases/latest';
+const RELEASES_URL: string =
+  'https://github.com/Tauber01/ZENCHE/releases';
+
 const EXPOSURE_MODES: Array<SelectEntry> = [
   new SelectEntry('P · 程序自动', 'program'),
   new SelectEntry('S · 快门优先', 'shutterPriority'),
@@ -31,11 +123,47 @@ const EXPOSURE_MODES: Array<SelectEntry> = [
 ];
 const SHUTTER_SPEEDS: Array<SelectEntry> = [
   new SelectEntry('1/8000 s', '0.000125'),
+  new SelectEntry('1/6400 s', '0.00015625'),
+  new SelectEntry('1/5000 s', '0.0002'),
+  new SelectEntry('1/4000 s', '0.00025'),
+  new SelectEntry('1/3200 s', '0.0003125'),
+  new SelectEntry('1/2500 s', '0.0004'),
+  new SelectEntry('1/2000 s', '0.0005'),
+  new SelectEntry('1/1600 s', '0.000625'),
+  new SelectEntry('1/1250 s', '0.0008'),
   new SelectEntry('1/1000 s', '0.001'),
+  new SelectEntry('1/800 s', '0.00125'),
+  new SelectEntry('1/640 s', '0.0015625'),
+  new SelectEntry('1/500 s', '0.002'),
+  new SelectEntry('1/400 s', '0.0025'),
+  new SelectEntry('1/320 s', '0.003125'),
   new SelectEntry('1/250 s', '0.004'),
+  new SelectEntry('1/200 s', '0.005'),
+  new SelectEntry('1/160 s', '0.00625'),
   new SelectEntry('1/125 s', '0.008'),
+  new SelectEntry('1/100 s', '0.01'),
+  new SelectEntry('1/80 s', '0.0125'),
   new SelectEntry('1/60 s', '0.016667'),
+  new SelectEntry('1/50 s', '0.02'),
+  new SelectEntry('1/40 s', '0.025'),
+  new SelectEntry('1/30 s', '0.033333'),
+  new SelectEntry('1/25 s', '0.04'),
+  new SelectEntry('1/20 s', '0.05'),
+  new SelectEntry('1/15 s', '0.066667'),
+  new SelectEntry('1/10 s', '0.1'),
+  new SelectEntry('1/8 s', '0.125'),
+  new SelectEntry('1/6 s', '0.166667'),
+  new SelectEntry('1/4 s', '0.25'),
+  new SelectEntry('1/2 s', '0.5'),
   new SelectEntry('1 s', '1'),
+  new SelectEntry('1.3 s', '1.3'),
+  new SelectEntry('1.6 s', '1.6'),
+  new SelectEntry('2 s', '2'),
+  new SelectEntry('2.5 s', '2.5'),
+  new SelectEntry('3.2 s', '3.2'),
+  new SelectEntry('5 s', '5'),
+  new SelectEntry('10 s', '10'),
+  new SelectEntry('15 s', '15'),
   new SelectEntry('30 s', '30')
 ];
 const VIDEO_FRAME_RATES: Array<SelectEntry> = [
@@ -47,42 +175,98 @@ const VIDEO_FRAME_RATES: Array<SelectEntry> = [
 ];
 const SHUTTER_ANGLES: Array<SelectEntry> = [
   new SelectEntry('45°', '45'),
+  new SelectEntry('60°', '60'),
+  new SelectEntry('72°', '72'),
   new SelectEntry('90°', '90'),
+  new SelectEntry('108°', '108'),
+  new SelectEntry('120°', '120'),
   new SelectEntry('144°', '144'),
+  new SelectEntry('150°', '150'),
   new SelectEntry('172.8°', '172.8'),
   new SelectEntry('180°', '180'),
+  new SelectEntry('216°', '216'),
+  new SelectEntry('240°', '240'),
   new SelectEntry('270°', '270'),
+  new SelectEntry('300°', '300'),
+  new SelectEntry('324°', '324'),
   new SelectEntry('360°', '360')
 ];
 const APERTURES: Array<SelectEntry> = [
+  new SelectEntry('f/1.2', '1.2'),
   new SelectEntry('f/1.4', '1.4'),
+  new SelectEntry('f/1.6', '1.6'),
+  new SelectEntry('f/1.8', '1.8'),
+  new SelectEntry('f/2', '2'),
+  new SelectEntry('f/2.2', '2.2'),
+  new SelectEntry('f/2.5', '2.5'),
   new SelectEntry('f/2.8', '2.8'),
+  new SelectEntry('f/3.2', '3.2'),
+  new SelectEntry('f/3.5', '3.5'),
   new SelectEntry('f/4', '4'),
+  new SelectEntry('f/4.5', '4.5'),
+  new SelectEntry('f/5', '5'),
   new SelectEntry('f/5.6', '5.6'),
+  new SelectEntry('f/6.3', '6.3'),
+  new SelectEntry('f/7.1', '7.1'),
   new SelectEntry('f/8', '8'),
+  new SelectEntry('f/9', '9'),
+  new SelectEntry('f/10', '10'),
   new SelectEntry('f/11', '11'),
-  new SelectEntry('f/16', '16')
+  new SelectEntry('f/13', '13'),
+  new SelectEntry('f/14', '14'),
+  new SelectEntry('f/16', '16'),
+  new SelectEntry('f/18', '18'),
+  new SelectEntry('f/20', '20'),
+  new SelectEntry('f/22', '22')
 ];
 const ISO_VALUES: Array<SelectEntry> = [
   new SelectEntry('ISO 64', '64'),
+  new SelectEntry('ISO 80', '80'),
   new SelectEntry('ISO 100', '100'),
+  new SelectEntry('ISO 125', '125'),
+  new SelectEntry('ISO 160', '160'),
   new SelectEntry('ISO 200', '200'),
+  new SelectEntry('ISO 250', '250'),
+  new SelectEntry('ISO 320', '320'),
   new SelectEntry('ISO 400', '400'),
+  new SelectEntry('ISO 500', '500'),
+  new SelectEntry('ISO 640', '640'),
   new SelectEntry('ISO 800', '800'),
+  new SelectEntry('ISO 1000', '1000'),
+  new SelectEntry('ISO 1250', '1250'),
   new SelectEntry('ISO 1600', '1600'),
+  new SelectEntry('ISO 2000', '2000'),
+  new SelectEntry('ISO 2500', '2500'),
   new SelectEntry('ISO 3200', '3200'),
+  new SelectEntry('ISO 4000', '4000'),
+  new SelectEntry('ISO 5000', '5000'),
   new SelectEntry('ISO 6400', '6400'),
+  new SelectEntry('ISO 8000', '8000'),
+  new SelectEntry('ISO 10000', '10000'),
   new SelectEntry('ISO 12800', '12800'),
+  new SelectEntry('ISO 16000', '16000'),
+  new SelectEntry('ISO 20000', '20000'),
   new SelectEntry('ISO 25600', '25600'),
+  new SelectEntry('ISO 32000', '32000'),
+  new SelectEntry('ISO 40000', '40000'),
   new SelectEntry('ISO 51200', '51200'),
   new SelectEntry('ISO 64000', '64000'),
+  new SelectEntry('ISO 80000', '80000'),
   new SelectEntry('ISO 102400', '102400')
 ];
 const EXPOSURE_COMPENSATIONS: Array<SelectEntry> = [
   new SelectEntry('-2 EV', '-2'),
+  new SelectEntry('-1.7 EV', '-1.666667'),
+  new SelectEntry('-1.3 EV', '-1.333333'),
   new SelectEntry('-1 EV', '-1'),
+  new SelectEntry('-0.7 EV', '-0.666667'),
+  new SelectEntry('-0.3 EV', '-0.333333'),
   new SelectEntry('0 EV', '0'),
+  new SelectEntry('+0.3 EV', '0.333333'),
+  new SelectEntry('+0.7 EV', '0.666667'),
   new SelectEntry('+1 EV', '1'),
+  new SelectEntry('+1.3 EV', '1.333333'),
+  new SelectEntry('+1.7 EV', '1.666667'),
   new SelectEntry('+2 EV', '2')
 ];
 const FOCUS_MODES: Array<SelectEntry> = [
@@ -128,8 +312,33 @@ struct Index {
   @State private exposureMode: string = 'manual';
   @State private videoFrameRate: number = 30;
   @State private videoShutterAngle: number = 180;
+  @State private currentShutterSpeed: number = 0.008;
+  @State private currentAperture: number = 4;
+  @State private currentIso: number = 400;
+  @State private currentCompensation: number = 0;
+  @State private videoRecording: boolean = false;
   @State private recentLogs: string = '点击“查询最近日志”后显示。';
+  @State private updateStatus: string = '尚未检查更新';
+  @State private updateChecking: boolean = false;
+  @State private availableUpdateUrl: string = '';
+  @State private availableVersion: string = '';
+  @State private largePreviewVisible: boolean = false;
+  @State private largePreviewName: string = '';
+  @State private systemMedia: Array<SystemMediaItem> = [];
+  @State private systemAlbumStatus: string = '等待相册授权';
+  @State private cloudGuideVisible: boolean = false;
+  @State private immersivePreviewVisible: boolean = false;
+  @State private immersiveMonitoring: boolean = false;
+  @State private immersiveParametersExpanded: boolean = true;
+  @State private systemExpanded: boolean = true;
+  @State private systemPhotosExpanded: boolean = true;
+  @State private systemVideosExpanded: boolean = true;
+  @State private wirelessExpanded: boolean = false;
+  @State private localExpanded: boolean = true;
+  @State private localPhotosExpanded: boolean = true;
+  @State private localVideosExpanded: boolean = true;
   @State private currentBreakpoint: string = 'lg';
+  private largePreview?: image.PixelMap;
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext =
@@ -165,22 +374,40 @@ struct Index {
       this.preview.release();
       this.preview = undefined;
     }
+    if (this.largePreview !== undefined) {
+      this.largePreview.release();
+      this.largePreview = undefined;
+    }
   }
 
   build() {
-    Column() {
-      this.TopBar()
-      if (this.isCompact()) {
-        Scroll() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column() {
+        this.TopBar()
+        if (this.isCompact()) {
+          Scroll() {
+            this.MainGrid()
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .scrollBar(BarState.Auto)
+        } else {
           this.MainGrid()
         }
-        .width('100%')
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-      } else {
-        this.MainGrid()
+        this.StatusBar()
       }
-      this.StatusBar()
+      .width('100%')
+      .height('100%')
+      .backgroundColor($r('app.color.paper'))
+      if (this.largePreviewVisible) {
+        this.LargePhotoOverlay()
+      }
+      if (this.cloudGuideVisible) {
+        this.CloudDriveGuideOverlay()
+      }
+      if (this.immersivePreviewVisible) {
+        this.ImmersivePreviewOverlay()
+      }
     }
     .width('100%')
     .height('100%')
@@ -235,10 +462,14 @@ struct Index {
   private TopBar() {
     Row() {
       Column({ space: 4 }) {
-        Text('Nikon Link')
+        Text('帧澈 ZENCHE')
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
+        Text('Capture · Connect · Flow')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
         Text(
           this.connected
             ? `${this.cameraName} · USB/PTP`
@@ -326,7 +557,7 @@ struct Index {
         this.NavButton('视频监看', 'monitor')
         this.NavButton('文件与传输', 'library')
         Blank()
-        Text('NIKON LINK 0.8.1')
+        Text('NIKON LINK 0.8.3')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -367,6 +598,7 @@ struct Index {
         this.section = target;
         if (target === 'library') {
           this.refreshPhotos();
+          this.loadSystemAlbum();
         }
       })
   }
@@ -406,6 +638,17 @@ struct Index {
           .borderRadius(5)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .margin(16)
+        Button('全屏', { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor('#99000000')
+          .borderRadius(8)
+          .align(Alignment.TopEnd)
+          .margin(16)
+          .onClick((): void => {
+            this.immersiveMonitoring = this.section === 'monitor';
+            this.immersivePreviewVisible = true;
+          })
       }
       .width('100%')
       .layoutWeight(1)
@@ -441,14 +684,27 @@ struct Index {
           .onClick((): void => {
             this.toggleLiveView();
           })
-        Button('拍摄照片', { type: ButtonType.Normal })
+        Button(
+          this.section === 'monitor'
+            ? (this.videoRecording ? '停止录制' : '开始录制')
+            : '拍摄照片',
+          { type: ButtonType.Normal }
+        )
           .height(44)
           .fontColor($r('app.color.accent_ink'))
-          .backgroundColor($r('app.color.accent'))
+          .backgroundColor(
+            this.section === 'monitor'
+              ? $r('app.color.video')
+              : $r('app.color.accent')
+          )
           .borderRadius(6)
           .enabled(this.connected && !this.busy)
           .onClick((): void => {
-            this.capturePhoto();
+            if (this.section === 'monitor') {
+              this.toggleVideoRecording();
+            } else {
+              this.capturePhoto();
+            }
           })
       }
       .width('100%')
@@ -466,12 +722,185 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
-      Text(`${this.photos.length} 个本地文件 · 多协议无线收件箱`)
+      Text(
+        `${this.photos.length} 个 帧澈 ZENCHE 文件 · ` +
+        `${this.systemMedia.length} 个系统相册项目`
+      )
         .fontSize(14)
         .fontColor($r('app.color.muted'))
         .width('100%')
-      this.WirelessTransferCard()
-      if (this.photos.length === 0) {
+      Row({ space: 8 }) {
+        Button('刷新系统相册', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.loadSystemAlbum();
+          })
+        Button('链接网盘', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.cloudGuideVisible = true;
+          })
+      }
+      .width('100%')
+      Text('系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。')
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Button(
+        `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
+        `${this.systemMedia.length}`,
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.systemExpanded = !this.systemExpanded;
+        })
+      if (this.systemExpanded && this.systemMedia.length === 0) {
+        Column({ space: 8 }) {
+          Text('系统相册暂不可见')
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+          Text('允许照片和视频访问后，最近媒体会直接显示在这里。')
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+        .height(120)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+      } else if (this.systemExpanded) {
+        Row({ space: 8 }) {
+          Button(
+            `${this.systemPhotosExpanded ? '⌄' : '›'} 照片 · ` +
+            `${this.systemMedia.filter((item: SystemMediaItem): boolean => !item.isVideo).length}`
+          )
+            .height(44)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.systemPhotosExpanded = !this.systemPhotosExpanded;
+            })
+          Button(
+            `${this.systemVideosExpanded ? '⌄' : '›'} 视频 · ` +
+            `${this.systemMedia.filter((item: SystemMediaItem): boolean => item.isVideo).length}`
+          )
+            .height(44)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.systemVideosExpanded = !this.systemVideosExpanded;
+            })
+        }
+        .width('100%')
+        List({ space: 8 }) {
+          ForEach(
+            this.systemMedia.filter((item: SystemMediaItem): boolean => {
+              return item.isVideo
+                ? this.systemVideosExpanded
+                : this.systemPhotosExpanded;
+            }),
+            (item: SystemMediaItem) => {
+              ListItem() {
+                Column({ space: 6 }) {
+                  Stack({ alignContent: Alignment.BottomEnd }) {
+                    Image(item.uri)
+                      .width(150)
+                      .height(108)
+                      .objectFit(ImageFit.Cover)
+                    if (item.isVideo) {
+                      Text(`▶ ${this.durationLabel(item.duration)}`)
+                        .fontSize(10)
+                        .fontFamily('monospace')
+                        .fontColor(Color.White)
+                        .backgroundColor('#99000000')
+                        .borderRadius(12)
+                        .padding({
+                          left: 7,
+                          right: 7,
+                          top: 4,
+                          bottom: 4
+                        })
+                        .margin(6)
+                    }
+                  }
+                  Text(item.name)
+                    .fontSize(11)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.ink'))
+                    .width(150)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                }
+                .padding(8)
+                .backgroundColor($r('app.color.surface'))
+                .border({
+                  width: 1,
+                  color: $r('app.color.rule'),
+                  radius: 8
+                })
+                .gesture(
+                  TapGesture({ count: 2 })
+                    .onAction((): void => {
+                      this.openSystemMedia(item);
+                    })
+                )
+              }
+            },
+            (item: SystemMediaItem): string => item.id
+          )
+        }
+        .width('100%')
+        .height(164)
+        .listDirection(Axis.Horizontal)
+        .scrollBar(BarState.Auto)
+      }
+      if (this.systemExpanded) {
+        Text('系统相册内容保持在原位置；帧澈 ZENCHE 只读取缩略图和预览。')
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+      }
+      Button(
+        `${this.wirelessExpanded ? '⌄' : '›'} 无线传输`,
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.wirelessExpanded = !this.wirelessExpanded;
+        })
+      if (this.wirelessExpanded) {
+        this.WirelessTransferCard()
+      }
+      Button(
+        `${this.localExpanded ? '⌄' : '›'} 帧澈 ZENCHE 文件库 · ` +
+        `${this.photos.length}`,
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.localExpanded = !this.localExpanded;
+        })
+      if (this.localExpanded && this.photos.length === 0) {
         Column({ space: 12 }) {
           Text('本地图库还是空的')
             .fontSize(18)
@@ -483,10 +912,35 @@ struct Index {
         .width('100%')
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
-      } else {
+      } else if (this.localExpanded) {
+        Row({ space: 8 }) {
+          Button(
+            `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
+            `${this.photos.filter((item: PhotoItem): boolean => !item.isVideo).length}`
+          )
+            .height(44)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.localPhotosExpanded = !this.localPhotosExpanded;
+            })
+          Button(
+            `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
+            `${this.photos.filter((item: PhotoItem): boolean => item.isVideo).length}`
+          )
+            .height(44)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.localVideosExpanded = !this.localVideosExpanded;
+            })
+        }
+        .width('100%')
         List({ space: 8 }) {
           ForEach(
-            this.photos,
+            this.photos.filter((item: PhotoItem): boolean => {
+              return item.isVideo
+                ? this.localVideosExpanded
+                : this.localPhotosExpanded;
+            }),
             (item: PhotoItem) => {
               ListItem() {
                 Row({ space: 12 }) {
@@ -512,6 +966,14 @@ struct Index {
                     .onClick((): void => {
                       this.previewPhoto(item);
                     })
+                  Button('分享', { type: ButtonType.Normal })
+                    .height(44)
+                    .fontColor($r('app.color.ink'))
+                    .backgroundColor($r('app.color.paper_2'))
+                    .borderRadius(6)
+                    .onClick((): void => {
+                      this.sharePhoto(item);
+                    })
                   Button('删除', { type: ButtonType.Normal })
                     .height(44)
                     .fontColor($r('app.color.error'))
@@ -533,6 +995,12 @@ struct Index {
                   color: $r('app.color.rule'),
                   radius: 8
                 })
+                .gesture(
+                  TapGesture({ count: 2 })
+                    .onAction((): void => {
+                      this.openLargePhoto(item);
+                    })
+                )
               }
             },
             (item: PhotoItem): string => item.path
@@ -577,7 +1045,8 @@ struct Index {
           Text(
             `FTP/PASV · ${this.wirelessAddress}\n` +
             `HTTP 上传 · 端口 ${HTTP_PORT} · /upload/文件名\n` +
-            `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink`
+            `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink\n` +
+            `接收完成后自动进入文件库`
           )
             .fontSize(12)
             .fontFamily('monospace')
@@ -596,6 +1065,413 @@ struct Index {
   }
 
   @Builder
+  private LargePhotoOverlay() {
+    Column({ space: 12 }) {
+      Row({ space: 8 }) {
+        Button('关闭', { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor('#66000000')
+          .borderRadius(8)
+          .onClick((): void => {
+            this.closeLargePhoto();
+          })
+        Blank()
+        Button('分享到社交平台', { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(8)
+          .onClick((): void => {
+            const item: PhotoItem | undefined = this.photos.find(
+              (candidate: PhotoItem): boolean =>
+                candidate.name === this.largePreviewName
+            );
+            if (item !== undefined) {
+              this.sharePhoto(item);
+            }
+          })
+      }
+      .width('100%')
+      if (this.largePreview !== undefined) {
+        Image(this.largePreview)
+          .objectFit(ImageFit.Contain)
+          .width('100%')
+          .layoutWeight(1)
+      }
+      Text(this.largePreviewName)
+        .fontSize(12)
+        .fontFamily('monospace')
+        .fontColor(Color.White)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .height('100%')
+    .padding(20)
+    .backgroundColor('#F2080A0F')
+  }
+
+  @Builder
+  private CloudDriveGuideOverlay() {
+    Column({ space: 14 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text('链接网盘')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text('账号和密码始终由网盘客户端管理。')
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        Blank()
+        Button('关闭', { type: ButtonType.Normal })
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.cloudGuideVisible = false;
+          })
+      }
+      .width('100%')
+      Text('先安装并登录对应客户端，把照片或视频下载到设备，再通过系统文件选择器加入 帧澈 ZENCHE。')
+        .fontSize(13)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      List({ space: 8 }) {
+        ForEach(
+          DOMESTIC_CLOUDS,
+          (provider: CloudProvider) => {
+            ListItem() {
+              Button({ type: ButtonType.Normal }) {
+                Row({ space: 12 }) {
+                  Text('☁')
+                    .fontSize(24)
+                    .fontColor($r('app.color.accent'))
+                    .width(42)
+                  Column({ space: 3 }) {
+                    Text(provider.name)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor($r('app.color.ink'))
+                      .width('100%')
+                    Text(provider.note)
+                      .fontSize(12)
+                      .fontColor($r('app.color.muted'))
+                      .width('100%')
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+                  Text('↗')
+                    .fontSize(18)
+                    .fontColor($r('app.color.muted'))
+                }
+                .width('100%')
+              }
+              .width('100%')
+              .height(70)
+              .backgroundColor($r('app.color.surface'))
+              .border({
+                width: 1,
+                color: $r('app.color.rule'),
+                radius: 8
+              })
+              .onClick((): void => {
+                this.openCloudProvider(provider.url);
+              })
+            }
+          },
+          (provider: CloudProvider): string => provider.name
+        )
+      }
+      .width('100%')
+      .layoutWeight(1)
+      Text('步骤：安装并登录 → 下载媒体 → 选择文件并加入。')
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Button('选择文件并加入', { type: ButtonType.Normal })
+        .width('100%')
+        .height(48)
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
+        .borderRadius(8)
+        .onClick((): void => {
+          this.cloudGuideVisible = false;
+          this.openCloudDrive();
+        })
+    }
+    .width(this.isCompact() ? '94%' : 620)
+    .height(this.isCompact() ? '94%' : '88%')
+    .padding(22)
+    .backgroundColor($r('app.color.paper'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule_strong'),
+      radius: 14
+    })
+    .shadow({
+      radius: 24,
+      color: '#55000000',
+      offsetX: 0,
+      offsetY: 10
+    })
+  }
+
+  @Builder
+  private ImmersivePreviewOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      if (this.preview !== undefined) {
+        Image(this.preview)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Contain)
+      } else {
+        Column({ space: 8 }) {
+          Text('等待相机画面')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+          Text('连接相机并开启实时取景后即可全屏监看。')
+            .fontSize(13)
+            .fontColor('#99FFFFFF')
+        }
+      }
+      Column() {
+        Row({ space: 10 }) {
+          Button('⌄ 退出全屏', { type: ButtonType.Normal })
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor('#99000000')
+            .borderRadius(10)
+            .onClick((): void => {
+              this.closeImmersivePreview();
+            })
+          Text(
+            `${this.liveView ? '● LIVE' : '● NO SOURCE'} · ` +
+            `${this.cameraName} · USB/PTP`
+          )
+            .fontSize(11)
+            .fontFamily('monospace')
+            .fontColor(Color.White)
+            .backgroundColor('#99000000')
+            .borderRadius(22)
+            .padding({
+              left: 14,
+              right: 14,
+              top: 10,
+              bottom: 10
+            })
+          Blank()
+        }
+        .width('100%')
+        Blank()
+        Text(
+          this.immersiveMonitoring
+            ? `${this.videoShutterAngle.toFixed(1)}°   ` +
+              `${this.videoFrameRate} fps   JPEG`
+            : `${this.exposureMode.toUpperCase()}   JPEG   帧澈 ZENCHE`
+        )
+          .fontSize(13)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .backgroundColor('#99000000')
+          .borderRadius(22)
+          .padding({
+            left: 18,
+            right: 18,
+            top: 10,
+            bottom: 10
+          })
+      }
+      .width('100%')
+      .height('100%')
+      .padding(20)
+      this.ImmersiveParameterBar()
+      Row() {
+        Column({ space: 12 }) {
+          Text(
+            this.immersiveMonitoring
+              ? `${this.videoFrameRate}P`
+              : this.exposureMode.toUpperCase()
+          )
+            .fontSize(19)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .width(64)
+            .height(56)
+            .textAlign(TextAlign.Center)
+            .backgroundColor('#99000000')
+            .borderRadius(10)
+          Text('USB\nPTP')
+            .fontSize(11)
+            .fontFamily('monospace')
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .width(64)
+            .height(56)
+            .textAlign(TextAlign.Center)
+            .backgroundColor('#99000000')
+            .borderRadius(10)
+        }
+        Blank()
+        Column({ space: 10 }) {
+          Text(this.immersiveMonitoring ? '视频' : '照片')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(
+              this.immersiveMonitoring
+                ? $r('app.color.video')
+                : $r('app.color.accent')
+            )
+          Button(
+            this.immersiveMonitoring
+              ? (this.videoRecording ? '■\n停止' : '●\n录制')
+              : '●\n拍摄',
+            { type: ButtonType.Normal }
+          )
+            .width(96)
+            .height(96)
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .backgroundColor(
+              this.immersiveMonitoring
+                ? $r('app.color.video')
+                : $r('app.color.accent')
+            )
+            .borderRadius(48)
+            .enabled(this.connected && !this.busy)
+            .onClick((): void => {
+              if (this.immersiveMonitoring) {
+                this.toggleVideoRecording();
+              } else {
+                this.capturePhoto();
+              }
+            })
+          Button(
+            this.liveView ? '停止取景' : '开启取景',
+            { type: ButtonType.Normal }
+          )
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor('#99000000')
+            .borderRadius(8)
+            .onClick((): void => {
+              this.toggleLiveView();
+            })
+        }
+      }
+      .width('100%')
+      .padding({ left: 22, right: 22 })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Black)
+  }
+
+  @Builder
+  private ImmersiveParameterBar() {
+    Column({ space: 6 }) {
+      Button(
+        this.immersiveParametersExpanded ? '收起参数' : '展开参数',
+        { type: ButtonType.Normal }
+      )
+        .height(44)
+        .fontColor(Color.White)
+        .backgroundColor('#99000000')
+        .borderRadius(10)
+        .onClick((): void => {
+          this.immersiveParametersExpanded =
+            !this.immersiveParametersExpanded;
+        })
+      if (this.immersiveParametersExpanded) {
+        Scroll() {
+          Row({ space: 8 }) {
+            this.ImmersiveParameterControl(
+              this.immersiveMonitoring ? '快门角度' : '快门',
+              this.immersiveMonitoring
+                ? `${this.videoShutterAngle.toFixed(1)}°`
+                : this.shutterDisplay(),
+              this.immersiveMonitoring ? 'videoShutter' : 'photoShutter'
+            )
+            this.ImmersiveParameterControl(
+              '光圈',
+              `f/${this.currentAperture}`,
+              'aperture'
+            )
+            this.ImmersiveParameterControl('ISO', `${this.currentIso}`, 'iso')
+            this.ImmersiveParameterControl(
+              '曝光补偿',
+              `${this.currentCompensation.toFixed(1)} EV`,
+              'exposureCompensation'
+            )
+          }
+          .padding({ left: 12, right: 12 })
+        }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+      }
+    }
+    .width('100%')
+    .align(Alignment.Bottom)
+    .margin({ bottom: 74 })
+  }
+
+  @Builder
+  private ImmersiveParameterControl(
+    label: string,
+    value: string,
+    parameter: string
+  ) {
+    Row({ space: 4 }) {
+      Button('−', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontColor(Color.White)
+        .backgroundColor('#66000000')
+        .enabled(
+          this.connected &&
+          this.camera.canAdjustParameter(this.cameraParameter(parameter))
+        )
+        .onClick((): void => {
+          this.adjustImmersiveParameter(parameter, -1);
+        })
+      Column({ space: 1 }) {
+        Text(label)
+          .fontSize(10)
+          .fontColor('#99FFFFFF')
+        Text(value)
+          .fontSize(12)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+      }
+      .width(64)
+      Button('+', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontColor(Color.White)
+        .backgroundColor('#66000000')
+        .enabled(
+          this.connected &&
+          this.camera.canAdjustParameter(this.cameraParameter(parameter))
+        )
+        .onClick((): void => {
+          this.adjustImmersiveParameter(parameter, 1);
+        })
+    }
+    .height(50)
+    .padding(4)
+    .backgroundColor('#99000000')
+    .borderRadius(10)
+  }
+
+  @Builder
   private SettingsWorkspace() {
     Scroll() {
       Column({ space: 20 }) {
@@ -604,12 +1480,65 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text('诊断、隐私与支持。')
+        Text('更新、诊断与支持。')
           .fontSize(14)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
-          Text('本地目录')
+          Text('软件更新')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(`当前版本 ${CURRENT_VERSION} · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。`)
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.updateStatus)
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Row({ space: 8 }) {
+            Button(
+              this.updateChecking ? '正在检查…' : '检查更新',
+              { type: ButtonType.Normal }
+            )
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .enabled(!this.updateChecking)
+              .onClick((): void => {
+                this.checkForUpdates();
+              })
+            if (this.availableVersion.length > 0) {
+              Button(
+                `获取 ${this.availableVersion}`,
+                { type: ButtonType.Normal }
+              )
+                .height(44)
+                .layoutWeight(1)
+                .fontColor($r('app.color.accent_ink'))
+                .backgroundColor($r('app.color.accent'))
+                .borderRadius(6)
+                .onClick((): void => {
+                  this.openUpdate();
+                })
+            }
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        Column({ space: 12 }) {
+          Text('诊断日志')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
@@ -662,7 +1591,7 @@ struct Index {
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
-          Text('喜欢 Nikon Link？')
+          Text('喜欢 帧澈 ZENCHE？')
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
@@ -717,12 +1646,12 @@ struct Index {
           this.ParameterSelect(
             '光圈',
             APERTURES,
-            2,
+            10,
             this.exposureMode === 'manual' ||
               this.exposureMode === 'aperturePriority',
             'aperture'
           )
-          this.ParameterSelect('ISO 感光度', ISO_VALUES, 3, true, 'iso')
+          this.ParameterSelect('ISO 感光度', ISO_VALUES, 8, true, 'iso')
           this.ParameterSelect(
             '白平衡',
             WHITE_BALANCES,
@@ -741,7 +1670,7 @@ struct Index {
           this.ParameterSelect(
             '快门速度',
             SHUTTER_SPEEDS,
-            3,
+            18,
             this.exposureMode === 'manual' ||
               this.exposureMode === 'shutterPriority',
             'exposureTime'
@@ -749,17 +1678,17 @@ struct Index {
           this.ParameterSelect(
             '光圈',
             APERTURES,
-            2,
+            10,
             this.exposureMode === 'manual' ||
               this.exposureMode === 'aperturePriority' ||
               this.exposureMode === 'bulb',
             'aperture'
           )
-          this.ParameterSelect('ISO 感光度', ISO_VALUES, 3, true, 'iso')
+          this.ParameterSelect('ISO 感光度', ISO_VALUES, 8, true, 'iso')
           this.ParameterSelect(
             '曝光补偿',
             EXPOSURE_COMPENSATIONS,
-            2,
+            6,
             this.exposureMode === 'program' ||
               this.exposureMode === 'aperturePriority' ||
               this.exposureMode === 'shutterPriority',
@@ -829,12 +1758,21 @@ struct Index {
         color: $r('app.color.rule_strong'),
         radius: 6
       })
-      .enabled(this.connected && !this.busy && modeEnabled)
+      .enabled(
+        this.connected &&
+        !this.busy &&
+        modeEnabled &&
+        this.camera.canAdjustParameter(parameter)
+      )
       .margin({ bottom: 8 })
       .onSelect((index: number): void => {
         const entry: SelectEntry = entries[index];
-        if (parameter === 'exposureMode') {
-          this.exposureMode = entry.value;
+        if (parameter === 'exposureTime') {
+          this.currentShutterSpeed = Number(entry.value);
+        } else if (parameter === 'aperture') {
+          this.currentAperture = Number(entry.value);
+        } else if (parameter === 'iso') {
+          this.currentIso = Number(entry.value);
         }
         this.setCameraParameter(parameter, entry);
       })
@@ -937,6 +1875,7 @@ struct Index {
         await this.camera.disconnect();
         this.connected = false;
         this.liveView = false;
+        this.videoRecording = false;
         this.cameraName = '未连接';
         if (this.preview !== undefined) {
           this.preview.release();
@@ -988,6 +1927,7 @@ struct Index {
 
   private async startPreviewLoop(): Promise<void> {
     const generation: number = ++this.previewGeneration;
+    let failures: number = 0;
     while (
       generation === this.previewGeneration &&
       this.camera.isConnected &&
@@ -995,14 +1935,24 @@ struct Index {
     ) {
       try {
         const jpeg: Uint8Array = await this.camera.getLiveViewFrame();
+        failures = 0;
         await this.displayJpeg(jpeg);
       } catch (error) {
+        failures++;
         const message: string = (error as BusinessError).message;
         this.diagnostics?.warning(
           'liveview',
-          `获取实时取景帧失败，将重试：${message}`
+          `获取实时取景帧失败（${failures}/3）：${message}`
         );
-        this.status = `实时取景暂停：${message}`;
+        if (failures >= 3) {
+          this.previewGeneration++;
+          await this.camera.stopLiveView();
+          this.liveView = false;
+          this.status = '实时取景已安全停止 · 机身控制已释放';
+          this.showError('连续 3 次未收到画面，已停止重试并释放相机。');
+          break;
+        }
+        this.status = `实时取景正在重试 · ${failures}/3`;
         await new Promise<void>((resolve: () => void) => {
           setTimeout(resolve, 600);
         });
@@ -1029,6 +1979,107 @@ struct Index {
     });
   }
 
+  private async toggleVideoRecording(): Promise<void> {
+    if (!this.connected || this.busy) {
+      return;
+    }
+    await this.runBusy(
+      this.videoRecording ? '正在停止视频录制…' : '正在开始视频录制…',
+      async (): Promise<void> => {
+        if (this.videoRecording) {
+          await this.camera.stopMovieRecording();
+        } else {
+          await this.camera.startMovieRecording();
+        }
+        this.videoRecording = this.camera.isMovieRecording;
+        this.status = this.videoRecording
+          ? '● REC · 视频正在录制到相机存储卡'
+          : '录制已停止 · 视频保存在相机存储卡';
+      }
+    );
+  }
+
+  private closeImmersivePreview(): void {
+    if (!this.immersivePreviewVisible) {
+      return;
+    }
+    this.immersivePreviewVisible = false;
+    setTimeout((): void => {
+      this.immersiveMonitoring = false;
+    }, 0);
+  }
+
+  private shutterDisplay(): string {
+    if (this.currentShutterSpeed < 1) {
+      return `1/${Math.round(1 / this.currentShutterSpeed)}`;
+    }
+    return `${this.currentShutterSpeed.toFixed(1)}s`;
+  }
+
+  private adjustImmersiveParameter(
+    parameter: string,
+    direction: number
+  ): void {
+    if (!this.connected || this.busy) {
+      return;
+    }
+    let entries: Array<SelectEntry>;
+    let current: number;
+    if (parameter === 'videoShutter') {
+      entries = SHUTTER_ANGLES;
+      current = this.videoShutterAngle;
+    } else if (parameter === 'photoShutter') {
+      entries = SHUTTER_SPEEDS;
+      current = this.currentShutterSpeed;
+    } else if (parameter === 'aperture') {
+      entries = APERTURES;
+      current = this.currentAperture;
+    } else if (parameter === 'exposureCompensation') {
+      entries = EXPOSURE_COMPENSATIONS;
+      current = this.currentCompensation;
+    } else {
+      entries = ISO_VALUES;
+      current = this.currentIso;
+    }
+    let nearest: number = 0;
+    for (let index: number = 1; index < entries.length; index++) {
+      if (
+        Math.abs(Number(entries[index].value) - current) <
+        Math.abs(Number(entries[nearest].value) - current)
+      ) {
+        nearest = index;
+      }
+    }
+    const next: number = Math.max(
+      0,
+      Math.min(entries.length - 1, nearest + direction)
+    );
+    const entry: SelectEntry = entries[next];
+    if (parameter === 'videoShutter') {
+      this.videoShutterAngle = Number(entry.value);
+      this.applyVideoShutterAngle();
+    } else if (parameter === 'photoShutter') {
+      this.currentShutterSpeed = Number(entry.value);
+      this.setCameraParameter('exposureTime', entry);
+    } else if (parameter === 'aperture') {
+      this.currentAperture = Number(entry.value);
+      this.setCameraParameter('aperture', entry);
+    } else if (parameter === 'exposureCompensation') {
+      this.currentCompensation = Number(entry.value);
+      this.setCameraParameter('exposureCompensation', entry);
+    } else {
+      this.currentIso = Number(entry.value);
+      this.setCameraParameter('iso', entry);
+    }
+  }
+
+  private cameraParameter(parameter: string): string {
+    if (parameter === 'videoShutter' || parameter === 'photoShutter') {
+      return 'exposureTime';
+    }
+    return parameter;
+  }
+
   private async setCameraParameter(
     parameter: string,
     entry: SelectEntry
@@ -1047,6 +2098,9 @@ struct Index {
         parameter,
         numeric ? Number(entry.value) : entry.value
       );
+      if (parameter === 'exposureMode') {
+        this.exposureMode = entry.value;
+      }
       this.status = `已设置 ${entry.label}`;
     });
   }
@@ -1093,6 +2147,196 @@ struct Index {
     }
   }
 
+  private async openOwnerAlbum(): Promise<void> {
+    try {
+      const options: photoAccessHelper.PhotoSelectOptions =
+        new photoAccessHelper.PhotoSelectOptions();
+      options.MIMEType =
+        photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      options.maxSelectNumber = 50;
+      options.isOriginalSupported = true;
+      const result: photoAccessHelper.PhotoSelectResult =
+        await new photoAccessHelper.PhotoViewPicker().select(options);
+      await this.importExternalPhotos(result.photoUris, '相册');
+    } catch (error) {
+      const businessError: BusinessError = error as BusinessError;
+      if (businessError.code !== 13900012) {
+        this.showError(`无法打开机主相册：${businessError.message}`);
+      }
+    }
+  }
+
+  private async loadSystemAlbum(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      const permissions: Array<Permissions> = [
+        'ohos.permission.READ_IMAGEVIDEO'
+      ];
+      const result = await abilityAccessCtrl
+        .createAtManager()
+        .requestPermissionsFromUser(context, permissions);
+      if (result.authResults.length === 0 || result.authResults[0] !== 0) {
+        this.systemMedia = [];
+        this.systemAlbumStatus = '未获得相册读取权限';
+        return;
+      }
+      const predicates: dataSharePredicates.DataSharePredicates =
+        new dataSharePredicates.DataSharePredicates();
+      predicates
+        .orderByDesc(photoAccessHelper.PhotoKeys.DATE_ADDED.toString())
+        .limit(80, 0);
+      const options: photoAccessHelper.FetchOptions = {
+        fetchColumns: [
+          photoAccessHelper.PhotoKeys.DISPLAY_NAME.toString(),
+          photoAccessHelper.PhotoKeys.DATE_ADDED.toString(),
+          photoAccessHelper.PhotoKeys.DURATION.toString()
+        ],
+        predicates: predicates
+      };
+      const helper: photoAccessHelper.PhotoAccessHelper =
+        photoAccessHelper.getPhotoAccessHelper(context);
+      const fetchResult:
+        photoAccessHelper.FetchResult<photoAccessHelper.PhotoAsset> =
+        await helper.getAssets(options);
+      const assets: Array<photoAccessHelper.PhotoAsset> =
+        await fetchResult.getAllObjects();
+      fetchResult.close();
+      this.systemMedia = assets.map(
+        (asset: photoAccessHelper.PhotoAsset): SystemMediaItem => {
+          const durationValue: photoAccessHelper.MemberType =
+            asset.get(photoAccessHelper.PhotoKeys.DURATION.toString());
+          return new SystemMediaItem(
+            asset.uri,
+            asset.displayName,
+            asset.photoType === photoAccessHelper.PhotoType.VIDEO,
+            Number(durationValue)
+          );
+        }
+      );
+      this.systemAlbumStatus = `最近 ${this.systemMedia.length} 项`;
+    } catch (error) {
+      this.systemMedia = [];
+      this.systemAlbumStatus = '系统相册读取失败';
+      this.diagnostics?.error(
+        'library',
+        `读取系统相册失败：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private durationLabel(duration: number): string {
+    let seconds: number = Math.max(0, Math.round(duration));
+    if (seconds > 24 * 60 * 60) {
+      seconds = Math.round(seconds / 1000);
+    }
+    const minutes: number = Math.floor(seconds / 60);
+    const remainder: number = seconds % 60;
+    return `${minutes}:${remainder < 10 ? '0' : ''}${remainder}`;
+  }
+
+  private async openSystemMedia(item: SystemMediaItem): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri: item.uri,
+        type: item.isVideo ? 'video/*' : 'image/*'
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开系统相册文件：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async openCloudProvider(url: string): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri: url
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开网盘页面：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async openCloudDrive(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      const documentPicker: picker.DocumentViewPicker =
+        new picker.DocumentViewPicker(context);
+      const options: picker.DocumentSelectOptions =
+        new picker.DocumentSelectOptions();
+      options.maxSelectNumber = 50;
+      options.fileSuffixFilters = [
+        '照片与视频|jpg,jpeg,png,heic,heif,tif,tiff,nef,nrw,mp4,mov,m4v'
+      ];
+      const uris: Array<string> = await documentPicker.select(options);
+      await this.importExternalPhotos(uris, '网盘');
+    } catch (error) {
+      const businessError: BusinessError = error as BusinessError;
+      if (businessError.code !== 13900012) {
+        this.showError(`无法打开网盘文件提供器：${businessError.message}`);
+      }
+    }
+  }
+
+  private async importExternalPhotos(
+    uris: Array<string>,
+    source: string
+  ): Promise<void> {
+    const library: PhotoLibrary | undefined = this.library;
+    if (library === undefined || uris.length === 0) {
+      return;
+    }
+    let imported: number = 0;
+    for (let index: number = 0; index < uris.length; index++) {
+      const uri: string = uris[index];
+      try {
+        const name: string = this.externalPhotoName(uri, source, index);
+        library.importFromUri(uri, name);
+        imported++;
+      } catch (error) {
+        this.diagnostics?.error(
+          'library',
+          `从${source}导入失败；URI=${uri}；错误=${(error as BusinessError).message}`
+        );
+      }
+    }
+    this.refreshPhotos();
+    this.status = imported > 0
+      ? `已从${source}加入 ${imported} 张照片`
+      : `未能从${source}加入照片`;
+    promptAction.showToast({ message: this.status });
+  }
+
+  private externalPhotoName(
+    uri: string,
+    source: string,
+    index: number
+  ): string {
+    const withoutQuery: string = uri.split('?')[0];
+    const slash: number = withoutQuery.lastIndexOf('/');
+    const leaf: string = slash >= 0
+      ? withoutQuery.substring(slash + 1)
+      : withoutQuery;
+    const lower: string = leaf.toLowerCase();
+    const supported: boolean = [
+      '.jpg', '.jpeg', '.png', '.heic', '.heif',
+      '.tif', '.tiff', '.nef', '.nrw', '.mp4', '.mov', '.m4v'
+    ].some((extension: string): boolean => lower.endsWith(extension));
+    return supported && leaf.length > 0
+      ? leaf.replace(/[<>:"|?*]/g, '_')
+      : `${source}_${Date.now()}_${index + 1}.JPG`;
+  }
+
   private refreshPhotos(): void {
     if (this.library !== undefined) {
       this.photos = this.library.list();
@@ -1100,22 +2344,82 @@ struct Index {
   }
 
   private async previewPhoto(item: PhotoItem): Promise<void> {
+    await this.openLargePhoto(item);
+  }
+
+  private async openLargePhoto(item: PhotoItem): Promise<void> {
     if (this.library === undefined) {
       return;
     }
-    if (
-      !item.name.toLowerCase().endsWith('.jpg') &&
-      !item.name.toLowerCase().endsWith('.jpeg')
-    ) {
-      this.showError('NEF、HEIF 与 TIFF 已安全保存，但当前页面只预览 JPEG。');
+    if (item.isVideo) {
+      const context: common.UIAbilityContext =
+        getContext(this) as common.UIAbilityContext;
+      try {
+        await context.startAbility({
+          action: 'ohos.want.action.viewData',
+          uri: `file://${item.path}`,
+          type: 'video/*'
+        });
+      } catch (error) {
+        this.showError(
+          `无法播放视频：${(error as BusinessError).message}`
+        );
+      }
       return;
     }
     try {
-      await this.displayJpeg(this.library.read(item));
-      this.section = 'capture';
-      this.status = `正在预览 ${item.name}`;
+      const source: image.ImageSource = image.createImageSource(
+        this.library.read(item).buffer
+      );
+      const pixelMap: image.PixelMap = await source.createPixelMap({
+        editable: false,
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      source.release();
+      if (this.largePreview !== undefined) {
+        this.largePreview.release();
+      }
+      this.largePreview = pixelMap;
+      this.largePreviewName = item.name;
+      this.largePreviewVisible = true;
+      this.status = `正在查看 ${item.name}`;
     } catch (error) {
-      this.showError(`无法预览 ${item.name}。`);
+      this.showError(
+        '当前格式已安全保存，但系统无法显示这张照片的大图。'
+      );
+    }
+  }
+
+  private closeLargePhoto(): void {
+    this.largePreviewVisible = false;
+    this.largePreviewName = '';
+    if (this.largePreview !== undefined) {
+      this.largePreview.release();
+      this.largePreview = undefined;
+    }
+  }
+
+  private async sharePhoto(item: PhotoItem): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      const record: systemShare.SharedRecord = {
+        utd: item.isVideo ? 'general.video' : 'general.image',
+        uri: `file://${item.path}`,
+        title: item.name,
+        description: '来自 帧澈 ZENCHE 文件库'
+      };
+      const data: systemShare.SharedData =
+        new systemShare.SharedData(record);
+      const controller: systemShare.ShareController =
+        new systemShare.ShareController(data);
+      await controller.show(context, {
+        previewMode: systemShare.SharePreviewMode.DETAIL
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开系统分享面板：${(error as BusinessError).message}`
+      );
     }
   }
 
@@ -1139,10 +2443,13 @@ struct Index {
       desiredPixelFormat: image.PixelMapFormat.RGBA_8888
     });
     source.release();
-    if (this.preview !== undefined) {
-      this.preview.release();
-    }
+    const previous: image.PixelMap | undefined = this.preview;
     this.preview = pixelMap;
+    if (previous !== undefined) {
+      setTimeout((): void => {
+        previous.release();
+      }, 300);
+    }
   }
 
   private async runBusy(
@@ -1195,6 +2502,110 @@ struct Index {
     }
   }
 
+  private async checkForUpdates(): Promise<void> {
+    if (this.updateChecking) {
+      return;
+    }
+    this.updateChecking = true;
+    this.updateStatus = '正在检查更新…';
+    const request: http.HttpRequest = http.createHttp();
+    try {
+      const response: http.HttpResponse = await request.request(
+        LATEST_RELEASE_API,
+        {
+          method: http.RequestMethod.GET,
+          header: {
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': `ZENCHE-HarmonyOS/${CURRENT_VERSION}`
+          },
+          connectTimeout: 20000,
+          readTimeout: 20000,
+          expectDataType: http.HttpDataType.STRING
+        }
+      );
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`GitHub HTTP ${response.responseCode}`);
+      }
+      const release: GitHubRelease =
+        JSON.parse(response.result as string) as GitHubRelease;
+      const version: string = this.normalizeVersion(release.tag_name);
+      if (!this.isNewerVersion(version, CURRENT_VERSION)) {
+        this.availableVersion = '';
+        this.availableUpdateUrl = '';
+        this.updateStatus = '已是最新版本';
+        return;
+      }
+
+      let targetUrl: string = release.html_url;
+      for (const asset of release.assets) {
+        if (asset.name.endsWith('-HarmonyOS.hap')) {
+          targetUrl = asset.browser_download_url;
+          break;
+        }
+      }
+      this.availableVersion = version;
+      this.availableUpdateUrl = targetUrl;
+      this.updateStatus = `发现新版本 ${version}`;
+      this.diagnostics?.info('update', this.updateStatus);
+    } catch (error) {
+      this.updateStatus = '检查失败，请确认网络后重试';
+      this.diagnostics?.error(
+        'update',
+        `检查更新失败：${(error as BusinessError).message}`
+      );
+    } finally {
+      this.updateChecking = false;
+      request.destroy();
+    }
+  }
+
+  private async openUpdate(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri:
+          this.availableUpdateUrl.length > 0
+            ? this.availableUpdateUrl
+            : RELEASES_URL
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开更新页：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private normalizeVersion(value: string): string {
+    if (value.startsWith('v') || value.startsWith('V')) {
+      return value.substring(1);
+    }
+    return value;
+  }
+
+  private isNewerVersion(candidate: string, current: string): boolean {
+    const left: Array<string> = candidate.split(/[.-]/);
+    const right: Array<string> = current.split(/[.-]/);
+    const count: number = Math.max(left.length, right.length);
+    for (let index: number = 0; index < count; index++) {
+      const candidatePart: number = this.versionPart(left, index);
+      const currentPart: number = this.versionPart(right, index);
+      if (candidatePart !== currentPart) {
+        return candidatePart > currentPart;
+      }
+    }
+    return false;
+  }
+
+  private versionPart(parts: Array<string>, index: number): number {
+    if (index >= parts.length) {
+      return 0;
+    }
+    const match: RegExpMatchArray | null = parts[index].match(/^\d+/);
+    return match === null ? 0 : Number(match[0]);
+  }
+
   private async openDonation(): Promise<void> {
     const context: common.UIAbilityContext =
       getContext(this) as common.UIAbilityContext;
@@ -1202,7 +2613,7 @@ struct Index {
       await context.startAbility({
         action: 'ohos.want.action.viewData',
         uri:
-          'https://raw.githubusercontent.com/Tauber01/NikonLink/' +
+          'https://raw.githubusercontent.com/Tauber01/ZENCHE/' +
           'main/native/macos/Resources/wechat-donation.png'
       });
     } catch (error) {

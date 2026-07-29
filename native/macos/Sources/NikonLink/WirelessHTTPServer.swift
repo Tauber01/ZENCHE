@@ -128,8 +128,8 @@ final class WirelessHTTPServer {
             respond(
                 401,
                 "Unauthorized",
-                body: "需要使用 Nikon Link 无线收件箱账号。",
-                headers: ["WWW-Authenticate": "Basic realm=\"Nikon Link\""],
+                body: "需要使用 帧澈 ZENCHE 无线收件箱账号。",
+                headers: ["WWW-Authenticate": "Basic realm=\"ZENCHE\""],
                 to: descriptor
             )
             return
@@ -150,7 +150,7 @@ final class WirelessHTTPServer {
             respond(
                 200,
                 "OK",
-                body: "{\"service\":\"Nikon Link\",\"upload\":\"ready\"}",
+                body: "{\"service\":\"ZENCHE\",\"upload\":\"ready\"}",
                 headers: ["Content-Type": "application/json; charset=utf-8"],
                 to: descriptor
             )
@@ -161,7 +161,7 @@ final class WirelessHTTPServer {
             <?xml version="1.0" encoding="utf-8"?>
             <d:multistatus xmlns:d="DAV:"><d:response><d:href>/</d:href>\
             <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype>\
-            <d:displayname>Nikon Link</d:displayname></d:prop>\
+            <d:displayname>ZENCHE</d:displayname></d:prop>\
             <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>\
             </d:multistatus>
             """

@@ -25,7 +25,7 @@ struct SettingsSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("设置")
                         .font(.system(size: 26, weight: .bold))
-                    Text("Nikon Link \(updater.currentVersion)")
+                    Text("帧澈 ZENCHE \(updater.currentVersion)")
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
@@ -98,7 +98,7 @@ struct SettingsSheet: View {
                             .font(.system(size: 13))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("~/Library/Logs/Nikon Link")
+                        Text("~/Library/Logs/帧澈 ZENCHE")
                             .font(.system(size: 11, design: .monospaced))
                             .foregroundStyle(SettingsPalette.muted)
                     }
@@ -133,7 +133,7 @@ struct SettingsSheet: View {
                 HStack(spacing: 14) {
                     settingIcon("cup.and.saucer.fill", color: SettingsPalette.support)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("喜欢 Nikon Link？")
+                        Text("喜欢 帧澈 ZENCHE？")
                             .font(.system(size: 16, weight: .bold))
                         Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
                             .font(.system(size: 13))
@@ -161,7 +161,7 @@ struct SettingsSheet: View {
                 }
                 .buttonStyle(.link)
                 Spacer()
-                Text("更新包仅从 github.com/Tauber01/NikonLink 获取")
+                Text("更新包仅从 github.com/Tauber01/ZENCHE 获取")
                     .font(.system(size: 11))
                     .foregroundStyle(SettingsPalette.muted)
             }
@@ -245,9 +245,9 @@ struct SettingsSheet: View {
         formatter.dateFormat = "yyyyMMdd-HHmmss"
 
         let panel = NSSavePanel()
-        panel.title = "导出 Nikon Link 诊断日志"
+        panel.title = "导出 帧澈 ZENCHE 诊断日志"
         panel.nameFieldStringValue =
-            "NikonLink-Diagnostics-\(formatter.string(from: Date())).zip"
+            "ZENCHE-Diagnostics-\(formatter.string(from: Date())).zip"
         panel.allowedContentTypes = [.zip]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let destination = panel.url else {
@@ -357,7 +357,7 @@ private struct DonationSheet: View {
                 ContentUnavailableView(
                     "二维码未找到",
                     systemImage: "qrcode",
-                    description: Text("请重新安装 Nikon Link 后再试。")
+                    description: Text("请重新安装 帧澈 ZENCHE 后再试。")
                 )
                 .frame(height: 420)
             }

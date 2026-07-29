@@ -1225,7 +1225,7 @@ $("#installButton").addEventListener("click", async () => {
 window.addEventListener("appinstalled", () => {
   state.deferredInstallPrompt = null;
   $("#installButton").hidden = true;
-  showToast("Nikon Link 已安装。");
+  showToast("帧澈 ZENCHE 已安装。");
 });
 
 document.addEventListener("keydown", (event) => {
@@ -1273,7 +1273,7 @@ if (camera.nativeSupported) {
     element.hidden = false;
   });
   state.connectionMode = "native";
-  $("#storageLocation").textContent = "Nikon Link 本地照片库";
+  $("#storageLocation").textContent = "帧澈 ZENCHE 本地照片库";
   setRuntimeNotice(
     `${window.NikonNativeBridge.platform === "android" ? "Android" : "macOS"} 原生版已就绪，可连接支持的 Nikon EXPEED 7 相机。`,
   );

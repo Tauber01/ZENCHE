@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleDisplayName</key>
-  <string>Nikon Link</string>
+  <string>帧澈 ZENCHE</string>
   <key>CFBundleExecutable</key>
-  <string>NikonLink</string>
+  <string>ZENCHE</string>
   <key>CFBundleIdentifier</key>
   <string>com.tauber.nikonlink</string>
   <key>CFBundleIconFile</key>
@@ -13,16 +13,18 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Nikon Link</string>
+  <string>帧澈 ZENCHE</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-	<string>0.8.1</string>
+	<string>0.8.3</string>
   <key>CFBundleVersion</key>
-	<string>16</string>
+	<string>18</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>用于在文件页面直接显示机主相册中的照片和视频。</string>
 </dict>
 </plist>

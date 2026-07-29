@@ -62,7 +62,7 @@ export class CameraService extends EventTarget {
 
   async connectNative() {
     if (!this.nativeSupported) {
-      throw makeError("NATIVE_UNAVAILABLE", "请使用 Nikon Link 原生安装版连接 EXPEED 7 相机。");
+      throw makeError("NATIVE_UNAVAILABLE", "请使用 帧澈 ZENCHE 原生安装版连接 EXPEED 7 相机。");
     }
     await this.disconnect();
     const result = await window.NikonNativeBridge.call("connect", {}, 45_000);

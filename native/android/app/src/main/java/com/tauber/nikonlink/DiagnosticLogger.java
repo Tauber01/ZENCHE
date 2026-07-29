@@ -21,9 +21,9 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 final class DiagnosticLogger {
-    private static final String TAG = "NikonLink";
+    private static final String TAG = "ZENCHE";
     private static final String ISSUE_URL =
-            "https://github.com/Tauber01/NikonLink/issues/new";
+            "https://github.com/Tauber01/ZENCHE/issues/new";
     private static final long MAX_FILE_BYTES = 5L * 1024L * 1024L;
     private static final long RETENTION_MILLIS = 14L * 24L * 60L * 60L * 1000L;
     private static final int ISSUE_LOG_LIMIT = 2_500;
@@ -83,7 +83,7 @@ final class DiagnosticLogger {
                 + "- 平台：Android " + Build.VERSION.RELEASE
                 + "（API " + Build.VERSION.SDK_INT + "）\n"
                 + "- 设备：" + redact(Build.MANUFACTURER + " " + Build.MODEL) + "\n"
-                + "- Nikon Link：" + appVersion() + "\n"
+                + "- 帧澈 ZENCHE：" + appVersion() + "\n"
                 + "- 会话：" + sessionId + "\n\n"
                 + "## 最近诊断日志（已脱敏）\n\n```text\n"
                 + recentText(ISSUE_LOG_LIMIT)
@@ -142,7 +142,7 @@ final class DiagnosticLogger {
         if (target.length() >= MAX_FILE_BYTES) {
             File rotated = new File(
                     directory,
-                    "NikonLink-" + timestamp("yyyy-MM-dd-HHmmss")
+                    "ZENCHE-" + timestamp("yyyy-MM-dd-HHmmss")
                             + "-" + sessionId + ".log");
             if (!target.renameTo(rotated)) {
                 Log.w(TAG, "Unable to rotate diagnostic log");
@@ -159,7 +159,7 @@ final class DiagnosticLogger {
     private File currentLogFile() {
         return new File(
                 directory,
-                "NikonLink-" + timestamp("yyyy-MM-dd") + ".log");
+                "ZENCHE-" + timestamp("yyyy-MM-dd") + ".log");
     }
 
     private String tail(File file, int maxCharacters) {

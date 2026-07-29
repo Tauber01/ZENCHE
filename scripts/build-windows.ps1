@@ -14,11 +14,11 @@ $BuildRoot = Join-Path $ProjectRoot "build/windows"
 $PublishDirectory = Join-Path $BuildRoot $Runtime
 $DistDirectory = Join-Path $ProjectRoot "dist"
 $Architecture = if ($Runtime -eq "win-arm64") { "arm64" } else { "x64" }
-$PackageVersion = "0.8.1"
+$PackageVersion = "0.8.3"
 $FileVersion = "$PackageVersion.0"
-$ArchiveName = "NikonLink-$PackageVersion-Windows-$Architecture.zip"
+$ArchiveName = "ZENCHE-$PackageVersion-Windows-$Architecture.zip"
 $ArchivePath = Join-Path $DistDirectory $ArchiveName
-$InstallerName = "NikonLink-$PackageVersion-Windows-$Architecture-Setup.exe"
+$InstallerName = "ZENCHE-$PackageVersion-Windows-$Architecture-Setup.exe"
 $InstallerPath = Join-Path $DistDirectory $InstallerName
 
 function Resolve-MakeNsis {
@@ -112,14 +112,15 @@ Compress-Archive `
 if (Test-Path -LiteralPath $InstallerPath) {
     Remove-Item -LiteralPath $InstallerPath -Force
 }
+$NsisOptionPrefix = if ($env:OS -eq "Windows_NT") { "/" } else { "-" }
 & $ResolvedMakeNsis `
-    "/V2" `
-    "/DPRODUCT_VERSION=$PackageVersion" `
-    "/DFILE_VERSION=$FileVersion" `
-    "/DAPP_ARCHITECTURE=$Architecture" `
-    "/DPUBLISH_DIR=$PublishDirectory" `
-    "/DPROJECT_ROOT=$ProjectRoot" `
-    "/DOUTPUT_FILE=$InstallerPath" `
+    "${NsisOptionPrefix}V2" `
+    "${NsisOptionPrefix}DPRODUCT_VERSION=$PackageVersion" `
+    "${NsisOptionPrefix}DFILE_VERSION=$FileVersion" `
+    "${NsisOptionPrefix}DAPP_ARCHITECTURE=$Architecture" `
+    "${NsisOptionPrefix}DPUBLISH_DIR=$PublishDirectory" `
+    "${NsisOptionPrefix}DPROJECT_ROOT=$ProjectRoot" `
+    "${NsisOptionPrefix}DOUTPUT_FILE=$InstallerPath" `
     $InstallerScript
 if ($LASTEXITCODE -ne 0) {
     throw "NSIS failed with exit code $LASTEXITCODE."

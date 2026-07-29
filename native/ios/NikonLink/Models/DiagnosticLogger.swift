@@ -22,7 +22,7 @@ final class DiagnosticLogger {
         )[0]
         directoryURL = library
             .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent("Nikon Link", isDirectory: true)
+            .appendingPathComponent("ZENCHE", isDirectory: true)
         queue.sync {
             try? FileManager.default.createDirectory(
                 at: directoryURL,
@@ -64,7 +64,7 @@ final class DiagnosticLogger {
 
         - 平台：\(device.systemName) \(device.systemVersion)
         - 设备：\(redact(device.model))
-        - Nikon Link：\(appVersion())
+        - 帧澈 ZENCHE：\(appVersion())
         - 会话：\(sessionID)
 
         ## 最近诊断日志（已脱敏）
@@ -76,7 +76,7 @@ final class DiagnosticLogger {
         > 提交前请检查以上内容；不要填写密码、令牌或相机序列号。
         """
         var components = URLComponents(
-            string: "https://github.com/Tauber01/NikonLink/issues/new"
+            string: "https://github.com/Tauber01/ZENCHE/issues/new"
         )
         components?.queryItems = [
             URLQueryItem(name: "title", value: "[iOS/iPadOS] "),
@@ -126,7 +126,7 @@ final class DiagnosticLogger {
                 var target = self.dailyLogURL()
                 if self.fileSize(target) >= self.maxFileBytes {
                     let rotated = self.directoryURL.appendingPathComponent(
-                        "NikonLink-\(self.filenameTimestamp())-"
+                        "ZENCHE-\(self.filenameTimestamp())-"
                             + "\(self.sessionID).log"
                     )
                     try? FileManager.default.moveItem(at: target, to: rotated)
@@ -149,14 +149,14 @@ final class DiagnosticLogger {
                     try handle.synchronize()
                 }
             } catch {
-                NSLog("NikonLink diagnostics write failed: %@", error.localizedDescription)
+                NSLog("ZENCHE diagnostics write failed: %@", error.localizedDescription)
             }
         }
     }
 
     private func dailyLogURL() -> URL {
         directoryURL.appendingPathComponent(
-            "NikonLink-\(dateFormatter("yyyy-MM-dd").string(from: Date())).log"
+            "ZENCHE-\(dateFormatter("yyyy-MM-dd").string(from: Date())).log"
         )
     }
 

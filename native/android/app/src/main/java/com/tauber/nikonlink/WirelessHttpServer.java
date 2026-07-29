@@ -37,7 +37,7 @@ final class WirelessHttpServer {
     private final File directory;
     private final Listener listener;
     private final ExecutorService clients = Executors.newCachedThreadPool(task -> {
-        Thread thread = new Thread(task, "NikonLink-HTTP-Client");
+        Thread thread = new Thread(task, "ZENCHE-HTTP-Client");
         thread.setDaemon(true);
         return thread;
     });
@@ -54,7 +54,7 @@ final class WirelessHttpServer {
     synchronized void start() {
         if (running) return;
         running = true;
-        Thread thread = new Thread(this::runServer, "NikonLink-HTTP");
+        Thread thread = new Thread(this::runServer, "ZENCHE-HTTP");
         thread.setDaemon(true);
         thread.start();
     }
@@ -128,8 +128,8 @@ final class WirelessHttpServer {
                         output,
                         401,
                         "Unauthorized",
-                        "需要使用 Nikon Link 无线收件箱账号。",
-                        "WWW-Authenticate: Basic realm=\"Nikon Link\"\r\n");
+                        "需要使用 帧澈 ZENCHE 无线收件箱账号。",
+                        "WWW-Authenticate: Basic realm=\"ZENCHE\"\r\n");
                 return;
             }
 
@@ -148,7 +148,7 @@ final class WirelessHttpServer {
                             output,
                             200,
                             "OK",
-                            "{\"service\":\"Nikon Link\",\"upload\":\"ready\"}",
+                            "{\"service\":\"ZENCHE\",\"upload\":\"ready\"}",
                             "Content-Type: application/json; charset=utf-8\r\n");
                     return;
                 case "MKCOL":
@@ -159,7 +159,7 @@ final class WirelessHttpServer {
                             + "<d:multistatus xmlns:d=\"DAV:\">"
                             + "<d:response><d:href>/</d:href><d:propstat><d:prop>"
                             + "<d:resourcetype><d:collection/></d:resourcetype>"
-                            + "<d:displayname>Nikon Link</d:displayname>"
+                            + "<d:displayname>ZENCHE</d:displayname>"
                             + "</d:prop><d:status>HTTP/1.1 200 OK</d:status>"
                             + "</d:propstat></d:response></d:multistatus>";
                     respond(

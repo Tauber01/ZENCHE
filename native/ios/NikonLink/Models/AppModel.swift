@@ -3,6 +3,7 @@ import Foundation
 import Photos
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
@@ -26,6 +27,9 @@ struct LibraryItem: Identifiable, Hashable {
 
     var id: String { url.path }
     var filename: String { url.lastPathComponent }
+    var isVideo: Bool {
+        ["mov", "mp4", "m4v"].contains(url.pathExtension.lowercased())
+    }
 }
 
 @MainActor
@@ -37,12 +41,28 @@ final class MediaLibrary: ObservableObject {
     private let fileManager = FileManager.default
     private let directory: URL
     private let supportedExtensions: Set<String> = [
-        "jpg", "jpeg", "heic", "heif", "png", "tif", "tiff", "nef", "nrw"
+        "jpg", "jpeg", "heic", "heif", "png", "tif", "tiff", "nef", "nrw",
+        "mov", "mp4", "m4v"
     ]
 
     init() {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        directory = documents.appendingPathComponent("Nikon Link", isDirectory: true)
+        let preferredDirectory = documents.appendingPathComponent(
+            "ZENCHE",
+            isDirectory: true
+        )
+        let legacyDirectory = documents.appendingPathComponent(
+            "Nikon" + " Link",
+            isDirectory: true
+        )
+        if !fileManager.fileExists(atPath: preferredDirectory.path),
+           fileManager.fileExists(atPath: legacyDirectory.path) {
+            try? fileManager.moveItem(
+                at: legacyDirectory,
+                to: preferredDirectory
+            )
+        }
+        directory = preferredDirectory
         try? fileManager.createDirectory(
             at: directory,
             withIntermediateDirectories: true,
@@ -76,7 +96,7 @@ final class MediaLibrary: ObservableObject {
             )
             reload()
             selectedItemID = url.path
-            message = "照片已保存到 Nikon Link 文件库"
+            message = "照片已保存到 帧澈 ZENCHE 文件库"
             return url
         } catch {
             DiagnosticLogger.shared.error(
@@ -84,6 +104,34 @@ final class MediaLibrary: ObservableObject {
                 "保存照片失败：\(error.localizedDescription)"
             )
             message = "保存失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    @discardableResult
+    func saveRecordedVideo(at temporaryURL: URL) -> URL? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
+        let destination = directory
+            .appendingPathComponent("NL-VIDEO-\(formatter.string(from: Date()))")
+            .appendingPathExtension("mov")
+
+        do {
+            try fileManager.moveItem(at: temporaryURL, to: destination)
+            reload()
+            selectedItemID = destination.path
+            message = "视频已保存到 帧澈 ZENCHE 文件库"
+            DiagnosticLogger.shared.info(
+                "recording",
+                "视频已保存；文件=\(destination.lastPathComponent)"
+            )
+            return destination
+        } catch {
+            DiagnosticLogger.shared.error(
+                "recording",
+                "保存视频失败：\(error.localizedDescription)"
+            )
+            message = "视频保存失败：\(error.localizedDescription)"
             return nil
         }
     }
@@ -122,6 +170,30 @@ final class MediaLibrary: ObservableObject {
         }
     }
 
+    func importPhotoData(_ data: Data, fileExtension: String = "jpg") {
+        let normalizedExtension = supportedExtensions.contains(
+            fileExtension.lowercased()
+        ) ? fileExtension.lowercased() : "jpg"
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
+        let destination = directory
+            .appendingPathComponent("相册-\(formatter.string(from: Date()))")
+            .appendingPathExtension(normalizedExtension)
+
+        do {
+            try data.write(to: destination, options: .atomic)
+            reload()
+            selectedItemID = destination.path
+            message = "照片已从机主相册加入文件库"
+        } catch {
+            DiagnosticLogger.shared.error(
+                "library",
+                "相册照片导入失败：\(error.localizedDescription)"
+            )
+            message = "相册照片导入失败：\(error.localizedDescription)"
+        }
+    }
+
     func deleteSelected() {
         guard let selectedItem else { return }
         do {
@@ -149,7 +221,10 @@ final class MediaLibrary: ObservableObject {
 
             PHPhotoLibrary.shared().performChanges {
                 let request = PHAssetCreationRequest.forAsset()
-                request.addResource(with: .photo, fileURL: url, options: nil)
+                let resourceType: PHAssetResourceType = [
+                    "mov", "mp4", "m4v"
+                ].contains(url.pathExtension.lowercased()) ? .video : .photo
+                request.addResource(with: resourceType, fileURL: url, options: nil)
             } completionHandler: { success, error in
                 DispatchQueue.main.async {
                     completion(
@@ -198,6 +273,7 @@ final class AppModel: ObservableObject {
     let camera: CameraService
     let library: MediaLibrary
     let wireless: WirelessTransferServer
+    let updater: UpdateController
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
@@ -214,8 +290,10 @@ final class AppModel: ObservableObject {
 
         let camera = CameraService()
         let library = MediaLibrary()
+        let updater = UpdateController()
         self.camera = camera
         self.library = library
+        self.updater = updater
         wireless = WirelessTransferServer(directory: library.storageDirectory) { [weak library] url in
             library?.reload()
             library?.selectedItemID = url.path
@@ -238,6 +316,9 @@ final class AppModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         wireless.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
+        updater.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         wireless.$isRunning
@@ -264,6 +345,22 @@ final class AppModel: ObservableObject {
                     return
                 }
                 self.statusMessage = "拍摄完成 · \(url.lastPathComponent)"
+                if self.autoSaveToPhotos {
+                    self.library.saveToSystemPhotos(url) { [weak self] message in
+                        self?.statusMessage = message
+                    }
+                }
+            }
+        }
+
+        camera.onVideoRecorded = { [weak self] temporaryURL in
+            Task { @MainActor in
+                guard let self,
+                      let url = self.library.saveRecordedVideo(at: temporaryURL)
+                else {
+                    return
+                }
+                self.statusMessage = "录制完成 · \(url.lastPathComponent)"
                 if self.autoSaveToPhotos {
                     self.library.saveToSystemPhotos(url) { [weak self] message in
                         self?.statusMessage = message

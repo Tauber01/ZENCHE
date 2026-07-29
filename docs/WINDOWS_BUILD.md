@@ -36,13 +36,13 @@ $env:NIKONLINK_LIBUSB_DLL = "C:\path\to\libusb-1.0.dll"
 输出：
 
 ```text
-dist/NikonLink-0.8.1-Windows-x64-Setup.exe
-dist/NikonLink-0.8.1-Windows-x64-Setup.exe.sha256
-dist/NikonLink-0.8.1-Windows-x64.zip
-dist/NikonLink-0.8.1-Windows-x64.zip.sha256
+dist/ZENCHE-0.8.3-Windows-x64-Setup.exe
+dist/ZENCHE-0.8.3-Windows-x64-Setup.exe.sha256
+dist/ZENCHE-0.8.3-Windows-x64.zip
+dist/ZENCHE-0.8.3-Windows-x64.zip.sha256
 ```
 
-`Setup.exe` 是默认交付物，安装到 `Program Files\Nikon Link`，创建开始菜单和
+`Setup.exe` 是默认交付物，安装到 `Program Files\帧澈 ZENCHE`，创建开始菜单和
 桌面快捷方式，并注册到 Windows“已安装的应用”以支持卸载和覆盖升级。ZIP
 保留为便携版。两者默认都是自包含 .NET 发布；传入 `-FrameworkDependent`
 可减小包体，但目标电脑必须安装 .NET 8 Desktop Runtime。
@@ -62,7 +62,7 @@ Windows 默认可能把 PTP 接口交给系统相机驱动，libusb 无法直接
 连接前关闭会占用相机的 Nikon 软件。Windows 版会严格匹配 Nikon Vendor ID
 `0x04b0` 和项目支持的 Product ID，不会把其他 USB 设备当作受支持相机。
 
-诊断日志保存在 `%LOCALAPPDATA%\Nikon Link\Logs`，按日写入、单文件 5 MB
+诊断日志保存在 `%LOCALAPPDATA%\帧澈 ZENCHE\Logs`，按日写入、单文件 5 MB
 滚动并保留 14 天。“无线传输”页面可打开日志目录，或打开带最近脱敏日志的
 GitHub Issue 预填页面。
 

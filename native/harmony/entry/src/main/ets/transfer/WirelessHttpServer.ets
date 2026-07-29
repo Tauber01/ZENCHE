@@ -188,8 +188,8 @@ export class WirelessHttpServer {
         respond(
           401,
           'Unauthorized',
-          '需要使用 Nikon Link 无线收件箱账号。',
-          'WWW-Authenticate: Basic realm="Nikon Link"\r\n'
+          '需要使用 帧澈 ZENCHE 无线收件箱账号。',
+          'WWW-Authenticate: Basic realm="ZENCHE"\r\n'
         );
         return false;
       }
@@ -208,7 +208,7 @@ export class WirelessHttpServer {
           respond(
             200,
             'OK',
-            '{"service":"Nikon Link","upload":"ready"}',
+            '{"service":"ZENCHE","upload":"ready"}',
             'Content-Type: application/json; charset=utf-8\r\n'
           );
           return false;
@@ -224,7 +224,7 @@ export class WirelessHttpServer {
             '<?xml version="1.0" encoding="utf-8"?>' +
               '<d:multistatus xmlns:d="DAV:"><d:response><d:href>/</d:href>' +
               '<d:propstat><d:prop><d:resourcetype><d:collection/>' +
-              '</d:resourcetype><d:displayname>Nikon Link</d:displayname>' +
+              '</d:resourcetype><d:displayname>ZENCHE</d:displayname>' +
               '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>' +
               '</d:response></d:multistatus>',
             'Content-Type: application/xml; charset=utf-8\r\nDAV: 1\r\n'

@@ -8,8 +8,12 @@ const SUPPORTED_EXTENSIONS: Array<string> = [
   '.nrw',
   '.heif',
   '.heic',
+  '.png',
   '.tif',
-  '.tiff'
+  '.tiff',
+  '.mp4',
+  '.mov',
+  '.m4v'
 ];
 
 export class PhotoItem {
@@ -32,6 +36,13 @@ export class PhotoItem {
     )}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(
       date.getMinutes()
     )}`;
+  }
+
+  get isVideo(): boolean {
+    const lower: string = this.name.toLowerCase();
+    return lower.endsWith('.mp4') ||
+      lower.endsWith('.mov') ||
+      lower.endsWith('.m4v');
   }
 }
 
@@ -177,6 +188,44 @@ export class PhotoLibrary {
       return new Uint8Array(buffer);
     } finally {
       fs.closeSync(file);
+    }
+  }
+
+  importFromUri(uri: string, requestedName: string): string {
+    this.ensureDirectory();
+    const filename: string = this.safeFilename(requestedName);
+    const destination: string = this.uniqueDestination(filename);
+    const source: fs.File = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+    let target: fs.File | undefined;
+    try {
+      target = fs.openSync(
+        destination,
+        fs.OpenMode.CREATE |
+        fs.OpenMode.READ_WRITE |
+        fs.OpenMode.TRUNC
+      );
+      fs.copyFileSync(source.fd, target.fd);
+      fs.fsyncSync(target.fd);
+      if (fs.statSync(target.fd).size === 0) {
+        throw new Error('所选照片为空。');
+      }
+      return destination;
+    } catch (error) {
+      if (fs.accessSync(destination)) {
+        try {
+          fs.unlinkSync(destination);
+        } catch (cleanupError) {
+        }
+      }
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('无法从系统文件提供器导入照片。');
+    } finally {
+      fs.closeSync(source);
+      if (target !== undefined) {
+        fs.closeSync(target);
+      }
     }
   }
 

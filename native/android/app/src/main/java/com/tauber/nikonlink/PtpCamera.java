@@ -13,8 +13,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 final class PtpCamera {
@@ -50,6 +52,7 @@ final class PtpCamera {
     private static final int OPEN_SESSION = 0x1002;
     private static final int CLOSE_SESSION = 0x1003;
     private static final int GET_OBJECT = 0x1009;
+    private static final int GET_DEVICE_PROP_DESC = 0x1014;
     private static final int SET_DEVICE_PROP = 0x1016;
     private static final int CHANGE_CAMERA_MODE = 0x90c2;
     private static final int DEVICE_READY = 0x90c8;
@@ -58,6 +61,8 @@ final class PtpCamera {
     private static final int END_LIVE_VIEW = 0x9202;
     private static final int GET_LIVE_VIEW_IMAGE = 0x9203;
     private static final int CAPTURE_TO_SDRAM = 0x9207;
+    private static final int START_MOVIE_RECORDING = 0x920a;
+    private static final int END_MOVIE_RECORDING = 0x920b;
     private static final int TERMINATE_CAPTURE = 0x920c;
     private static final int OBJECT_ADDED_IN_SDRAM = 0xc101;
     private static final int USB_REQUEST_CLEAR_FEATURE = 0x01;
@@ -80,9 +85,12 @@ final class PtpCamera {
     private UsbEndpoint bulkOut;
     private int transaction = 0;
     private boolean liveView;
+    private boolean movieRecording;
     private String exposureMode = "manual";
     private int bulbDurationSeconds = 5;
     private CameraProfile profile;
+    private final Map<Integer, Boolean> writableProperties = new HashMap<>();
+    private final Set<String> deniedParameters = new HashSet<>();
 
     PtpCamera(MainActivity activity, DiagnosticLogger diagnostics) {
         this.activity = activity;
@@ -124,6 +132,7 @@ final class PtpCamera {
         try {
             openFreshTransport(device);
             openSessionWithRecovery();
+            refreshParameterCapabilities();
         } catch (Exception error) {
             closeTransport();
             throw error;
@@ -160,6 +169,28 @@ final class PtpCamera {
         ensureConnected();
         if (!liveView) throw new Exception("实时取景尚未开启。");
         return extractJpeg(transact(GET_LIVE_VIEW_IMAGE, null, null, 12_000));
+    }
+
+    synchronized void startMovieRecording() throws Exception {
+        ensureConnected();
+        if (movieRecording) return;
+        if (!liveView) startLiveView();
+        transact(START_MOVIE_RECORDING, null, null, 15_000);
+        movieRecording = true;
+    }
+
+    synchronized void stopMovieRecording() throws Exception {
+        ensureConnected();
+        if (!movieRecording) return;
+        try {
+            transact(END_MOVIE_RECORDING, null, null, 15_000);
+        } finally {
+            movieRecording = false;
+        }
+    }
+
+    synchronized boolean isMovieRecording() {
+        return movieRecording;
     }
 
     synchronized byte[] capture() throws Exception {
@@ -212,6 +243,27 @@ final class PtpCamera {
     }
 
     synchronized Object setParameter(String name, Object rawValue) throws Exception {
+        if (!isParameterWritable(name)) {
+            throw new Exception(parameterLockReason(name));
+        }
+        try {
+            return setParameterCore(name, rawValue);
+        } catch (Exception error) {
+            if (error.getMessage() != null
+                    && error.getMessage().contains("0x200F")) {
+                deniedParameters.add(name);
+                throw new Exception(
+                        cameraName()
+                                + " 报告“"
+                                + parameterDisplayName(name)
+                                + "”当前只读，已锁定该参数以防止重复报错。",
+                        error);
+            }
+            throw error;
+        }
+    }
+
+    private Object setParameterCore(String name, Object rawValue) throws Exception {
         ensureConnected();
         if ("bulbDuration".equals(name)) {
             if (!"bulb".equals(exposureMode)) {
@@ -287,9 +339,9 @@ final class PtpCamera {
                 value = littleEndian16(control);
                 break;
             case "exposureMode":
-                exposureMode = String.valueOf(rawValue);
+                String requestedExposureMode = String.valueOf(rawValue);
                 property = 0x500e;
-                if ("bulb".equals(exposureMode)) {
+                if ("bulb".equals(requestedExposureMode)) {
                     transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
                     transact(
                             SET_DEVICE_PROP,
@@ -301,12 +353,14 @@ final class PtpCamera {
                             new long[]{0x500d},
                             littleEndian32(0xffffffffL),
                             10_000);
+                    exposureMode = requestedExposureMode;
+                    refreshParameterCapabilities();
                     return rawValue;
                 }
                 int program;
-                if ("manual".equals(exposureMode)) program = 1;
-                else if ("aperturePriority".equals(exposureMode)) program = 3;
-                else if ("shutterPriority".equals(exposureMode)) program = 4;
+                if ("manual".equals(requestedExposureMode)) program = 1;
+                else if ("aperturePriority".equals(requestedExposureMode)) program = 3;
+                else if ("shutterPriority".equals(requestedExposureMode)) program = 4;
                 else program = 2;
                 value = littleEndian16(program);
                 break;
@@ -314,7 +368,34 @@ final class PtpCamera {
                 throw new Exception(cameraName() + " 不支持此参数：" + name);
         }
         transact(SET_DEVICE_PROP, new long[]{property}, value, 10_000);
+        if ("exposureMode".equals(name)) {
+            exposureMode = String.valueOf(rawValue);
+            refreshParameterCapabilities();
+        }
         return rawValue;
+    }
+
+    synchronized boolean isParameterWritable(String name) {
+        if (deniedParameters.contains(name) || !canAdjustExposureParameter(name)) {
+            return false;
+        }
+        int property = propertyCode(name);
+        Boolean writable = writableProperties.get(property);
+        return writable == null || writable;
+    }
+
+    synchronized String parameterLockReason(String name) {
+        if (deniedParameters.contains(name)) {
+            return parameterDisplayName(name) + "已被相机拒绝，重新连接后再检测";
+        }
+        if (!canAdjustExposureParameter(name)) {
+            return "当前拍摄模式下由相机控制";
+        }
+        Boolean writable = writableProperties.get(propertyCode(name));
+        if (Boolean.FALSE.equals(writable)) {
+            return "相机固件报告" + parameterDisplayName(name) + "为只读";
+        }
+        return null;
     }
 
     private boolean canAdjustExposureParameter(String name) {
@@ -331,12 +412,72 @@ final class PtpCamera {
                 return "program".equals(exposureMode)
                         || "aperturePriority".equals(exposureMode)
                         || "shutterPriority".equals(exposureMode);
+            case "bulbDuration":
+                return "bulb".equals(exposureMode);
             default:
                 return true;
         }
     }
 
+    private void refreshParameterCapabilities() {
+        writableProperties.clear();
+        deniedParameters.clear();
+        int[] properties = new int[]{
+                0x5005, 0x5007, 0x500a, 0x500d, 0x500e, 0x500f, 0x5010, 0xd200
+        };
+        for (int property : properties) {
+            try {
+                byte[] descriptor = transact(
+                        GET_DEVICE_PROP_DESC,
+                        new long[]{property},
+                        null,
+                        5_000);
+                if (descriptor.length >= 5) {
+                    writableProperties.put(property, descriptor[4] != 0);
+                }
+            } catch (Exception ignored) {
+                // Older Nikon bodies do not expose every descriptor. In that
+                // case mode-based gating remains the safe fallback.
+            }
+        }
+    }
+
+    private int propertyCode(String name) {
+        switch (name) {
+            case "whiteBalanceMode": return 0x5005;
+            case "aperture": return 0x5007;
+            case "focusMode": return 0x500a;
+            case "exposureTime": return 0x500d;
+            case "exposureMode": return 0x500e;
+            case "iso": return 0x500f;
+            case "exposureCompensation": return 0x5010;
+            case "pictureControl": return 0xd200;
+            default: return -1;
+        }
+    }
+
+    private String parameterDisplayName(String name) {
+        switch (name) {
+            case "exposureTime": return "快门速度";
+            case "aperture": return "光圈";
+            case "iso": return "ISO";
+            case "exposureCompensation": return "曝光补偿";
+            case "focusMode": return "对焦模式";
+            case "whiteBalanceMode": return "白平衡";
+            case "pictureControl": return "优化校准";
+            case "exposureMode": return "拍摄模式";
+            default: return "参数";
+        }
+    }
+
     synchronized void disconnect() {
+        if (movieRecording && connection != null) {
+            try {
+                stopMovieRecording();
+            } catch (Exception ignored) {
+                movieRecording = false;
+            }
+        }
         stopLiveView();
         if (connection != null) {
             try {
@@ -345,6 +486,9 @@ final class PtpCamera {
             }
         }
         closeTransport();
+        movieRecording = false;
+        writableProperties.clear();
+        deniedParameters.clear();
     }
 
     private void openSessionWithRecovery() throws Exception {

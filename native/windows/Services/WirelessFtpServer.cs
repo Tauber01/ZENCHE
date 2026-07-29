@@ -149,7 +149,7 @@ public sealed class WirelessFtpServer : IAsyncDisposable
                 AutoFlush = true
             };
 
-            await ReplyAsync(writer, "220 Nikon Link Wireless Inbox ready");
+            await ReplyAsync(writer, "220 ZENCHE Wireless Inbox ready");
             OnStatus("相机已连接，等待图片");
             var acceptedUser = false;
             var authenticated = false;

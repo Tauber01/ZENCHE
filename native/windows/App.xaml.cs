@@ -28,7 +28,7 @@ public partial class App : Application
             $"未处理异常：{e.Exception}");
         MessageBox.Show(
             e.Exception.Message,
-            "Nikon Link",
+            "帧澈 ZENCHE",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
         e.Handled = true;

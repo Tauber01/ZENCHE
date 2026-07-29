@@ -49,5 +49,5 @@ const server = createServer((request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`Nikon Link is running at http://127.0.0.1:${port}`);
+  console.log(`帧澈 ZENCHE is running at http://127.0.0.1:${port}`);
 });

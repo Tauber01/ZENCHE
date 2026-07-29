@@ -24,13 +24,19 @@ NikonSDK/
 *.framework
 
 # Generated promotional media and review frames.
-NikonLink_BGM_*
-NikonLink_PV*.mp4
-NikonLink_PV*.m4a
-NikonLink_PV*.m4s
-NikonLink_PV*.webm
-NikonLink_PV*.jpg
+ZENCHE_BGM_*
+ZENCHE_PV*.mp4
+ZENCHE_PV*.m4a
+ZENCHE_PV*.m4s
+ZENCHE_PV*.webm
+ZENCHE_PV*.jpg
 build_nikonlink_pv.py
 nikonlink_pv.html
 pv_*.png
 pv_review_frames/
+
+# Organized promotional PV source assets, render cache, and deliverables.
+PV/assets/
+PV/archive/
+PV/work/
+PV/output/

@@ -1,6 +1,8 @@
 import AppKit
+import AVKit
 import Darwin
 import Foundation
+import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -173,8 +175,10 @@ private struct SupportedCamera: Equatable {
         let minimum = profile?.minimumISO ?? 100
         let maximum = profile?.maximumISO ?? 64000
         return [
-            64, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
-            51200, 64000, 102400
+            64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640,
+            800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000,
+            6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000,
+            40000, 51200, 64000, 80000, 102400
         ].filter { $0 >= minimum && $0 <= maximum }
     }
 }
@@ -192,7 +196,7 @@ private enum CameraError: LocalizedError {
         switch self {
         case .command(let value): return value
         case .timeout(let value):
-            return "\(value) 的 PTP 会话超时。Nikon Link 已尝试复位 USB 连接，请重新连接相机。"
+            return "\(value) 的 PTP 会话超时。帧澈 ZENCHE 已尝试复位 USB 连接，请重新连接相机。"
         case .thermal(let value):
             return "\(value) 温度过高，已停止实时取景。请关闭相机并等待冷却后再试。"
         case .liveViewBusy(let value):
@@ -217,6 +221,7 @@ private final class GPhotoCamera {
     private let logger = DiagnosticLogger.shared
     private var connected = false
     private var liveView = false
+    private var movieRecording = false
     private var activeProcess: Process?
     private var liveViewProcess: Process?
     private var liveViewOutput: Pipe?
@@ -228,6 +233,7 @@ private final class GPhotoCamera {
     private var previewFrameWindowStartedAt: Date?
     private var previewFramesInWindow = 0
     private(set) var profile: SupportedCamera?
+    private(set) var parameterWritable: [String: Bool] = [:]
 
     private var cameraName: String {
         profile?.name ?? "Nikon 相机"
@@ -453,7 +459,7 @@ private final class GPhotoCamera {
         }
         if isUSBClaimFailure(output) {
             return """
-            \(cameraName) 的 USB/PTP 接口仍被其他程序占用。Nikon Link 已尝试释放 \
+            \(cameraName) 的 USB/PTP 接口仍被其他程序占用。帧澈 ZENCHE 已尝试释放 \
             macOS 相机服务；请退出“照片”“图像捕捉”、NX Tether 和 Camera Control \
             Pro，重新插拔相机后再连接。
             """
@@ -570,8 +576,49 @@ private final class GPhotoCamera {
         profile = matchedProfile
         _ = try run(["--summary"])
         connected = true
+        refreshParameterCapabilities()
         logger.info("camera", "已连接 \(matchedProfile.name)")
         return matchedProfile
+    }
+
+    private func refreshParameterCapabilities() {
+        let keys: [String: [String]] = [
+            "exposureTime": ["shutterspeed"],
+            "aperture": ["f-number"],
+            "iso": ["iso"],
+            "exposureCompensation": ["exposurecompensation"],
+            "whiteBalanceMode": ["whitebalance"],
+            "focusMode": ["focusmode", "liveviewaffocus"],
+            "exposureMode": ["expprogram"],
+            "pictureControl": ["picturecontrol", "activepicctrlitem", "d200"]
+        ]
+        var result: [String: Bool] = [:]
+        for (name, candidates) in keys {
+            var discovered: [Bool] = []
+            for key in candidates {
+                guard let output = try? run(["--get-config", key]) else {
+                    continue
+                }
+                let readOnly = output
+                    .split(separator: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .first { $0.lowercased().hasPrefix("readonly:") }
+                if let readOnly {
+                    discovered.append(
+                        readOnly.split(separator: ":").last?
+                            .trimmingCharacters(in: .whitespaces) != "0"
+                    )
+                }
+            }
+            if !discovered.isEmpty {
+                result[name] = discovered.contains(false)
+            }
+        }
+        parameterWritable = result
+    }
+
+    func parameterCapabilitySnapshot() -> [String: Bool] {
+        parameterWritable
     }
 
     func startLiveView() throws {
@@ -900,7 +947,7 @@ private final class GPhotoCamera {
             throw CameraError.command("实时取景尚未开启。")
         }
         let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("NikonLink", isDirectory: true)
+            .appendingPathComponent("ZENCHE", isDirectory: true)
         try FileManager.default.createDirectory(
             at: folder,
             withIntermediateDirectories: true
@@ -986,6 +1033,26 @@ private final class GPhotoCamera {
         }
     }
 
+    func startMovieRecording() throws {
+        guard connected else { throw CameraError.noCamera }
+        guard !movieRecording else { return }
+        try performWithoutLiveView {
+            _ = try run(["--set-config", "movie=1"])
+            movieRecording = true
+        }
+        logger.info("recording", "已开始向 \(cameraName) 存储卡录制视频")
+    }
+
+    func stopMovieRecording() throws {
+        guard connected else { throw CameraError.noCamera }
+        guard movieRecording else { return }
+        try performWithoutLiveView {
+            _ = try run(["--set-config", "movie=0"])
+            movieRecording = false
+        }
+        logger.info("recording", "已停止 \(cameraName) 视频录制")
+    }
+
     func setParameter(name: String, value: Any) throws {
         try performWithoutLiveView {
             try setParameterWithoutLiveView(name: name, value: value)
@@ -997,6 +1064,11 @@ private final class GPhotoCamera {
         value: Any
     ) throws {
         guard connected else { throw CameraError.noCamera }
+        if parameterWritable[name] == false {
+            throw CameraError.command(
+                "\(cameraName) 报告“\(parameterDisplayName(name))”当前只读；帧澈 ZENCHE 已锁定该参数。"
+            )
+        }
         let key: String
         let formatted: String
         switch name {
@@ -1087,16 +1159,37 @@ private final class GPhotoCamera {
             throw CameraError.command("\(cameraName) 不支持此参数：\(name)")
         }
         _ = try run(["--set-config", "\(key)=\(formatted)"])
+        if name == "exposureMode" {
+            refreshParameterCapabilities()
+        }
+    }
+
+    private func parameterDisplayName(_ name: String) -> String {
+        [
+            "exposureTime": "快门速度",
+            "aperture": "光圈",
+            "iso": "ISO",
+            "exposureCompensation": "曝光补偿",
+            "whiteBalanceMode": "白平衡",
+            "focusMode": "对焦模式",
+            "exposureMode": "拍摄模式",
+            "pictureControl": "优化校准"
+        ][name] ?? "参数"
     }
 
     func disconnect() {
         logger.info("camera", "正在断开相机")
+        if movieRecording {
+            try? stopMovieRecording()
+        }
         stopLiveView()
         if let activeProcess, activeProcess.isRunning {
             _ = Darwin.kill(activeProcess.processIdentifier, SIGKILL)
         }
         connected = false
+        movieRecording = false
         profile = nil
+        parameterWritable = [:]
         logger.info("camera", "相机已断开")
     }
 }
@@ -1106,6 +1199,9 @@ private struct PhotoRecord: Identifiable, Hashable {
     let createdAt: Date
     var id: URL { url }
     var name: String { url.lastPathComponent }
+    var isVideo: Bool {
+        ["mov", "mp4", "m4v"].contains(url.pathExtension.lowercased())
+    }
 }
 
 private enum AppSection: String, CaseIterable, Identifiable {
@@ -1152,6 +1248,7 @@ private final class CameraModel: ObservableObject {
     @Published var connecting = false
     @Published var liveViewEnabled = false
     @Published var capturing = false
+    @Published var videoRecording = false
     @Published var frame: NSImage?
     @Published var photoFrame: NSImage?
     @Published var status = "未连接"
@@ -1168,6 +1265,7 @@ private final class CameraModel: ObservableObject {
     @Published var focusMode = "single-shot"
     @Published var whiteBalance = "continuous"
     @Published var exposureMode = "manual"
+    @Published var parameterWritable: [String: Bool] = [:]
     @Published var bulbSeconds = 5
     @Published var pictureControl = "standard"
     @Published var zebraEnabled = false
@@ -1207,7 +1305,22 @@ private final class CameraModel: ObservableObject {
             for: .picturesDirectory,
             in: .userDomainMask
         ).first ?? FileManager.default.homeDirectoryForCurrentUser
-        photoDirectory = pictures.appendingPathComponent("Nikon Link", isDirectory: true)
+        let preferredDirectory = pictures.appendingPathComponent(
+            "ZENCHE",
+            isDirectory: true
+        )
+        let legacyDirectory = pictures.appendingPathComponent(
+            "Nikon" + " Link",
+            isDirectory: true
+        )
+        if !FileManager.default.fileExists(atPath: preferredDirectory.path),
+           FileManager.default.fileExists(atPath: legacyDirectory.path) {
+            try? FileManager.default.moveItem(
+                at: legacyDirectory,
+                to: preferredDirectory
+            )
+        }
+        photoDirectory = preferredDirectory
         try? FileManager.default.createDirectory(
             at: photoDirectory,
             withIntermediateDirectories: true
@@ -1239,39 +1352,19 @@ private final class CameraModel: ObservableObject {
             guard let self else { return }
             do {
                 let profile = try self.camera.connect()
-                var liveViewStarted = false
-                var liveViewStartError: Error?
-                do {
-                    try self.camera.startLiveView()
-                    liveViewStarted = true
-                } catch {
-                    liveViewStarted = false
-                    liveViewStartError = error
-                    self.logger.warning(
-                        "liveview",
-                        "相机已连接，但实时取景启动失败：\(error.localizedDescription)"
-                    )
-                }
+                let capabilities = self.camera.parameterCapabilitySnapshot()
                 self.logger.info(
                     "workflow",
-                    "连接流程完成；相机=\(profile.name)；实时取景=\(liveViewStarted)"
+                    "连接流程完成；相机=\(profile.name)；实时取景=等待用户开启"
                 )
-                let initialLiveView = liveViewStarted
                 DispatchQueue.main.async {
                     self.connected = true
                     self.connecting = false
-                    self.liveViewEnabled = initialLiveView
+                    self.liveViewEnabled = false
                     self.cameraName = profile.name
                     self.status = profile.name
-                    self.detail = initialLiveView
-                        ? "USB/PTP · 原生连接"
-                        : "USB/PTP 已连接 · 实时取景需实机确认"
-                    if let liveViewStartError {
-                        self.errorMessage = liveViewStartError.localizedDescription
-                    }
-                    if initialLiveView {
-                        self.startPreviewLoop()
-                    }
+                    self.parameterWritable = capabilities
+                    self.detail = "USB/PTP 已连接 · 机身快门可用"
                 }
             } catch {
                 self.logger.error(
@@ -1293,6 +1386,7 @@ private final class CameraModel: ObservableObject {
         logger.info("workflow", "用户请求断开相机")
         previewToken = UUID()
         liveViewEnabled = false
+        videoRecording = false
         cameraQueue.async { [weak self] in
             self?.camera.disconnect()
         }
@@ -1300,6 +1394,7 @@ private final class CameraModel: ObservableObject {
         frame = nil
         photoFrame = nil
         cameraName = nil
+        parameterWritable = [:]
         status = "未连接"
         detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
     }
@@ -1499,6 +1594,44 @@ private final class CameraModel: ObservableObject {
         }
     }
 
+    func toggleMovieRecording() {
+        guard connected else {
+            errorMessage = "请先连接支持的 Nikon 相机。"
+            return
+        }
+        guard !capturing else { return }
+        let shouldStop = videoRecording
+        capturing = true
+        detail = shouldStop ? "正在停止视频录制…" : "正在开始视频录制…"
+        cameraQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                if shouldStop {
+                    try self.camera.stopMovieRecording()
+                } else {
+                    try self.camera.startMovieRecording()
+                }
+                DispatchQueue.main.async {
+                    self.capturing = false
+                    self.videoRecording = !shouldStop
+                    self.detail = shouldStop
+                        ? "视频已停止并保存到相机存储卡"
+                        : "● REC · 正在录制到相机存储卡"
+                }
+            } catch {
+                self.logger.error(
+                    "recording",
+                    "视频录制切换失败：\(error.localizedDescription)"
+                )
+                DispatchQueue.main.async {
+                    self.capturing = false
+                    self.detail = "视频录制操作失败"
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
     func reloadPhotos() {
         let keys: Set<URLResourceKey> = [.creationDateKey, .contentModificationDateKey]
         let urls = (try? FileManager.default.contentsOfDirectory(
@@ -1508,7 +1641,10 @@ private final class CameraModel: ObservableObject {
         )) ?? []
         photos = urls
             .filter {
-                ["jpg", "jpeg", "png", "nef", "heif", "heic", "tif", "tiff"]
+                [
+                    "jpg", "jpeg", "png", "nef", "heif", "heic", "tif", "tiff",
+                    "mov", "mp4", "m4v"
+                ]
                     .contains($0.pathExtension.lowercased())
             }
             .map { url in
@@ -1536,33 +1672,96 @@ private final class CameraModel: ObservableObject {
         }
     }
 
+    func importPhotos(from urls: [URL]) {
+        var imported = 0
+        for source in urls {
+            let scoped = source.startAccessingSecurityScopedResource()
+            defer {
+                if scoped {
+                    source.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            var destination = photoDirectory.appendingPathComponent(
+                source.lastPathComponent
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                destination = photoDirectory
+                    .appendingPathComponent(
+                        source.deletingPathExtension().lastPathComponent
+                        + "-\(UUID().uuidString.prefix(6))"
+                    )
+                    .appendingPathExtension(source.pathExtension)
+            }
+            do {
+                try FileManager.default.copyItem(at: source, to: destination)
+                imported += 1
+            } catch {
+                logger.error(
+                    "library",
+                    "从网盘导入失败：\(error.localizedDescription)"
+                )
+            }
+        }
+        reloadPhotos()
+        selectedPhoto = photos.first
+        detail = imported > 0
+            ? "已从网盘加入 \(imported) 张照片"
+            : "没有可加入文件库的照片"
+    }
+
+    func openOwnerAlbum() {
+        guard let photosApp = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: "com.apple.Photos"
+        ) else {
+            errorMessage = "找不到系统“照片”应用。"
+            return
+        }
+        NSWorkspace.shared.openApplication(
+            at: photosApp,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { _, error in
+            if let error {
+                DispatchQueue.main.async {
+                    self.errorMessage =
+                        "无法打开机主相册：\(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
     func revealLibrary() {
         NSWorkspace.shared.activateFileViewerSelecting([photoDirectory])
     }
 
     func canAdjustExposureParameter(_ name: String) -> Bool {
+        let modeAllows: Bool
         switch name {
         case "exposureTime":
-            return exposureMode == "manual" || exposureMode == "shutterPriority"
+            modeAllows = exposureMode == "manual" || exposureMode == "shutterPriority"
         case "aperture":
-            return exposureMode == "manual"
+            modeAllows = exposureMode == "manual"
                 || exposureMode == "aperturePriority"
                 || exposureMode == "bulb"
         case "iso":
-            return true
+            modeAllows = true
         case "exposureCompensation":
-            return exposureMode == "program"
+            modeAllows = exposureMode == "program"
                 || exposureMode == "aperturePriority"
                 || exposureMode == "shutterPriority"
         case "bulbDuration":
-            return exposureMode == "bulb"
+            modeAllows = exposureMode == "bulb"
         default:
-            return true
+            modeAllows = true
         }
+        return modeAllows && parameterWritable[name] != false
     }
 
     func exposureLockReason(_ name: String) -> String? {
         guard !canAdjustExposureParameter(name) else { return nil }
+        if parameterWritable[name] == false {
+            return "相机固件报告为只读"
+        }
         let mode = [
             "program": "P",
             "manual": "M",
@@ -1683,7 +1882,7 @@ private final class CameraModel: ObservableObject {
             return
         }
         guard canAdjustExposureParameter(name) else {
-            errorMessage = "\(label)在当前拍摄模式下由相机控制。"
+            errorMessage = "\(label)不可调整：\(exposureLockReason(name) ?? "相机当前未开放此参数")。"
             return
         }
         detail = "正在设置 \(label)…"
@@ -1691,15 +1890,22 @@ private final class CameraModel: ObservableObject {
             guard let self else { return }
             do {
                 try self.camera.setParameter(name: name, value: value)
+                let capabilities = self.camera.parameterCapabilitySnapshot()
                 DispatchQueue.main.async {
+                    if name == "exposureMode" {
+                        self.exposureMode = String(describing: value)
+                    }
+                    self.parameterWritable = capabilities
                     self.detail = "\(label)已应用"
                 }
             } catch {
+                let capabilities = self.camera.parameterCapabilitySnapshot()
                 self.logger.error(
                     "settings",
                     "\(label)设置失败：\(error.localizedDescription)"
                 )
                 DispatchQueue.main.async {
+                    self.parameterWritable = capabilities
                     self.detail = "\(label)设置失败"
                     self.errorMessage = error.localizedDescription
                 }
@@ -1780,6 +1986,7 @@ private struct PreviewStage: View {
     @ObservedObject var model: CameraModel
     var compact = false
     var showsMonitorEffects = false
+    var openFullscreen: (() -> Void)?
 
     var body: some View {
         let previewFrame = showsMonitorEffects ? model.frame : model.photoFrame
@@ -1858,6 +2065,18 @@ private struct PreviewStage: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         }
+        .overlay(alignment: .topTrailing) {
+            if let openFullscreen {
+                Button(action: openFullscreen) {
+                    Label(
+                        "全屏",
+                        systemImage: "arrow.up.left.and.arrow.down.right"
+                    )
+                }
+                .buttonStyle(NativeButtonStyle())
+                .padding(14)
+            }
+        }
     }
 
     private var shutterLabel: String {
@@ -1872,6 +2091,507 @@ private struct PreviewStage: View {
     }
 }
 
+private struct ImmersiveMacCameraView: View {
+    @ObservedObject var model: CameraModel
+    @State private var showsParameters = true
+    let monitoring: Bool
+    let close: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let frame = monitoring ? model.frame : model.photoFrame {
+                Image(nsImage: frame)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .ignoresSafeArea()
+                if monitoring,
+                   model.zebraEnabled,
+                   let zebraMask = model.zebraMask {
+                    Image(nsImage: zebraMask)
+                        .resizable()
+                        .scaledToFit()
+                        .allowsHitTesting(false)
+                }
+            } else {
+                ContentUnavailableView(
+                    "等待相机画面",
+                    systemImage: "camera.viewfinder",
+                    description: Text("连接相机并开启实时取景后即可全屏监看。")
+                )
+                .foregroundStyle(.white)
+            }
+
+            VStack {
+                HStack(spacing: 12) {
+                    Button {
+                        close()
+                    } label: {
+                        Label("退出全屏", systemImage: "chevron.down")
+                    }
+                    .buttonStyle(ImmersiveMacButtonStyle())
+
+                    Label(
+                        model.liveViewEnabled ? "LIVE" : "NO SOURCE",
+                        systemImage: "circle.fill"
+                    )
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(
+                        model.liveViewEnabled ? Color.red : Color.white.opacity(0.58)
+                    )
+                    .padding(.horizontal, 14)
+                    .frame(height: 44)
+                    .background(.black.opacity(0.58), in: Capsule())
+                    Spacer()
+                    Text("\(model.cameraName ?? SupportedCamera.summary) · USB/PTP")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .padding(.horizontal, 14)
+                        .frame(height: 44)
+                        .background(.black.opacity(0.58), in: Capsule())
+                }
+                Spacer()
+                immersiveParameterBar
+                HStack(spacing: 20) {
+                    Text(shutterLabel)
+                    Text("F\(model.aperture, specifier: "%.1f")")
+                    Text("ISO \(model.iso)")
+                    Text(monitoring ? "\(Int(model.videoFrameRate))P" : "JPEG")
+                }
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.88))
+                .padding(.horizontal, 18)
+                .frame(height: 44)
+                .background(.black.opacity(0.58), in: Capsule())
+            }
+            .padding(20)
+
+            HStack {
+                VStack(spacing: 12) {
+                    Text(model.exposureMode.uppercased())
+                        .font(.system(size: 22, weight: .bold))
+                        .frame(width: 64, height: 56)
+                        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+                    Text("USB\nPTP")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .frame(width: 64, height: 56)
+                        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+                }
+                Spacer()
+                VStack(spacing: 12) {
+                    Text(
+                        monitoring && model.videoRecording
+                            ? "● REC"
+                            : monitoring ? "视频" : "照片"
+                    )
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(monitoring ? Palette.video : Palette.cobalt)
+                    Button {
+                        if monitoring {
+                            model.toggleMovieRecording()
+                        } else {
+                            model.capture()
+                        }
+                    } label: {
+                        ZStack {
+                            if monitoring && model.videoRecording {
+                                RoundedRectangle(cornerRadius: 13)
+                                    .fill(Palette.video)
+                                    .frame(width: 54, height: 54)
+                            } else {
+                                Circle()
+                                    .fill(monitoring ? Palette.video : Palette.cobalt)
+                                    .frame(width: 76, height: 76)
+                            }
+                            Circle()
+                                .stroke(.white.opacity(0.88), lineWidth: 3)
+                                .frame(width: 88, height: 88)
+                            if !monitoring {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 23, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        .frame(width: 96, height: 96)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!model.connected || model.capturing)
+                    .help(
+                        monitoring
+                            ? model.videoRecording ? "停止录制" : "开始录制"
+                            : "拍摄照片"
+                    )
+
+                    Button(model.liveViewEnabled ? "停止取景" : "开启取景") {
+                        model.toggleLiveView()
+                    }
+                    .buttonStyle(ImmersiveMacButtonStyle())
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+        .preferredColorScheme(.dark)
+        .onExitCommand(perform: close)
+    }
+
+    @ViewBuilder
+    private var immersiveParameterBar: some View {
+        VStack(spacing: 8) {
+            Button(showsParameters ? "收起参数" : "展开参数") {
+                showsParameters.toggle()
+            }
+            .buttonStyle(ImmersiveMacButtonStyle())
+            if showsParameters {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        if monitoring {
+                            parameterControl(
+                                "快门角度",
+                                model.videoShutterAngle.formatted() + "°",
+                                parameter: "exposureTime",
+                                decrease: { adjustVideoShutterAngle(-1) },
+                                increase: { adjustVideoShutterAngle(1) }
+                            )
+                            ImmersiveMacParameterControl(
+                                title: "帧率",
+                                value: "\(Int(model.videoFrameRate)) fps",
+                                decrease: { adjustVideoFrameRate(-1) },
+                                increase: { adjustVideoFrameRate(1) }
+                            )
+                        } else {
+                            parameterControl(
+                                "快门",
+                                shutterLabel,
+                                parameter: "exposureTime",
+                                decrease: { adjustPhotoShutter(-1) },
+                                increase: { adjustPhotoShutter(1) }
+                            )
+                        }
+                        parameterControl(
+                            "光圈",
+                            "F\(model.aperture.formatted())",
+                            parameter: "aperture",
+                            decrease: { adjustAperture(-1) },
+                            increase: { adjustAperture(1) }
+                        )
+                        parameterControl(
+                            "ISO",
+                            "\(model.iso)",
+                            parameter: "iso",
+                            decrease: { adjustISO(-1) },
+                            increase: { adjustISO(1) }
+                        )
+                        parameterControl(
+                            "曝光补偿",
+                            String(format: "%+.1f EV", model.compensation),
+                            parameter: "exposureCompensation",
+                            decrease: { adjustCompensation(-1) },
+                            increase: { adjustCompensation(1) }
+                        )
+                        parameterControl(
+                            "白平衡",
+                            model.whiteBalance == "continuous" ? "自动" : "预设",
+                            parameter: "whiteBalanceMode",
+                            decrease: { setWhiteBalance("continuous") },
+                            increase: { setWhiteBalance("manual") }
+                        )
+                        parameterControl(
+                            "对焦",
+                            model.focusMode == "continuous" ? "AF-C" : "AF-S",
+                            parameter: "focusMode",
+                            decrease: { setFocusMode("single-shot") },
+                            increase: { setFocusMode("continuous") }
+                        )
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func parameterControl(
+        _ title: String,
+        _ value: String,
+        parameter: String,
+        decrease: @escaping () -> Void,
+        increase: @escaping () -> Void
+    ) -> some View {
+        ImmersiveMacParameterControl(
+            title: title,
+            value: value,
+            enabled: model.canAdjustExposureParameter(parameter),
+            lockedReason: model.exposureLockReason(parameter),
+            decrease: decrease,
+            increase: increase
+        )
+    }
+
+    private let shutterOptions: [Double] = [
+        1.0 / 8000, 1.0 / 6400, 1.0 / 5000, 1.0 / 4000,
+        1.0 / 3200, 1.0 / 2500, 1.0 / 2000, 1.0 / 1600,
+        1.0 / 1250, 1.0 / 1000, 1.0 / 800, 1.0 / 640,
+        1.0 / 500, 1.0 / 400, 1.0 / 320, 1.0 / 250,
+        1.0 / 200, 1.0 / 160, 1.0 / 125, 1.0 / 100,
+        1.0 / 80, 1.0 / 60, 1.0 / 50, 1.0 / 40,
+        1.0 / 30, 1.0 / 25, 1.0 / 20, 1.0 / 15,
+        1.0 / 13, 1.0 / 10, 1.0 / 8, 1.0 / 6,
+        1.0 / 5, 1.0 / 4, 1.0 / 3, 1.0 / 2, 1.0
+    ]
+    private let apertureOptions = [
+        1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5,
+        4.0, 4.5, 5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10.0, 11.0,
+        13.0, 14.0, 16.0, 18.0, 20.0, 22.0
+    ]
+    private let frameRateOptions = [24.0, 25.0, 30.0, 50.0, 60.0]
+    private let shutterAngleOptions = [
+        45.0, 60.0, 72.0, 90.0, 108.0, 120.0, 144.0, 150.0,
+        172.8, 180.0, 216.0, 240.0, 270.0, 300.0, 324.0, 360.0
+    ]
+
+    private func adjacentValue(
+        in values: [Double],
+        current: Double,
+        offset: Int
+    ) -> Double {
+        guard !values.isEmpty else { return current }
+        let nearest = values.indices.min {
+            abs(values[$0] - current) < abs(values[$1] - current)
+        } ?? 0
+        return values[max(0, min(values.count - 1, nearest + offset))]
+    }
+
+    private func adjustVideoShutterAngle(_ offset: Int) {
+        model.setVideoShutterAngle(
+            adjacentValue(
+                in: shutterAngleOptions,
+                current: model.videoShutterAngle,
+                offset: offset
+            )
+        )
+    }
+
+    private func adjustVideoFrameRate(_ offset: Int) {
+        model.setVideoFrameRate(
+            adjacentValue(
+                in: frameRateOptions,
+                current: model.videoFrameRate,
+                offset: offset
+            )
+        )
+    }
+
+    private func adjustPhotoShutter(_ offset: Int) {
+        let value = adjacentValue(
+            in: shutterOptions,
+            current: model.shutter,
+            offset: offset
+        )
+        model.shutter = value
+        model.applyParameter("exposureTime", value: value, label: "快门")
+    }
+
+    private func adjustAperture(_ offset: Int) {
+        let value = adjacentValue(
+            in: apertureOptions,
+            current: model.aperture,
+            offset: offset
+        )
+        model.aperture = value
+        model.applyParameter("aperture", value: value, label: "光圈")
+    }
+
+    private func adjustISO(_ offset: Int) {
+        let values = SupportedCamera.isoOptions(for: model.cameraName)
+        guard !values.isEmpty else { return }
+        let nearest = values.indices.min {
+            abs(values[$0] - model.iso) < abs(values[$1] - model.iso)
+        } ?? 0
+        let value = values[max(0, min(values.count - 1, nearest + offset))]
+        model.iso = value
+        model.applyParameter("iso", value: value, label: "ISO")
+    }
+
+    private func adjustCompensation(_ offset: Int) {
+        let value = max(-5, min(5, model.compensation + Double(offset) / 3))
+        model.compensation = value
+        model.applyParameter(
+            "exposureCompensation",
+            value: value,
+            label: "曝光补偿"
+        )
+    }
+
+    private func setWhiteBalance(_ value: String) {
+        model.whiteBalance = value
+        model.applyParameter("whiteBalanceMode", value: value, label: "白平衡")
+    }
+
+    private func setFocusMode(_ value: String) {
+        model.focusMode = value
+        model.applyParameter("focusMode", value: value, label: "对焦模式")
+    }
+
+    private var shutterLabel: String {
+        if monitoring {
+            return model.videoShutterAngle.formatted() + "°"
+        }
+        if model.exposureMode == "bulb" { return "B门" }
+        if model.shutter < 1 {
+            return "1/\(Int((1 / model.shutter).rounded()))"
+        }
+        return String(format: "%.1fs", model.shutter)
+    }
+}
+
+private struct ImmersiveMacParameterControl: View {
+    let title: String
+    let value: String
+    var enabled = true
+    var lockedReason: String?
+    let decrease: () -> Void
+    let increase: () -> Void
+
+    var body: some View {
+        VStack(spacing: 5) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.62))
+            HStack(spacing: 5) {
+                Button(action: decrease) {
+                    Image(systemName: "minus")
+                        .frame(width: 44, height: 44)
+                }
+                Text(value)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .frame(minWidth: 72)
+                Button(action: increase) {
+                    Image(systemName: "plus")
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.64), in: RoundedRectangle(cornerRadius: 12))
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.48)
+        .help(enabled ? title : (lockedReason ?? "\(title)当前不可调整"))
+    }
+}
+
+private final class ImmersiveMacWindowController:
+    NSWindowController,
+    NSWindowDelegate
+{
+    private var closeAfterLeavingFullScreen = false
+
+    init(model: CameraModel, monitoring: Bool) {
+        let screenFrame = NSScreen.main?.frame
+            ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let window = NSWindow(
+            contentRect: screenFrame,
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        super.init(window: window)
+        window.title = monitoring
+            ? "帧澈 ZENCHE · 视频全屏监看"
+            : "帧澈 ZENCHE · 照片全屏取景"
+        window.backgroundColor = .black
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentView = NSHostingView(
+            rootView: ImmersiveMacCameraView(
+                model: model,
+                monitoring: monitoring,
+                close: { [weak self] in self?.requestClose() }
+            )
+        )
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func present() {
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        window?.toggleFullScreen(nil)
+    }
+
+    func requestClose() {
+        guard let window else { return }
+        if window.styleMask.contains(.fullScreen) {
+            guard !closeAfterLeavingFullScreen else { return }
+            closeAfterLeavingFullScreen = true
+            window.toggleFullScreen(nil)
+        } else {
+            window.close()
+        }
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard sender.styleMask.contains(.fullScreen) else { return true }
+        requestClose()
+        return false
+    }
+
+    func windowDidExitFullScreen(_ notification: Notification) {
+        guard closeAfterLeavingFullScreen else { return }
+        closeAfterLeavingFullScreen = false
+        DispatchQueue.main.async { [weak self] in
+            self?.window?.close()
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        ImmersiveMacWindowStore.release(self)
+    }
+}
+
+private enum ImmersiveMacWindowStore {
+    private static var controllers:
+        [ObjectIdentifier: ImmersiveMacWindowController] = [:]
+
+    static func retain(_ controller: ImmersiveMacWindowController) {
+        controllers[ObjectIdentifier(controller)] = controller
+    }
+
+    static func release(_ controller: ImmersiveMacWindowController) {
+        controllers.removeValue(forKey: ObjectIdentifier(controller))
+    }
+}
+
+private func showMacImmersiveWindow(
+    model: CameraModel,
+    monitoring: Bool
+) {
+    let controller = ImmersiveMacWindowController(
+        model: model,
+        monitoring: monitoring
+    )
+    ImmersiveMacWindowStore.retain(controller)
+    controller.present()
+}
+
+private struct ImmersiveMacButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+            .opacity(configuration.isPressed ? 0.68 : 1)
+    }
+}
+
 private struct TopBar: View {
     @ObservedObject var model: CameraModel
     @Binding var showConnection: Bool
@@ -1882,15 +2602,15 @@ private struct TopBar: View {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8).fill(Palette.graphite)
-                    Text("N")
+                    Text("Z")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Nikon Link")
+                    Text("帧澈 ZENCHE")
                         .font(.system(size: 18, weight: .bold))
-                    Text("原生版")
+                    Text("Capture · Connect · Flow")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Palette.muted)
                 }
@@ -1998,7 +2718,9 @@ private struct CaptureView: View {
                         Text("快门、曝光、对焦、白平衡与拍摄模式集中在当前页面。")
                         .foregroundStyle(Palette.muted)
                     }
-                    PreviewStage(model: model)
+                    PreviewStage(model: model) {
+                        showMacImmersiveWindow(model: model, monitoring: false)
+                    }
                     HStack {
                         Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
                             model.toggleLiveView()
@@ -2171,7 +2893,6 @@ private struct ParameterInspector: View {
                             selection: Binding(
                                 get: { model.exposureMode },
                                 set: { value in
-                                    model.exposureMode = value
                                     model.applyParameter(
                                         "exposureMode",
                                         value: value,
@@ -2279,6 +3000,16 @@ private struct MonitorView: View {
                             .foregroundStyle(Palette.muted)
                     }
                     Spacer()
+                    Button(model.videoRecording ? "停止录制" : "开始录制") {
+                        model.toggleMovieRecording()
+                    }
+                    .buttonStyle(
+                        NativeButtonStyle(
+                            primary: true,
+                            accent: Palette.video
+                        )
+                    )
+                    .disabled(!model.connected || model.capturing)
                     Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
                         model.toggleLiveView()
                     }
@@ -2292,13 +3023,23 @@ private struct MonitorView: View {
 
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 20) {
-                        PreviewStage(model: model, showsMonitorEffects: true)
+                        PreviewStage(
+                            model: model,
+                            showsMonitorEffects: true
+                        ) {
+                            showMacImmersiveWindow(model: model, monitoring: true)
+                        }
                             .frame(minWidth: 520)
                         MonitorControlDeck(model: model)
                             .frame(width: 320)
                     }
                     VStack(alignment: .leading, spacing: 20) {
-                        PreviewStage(model: model, showsMonitorEffects: true)
+                        PreviewStage(
+                            model: model,
+                            showsMonitorEffects: true
+                        ) {
+                            showMacImmersiveWindow(model: model, monitoring: true)
+                        }
                         MonitorControlDeck(model: model)
                     }
                 }
@@ -2552,6 +3293,19 @@ private struct MonitorControlDeck: View {
 private struct LibraryView: View {
     @ObservedObject var model: CameraModel
     @State private var confirmDelete = false
+    @State private var showCloudImporter = false
+    @State private var showCloudGuide = false
+    @State private var largePhoto: PhotoRecord?
+    @State private var systemLargePhoto: SystemMacAlbumItem?
+    @State private var systemAlbum: [SystemMacAlbumItem] = []
+    @State private var systemAlbumStatus = "正在读取系统相册…"
+    @State private var systemExpanded = true
+    @State private var systemPhotosExpanded = true
+    @State private var systemVideosExpanded = true
+    @State private var localExpanded = true
+    @State private var localPhotosExpanded = true
+    @State private var localVideosExpanded = true
+    @State private var wirelessExpanded = true
 
     private let columns = [
         GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 16)
@@ -2563,10 +3317,22 @@ private struct LibraryView: View {
                 HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("文件与传输").font(.system(size: 30, weight: .bold))
-                    Text("\(model.photos.count) 个本地文件")
+                    Text("\(model.photos.count) 个本地文件 · 无线照片自动入库")
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
+                Button("刷新相册") {
+                    Task { await loadSystemAlbum() }
+                }
+                    .buttonStyle(NativeButtonStyle())
+                Button("链接网盘") { showCloudGuide = true }
+                    .buttonStyle(NativeButtonStyle())
+                if let selectedPhoto = model.selectedPhoto {
+                    ShareLink(item: selectedPhoto.url) {
+                        Label("分享到社交平台", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(NativeButtonStyle(primary: true))
+                }
                 Button("在访达中显示") { model.revealLibrary() }
                     .buttonStyle(NativeButtonStyle())
                 Button("移到废纸篓") { confirmDelete = true }
@@ -2575,68 +3341,81 @@ private struct LibraryView: View {
             }
             .padding(24)
             Divider()
-            if model.photos.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 46))
-                    Text("还没有联机拍摄文件").font(.headline)
-                    Text("照片将保存在“图片/Nikon Link”。")
-                        .foregroundStyle(Palette.muted)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(model.photos) { photo in
-                            Button {
-                                model.selectedPhoto = photo
-                            } label: {
-                                VStack(alignment: .leading, spacing: 9) {
-                                    if let image = NSImage(contentsOf: photo.url) {
-                                        Image(nsImage: image)
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(height: 132)
-                                            .clipped()
-                                    } else {
-                                        Rectangle()
-                                            .fill(Palette.graphite)
-                                            .frame(height: 132)
-                                    }
-                                    Text(photo.name)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                    Text(
-                                        photo.createdAt.formatted(
-                                            date: .abbreviated,
-                                            time: .shortened
-                                        )
-                                    )
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(Palette.muted)
-                                }
-                                .padding(10)
-                                .background(Palette.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(
-                                            model.selectedPhoto == photo
-                                                ? Palette.cobalt : Palette.rule,
-                                            lineWidth: model.selectedPhoto == photo ? 2 : 1
-                                        )
-                                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    DisclosureGroup(
+                        "系统相册 · \(systemAlbum.count)",
+                        isExpanded: $systemExpanded
+                    ) {
+                        if systemAlbum.isEmpty {
+                            ContentUnavailableView(
+                                "系统相册暂不可见",
+                                systemImage: "photo.on.rectangle",
+                                description: Text("允许照片访问后，照片和视频会直接显示在文件页。")
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 180)
+                        } else {
+                            DisclosureGroup(
+                                "照片 · \(systemAlbum.filter { !$0.isVideo }.count)",
+                                isExpanded: $systemPhotosExpanded
+                            ) {
+                                systemAlbumGrid(systemAlbum.filter { !$0.isVideo })
                             }
-                            .buttonStyle(.plain)
+                            DisclosureGroup(
+                                "视频 · \(systemAlbum.filter(\.isVideo).count)",
+                                isExpanded: $systemVideosExpanded
+                            ) {
+                                systemAlbumGrid(systemAlbum.filter(\.isVideo))
+                            }
                         }
                     }
-                    .padding(24)
+                    .font(.system(size: 19, weight: .bold))
+
+                    DisclosureGroup(
+                        "帧澈 ZENCHE 文件库 · \(model.photos.count)",
+                        isExpanded: $localExpanded
+                    ) {
+                        if model.photos.isEmpty {
+                            ContentUnavailableView(
+                                "还没有联机拍摄文件",
+                                systemImage: "photo.on.rectangle.angled",
+                                description: Text("文件将保存在“图片/帧澈 ZENCHE”。")
+                            )
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 180)
+                        } else {
+                            DisclosureGroup(
+                                "照片 · \(model.photos.filter { !$0.isVideo }.count)",
+                                isExpanded: $localPhotosExpanded
+                            ) {
+                                localPhotoGrid(model.photos.filter { !$0.isVideo })
+                            }
+                            DisclosureGroup(
+                                "视频 · \(model.photos.filter(\.isVideo).count)",
+                                isExpanded: $localVideosExpanded
+                            ) {
+                                localPhotoGrid(model.photos.filter(\.isVideo))
+                            }
+                        }
+                    }
+                    .font(.system(size: 19, weight: .bold))
                 }
+                .padding(24)
             }
             }
             .frame(minWidth: 560)
-            TransferView(model: model)
-                .frame(minWidth: 380, idealWidth: 440, maxWidth: 520)
+            VStack(alignment: .leading, spacing: 0) {
+                DisclosureGroup(
+                    "无线传输 · FTP / HTTP / WebDAV",
+                    isExpanded: $wirelessExpanded
+                ) {
+                    TransferView(model: model)
+                }
+                .font(.system(size: 17, weight: .bold))
+                .padding(18)
+            }
+            .frame(minWidth: 380, idealWidth: 440, maxWidth: 520)
         }
         .alert("将照片移到废纸篓？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
@@ -2645,6 +3424,423 @@ private struct LibraryView: View {
             }
         } message: {
             Text(model.selectedPhoto?.name ?? "")
+        }
+        .fileImporter(
+            isPresented: $showCloudImporter,
+            allowedContentTypes: [
+                .image,
+                .movie,
+                UTType(filenameExtension: "nef") ?? .data,
+                UTType(filenameExtension: "nrw") ?? .data
+            ],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                model.importPhotos(from: urls)
+            case .failure(let error):
+                model.errorMessage =
+                    "无法从网盘导入照片：\(error.localizedDescription)"
+            }
+        }
+        .sheet(item: $largePhoto) { photo in
+            LargePhotoView(photo: photo)
+        }
+        .sheet(item: $systemLargePhoto) { item in
+            SystemMacAlbumPreview(item: item)
+        }
+        .sheet(isPresented: $showCloudGuide) {
+            MacCloudDriveGuide {
+                showCloudGuide = false
+                DispatchQueue.main.async {
+                    showCloudImporter = true
+                }
+            }
+        }
+        .task {
+            await loadSystemAlbum()
+        }
+    }
+
+    @ViewBuilder
+    private func systemAlbumGrid(_ items: [SystemMacAlbumItem]) -> some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(items) { item in
+                SystemMacAlbumThumbnail(item: item)
+                    .onTapGesture(count: 2) {
+                        systemLargePhoto = item
+                    }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func localPhotoGrid(_ items: [PhotoRecord]) -> some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(items) { photo in
+                Button {
+                    model.selectedPhoto = photo
+                } label: {
+                    VStack(alignment: .leading, spacing: 9) {
+                        if photo.isVideo {
+                            ZStack {
+                                Rectangle().fill(Palette.graphite)
+                                Image(systemName: "play.rectangle.fill")
+                                    .font(.system(size: 34))
+                                    .foregroundStyle(.white.opacity(0.78))
+                            }
+                            .frame(height: 132)
+                        } else if let image = NSImage(contentsOf: photo.url) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 132)
+                                .clipped()
+                        } else {
+                            Rectangle()
+                                .fill(Palette.graphite)
+                                .frame(height: 132)
+                        }
+                        Text(photo.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
+                        Text(
+                            photo.createdAt.formatted(
+                                date: .abbreviated,
+                                time: .shortened
+                            )
+                        )
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.muted)
+                    }
+                    .padding(10)
+                    .background(Palette.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                model.selectedPhoto == photo
+                                    ? Palette.cobalt : Palette.rule,
+                                lineWidth: model.selectedPhoto == photo ? 2 : 1
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(
+                    TapGesture(count: 2).onEnded {
+                        model.selectedPhoto = photo
+                        largePhoto = photo
+                    }
+                )
+            }
+        }
+    }
+
+    @MainActor
+    private func loadSystemAlbum() async {
+        var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if status == .notDetermined {
+            status = await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) {
+                    continuation.resume(returning: $0)
+                }
+            }
+        }
+        guard status == .authorized || status == .limited else {
+            systemAlbum = []
+            systemAlbumStatus = "未获得相册读取权限"
+            return
+        }
+        let options = PHFetchOptions()
+        options.fetchLimit = 80
+        options.sortDescriptors = [
+            NSSortDescriptor(key: "creationDate", ascending: false)
+        ]
+        let assets = PHAsset.fetchAssets(with: options)
+        var items: [SystemMacAlbumItem] = []
+        assets.enumerateObjects { asset, _, _ in
+            items.append(SystemMacAlbumItem(asset: asset))
+        }
+        systemAlbum = items
+        systemAlbumStatus = status == .limited
+            ? "已显示允许访问的 \(items.count) 项"
+            : "最近 \(items.count) 项"
+    }
+}
+
+private struct SystemMacAlbumItem: Identifiable {
+    let asset: PHAsset
+
+    var id: String { asset.localIdentifier }
+    var isVideo: Bool { asset.mediaType == .video }
+    var name: String {
+        PHAssetResource.assetResources(for: asset).first?.originalFilename
+            ?? (isVideo ? "系统视频" : "系统照片")
+    }
+}
+
+private struct SystemMacAlbumThumbnail: View {
+    let item: SystemMacAlbumItem
+    @State private var thumbnail: NSImage?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ZStack(alignment: .bottomTrailing) {
+                if let thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle().fill(Palette.graphite)
+                    Image(systemName: item.isVideo ? "video.fill" : "photo")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.white.opacity(0.62))
+                }
+                if item.isVideo {
+                    Label(durationLabel, systemImage: "play.fill")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 5)
+                        .background(.black.opacity(0.68), in: Capsule())
+                        .padding(7)
+                }
+            }
+            .frame(height: 132)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            Text(item.name)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+            Text(item.isVideo ? "系统视频 · 双击播放" : "系统照片 · 双击查看")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(10)
+        .background(Palette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Palette.rule, lineWidth: 1)
+        }
+        .task(id: item.id) {
+            PHImageManager.default().requestImage(
+                for: item.asset,
+                targetSize: NSSize(width: 520, height: 360),
+                contentMode: .aspectFill,
+                options: nil
+            ) { image, _ in
+                if let image {
+                    thumbnail = image
+                }
+            }
+        }
+    }
+
+    private var durationLabel: String {
+        let seconds = max(0, Int(item.asset.duration.rounded()))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+private struct SystemMacAlbumPreview: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: SystemMacAlbumItem
+    @State private var image: NSImage?
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Button("关闭") {
+                    player?.pause()
+                    dismiss()
+                }
+                .buttonStyle(NativeButtonStyle())
+                Spacer()
+                Text("系统相册 · \(item.name)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .lineLimit(1)
+            }
+            if item.isVideo {
+                if let player {
+                    VideoPlayer(player: player)
+                        .onAppear { player.play() }
+                } else {
+                    ProgressView("正在载入视频…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ProgressView("正在载入照片…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding(18)
+        .frame(minWidth: 760, minHeight: 560)
+        .background(Color.black)
+        .foregroundStyle(.white)
+        .task {
+            if item.isVideo {
+                PHImageManager.default().requestPlayerItem(
+                    forVideo: item.asset,
+                    options: nil
+                ) { playerItem, _ in
+                    if let playerItem {
+                        player = AVPlayer(playerItem: playerItem)
+                    }
+                }
+            } else {
+                PHImageManager.default().requestImage(
+                    for: item.asset,
+                    targetSize: NSSize(width: 2400, height: 2400),
+                    contentMode: .aspectFit,
+                    options: nil
+                ) { loaded, _ in
+                    image = loaded
+                }
+            }
+        }
+    }
+}
+
+private struct MacCloudDriveProvider: Identifiable {
+    let name: String
+    let note: String
+    let url: URL
+    var id: String { name }
+
+    static let domestic: [MacCloudDriveProvider] = [
+        .init(name: "百度网盘", note: "安装客户端后，从下载或同步目录选择。", url: URL(string: "https://pan.baidu.com/")!),
+        .init(name: "阿里云盘", note: "支持 macOS 桌面端；先下载或同步媒体。", url: URL(string: "https://www.alipan.com/")!),
+        .init(name: "腾讯微云", note: "从微云客户端把文件下载到访达。", url: URL(string: "https://www.weiyun.com/")!),
+        .init(name: "夸克网盘", note: "使用桌面客户端下载到本机目录。", url: URL(string: "https://pan.quark.cn/")!),
+        .init(name: "迅雷云盘", note: "通过迅雷客户端下载后从访达选择。", url: URL(string: "https://pan.xunlei.com/")!),
+        .init(name: "115", note: "在“存储”中下载文件后从访达选择。", url: URL(string: "https://115.com/")!)
+    ]
+}
+
+private struct MacCloudDriveGuide: View {
+    @Environment(\.dismiss) private var dismiss
+    let chooseFiles: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("链接网盘")
+                        .font(.system(size: 26, weight: .bold))
+                    Text("账号和密码始终由网盘客户端管理。")
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Button("关闭") { dismiss() }
+                    .buttonStyle(NativeButtonStyle())
+            }
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(MacCloudDriveProvider.domestic) { provider in
+                        Button {
+                            NSWorkspace.shared.open(provider.url)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "externaldrive.connected.to.line.below")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Palette.cobalt)
+                                    .frame(width: 40, height: 40)
+                                    .background(Palette.cobaltSoft)
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(provider.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                    Text(provider.note)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Palette.muted)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.right")
+                                    .foregroundStyle(Palette.muted)
+                            }
+                            .padding(12)
+                            .background(Palette.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Palette.rule)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            Text("步骤：安装并登录网盘客户端 → 下载/同步照片或视频 → 选择文件并加入 帧澈 ZENCHE 文件库。")
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.muted)
+            Button("选择文件并加入", action: chooseFiles)
+                .buttonStyle(NativeButtonStyle(primary: true))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(22)
+        .frame(width: 620, height: 640)
+        .background(Palette.paper)
+    }
+}
+
+private struct LargePhotoView: View {
+    @Environment(\.dismiss) private var dismiss
+    let photo: PhotoRecord
+    @State private var player: AVPlayer?
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack {
+                Button("关闭") { dismiss() }
+                    .buttonStyle(NativeButtonStyle())
+                Spacer()
+                Text(photo.name)
+                    .font(.system(size: 12, design: .monospaced))
+                    .lineLimit(1)
+                Spacer()
+                ShareLink(item: photo.url) {
+                    Label("分享到社交平台", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(NativeButtonStyle(primary: true))
+            }
+            if photo.isVideo {
+                if let player {
+                    VideoPlayer(player: player)
+                        .onAppear { player.play() }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black)
+                } else {
+                    ProgressView("正在载入视频…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else if let image = NSImage(contentsOf: photo.url) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+            } else {
+                ContentUnavailableView(
+                    "无法显示大图",
+                    systemImage: "photo.badge.exclamationmark",
+                    description: Text("文件已安全保存在 帧澈 ZENCHE 文件库。")
+                )
+            }
+        }
+        .padding(18)
+        .frame(minWidth: 760, minHeight: 560)
+        .background(Palette.paper)
+        .task {
+            if photo.isVideo {
+                player = AVPlayer(url: photo.url)
+            }
         }
     }
 }
@@ -2662,7 +3858,7 @@ private struct TransferView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 Text("无线传输").font(.system(size: 34, weight: .bold))
-                Text("通过 FTP、HTTP 或 WebDAV，把 JPEG、NEF 或 HEIF 直接发送到 Nikon Link。")
+                Text("通过 FTP、HTTP 或 WebDAV，把 JPEG、NEF 或 HEIF 直接发送到 帧澈 ZENCHE；接收完成后会自动进入文件库。")
                     .foregroundStyle(Palette.muted)
                 LazyVGrid(
                     columns: [
@@ -2885,7 +4081,7 @@ private struct RootView: View {
             updater.checkAutomaticallyIfNeeded()
         }
         .alert(
-            "Nikon Link",
+            "帧澈 ZENCHE",
             isPresented: Binding(
                 get: { model.errorMessage != nil },
                 set: { if !$0 { model.errorMessage = nil } }
@@ -2922,14 +4118,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Nikon Link"
+        window.title = "帧澈 ZENCHE"
         window.titlebarAppearsTransparent = true
         window.minSize = NSSize(width: 1040, height: 700)
         window.contentView = hostingView
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        print("Nikon Link native SwiftUI ready")
+        print("帧澈 ZENCHE native SwiftUI ready")
     }
 
     func applicationWillTerminate(_ notification: Notification) {

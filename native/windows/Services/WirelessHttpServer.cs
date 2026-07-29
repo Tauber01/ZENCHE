@@ -148,10 +148,10 @@ public sealed class WirelessHttpServer : IAsyncDisposable
                     stream,
                     401,
                     "Unauthorized",
-                    "需要使用 Nikon Link 无线收件箱账号。",
+                    "需要使用 帧澈 ZENCHE 无线收件箱账号。",
                     new Dictionary<string, string>
                     {
-                        ["WWW-Authenticate"] = "Basic realm=\"Nikon Link\""
+                        ["WWW-Authenticate"] = "Basic realm=\"ZENCHE\""
                     },
                     cancellationToken);
                 return;
@@ -178,7 +178,7 @@ public sealed class WirelessHttpServer : IAsyncDisposable
                         stream,
                         200,
                         "OK",
-                        "{\"service\":\"Nikon Link\",\"upload\":\"ready\"}",
+                        "{\"service\":\"ZENCHE\",\"upload\":\"ready\"}",
                         new Dictionary<string, string>
                         {
                             ["Content-Type"] =
@@ -201,7 +201,7 @@ public sealed class WirelessHttpServer : IAsyncDisposable
                         "<d:multistatus xmlns:d=\"DAV:\"><d:response>" +
                         "<d:href>/</d:href><d:propstat><d:prop>" +
                         "<d:resourcetype><d:collection/></d:resourcetype>" +
-                        "<d:displayname>Nikon Link</d:displayname></d:prop>" +
+                        "<d:displayname>ZENCHE</d:displayname></d:prop>" +
                         "<d:status>HTTP/1.1 200 OK</d:status></d:propstat>" +
                         "</d:response></d:multistatus>";
                     await RespondAsync(
