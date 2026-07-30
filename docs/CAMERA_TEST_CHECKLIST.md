@@ -101,7 +101,7 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 
 ## Current build status
 
-The 0.8.3 stable release passes compilation, signature/container validation,
+The 1.0.0 stable release passes compilation, signature/container validation,
 native UI startup checks and package scans. Windows passes .NET compilation and
 PE/ZIP package checks. HarmonyOS source, resources, and unsigned HAP compilation
 pass, but signing, startup, and hardware checks are still pending. No supported

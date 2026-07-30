@@ -39,6 +39,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -103,6 +104,8 @@ public final class MainActivity extends Activity {
     private static final String RELEASES_URL =
             "https://github.com/Tauber01/ZENCHE/releases";
     private static final String AUTOMATIC_UPDATE_KEY = "automaticallyCheckForUpdates";
+    private static final String DISMISSED_ANNOUNCEMENT_VERSION_KEY =
+            "dismissedLaunchAnnouncementVersion";
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
@@ -171,12 +174,18 @@ public final class MainActivity extends Activity {
     private volatile String availableVersion;
     private volatile String updateStatus = "尚未检查更新";
     private String currentSection = "capture";
+    private String appLanguage = Localization.SIMPLIFIED_CHINESE;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         diagnostics = new DiagnosticLogger(this);
         diagnostics.startSession();
+        appLanguage = Localization.normalize(
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .getString(
+                                Localization.PREFERENCE_KEY,
+                                Localization.SIMPLIFIED_CHINESE));
         Window window = getWindow();
         window.setStatusBarColor(PAPER);
         window.setNavigationBarColor(GRAPHITE);
@@ -245,6 +254,7 @@ public final class MainActivity extends Activity {
         setContentView(buildApplication());
         showSection("capture");
         updateConnectionUi();
+        showLaunchAnnouncementIfNeeded();
         if (getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getBoolean(AUTOMATIC_UPDATE_KEY, true)) {
             checkForUpdates(true);
@@ -287,7 +297,7 @@ public final class MainActivity extends Activity {
         } catch (RuntimeException ignored) {
         }
         String fallbackName = uri.getLastPathSegment();
-        if (lutStatusText != null) lutStatusText.setText("正在读取 LUT…");
+        if (lutStatusText != null) lutStatusText.setText(tr("正在读取 LUT…"));
         cameraExecutor.submit(() -> {
             try (InputStream stream = getContentResolver().openInputStream(uri)) {
                 CubeLut lut = CubeLut.parse(stream, fallbackName);
@@ -302,13 +312,14 @@ public final class MainActivity extends Activity {
                         lutSwitch.setChecked(true);
                     }
                     if (lutStatusText != null) {
-                        lutStatusText.setText("已载入 · " + lut.getTitle());
+                        lutStatusText.setText(tr("已载入 · ") + lut.getTitle());
                     }
                 });
             } catch (Exception error) {
                 mainHandler.post(() -> {
                     if (lutStatusText != null) {
-                        lutStatusText.setText("导入失败；请选择有效的 3D .cube 文件。");
+                        lutStatusText.setText(
+                                tr("导入失败；请选择有效的 3D .cube 文件。"));
                     }
                     showError("LUT 导入失败：" + error.getMessage());
                 });
@@ -588,7 +599,7 @@ public final class MainActivity extends Activity {
                             "已从" + (ownerAlbum ? "机主相册" : "网盘")
                                     + "加入 " + finalImported + " 张照片");
                     if (finalLastName != null) {
-                        statusText.setText("已加入 " + finalLastName);
+                        statusText.setText(tr("已加入 ") + finalLastName);
                     }
                 } else {
                     showError("没有可加入文件库的照片。");
@@ -939,11 +950,12 @@ public final class MainActivity extends Activity {
         });
         top.addView(connectButton, new LinearLayout.LayoutParams(0, dp(46), 1f));
 
-        Button settingsButton = nativeButton("设置", false);
-        settingsButton.setContentDescription("打开设置");
+        Button settingsButton = nativeButton("⚙", false);
+        settingsButton.setTextSize(22);
+        settingsButton.setContentDescription(tr("打开设置"));
         settingsButton.setOnClickListener(view -> showSection("settings"));
         LinearLayout.LayoutParams settingsParams = new LinearLayout.LayoutParams(
-                dp(58),
+                dp(48),
                 dp(44));
         settingsParams.setMargins(dp(6), 0, 0, 0);
         top.addView(settingsButton, settingsParams);
@@ -1373,7 +1385,7 @@ public final class MainActivity extends Activity {
         parameterToggle.setOnClickListener(view -> {
             boolean show = parameterScroller.getVisibility() != View.VISIBLE;
             parameterScroller.setVisibility(show ? View.VISIBLE : View.GONE);
-            parameterToggle.setText(show ? "参数⌄" : "参数⌃");
+            parameterToggle.setText(tr(show ? "参数⌄" : "参数⌃"));
         });
         FrameLayout.LayoutParams toggleParams =
                 new FrameLayout.LayoutParams(
@@ -1690,10 +1702,10 @@ public final class MainActivity extends Activity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 double value = (progress - 15) / 3.0;
-                compensationLabel.setText(String.format(
+                compensationLabel.setText(tr(String.format(
                         Locale.CHINA,
                         "曝光补偿 · %+.1f EV",
-                        value));
+                        value)));
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -1760,7 +1772,8 @@ public final class MainActivity extends Activity {
                         .putString("monitorVideoProfile", monitorVideoProfile)
                         .apply();
                 refreshPreviewProcessing();
-                statusText.setText("监看显示尺寸 · " + monitorProfileLabel());
+                statusText.setText(
+                        tr("监看显示尺寸 · ") + tr(monitorProfileLabel()));
             }
 
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
@@ -1785,7 +1798,7 @@ public final class MainActivity extends Activity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_spinner_item,
-                labels);
+                Localization.translate(appLanguage, labels));
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
@@ -1990,7 +2003,11 @@ public final class MainActivity extends Activity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 double value = (progress - 15) / 3.0;
-                compensationLabel.setText(String.format(Locale.CHINA, "曝光补偿 · %+.1f EV", value));
+                compensationLabel.setText(
+                        tr(String.format(
+                                Locale.CHINA,
+                                "曝光补偿 · %+.1f EV",
+                                value)));
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -2099,7 +2116,7 @@ public final class MainActivity extends Activity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this,
                 android.R.layout.simple_spinner_item,
-                labels);
+                Localization.translate(appLanguage, labels));
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setSelection(selected, false);
@@ -2146,7 +2163,7 @@ public final class MainActivity extends Activity {
         parent.addView(title, marginParams(-1, -2, 0, 12, 0, 4));
 
         Switch enabled = new Switch(this);
-        enabled.setText("加亮显示");
+        enabled.setText(tr("加亮显示"));
         enabled.setTextColor(INK);
         enabled.setChecked(zebraEnabled);
         enabled.setOnCheckedChangeListener((button, checked) -> {
@@ -2174,7 +2191,8 @@ public final class MainActivity extends Activity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 zebraThreshold = 70 + progress;
-                thresholdLabel.setText("加亮显示阈值 · " + zebraThreshold + " IRE");
+                thresholdLabel.setText(
+                        tr("加亮显示阈值 · ") + zebraThreshold + " IRE");
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -2193,7 +2211,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 12, 0, 4));
 
         lutSwitch = new Switch(this);
-        lutSwitch.setText("应用到实时取景");
+        lutSwitch.setText(tr("应用到实时取景"));
         lutSwitch.setTextColor(INK);
         lutSwitch.setChecked(lutEnabled && previewLut != null);
         lutSwitch.setEnabled(previewLut != null);
@@ -2217,7 +2235,8 @@ public final class MainActivity extends Activity {
                 lutSwitch.setEnabled(false);
             }
             if (lutStatusText != null) {
-                lutStatusText.setText("尚未导入；LUT 只影响监看，不写入原片。");
+                lutStatusText.setText(
+                        tr("尚未导入；LUT 只影响监看，不写入原片。"));
             }
             refreshPreviewProcessing();
         });
@@ -2372,13 +2391,21 @@ public final class MainActivity extends Activity {
         disclosureStates.put(key, expanded);
         Button header = nativeButton("", false);
         header.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        header.setText((expanded ? "⌄  " : "›  ") + title + " · " + subtitle);
+        header.setText(
+                (expanded ? "⌄  " : "›  ")
+                        + tr(title)
+                        + " · "
+                        + tr(subtitle));
         body.setVisibility(expanded ? View.VISIBLE : View.GONE);
         header.setOnClickListener(view -> {
             boolean next = body.getVisibility() != View.VISIBLE;
             disclosureStates.put(key, next);
             body.setVisibility(next ? View.VISIBLE : View.GONE);
-            header.setText((next ? "⌄  " : "›  ") + title + " · " + subtitle);
+            header.setText(
+                    (next ? "⌄  " : "›  ")
+                            + tr(title)
+                            + " · "
+                            + tr(subtitle));
         });
         group.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -2627,10 +2654,10 @@ public final class MainActivity extends Activity {
         actions.addView(share, new LinearLayout.LayoutParams(dp(72), dp(36)));
         Button delete = nativeButton("删除", false);
         delete.setOnClickListener(view -> new AlertDialog.Builder(this)
-                .setTitle("删除照片？")
+                .setTitle(tr("删除照片？"))
                 .setMessage(file.getName())
-                .setNegativeButton("取消", null)
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(tr("删除"), (dialog, which) -> {
                     if (!file.delete()) {
                         showToast("无法删除文件。");
                     }
@@ -2704,6 +2731,57 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 20));
 
+        LinearLayout languagePanel = panel();
+        languagePanel.addView(text("语言", 18, Typeface.BOLD, INK));
+        languagePanel.addView(text(
+                "语言更改会立即应用，并在下次启动时保留。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        Spinner languageSpinner = new Spinner(this);
+        String[] languageNames = new String[]{"简体中文", "English", "日本語"};
+        String[] languageCodes = new String[]{
+                Localization.SIMPLIFIED_CHINESE,
+                Localization.ENGLISH,
+                Localization.JAPANESE};
+        ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                languageNames);
+        languageAdapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(languageAdapter);
+        languageSpinner.setSelection(
+                Math.max(0, Arrays.asList(languageCodes).indexOf(appLanguage)),
+                false);
+        languageSpinner.setBackground(rounded(
+                Color.rgb(241, 244, 249),
+                9,
+                RULE));
+        languageSpinner.setPadding(dp(10), 0, dp(8), 0);
+        languageSpinner.setOnItemSelectedListener(
+                new android.widget.AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(
+                            android.widget.AdapterView<?> parent,
+                            View view,
+                            int position,
+                            long id) {
+                        changeLanguage(languageCodes[position]);
+                    }
+
+                    @Override
+                    public void onNothingSelected(
+                            android.widget.AdapterView<?> parent) {}
+                });
+        languagePanel.addView(languageSpinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+        content.addView(
+                languagePanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
         LinearLayout updatePanel = panel();
         updatePanel.addView(text("软件更新", 18, Typeface.BOLD, INK));
         updatePanel.addView(text(
@@ -2714,7 +2792,7 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
         Switch automaticUpdates = new Switch(this);
-        automaticUpdates.setText("启动时自动检查更新");
+        automaticUpdates.setText(tr("启动时自动检查更新"));
         automaticUpdates.setTextColor(INK);
         automaticUpdates.setChecked(
                 getSharedPreferences("nikon-link", MODE_PRIVATE)
@@ -2824,7 +2902,8 @@ public final class MainActivity extends Activity {
 
     private void updateWirelessUi() {
         if (wirelessButton != null) {
-            wirelessButton.setText(wirelessRequested ? "停止接收" : "开启无线接收");
+            wirelessButton.setText(
+                    tr(wirelessRequested ? "停止接收" : "开启无线接收"));
             wirelessButton.setTextColor(wirelessRequested ? INK : Color.WHITE);
             wirelessButton.setBackground(rounded(
                     wirelessRequested ? SURFACE : COBALT,
@@ -2832,12 +2911,12 @@ public final class MainActivity extends Activity {
                     wirelessRequested ? RULE : 0));
         }
         if (wirelessAddressText != null) {
-            wirelessAddressText.setText(wirelessSettingsText());
+            wirelessAddressText.setText(tr(wirelessSettingsText()));
         }
         if (wirelessStatusText != null) {
-            wirelessStatusText.setText(
+            wirelessStatusText.setText(tr(
                     (wirelessRequested ? wirelessStatus + "\n" : "")
-                            + "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用 Basic Auth，PUT/POST 请求需提供 Content-Length。");
+                            + "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用 Basic Auth，PUT/POST 请求需提供 Content-Length。"));
         }
     }
 
@@ -2871,10 +2950,12 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED));
         new AlertDialog.Builder(this)
-                .setTitle("连接相机")
+                .setTitle(tr("连接相机"))
                 .setView(content)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("连接 Nikon 相机", (dialog, which) -> connectCamera())
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(
+                        tr("连接 Nikon 相机"),
+                        (dialog, which) -> connectCamera())
                 .show();
     }
 
@@ -2896,8 +2977,8 @@ public final class MainActivity extends Activity {
                     previewFailureCount = 0;
                     showSection(currentSection);
                     updateConnectionUi();
-                    statusText.setText(
-                            connectedCameraName + " 已连接 · 机身快门可用");
+                    statusText.setText(tr(
+                            connectedCameraName + " 已连接 · 机身快门可用"));
                     showToast(
                             connectedCameraName
                                     + " 已连接；实时取景仅在你主动开启后接管相机。");
@@ -2940,7 +3021,9 @@ public final class MainActivity extends Activity {
             liveViewEnabled = false;
             cameraExecutor.submit(camera::stopLiveView);
             updateConnectionUi();
-            if (liveViewButton != null) liveViewButton.setText("开启实时取景");
+            if (liveViewButton != null) {
+                liveViewButton.setText(tr("开启实时取景"));
+            }
         } else {
             cameraExecutor.submit(() -> {
                 try {
@@ -2977,7 +3060,8 @@ public final class MainActivity extends Activity {
                     if (generation != previewGeneration) return;
                     previewFailureCount = 0;
                     showProcessedPreview(source, output);
-                    statusText.setText(connectedCameraName + " LIVE · USB/PTP");
+                    statusText.setText(
+                            connectedCameraName + " LIVE · USB/PTP");
                     mainHandler.postDelayed(() -> pullPreview(generation), 220);
                 });
             } catch (Exception error) {
@@ -2996,12 +3080,14 @@ public final class MainActivity extends Activity {
                         previewFailureCount = 0;
                         cameraExecutor.submit(camera::stopLiveView);
                         updateConnectionUi();
-                        statusText.setText("实时取景已安全停止 · 机身控制已释放");
+                        statusText.setText(
+                                tr("实时取景已安全停止 · 机身控制已释放"));
                         showError(
                                 "连续 3 次未收到实时取景画面，帧澈 ZENCHE 已停止重试并释放相机。"
                                         + "请检查 USB 线与相机实时取景状态后再开启。");
                     } else {
-                        statusText.setText("实时取景正在重试 · " + failures + "/3");
+                        statusText.setText(
+                                tr("实时取景正在重试 · ") + failures + "/3");
                         mainHandler.postDelayed(
                                 () -> pullPreview(generation),
                                 1200);
@@ -3018,7 +3104,7 @@ public final class MainActivity extends Activity {
         }
         if (capturing) return;
         capturing = true;
-        if (shutterButton != null) shutterButton.setText("拍摄中…");
+        if (shutterButton != null) shutterButton.setText(tr("拍摄中…"));
         cameraExecutor.submit(() -> {
             try {
                 byte[] jpeg = camera.capture();
@@ -3032,16 +3118,16 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     capturing = false;
                     showProcessedPreview(source, output);
-                    if (shutterButton != null) shutterButton.setText("拍摄");
+                    if (shutterButton != null) shutterButton.setText(tr("拍摄"));
                     updateFileCount();
-                    statusText.setText("已保存 " + file.getName());
+                    statusText.setText(tr("已保存 ") + file.getName());
                     showToast("拍摄完成，已保存到本地照片库。");
                 });
             } catch (Exception error) {
                 diagnostics.error("capture", "拍摄失败：" + error.getMessage());
                 mainHandler.post(() -> {
                     capturing = false;
-                    if (shutterButton != null) shutterButton.setText("拍摄");
+                    if (shutterButton != null) shutterButton.setText(tr("拍摄"));
                     showError(error.getMessage());
                 });
             }
@@ -3073,10 +3159,10 @@ public final class MainActivity extends Activity {
                     videoRecording = nowRecording;
                     capturing = false;
                     updateRecordingButtons();
-                    statusText.setText(
+                    statusText.setText(tr(
                             nowRecording
                                     ? "● REC · 视频正在录制到相机存储卡"
-                                    : "录制已停止 · 视频保存在相机存储卡");
+                                    : "录制已停止 · 视频保存在相机存储卡"));
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -3094,18 +3180,18 @@ public final class MainActivity extends Activity {
 
     private void updateRecordingButtons() {
         if (shutterButton != null && "monitor".equals(currentSection)) {
-            shutterButton.setText(
+            shutterButton.setText(tr(
                     capturing
                             ? "处理中…"
-                            : videoRecording ? "停止录制" : "开始录制");
+                            : videoRecording ? "停止录制" : "开始录制"));
             shutterButton.setBackground(rounded(VIDEO, 9, 0));
             shutterButton.setEnabled(connected && !capturing);
         }
         if (immersiveRecordButton != null) {
-            immersiveRecordButton.setText(
+            immersiveRecordButton.setText(tr(
                     capturing
                             ? "…"
-                            : videoRecording ? "■\n停止" : "●\n录制");
+                            : videoRecording ? "■\n停止" : "●\n录制"));
             immersiveRecordButton.setEnabled(connected && !capturing);
         }
     }
@@ -3241,7 +3327,7 @@ public final class MainActivity extends Activity {
                         exposureMode = String.valueOf(value);
                         updateCameraControls();
                     }
-                    statusText.setText(label + "已应用");
+                    statusText.setText(tr(label) + tr("已应用"));
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -3257,19 +3343,25 @@ public final class MainActivity extends Activity {
 
     private void updateConnectionUi() {
         if (connectButton != null) {
-            connectButton.setText(
+            connectButton.setText(tr(
                     connecting
                             ? "正在连接…"
-                            : connected ? "断开 " + connectedCameraName.replace("Nikon ", "") : "连接相机");
+                            : connected
+                                    ? "断开 "
+                                            + connectedCameraName.replace("Nikon ", "")
+                                    : "连接相机"));
             connectButton.setEnabled(!connecting);
         }
         if (statusText != null) {
-            statusText.setText(connecting
+            statusText.setText(tr(connecting
                     ? "正在检测 Nikon 相机"
-                    : connected ? connectedCameraName + " · USB/PTP" : "未连接");
+                    : connected
+                            ? connectedCameraName + " · USB/PTP"
+                            : "未连接"));
         }
         if (liveViewButton != null) {
-            liveViewButton.setText(liveViewEnabled ? "停止实时取景" : "开启实时取景");
+            liveViewButton.setText(
+                    tr(liveViewEnabled ? "停止实时取景" : "开启实时取景"));
         }
         updateCameraControls();
         updateRecordingButtons();
@@ -3289,7 +3381,10 @@ public final class MainActivity extends Activity {
             String reason = connected
                     ? camera.parameterLockReason(entry.getKey())
                     : "连接相机后可调整";
-            entry.getValue().setText(reason == null ? base : base + " · " + reason);
+            entry.getValue().setText(
+                    reason == null
+                            ? tr(base)
+                            : tr(base) + " · " + tr(reason));
             entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
         }
     }
@@ -3322,7 +3417,15 @@ public final class MainActivity extends Activity {
     }
 
     private void updateFileCount() {
-        if (countText != null) countText.setText(photoFiles().size() + " 张");
+        if (countText != null) {
+            countText.setText(
+                    photoFiles().size()
+                            + (Localization.ENGLISH.equals(appLanguage)
+                                    ? " items"
+                                    : Localization.JAPANESE.equals(appLanguage)
+                                            ? " 件"
+                                            : " 张"));
+        }
     }
 
     private List<File> photoFiles() {
@@ -3431,9 +3534,36 @@ public final class MainActivity extends Activity {
         return panel;
     }
 
+    private String tr(String value) {
+        return Localization.translate(appLanguage, value);
+    }
+
+    private void changeLanguage(String language) {
+        String normalized = Localization.normalize(language);
+        if (normalized.equals(appLanguage)) {
+            return;
+        }
+        appLanguage = normalized;
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putString(Localization.PREFERENCE_KEY, appLanguage)
+                .apply();
+        String destination = currentSection;
+        navigationButtons.clear();
+        setContentView(buildApplication());
+        showSection(destination);
+        updateConnectionUi();
+        updateWirelessUi();
+        refreshUpdateUi();
+        updateFileCount();
+        if (latestSourceFrame != null) {
+            refreshPreviewProcessing();
+        }
+    }
+
     private TextView text(String value, int sp, int style, int color) {
         TextView text = new TextView(this);
-        text.setText(value);
+        text.setText(tr(value));
         text.setTextSize(sp);
         text.setTextColor(color);
         text.setTypeface(Typeface.create("sans", style));
@@ -3443,7 +3573,7 @@ public final class MainActivity extends Activity {
 
     private Button nativeButton(String label, boolean primary) {
         Button button = new Button(this);
-        button.setText(label);
+        button.setText(tr(label));
         button.setTextSize(13);
         button.setTypeface(Typeface.create("sans", Typeface.BOLD));
         button.setTextColor(primary ? Color.WHITE : INK);
@@ -3488,15 +3618,15 @@ public final class MainActivity extends Activity {
     }
 
     private void showToast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, tr(message), Toast.LENGTH_SHORT).show();
     }
 
     private void showError(String message) {
         diagnostics.error("ui", message);
         new AlertDialog.Builder(this)
                 .setTitle("帧澈 ZENCHE")
-                .setMessage(message == null ? "原生相机操作失败。" : message)
-                .setPositiveButton("好", null)
+                .setMessage(tr(message == null ? "原生相机操作失败。" : message))
+                .setPositiveButton(tr("好"), null)
                 .show();
     }
 
@@ -3585,16 +3715,21 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshUpdateUi() {
-        if (updateStatusText != null) updateStatusText.setText(updateStatus);
+        if (updateStatusText != null) {
+            updateStatusText.setText(tr(updateStatus));
+        }
         if (checkUpdateButton != null) {
             checkUpdateButton.setEnabled(!checkingUpdate);
-            checkUpdateButton.setText(checkingUpdate ? "正在检查…" : "检查更新");
+            checkUpdateButton.setText(
+                    tr(checkingUpdate ? "正在检查…" : "检查更新"));
         }
         if (openUpdateButton != null) {
             openUpdateButton.setVisibility(
                     availableVersion == null ? View.GONE : View.VISIBLE);
-            openUpdateButton.setText(
-                    availableVersion == null ? "获取更新" : "获取 " + availableVersion);
+            openUpdateButton.setText(tr(
+                    availableVersion == null
+                            ? "获取更新"
+                            : "获取 " + availableVersion));
         }
     }
 
@@ -3620,9 +3755,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "0.8.3" : version;
+            return version == null || version.isEmpty() ? "1.0.0" : version;
         } catch (Exception error) {
-            return "0.8.3";
+            return "1.0.0";
         }
     }
 
@@ -3659,10 +3794,12 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(logView);
         new AlertDialog.Builder(this)
-                .setTitle("最近诊断日志")
+                .setTitle(tr("最近诊断日志"))
                 .setView(scroll)
-                .setNegativeButton("关闭", null)
-                .setPositiveButton("刷新", (dialog, which) -> showRecentLogs())
+                .setNegativeButton(tr("关闭"), null)
+                .setPositiveButton(
+                        tr("刷新"),
+                        (dialog, which) -> showRecentLogs())
                 .show();
     }
 
@@ -3673,15 +3810,109 @@ public final class MainActivity extends Activity {
             image.setAdjustViewBounds(true);
             image.setPadding(dp(18), dp(12), dp(18), dp(12));
             new AlertDialog.Builder(this)
-                    .setTitle("请作者喝奶茶")
-                    .setMessage("打开微信扫一扫，感谢支持。")
+                    .setTitle(tr("请作者喝奶茶"))
+                    .setMessage(tr("打开微信扫一扫，感谢支持。"))
                     .setView(image)
-                    .setPositiveButton("完成", null)
+                    .setPositiveButton(tr("完成"), null)
                     .show();
         } catch (Exception error) {
             diagnostics.error("support", "无法载入赞赏二维码：" + error.getMessage());
             showToast("二维码暂不可用，请稍后再试。");
         }
+    }
+
+    private void showLaunchAnnouncementIfNeeded() {
+        String version = currentVersion();
+        String dismissedVersion = getSharedPreferences(
+                "nikon-link",
+                MODE_PRIVATE)
+                .getString(DISMISSED_ANNOUNCEMENT_VERSION_KEY, "");
+        if (version.equals(dismissedVersion)) {
+            return;
+        }
+
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(22), dp(12), dp(22), dp(8));
+
+        content.addView(text("本次更新", 19, Typeface.BOLD, INK));
+        content.addView(
+                text(
+                        "• 新增启动更新公告，并支持按版本控制提醒。\n"
+                                + "• 五端公告与赞助入口保持一致。\n"
+                                + "• 更新赞助图片并优化多语言体验。",
+                        14,
+                        Typeface.NORMAL,
+                        INK),
+                marginParams(-1, -2, 0, 8, 0, 18));
+
+        LinearLayout warning = verticalContainer();
+        warning.setPadding(dp(16), dp(14), dp(16), dp(14));
+        warning.setBackground(rounded(
+                Color.rgb(255, 238, 238),
+                12,
+                Color.rgb(244, 185, 185)));
+        warning.addView(text("谨防诈骗", 17, Typeface.BOLD, Color.rgb(178, 25, 35)));
+        warning.addView(
+                text(
+                        "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”"
+                                + "或要求付费购买软件的人都是骗子，请勿转账。",
+                        14,
+                        Typeface.BOLD,
+                        Color.rgb(117, 20, 28)),
+                marginParams(-1, -2, 0, 6, 0, 0));
+        content.addView(
+                warning,
+                marginParams(-1, -2, 0, 0, 0, 18));
+
+        content.addView(text("自愿赞助", 17, Typeface.BOLD, INK));
+        content.addView(
+                text(
+                        "如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。",
+                        13,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 4, 0, 10));
+        try (InputStream stream = getAssets().open("wechat-donation.png")) {
+            ImageView image = new ImageView(this);
+            image.setImageBitmap(BitmapFactory.decodeStream(stream));
+            image.setAdjustViewBounds(true);
+            image.setMaxHeight(dp(460));
+            image.setBackground(rounded(SURFACE, 12, RULE));
+            content.addView(
+                    image,
+                    marginParams(-1, -2, 0, 0, 0, 12));
+        } catch (Exception error) {
+            diagnostics.warning(
+                    "announcement",
+                    "无法载入公告赞助图片：" + error.getMessage());
+        }
+
+        CheckBox doNotRemind = new CheckBox(this);
+        doNotRemind.setText(tr("不再提醒（软件更新后仍会显示）"));
+        doNotRemind.setTextSize(14);
+        doNotRemind.setTextColor(INK);
+        content.addView(
+                doNotRemind,
+                marginParams(-1, dp(48), 0, 0, 0, 0));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(tr("更新公告") + " · " + version)
+                .setView(scroll)
+                .setPositiveButton(tr("关闭公告"), null)
+                .create();
+        dialog.setOnDismissListener(ignored -> {
+            if (doNotRemind.isChecked()) {
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putString(
+                                DISMISSED_ANNOUNCEMENT_VERSION_KEY,
+                                version)
+                        .apply();
+            }
+        });
+        dialog.show();
     }
 
     private static final class ProcessedPreview {

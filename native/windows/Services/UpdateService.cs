@@ -19,7 +19,7 @@ public sealed class UpdateService
     private static readonly HttpClient Client = CreateClient();
 
     public string CurrentVersion { get; } =
-        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.8.3";
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.0.0";
 
     public async Task<UpdateCheckResult> CheckAsync(
         CancellationToken cancellationToken = default)
@@ -75,7 +75,7 @@ public sealed class UpdateService
         };
         client.DefaultRequestHeaders.Accept.ParseAdd(
             "application/vnd.github+json");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/0.8.3");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.0.0");
         return client;
     }
 

@@ -14,11 +14,11 @@
 ## 当前正式版
 
 - 版本标识：`V1 正式版`
-- 画幅：1920 × 1080，30 fps，102.7 秒
-- 节奏：105.47 BPM；镜头切点、标题和卡片进场吸附四拍小节
+- 画幅：1920 × 1080，30 fps，84.4 秒
+- 节奏：105.47 BPM；复杂章节占 3 小节，简洁章节占 2 小节
 - 项目网页：`https://github.com/Tauber01/ZENCHE`
 - 版本下载：`https://github.com/Tauber01/ZENCHE/releases`
-- BGM：弧光作战 PV（本地素材 `assets/bgm/ZENCHE_BGM_BATTLEPLAN_ARCLIGHT.m4s`）
+- BGM：弧光作战 PV（从有效音乐起点连续播放一次，不循环）
 - 最终成片：`output/帧澈_ZENCHE_PV_V1_正式版.mp4`
 - 剪映草稿：`帧澈_ZENCHE_宣传PV_V1_正式版`
 

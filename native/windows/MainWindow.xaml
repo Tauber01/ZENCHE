@@ -40,10 +40,13 @@
                 Click="ConnectButton_Click" />
         <Button x:Name="SettingsButton"
                 Grid.Column="2"
-                Width="76"
+                Width="48"
                 Margin="10,0,0,0"
+                FontFamily="Segoe UI Symbol"
+                FontSize="20"
                 Style="{StaticResource ButtonBase}"
-                Content="设置"
+                Content="⚙"
+                ToolTip="设置"
                 Click="SettingsButton_Click" />
       </Grid>
     </Border>
@@ -61,7 +64,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="16">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="NIKON LINK 0.8.3" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.0.0" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -322,6 +325,29 @@
               <TextBlock Margin="0,12,0,24"
                          Foreground="{StaticResource MutedBrush}"
                          Text="更新、诊断与应用支持。" />
+              <Border Margin="0,0,0,20" Style="{StaticResource PanelCard}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="220" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="语言" />
+                    <TextBlock Foreground="{StaticResource MutedBrush}"
+                               TextWrapping="Wrap"
+                               Text="语言更改会立即应用，并在下次启动时保留。" />
+                  </StackPanel>
+                  <ComboBox x:Name="LanguageBox"
+                            Grid.Column="1"
+                            Margin="18,0,0,0"
+                            VerticalAlignment="Center"
+                            SelectionChanged="LanguageBox_SelectionChanged">
+                    <ComboBoxItem Tag="zh-Hans" Content="简体中文" />
+                    <ComboBoxItem Tag="en" Content="English" />
+                    <ComboBoxItem Tag="ja" Content="日本語" />
+                  </ComboBox>
+                </Grid>
+              </Border>
               <Border Style="{StaticResource PanelCard}">
                 <Grid>
                   <Grid.ColumnDefinitions>

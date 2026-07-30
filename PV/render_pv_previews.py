@@ -15,13 +15,13 @@ REVIEW_TIMES = {
     "brand-lockup": 2.75,
     "first-transition": 5.16,
     "direct-control": 6.45,
-    "monitoring": 26.95,
-    "desktop-platforms": 54.25,
-    "mobile-platforms": 61.10,
-    "camera-support": 68.45,
-    "project-page": 81.80,
-    "future": 88.65,
-    "end-card": 96.20,
+    "monitoring": 22.25,
+    "desktop-platforms": 43.25,
+    "mobile-platforms": 50.15,
+    "camera-support": 56.95,
+    "project-page": 67.85,
+    "future": 72.65,
+    "end-card": 80.75,
 }
 
 

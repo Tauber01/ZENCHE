@@ -3,7 +3,7 @@ import {
   common,
   Permissions
 } from '@kit.AbilityKit';
-import { dataSharePredicates } from '@kit.ArkData';
+import { dataSharePredicates, preferences } from '@kit.ArkData';
 import { picker } from '@kit.CoreFileKit';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
@@ -20,6 +20,14 @@ import {
   WirelessTransferServer
 } from '../transfer/WirelessTransferServer';
 import { DiagnosticLogger } from '../diagnostics/DiagnosticLogger';
+import {
+  LANGUAGE_ENGLISH,
+  LANGUAGE_JAPANESE,
+  LANGUAGE_PREFERENCE_KEY,
+  LANGUAGE_SIMPLIFIED_CHINESE,
+  normalizeLanguage,
+  translate
+} from '../localization/Localization';
 
 class SelectEntry {
   readonly label: string;
@@ -108,11 +116,13 @@ interface GitHubRelease {
   assets: Array<GitHubAsset>;
 }
 
-const CURRENT_VERSION: string = '0.8.3';
+const CURRENT_VERSION: string = '1.0.0';
 const LATEST_RELEASE_API: string =
   'https://api.github.com/repos/Tauber01/ZENCHE/releases/latest';
 const RELEASES_URL: string =
   'https://github.com/Tauber01/ZENCHE/releases';
+const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
+  'dismissedLaunchAnnouncementVersion';
 
 const EXPOSURE_MODES: Array<SelectEntry> = [
   new SelectEntry('P · 程序自动', 'program'),
@@ -296,9 +306,11 @@ struct Index {
   private library?: PhotoLibrary;
   private wireless?: WirelessTransferServer;
   private diagnostics?: DiagnosticLogger;
+  private settingsPreferences?: preferences.Preferences;
   private previewGeneration: number = 0;
 
   @State private section: string = 'capture';
+  @State private language: string = LANGUAGE_SIMPLIFIED_CHINESE;
   @State private connected: boolean = false;
   @State private liveView: boolean = false;
   @State private busy: boolean = false;
@@ -327,6 +339,9 @@ struct Index {
   @State private systemMedia: Array<SystemMediaItem> = [];
   @State private systemAlbumStatus: string = '等待相册授权';
   @State private cloudGuideVisible: boolean = false;
+  @State private launchAnnouncementVisible: boolean = false;
+  @State private announcementDoNotRemind: boolean = false;
+  @State private donationVisible: boolean = false;
   @State private immersivePreviewVisible: boolean = false;
   @State private immersiveMonitoring: boolean = false;
   @State private immersiveParametersExpanded: boolean = true;
@@ -343,6 +358,7 @@ struct Index {
   aboutToAppear(): void {
     const context: common.UIAbilityContext =
       getContext(this) as common.UIAbilityContext;
+    this.loadLanguage(context);
     this.diagnostics = new DiagnosticLogger(context);
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
@@ -361,6 +377,85 @@ struct Index {
       }
     );
     this.refreshPhotos();
+  }
+
+  private async loadLanguage(
+    context: common.UIAbilityContext
+  ): Promise<void> {
+    try {
+      this.settingsPreferences = await preferences.getPreferences(
+        context,
+        { name: 'zenche-settings' }
+      );
+      const saved: preferences.ValueType =
+        await this.settingsPreferences.get(
+          LANGUAGE_PREFERENCE_KEY,
+          LANGUAGE_SIMPLIFIED_CHINESE
+        );
+      this.language = normalizeLanguage(saved as string);
+      const dismissedVersion: preferences.ValueType =
+        await this.settingsPreferences.get(
+          DISMISSED_ANNOUNCEMENT_VERSION_KEY,
+          ''
+        );
+      this.launchAnnouncementVisible =
+        (dismissedVersion as string) !== CURRENT_VERSION;
+    } catch (error) {
+      this.language = LANGUAGE_SIMPLIFIED_CHINESE;
+      this.launchAnnouncementVisible = true;
+    }
+  }
+
+  private async closeLaunchAnnouncement(): Promise<void> {
+    if (
+      this.announcementDoNotRemind &&
+      this.settingsPreferences !== undefined
+    ) {
+      try {
+        await this.settingsPreferences.put(
+          DISMISSED_ANNOUNCEMENT_VERSION_KEY,
+          CURRENT_VERSION
+        );
+        await this.settingsPreferences.flush();
+      } catch (error) {
+        this.diagnostics?.warning(
+          'announcement',
+          `无法保存公告提醒设置：${(error as BusinessError).message}`
+        );
+      }
+    }
+    this.launchAnnouncementVisible = false;
+  }
+
+  private changeLanguage(language: string): void {
+    const normalized: string = normalizeLanguage(language);
+    if (normalized === this.language) {
+      return;
+    }
+    this.language = normalized;
+    this.persistLanguage();
+  }
+
+  private async persistLanguage(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      await this.settingsPreferences.put(
+        LANGUAGE_PREFERENCE_KEY,
+        this.language
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'settings',
+        `无法保存界面语言：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private tr(source: string): string {
+    return translate(this.language, source);
   }
 
   aboutToDisappear(): void {
@@ -407,6 +502,12 @@ struct Index {
       }
       if (this.immersivePreviewVisible) {
         this.ImmersivePreviewOverlay()
+      }
+      if (this.donationVisible) {
+        this.DonationOverlay()
+      }
+      if (this.launchAnnouncementVisible) {
+        this.LaunchAnnouncementOverlay()
       }
     }
     .width('100%')
@@ -473,7 +574,7 @@ struct Index {
         Text(
           this.connected
             ? `${this.cameraName} · USB/PTP`
-            : '未连接 · HARMONYOS USB/PTP'
+            : `${this.tr('未连接')} · HARMONYOS USB/PTP`
         )
           .fontSize(11)
           .fontFamily('monospace')
@@ -483,8 +584,8 @@ struct Index {
       .layoutWeight(1)
       Button(
         this.isCompact()
-          ? (this.connected ? '断开' : '连接')
-          : (this.connected ? '断开相机' : '连接相机'),
+          ? this.tr(this.connected ? '断开' : '连接')
+          : this.tr(this.connected ? '断开相机' : '连接相机'),
         {
         type: ButtonType.Normal
         }
@@ -501,7 +602,8 @@ struct Index {
         .onClick((): void => {
           this.toggleCameraConnection();
         })
-      Button('设置', { type: ButtonType.Normal })
+      Button('⚙', { type: ButtonType.Normal })
+        .fontSize(22)
         .height(44)
         .padding({ left: 12, right: 12 })
         .fontColor($r('app.color.ink'))
@@ -547,7 +649,7 @@ struct Index {
       })
     } else {
       Column({ space: 8 }) {
-        Text('工作区')
+        Text(this.tr('工作区'))
           .fontSize(11)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -557,7 +659,7 @@ struct Index {
         this.NavButton('视频监看', 'monitor')
         this.NavButton('文件与传输', 'library')
         Blank()
-        Text('NIKON LINK 0.8.3')
+        Text('ZENCHE 1.0.0')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -575,7 +677,7 @@ struct Index {
 
   @Builder
   private NavButton(label: string, target: string) {
-    Button(label, { type: ButtonType.Normal })
+    Button(this.tr(label), { type: ButtonType.Normal })
       .width(this.isCompact() ? 104 : '100%')
       .height(44)
       .fontSize(14)
@@ -614,11 +716,11 @@ struct Index {
             .objectFit(ImageFit.Contain)
         } else {
           Column({ space: 8 }) {
-            Text('等待相机画面')
+            Text(this.tr('等待相机画面'))
               .fontSize(22)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.graphite_ink'))
-            Text('连接相机后开启实时取景')
+            Text(this.tr('连接相机后开启实时取景'))
               .fontSize(14)
               .fontColor($r('app.color.graphite_muted'))
           }
@@ -638,7 +740,7 @@ struct Index {
           .borderRadius(5)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .margin(16)
-        Button('全屏', { type: ButtonType.Normal })
+        Button(this.tr('全屏'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
           .backgroundColor('#99000000')
@@ -661,15 +763,15 @@ struct Index {
       })
 
       Row({ space: 8 }) {
-        Text(
+        Text(this.tr(
           this.section === 'monitor'
             ? '相机原生 JPEG · 监看输出 · 不修改原片'
             : '相机原生 JPEG · 本地预览'
-        )
+        ))
           .fontSize(12)
           .fontColor($r('app.color.muted'))
           .layoutWeight(1)
-        Button(this.liveView ? '停止取景' : '开启取景', {
+        Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
           type: ButtonType.Normal
         })
           .height(44)
@@ -685,9 +787,11 @@ struct Index {
             this.toggleLiveView();
           })
         Button(
-          this.section === 'monitor'
-            ? (this.videoRecording ? '停止录制' : '开始录制')
-            : '拍摄照片',
+          this.tr(
+            this.section === 'monitor'
+              ? (this.videoRecording ? '停止录制' : '开始录制')
+              : '拍摄照片'
+          ),
           { type: ButtonType.Normal }
         )
           .height(44)
@@ -717,20 +821,20 @@ struct Index {
   @Builder
   private LibraryWorkspace() {
     Column({ space: 16 }) {
-      Text('文件与传输')
+      Text(this.tr('文件与传输'))
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
-      Text(
+      Text(this.tr(
         `${this.photos.length} 个 帧澈 ZENCHE 文件 · ` +
         `${this.systemMedia.length} 个系统相册项目`
-      )
+      ))
         .fontSize(14)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Row({ space: 8 }) {
-        Button('刷新系统相册', { type: ButtonType.Normal })
+        Button(this.tr('刷新系统相册'), { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
@@ -739,7 +843,7 @@ struct Index {
           .onClick((): void => {
             this.loadSystemAlbum();
           })
-        Button('链接网盘', { type: ButtonType.Normal })
+        Button(this.tr('链接网盘'), { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
@@ -750,13 +854,15 @@ struct Index {
           })
       }
       .width('100%')
-      Text('系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。')
+      Text(this.tr('系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。'))
         .fontSize(12)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Button(
-        `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
-        `${this.systemMedia.length}`,
+        this.tr(
+          `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
+          `${this.systemMedia.length}`
+        ),
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -768,10 +874,10 @@ struct Index {
         })
       if (this.systemExpanded && this.systemMedia.length === 0) {
         Column({ space: 8 }) {
-          Text('系统相册暂不可见')
+          Text(this.tr('系统相册暂不可见'))
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
-          Text('允许照片和视频访问后，最近媒体会直接显示在这里。')
+          Text(this.tr('允许照片和视频访问后，最近媒体会直接显示在这里。'))
             .fontSize(12)
             .fontColor($r('app.color.muted'))
         }
@@ -787,8 +893,10 @@ struct Index {
       } else if (this.systemExpanded) {
         Row({ space: 8 }) {
           Button(
-            `${this.systemPhotosExpanded ? '⌄' : '›'} 照片 · ` +
-            `${this.systemMedia.filter((item: SystemMediaItem): boolean => !item.isVideo).length}`
+            this.tr(
+              `${this.systemPhotosExpanded ? '⌄' : '›'} 照片 · ` +
+              `${this.systemMedia.filter((item: SystemMediaItem): boolean => !item.isVideo).length}`
+            )
           )
             .height(44)
             .layoutWeight(1)
@@ -796,8 +904,10 @@ struct Index {
               this.systemPhotosExpanded = !this.systemPhotosExpanded;
             })
           Button(
-            `${this.systemVideosExpanded ? '⌄' : '›'} 视频 · ` +
-            `${this.systemMedia.filter((item: SystemMediaItem): boolean => item.isVideo).length}`
+            this.tr(
+              `${this.systemVideosExpanded ? '⌄' : '›'} 视频 · ` +
+              `${this.systemMedia.filter((item: SystemMediaItem): boolean => item.isVideo).length}`
+            )
           )
             .height(44)
             .layoutWeight(1)
@@ -869,13 +979,13 @@ struct Index {
         .scrollBar(BarState.Auto)
       }
       if (this.systemExpanded) {
-        Text('系统相册内容保持在原位置；帧澈 ZENCHE 只读取缩略图和预览。')
+        Text(this.tr('系统相册内容保持在原位置；帧澈 ZENCHE 只读取缩略图和预览。'))
           .fontSize(11)
           .fontColor($r('app.color.muted'))
           .width('100%')
       }
       Button(
-        `${this.wirelessExpanded ? '⌄' : '›'} 无线传输`,
+        this.tr(`${this.wirelessExpanded ? '⌄' : '›'} 无线传输`),
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -889,8 +999,10 @@ struct Index {
         this.WirelessTransferCard()
       }
       Button(
-        `${this.localExpanded ? '⌄' : '›'} 帧澈 ZENCHE 文件库 · ` +
-        `${this.photos.length}`,
+        this.tr(
+          `${this.localExpanded ? '⌄' : '›'} 帧澈 ZENCHE 文件库 · ` +
+          `${this.photos.length}`
+        ),
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -902,10 +1014,10 @@ struct Index {
         })
       if (this.localExpanded && this.photos.length === 0) {
         Column({ space: 12 }) {
-          Text('本地图库还是空的')
+          Text(this.tr('本地图库还是空的'))
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
-          Text('连接相机拍摄，或在上方开启无线图片收件箱。')
+          Text(this.tr('连接相机拍摄，或在上方开启无线图片收件箱。'))
             .fontSize(14)
             .fontColor($r('app.color.muted'))
         }
@@ -915,8 +1027,10 @@ struct Index {
       } else if (this.localExpanded) {
         Row({ space: 8 }) {
           Button(
-            `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
-            `${this.photos.filter((item: PhotoItem): boolean => !item.isVideo).length}`
+            this.tr(
+              `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
+              `${this.photos.filter((item: PhotoItem): boolean => !item.isVideo).length}`
+            )
           )
             .height(44)
             .layoutWeight(1)
@@ -924,8 +1038,10 @@ struct Index {
               this.localPhotosExpanded = !this.localPhotosExpanded;
             })
           Button(
-            `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
-            `${this.photos.filter((item: PhotoItem): boolean => item.isVideo).length}`
+            this.tr(
+              `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
+              `${this.photos.filter((item: PhotoItem): boolean => item.isVideo).length}`
+            )
           )
             .height(44)
             .layoutWeight(1)
@@ -958,7 +1074,7 @@ struct Index {
                   }
                   .alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
-                  Button('预览', { type: ButtonType.Normal })
+                  Button(this.tr('预览'), { type: ButtonType.Normal })
                     .height(44)
                     .fontColor($r('app.color.ink'))
                     .backgroundColor($r('app.color.paper_2'))
@@ -966,7 +1082,7 @@ struct Index {
                     .onClick((): void => {
                       this.previewPhoto(item);
                     })
-                  Button('分享', { type: ButtonType.Normal })
+                  Button(this.tr('分享'), { type: ButtonType.Normal })
                     .height(44)
                     .fontColor($r('app.color.ink'))
                     .backgroundColor($r('app.color.paper_2'))
@@ -974,7 +1090,7 @@ struct Index {
                     .onClick((): void => {
                       this.sharePhoto(item);
                     })
-                  Button('删除', { type: ButtonType.Normal })
+                  Button(this.tr('删除'), { type: ButtonType.Normal })
                     .height(44)
                     .fontColor($r('app.color.error'))
                     .backgroundColor($r('app.color.surface'))
@@ -1018,21 +1134,23 @@ struct Index {
   @Builder
   private WirelessTransferCard() {
     Column({ space: 12 }) {
-          Text('多协议无线图片收件箱')
+        Text(this.tr('多协议无线图片收件箱'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text(this.wirelessStatus)
+          Text(this.tr(this.wirelessStatus))
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .width('100%')
-          Text(this.wirelessAddress)
+          Text(this.tr(this.wirelessAddress))
             .fontSize(13)
             .fontFamily('monospace')
             .fontColor($r('app.color.accent'))
             .width('100%')
           Button(
-            this.wirelessRunning ? '停止无线接收' : '开启无线接收',
+            this.tr(
+              this.wirelessRunning ? '停止无线接收' : '开启无线接收'
+            ),
             { type: ButtonType.Normal }
           )
             .height(44)
@@ -1042,12 +1160,12 @@ struct Index {
             .onClick((): void => {
               this.toggleWireless();
             })
-          Text(
+          Text(this.tr(
             `FTP/PASV · ${this.wirelessAddress}\n` +
             `HTTP 上传 · 端口 ${HTTP_PORT} · /upload/文件名\n` +
             `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink\n` +
             `接收完成后自动进入文件库`
-          )
+          ))
             .fontSize(12)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
@@ -1068,7 +1186,7 @@ struct Index {
   private LargePhotoOverlay() {
     Column({ space: 12 }) {
       Row({ space: 8 }) {
-        Button('关闭', { type: ButtonType.Normal })
+        Button(this.tr('关闭'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
           .backgroundColor('#66000000')
@@ -1077,7 +1195,7 @@ struct Index {
             this.closeLargePhoto();
           })
         Blank()
-        Button('分享到社交平台', { type: ButtonType.Normal })
+        Button(this.tr('分享到社交平台'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
           .backgroundColor($r('app.color.accent'))
@@ -1117,17 +1235,17 @@ struct Index {
     Column({ space: 14 }) {
       Row() {
         Column({ space: 3 }) {
-          Text('链接网盘')
+          Text(this.tr('链接网盘'))
             .fontSize(24)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text('账号和密码始终由网盘客户端管理。')
+          Text(this.tr('账号和密码始终由网盘客户端管理。'))
             .fontSize(12)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button('关闭', { type: ButtonType.Normal })
+        Button(this.tr('关闭'), { type: ButtonType.Normal })
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
@@ -1137,7 +1255,7 @@ struct Index {
           })
       }
       .width('100%')
-      Text('先安装并登录对应客户端，把照片或视频下载到设备，再通过系统文件选择器加入 帧澈 ZENCHE。')
+      Text(this.tr('先安装并登录对应客户端，把照片或视频下载到设备，再通过系统文件选择器加入 帧澈 ZENCHE。'))
         .fontSize(13)
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -1153,12 +1271,12 @@ struct Index {
                     .fontColor($r('app.color.accent'))
                     .width(42)
                   Column({ space: 3 }) {
-                    Text(provider.name)
+                    Text(this.tr(provider.name))
                       .fontSize(15)
                       .fontWeight(FontWeight.Bold)
                       .fontColor($r('app.color.ink'))
                       .width('100%')
-                    Text(provider.note)
+                    Text(this.tr(provider.note))
                       .fontSize(12)
                       .fontColor($r('app.color.muted'))
                       .width('100%')
@@ -1189,11 +1307,11 @@ struct Index {
       }
       .width('100%')
       .layoutWeight(1)
-      Text('步骤：安装并登录 → 下载媒体 → 选择文件并加入。')
+      Text(this.tr('步骤：安装并登录 → 下载媒体 → 选择文件并加入。'))
         .fontSize(12)
         .fontColor($r('app.color.muted'))
         .width('100%')
-      Button('选择文件并加入', { type: ButtonType.Normal })
+      Button(this.tr('选择文件并加入'), { type: ButtonType.Normal })
         .width('100%')
         .height(48)
         .fontColor($r('app.color.accent_ink'))
@@ -1222,6 +1340,213 @@ struct Index {
   }
 
   @Builder
+  private LaunchAnnouncementOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 14 }) {
+        Row({ space: 10 }) {
+          Column({ space: 3 }) {
+            Text(this.tr('更新公告'))
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .width('100%')
+            Text(`${this.tr('当前版本')} ${CURRENT_VERSION}`)
+              .fontSize(12)
+              .fontFamily('monospace')
+              .fontColor($r('app.color.muted'))
+              .width('100%')
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+          Button(this.tr('关闭公告'), { type: ButtonType.Normal })
+            .height(40)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .borderRadius(7)
+            .onClick((): void => {
+              this.closeLaunchAnnouncement();
+            })
+        }
+        .width('100%')
+
+        Scroll() {
+          Column({ space: 14 }) {
+            Column({ space: 8 }) {
+              Text(this.tr('本次更新'))
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+                .width('100%')
+              Text(this.tr(
+                '• 新增启动更新公告，并支持按版本控制提醒。\n' +
+                '• 五端公告与赞助入口保持一致。\n' +
+                '• 更新赞助图片并优化多语言体验。'
+              ))
+                .fontSize(14)
+                .lineHeight(23)
+                .fontColor($r('app.color.ink'))
+                .width('100%')
+            }
+            .width('100%')
+            .padding(16)
+            .alignItems(HorizontalAlign.Start)
+            .backgroundColor($r('app.color.surface'))
+            .border({
+              width: 1,
+              color: $r('app.color.rule'),
+              radius: 10
+            })
+
+            Column({ space: 8 }) {
+              Text(this.tr('谨防诈骗'))
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#B21923')
+                .width('100%')
+              Text(this.tr(
+                '帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”' +
+                '或要求付费购买软件的人都是骗子，请勿转账。'
+              ))
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#75141C')
+                .width('100%')
+            }
+            .width('100%')
+            .padding(16)
+            .alignItems(HorizontalAlign.Start)
+            .backgroundColor('#FFFFEEEE')
+            .border({
+              width: 1,
+              color: '#FFF4B9B9',
+              radius: 10
+            })
+
+            Column({ space: 8 }) {
+              Text(this.tr('自愿赞助'))
+                .fontSize(17)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+                .width('100%')
+              Text(this.tr(
+                '如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。'
+              ))
+                .fontSize(13)
+                .fontColor($r('app.color.muted'))
+                .width('100%')
+              Image($r('app.media.afdian_donation'))
+                .width('100%')
+                .height(this.isCompact() ? 390 : 460)
+                .objectFit(ImageFit.Contain)
+                .borderRadius(10)
+            }
+            .width('100%')
+            .padding(16)
+            .alignItems(HorizontalAlign.Start)
+            .backgroundColor($r('app.color.surface'))
+            .border({
+              width: 1,
+              color: $r('app.color.rule'),
+              radius: 10
+            })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+
+        Row({ space: 8 }) {
+          Checkbox({
+            name: 'announcement-do-not-remind',
+            group: 'launch-announcement'
+          })
+            .select(this.announcementDoNotRemind)
+            .onChange((selected: boolean): void => {
+              this.announcementDoNotRemind = selected;
+            })
+          Text(this.tr('不再提醒（软件更新后仍会显示）'))
+            .fontSize(14)
+            .fontColor($r('app.color.ink'))
+            .layoutWeight(1)
+        }
+        .width('100%')
+      }
+      .width(this.isCompact() ? '94%' : 660)
+      .height(this.isCompact() ? '94%' : '88%')
+      .padding(22)
+      .alignItems(HorizontalAlign.Start)
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 14
+      })
+      .shadow({
+        radius: 24,
+        color: '#55000000',
+        offsetX: 0,
+        offsetY: 10
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#88000000')
+  }
+
+  @Builder
+  private DonationOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 14 }) {
+        Row() {
+          Text(this.tr('请作者喝奶茶'))
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .layoutWeight(1)
+          Button(this.tr('关闭'), { type: ButtonType.Normal })
+            .height(40)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .borderRadius(7)
+            .onClick((): void => {
+              this.donationVisible = false;
+            })
+        }
+        .width('100%')
+        Text(this.tr('打开微信扫一扫，感谢支持。'))
+          .fontSize(13)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Image($r('app.media.afdian_donation'))
+          .width('100%')
+          .layoutWeight(1)
+          .objectFit(ImageFit.Contain)
+          .borderRadius(10)
+      }
+      .width(this.isCompact() ? '94%' : 520)
+      .height(this.isCompact() ? '90%' : '84%')
+      .padding(20)
+      .alignItems(HorizontalAlign.Start)
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 14
+      })
+      .shadow({
+        radius: 24,
+        color: '#55000000',
+        offsetX: 0,
+        offsetY: 10
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#88000000')
+  }
+
+  @Builder
   private ImmersivePreviewOverlay() {
     Stack({ alignContent: Alignment.Center }) {
       if (this.preview !== undefined) {
@@ -1231,18 +1556,18 @@ struct Index {
           .objectFit(ImageFit.Contain)
       } else {
         Column({ space: 8 }) {
-          Text('等待相机画面')
+          Text(this.tr('等待相机画面'))
             .fontSize(24)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
-          Text('连接相机并开启实时取景后即可全屏监看。')
+          Text(this.tr('连接相机并开启实时取景后即可全屏监看。'))
             .fontSize(13)
             .fontColor('#99FFFFFF')
         }
       }
       Column() {
         Row({ space: 10 }) {
-          Button('⌄ 退出全屏', { type: ButtonType.Normal })
+          Button(`⌄ ${this.tr('退出全屏')}`, { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
             .backgroundColor('#99000000')
@@ -1320,7 +1645,7 @@ struct Index {
         }
         Blank()
         Column({ space: 10 }) {
-          Text(this.immersiveMonitoring ? '视频' : '照片')
+          Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .fontColor(
@@ -1329,9 +1654,11 @@ struct Index {
                 : $r('app.color.accent')
             )
           Button(
-            this.immersiveMonitoring
-              ? (this.videoRecording ? '■\n停止' : '●\n录制')
-              : '●\n拍摄',
+            this.tr(
+              this.immersiveMonitoring
+                ? (this.videoRecording ? '■\n停止' : '●\n录制')
+                : '●\n拍摄'
+            ),
             { type: ButtonType.Normal }
           )
             .width(96)
@@ -1354,7 +1681,7 @@ struct Index {
               }
             })
           Button(
-            this.liveView ? '停止取景' : '开启取景',
+            this.tr(this.liveView ? '停止取景' : '开启取景'),
             { type: ButtonType.Normal }
           )
             .height(44)
@@ -1378,7 +1705,9 @@ struct Index {
   private ImmersiveParameterBar() {
     Column({ space: 6 }) {
       Button(
-        this.immersiveParametersExpanded ? '收起参数' : '展开参数',
+        this.tr(
+          this.immersiveParametersExpanded ? '收起参数' : '展开参数'
+        ),
         { type: ButtonType.Normal }
       )
         .height(44)
@@ -1442,7 +1771,7 @@ struct Index {
           this.adjustImmersiveParameter(parameter, -1);
         })
       Column({ space: 1 }) {
-        Text(label)
+        Text(this.tr(label))
           .fontSize(10)
           .fontColor('#99FFFFFF')
         Text(value)
@@ -1475,31 +1804,80 @@ struct Index {
   private SettingsWorkspace() {
     Scroll() {
       Column({ space: 20 }) {
-        Text('设置')
+        Text(this.tr('设置'))
           .fontSize(24)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text('更新、诊断与支持。')
+        Text(this.tr('更新、诊断与支持。'))
           .fontSize(14)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
-          Text('软件更新')
+          Text(this.tr('语言'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text(`当前版本 ${CURRENT_VERSION} · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。`)
+          Text(this.tr('语言更改会立即应用，并在下次启动时保留。'))
             .fontSize(12)
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Text(this.updateStatus)
+          Select([
+            { value: '简体中文' },
+            { value: 'English' },
+            { value: '日本語' }
+          ])
+            .selected(
+              this.language === LANGUAGE_ENGLISH
+                ? 1
+                : this.language === LANGUAGE_JAPANESE
+                  ? 2
+                  : 0
+            )
+            .width('100%')
+            .height(44)
+            .backgroundColor($r('app.color.paper'))
+            .border({
+              width: 1,
+              color: $r('app.color.rule_strong'),
+              radius: 6
+            })
+            .onSelect((index: number): void => {
+              const languages: Array<string> = [
+                LANGUAGE_SIMPLIFIED_CHINESE,
+                LANGUAGE_ENGLISH,
+                LANGUAGE_JAPANESE
+              ];
+              this.changeLanguage(languages[index]);
+            })
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        Column({ space: 12 }) {
+          Text(this.tr('软件更新'))
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr(
+            `当前版本 ${CURRENT_VERSION} · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。`
+          ))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.tr(this.updateStatus))
             .fontSize(13)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row({ space: 8 }) {
             Button(
-              this.updateChecking ? '正在检查…' : '检查更新',
+              this.tr(this.updateChecking ? '正在检查…' : '检查更新'),
               { type: ButtonType.Normal }
             )
               .height(44)
@@ -1513,7 +1891,7 @@ struct Index {
               })
             if (this.availableVersion.length > 0) {
               Button(
-                `获取 ${this.availableVersion}`,
+                `${this.tr('获取')} ${this.availableVersion}`,
                 { type: ButtonType.Normal }
               )
                 .height(44)
@@ -1538,17 +1916,19 @@ struct Index {
           radius: 8
         })
         Column({ space: 12 }) {
-          Text('诊断日志')
+          Text(this.tr('诊断日志'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text(this.diagnostics?.directoryPath ?? '日志目录暂不可用')
+          Text(this.tr(
+            this.diagnostics?.directoryPath ?? '日志目录暂不可用'
+          ))
             .fontSize(12)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row({ space: 8 }) {
-            Button('查询最近日志', { type: ButtonType.Normal })
+            Button(this.tr('查询最近日志'), { type: ButtonType.Normal })
               .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
@@ -1558,7 +1938,7 @@ struct Index {
                 this.recentLogs =
                   this.diagnostics?.recentText(6000) ?? '日志暂不可用。';
               })
-            Button('上传脱敏日志', { type: ButtonType.Normal })
+            Button(this.tr('上传脱敏日志'), { type: ButtonType.Normal })
               .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.accent_ink'))
@@ -1586,20 +1966,22 @@ struct Index {
           color: $r('app.color.rule'),
           radius: 8
         })
-        Text('只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。')
+        Text(this.tr(
+          '只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。'
+        ))
           .fontSize(12)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
-          Text('喜欢 帧澈 ZENCHE？')
+          Text(this.tr('喜欢 帧澈 ZENCHE？'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text('请作者喝杯奶茶，支持后续维护与新机型适配。')
+          Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配。'))
             .fontSize(14)
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Button('请作者喝奶茶', { type: ButtonType.Normal })
+          Button(this.tr('请作者喝奶茶'), { type: ButtonType.Normal })
             .height(44)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
@@ -1629,14 +2011,14 @@ struct Index {
   private ParameterPanel() {
     Scroll() {
       Column({ space: 8 }) {
-        Text('相机参数')
+        Text(this.tr('相机参数'))
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
           .margin({ bottom: 8 })
         if (this.section === 'monitor') {
-          Text('视频曝光三要素')
+          Text(this.tr('视频曝光三要素'))
             .fontSize(13)
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -1737,13 +2119,13 @@ struct Index {
     modeEnabled: boolean,
     parameter: string
   ) {
-    Text(label)
+    Text(this.tr(label))
       .fontSize(13)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
       entries.map((entry: SelectEntry): SelectOption => {
-        return { value: entry.label };
+        return { value: this.tr(entry.label) };
       })
     )
       .selected(selectedIndex)
@@ -1780,7 +2162,7 @@ struct Index {
 
   @Builder
   private VideoFrameRateSelect() {
-    Text('视频帧率基准')
+    Text(this.tr('视频帧率基准'))
       .fontSize(13)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
@@ -1808,7 +2190,9 @@ struct Index {
 
   @Builder
   private VideoShutterAngleSelect() {
-    Text(`快门角度 · 按 ${this.videoFrameRate}p 换算`)
+    Text(
+      `${this.tr('快门角度')} · ${this.videoFrameRate}p`
+    )
       .fontSize(13)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
@@ -1843,14 +2227,20 @@ struct Index {
   @Builder
   private StatusBar() {
     Row() {
-      Text(this.status)
+      Text(this.tr(this.status))
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.graphite_ink'))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
-      Text(`${this.photos.length} 张照片`)
+      Text(
+        this.language === LANGUAGE_ENGLISH
+          ? `${this.photos.length} photos`
+          : this.language === LANGUAGE_JAPANESE
+            ? `${this.photos.length} 枚の写真`
+            : `${this.photos.length} 张照片`
+      )
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.graphite_muted'))
@@ -2606,20 +2996,7 @@ struct Index {
     return match === null ? 0 : Number(match[0]);
   }
 
-  private async openDonation(): Promise<void> {
-    const context: common.UIAbilityContext =
-      getContext(this) as common.UIAbilityContext;
-    try {
-      await context.startAbility({
-        action: 'ohos.want.action.viewData',
-        uri:
-          'https://raw.githubusercontent.com/Tauber01/ZENCHE/' +
-          'main/native/macos/Resources/wechat-donation.png'
-      });
-    } catch (error) {
-      this.showError(
-        `无法打开赞赏二维码：${(error as BusinessError).message}`
-      );
-    }
+  private openDonation(): void {
+    this.donationVisible = true;
   }
 }

@@ -16,6 +16,8 @@
 		A10000000000000000000007 /* DiagnosticLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* DiagnosticLogger.swift */; };
 		A10000000000000000000008 /* wechat-donation.png in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* wechat-donation.png */; };
 		A10000000000000000000009 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* UpdateController.swift */; };
+		A10000000000000000000010 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* Localizable.strings */; };
+		A10000000000000000000011 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +32,12 @@
 		B10000000000000000000009 /* DiagnosticLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogger.swift; sourceTree = "<group>"; };
 		B10000000000000000000010 /* wechat-donation.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "../macos/Resources/wechat-donation.png"; sourceTree = SOURCE_ROOT; };
 		B10000000000000000000011 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B10000000000000000000013 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B10000000000000000000015 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10000000000000000000016 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		B10000000000000000000018 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		B10000000000000000000019 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +69,8 @@
 				C10000000000000000000007 /* Views */,
 				B10000000000000000000006 /* Assets.xcassets */,
 				B10000000000000000000010 /* wechat-donation.png */,
+				B10000000000000000000014 /* Localizable.strings */,
+				B10000000000000000000017 /* InfoPlist.strings */,
 				B10000000000000000000005 /* Info.plist */,
 			);
 			path = NikonLink;
@@ -159,6 +169,7 @@
 			knownRegions = (
 				Base,
 				en,
+				ja,
 				"zh-Hans",
 			);
 			mainGroup = C10000000000000000000001;
@@ -178,6 +189,8 @@
 			files = (
 				A10000000000000000000005 /* Assets.xcassets in Resources */,
 				A10000000000000000000008 /* wechat-donation.png in Resources */,
+				A10000000000000000000010 /* Localizable.strings in Resources */,
+				A10000000000000000000011 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +212,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		B10000000000000000000014 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B10000000000000000000018 /* zh-Hans */,
+				B10000000000000000000012 /* en */,
+				B10000000000000000000013 /* ja */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		B10000000000000000000017 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B10000000000000000000019 /* zh-Hans */,
+				B10000000000000000000015 /* en */,
+				B10000000000000000000016 /* ja */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		E10000000000000000000011 /* Debug */ = {
@@ -318,7 +354,7 @@
 				ASSETCATALOG_COMPILER_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -328,7 +364,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.8.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tauber.nikonlink.ios;
 				PRODUCT_NAME = "帧澈 ZENCHE";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -343,7 +379,7 @@
 				ASSETCATALOG_COMPILER_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 19;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NikonLink/Info.plist;
@@ -352,7 +388,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.8.3;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tauber.nikonlink.ios;
 				PRODUCT_NAME = "帧澈 ZENCHE";
 				SWIFT_EMIT_LOC_STRINGS = YES;

@@ -1,0 +1,79 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const targets = {
+  ios: ["native/ios/NikonLink/Views/RootView.swift"],
+  android: [
+    "native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java",
+  ],
+  harmony: ["native/harmony/entry/src/main/ets/pages/Index.ets"],
+  macos: [
+    "native/macos/Sources/NikonLink/main.swift",
+    "native/macos/Sources/NikonLink/SettingsSheet.swift",
+  ],
+  windows: ["native/windows/MainWindow.xaml.cs"],
+};
+
+const scamWarning =
+  "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”";
+
+test("all native targets show the launch announcement and scam warning", async () => {
+  for (const [platform, paths] of Object.entries(targets)) {
+    const source = (
+      await Promise.all(paths.map((path) => readFile(path, "utf8")))
+    ).join("\n");
+    assert.match(
+      source,
+      /LaunchAnnouncement|launchAnnouncement/,
+      `${platform} is missing the launch announcement`,
+    );
+    assert.ok(
+      source.includes(scamWarning),
+      `${platform} is missing the scam warning`,
+    );
+  }
+});
+
+test("all native targets persist announcement dismissal by app version", async () => {
+  const sources = await Promise.all(
+    Object.values(targets).map(async (paths) =>
+      (
+        await Promise.all(paths.map((path) => readFile(path, "utf8")))
+      ).join("\n"),
+    ),
+  );
+  for (const [index, source] of sources.entries()) {
+    assert.match(
+      source,
+      /dismissed.*announcement.*version/i,
+      `${Object.keys(targets)[index]} is missing version-scoped dismissal`,
+    );
+  }
+});
+
+test("the bundled donation image is shared or copied across native packages", async () => {
+  const sharedImage = await readFile(
+    "native/macos/Resources/wechat-donation.png",
+  );
+  const harmonyImage = await readFile(
+    "native/harmony/entry/src/main/resources/base/media/afdian_donation.png",
+  );
+  assert.deepEqual(harmonyImage, sharedImage);
+
+  const iosProject = await readFile(
+    "native/ios/NikonLink.xcodeproj/project.pbxproj",
+    "utf8",
+  );
+  const androidBuild = await readFile(
+    "native/android/app/build.gradle",
+    "utf8",
+  );
+  const windowsProject = await readFile(
+    "native/windows/NikonLink.Windows.csproj",
+    "utf8",
+  );
+  assert.match(iosProject, /macos\/Resources\/wechat-donation\.png/);
+  assert.match(androidBuild, /macos\/Resources/);
+  assert.match(windowsProject, /macos\\Resources\\wechat-donation\.png/);
+});

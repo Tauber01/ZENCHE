@@ -2,6 +2,98 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum RuntimeLocalization {
+    private static let tables: [String: [String: String]] = [
+        "en": loadTable(language: "en"),
+        "ja": loadTable(language: "ja")
+    ]
+
+    static func text(_ source: String, locale: Locale) -> String {
+        let language = languageCode(for: locale)
+        guard language != "zh-Hans", let table = tables[language] else {
+            return source
+        }
+        if let exact = table[source] {
+            return exact
+        }
+
+        // Camera state, transfer state, and error messages often contain a
+        // filename, camera name, or count. Translate their stable fragments
+        // using the same Localizable.strings table used by SwiftUI literals.
+        return table.keys
+            .filter {
+                $0.count > 1
+                    && !$0.contains("%")
+                    && source.contains($0)
+            }
+            .sorted { $0.count > $1.count }
+            .reduce(source) { partial, key in
+                partial.replacingOccurrences(of: key, with: table[key] ?? key)
+            }
+    }
+
+    private static func languageCode(for locale: Locale) -> String {
+        let identifier = locale.identifier.lowercased()
+        if identifier.hasPrefix("ja") { return "ja" }
+        if identifier.hasPrefix("en") { return "en" }
+        return "zh-Hans"
+    }
+
+    private static func loadTable(language: String) -> [String: String] {
+        guard
+            let path = Bundle.main.path(forResource: language, ofType: "lproj"),
+            let bundle = Bundle(path: path),
+            let url = bundle.url(
+                forResource: "Localizable",
+                withExtension: "strings"
+            ),
+            let data = try? Data(contentsOf: url),
+            let plist = try? PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ),
+            let table = plist as? [String: String]
+        else {
+            return [:]
+        }
+        return table
+    }
+}
+
+struct RuntimeLocalizedText: View {
+    @Environment(\.locale) private var locale
+    let source: String
+
+    init(_ source: String) {
+        self.source = source
+    }
+
+    var body: some View {
+        Text(RuntimeLocalization.text(source, locale: locale))
+    }
+}
+
+enum InterfaceLanguage: String, CaseIterable, Identifiable {
+    case simplifiedChinese = "zh-Hans"
+    case english = "en"
+    case japanese = "ja"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .simplifiedChinese: return "简体中文"
+        case .english: return "English"
+        case .japanese: return "日本語"
+        }
+    }
+
+    var locale: Locale {
+        Locale(identifier: rawValue)
+    }
+}
+
 private enum SettingsPalette {
     static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
     static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
@@ -14,21 +106,57 @@ private enum SettingsPalette {
 
 struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
+    @Binding var languageRaw: String
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
     @State private var showLogViewer = false
     @State private var logExportMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("设置")
                         .font(.system(size: 26, weight: .bold))
-                    Text("帧澈 ZENCHE \(updater.currentVersion)")
-                        .foregroundStyle(SettingsPalette.muted)
+                    HStack(spacing: 4) {
+                        Text("帧澈 ZENCHE")
+                        Text(updater.currentVersion)
+                    }
+                    .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .foregroundStyle(SettingsPalette.muted)
+                    ForEach(InterfaceLanguage.allCases) { language in
+                        Button {
+                            languageRaw = language.rawValue
+                        } label: {
+                            Text(language.displayName)
+                                .font(
+                                    .system(
+                                        size: 11,
+                                        weight: language.rawValue == languageRaw
+                                            ? .bold
+                                            : .medium
+                                    )
+                                )
+                                .padding(.horizontal, 7)
+                                .frame(height: 28)
+                                .background(
+                                    language.rawValue == languageRaw
+                                        ? SettingsPalette.cobaltSoft
+                                        : Color.clear
+                                )
+                                .clipShape(
+                                    RoundedRectangle(cornerRadius: 6)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .fixedSize()
                 Button("完成") { dismiss() }
                     .buttonStyle(.plain)
             }
@@ -57,9 +185,12 @@ struct SettingsSheet: View {
 
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(updater.statusText)
+                        RuntimeLocalizedText(updater.statusText)
                             .font(.system(size: 13, weight: .semibold))
-                        Text("当前版本 \(updater.currentVersion)")
+                        HStack(spacing: 4) {
+                            Text("当前版本")
+                            Text(updater.currentVersion)
+                        }
                             .font(.system(size: 12))
                             .foregroundStyle(SettingsPalette.muted)
                     }
@@ -165,8 +296,9 @@ struct SettingsSheet: View {
                     .font(.system(size: 11))
                     .foregroundStyle(SettingsPalette.muted)
             }
+            }
+            .padding(26)
         }
-        .padding(26)
         .frame(width: 620)
         .sheet(isPresented: $showDonation) {
             DonationSheet()
@@ -183,7 +315,7 @@ struct SettingsSheet: View {
         ) {
             Button("好") { logExportMessage = nil }
         } message: {
-            Text(logExportMessage ?? "")
+            RuntimeLocalizedText(logExportMessage ?? "")
         }
     }
 
@@ -220,7 +352,7 @@ struct SettingsSheet: View {
         primary: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button(title, action: action)
+        Button(LocalizedStringKey(title), action: action)
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(primary ? Color.white : SettingsPalette.ink)
             .padding(.horizontal, 14)
@@ -364,5 +496,121 @@ private struct DonationSheet: View {
         }
         .padding(24)
         .frame(width: 500, height: 700)
+    }
+}
+
+struct LaunchAnnouncementSheet: View {
+    let version: String
+    @Binding var doNotRemind: Bool
+    let close: () -> Void
+
+    private let donationImage: NSImage? = {
+        guard let url = Bundle.main.url(
+            forResource: "wechat-donation",
+            withExtension: "png"
+        ) else {
+            return nil
+        }
+        return NSImage(contentsOf: url)
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("更新公告")
+                        .font(.system(size: 26, weight: .bold))
+                    HStack(spacing: 4) {
+                        Text("当前版本")
+                        Text(version)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(SettingsPalette.muted)
+                }
+                Spacer()
+                Button("关闭公告", action: close)
+                    .buttonStyle(.borderedProminent)
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    settingsSection(
+                        title: "本次更新",
+                        icon: "sparkles.rectangle.stack.fill",
+                        color: SettingsPalette.cobalt
+                    ) {
+                        Text("• 新增启动更新公告，并支持按版本控制提醒。\n• 五端公告与赞助入口保持一致。\n• 更新赞助图片并优化多语言体验。")
+                            .font(.system(size: 14))
+                            .lineSpacing(5)
+                    }
+
+                    settingsSection(
+                        title: "谨防诈骗",
+                        icon: "exclamationmark.shield.fill",
+                        color: .red
+                    ) {
+                        Text("帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”或要求付费购买软件的人都是骗子，请勿转账。")
+                            .font(.system(size: 14, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .background(Color.red.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("自愿赞助")
+                            .font(.system(size: 17, weight: .bold))
+                        Text("如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(SettingsPalette.muted)
+                        if let donationImage {
+                            Image(nsImage: donationImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity, maxHeight: 430)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding(18)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(SettingsPalette.rule)
+                    }
+                }
+                .padding(.trailing, 4)
+            }
+
+            Toggle(
+                "不再提醒（软件更新后仍会显示）",
+                isOn: $doNotRemind
+            )
+            .toggleStyle(.checkbox)
+        }
+        .padding(24)
+        .frame(width: 620, height: 780)
+        .background(SettingsPalette.cobaltSoft.opacity(0.22))
+    }
+
+    private func settingsSection<Content: View>(
+        title: LocalizedStringKey,
+        icon: String,
+        color: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(color)
+            content()
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(SettingsPalette.rule)
+        }
     }
 }

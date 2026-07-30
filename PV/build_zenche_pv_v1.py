@@ -66,7 +66,7 @@ CHECKSUM_PATH = OUTPUT_DIR / "帧澈_ZENCHE_PV_V1_正式版.mp4.sha256"
 MANIFEST_PATH = OUTPUT_DIR / "帧澈_ZENCHE_PV_V1_正式版_manifest.json"
 
 PROJECT_NAME = "帧澈_ZENCHE_宣传PV_V1_正式版"
-DURATION = 102.7
+DURATION = 84.4
 BGM_START = 5.1
 WIDTH = 1920
 HEIGHT = 1080
@@ -77,7 +77,7 @@ REQUIRED_ASSETS = [
     PLATFORM_SCREENSHOT_RENDERER,
     BGM_SOURCE,
     PV_ROOT / "assets" / "branding" / "zenche-z-mark.svg",
-    PV_ROOT / "assets" / "screens" / "current" / "macos-transfer.png",
+    PV_ROOT / "assets" / "screens" / "current" / "macos-transfer-public.png",
     PV_ROOT / "assets" / "screens" / "platforms" / "macos.png",
     PV_ROOT / "assets" / "screens" / "platforms" / "android.png",
     PV_ROOT / "assets" / "screens" / "platforms" / "windows.png",
@@ -138,76 +138,22 @@ def render_visual():
 
 
 def build_audio():
-    duration_result = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            str(BGM_SOURCE),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    source_duration = float(duration_result.stdout.strip())
-    usable_duration = source_duration - BGM_START
-    mix_tail = (
-        "loudnorm=I=-16:TP=-1.5:LRA=11,"
-        "afade=t=in:st=0:d=1.0,"
-        f"afade=t=out:st={DURATION - 3}:d=3"
-    )
-
-    if usable_duration >= DURATION:
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-ss",
-                str(BGM_START),
-                "-i",
-                BGM_SOURCE,
-                "-t",
-                str(DURATION),
-                "-af",
-                mix_tail,
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                "-ar",
-                "48000",
-                BGM_PATH,
-            ]
-        )
-        return
-
-    crossfade = 2.0
-    continuation_duration = DURATION - usable_duration + crossfade
     run(
         [
             "ffmpeg",
             "-y",
+            "-ss",
+            str(BGM_START),
             "-i",
             BGM_SOURCE,
-            "-i",
-            BGM_SOURCE,
-            "-filter_complex",
-            (
-                f"[0:a]atrim=start={BGM_START}:end={source_duration},"
-                "asetpts=PTS-STARTPTS[first];"
-                f"[1:a]atrim=start=0:end={continuation_duration},"
-                "asetpts=PTS-STARTPTS[continuation];"
-                f"[first][continuation]acrossfade=d={crossfade}:c1=tri:c2=tri,"
-                f"{mix_tail}[mixed]"
-            ),
-            "-map",
-            "[mixed]",
             "-t",
             str(DURATION),
+            "-af",
+            (
+                "loudnorm=I=-16:TP=-1.5:LRA=11,"
+                "afade=t=in:st=0:d=0.8,"
+                f"afade=t=out:st={DURATION - 2}:d=2"
+            ),
             "-c:a",
             "aac",
             "-b:a",
@@ -259,7 +205,7 @@ def create_review_images():
             "ffmpeg",
             "-y",
             "-ss",
-            "99.4",
+            str(DURATION - 3.3),
             "-i",
             FINAL_PATH,
             "-frames:v",
@@ -278,7 +224,7 @@ def create_review_images():
             "-i",
             FINAL_PATH,
             "-vf",
-            "fps=1/5,scale=384:216:flags=lanczos,tile=5x4",
+            "fps=1/4,scale=384:216:flags=lanczos,tile=5x4",
             "-frames:v",
             "1",
             "-q:v",
@@ -359,6 +305,9 @@ def write_delivery_metadata(draft_result, probe):
             "label": "弧光作战 PV",
             "source": str(BGM_SOURCE.resolve()),
             "source_offset_seconds": BGM_START,
+            "source_end_seconds": round(BGM_START + DURATION, 3),
+            "looped": False,
+            "playback": "single continuous pass",
         },
         "final_video": str(FINAL_PATH.resolve()),
         "sha256": digest,
