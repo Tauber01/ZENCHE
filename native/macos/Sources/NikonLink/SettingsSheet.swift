@@ -104,6 +104,8 @@ private enum SettingsPalette {
     static let rule = Color.black.opacity(0.10)
 }
 
+private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
+
 struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     @Binding var languageRaw: String
@@ -167,7 +169,7 @@ struct SettingsSheet: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("自动更新")
                             .font(.system(size: 16, weight: .bold))
-                        Text("启动时自动检查 GitHub Releases，有新版本时可直接下载安装包。")
+                        Text("启动时优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。")
                             .font(.system(size: 13))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -179,6 +181,23 @@ struct SettingsSheet: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    SecureField(
+                        "Mirror酱 CDK（可选）",
+                        text: $updater.mirrorChyanCDK
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    Text("CDK 保存在系统钥匙串中，不会写入诊断日志。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(SettingsPalette.muted)
+                    Spacer()
+                    actionButton("打开 Mirror酱") {
+                        updater.openMirrorChyan()
+                    }
                 }
 
                 Divider()
@@ -257,6 +276,7 @@ struct SettingsSheet: View {
                             openGithubIssue()
                         }
                     }
+                    fastFeedbackCallout
                 }
             }
 
@@ -366,6 +386,12 @@ struct SettingsSheet: View {
             .buttonStyle(.plain)
     }
 
+    private var fastFeedbackCallout: some View {
+        FastFeedbackCallout {
+            NSWorkspace.shared.open(afdianURL)
+        }
+    }
+
     private func openLogDirectory() {
         DiagnosticLogger.shared.info("diagnostics", "用户打开日志目录")
         NSWorkspace.shared.open(DiagnosticLogger.shared.directoryURL)
@@ -450,6 +476,44 @@ private struct DiagnosticLogViewer: View {
     }
 }
 
+private struct FastFeedbackCallout: View {
+    let openAfdian: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: "bolt.horizontal.circle.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(SettingsPalette.cobalt)
+                .frame(width: 42, height: 42)
+                .background(SettingsPalette.cobaltSoft)
+                .clipShape(RoundedRectangle(cornerRadius: 11))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("快速问题反馈")
+                    .font(.system(size: 14, weight: .bold))
+                Text("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(SettingsPalette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("官方 QQ 群：165315727")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(SettingsPalette.cobalt)
+                    .textSelection(.enabled)
+            }
+            Spacer(minLength: 12)
+            Button("打开爱发电", action: openAfdian)
+                .buttonStyle(.bordered)
+        }
+        .padding(14)
+        .background(SettingsPalette.cobaltSoft.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(SettingsPalette.cobalt.opacity(0.16))
+        }
+    }
+}
+
 private struct DonationSheet: View {
     @Environment(\.dismiss) private var dismiss
     private let donationImage: NSImage? = {
@@ -463,17 +527,29 @@ private struct DonationSheet: View {
     }()
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("请作者喝奶茶")
-                        .font(.system(size: 24, weight: .bold))
-                    Text("打开微信扫一扫，感谢支持。")
-                        .foregroundStyle(SettingsPalette.muted)
+                HStack(spacing: 12) {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(SettingsPalette.cobalt)
+                        .frame(width: 44, height: 44)
+                        .background(SettingsPalette.cobaltSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("爱发电赞助")
+                            .font(.system(size: 24, weight: .bold))
+                        Text("扫描二维码，或打开爱发电主页支持项目。")
+                            .foregroundStyle(SettingsPalette.muted)
+                    }
                 }
                 Spacer()
                 Button("关闭") { dismiss() }
                     .buttonStyle(.plain)
+            }
+
+            FastFeedbackCallout {
+                NSWorkspace.shared.open(afdianURL)
             }
 
             if let donationImage {
@@ -493,9 +569,14 @@ private struct DonationSheet: View {
                 )
                 .frame(height: 420)
             }
+
+            Text("赞助不会解锁软件功能，也不影响公开 Issue 的处理。")
+                .font(.system(size: 11))
+                .foregroundStyle(SettingsPalette.muted)
         }
         .padding(24)
-        .frame(width: 500, height: 700)
+        .frame(width: 520, height: 760)
+        .background(SettingsPalette.cobaltSoft.opacity(0.18))
     }
 }
 
@@ -539,7 +620,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 新增启动更新公告，并支持按版本控制提醒。\n• 五端公告与赞助入口保持一致。\n• 更新赞助图片并优化多语言体验。")
+                        Text("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }
@@ -557,11 +638,15 @@ struct LaunchAnnouncementSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("自愿赞助")
+                        Label("爱发电赞助", systemImage: "heart.fill")
                             .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(SettingsPalette.cobalt)
                         Text("如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。")
                             .font(.system(size: 13))
                             .foregroundStyle(SettingsPalette.muted)
+                        FastFeedbackCallout {
+                            NSWorkspace.shared.open(afdianURL)
+                        }
                         if let donationImage {
                             Image(nsImage: donationImage)
                                 .resizable()

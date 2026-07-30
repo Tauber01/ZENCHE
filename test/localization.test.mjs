@@ -9,16 +9,18 @@ async function source(path) {
 }
 
 test("all native settings entries use a gear icon", async () => {
-  const [ios, android, harmony, macos, windows] = await Promise.all([
+  const [ios, android, androidGear, harmony, macos, windows] = await Promise.all([
     source("native/ios/NikonLink/Views/RootView.swift"),
     source("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    source("native/android/app/src/main/res/drawable/ic_settings_gear.xml"),
     source("native/harmony/entry/src/main/ets/pages/Index.ets"),
     source("native/macos/Sources/NikonLink/main.swift"),
     source("native/windows/MainWindow.xaml"),
   ]);
 
   assert.match(ios, /Image\(systemName: "gearshape"\)/);
-  assert.match(android, /nativeButton\("⚙", false\)/);
+  assert.match(android, /setImageResource\(R\.drawable\.ic_settings_gear\)/);
+  assert.match(androidGear, /<vector/);
   assert.match(harmony, /Button\('⚙'/);
   assert.match(macos, /Image\(systemName: "gearshape"\)/);
   assert.match(windows, /Content="⚙"/);

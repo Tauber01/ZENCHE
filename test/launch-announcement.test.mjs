@@ -17,6 +17,10 @@ const targets = {
 
 const scamWarning =
   "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”";
+const fastFeedbackMessage =
+  "公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。";
+const officialQqGroup = "官方 QQ 群：165315727";
+const afdianUrl = "https://www.ifdian.net/a/Tauber";
 
 test("all native targets show the launch announcement and scam warning", async () => {
   for (const [platform, paths] of Object.entries(targets)) {
@@ -76,4 +80,24 @@ test("the bundled donation image is shared or copied across native packages", as
   assert.match(iosProject, /macos\/Resources\/wechat-donation\.png/);
   assert.match(androidBuild, /macos\/Resources/);
   assert.match(windowsProject, /macos\\Resources\\wechat-donation\.png/);
+});
+
+test("all native targets disclose the optional faster feedback channel", async () => {
+  for (const [platform, paths] of Object.entries(targets)) {
+    const source = (
+      await Promise.all(paths.map((path) => readFile(path, "utf8")))
+    ).join("\n");
+    assert.ok(
+      source.includes(fastFeedbackMessage),
+      `${platform} is missing the faster-feedback disclosure`,
+    );
+    assert.ok(
+      source.includes(afdianUrl),
+      `${platform} is missing the Afdian destination`,
+    );
+    assert.ok(
+      source.includes(officialQqGroup),
+      `${platform} is missing the official QQ group`,
+    );
+  }
 });

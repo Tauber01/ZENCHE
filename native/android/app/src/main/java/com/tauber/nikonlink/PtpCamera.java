@@ -7,6 +7,7 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 import android.hardware.usb.UsbRequest;
+import android.os.Build;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
@@ -60,6 +61,7 @@ final class PtpCamera {
     private static final int START_LIVE_VIEW = 0x9201;
     private static final int END_LIVE_VIEW = 0x9202;
     private static final int GET_LIVE_VIEW_IMAGE = 0x9203;
+    private static final int MANUAL_FOCUS_DRIVE = 0x9204;
     private static final int CAPTURE_TO_SDRAM = 0x9207;
     private static final int START_MOVIE_RECORDING = 0x920a;
     private static final int END_MOVIE_RECORDING = 0x920b;
@@ -71,9 +73,13 @@ final class PtpCamera {
     private static final int USB_RECIPIENT_ENDPOINT = 0x02;
     private static final int PTP_USB_REQUEST_RESET = 0x66;
     private static final int CONNECT_ATTEMPTS = 3;
-    // Keep every asynchronous USB request small enough for conservative OEM
-    // usbfs implementations while bypassing their synchronous bulkTransfer path.
-    private static final int USB_BULK_CHUNK_BYTES = 16 * 1024;
+    private static final int EXPOSURE_TIME = 0x500d;
+    private static final int NIKON_EXPOSURE_TIME = 0xd100;
+    private static final int NIKON_MOVIE_EXPOSURE_TIME = 0xd1a8;
+    private static final int USB_BULK_CHUNK_BYTES =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    ? 64 * 1024
+                    : 16 * 1024;
 
     private final MainActivity activity;
     private final DiagnosticLogger diagnostics;
@@ -193,23 +199,25 @@ final class PtpCamera {
         return movieRecording;
     }
 
+    synchronized boolean isLiveView() {
+        return liveView;
+    }
+
     synchronized byte[] capture() throws Exception {
         ensureConnected();
         boolean resumeLiveView = liveView;
+        boolean releaseRemoteMode = false;
         if (resumeLiveView) stopLiveView();
         try {
             if ("bulb".equals(exposureMode)) {
                 transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
+                releaseRemoteMode = true;
                 transact(
                         SET_DEVICE_PROP,
                         new long[]{0x500e},
                         littleEndian16(1),
                         10_000);
-                transact(
-                        SET_DEVICE_PROP,
-                        new long[]{0x500d},
-                        littleEndian32(0xffffffffL),
-                        10_000);
+                setShutterValue(false, 0xffffffffL);
                 transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
                 Thread.sleep(Math.max(1, Math.min(bulbDurationSeconds, 900)) * 1000L);
                 transact(TERMINATE_CAPTURE, new long[]{0, 0}, null, 15_000);
@@ -231,13 +239,31 @@ final class PtpCamera {
                 }
                 Thread.sleep(180);
             }
-            return extractJpeg(transact(GET_OBJECT, new long[]{handle}, null, 60_000));
+            byte[] jpeg = extractJpeg(
+                    transact(GET_OBJECT, new long[]{handle}, null, 60_000));
+            waitUntilDeviceReady(8_000);
+            return jpeg;
         } finally {
-            if (resumeLiveView) {
+            if (releaseRemoteMode && connection != null) {
                 try {
-                    startLiveView();
-                } catch (Exception ignored) {
+                    waitUntilDeviceReady(8_000);
+                } catch (Exception error) {
+                    diagnostics.warning(
+                            "capture",
+                            "B 门拍摄后等待相机就绪失败，将直接尝试释放控制："
+                                    + error.getMessage());
                 }
+                try {
+                    transact(CHANGE_CAMERA_MODE, new long[]{0}, null, 10_000);
+                    diagnostics.info("capture", "B 门拍摄结束，已释放机身快门控制");
+                } catch (Exception error) {
+                    diagnostics.warning(
+                            "capture",
+                            "B 门拍摄后释放机身控制失败：" + error.getMessage());
+                }
+            }
+            if (resumeLiveView) {
+                resumeLiveViewAfterExclusiveOperation();
             }
         }
     }
@@ -246,21 +272,51 @@ final class PtpCamera {
         if (!isParameterWritable(name)) {
             throw new Exception(parameterLockReason(name));
         }
+        boolean resumeLiveView = liveView;
+        if (resumeLiveView) stopLiveView();
         try {
             return setParameterCore(name, rawValue);
         } catch (Exception error) {
             if (error.getMessage() != null
                     && error.getMessage().contains("0x200F")) {
-                deniedParameters.add(name);
+                diagnostics.warning(
+                        "camera",
+                        cameraName()
+                                + " 当前状态暂时拒绝写入"
+                                + parameterDisplayName(name)
+                                + "；控件保持可用，允许切换机身模式后重试");
                 throw new Exception(
                         cameraName()
-                                + " 报告“"
+                                + " 当前状态暂时拒绝写入“"
                                 + parameterDisplayName(name)
-                                + "”当前只读，已锁定该参数以防止重复报错。",
+                                + "”。请确认机身处于允许调整的曝光模式后重试。",
                         error);
             }
             throw error;
+        } finally {
+            if (resumeLiveView) {
+                resumeLiveViewAfterExclusiveOperation();
+            }
         }
+    }
+
+    synchronized void moveFocus(int signedStep) throws Exception {
+        ensureConnected();
+        if (!liveView) {
+            throw new Exception("焦点步进仅能在实时取景开启时使用。");
+        }
+        int normalized = Math.max(-3, Math.min(3, signedStep));
+        if (normalized == 0) return;
+        long direction = normalized < 0 ? 0x1 : 0x2;
+        long amount = Math.abs(normalized) == 1
+                ? 128
+                : Math.abs(normalized) == 2 ? 512 : 1024;
+        transact(
+                MANUAL_FOCUS_DRIVE,
+                new long[]{direction, amount},
+                null,
+                10_000);
+        waitUntilDeviceReady(4_000);
     }
 
     private Object setParameterCore(String name, Object rawValue) throws Exception {
@@ -305,9 +361,11 @@ final class PtpCamera {
         double number = rawValue instanceof Number ? ((Number) rawValue).doubleValue() : 0;
         switch (name) {
             case "exposureTime":
-                property = 0x500d;
-                value = littleEndian32(Math.round(number * 10_000));
-                break;
+            case "videoExposureTime":
+                setShutterSeconds(
+                        number,
+                        "videoExposureTime".equals(name));
+                return rawValue;
             case "aperture":
                 property = 0x5007;
                 value = littleEndian16((int) Math.round(number * 100));
@@ -342,19 +400,10 @@ final class PtpCamera {
                 String requestedExposureMode = String.valueOf(rawValue);
                 property = 0x500e;
                 if ("bulb".equals(requestedExposureMode)) {
-                    transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
-                    transact(
-                            SET_DEVICE_PROP,
-                            new long[]{property},
-                            littleEndian16(1),
-                            10_000);
-                    transact(
-                            SET_DEVICE_PROP,
-                            new long[]{0x500d},
-                            littleEndian32(0xffffffffL),
-                            10_000);
+                    // Bulb is an app capture state. Do not enter Nikon remote
+                    // mode until the shutter is actually triggered, otherwise
+                    // the physical shutter button remains unavailable.
                     exposureMode = requestedExposureMode;
-                    refreshParameterCapabilities();
                     return rawValue;
                 }
                 int program;
@@ -375,13 +424,168 @@ final class PtpCamera {
         return rawValue;
     }
 
+    private void setShutterSeconds(double seconds, boolean video) throws Exception {
+        if (!Double.isFinite(seconds) || seconds <= 0) {
+            throw new Exception("快门速度必须大于 0 秒。");
+        }
+        Exception finalError = null;
+        for (int property : shutterProperties(video)) {
+            byte[] encoded = property == EXPOSURE_TIME
+                    ? littleEndian32(Math.round(seconds * 10_000))
+                    : nikonShutterValue(seconds);
+            try {
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{property},
+                        encoded,
+                        10_000);
+                diagnostics.info(
+                        "camera",
+                        String.format(
+                                Locale.US,
+                                "快门属性写入成功；property=0x%04X；video=%s",
+                                property,
+                                video));
+                return;
+            } catch (Exception error) {
+                if (!isPropertyCompatibilityError(error)) throw error;
+                finalError = error;
+            }
+        }
+        throw new Exception(
+                cameraName()
+                        + " 当前没有可写的"
+                        + (video ? "视频" : "照片")
+                        + "快门属性。请确认相机处于 M/S 模式，且未在机身菜单中锁定曝光参数。",
+                finalError);
+    }
+
+    private void setShutterValue(boolean video, long rawValue) throws Exception {
+        Exception finalError = null;
+        for (int property : shutterProperties(video)) {
+            try {
+                transact(
+                        SET_DEVICE_PROP,
+                        new long[]{property},
+                        littleEndian32(rawValue),
+                        10_000);
+                return;
+            } catch (Exception error) {
+                if (!isPropertyCompatibilityError(error)) throw error;
+                finalError = error;
+            }
+        }
+        throw new Exception(
+                cameraName() + " 当前不支持通过 USB/PTP 设置 B 门快门。",
+                finalError);
+    }
+
+    private int[] shutterProperties(boolean video) {
+        return video
+                ? new int[]{
+                        NIKON_MOVIE_EXPOSURE_TIME,
+                        EXPOSURE_TIME,
+                        NIKON_EXPOSURE_TIME
+                }
+                : new int[]{NIKON_EXPOSURE_TIME, EXPOSURE_TIME};
+    }
+
+    private boolean hasWritableShutterProperty(boolean video) {
+        boolean hasUnknownProperty = false;
+        for (int property : shutterProperties(video)) {
+            Boolean writable = writableProperties.get(property);
+            if (Boolean.TRUE.equals(writable)) return true;
+            if (writable == null) hasUnknownProperty = true;
+        }
+        return hasUnknownProperty;
+    }
+
+    private byte[] nikonShutterValue(double seconds) {
+        long numerator;
+        long denominator;
+        if (seconds < 1) {
+            numerator = 1;
+            denominator = Math.max(1, Math.round(1 / seconds));
+        } else if (Math.abs(seconds - Math.rint(seconds)) < 0.000001) {
+            numerator = Math.round(seconds);
+            denominator = 1;
+        } else {
+            denominator = 1_000;
+            numerator = Math.round(seconds * denominator);
+            long divisor = greatestCommonDivisor(numerator, denominator);
+            numerator /= divisor;
+            denominator /= divisor;
+        }
+        numerator = Math.max(1, Math.min(0xffff, numerator));
+        denominator = Math.max(1, Math.min(0xffff, denominator));
+        return littleEndian32((numerator << 16) | denominator);
+    }
+
+    private long greatestCommonDivisor(long left, long right) {
+        while (right != 0) {
+            long remainder = left % right;
+            left = right;
+            right = remainder;
+        }
+        return Math.max(1, left);
+    }
+
+    private boolean isPropertyCompatibilityError(Exception error) {
+        String message = error.getMessage();
+        if (message == null) return false;
+        return message.contains("0x2005")
+                || message.contains("0x200A")
+                || message.contains("0x200F")
+                || message.contains("0x201C")
+                || message.contains("0x201D");
+    }
+
+    private void waitUntilDeviceReady(long timeoutMillis) throws Exception {
+        Exception finalError = null;
+        long deadline = System.currentTimeMillis() + timeoutMillis;
+        do {
+            try {
+                transact(DEVICE_READY, null, null, 3_000);
+                return;
+            } catch (Exception error) {
+                finalError = error;
+                Thread.sleep(180);
+            }
+        } while (System.currentTimeMillis() < deadline);
+        throw new Exception(
+                cameraName() + " 在独占操作后未恢复就绪状态。",
+                finalError);
+    }
+
+    private void resumeLiveViewAfterExclusiveOperation() {
+        Exception finalError = null;
+        for (int attempt = 1; attempt <= 3 && connection != null; attempt++) {
+            try {
+                waitUntilDeviceReady(4_000);
+                startLiveView();
+                return;
+            } catch (Exception error) {
+                finalError = error;
+                liveView = false;
+                try {
+                    Thread.sleep(250L * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        diagnostics.warning(
+                "liveview",
+                "独占相机操作后未能恢复实时取景："
+                        + (finalError == null ? "未知错误" : finalError.getMessage()));
+    }
+
     synchronized boolean isParameterWritable(String name) {
         if (deniedParameters.contains(name) || !canAdjustExposureParameter(name)) {
             return false;
         }
-        int property = propertyCode(name);
-        Boolean writable = writableProperties.get(property);
-        return writable == null || writable;
+        return true;
     }
 
     synchronized String parameterLockReason(String name) {
@@ -391,16 +595,13 @@ final class PtpCamera {
         if (!canAdjustExposureParameter(name)) {
             return "当前拍摄模式下由相机控制";
         }
-        Boolean writable = writableProperties.get(propertyCode(name));
-        if (Boolean.FALSE.equals(writable)) {
-            return "相机固件报告" + parameterDisplayName(name) + "为只读";
-        }
         return null;
     }
 
     private boolean canAdjustExposureParameter(String name) {
         switch (name) {
             case "exposureTime":
+            case "videoExposureTime":
                 return "manual".equals(exposureMode) || "shutterPriority".equals(exposureMode);
             case "aperture":
                 return "manual".equals(exposureMode)
@@ -423,7 +624,8 @@ final class PtpCamera {
         writableProperties.clear();
         deniedParameters.clear();
         int[] properties = new int[]{
-                0x5005, 0x5007, 0x500a, 0x500d, 0x500e, 0x500f, 0x5010, 0xd200
+                0x5005, 0x5007, 0x500a, EXPOSURE_TIME, 0x500e, 0x500f,
+                0x5010, NIKON_EXPOSURE_TIME, NIKON_MOVIE_EXPOSURE_TIME, 0xd200
         };
         for (int property : properties) {
             try {
@@ -440,6 +642,10 @@ final class PtpCamera {
                 // case mode-based gating remains the safe fallback.
             }
         }
+        diagnostics.info(
+                "camera",
+                "已读取 PTP 参数描述符；可写标志仅用于诊断，"
+                        + "实际写入会在暂停实时取景后重新尝试");
     }
 
     private int propertyCode(String name) {
@@ -447,7 +653,8 @@ final class PtpCamera {
             case "whiteBalanceMode": return 0x5005;
             case "aperture": return 0x5007;
             case "focusMode": return 0x500a;
-            case "exposureTime": return 0x500d;
+            case "exposureTime": return EXPOSURE_TIME;
+            case "videoExposureTime": return NIKON_MOVIE_EXPOSURE_TIME;
             case "exposureMode": return 0x500e;
             case "iso": return 0x500f;
             case "exposureCompensation": return 0x5010;
@@ -458,7 +665,8 @@ final class PtpCamera {
 
     private String parameterDisplayName(String name) {
         switch (name) {
-            case "exposureTime": return "快门速度";
+            case "exposureTime":
+            case "videoExposureTime": return "快门速度";
             case "aperture": return "光圈";
             case "iso": return "ISO";
             case "exposureCompensation": return "曝光补偿";
@@ -948,7 +1156,10 @@ final class PtpCamera {
             if (queued && !completed) {
                 try {
                     request.cancel();
+                    UsbRequest cancelled = activeConnection.requestWait(750);
+                    completed = cancelled == request;
                 } catch (RuntimeException ignored) {
+                } catch (TimeoutException ignored) {
                 }
             }
             request.close();

@@ -11,6 +11,7 @@ import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
 import { systemShare } from '@kit.ShareKit';
+import { sensor } from '@kit.SensorServiceKit';
 import { CameraProfile } from '../camera/CameraProfiles';
 import { PtpCamera } from '../camera/PtpCamera';
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
@@ -20,6 +21,14 @@ import {
   WirelessTransferServer
 } from '../transfer/WirelessTransferServer';
 import { DiagnosticLogger } from '../diagnostics/DiagnosticLogger';
+import {
+  CaptureSessionConfiguration,
+  CaptureWorkflow
+} from '../workflow/CaptureWorkflow';
+import {
+  processProfessionalMonitor,
+  ProfessionalMonitorResult
+} from '../monitor/ProfessionalMonitor';
 import {
   LANGUAGE_ENGLISH,
   LANGUAGE_JAPANESE,
@@ -116,13 +125,68 @@ interface GitHubRelease {
   assets: Array<GitHubAsset>;
 }
 
-const CURRENT_VERSION: string = '1.0.0';
+interface MirrorChyanVersion {
+  version_name: string;
+  url?: string;
+  update_type?: string;
+}
+
+interface MirrorChyanResponse {
+  code: number;
+  msg: string;
+  data?: MirrorChyanVersion;
+}
+
+class UpdateCandidate {
+  readonly version: string;
+  readonly url: string;
+  readonly notice: string;
+
+  constructor(version: string, url: string, notice: string = '') {
+    this.version = version;
+    this.url = url;
+    this.notice = notice;
+  }
+}
+
+class MirrorChyanRequestError extends Error {
+  readonly code: number;
+
+  constructor(code: number, message: string) {
+    super(`MirrorChyan ${code}: ${message}`);
+    this.code = code;
+  }
+}
+
+function taskLabel(kind: string): string {
+  switch (kind) {
+    case 'exposure': return '曝光包围';
+    case 'focus': return '焦点包围';
+    case 'bulb': return 'B 门计时';
+    default: return '间隔拍摄';
+  }
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise<void>((resolve: () => void): void => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+const CURRENT_VERSION: string = '1.1.0';
+const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
+const MIRROR_CHYAN_API: string =
+  `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
 const LATEST_RELEASE_API: string =
   'https://api.github.com/repos/Tauber01/ZENCHE/releases/latest';
 const RELEASES_URL: string =
   'https://github.com/Tauber01/ZENCHE/releases';
+const AFDIAN_URL: string =
+  'https://www.ifdian.net/a/Tauber';
 const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
   'dismissedLaunchAnnouncementVersion';
+const AUTOMATIC_UPDATE_KEY: string = 'automaticallyCheckForUpdates';
+const MIRROR_CHYAN_CDK_KEY: string = 'mirrorChyanCdk';
 
 const EXPOSURE_MODES: Array<SelectEntry> = [
   new SelectEntry('P · 程序自动', 'program'),
@@ -304,10 +368,12 @@ const PICTURE_CONTROLS: Array<SelectEntry> = [
 struct Index {
   private camera: PtpCamera = new PtpCamera();
   private library?: PhotoLibrary;
+  private captureWorkflow?: CaptureWorkflow;
   private wireless?: WirelessTransferServer;
   private diagnostics?: DiagnosticLogger;
   private settingsPreferences?: preferences.Preferences;
   private previewGeneration: number = 0;
+  private previewAnalysisSequence: number = 0;
 
   @State private section: string = 'capture';
   @State private language: string = LANGUAGE_SIMPLIFIED_CHINESE;
@@ -328,10 +394,33 @@ struct Index {
   @State private currentAperture: number = 4;
   @State private currentIso: number = 400;
   @State private currentCompensation: number = 0;
+  @State private shootingTaskKind: string = 'interval';
+  @State private shootingTaskCount: number = 5;
+  @State private shootingTaskInterval: number = 3;
+  @State private shootingTaskStep: number = 1;
+  @State private shootingTaskRunning: boolean = false;
+  @State private shootingTaskStatus: string = '尚未开始拍摄任务';
+  @State private focusPeakingEnabled: boolean = false;
+  @State private falseColorEnabled: boolean = false;
+  @State private redHistogram: string = '—';
+  @State private greenHistogram: string = '—';
+  @State private blueHistogram: string = '—';
+  @State private waveform: string = '—';
+  @State private vectorscope: string = '—';
+  @State private peakingCoverage: number = 0;
+  @State private sessionName: string = '未命名会话';
+  @State private sessionNamingTemplate: string =
+    '{session}_{date}_{counter}';
+  @State private sessionCreator: string = '';
+  @State private sessionRights: string = '';
+  @State private sessionRating: number = 0;
+  @State private sessionDualBackup: boolean = true;
   @State private videoRecording: boolean = false;
   @State private recentLogs: string = '点击“查询最近日志”后显示。';
   @State private updateStatus: string = '尚未检查更新';
   @State private updateChecking: boolean = false;
+  @State private automaticUpdates: boolean = true;
+  @State private mirrorChyanCdk: string = '';
   @State private availableUpdateUrl: string = '';
   @State private availableVersion: string = '';
   @State private largePreviewVisible: boolean = false;
@@ -340,11 +429,13 @@ struct Index {
   @State private systemAlbumStatus: string = '等待相册授权';
   @State private cloudGuideVisible: boolean = false;
   @State private launchAnnouncementVisible: boolean = false;
+  @State private showSplash: boolean = true;
   @State private announcementDoNotRemind: boolean = false;
   @State private donationVisible: boolean = false;
   @State private immersivePreviewVisible: boolean = false;
   @State private immersiveMonitoring: boolean = false;
   @State private immersiveParametersExpanded: boolean = true;
+  @State private immersiveLandscape: boolean = false;
   @State private systemExpanded: boolean = true;
   @State private systemPhotosExpanded: boolean = true;
   @State private systemVideosExpanded: boolean = true;
@@ -354,6 +445,23 @@ struct Index {
   @State private localVideosExpanded: boolean = true;
   @State private currentBreakpoint: string = 'lg';
   private largePreview?: image.PixelMap;
+  private shootingTaskGeneration: number = 0;
+  private immersiveOrientationListener:
+    Callback<sensor.OrientationResponse> =
+      (response: sensor.OrientationResponse): void => {
+        if (!this.immersivePreviewVisible) {
+          return;
+        }
+        const lateral: number = Math.abs(response.gamma);
+        const threshold: number =
+          lateral <= Math.PI * 2 ? Math.PI / 4 : 45;
+        const nextLandscape: boolean = this.immersiveLandscape
+          ? lateral > threshold * 0.66
+          : lateral > threshold;
+        if (nextLandscape !== this.immersiveLandscape) {
+          this.immersiveLandscape = nextLandscape;
+        }
+      };
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext =
@@ -362,6 +470,15 @@ struct Index {
     this.diagnostics = new DiagnosticLogger(context);
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
+    this.captureWorkflow = new CaptureWorkflow(this.library.directoryPath);
+    const session: CaptureSessionConfiguration =
+      this.captureWorkflow.configuration;
+    this.sessionName = session.name;
+    this.sessionNamingTemplate = session.namingTemplate;
+    this.sessionCreator = session.creator;
+    this.sessionRights = session.rights;
+    this.sessionRating = session.rating;
+    this.sessionDualBackup = session.dualBackupEnabled;
     this.wireless = new WirelessTransferServer(
       this.library,
       (status: string): void => {
@@ -400,10 +517,28 @@ struct Index {
         );
       this.launchAnnouncementVisible =
         (dismissedVersion as string) !== CURRENT_VERSION;
+      const automaticUpdates: preferences.ValueType =
+        await this.settingsPreferences.get(
+          AUTOMATIC_UPDATE_KEY,
+          true
+        );
+      this.automaticUpdates = automaticUpdates as boolean;
+      const mirrorChyanCdk: preferences.ValueType =
+        await this.settingsPreferences.get(
+          MIRROR_CHYAN_CDK_KEY,
+          ''
+        );
+      this.mirrorChyanCdk = mirrorChyanCdk as string;
+      if (this.automaticUpdates) {
+        setTimeout((): void => {
+          this.checkForUpdates(true);
+        }, 800);
+      }
     } catch (error) {
       this.language = LANGUAGE_SIMPLIFIED_CHINESE;
       this.launchAnnouncementVisible = true;
     }
+    setTimeout(() => { this.showSplash = false; }, 2500);
   }
 
   private async closeLaunchAnnouncement(): Promise<void> {
@@ -459,6 +594,7 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    this.stopImmersiveOrientationTracking();
     this.diagnostics?.endSession();
     this.previewGeneration++;
     this.camera.disconnect();
@@ -509,10 +645,52 @@ struct Index {
       if (this.launchAnnouncementVisible) {
         this.LaunchAnnouncementOverlay()
       }
+      if (this.showSplash) {
+        this.SplashOverlay()
+      }
     }
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.paper'))
+  }
+
+  @Builder
+  private SplashOverlay() {
+    Column() {
+      Column() {
+        Row() {
+          Text('Z')
+            .fontSize(42)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+        }
+        .width(80)
+        .height(80)
+        .borderRadius(24)
+        .backgroundColor($r('app.color.graphite'))
+        .justifyContent(FlexAlign.Center)
+        .scale({ x: 1, y: 1 })
+        .animation({ duration: 600, curve: Curve.Friction })
+      }
+      Column() {
+        Text('帧澈 ZENCHE')
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+        Text('Capture · Connect · Flow')
+          .fontSize(14)
+          .fontColor($r('app.color.muted'))
+          .margin({ top: 6 })
+      }
+      .margin({ top: 28 })
+      .opacity(1)
+      .animation({ duration: 400, curve: Curve.EaseOut })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('app.color.paper'))
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder
@@ -562,25 +740,48 @@ struct Index {
   @Builder
   private TopBar() {
     Row() {
-      Column({ space: 4 }) {
-        Text('帧澈 ZENCHE')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-        Text('Capture · Connect · Flow')
-          .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor($r('app.color.muted'))
-        Text(
-          this.connected
-            ? `${this.cameraName} · USB/PTP`
-            : `${this.tr('未连接')} · HARMONYOS USB/PTP`
-        )
-          .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor($r('app.color.muted'))
+      Row({ space: 12 }) {
+        Row() {
+          Text('Z')
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+        }
+        .width(44)
+        .height(44)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(13)
+        .shadow({
+          radius: 8,
+          color: '#24055AD2',
+          offsetX: 0,
+          offsetY: 4
+        })
+        Column({ space: 3 }) {
+          Text('帧澈 ZENCHE')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text('Capture · Connect · Flow')
+            .fontSize(10)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+          Text(
+            this.connected
+              ? `${this.cameraName} · USB/PTP`
+              : `${this.tr('未连接')} · HARMONYOS USB/PTP`
+          )
+            .fontSize(10)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
       }
-      .alignItems(HorizontalAlign.Start)
+      .alignItems(VerticalAlign.Center)
       .layoutWeight(1)
       Button(
         this.isCompact()
@@ -597,7 +798,7 @@ struct Index {
         })
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
-        .borderRadius(6)
+        .borderRadius(12)
         .enabled(!this.busy)
         .onClick((): void => {
           this.toggleCameraConnection();
@@ -611,19 +812,25 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule_strong'),
-          radius: 6
+          radius: 12
         })
         .onClick((): void => {
           this.section = 'settings';
         })
     }
     .width('100%')
-    .height(68)
+    .height(76)
     .padding({ left: 20, right: 20 })
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor($r('app.color.surface_raised'))
     .border({
       width: { bottom: 1 },
       color: $r('app.color.rule')
+    })
+    .shadow({
+      radius: 14,
+      color: '#14050B18',
+      offsetX: 0,
+      offsetY: 4
     })
   }
 
@@ -659,7 +866,7 @@ struct Index {
         this.NavButton('视频监看', 'monitor')
         this.NavButton('文件与传输', 'library')
         Blank()
-        Text('ZENCHE 1.0.0')
+        Text('ZENCHE 1.1.0')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -686,15 +893,26 @@ struct Index {
       )
       .fontColor(
         this.section === target
-          ? $r('app.color.accent')
-          : $r('app.color.ink')
+          ? target === 'monitor'
+            ? $r('app.color.video')
+            : $r('app.color.accent')
+          : $r('app.color.muted')
       )
       .backgroundColor(
         this.section === target
-          ? $r('app.color.accent_soft')
+          ? target === 'monitor'
+            ? $r('app.color.video_soft')
+            : $r('app.color.surface_raised')
           : Color.Transparent
       )
-      .borderRadius(6)
+      .border({
+        width: this.section === target ? 1 : 0,
+        color: target === 'monitor'
+          ? $r('app.color.video')
+          : $r('app.color.accent'),
+        radius: 12
+      })
+      .borderRadius(12)
       .flexShrink(0)
       .onClick((): void => {
         this.section = target;
@@ -744,12 +962,11 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor('#99000000')
-          .borderRadius(8)
+          .borderRadius(12)
           .align(Alignment.TopEnd)
           .margin(16)
           .onClick((): void => {
-            this.immersiveMonitoring = this.section === 'monitor';
-            this.immersivePreviewVisible = true;
+            this.openImmersivePreview(this.section === 'monitor');
           })
       }
       .width('100%')
@@ -759,7 +976,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.graphite_rule'),
-        radius: 10
+        radius: 18
       })
 
       Row({ space: 8 }) {
@@ -780,7 +997,7 @@ struct Index {
           .border({
             width: 1,
             color: $r('app.color.rule_strong'),
-            radius: 6
+            radius: 12
           })
           .enabled(this.connected && !this.busy)
           .onClick((): void => {
@@ -801,7 +1018,7 @@ struct Index {
               ? $r('app.color.video')
               : $r('app.color.accent')
           )
-          .borderRadius(6)
+          .borderRadius(12)
           .enabled(this.connected && !this.busy)
           .onClick((): void => {
             if (this.section === 'monitor') {
@@ -812,10 +1029,126 @@ struct Index {
           })
       }
       .width('100%')
+      if (this.section === 'capture') {
+        this.ShootingTaskPanel()
+      }
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
+  }
+
+  @Builder
+  private ShootingTaskPanel() {
+    Column({ space: 10 }) {
+      Text(this.tr('拍摄任务'))
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      Select([
+        { value: this.tr('间隔拍摄') },
+        { value: this.tr('曝光包围') },
+        { value: this.tr('焦点包围') },
+        { value: this.tr('B 门计时') }
+      ])
+        .selected(
+          this.shootingTaskKind === 'exposure' ? 1 :
+            this.shootingTaskKind === 'focus' ? 2 :
+              this.shootingTaskKind === 'bulb' ? 3 : 0
+        )
+        .width('100%')
+        .onSelect((index: number): void => {
+          this.shootingTaskKind =
+            ['interval', 'exposure', 'focus', 'bulb'][index];
+        })
+      Text(`${this.tr('张数')} · ${this.shootingTaskCount}`)
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Slider({
+        value: this.shootingTaskCount,
+        min: 1,
+        max: 99,
+        step: 1,
+        style: SliderStyle.OutSet
+      })
+        .onChange((value: number): void => {
+          this.shootingTaskCount = Math.round(value);
+        })
+      Text(
+        `${this.tr(
+          this.shootingTaskKind === 'bulb' ? '曝光时长' : '间隔'
+        )} · ${this.shootingTaskInterval} ${this.tr('秒')}`
+      )
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Slider({
+        value: this.shootingTaskInterval,
+        min: 1,
+        max: 60,
+        step: 1,
+        style: SliderStyle.OutSet
+      })
+        .onChange((value: number): void => {
+          this.shootingTaskInterval = Math.round(value);
+        })
+      if (
+        this.shootingTaskKind === 'exposure' ||
+        this.shootingTaskKind === 'focus'
+      ) {
+        Text(`${this.tr('包围步长')} · ${this.shootingTaskStep}`)
+          .fontSize(12)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Slider({
+          value: this.shootingTaskStep,
+          min: 1,
+          max: 3,
+          step: 1,
+          style: SliderStyle.OutSet
+        })
+          .onChange((value: number): void => {
+            this.shootingTaskStep = Math.round(value);
+          })
+      }
+      Text(this.tr(this.shootingTaskStatus))
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Button(
+        this.tr(this.shootingTaskRunning ? '取消任务' : '开始任务'),
+        { type: ButtonType.Normal }
+      )
+        .height(44)
+        .width('100%')
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor(
+          this.shootingTaskRunning
+            ? $r('app.color.video')
+            : $r('app.color.accent')
+        )
+        .borderRadius(6)
+        .enabled(this.connected)
+        .onClick((): void => {
+          if (this.shootingTaskRunning) {
+            this.cancelShootingTask();
+          } else {
+            this.startShootingTask();
+          }
+        })
+    }
+    .width('100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 8
+    })
   }
 
   @Builder
@@ -858,6 +1191,7 @@ struct Index {
         .fontSize(12)
         .fontColor($r('app.color.muted'))
         .width('100%')
+      this.CaptureSessionPanel()
       Button(
         this.tr(
           `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
@@ -888,7 +1222,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: 14
         })
       } else if (this.systemExpanded) {
         Row({ space: 8 }) {
@@ -1132,6 +1466,121 @@ struct Index {
   }
 
   @Builder
+  private CaptureSessionPanel() {
+    Column({ space: 8 }) {
+      Text(this.tr('拍摄会话'))
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      TextInput({
+        placeholder: this.tr('项目名称'),
+        text: this.sessionName
+      })
+        .height(42)
+        .onChange((value: string): void => {
+          this.sessionName = value;
+        })
+      TextInput({
+        placeholder: this.tr('命名模板'),
+        text: this.sessionNamingTemplate
+      })
+        .height(42)
+        .fontFamily('monospace')
+        .onChange((value: string): void => {
+          this.sessionNamingTemplate = value;
+        })
+      Row({ space: 8 }) {
+        TextInput({
+          placeholder: this.tr('创作者'),
+          text: this.sessionCreator
+        })
+          .height(42)
+          .layoutWeight(1)
+          .onChange((value: string): void => {
+            this.sessionCreator = value;
+          })
+        TextInput({
+          placeholder: this.tr('版权'),
+          text: this.sessionRights
+        })
+          .height(42)
+          .layoutWeight(1)
+          .onChange((value: string): void => {
+            this.sessionRights = value;
+          })
+      }
+      .width('100%')
+      Text(`${this.tr('默认评级')} · ${this.sessionRating} ★`)
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Slider({
+        value: this.sessionRating,
+        min: 0,
+        max: 5,
+        step: 1,
+        style: SliderStyle.OutSet
+      })
+        .onChange((value: number): void => {
+          this.sessionRating = Math.round(value);
+        })
+      Row() {
+        Text(this.tr('双目标备份'))
+          .fontSize(13)
+          .fontColor($r('app.color.ink'))
+          .layoutWeight(1)
+        Toggle({
+          type: ToggleType.Switch,
+          isOn: this.sessionDualBackup
+        })
+          .onChange((enabled: boolean): void => {
+            this.sessionDualBackup = enabled;
+          })
+      }
+      .width('100%')
+      Text(this.tr(
+        'RAW + JPEG 自动配对，并生成 XMP 与 SHA-256 清单。'
+      ))
+        .fontSize(11)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Text(this.tr(
+        this.captureWorkflow?.status ?? '尚未开始拍摄会话'
+      ))
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Button(
+        this.tr(
+          (this.captureWorkflow?.isActive ?? false)
+            ? '结束会话'
+            : '开始会话'
+        ),
+        { type: ButtonType.Normal }
+      )
+        .height(44)
+        .width('100%')
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
+        .borderRadius(6)
+        .onClick((): void => {
+          this.toggleCaptureSession();
+        })
+    }
+    .width('100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 8
+    })
+  }
+
+  @Builder
   private WirelessTransferCard() {
     Column({ space: 12 }) {
         Text(this.tr('多协议无线图片收件箱'))
@@ -1342,27 +1791,33 @@ struct Index {
   @Builder
   private LaunchAnnouncementOverlay() {
     Stack({ alignContent: Alignment.Center }) {
-      Column({ space: 14 }) {
+      Column({ space: 16 }) {
         Row({ space: 10 }) {
           Column({ space: 3 }) {
-            Text(this.tr('更新公告'))
-              .fontSize(24)
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.ink'))
-              .width('100%')
+            Row({ space: 10 }) {
+              Text('✨')
+                .fontSize(20)
+              Text(this.tr('更新公告'))
+                .fontSize(22)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+            }
             Text(`${this.tr('当前版本')} ${CURRENT_VERSION}`)
-              .fontSize(12)
+              .fontSize(13)
               .fontFamily('monospace')
               .fontColor($r('app.color.muted'))
               .width('100%')
+              .padding({ left: 30 })
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
           Button(this.tr('关闭公告'), { type: ButtonType.Normal })
-            .height(40)
+            .height(42)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
-            .borderRadius(7)
+            .borderRadius(8)
+            .fontWeight(FontWeight.Medium)
+            .padding({ left: 18, right: 18 })
             .onClick((): void => {
               this.closeLaunchAnnouncement();
             })
@@ -1378,9 +1833,9 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增启动更新公告，并支持按版本控制提醒。\n' +
-                '• 五端公告与赞助入口保持一致。\n' +
-                '• 更新赞助图片并优化多语言体验。'
+                '• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n' +
+                '• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n' +
+                '• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。'
               ))
                 .fontSize(14)
                 .lineHeight(23)
@@ -1394,7 +1849,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule'),
-              radius: 10
+              radius: 12
             })
 
             Column({ space: 8 }) {
@@ -1419,14 +1874,14 @@ struct Index {
             .border({
               width: 1,
               color: '#FFF4B9B9',
-              radius: 10
+              radius: 12
             })
 
-            Column({ space: 8 }) {
-              Text(this.tr('自愿赞助'))
+            Column({ space: 10 }) {
+              Text(this.tr('爱发电赞助'))
                 .fontSize(17)
                 .fontWeight(FontWeight.Bold)
-                .fontColor($r('app.color.ink'))
+                .fontColor($r('app.color.accent'))
                 .width('100%')
               Text(this.tr(
                 '如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。'
@@ -1434,6 +1889,7 @@ struct Index {
                 .fontSize(13)
                 .fontColor($r('app.color.muted'))
                 .width('100%')
+              this.FastFeedbackCard()
               Image($r('app.media.afdian_donation'))
                 .width('100%')
                 .height(this.isCompact() ? 390 : 460)
@@ -1447,7 +1903,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule'),
-              radius: 10
+              radius: 12
             })
           }
           .width('100%')
@@ -1456,7 +1912,7 @@ struct Index {
         .layoutWeight(1)
         .scrollBar(BarState.Auto)
 
-        Row({ space: 8 }) {
+        Row({ space: 10 }) {
           Checkbox({
             name: 'announcement-do-not-remind',
             group: 'launch-announcement'
@@ -1495,34 +1951,117 @@ struct Index {
   }
 
   @Builder
-  private DonationOverlay() {
-    Stack({ alignContent: Alignment.Center }) {
-      Column({ space: 14 }) {
-        Row() {
-          Text(this.tr('请作者喝奶茶'))
-            .fontSize(22)
+  private FastFeedbackCard() {
+    Column({ space: 10 }) {
+      Row({ space: 10 }) {
+        Text('⚡')
+          .fontSize(19)
+        Column({ space: 4 }) {
+          Text(this.tr('快速问题反馈'))
+            .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-            .layoutWeight(1)
+            .width('100%')
+          Text(this.tr(
+            '公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。'
+          ))
+            .fontSize(12)
+            .lineHeight(19)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.tr('官方 QQ 群：165315727'))
+            .fontSize(13)
+            .fontFamily('monospace')
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.accent'))
+            .width('100%')
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      Button(this.tr('打开爱发电'), { type: ButtonType.Normal })
+        .height(42)
+        .width('100%')
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.surface'))
+        .borderRadius(8)
+        .border({
+          width: 1,
+          color: $r('app.color.rule_strong')
+        })
+        .onClick((): void => {
+          this.openAfdian();
+        })
+    }
+    .width('100%')
+    .padding(14)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.accent_soft'))
+    .border({
+      width: 1,
+      color: '#FFB6CFF5',
+      radius: 12
+    })
+  }
+
+  @Builder
+  private DonationOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 16 }) {
+        Row() {
+          Row({ space: 10 }) {
+            Text('☕')
+              .fontSize(20)
+            Text(this.tr('爱发电赞助'))
+              .fontSize(22)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+          }
+          .layoutWeight(1)
           Button(this.tr('关闭'), { type: ButtonType.Normal })
             .height(40)
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
-            .borderRadius(7)
+            .borderRadius(8)
+            .padding({ left: 16, right: 16 })
             .onClick((): void => {
               this.donationVisible = false;
             })
         }
         .width('100%')
-        Text(this.tr('打开微信扫一扫，感谢支持。'))
+        Text(this.tr('扫描二维码，或打开爱发电主页支持项目。'))
           .fontSize(13)
           .fontColor($r('app.color.muted'))
           .width('100%')
-        Image($r('app.media.afdian_donation'))
+        Text(this.tr(
+          '软件功能永久免费，赞助为自愿行为。'
+        ))
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
           .width('100%')
-          .layoutWeight(1)
-          .objectFit(ImageFit.Contain)
-          .borderRadius(10)
+          .margin({ top: -6 })
+        this.FastFeedbackCard()
+        Column() {
+          Image($r('app.media.afdian_donation'))
+            .width('100%')
+            .layoutWeight(1)
+            .objectFit(ImageFit.Contain)
+            .borderRadius(12)
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .padding(10)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 12
+        })
+        Text(this.tr('赞助不会解锁软件功能，也不影响公开 Issue 的处理。'))
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
       }
       .width(this.isCompact() ? '94%' : 520)
       .height(this.isCompact() ? '90%' : '84%')
@@ -1565,6 +2104,14 @@ struct Index {
             .fontColor('#99FFFFFF')
         }
       }
+      Row()
+        .width(82)
+        .height(82)
+        .border({
+          width: 2,
+          color: '#DDFFD646',
+          radius: 4
+        })
       Column() {
         Row({ space: 10 }) {
           Button(`⌄ ${this.tr('退出全屏')}`, { type: ButtonType.Normal })
@@ -1612,93 +2159,149 @@ struct Index {
             top: 10,
             bottom: 10
           })
+          .margin({
+            bottom: this.isImmersiveLandscape() ? 0 : 118
+          })
       }
       .width('100%')
       .height('100%')
       .padding(20)
       this.ImmersiveParameterBar()
-      Row() {
-        Column({ space: 12 }) {
-          Text(
-            this.immersiveMonitoring
-              ? `${this.videoFrameRate}P`
-              : this.exposureMode.toUpperCase()
-          )
-            .fontSize(19)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-            .width(64)
-            .height(56)
-            .textAlign(TextAlign.Center)
-            .backgroundColor('#99000000')
-            .borderRadius(10)
-          Text('USB\nPTP')
-            .fontSize(11)
-            .fontFamily('monospace')
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-            .width(64)
-            .height(56)
-            .textAlign(TextAlign.Center)
-            .backgroundColor('#99000000')
-            .borderRadius(10)
+      if (this.isImmersiveLandscape()) {
+        Row() {
+          this.ImmersiveToolRail()
+          Blank()
+          this.ImmersiveCaptureRail()
         }
-        Blank()
-        Column({ space: 10 }) {
+        .width('100%')
+        .padding({ left: 22, right: 22 })
+      } else {
+        this.ImmersivePortraitControls()
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Color.Black)
+  }
+
+  @Builder
+  private ImmersiveToolRail() {
+    Column({ space: 12 }) {
+      Text(
+        this.immersiveMonitoring
+          ? `${this.videoFrameRate}P`
+          : this.exposureMode.toUpperCase()
+      )
+        .fontSize(19)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .width(64)
+        .height(56)
+        .textAlign(TextAlign.Center)
+        .backgroundColor('#AA000000')
+        .borderRadius(10)
+      Button(
+        this.tr(this.liveView ? 'LIVE' : '开启取景'),
+        { type: ButtonType.Normal }
+      )
+        .width(64)
+        .height(52)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .backgroundColor(this.liveView ? '#B8991020' : '#AA000000')
+        .borderRadius(10)
+        .onClick((): void => {
+          this.toggleLiveView();
+        })
+    }
+  }
+
+  @Builder
+  private ImmersiveCaptureRail() {
+    Column({ space: 10 }) {
+      Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(
+          this.immersiveMonitoring
+            ? $r('app.color.video')
+            : $r('app.color.accent')
+        )
+      this.ImmersiveCaptureButton()
+      Text(this.immersiveMonitoring
+        ? (this.videoRecording ? 'REC' : this.tr('待机'))
+        : 'JPEG')
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+        .backgroundColor('#AA000000')
+        .borderRadius(10)
+    }
+  }
+
+  @Builder
+  private ImmersiveCaptureButton() {
+    Button(
+      this.immersiveMonitoring
+        ? (this.videoRecording ? '■' : '●')
+        : '●',
+      { type: ButtonType.Normal }
+    )
+      .width(96)
+      .height(96)
+      .fontSize(this.videoRecording ? 26 : 34)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(Color.White)
+      .backgroundColor(
+        this.immersiveMonitoring
+          ? $r('app.color.video')
+          : $r('app.color.accent')
+      )
+      .borderRadius(48)
+      .enabled(this.connected && !this.busy)
+      .onClick((): void => {
+        if (this.immersiveMonitoring) {
+          this.toggleVideoRecording();
+        } else {
+          this.capturePhoto();
+        }
+      })
+  }
+
+  @Builder
+  private ImmersivePortraitControls() {
+    Column() {
+      Blank()
+      Row({ space: 18 }) {
+        this.ImmersiveToolRail()
+        this.ImmersiveCaptureButton()
+        Column({ space: 6 }) {
           Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
-            .fontSize(17)
+            .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.immersiveMonitoring
                 ? $r('app.color.video')
                 : $r('app.color.accent')
             )
-          Button(
-            this.tr(
-              this.immersiveMonitoring
-                ? (this.videoRecording ? '■\n停止' : '●\n录制')
-                : '●\n拍摄'
-            ),
-            { type: ButtonType.Normal }
-          )
-            .width(96)
-            .height(96)
-            .fontSize(15)
-            .fontWeight(FontWeight.Bold)
+          Text(this.immersiveMonitoring
+            ? (this.videoRecording ? 'REC' : this.tr('待机'))
+            : 'JPEG')
+            .fontSize(11)
+            .fontFamily('monospace')
             .fontColor(Color.White)
-            .backgroundColor(
-              this.immersiveMonitoring
-                ? $r('app.color.video')
-                : $r('app.color.accent')
-            )
-            .borderRadius(48)
-            .enabled(this.connected && !this.busy)
-            .onClick((): void => {
-              if (this.immersiveMonitoring) {
-                this.toggleVideoRecording();
-              } else {
-                this.capturePhoto();
-              }
-            })
-          Button(
-            this.tr(this.liveView ? '停止取景' : '开启取景'),
-            { type: ButtonType.Normal }
-          )
-            .height(44)
-            .fontColor(Color.White)
-            .backgroundColor('#99000000')
-            .borderRadius(8)
-            .onClick((): void => {
-              this.toggleLiveView();
-            })
+            .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+            .backgroundColor('#AA000000')
+            .borderRadius(10)
         }
       }
-      .width('100%')
-      .padding({ left: 22, right: 22 })
+      .padding({ left: 14, right: 14, bottom: 12 })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Color.Black)
   }
 
   @Builder
@@ -1748,7 +2351,9 @@ struct Index {
     }
     .width('100%')
     .align(Alignment.Bottom)
-    .margin({ bottom: 74 })
+    .margin({
+      bottom: this.isImmersiveLandscape() ? 74 : 188
+    })
   }
 
   @Builder
@@ -1866,11 +2471,66 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(
-            `当前版本 ${CURRENT_VERSION} · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。`
+            `当前版本 ${CURRENT_VERSION} · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。`
           ))
             .fontSize(12)
             .fontColor($r('app.color.muted'))
             .width('100%')
+          Row() {
+            Text(this.tr('启动时自动检查更新'))
+              .fontSize(13)
+              .fontColor($r('app.color.ink'))
+              .layoutWeight(1)
+            Toggle({
+              type: ToggleType.Switch,
+              isOn: this.automaticUpdates
+            })
+              .onChange((enabled: boolean): void => {
+                this.automaticUpdates = enabled;
+                this.persistAutomaticUpdates();
+                if (enabled) {
+                  this.checkForUpdates(true);
+                }
+              })
+          }
+          .width('100%')
+          TextInput({
+            placeholder: this.tr('Mirror酱 CDK（可选）'),
+            text: this.mirrorChyanCdk
+          })
+            .type(InputType.Password)
+            .height(42)
+            .showPasswordIcon(true)
+            .onChange((value: string): void => {
+              this.mirrorChyanCdk = value;
+            })
+          Text(this.tr(
+            'CDK 保存在应用私有设置中，不会写入诊断日志。'
+          ))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Row({ space: 8 }) {
+            Button(this.tr('保存 CDK'), { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.saveMirrorChyanCdk();
+              })
+            Button(this.tr('打开 Mirror酱'), { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.openMirrorChyan();
+              })
+          }
+          .width('100%')
           Text(this.tr(this.updateStatus))
             .fontSize(13)
             .fontColor($r('app.color.muted'))
@@ -1887,7 +2547,7 @@ struct Index {
               .borderRadius(6)
               .enabled(!this.updateChecking)
               .onClick((): void => {
-                this.checkForUpdates();
+                this.checkForUpdates(false);
               })
             if (this.availableVersion.length > 0) {
               Button(
@@ -1949,6 +2609,7 @@ struct Index {
               })
           }
           .width('100%')
+          this.FastFeedbackCard()
           Text(this.recentLogs)
             .fontSize(11)
             .fontFamily('monospace')
@@ -2041,6 +2702,7 @@ struct Index {
             true,
             'whiteBalanceMode'
           )
+          this.ProfessionalMonitorPanel()
         } else {
           this.ParameterSelect(
             '拍摄模式',
@@ -2104,11 +2766,82 @@ struct Index {
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor($r('app.color.paper_2'))
     .border({
       width: { left: 1 },
       color: $r('app.color.rule')
     })
+  }
+
+  @Builder
+  private ProfessionalMonitorPanel() {
+    Text(this.tr('专业监看'))
+      .fontSize(13)
+      .fontWeight(FontWeight.Bold)
+      .fontColor($r('app.color.ink'))
+      .width('100%')
+      .margin({ top: 8 })
+    Row() {
+      Text(this.tr('峰值对焦'))
+        .fontSize(13)
+        .layoutWeight(1)
+      Toggle({
+        type: ToggleType.Switch,
+        isOn: this.focusPeakingEnabled
+      })
+        .onChange((enabled: boolean): void => {
+          this.focusPeakingEnabled = enabled;
+        })
+    }
+    .width('100%')
+    Row() {
+      Text(this.tr('假色曝光'))
+        .fontSize(13)
+        .layoutWeight(1)
+      Toggle({
+        type: ToggleType.Switch,
+        isOn: this.falseColorEnabled
+      })
+        .onChange((enabled: boolean): void => {
+          this.falseColorEnabled = enabled;
+        })
+    }
+    .width('100%')
+    Column({ space: 4 }) {
+      this.ScopeLine('R', this.redHistogram, '#FFD22D34')
+      this.ScopeLine('G', this.greenHistogram, '#FF199152')
+      this.ScopeLine('B', this.blueHistogram, '#FF2468D8')
+      this.ScopeLine('波形', this.waveform, '#FF1C2330')
+      this.ScopeLine('矢量', this.vectorscope, '#FF1C2330')
+      Text(`${this.tr('峰值覆盖')} · ${this.peakingCoverage}%`)
+        .fontSize(10)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+    }
+    .width('100%')
+    .padding(10)
+    .backgroundColor($r('app.color.paper_2'))
+    .borderRadius(6)
+  }
+
+  @Builder
+  private ScopeLine(label: string, value: string, color: ResourceColor) {
+    Row({ space: 6 }) {
+      Text(this.tr(label))
+        .width(34)
+        .fontSize(10)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(color)
+      Text(value)
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.ink'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+    }
+    .width('100%')
   }
 
   @Builder
@@ -2138,7 +2871,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 6
+        radius: 12
       })
       .enabled(
         this.connected &&
@@ -2214,8 +2947,7 @@ struct Index {
       .enabled(
         this.connected &&
         !this.busy &&
-        (this.exposureMode === 'manual' ||
-          this.exposureMode === 'shutterPriority')
+        this.camera.canAdjustParameter('videoExposureTime')
       )
       .margin({ bottom: 8 })
       .onSelect((index: number): void => {
@@ -2248,7 +2980,7 @@ struct Index {
     .width('100%')
     .height(34)
     .padding({ left: 16, right: 16 })
-    .backgroundColor($r('app.color.graphite'))
+      .backgroundColor($r('app.color.graphite_2'))
     .border({
       width: { top: 1 },
       color: $r('app.color.graphite_rule')
@@ -2352,12 +3084,22 @@ struct Index {
 
   private async capturePhoto(): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
-    if (!this.connected || this.busy || library === undefined) {
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    if (
+      !this.connected ||
+      this.busy ||
+      library === undefined ||
+      workflow === undefined
+    ) {
       return;
     }
     await this.runBusy('正在拍摄并下载 JPEG…', async (): Promise<void> => {
       const jpeg: Uint8Array = await this.camera.capture();
-      const path: string = library.saveCapture(jpeg);
+      const path: string = await workflow.store(
+        jpeg,
+        'capture.jpg',
+        this.cameraName
+      );
       this.diagnostics?.info(
         'capture',
         `拍摄完成；文件=${path.substring(path.lastIndexOf('/') + 1)}` +
@@ -2367,6 +3109,160 @@ struct Index {
       this.refreshPhotos();
       this.status = `已保存 ${path.substring(path.lastIndexOf('/') + 1)}`;
     });
+  }
+
+  private toggleCaptureSession(): void {
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    if (workflow === undefined) {
+      return;
+    }
+    if (workflow.isActive) {
+      workflow.end();
+      this.status = workflow.status;
+      return;
+    }
+    try {
+      const configuration: CaptureSessionConfiguration =
+        new CaptureSessionConfiguration();
+      configuration.name = this.sessionName;
+      configuration.namingTemplate = this.sessionNamingTemplate;
+      configuration.creator = this.sessionCreator;
+      configuration.rights = this.sessionRights;
+      configuration.rating = this.sessionRating;
+      configuration.dualBackupEnabled = this.sessionDualBackup;
+      workflow.begin(configuration);
+      this.status = workflow.status;
+    } catch (error) {
+      this.showError(
+        `无法开始拍摄会话：${(error as Error).message}`
+      );
+    }
+  }
+
+  private async startShootingTask(): Promise<void> {
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    if (
+      !this.connected ||
+      this.busy ||
+      this.shootingTaskRunning ||
+      workflow === undefined
+    ) {
+      return;
+    }
+    const generation: number = ++this.shootingTaskGeneration;
+    const kind: string = this.shootingTaskKind;
+    const count: number = Math.max(
+      1,
+      Math.min(999, this.shootingTaskCount)
+    );
+    const interval: number = Math.max(
+      1,
+      Math.min(3600, this.shootingTaskInterval)
+    );
+    const step: number = Math.max(1, Math.min(3, this.shootingTaskStep));
+    const originalCompensation: number = this.currentCompensation;
+    const originalMode: string = this.exposureMode;
+    this.shootingTaskRunning = true;
+    this.shootingTaskStatus = `${taskLabel(kind)}准备中`;
+    this.previewGeneration++;
+    try {
+      let total: number = kind === 'bulb' ? 1 : count;
+      if (kind === 'exposure' && total % 2 === 0) {
+        total++;
+      }
+      if (kind === 'focus' && !this.camera.isLiveView) {
+        await this.camera.startLiveView();
+        this.liveView = true;
+      }
+      if (kind === 'bulb') {
+        await this.camera.setParameter('exposureMode', 'bulb');
+        await this.camera.setParameter('bulbDuration', interval);
+      }
+      for (let index: number = 0; index < total; index++) {
+        if (generation !== this.shootingTaskGeneration) {
+          throw new Error('CANCELLED');
+        }
+        if (kind === 'exposure') {
+          const center: number = Math.floor(total / 2);
+          await this.camera.setParameter(
+            'exposureCompensation',
+            originalCompensation + (index - center) * step
+          );
+        }
+        if (kind === 'focus' && index > 0) {
+          await this.camera.moveFocus(step);
+        }
+        const jpeg: Uint8Array = await this.camera.capture();
+        const path: string = await workflow.store(
+          jpeg,
+          'capture.jpg',
+          this.cameraName
+        );
+        await this.displayJpeg(jpeg);
+        this.refreshPhotos();
+        this.shootingTaskStatus =
+          `${taskLabel(kind)} · ${index + 1}/${total} · ` +
+          path.substring(path.lastIndexOf('/') + 1);
+        this.status = this.shootingTaskStatus;
+        if (kind === 'interval' && index + 1 < total) {
+          for (let tick: number = 0; tick < interval * 10; tick++) {
+            if (generation !== this.shootingTaskGeneration) {
+              throw new Error('CANCELLED');
+            }
+            await delay(100);
+          }
+        }
+      }
+      await this.restoreTaskCameraState(
+        kind,
+        originalCompensation,
+        originalMode
+      );
+      this.shootingTaskStatus = `${taskLabel(kind)}已完成`;
+      this.status = this.shootingTaskStatus;
+    } catch (error) {
+      await this.restoreTaskCameraState(
+        kind,
+        originalCompensation,
+        originalMode
+      );
+      if ((error as Error).message === 'CANCELLED') {
+        this.shootingTaskStatus = '拍摄任务已取消';
+      } else {
+        this.shootingTaskStatus = '拍摄任务失败';
+        this.showError((error as Error).message);
+      }
+      this.status = this.shootingTaskStatus;
+    } finally {
+      this.shootingTaskRunning = false;
+      if (this.liveView && this.camera.isLiveView) {
+        this.startPreviewLoop();
+      }
+    }
+  }
+
+  private cancelShootingTask(): void {
+    this.shootingTaskGeneration++;
+    this.shootingTaskStatus = '正在取消拍摄任务…';
+  }
+
+  private async restoreTaskCameraState(
+    kind: string,
+    originalCompensation: number,
+    originalMode: string
+  ): Promise<void> {
+    try {
+      if (kind === 'exposure') {
+        await this.camera.setParameter(
+          'exposureCompensation',
+          originalCompensation
+        );
+      }
+      if (kind === 'bulb' && originalMode !== 'bulb') {
+        await this.camera.setParameter('exposureMode', originalMode);
+      }
+    } catch (error) {
+    }
   }
 
   private async toggleVideoRecording(): Promise<void> {
@@ -2389,10 +3285,47 @@ struct Index {
     );
   }
 
+  private openImmersivePreview(monitoring: boolean): void {
+    this.immersiveMonitoring = monitoring;
+    this.immersiveLandscape = this.currentBreakpoint === 'lg';
+    this.immersivePreviewVisible = true;
+    this.startImmersiveOrientationTracking();
+  }
+
+  private startImmersiveOrientationTracking(): void {
+    try {
+      sensor.on(
+        sensor.SensorId.ORIENTATION,
+        this.immersiveOrientationListener,
+        { interval: 200000000 }
+      );
+    } catch (error) {
+      this.diagnostics?.warning(
+        'immersive',
+        `无法启用方向传感器，将使用窗口布局：${(error as Error).message}`
+      );
+    }
+  }
+
+  private stopImmersiveOrientationTracking(): void {
+    try {
+      sensor.off(
+        sensor.SensorId.ORIENTATION,
+        this.immersiveOrientationListener
+      );
+    } catch (error) {
+    }
+  }
+
+  private isImmersiveLandscape(): boolean {
+    return this.immersiveLandscape || this.currentBreakpoint === 'lg';
+  }
+
   private closeImmersivePreview(): void {
     if (!this.immersivePreviewVisible) {
       return;
     }
+    this.stopImmersiveOrientationTracking();
     this.immersivePreviewVisible = false;
     setTimeout((): void => {
       this.immersiveMonitoring = false;
@@ -2465,7 +3398,9 @@ struct Index {
 
   private cameraParameter(parameter: string): string {
     if (parameter === 'videoShutter' || parameter === 'photoShutter') {
-      return 'exposureTime';
+      return parameter === 'videoShutter'
+        ? 'videoExposureTime'
+        : 'exposureTime';
     }
     return parameter;
   }
@@ -2479,6 +3414,7 @@ struct Index {
     }
     const numeric: boolean = [
       'exposureTime',
+      'videoExposureTime',
       'aperture',
       'iso',
       'exposureCompensation'
@@ -2499,7 +3435,7 @@ struct Index {
     const exposureSeconds: number =
       this.videoShutterAngle / (360 * this.videoFrameRate);
     this.setCameraParameter(
-      'exposureTime',
+      'videoExposureTime',
       new SelectEntry(
         `快门角度 ${this.videoShutterAngle}°（${this.videoFrameRate}p）`,
         exposureSeconds.toString()
@@ -2683,15 +3619,34 @@ struct Index {
     source: string
   ): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
-    if (library === undefined || uris.length === 0) {
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    if (
+      library === undefined ||
+      workflow === undefined ||
+      uris.length === 0
+    ) {
       return;
     }
     let imported: number = 0;
+    const pairNames: Map<string, string> = new Map<string, string>();
     for (let index: number = 0; index < uris.length; index++) {
       const uri: string = uris[index];
       try {
         const name: string = this.externalPhotoName(uri, source, index);
-        library.importFromUri(uri, name);
+        const dot: number = name.lastIndexOf('.');
+        const pairKey: string =
+          (dot > 0 ? name.substring(0, dot) : name).toLowerCase();
+        let reservedBase: string | undefined = pairNames.get(pairKey);
+        if (reservedBase === undefined) {
+          reservedBase = workflow.reserveBaseName(source);
+          pairNames.set(pairKey, reservedBase);
+        }
+        await workflow.importFromUri(
+          uri,
+          name,
+          source,
+          reservedBase
+        );
         imported++;
       } catch (error) {
         this.diagnostics?.error(
@@ -2828,11 +3783,36 @@ struct Index {
 
   private async displayJpeg(jpeg: Uint8Array): Promise<void> {
     const source: image.ImageSource = image.createImageSource(jpeg.buffer);
-    const pixelMap: image.PixelMap = await source.createPixelMap({
+    const sourceMap: image.PixelMap = await source.createPixelMap({
       editable: false,
       desiredPixelFormat: image.PixelMapFormat.RGBA_8888
     });
     source.release();
+    let pixelMap: image.PixelMap = sourceMap;
+    const monitoring: boolean =
+      this.section === 'monitor' || this.immersiveMonitoring;
+    const visualProcessing: boolean =
+      this.focusPeakingEnabled || this.falseColorEnabled;
+    const analyzeFrame: boolean =
+      visualProcessing || this.previewAnalysisSequence++ % 3 === 0;
+    if (monitoring && analyzeFrame) {
+      const result: ProfessionalMonitorResult =
+        await processProfessionalMonitor(
+          sourceMap,
+          this.focusPeakingEnabled,
+          this.falseColorEnabled
+        );
+      pixelMap = result.pixelMap;
+      this.redHistogram = result.redHistogram;
+      this.greenHistogram = result.greenHistogram;
+      this.blueHistogram = result.blueHistogram;
+      this.waveform = result.waveform;
+      this.vectorscope = result.vectorscope;
+      this.peakingCoverage = result.peakingCoverage;
+      if (pixelMap !== sourceMap) {
+        sourceMap.release();
+      }
+    }
     const previous: image.PixelMap | undefined = this.preview;
     this.preview = pixelMap;
     if (previous !== undefined) {
@@ -2892,12 +3872,160 @@ struct Index {
     }
   }
 
-  private async checkForUpdates(): Promise<void> {
+  private async persistAutomaticUpdates(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      await this.settingsPreferences.put(
+        AUTOMATIC_UPDATE_KEY,
+        this.automaticUpdates
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'settings',
+        `无法保存自动更新设置：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async saveMirrorChyanCdk(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      const cdk: string = this.mirrorChyanCdk.trim();
+      if (cdk.length === 0) {
+        await this.settingsPreferences.delete(MIRROR_CHYAN_CDK_KEY);
+        this.updateStatus = 'Mirror酱 CDK 已清除';
+      } else {
+        await this.settingsPreferences.put(MIRROR_CHYAN_CDK_KEY, cdk);
+        this.updateStatus = 'Mirror酱 CDK 已保存';
+      }
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.updateStatus = 'Mirror酱 CDK 保存失败';
+      this.diagnostics?.error(
+        'update',
+        `无法保存 Mirror酱 CDK：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async checkForUpdates(silent: boolean): Promise<void> {
     if (this.updateChecking) {
       return;
     }
     this.updateChecking = true;
-    this.updateStatus = '正在检查更新…';
+    if (!silent) {
+      this.updateStatus = '正在检查更新…';
+    }
+    try {
+      let candidate: UpdateCandidate;
+      try {
+        candidate = await this.checkMirrorChyan();
+        if (
+          this.isNewerVersion(candidate.version, CURRENT_VERSION) &&
+          candidate.url.length === 0
+        ) {
+          const github: UpdateCandidate = await this.checkGitHub();
+          candidate = new UpdateCandidate(
+            candidate.version,
+            github.url,
+            candidate.notice
+          );
+        }
+      } catch (error) {
+        const mirrorError: MirrorChyanRequestError =
+          error as MirrorChyanRequestError;
+        this.diagnostics?.warning(
+          'update',
+          `Mirror酱检查失败，准备回退 GitHub；code=${mirrorError.code}`
+        );
+        const github: UpdateCandidate = await this.checkGitHub();
+        candidate = new UpdateCandidate(
+          github.version,
+          github.url,
+          this.mirrorFallbackStatus(mirrorError.code)
+        );
+      }
+      if (!this.isNewerVersion(candidate.version, CURRENT_VERSION)) {
+        this.availableVersion = '';
+        this.availableUpdateUrl = '';
+        this.updateStatus = '已是最新版本';
+        if (candidate.notice.length > 0) {
+          this.updateStatus += ` · ${candidate.notice}`;
+        }
+        return;
+      }
+
+      this.availableVersion = candidate.version;
+      this.availableUpdateUrl = candidate.url;
+      this.updateStatus = `发现新版本 ${candidate.version}`;
+      if (candidate.notice.length > 0) {
+        this.updateStatus += ` · ${candidate.notice}`;
+      }
+      this.diagnostics?.info('update', this.updateStatus);
+    } catch (error) {
+      if (!silent) {
+        this.updateStatus = '检查失败，请确认网络后重试';
+      }
+      this.diagnostics?.error(
+        'update',
+        `检查更新失败：${(error as BusinessError).message}`
+      );
+    } finally {
+      this.updateChecking = false;
+    }
+  }
+
+  private async checkMirrorChyan(): Promise<UpdateCandidate> {
+    let endpoint: string =
+      `${MIRROR_CHYAN_API}?current_version=${encodeURIComponent(`v${CURRENT_VERSION}`)}`
+      + '&user_agent=ZENCHE_HarmonyOS&channel=stable';
+    const cdk: string = this.mirrorChyanCdk.trim();
+    if (cdk.length > 0) {
+      endpoint += `&cdk=${encodeURIComponent(cdk)}`;
+    }
+    const request: http.HttpRequest = http.createHttp();
+    try {
+      const response: http.HttpResponse = await request.request(
+        endpoint,
+        {
+          method: http.RequestMethod.GET,
+          header: {
+            'Accept': 'application/json',
+            'User-Agent': `ZENCHE-HarmonyOS/${CURRENT_VERSION}`
+          },
+          connectTimeout: 20000,
+          readTimeout: 20000,
+          expectDataType: http.HttpDataType.STRING
+        }
+      );
+      const root: MirrorChyanResponse =
+        JSON.parse(response.result as string) as MirrorChyanResponse;
+      if (root.code !== 0 || root.data === undefined) {
+        throw new MirrorChyanRequestError(root.code, root.msg);
+      }
+      let url: string = root.data.url ?? '';
+      let notice: string = '';
+      if ((root.data.update_type ?? '').toLowerCase() === 'incremental') {
+        url = '';
+        notice =
+          'Mirror酱未返回可直接安装的完整包，已回退 GitHub';
+      }
+      return new UpdateCandidate(
+        this.normalizeVersion(root.data.version_name),
+        url,
+        notice
+      );
+    } finally {
+      request.destroy();
+    }
+  }
+
+  private async checkGitHub(): Promise<UpdateCandidate> {
     const request: http.HttpRequest = http.createHttp();
     try {
       const response: http.HttpResponse = await request.request(
@@ -2918,14 +4046,6 @@ struct Index {
       }
       const release: GitHubRelease =
         JSON.parse(response.result as string) as GitHubRelease;
-      const version: string = this.normalizeVersion(release.tag_name);
-      if (!this.isNewerVersion(version, CURRENT_VERSION)) {
-        this.availableVersion = '';
-        this.availableUpdateUrl = '';
-        this.updateStatus = '已是最新版本';
-        return;
-      }
-
       let targetUrl: string = release.html_url;
       for (const asset of release.assets) {
         if (asset.name.endsWith('-HarmonyOS.hap')) {
@@ -2933,19 +4053,31 @@ struct Index {
           break;
         }
       }
-      this.availableVersion = version;
-      this.availableUpdateUrl = targetUrl;
-      this.updateStatus = `发现新版本 ${version}`;
-      this.diagnostics?.info('update', this.updateStatus);
-    } catch (error) {
-      this.updateStatus = '检查失败，请确认网络后重试';
-      this.diagnostics?.error(
-        'update',
-        `检查更新失败：${(error as BusinessError).message}`
+      return new UpdateCandidate(
+        this.normalizeVersion(release.tag_name),
+        targetUrl
       );
     } finally {
-      this.updateChecking = false;
       request.destroy();
+    }
+  }
+
+  private mirrorFallbackStatus(code: number): string {
+    switch (code) {
+      case 7001:
+        return 'Mirror酱 CDK 已过期，已回退 GitHub';
+      case 7002:
+        return 'Mirror酱 CDK 无效，已回退 GitHub';
+      case 7003:
+        return 'Mirror酱今日下载额度已用完，已回退 GitHub';
+      case 7004:
+        return 'Mirror酱 CDK 与资源不匹配，已回退 GitHub';
+      case 7005:
+        return 'Mirror酱 CDK 已被停用，已回退 GitHub';
+      case 8001:
+        return 'Mirror酱资源尚未配置，已回退 GitHub';
+      default:
+        return 'Mirror酱暂不可用，已回退 GitHub';
     }
   }
 
@@ -2963,6 +4095,40 @@ struct Index {
     } catch (error) {
       this.showError(
         `无法打开更新页：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async openMirrorChyan(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    const url: string =
+      'https://mirrorchyan.com/zh/projects'
+      + `?rid=${encodeURIComponent(MIRROR_CHYAN_RESOURCE_ID)}`
+      + '&source=zenche_harmonyos_settings';
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri: url
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开 Mirror酱：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async openAfdian(): Promise<void> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      await context.startAbility({
+        action: 'ohos.want.action.viewData',
+        uri: AFDIAN_URL
+      });
+    } catch (error) {
+      this.showError(
+        `无法打开爱发电页面：${(error as BusinessError).message}`
       );
     }
   }

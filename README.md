@@ -27,7 +27,7 @@
 Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、
 管理、导入与分享。
 
-- 当前源码版本：**1.0.0**
+- 当前源码版本：**1.1.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**17 款 Nikon EXPEED 6 / 7 机型**
@@ -53,14 +53,15 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 
 | 环节 | 能力 |
 | --- | --- |
-| Capture · 拍摄 | USB 识别、实时取景、SDRAM 拍摄、JPEG 下载；支持 P / S / A / M 与 M 模式 B 门 |
+| Capture · 拍摄 | USB 识别、实时取景、SDRAM 拍摄、JPEG 下载；支持间隔拍摄、曝光包围、焦点包围与 B 门计时 |
 | Control · 控制 | 快门、光圈、ISO、曝光补偿、对焦模式、白平衡与 Picture Control |
-| Monitor · 监看 | 快门角度换算、加亮显示条纹、自定义 3D `.cube` LUT 与本地 2× 超采样 |
+| Monitor · 监看 | 快门角度换算、RGB 直方图、波形、矢量示波器、峰值对焦、假色、条纹图案与自定义 3D `.cube` LUT |
 | Connect · 传输 | 内置 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
-| Flow · 管理 | JPEG、NEF、HEIF/HEIC、TIFF 本地图库，支持导入、预览、分享与保存到系统相册 |
+| Flow · 管理 | 项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份、SHA-256，以及本地图库导入、预览与分享 |
 | Diagnose · 诊断 | 隐私脱敏的滚动日志、版本检查与预填 GitHub Issue |
 
-LUT、条纹图案和超采样只影响监看画面，不修改原片，也不写入相机的视频设置。
+LUT、直方图、波形、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
+不修改原片，也不写入相机的视频设置。
 具体能力取决于平台、相机固件、镜头和当前拍摄模式。
 
 ## 平台支持
@@ -112,16 +113,16 @@ USB 主机组合均已完成实机验证。请使用
 ## 下载与安装
 
 前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
-版本及同名 `.sha256` 校验文件。1.0.0 的交付文件命名如下：
+版本及同名 `.sha256` 校验文件。1.1.0 的交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.0.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.0.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.0.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.0.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.0.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.0.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.1.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.1.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -132,14 +133,28 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.0.0-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.1.0-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.0.0-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.1.0-Windows-x64-Setup.exe -Algorithm SHA256
 ```
+
+### 自动更新与 Mirror酱
+
+五个原生客户端会在启用“启动时自动检查更新”后优先请求
+[Mirror酱](https://mirrorchyan.com)，并在服务不可用、CDK 无效或没有可直接安装的
+完整包时自动回退 GitHub Releases。设置页可填写可选 CDK；iOS / iPadOS 与 macOS
+保存到系统钥匙串，Android 使用 Android Keystore，Windows 使用 DPAPI，
+HarmonyOS 保存到应用私有设置，所有平台都不会把 CDK 写入诊断日志。
+
+为避免破坏签名与平台安装状态，客户端不会直接覆盖应用文件，也不会应用
+Mirror酱增量包；仅接受完整安装包并交给各平台原生安装流程。资源标识当前预留为
+`ZENCHE`。在 Mirror酱完成资源注册和平台包映射前，客户端会显示“资源尚未配置”
+并继续使用 GitHub，不影响原有更新检查。服务端接入与上传令牌配置请参考
+[MirrorChyan 官方集成指南](https://github.com/MirrorChyan/docs)。
 
 ## USB 快速开始
 
@@ -283,7 +298,7 @@ implementations where the operating system permits it, provides live view and
 capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Source version: **1.0.0**
+- Source version: **1.1.0**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **17 Nikon EXPEED 6 / 7 bodies**
@@ -299,15 +314,16 @@ in a local library for review and export.
 
 | Stage | Capabilities |
 | --- | --- |
-| Capture | USB detection, live view, SDRAM capture, JPEG download, P/S/A/M, and timed Bulb in M mode |
+| Capture | USB detection, live view, SDRAM capture, JPEG download, interval capture, exposure bracketing, focus bracketing, and timed Bulb |
 | Control | Shutter speed, aperture, ISO, exposure compensation, focus mode, white balance, and Picture Control |
-| Monitor | Shutter-angle conversion, highlight zebra, custom 3D `.cube` LUTs, and local 2× supersampling |
+| Monitor | Shutter-angle conversion, RGB histograms, waveform, vectorscope, focus peaking, false color, zebra, and custom 3D `.cube` LUTs |
 | Connect | Built-in FTP/PASV, HTTP PUT/POST, and WebDAV inboxes |
-| Flow | Local JPEG, NEF, HEIF/HEIC, and TIFF library with import, preview, sharing, and Photos export |
+| Flow | Project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, SHA-256, and local import, preview, and sharing |
 | Diagnose | Privacy-redacted rolling logs, update checks, and prefilled GitHub Issues |
 
-LUTs, zebra overlays, and supersampling affect only the monitoring image. They
-do not modify the original file or write video settings to the camera.
+LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
+monitoring image. They do not modify the original file or write video settings
+to the camera.
 Capabilities vary with the platform, camera firmware, lens, and shooting mode.
 
 ### Platform support
@@ -357,23 +373,42 @@ completed hardware validation.
 ### Download and install
 
 Download published packages and their matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.0.0
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.1.0
 uses the following delivery names:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.0.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.0.0-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.0.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.0.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.0.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.0.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.1.0-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.1.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
 the interface driver can affect NX Tether, Camera Control Pro, or system photo
 import. See [HarmonyOS build and deployment](docs/HARMONY_BUILD.md) and
 [iOS signing and release](docs/IOS_SIGNING.md) for platform signing details.
+
+### Automatic updates and MirrorChyan
+
+When **Automatically check for updates at launch** is enabled, all five native
+clients query [MirrorChyan](https://mirrorchyan.com) first and fall back to
+GitHub Releases when the service is unavailable, the CDK is invalid, or no
+directly installable full package is returned. The optional CDK is stored in
+the Apple Keychain on iOS, iPadOS, and macOS, Android Keystore on Android,
+DPAPI on Windows, and private app settings on HarmonyOS. It is never written
+to diagnostic logs.
+
+To preserve code signatures and platform installation state, clients do not
+overwrite application files or apply MirrorChyan incremental packages. They
+accept full installers only and hand them to the native installation flow.
+The reserved resource ID is `ZENCHE`. Until that resource and its platform
+package mappings are registered with MirrorChyan, clients report that the
+resource is not configured and continue using GitHub. See the
+[official MirrorChyan integration guide](https://github.com/MirrorChyan/docs)
+for server-side registration and upload-token setup.
 
 ### USB quick start
 
@@ -467,7 +502,7 @@ OS が許可する環境では Nikon カメラを USB/PTP で接続・制御し�
 WebDAV で画像を受信して、同じアプリ内でプレビュー、管理、読み込み、共有まで
 行えます。
 
-- 現在のソースバージョン：**1.0.0**
+- 現在のソースバージョン：**1.1.0**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon EXPEED 6 / 7 の 17 機種**
@@ -483,15 +518,15 @@ WebDAV で画像を受信して、同じアプリ内でプレビュー、管理�
 
 | 工程 | 機能 |
 | --- | --- |
-| Capture · 撮影 | USB 検出、ライブビュー、SDRAM 撮影、JPEG ダウンロード、P/S/A/M、M モードの時間指定バルブ |
+| Capture · 撮影 | USB 検出、ライブビュー、SDRAM 撮影、JPEG ダウンロード、インターバル撮影、露出ブラケット、フォーカスブラケット、時間指定バルブ |
 | Control · 制御 | シャッター速度、絞り、ISO、露出補正、フォーカスモード、ホワイトバランス、Picture Control |
-| Monitor · モニター | シャッター角度換算、ハイライトゼブラ、カスタム 3D `.cube` LUT、ローカル 2× スーパーサンプリング |
+| Monitor · モニター | シャッター角度換算、RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT |
 | Connect · 転送 | 内蔵 FTP/PASV、HTTP PUT/POST、WebDAV 受信ボックス |
-| Flow · 管理 | JPEG、NEF、HEIF/HEIC、TIFF のローカルライブラリ、読み込み、プレビュー、共有、「写真」への保存 |
+| Flow · 管理 | プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256、ローカル読み込み、プレビュー、共有 |
 | Diagnose · 診断 | プライバシー情報を除去したローテーションログ、更新確認、入力済み GitHub Issue |
 
-LUT、ゼブラ、スーパーサンプリングはモニター画像だけに適用されます。原本を変更
-したり、カメラ本体の動画設定へ書き込んだりしません。利用できる機能は、
+LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
+適用されます。原本を変更したり、カメラ本体の動画設定へ書き込んだりしません。利用できる機能は、
 プラットフォーム、ファームウェア、レンズ、撮影モードによって異なります。
 
 ### プラットフォーム対応
@@ -540,17 +575,17 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 ### ダウンロードとインストール
 
 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から公開済み
-パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.0.0 の
+パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.1.0 の
 配布ファイル名は次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.0.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.0.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.0.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.0.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.0.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.0.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.1.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.1.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
@@ -558,6 +593,23 @@ Windows ではカメラの PTP インターフェースを WinUSB に割り当�
 確認してください。署名については
 [HarmonyOS ビルドと配備](docs/HARMONY_BUILD.md)および
 [iOS 署名とリリース](docs/IOS_SIGNING.md)を参照してください。
+
+### 自動更新と MirrorChyan
+
+「起動時にアップデートを自動確認」を有効にすると、5 つのネイティブクライアントは
+まず [MirrorChyan](https://mirrorchyan.com) を確認し、サービスを利用できない場合、
+CDK が無効な場合、または直接インストールできる完全パッケージが返らない場合に
+GitHub Releases へ自動的に切り替えます。任意の CDK は iOS / iPadOS と macOS
+では Apple Keychain、Android では Android Keystore、Windows では DPAPI、
+HarmonyOS ではアプリの非公開設定に保存され、診断ログには記録されません。
+
+コード署名と各プラットフォームのインストール状態を保護するため、クライアントは
+アプリファイルを直接上書きせず、MirrorChyan の差分パッケージも適用しません。
+完全なインストーラーのみを各 OS の標準インストール手順へ渡します。予約済みの
+リソース ID は `ZENCHE` です。MirrorChyan 側でリソース登録とプラットフォーム別
+パッケージの対応付けが完了するまでは「リソース未設定」と表示し、GitHub による
+更新確認を継続します。サーバー側の登録とアップロードトークン設定は
+[MirrorChyan 公式統合ガイド](https://github.com/MirrorChyan/docs)を参照してください。
 
 ### USB クイックスタート
 

@@ -40,20 +40,48 @@ internal static class AppLocalization
                 new(
                     "Support ongoing maintenance and compatibility with more camera models.",
                     "継続的なメンテナンスと新しいカメラへの対応をご支援ください。"),
+            ["爱发电赞助"] =
+                new("Afdian Support", "Afdian で支援"),
+            ["扫描二维码，或打开爱发电主页支持项目。"] =
+                new(
+                    "Scan the QR code or open the Afdian page to support the project.",
+                    "QR コードを読み取るか、Afdian ページを開いてプロジェクトを支援できます。"),
+            ["快速问题反馈"] =
+                new(
+                    "Faster Problem Feedback",
+                    "より迅速な問題フィードバック"),
+            ["公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。"] =
+                new(
+                    "Public issues remain free on GitHub. Afdian sponsors can access a faster feedback channel.",
+                    "公開 Issue は引き続き GitHub から無料で送信できます。Afdian で支援すると、より迅速なフィードバック窓口を利用できます。"),
+            ["官方 QQ 群：165315727"] =
+                new(
+                    "Official QQ group: 165315727",
+                    "公式 QQ グループ：165315727"),
+            ["打开爱发电"] =
+                new("Open Afdian", "Afdian を開く"),
+            ["赞助不会解锁软件功能，也不影响公开 Issue 的处理。"] =
+                new(
+                    "Sponsorship does not unlock app features or affect public issue handling.",
+                    "支援によってアプリ機能が解除されたり、公開 Issue の対応が変わったりすることはありません。"),
+            ["软件功能永久免费，赞助为自愿行为。"] =
+                new(
+                    "App features remain free; sponsorship is voluntary.",
+                    "アプリの機能は無料のままで、ご支援は任意です。"),
             ["更新公告"] =
                 new("What's New", "アップデートのお知らせ"),
             ["本次更新"] =
                 new("In This Update", "今回の更新"),
-            ["• 新增启动更新公告，并支持按版本控制提醒。\n" +
-             "• 五端公告与赞助入口保持一致。\n" +
-             "• 更新赞助图片并优化多语言体验。"] =
+            ["• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n" +
+             "• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n" +
+             "• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。"] =
                 new(
-                    "• Added a launch announcement with per-version reminder control.\n" +
-                    "• Kept announcements and support entry points consistent across all five platforms.\n" +
-                    "• Updated the support image and improved the multilingual experience.",
-                    "• 起動時のお知らせとバージョンごとの通知設定を追加しました。\n" +
-                    "• 5 つのプラットフォームでお知らせと支援画面を統一しました。\n" +
-                    "• 支援用画像を更新し、多言語表示を改善しました。"),
+                    "• Added interval capture, exposure bracketing, focus bracketing, and timed Bulb.\n" +
+                    "• Added project sessions, naming templates, RAW + JPEG pairing, dual-destination backup, and SHA-256.\n" +
+                    "• Added RGB histograms, waveform, vectorscope, focus peaking, and false color.",
+                    "• インターバル撮影、露出ブラケット、フォーカスブラケット、バルブタイマーを追加しました。\n" +
+                    "• プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、二重保存、SHA-256 を追加しました。\n" +
+                    "• RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラーを追加しました。"),
             ["谨防诈骗"] =
                 new("Scam Warning", "詐欺にご注意ください"),
             ["帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”" +
@@ -120,6 +148,40 @@ internal static class AppLocalization
                 new("Updates have not been checked", "アップデートは未確認です"),
             ["检查更新"] = new("Check for Updates", "アップデートを確認"),
             ["获取更新"] = new("Get Update", "アップデートを入手"),
+            ["优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases"] =
+                new(
+                    "Check MirrorChyan first and fall back to GitHub Releases when no CDN download is available",
+                    "MirrorChyan を優先して確認し、CDN ダウンロードがない場合は GitHub Releases に切り替えます"),
+            ["Mirror酱 CDK（可选）"] =
+                new("MirrorChyan CDK (Optional)", "MirrorChyan CDK（任意）"),
+            ["CDK 使用 Windows DPAPI 加密保存，不会写入诊断日志。"] =
+                new(
+                    "The CDK is encrypted with Windows DPAPI and is never written to diagnostic logs.",
+                    "CDK は Windows DPAPI で暗号化され、診断ログには記録されません。"),
+            ["保存 CDK"] = new("Save CDK", "CDK を保存"),
+            ["打开 Mirror酱"] = new("Open MirrorChyan", "MirrorChyan を開く"),
+            ["Mirror酱 CDK 已清除"] =
+                new("MirrorChyan CDK cleared", "MirrorChyan CDK を消去しました"),
+            ["Mirror酱 CDK 已安全保存"] =
+                new("MirrorChyan CDK saved securely", "MirrorChyan CDK を安全に保存しました"),
+            ["Mirror酱 CDK 保存失败"] =
+                new("Failed to save MirrorChyan CDK", "MirrorChyan CDK の保存に失敗しました"),
+            ["Mirror酱 CDK 已过期，已回退 GitHub"] =
+                new("MirrorChyan CDK expired; using GitHub", "MirrorChyan CDK の期限が切れています。GitHub を使用します"),
+            ["Mirror酱 CDK 无效，已回退 GitHub"] =
+                new("MirrorChyan CDK is invalid; using GitHub", "MirrorChyan CDK が無効です。GitHub を使用します"),
+            ["Mirror酱今日下载额度已用完，已回退 GitHub"] =
+                new("MirrorChyan daily quota is exhausted; using GitHub", "MirrorChyan の本日の上限に達しました。GitHub を使用します"),
+            ["Mirror酱 CDK 与资源不匹配，已回退 GitHub"] =
+                new("MirrorChyan CDK does not match this resource; using GitHub", "MirrorChyan CDK がリソースと一致しません。GitHub を使用します"),
+            ["Mirror酱 CDK 已被停用，已回退 GitHub"] =
+                new("MirrorChyan CDK is disabled; using GitHub", "MirrorChyan CDK は無効化されています。GitHub を使用します"),
+            ["Mirror酱资源尚未配置，已回退 GitHub"] =
+                new("MirrorChyan resource is not configured; using GitHub", "MirrorChyan リソースは未設定です。GitHub を使用します"),
+            ["Mirror酱暂不可用，已回退 GitHub"] =
+                new("MirrorChyan is unavailable; using GitHub", "MirrorChyan は利用できません。GitHub を使用します"),
+            ["Mirror酱未返回可直接安装的完整包，已回退 GitHub"] =
+                new("MirrorChyan did not return a full installer; using GitHub", "MirrorChyan から完全なインストーラーが返されなかったため、GitHub を使用します"),
             ["诊断日志"] = new("Diagnostic Logs", "診断ログ"),
             ["查询日志"] = new("View Logs", "ログを表示"),
             ["打开日志目录"] = new("Open Log Folder", "ログフォルダを開く"),
@@ -242,7 +304,44 @@ internal static class AppLocalization
                     "Choose Photos or Videos from a Cloud Drive",
                     "クラウドドライブから写真または動画を選択"),
             ["所有文件"] = new("All Files", "すべてのファイル"),
-            ["照片与视频"] = new("Photos and Videos", "写真と動画")
+            ["照片与视频"] = new("Photos and Videos", "写真と動画"),
+            ["拍摄任务"] = new("Shooting Task", "撮影タスク"),
+            ["任务类型"] = new("Task Type", "タスクの種類"),
+            ["间隔拍摄"] = new("Interval Capture", "インターバル撮影"),
+            ["曝光包围"] = new("Exposure Bracketing", "露出ブラケット"),
+            ["焦点包围"] = new("Focus Bracketing", "フォーカスブラケット"),
+            ["B 门计时"] = new("Timed Bulb", "バルブタイマー"),
+            ["开始任务"] = new("Start Task", "タスクを開始"),
+            ["取消任务"] = new("Cancel Task", "タスクをキャンセル"),
+            ["正在取消拍摄任务…"] = new("Cancelling shooting task…", "撮影タスクをキャンセル中…"),
+            ["拍摄任务已取消"] = new("Shooting task cancelled", "撮影タスクをキャンセルしました"),
+            ["拍摄任务失败"] = new("Shooting task failed", "撮影タスクに失敗しました"),
+            ["准备中"] = new("Preparing", "準備中"),
+            ["已完成"] = new("Completed", "完了"),
+            ["张数"] = new("Shots", "枚数"),
+            ["间隔"] = new("Interval", "間隔"),
+            ["曝光时长"] = new("Exposure Duration", "露光時間"),
+            ["秒"] = new("Seconds", "秒"),
+            ["包围步长"] = new("Bracket Step", "ブラケット幅"),
+            ["专业监看"] = new("Professional Monitoring", "プロモニター"),
+            ["峰值对焦"] = new("Focus Peaking", "フォーカスピーキング"),
+            ["假色曝光"] = new("False Color", "フォルスカラー"),
+            ["波形"] = new("Waveform", "波形"),
+            ["矢量"] = new("Vectorscope", "ベクトルスコープ"),
+            ["峰值覆盖"] = new("Peaking Coverage", "ピーキング範囲"),
+            ["拍摄会话"] = new("Capture Session", "撮影セッション"),
+            ["项目名称"] = new("Project Name", "プロジェクト名"),
+            ["命名模板"] = new("Naming Template", "命名テンプレート"),
+            ["创作者"] = new("Creator", "作成者"),
+            ["版权"] = new("Rights", "著作権"),
+            ["默认评级"] = new("Default Rating", "既定の評価"),
+            ["双目标备份"] = new("Dual-Destination Backup", "二重保存"),
+            ["开始会话"] = new("Start Session", "セッションを開始"),
+            ["结束会话"] = new("End Session", "セッションを終了"),
+            ["配置并开始"] = new("Configure and Start", "設定して開始"),
+            ["尚未开始拍摄会话"] = new("No capture session started", "撮影セッションは未開始です"),
+            ["会话进行中"] = new("Session Active", "セッション実行中"),
+            ["拍摄会话已结束"] = new("Capture session ended", "撮影セッションを終了しました")
         };
 
     private static readonly Dictionary<DependencyObject, string> OriginalText = [];

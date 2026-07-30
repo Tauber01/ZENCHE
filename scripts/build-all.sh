@@ -2,6 +2,18 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
+
+DIST="$PROJECT_ROOT/dist"
+ARCHIVE="$DIST/旧版"
+CURRENT_VERSION=$(node -e "console.log(require('$PROJECT_ROOT/package.json').version)" 2>/dev/null || echo "1.1.0")
+echo "归档 $CURRENT_VERSION 之前的旧版安装包…"
+for f in "$DIST"/*; do
+  base=$(basename "$f")
+  [[ "$base" == "旧版" || "$base" == ".DS_Store" || "$base" == ZENCHE-${CURRENT_VERSION}* ]] && continue
+  [[ -f "$f" ]] && mv "$f" "$ARCHIVE/"
+done
+echo "归档完成。"
+
 "$PROJECT_ROOT/scripts/build-macos.sh"
 "$PROJECT_ROOT/scripts/build-android.sh"
 if command -v xcodebuild >/dev/null &&

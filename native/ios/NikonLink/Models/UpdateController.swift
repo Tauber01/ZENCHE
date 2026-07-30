@@ -1,5 +1,52 @@
 import Foundation
+import Security
 import UIKit
+
+private struct MirrorChyanResponse: Decodable {
+    let code: Int
+    let msg: String
+    let data: MirrorChyanVersion?
+}
+
+private struct MirrorChyanVersion: Decodable {
+    let versionName: String
+    let downloadURL: URL?
+    let updateType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case versionName = "version_name"
+        case downloadURL = "url"
+        case updateType = "update_type"
+    }
+}
+
+private struct MirrorChyanServiceError: LocalizedError {
+    let code: Int
+    let message: String
+
+    var errorDescription: String? {
+        "MirrorChyan \(code): \(message)"
+    }
+
+    var fallbackStatus: String {
+        switch code {
+        case 7001:
+            return "Mirror酱 CDK 已过期，已回退 GitHub"
+        case 7002:
+            return "Mirror酱 CDK 无效，已回退 GitHub"
+        case 7003:
+            return "Mirror酱今日下载额度已用完，已回退 GitHub"
+        case 7004:
+            return "Mirror酱 CDK 与资源不匹配，已回退 GitHub"
+        case 7005:
+            return "Mirror酱 CDK 已被停用，已回退 GitHub"
+        case 8001:
+            return "Mirror酱资源尚未配置，已回退 GitHub"
+        default:
+            return "Mirror酱暂不可用，已回退 GitHub"
+        }
+    }
+}
 
 private struct GitHubRelease: Decodable {
     let tagName: String
@@ -13,19 +60,37 @@ private struct GitHubRelease: Decodable {
 
 @MainActor
 final class UpdateController: ObservableObject {
+    private static let defaultMirrorChyanResourceID = "ZENCHE"
+    private static let mirrorChyanResourceID =
+        ProcessInfo.processInfo.environment[
+            "ZENCHE_MIRRORCHYAN_RESOURCE_ID"
+        ]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty ?? defaultMirrorChyanResourceID
     private static let latestReleaseAPI = URL(
         string: "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest"
+    )!
+    private static let releasesURL = URL(
+        string: "https://github.com/Tauber01/ZENCHE/releases"
     )!
     private static let repositoryURL = URL(
         string: "https://github.com/Tauber01/ZENCHE"
     )!
     private static let automaticUpdateKey = "NikonLink.automaticallyChecksForUpdates"
+    private static let keychainService = "com.tauber.nikonlink.mirrorchyan"
+    private static let keychainAccount = "cdk"
 
     @Published var automaticallyChecksForUpdates: Bool {
         didSet {
             UserDefaults.standard.set(
                 automaticallyChecksForUpdates,
                 forKey: Self.automaticUpdateKey
+            )
+        }
+    }
+    @Published var mirrorChyanCDK: String {
+        didSet {
+            Self.saveMirrorChyanCDK(
+                mirrorChyanCDK.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
     }
@@ -37,7 +102,7 @@ final class UpdateController: ObservableObject {
     var currentVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.0.0"
+        ) as? String ?? "1.1.0"
     }
 
     init() {
@@ -48,6 +113,7 @@ final class UpdateController: ObservableObject {
                 forKey: Self.automaticUpdateKey
             )
         }
+        mirrorChyanCDK = Self.loadMirrorChyanCDK()
     }
 
     func checkAutomaticallyIfNeeded() {
@@ -65,52 +131,192 @@ final class UpdateController: ObservableObject {
         Task {
             defer { isChecking = false }
             do {
-                var request = URLRequest(url: Self.latestReleaseAPI)
-                request.timeoutInterval = 20
-                request.setValue(
-                    "application/vnd.github+json",
-                    forHTTPHeaderField: "Accept"
-                )
-                request.setValue(
-                    "ZENCHE-iOS/\(currentVersion)",
-                    forHTTPHeaderField: "User-Agent"
-                )
-                let (data, response) = try await URLSession.shared.data(for: request)
-                guard let response = response as? HTTPURLResponse,
-                      (200..<300).contains(response.statusCode) else {
-                    throw URLError(.badServerResponse)
-                }
-
-                let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-                let version = Self.normalizedVersion(release.tagName)
-                guard Self.isNewer(version, than: currentVersion) else {
-                    availableVersion = nil
-                    releaseURL = nil
-                    statusText = "已是最新版本"
-                    return
-                }
-
-                availableVersion = version
-                releaseURL = release.htmlURL
-                statusText = "发现新版本 \(version)"
+                let version = try await fetchMirrorChyanVersion()
+                applyMirrorChyanVersion(version)
             } catch {
-                if !silent {
-                    statusText = "检查失败，请确认网络后重试"
-                }
-                DiagnosticLogger.shared.error(
+                let fallbackStatus = (error as? MirrorChyanServiceError)?
+                    .fallbackStatus ?? "Mirror酱暂不可用，已回退 GitHub"
+                DiagnosticLogger.shared.warning(
                     "update",
-                    "检查更新失败：\(error.localizedDescription)"
+                    "Mirror酱检查失败，准备回退 GitHub：\(error.localizedDescription)"
                 )
+                do {
+                    let release = try await fetchGitHubRelease()
+                    applyGitHubRelease(release, fallbackStatus: fallbackStatus)
+                } catch {
+                    if !silent {
+                        statusText = "检查失败，请确认网络后重试"
+                    }
+                    DiagnosticLogger.shared.error(
+                        "update",
+                        "检查更新失败：\(error.localizedDescription)"
+                    )
+                }
             }
         }
     }
 
     func openAvailableUpdate() {
-        UIApplication.shared.open(releaseURL ?? Self.repositoryURL)
+        UIApplication.shared.open(releaseURL ?? Self.releasesURL)
     }
 
     func openProjectPage() {
         UIApplication.shared.open(Self.repositoryURL)
+    }
+
+    func openMirrorChyan() {
+        UIApplication.shared.open(Self.mirrorChyanWebsiteURL)
+    }
+
+    private func fetchMirrorChyanVersion() async throws -> MirrorChyanVersion {
+        var components = URLComponents(
+            string: "https://mirrorchyan.com/api/resources/"
+                + "\(Self.mirrorChyanResourceID)/latest"
+        )!
+        var queryItems = [
+            URLQueryItem(
+                name: "current_version",
+                value: "v\(currentVersion)"
+            ),
+            URLQueryItem(name: "user_agent", value: "ZENCHE_iOS"),
+            URLQueryItem(name: "channel", value: "stable")
+        ]
+        let cdk = mirrorChyanCDK.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        if !cdk.isEmpty {
+            queryItems.append(URLQueryItem(name: "cdk", value: cdk))
+        }
+        components.queryItems = queryItems
+
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 20
+        request.setValue(
+            "ZENCHE-iOS/\(currentVersion)",
+            forHTTPHeaderField: "User-Agent"
+        )
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let response = try JSONDecoder().decode(
+            MirrorChyanResponse.self,
+            from: data
+        )
+        guard response.code == 0, let version = response.data else {
+            throw MirrorChyanServiceError(
+                code: response.code,
+                message: response.msg
+            )
+        }
+        return version
+    }
+
+    private func fetchGitHubRelease() async throws -> GitHubRelease {
+        var request = URLRequest(url: Self.latestReleaseAPI)
+        request.timeoutInterval = 20
+        request.setValue(
+            "application/vnd.github+json",
+            forHTTPHeaderField: "Accept"
+        )
+        request.setValue(
+            "ZENCHE-iOS/\(currentVersion)",
+            forHTTPHeaderField: "User-Agent"
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse,
+              (200..<300).contains(response.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return try JSONDecoder().decode(GitHubRelease.self, from: data)
+    }
+
+    private func applyMirrorChyanVersion(_ update: MirrorChyanVersion) {
+        let version = Self.normalizedVersion(update.versionName)
+        guard Self.isNewer(version, than: currentVersion) else {
+            availableVersion = nil
+            releaseURL = nil
+            statusText = "已是最新版本"
+            return
+        }
+
+        availableVersion = version
+        releaseURL = update.updateType?.lowercased() == "incremental"
+            ? Self.releasesURL
+            : update.downloadURL ?? Self.releasesURL
+        statusText = "发现新版本 \(version)"
+    }
+
+    private func applyGitHubRelease(
+        _ release: GitHubRelease,
+        fallbackStatus: String
+    ) {
+        let version = Self.normalizedVersion(release.tagName)
+        guard Self.isNewer(version, than: currentVersion) else {
+            availableVersion = nil
+            releaseURL = nil
+            statusText = "已是最新版本 · \(fallbackStatus)"
+            return
+        }
+
+        availableVersion = version
+        releaseURL = release.htmlURL
+        statusText = "发现新版本 \(version) · \(fallbackStatus)"
+    }
+
+    private static var mirrorChyanWebsiteURL: URL {
+        var components = URLComponents(
+            string: "https://mirrorchyan.com/zh/projects"
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "rid", value: mirrorChyanResourceID),
+            URLQueryItem(name: "source", value: "zenche_ios_settings")
+        ]
+        return components.url!
+    }
+
+    private static func loadMirrorChyanCDK() -> String {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(
+            query as CFDictionary,
+            &item
+        ) == errSecSuccess,
+        let data = item as? Data,
+        let value = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        return value
+    }
+
+    private static func saveMirrorChyanCDK(_ value: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount
+        ]
+        if value.isEmpty {
+            SecItemDelete(query as CFDictionary)
+            return
+        }
+
+        let data = Data(value.utf8)
+        let attributes: [String: Any] = [
+            kSecValueData as String: data
+        ]
+        if SecItemUpdate(
+            query as CFDictionary,
+            attributes as CFDictionary
+        ) == errSecItemNotFound {
+            var newItem = query
+            newItem[kSecValueData as String] = data
+            newItem[kSecAttrAccessible as String] =
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(newItem as CFDictionary, nil)
+        }
     }
 
     private static func normalizedVersion(_ value: String) -> String {
@@ -119,5 +325,11 @@ final class UpdateController: ObservableObject {
 
     private static func isNewer(_ candidate: String, than current: String) -> Bool {
         candidate.compare(current, options: .numeric) == .orderedDescending
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

@@ -13,6 +13,20 @@ capability; do not create a separate visual language per platform.
 - Platform-native controls, navigation, accessibility, typography, and settings
   surfaces take precedence over pixel parity.
 
+## Splash screen
+
+- Every native application shows a branded launch screen on cold start.
+- Content: the geometric Z mark centred on a graphite rounded rectangle, followed
+  by the bilingual lockup "帧澈 ZENCHE" and "Capture · Connect · Flow".
+- Animation: Z mark scales up with a spring curve (≈600 ms), brand text fades in
+  (≈400 ms after 500 ms delay), then the splash dissolves (≈500 ms fade) after
+  a total hold of approximately 2.2–2.5 seconds.
+- Background: `Paper` (`oklch(98.5% 0.004 250)`, #F7F9FC).
+- No interactive elements, no skip button, no looping animation.
+- The main workspace must not paint behind the splash; use an overlay or a
+  separate window/surface so the first frame of the main UI is hidden until the
+  splash completes.
+
 ## Genre
 
 modern-minimal
@@ -112,8 +126,10 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - Exposure time, aperture, ISO, exposure compensation, and shutter angle advance
   in camera-standard fine increments (normally 1/3 stop). Values outside the
   connected camera's enumerated or ranged capabilities never become selectable.
-- A parameter reported read-only by the camera is visibly locked before a write is
-  attempted. Its control exposes a short mode- or firmware-specific reason.
+- Camera mode rules lock parameters before a write is attempted. State-sensitive
+  PTP read-only flags are advisory: pause live view and try the supported property
+  candidates before disabling a control, so temporary firmware state is never
+  mistaken for a permanent capability limit.
 - Photo capture uses cobalt; active video capture uses signal red. Text and icons
   remain white or platform-high-contrast against the dark overlay.
 - Every visible control performs a real action. Unsupported camera functions are
@@ -125,10 +141,34 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 
 ## Motion and feedback
 
-- Motion is limited to native state transitions and progress feedback.
-- No decorative animation, bounce, parallax, or repeated reveal effects.
+- Motion serves two purposes: branded launch (splash) and functional UI feedback.
+- Splash animation is the only decorative motion; it runs once per cold start
+  and does not repeat.
+- Within the main workspace, motion is limited to native state transitions
+  (section changes, sheet presentation) and progress feedback (spinners,
+  indeterminate bars).
+- No bounce, parallax, or repeated reveal effects in the workspace.
 - Successful visible changes are silent. Failures state what failed and what to do.
 - Respect Reduce Motion and each platform's accessibility settings.
+  When Reduce Motion is active, the splash appears instantly without scale
+  animation and fades out after a shorter hold.
+
+## Dialogs and support guidance
+
+- Dialogs use a restrained card hierarchy: a concise icon-and-title header,
+  grouped content cards, one visually dominant action, and a clearly reachable
+  close action. Long announcements scroll inside the dialog while the close and
+  reminder controls remain easy to reach.
+- Use platform-native sheets, dialogs, windows, focus handling, and dismissal
+  behavior. Do not imitate another platform's modal chrome.
+- Donation surfaces identify the bundled QR code as 爱发电 / Afdian and provide a
+  native action that opens `https://www.ifdian.net/a/Tauber`.
+- The launch announcement, donation dialog, and issue-reporting surface all state
+  that public issues remain free on GitHub and that users who sponsor through
+  爱发电 can obtain a faster problem-feedback channel.
+- Never imply that sponsorship unlocks application features or guarantees a fix.
+  The software remains free, public Issue handling remains available to everyone,
+  and sponsorship is voluntary.
 
 ## What systems MUST share
 
