@@ -21,18 +21,25 @@ namespace NikonLink.Windows;
 
 public partial class MainWindow : Window
 {
+    private sealed record PreparedPreview(
+        BitmapSource Display,
+        ProfessionalMonitorResult Monitor);
+
     private static readonly string AnnouncementStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "dismissed-announcement-version.txt");
+    private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
     private readonly PtpCamera _camera = new();
     private readonly PhotoLibrary _library = new();
+    private readonly CaptureWorkflow _workflow;
     private readonly WirelessTransferServer _wirelessServer;
     private readonly DiagnosticLogger _diagnostics = DiagnosticLogger.Shared;
     private readonly UpdateService _updateService = new();
     private readonly ObservableCollection<PhotoItem> _photos = [];
     private CancellationTokenSource? _previewCancellation;
     private Task? _previewTask;
+    private CancellationTokenSource? _shootingTaskCancellation;
     private bool _operationInProgress;
     private bool _initializing = true;
     private bool _shutdownStarted;
@@ -42,6 +49,12 @@ public partial class MainWindow : Window
     private double _videoFrameRate = 30;
     private double _videoShutterAngle = 180;
     private double _photoShutterSeconds = 0.008;
+    private string _shootingTaskKind = "interval";
+    private int _shootingTaskCount = 5;
+    private int _shootingTaskInterval = 3;
+    private int _shootingTaskStep = 1;
+    private bool _focusPeakingEnabled;
+    private bool _falseColorEnabled;
     private string? _availableUpdateUrl;
     private bool _checkingForUpdates;
     private bool _announcementShownThisLaunch;
@@ -56,6 +69,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _workflow = new CaptureWorkflow(_library.DirectoryPath);
+        LoadCaptureSessionControls();
         _wirelessServer = new WirelessTransferServer(_library);
         _wirelessServer.StatusChanged += (_, status) =>
             Dispatcher.Invoke(() =>
@@ -94,7 +109,8 @@ public partial class MainWindow : Window
             "按日写入、5 MB 滚动、保留 14 天\n") +
             _diagnostics.DirectoryPath;
         CurrentVersionText.Text = AppLocalization.T(
-            $"当前版本 {_updateService.CurrentVersion} · 从 GitHub Releases 检查新版本");
+            $"当前版本 {_updateService.CurrentVersion} · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases");
+        MirrorChyanCdkBox.Password = _updateService.LoadMirrorChyanCdk();
         ConfigureFineExposureControls();
         ConfigureShutterControl(false);
         RefreshPhotoList();
@@ -107,6 +123,7 @@ public partial class MainWindow : Window
         };
         AppLocalization.Apply(this);
         _initializing = false;
+        ShootingTaskStepText.IsEnabled = false;
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
     }
@@ -215,6 +232,19 @@ public partial class MainWindow : Window
         };
         _immersivePreviewImage = preview;
         root.Children.Add(preview);
+        root.Children.Add(new Border
+        {
+            Width = 84,
+            Height = 84,
+            BorderThickness = new Thickness(2),
+            BorderBrush = new SolidColorBrush(
+                Color.FromArgb(220, 255, 214, 70)),
+            CornerRadius = new CornerRadius(4),
+            Background = Brushes.Transparent,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false
+        });
 
         var top = new DockPanel
         {
@@ -297,6 +327,18 @@ public partial class MainWindow : Window
             _immersiveRecordButton = capture;
         }
         rightRail.Children.Add(capture);
+        var liveView = new Button
+        {
+            Content = AppLocalization.T(
+                _camera.IsLiveView ? "停止取景" : "开启取景"),
+            Height = 44,
+            MinWidth = 92,
+            Margin = new Thickness(0, 10, 0, 0),
+            Style = (Style)FindResource("ButtonBase"),
+            IsEnabled = _camera.IsConnected
+        };
+        liveView.Click += LiveViewButton_Click;
+        rightRail.Children.Add(liveView);
         root.Children.Add(rightRail);
 
         var exposure = new TextBlock
@@ -359,6 +401,46 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Bottom
         };
         root.Children.Add(parameterTray);
+        void ApplyImmersiveLayout()
+        {
+            var landscape = viewer.ActualWidth <= 0 ||
+                viewer.ActualWidth >= viewer.ActualHeight;
+            leftRail.Orientation = landscape
+                ? Orientation.Vertical
+                : Orientation.Horizontal;
+            leftRail.Width = landscape ? 76 : double.NaN;
+            leftRail.HorizontalAlignment = landscape
+                ? HorizontalAlignment.Left
+                : HorizontalAlignment.Center;
+            leftRail.VerticalAlignment = landscape
+                ? VerticalAlignment.Center
+                : VerticalAlignment.Top;
+            leftRail.Margin = landscape
+                ? new Thickness(20, 0, 0, 0)
+                : new Thickness(20, 86, 20, 0);
+
+            rightRail.Orientation = landscape
+                ? Orientation.Vertical
+                : Orientation.Horizontal;
+            rightRail.Width = landscape ? 112 : double.NaN;
+            rightRail.HorizontalAlignment = landscape
+                ? HorizontalAlignment.Right
+                : HorizontalAlignment.Center;
+            rightRail.VerticalAlignment = landscape
+                ? VerticalAlignment.Center
+                : VerticalAlignment.Bottom;
+            rightRail.Margin = landscape
+                ? new Thickness(0, 0, 20, 0)
+                : new Thickness(20, 0, 20, 18);
+
+            parameterTray.Margin = landscape
+                ? new Thickness(112, 0, 124, 78)
+                : new Thickness(18, 0, 18, 168);
+            exposure.Margin = landscape
+                ? new Thickness(0, 0, 0, 24)
+                : new Thickness(0, 0, 0, 122);
+        }
+        viewer.SizeChanged += (_, _) => ApplyImmersiveLayout();
         viewer.Content = root;
         viewer.KeyDown += (_, args) =>
         {
@@ -377,6 +459,7 @@ public partial class MainWindow : Window
             }
         };
         viewer.Show();
+        viewer.Dispatcher.BeginInvoke(ApplyImmersiveLayout);
     }
 
     private Border ImmersiveParameterControl(
@@ -534,13 +617,316 @@ public partial class MainWindow : Window
         await RunOperationAsync("正在拍摄并下载 JPEG…", async token =>
         {
             var jpeg = await _camera.CaptureAsync(token);
-            var path = await _library.SaveCaptureAsync(jpeg, token);
+            var path = await _workflow.StoreAsync(
+                jpeg,
+                "capture.jpg",
+                _camera.Profile?.Name ?? "Nikon 相机",
+                cancellationToken: token);
             DisplayJpeg(jpeg);
             RefreshPhotoList();
             OperationStatusText.Text = AppLocalization.T(
                 $"已保存 {Path.GetFileName(path)}");
         });
     }
+
+    private async Task StartShootingTaskAsync()
+    {
+        if (_operationInProgress || !_camera.IsConnected)
+        {
+            return;
+        }
+        _shootingTaskCancellation?.Cancel();
+        _shootingTaskCancellation?.Dispose();
+        _shootingTaskCancellation = new CancellationTokenSource();
+        var token = _shootingTaskCancellation.Token;
+        var kind = _shootingTaskKind;
+        var count = Math.Clamp(_shootingTaskCount, 1, 999);
+        var interval = Math.Clamp(_shootingTaskInterval, 1, 3600);
+        var step = Math.Clamp(_shootingTaskStep, 1, 3);
+        var originalMode = ExposureModeBox.SelectedItem is ComboBoxItem modeItem
+            ? Convert.ToString(modeItem.Tag) ?? "manual"
+            : "manual";
+        var originalCompensation =
+            ExposureCompensationBox.SelectedItem is ComboBoxItem compensationItem &&
+            double.TryParse(
+                Convert.ToString(compensationItem.Tag),
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out var compensation)
+                ? compensation
+                : 0;
+        _operationInProgress = true;
+        UpdateEnabledState();
+        ShootingTaskButton.Content = AppLocalization.T("取消任务");
+        ShootingTaskStatusText.Text = AppLocalization.T(
+            $"{ShootingTaskLabel(kind)}准备中");
+        await StopPreviewLoopAsync();
+        try
+        {
+            var total = kind == "bulb" ? 1 : count;
+            if (kind == "exposure" && total % 2 == 0)
+            {
+                total++;
+            }
+            if (kind == "focus" && !_camera.IsLiveView)
+            {
+                await _camera.StartLiveViewAsync(token);
+            }
+            if (kind == "bulb")
+            {
+                await _camera.SetParameterAsync("exposureMode", "bulb", token);
+                await _camera.SetParameterAsync(
+                    "bulbDuration",
+                    interval,
+                    token);
+            }
+            for (var index = 0; index < total; index++)
+            {
+                token.ThrowIfCancellationRequested();
+                if (kind == "exposure")
+                {
+                    var center = total / 2;
+                    await _camera.SetParameterAsync(
+                        "exposureCompensation",
+                        originalCompensation + (index - center) * step,
+                        token);
+                }
+                if (kind == "focus" && index > 0)
+                {
+                    await _camera.MoveFocusAsync(step, token);
+                }
+                var jpeg = await _camera.CaptureAsync(token);
+                var path = await _workflow.StoreAsync(
+                    jpeg,
+                    "capture.jpg",
+                    _camera.Profile?.Name ?? "Nikon 相机",
+                    cancellationToken: token);
+                DisplayJpeg(jpeg);
+                RefreshPhotoList();
+                ShootingTaskStatusText.Text = AppLocalization.T(
+                    $"{ShootingTaskLabel(kind)} · {index + 1}/{total} · " +
+                    Path.GetFileName(path));
+                OperationStatusText.Text = ShootingTaskStatusText.Text;
+                if (kind == "interval" && index + 1 < total)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(interval), token);
+                }
+            }
+            await RestoreTaskCameraStateAsync(
+                kind,
+                originalCompensation,
+                originalMode,
+                CancellationToken.None);
+            ShootingTaskStatusText.Text = AppLocalization.T(
+                $"{ShootingTaskLabel(kind)}已完成");
+        }
+        catch (OperationCanceledException)
+        {
+            await RestoreTaskCameraStateAsync(
+                kind,
+                originalCompensation,
+                originalMode,
+                CancellationToken.None);
+            ShootingTaskStatusText.Text =
+                AppLocalization.T("拍摄任务已取消");
+        }
+        catch (Exception error)
+        {
+            await RestoreTaskCameraStateAsync(
+                kind,
+                originalCompensation,
+                originalMode,
+                CancellationToken.None);
+            _diagnostics.Error(
+                "capture-task",
+                $"{ShootingTaskLabel(kind)}失败：{error}");
+            ShootingTaskStatusText.Text =
+                AppLocalization.T("拍摄任务失败");
+            ShowError(error.Message);
+        }
+        finally
+        {
+            _operationInProgress = false;
+            _shootingTaskCancellation?.Dispose();
+            _shootingTaskCancellation = null;
+            ShootingTaskButton.Content = AppLocalization.T("开始任务");
+            UpdateEnabledState();
+            UpdateLiveViewState();
+            if (_camera.IsLiveView)
+            {
+                StartPreviewLoop();
+            }
+        }
+    }
+
+    private async void ShootingTaskButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_shootingTaskCancellation is not null && _operationInProgress)
+        {
+            _shootingTaskCancellation.Cancel();
+            ShootingTaskStatusText.Text =
+                AppLocalization.T("正在取消拍摄任务…");
+            return;
+        }
+        if (ShootingTaskKindBox.SelectedItem is ComboBoxItem kindItem)
+        {
+            _shootingTaskKind =
+                Convert.ToString(kindItem.Tag) ?? "interval";
+        }
+        _shootingTaskCount = ParseBounded(
+            ShootingTaskCountText.Text,
+            1,
+            999,
+            5);
+        _shootingTaskInterval = ParseBounded(
+            ShootingTaskIntervalText.Text,
+            1,
+            3600,
+            3);
+        _shootingTaskStep = ParseBounded(
+            ShootingTaskStepText.Text,
+            1,
+            3,
+            1);
+        ShootingTaskCountText.Text = _shootingTaskCount.ToString();
+        ShootingTaskIntervalText.Text = _shootingTaskInterval.ToString();
+        ShootingTaskStepText.Text = _shootingTaskStep.ToString();
+        await StartShootingTaskAsync();
+    }
+
+    private void ShootingTaskKindBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            ShootingTaskKindBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        _shootingTaskKind = Convert.ToString(item.Tag) ?? "interval";
+        ShootingTaskIntervalLabel.Text = AppLocalization.T(
+            _shootingTaskKind == "bulb"
+                ? "曝光时长（秒）"
+                : "间隔（秒）");
+        ShootingTaskCountText.IsEnabled = _shootingTaskKind != "bulb";
+        ShootingTaskStepText.IsEnabled =
+            _shootingTaskKind is "exposure" or "focus";
+    }
+
+    private static int ParseBounded(
+        string value,
+        int minimum,
+        int maximum,
+        int fallback) =>
+        int.TryParse(value, out var parsed)
+            ? Math.Clamp(parsed, minimum, maximum)
+            : fallback;
+
+    private void FocusPeakingCheck_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _focusPeakingEnabled = FocusPeakingCheck.IsChecked == true;
+    }
+
+    private void FalseColorCheck_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _falseColorEnabled = FalseColorCheck.IsChecked == true;
+    }
+
+    private void LoadCaptureSessionControls()
+    {
+        var configuration = _workflow.Configuration;
+        SessionNameText.Text = configuration.Name;
+        SessionNamingTemplateText.Text = configuration.NamingTemplate;
+        SessionCreatorText.Text = configuration.Creator;
+        SessionRightsText.Text = configuration.Rights;
+        SessionRatingBox.SelectedIndex =
+            Math.Clamp(configuration.Rating, 0, 5);
+        SessionDualBackupCheck.IsChecked =
+            configuration.DualBackupEnabled;
+        SessionStatusText.Text = AppLocalization.T(_workflow.Status);
+        SessionActionButton.Content = AppLocalization.T(
+            _workflow.IsActive ? "结束会话" : "开始会话");
+    }
+
+    private void SessionActionButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            if (_workflow.IsActive)
+            {
+                _workflow.End();
+            }
+            else
+            {
+                var rating =
+                    SessionRatingBox.SelectedItem is ComboBoxItem ratingItem &&
+                    int.TryParse(
+                        Convert.ToString(ratingItem.Tag),
+                        out var selectedRating)
+                        ? selectedRating
+                        : 0;
+                _workflow.Begin(
+                    new CaptureSessionConfiguration(
+                        SessionNameText.Text,
+                        SessionNamingTemplateText.Text,
+                        SessionCreatorText.Text,
+                        SessionRightsText.Text,
+                        rating,
+                        SessionDualBackupCheck.IsChecked == true));
+            }
+            LoadCaptureSessionControls();
+            OperationStatusText.Text =
+                AppLocalization.T(_workflow.Status);
+        }
+        catch (Exception error)
+        {
+            ShowError(error.Message);
+        }
+    }
+
+    private async Task RestoreTaskCameraStateAsync(
+        string kind,
+        double compensation,
+        string exposureMode,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (kind == "exposure")
+            {
+                await _camera.SetParameterAsync(
+                    "exposureCompensation",
+                    compensation,
+                    cancellationToken);
+            }
+            if (kind == "bulb" && exposureMode != "bulb")
+            {
+                await _camera.SetParameterAsync(
+                    "exposureMode",
+                    exposureMode,
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static string ShootingTaskLabel(string kind) => kind switch
+    {
+        "exposure" => "曝光包围",
+        "focus" => "焦点包围",
+        "bulb" => "B 门计时",
+        _ => "间隔拍摄"
+    };
 
     private async Task ToggleMovieRecordingAsync()
     {
@@ -595,7 +981,8 @@ public partial class MainWindow : Window
 
         var parameter = combo.Name switch
         {
-            nameof(ShutterBox) => "exposureTime",
+            nameof(ShutterBox) =>
+                _videoMode ? "videoExposureTime" : "exposureTime",
             nameof(ApertureBox) => "aperture",
             nameof(IsoBox) => "iso",
             nameof(ExposureCompensationBox) => "exposureCompensation",
@@ -630,7 +1017,8 @@ public partial class MainWindow : Window
             }
         }
         object value = parameter is
-            "exposureTime" or "aperture" or "iso" or "exposureCompensation"
+            "exposureTime" or "videoExposureTime" or
+            "aperture" or "iso" or "exposureCompensation"
             ? double.Parse(
                 Convert.ToString(item.Tag) ?? "0",
                 CultureInfo.InvariantCulture)
@@ -723,7 +1111,16 @@ public partial class MainWindow : Window
         if (destination == "library")
         {
             RefreshPhotoList();
+            LoadCaptureSessionControls();
         }
+        ShootingTaskPanel.Visibility =
+            destination == "capture"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        ProfessionalMonitorPanel.Visibility =
+            destination == "monitor"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         PreviewDetailText.Text = AppLocalization.T(
             destination == "monitor"
                 ? "相机原生 JPEG · 监看输出 · 不修改原片"
@@ -768,7 +1165,7 @@ public partial class MainWindow : Window
             async token =>
             {
                 await _camera.SetParameterAsync(
-                    "exposureTime",
+                    "videoExposureTime",
                     seconds,
                     token);
                 OperationStatusText.Text = AppLocalization.T(
@@ -1005,7 +1402,9 @@ public partial class MainWindow : Window
             {
                 _availableUpdateUrl = update.DownloadUrl;
                 UpdateStatusText.Text =
-                    AppLocalization.T($"发现新版本 {update.Version}");
+                    AppLocalization.T(
+                        $"发现新版本 {update.Version}"
+                        + (update.Notice is null ? "" : $" · {update.Notice}"));
                 OpenUpdateButton.Content =
                     AppLocalization.T($"获取 {update.Version}");
                 OpenUpdateButton.Visibility = Visibility.Visible;
@@ -1014,7 +1413,9 @@ public partial class MainWindow : Window
             {
                 _availableUpdateUrl = null;
                 UpdateStatusText.Text =
-                    AppLocalization.T("已是最新版本");
+                    AppLocalization.T(
+                        "已是最新版本"
+                        + (update.Notice is null ? "" : $" · {update.Notice}"));
                 OpenUpdateButton.Visibility = Visibility.Collapsed;
             }
         }
@@ -1055,6 +1456,49 @@ public partial class MainWindow : Window
         }
     }
 
+    private void SaveMirrorChyanCdkButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            _updateService.SaveMirrorChyanCdk(MirrorChyanCdkBox.Password);
+            UpdateStatusText.Text = AppLocalization.T(
+                string.IsNullOrWhiteSpace(MirrorChyanCdkBox.Password)
+                    ? "Mirror酱 CDK 已清除"
+                    : "Mirror酱 CDK 已安全保存");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "update",
+                $"无法保存 Mirror酱 CDK：{error.Message}");
+            UpdateStatusText.Text =
+                AppLocalization.T("Mirror酱 CDK 保存失败");
+        }
+    }
+
+    private void OpenMirrorChyanButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _updateService.MirrorChyanWebsiteUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "update",
+                $"无法打开 Mirror酱：{error.Message}");
+            ShowError("无法打开 Mirror酱网站");
+        }
+    }
+
     private void ViewLogs_Click(object sender, RoutedEventArgs e)
     {
         _diagnostics.Info("diagnostics", "用户查询近期日志");
@@ -1066,20 +1510,75 @@ public partial class MainWindow : Window
             Height = 560,
             MinWidth = 560,
             MinHeight = 360,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Content = new TextBox
-            {
-                Text = _diagnostics.RecentText(12_000),
-                Margin = new Thickness(18),
-                FontFamily = new FontFamily("Cascadia Mono, Consolas"),
-                FontSize = 12,
-                IsReadOnly = true,
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-            }
+            Background = (Brush)FindResource("PaperBrush"),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
+        var logGrid = new Grid { Margin = new Thickness(20) };
+        logGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        logGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        logGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var logHeader = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        logHeader.Children.Add(new TextBlock
+        {
+            Text = "诊断日志查询",
+            FontFamily = (FontFamily)FindResource("DisplayFont"),
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("InkBrush")
+        });
+        logHeader.Children.Add(new TextBlock
+        {
+            Text = "显示近期脱敏日志；刷新可读取最新记录。",
+            FontSize = 12,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 2, 0, 0)
+        });
+        logGrid.Children.Add(logHeader);
+        var logBox = new TextBox
+        {
+            Text = _diagnostics.RecentText(12_000),
+            FontFamily = new FontFamily("Cascadia Mono, Consolas"),
+            FontSize = 12,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Background = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(12, 15, 21)),
+            Foreground = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(222, 228, 237)),
+            BorderBrush = (Brush)FindResource("RuleBrush"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(14)
+        };
+        Grid.SetRow(logBox, 1);
+        logGrid.Children.Add(logBox);
+        var logActions = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
+        var refreshBtn = new Button
+        {
+            Content = "刷新",
+            Style = (Style)FindResource("ButtonBase"),
+            Width = 100
+        };
+        refreshBtn.Click += (_, _) =>
+        {
+            logBox.Text = _diagnostics.RecentText(12_000);
+        };
+        DockPanel.SetDock(refreshBtn, Dock.Left);
+        logActions.Children.Add(refreshBtn);
+        var closeLogBtn = new Button
+        {
+            Content = "关闭",
+            Style = (Style)FindResource("PrimaryButton"),
+            Width = 100
+        };
+        closeLogBtn.Click += (_, _) => viewer.Close();
+        DockPanel.SetDock(closeLogBtn, Dock.Right);
+        logActions.Children.Add(closeLogBtn);
+        Grid.SetRow(logActions, 2);
+        logGrid.Children.Add(logActions);
+        viewer.Content = logGrid;
         viewer.ShowDialog();
     }
 
@@ -1106,21 +1605,73 @@ public partial class MainWindow : Window
                 new Uri(
                     "pack://application:,,,/Assets/wechat-donation.png",
                     UriKind.Absolute));
+            var root = new Grid { Margin = new Thickness(24) };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var header = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+            header.Children.Add(new TextBlock
+            {
+                Text = AppLocalization.T("爱发电赞助"),
+                Style = (Style)FindResource("DisplayText")
+            });
+            header.Children.Add(new TextBlock
+            {
+                Text = AppLocalization.T(
+                    "扫描二维码，或打开爱发电主页支持项目。"),
+                FontSize = 12,
+                Foreground = (Brush)FindResource("MutedBrush"),
+                Margin = new Thickness(0, 4, 0, 0)
+            });
+            root.Children.Add(header);
+
+            var feedbackCard = CreateFastFeedbackCard();
+            Grid.SetRow(feedbackCard, 1);
+            root.Children.Add(feedbackCard);
+
+            var imageCard = new Border
+            {
+                Background = (Brush)FindResource("SurfaceBrush"),
+                BorderBrush = (Brush)FindResource("RuleBrush"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(8),
+                Child = new Image
+                {
+                    Source = image,
+                    Stretch = Stretch.Uniform
+                }
+            };
+            imageCard.Margin = new Thickness(0, 14, 0, 0);
+            Grid.SetRow(imageCard, 2);
+            root.Children.Add(imageCard);
+
+            var footer = new TextBlock
+            {
+                Text = AppLocalization.T(
+                    "软件功能永久免费，赞助为自愿行为。\n" +
+                    "赞助不会解锁软件功能，也不影响公开 Issue 的处理。"),
+                FontSize = 11,
+                Foreground = (Brush)FindResource("MutedBrush"),
+                Margin = new Thickness(0, 12, 0, 0),
+                TextAlignment = TextAlignment.Left
+            };
+            Grid.SetRow(footer, 3);
+            root.Children.Add(footer);
+
             var dialog = new Window
             {
                 Owner = this,
-                Title = "请作者喝奶茶",
-                Width = 500,
-                Height = 700,
+                Title = AppLocalization.T("爱发电赞助"),
+                Width = 520,
+                Height = 780,
                 MinWidth = 360,
-                MinHeight = 520,
+                MinHeight = 620,
+                Background = (Brush)FindResource("PaperBrush"),
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Content = new Image
-                {
-                    Source = image,
-                    Margin = new Thickness(24),
-                    Stretch = Stretch.Uniform
-                }
+                Content = root
             };
             dialog.ShowDialog();
         }
@@ -1131,6 +1682,82 @@ public partial class MainWindow : Window
                 $"无法显示赞助二维码：{error.Message}");
             ShowError("无法显示赞助二维码，请稍后重试。");
         }
+    }
+
+    private void OpenAfdianButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenAfdian();
+    }
+
+    private static void OpenAfdian()
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = AfdianUrl,
+            UseShellExecute = true
+        });
+    }
+
+    private Border CreateFastFeedbackCard()
+    {
+        var copy = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 16, 0)
+        };
+        copy.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("快速问题反馈"),
+            FontSize = 15,
+            FontWeight = FontWeights.Bold
+        });
+        copy.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。"),
+            FontSize = 12,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 4, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        copy.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("官方 QQ 群：165315727"),
+            FontSize = 13,
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("AccentBrush"),
+            Margin = new Thickness(0, 6, 0, 0)
+        });
+
+        var openButton = new Button
+        {
+            Content = AppLocalization.T("打开爱发电"),
+            Style = (Style)FindResource("ButtonBase"),
+            MinWidth = 124,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        openButton.Click += (_, _) => OpenAfdian();
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+        grid.Children.Add(copy);
+        Grid.SetColumn(openButton, 1);
+        grid.Children.Add(openButton);
+
+        return new Border
+        {
+            Background = (Brush)FindResource("AccentSoftBrush"),
+            BorderBrush = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(182, 207, 245)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Child = grid
+        };
     }
 
     private void ShowLaunchAnnouncementIfNeeded()
@@ -1192,9 +1819,9 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 新增启动更新公告，并支持按版本控制提醒。\n" +
-                "• 五端公告与赞助入口保持一致。\n" +
-                "• 更新赞助图片并优化多语言体验。"),
+                "• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n" +
+                "• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n" +
+                "• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -1239,23 +1866,41 @@ public partial class MainWindow : Window
             Child = warning
         });
 
-        body.Children.Add(new TextBlock
+        var sponsorCard = new Border
         {
-            Text = AppLocalization.T("自愿赞助"),
-            FontSize = 17,
-            FontWeight = FontWeights.Bold,
-            Margin = new Thickness(0, 0, 0, 6)
-        });
-        body.Children.Add(new TextBlock
-        {
-            Text = AppLocalization.T(
-                "如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。"),
-            FontSize = 13,
-            Foreground = (Brush)FindResource("MutedBrush"),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 10)
-        });
-        body.Children.Add(new Image
+            Background = (Brush)FindResource("SurfaceBrush"),
+            BorderBrush = (Brush)FindResource("RuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = AppLocalization.T("自愿赞助"),
+                        FontSize = 17,
+                        FontWeight = FontWeights.Bold,
+                        Margin = new Thickness(0, 0, 0, 6)
+                    },
+                    new TextBlock
+                    {
+                        Text = AppLocalization.T(
+                            "如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。"),
+                        FontSize = 13,
+                        Foreground = (Brush)FindResource("MutedBrush"),
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 0, 0, 10)
+                    },
+                }
+            }
+        };
+        var sponsorContent = (StackPanel)sponsorCard.Child;
+        var sponsorFeedback = CreateFastFeedbackCard();
+        sponsorFeedback.Margin = new Thickness(0, 0, 0, 14);
+        sponsorContent.Children.Add(sponsorFeedback);
+        sponsorContent.Children.Add(new Image
         {
             Source = new BitmapImage(
                 new Uri(
@@ -1265,6 +1910,7 @@ public partial class MainWindow : Window
             Stretch = Stretch.Uniform,
             HorizontalAlignment = HorizontalAlignment.Center
         });
+        body.Children.Add(sponsorCard);
 
         var header = new StackPanel
         {
@@ -1306,6 +1952,7 @@ public partial class MainWindow : Window
             Height = 820,
             MinWidth = 460,
             MinHeight = 620,
+            Background = (Brush)FindResource("PaperBrush"),
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = root
         };
@@ -1353,7 +2000,7 @@ public partial class MainWindow : Window
         ShowCloudDriveGuide();
     }
 
-    private void OpenCloudFilePicker()
+    private async void OpenCloudFilePicker()
     {
         var dialog = new OpenFileDialog
         {
@@ -1370,7 +2017,22 @@ public partial class MainWindow : Window
         }
         try
         {
-            var imported = _library.ImportFiles(dialog.FileNames);
+            var pairNames = new Dictionary<string, string>(
+                StringComparer.OrdinalIgnoreCase);
+            var imported = new List<string>();
+            foreach (var source in dialog.FileNames)
+            {
+                var pairKey = Path.GetFileNameWithoutExtension(source);
+                if (!pairNames.TryGetValue(pairKey, out var reservedBase))
+                {
+                    reservedBase = _workflow.ReserveBaseName("Imported");
+                    pairNames[pairKey] = reservedBase;
+                }
+                imported.Add(await _workflow.ImportAsync(
+                    source,
+                    "Imported",
+                    reservedBase));
+            }
             RefreshPhotoList();
             OperationStatusText.Text = AppLocalization.T(
                 imported.Count > 0
@@ -1398,7 +2060,7 @@ public partial class MainWindow : Window
         };
         var root = new Grid
         {
-            Margin = new Thickness(24)
+            Margin = new Thickness(26)
         };
         root.RowDefinitions.Add(new RowDefinition
         {
@@ -1416,7 +2078,8 @@ public partial class MainWindow : Window
         header.Children.Add(new TextBlock
         {
             Text = "链接网盘",
-            Style = (Style)FindResource("DisplayText")
+            Style = (Style)FindResource("DisplayText"),
+            FontSize = 26
         });
         header.Children.Add(new TextBlock
         {
@@ -1425,7 +2088,7 @@ public partial class MainWindow : Window
                 "再通过系统文件选择器从下载或同步目录加入媒体。",
             Foreground = (Brush)FindResource("MutedBrush"),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 6, 0, 16)
+            Margin = new Thickness(0, 8, 0, 18)
         });
         root.Children.Add(header);
 
@@ -1470,12 +2133,13 @@ public partial class MainWindow : Window
 
         var actions = new DockPanel
         {
-            Margin = new Thickness(0, 16, 0, 0)
+            Margin = new Thickness(0, 18, 0, 0)
         };
         var close = new Button
         {
             Content = "关闭",
-            Width = 96,
+            MinWidth = 100,
+            Height = 40,
             Style = (Style)FindResource("ButtonBase")
         };
         close.Click += (_, _) => guide.Close();
@@ -1484,7 +2148,8 @@ public partial class MainWindow : Window
         var choose = new Button
         {
             Content = "选择文件并加入",
-            Width = 168,
+            MinWidth = 168,
+            Height = 40,
             Style = (Style)FindResource("PrimaryButton")
         };
         choose.Click += (_, _) =>
@@ -1815,7 +2480,18 @@ public partial class MainWindow : Window
             {
                 var jpeg = await _camera.GetLiveViewFrameAsync(cancellationToken);
                 failures = 0;
-                await Dispatcher.InvokeAsync(() => DisplayJpeg(jpeg));
+                var videoMode = _videoMode;
+                var focusPeaking = videoMode && _focusPeakingEnabled;
+                var falseColor = videoMode && _falseColorEnabled;
+                var prepared = await Task.Run(
+                    () => PrepareJpeg(
+                        jpeg,
+                        videoMode,
+                        focusPeaking,
+                        falseColor),
+                    cancellationToken);
+                await Dispatcher.InvokeAsync(
+                    () => DisplayPreparedPreview(prepared));
             }
             catch (OperationCanceledException)
             {
@@ -1937,6 +2613,9 @@ public partial class MainWindow : Window
         FocusModeBox.IsEnabled = connected;
         WhiteBalanceBox.IsEnabled = connected;
         PictureControlBox.IsEnabled = connected;
+        ShootingTaskButton.IsEnabled =
+            (_shootingTaskCancellation is not null && _operationInProgress) ||
+            connected;
         UpdateExposureAvailability();
     }
 
@@ -1947,7 +2626,10 @@ public partial class MainWindow : Window
             ExposureModeBox,
             "exposureMode",
             connected);
-        SetParameterAvailability(ShutterBox, "exposureTime", connected);
+        SetParameterAvailability(
+            ShutterBox,
+            _videoMode ? "videoExposureTime" : "exposureTime",
+            connected);
         SetParameterAvailability(ApertureBox, "aperture", connected);
         SetParameterAvailability(IsoBox, "iso", connected);
         SetParameterAvailability(
@@ -1995,6 +2677,19 @@ public partial class MainWindow : Window
 
     private void DisplayJpeg(byte[] jpeg)
     {
+        DisplayPreparedPreview(PrepareJpeg(
+            jpeg,
+            _videoMode,
+            _videoMode && _focusPeakingEnabled,
+            _videoMode && _falseColorEnabled));
+    }
+
+    private static PreparedPreview PrepareJpeg(
+        byte[] jpeg,
+        bool videoMode,
+        bool focusPeaking,
+        bool falseColor)
+    {
         using var stream = new MemoryStream(jpeg, writable: false);
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
@@ -2002,11 +2697,29 @@ public partial class MainWindow : Window
         bitmap.StreamSource = stream;
         bitmap.EndInit();
         bitmap.Freeze();
-        PreviewImage.Source = bitmap;
+        var monitor = ProfessionalMonitor.Process(
+            bitmap,
+            focusPeaking,
+            falseColor);
+        return new PreparedPreview(
+            videoMode ? monitor.Image : bitmap,
+            monitor);
+    }
+
+    private void DisplayPreparedPreview(PreparedPreview prepared)
+    {
+        PreviewImage.Source = prepared.Display;
         if (_immersivePreviewImage is not null)
         {
-            _immersivePreviewImage.Source = bitmap;
+            _immersivePreviewImage.Source = prepared.Display;
         }
+        RedHistogramText.Text = $"R {prepared.Monitor.RedHistogram}";
+        GreenHistogramText.Text = $"G {prepared.Monitor.GreenHistogram}";
+        BlueHistogramText.Text = $"B {prepared.Monitor.BlueHistogram}";
+        WaveformText.Text = $"Y {prepared.Monitor.Waveform}";
+        VectorscopeText.Text = $"H {prepared.Monitor.Vectorscope}";
+        PeakingCoverageText.Text = AppLocalization.T(
+            $"峰值覆盖 {prepared.Monitor.PeakingCoverage}%");
         PreviewEmpty.Visibility = Visibility.Collapsed;
     }
 

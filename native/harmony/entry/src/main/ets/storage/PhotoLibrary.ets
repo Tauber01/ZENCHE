@@ -126,8 +126,24 @@ export class PhotoLibrary {
   list(): Array<PhotoItem> {
     this.ensureDirectory();
     const items: Array<PhotoItem> = [];
-    const names: Array<string> = fs.listFileSync(this.directoryPath);
+    this.collect(this.directoryPath, items);
+    return items.sort((left: PhotoItem, right: PhotoItem) =>
+      right.modifiedAt - left.modifiedAt
+    );
+  }
+
+  private collect(directory: string, items: Array<PhotoItem>): void {
+    if (directory.endsWith('/Backup')) {
+      return;
+    }
+    const names: Array<string> = fs.listFileSync(directory);
     names.forEach((name: string) => {
+      const path: string = `${directory}/${name}`;
+      const stat: fs.Stat = fs.statSync(path);
+      if (stat.isDirectory()) {
+        this.collect(path, items);
+        return;
+      }
       const lower: string = name.toLowerCase();
       const supported: boolean = SUPPORTED_EXTENSIONS.some(
         (extension: string) => lower.endsWith(extension)
@@ -135,13 +151,8 @@ export class PhotoLibrary {
       if (!supported) {
         return;
       }
-      const path: string = `${this.directoryPath}/${name}`;
-      const stat: fs.Stat = fs.statSync(path);
       items.push(new PhotoItem(name, path, stat.size, stat.mtime));
     });
-    return items.sort((left: PhotoItem, right: PhotoItem) =>
-      right.modifiedAt - left.modifiedAt
-    );
   }
 
   saveCapture(jpeg: Uint8Array): string {

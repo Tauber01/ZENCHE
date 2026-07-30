@@ -87,7 +87,8 @@ enum MonitorVideoSpec: String, CaseIterable, Identifiable {
     }
 }
 
-final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate {
+final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecordingDelegate,
+    AVCaptureVideoDataOutputSampleBufferDelegate {
     @Published private(set) var state: CameraConnectionState = .disconnected
     @Published private(set) var deviceName = "未选择相机"
     @Published private(set) var availableDevices: [CameraDeviceOption] = []
@@ -110,6 +111,15 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published var exposureISO: Float = 100
     @Published var shutterAngle: Double = 180
     @Published var zoomFactor: CGFloat = 1
+    @Published private(set) var monitorOverlay: CGImage?
+    @Published private(set) var redHistogram = "—"
+    @Published private(set) var greenHistogram = "—"
+    @Published private(set) var blueHistogram = "—"
+    @Published private(set) var waveform = "—"
+    @Published private(set) var vectorscope = "—"
+    @Published private(set) var peakingCoverage = 0
+    @Published private(set) var focusPeakingEnabled = false
+    @Published private(set) var falseColorEnabled = false
 
     let session = AVCaptureSession()
     var onPhotoCaptured: ((Data, String) -> Void)?
@@ -119,9 +129,15 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private let sessionQueue = DispatchQueue(label: "com.tauber.nikonlink.camera")
     private let photoOutput = AVCapturePhotoOutput()
     private let movieOutput = AVCaptureMovieFileOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let monitorQueue = DispatchQueue(
+        label: "com.tauber.nikonlink.professional-monitor",
+        qos: .userInitiated
+    )
     private var currentDevice: AVCaptureDevice?
     private var captureDelegates: [Int64: PhotoCaptureDelegate] = [:]
     private var shouldResumeSession = false
+    private var lastMonitorFrameTime = CFAbsoluteTimeGetCurrent()
 
     override init() {
         super.init()
@@ -367,6 +383,43 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
         applyVideoExposure(shutterAngle: shutterAngle, iso: value)
     }
 
+    func setTimedExposure(seconds: Double) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            guard device.isExposureModeSupported(.custom) else {
+                self.onMessage?("当前视频设备不支持计时曝光")
+                return
+            }
+            let minimum = CMTimeGetSeconds(
+                device.activeFormat.minExposureDuration
+            )
+            let maximum = CMTimeGetSeconds(
+                device.activeFormat.maxExposureDuration
+            )
+            let applied = min(max(seconds, minimum), maximum)
+            do {
+                try device.lockForConfiguration()
+                device.setExposureModeCustom(
+                    duration: CMTimeMakeWithSeconds(
+                        applied,
+                        preferredTimescale: 1_000_000_000
+                    ),
+                    iso: min(
+                        max(device.iso, device.activeFormat.minISO),
+                        device.activeFormat.maxISO
+                    ),
+                    completionHandler: nil
+                )
+                device.unlockForConfiguration()
+                self.onMessage?(
+                    String(format: "计时曝光已设置 · %.2f 秒", applied)
+                )
+            } catch {
+                self.onMessage?("计时曝光设置失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
     private func applyVideoExposure(shutterAngle: Double, iso: Float) {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.currentDevice else { return }
@@ -535,6 +588,44 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    func moveFocus(_ signedStep: Int) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            guard device.isLockingFocusWithCustomLensPositionSupported else {
+                self.onMessage?("当前视频设备不支持焦点步进")
+                return
+            }
+            let normalized = max(-3, min(3, signedStep))
+            guard normalized != 0 else { return }
+            let increment = Float(normalized) * 0.025
+            let target = min(max(device.lensPosition + increment, 0), 1)
+            do {
+                try device.lockForConfiguration()
+                device.setFocusModeLocked(lensPosition: target)
+                device.unlockForConfiguration()
+                self.onMessage?(
+                    String(format: "焦点位置 %.0f%%", target * 100)
+                )
+            } catch {
+                self.onMessage?("焦点步进失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    func setFocusPeakingEnabled(_ enabled: Bool) {
+        focusPeakingEnabled = enabled
+        if !enabled, !falseColorEnabled {
+            monitorOverlay = nil
+        }
+    }
+
+    func setFalseColorEnabled(_ enabled: Bool) {
+        falseColorEnabled = enabled
+        if !enabled, !focusPeakingEnabled {
+            monitorOverlay = nil
+        }
+    }
+
     private func configureSession(deviceID: String?) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
@@ -570,6 +661,18 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 let canRecordMovie = self.session.canAddOutput(self.movieOutput)
                 if canRecordMovie {
                     self.session.addOutput(self.movieOutput)
+                }
+                if self.session.canAddOutput(self.videoOutput) {
+                    self.videoOutput.alwaysDiscardsLateVideoFrames = true
+                    self.videoOutput.videoSettings = [
+                        kCVPixelBufferPixelFormatTypeKey as String:
+                            kCVPixelFormatType_32BGRA
+                    ]
+                    self.videoOutput.setSampleBufferDelegate(
+                        self,
+                        queue: self.monitorQueue
+                    )
+                    self.session.addOutput(self.videoOutput)
                 }
                 self.session.commitConfiguration()
                 self.currentDevice = device
@@ -609,6 +712,34 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     message: "相机连接失败：\(error.localizedDescription)"
                 )
             }
+        }
+    }
+
+    func captureOutput(
+        _ output: AVCaptureOutput,
+        didOutput sampleBuffer: CMSampleBuffer,
+        from connection: AVCaptureConnection
+    ) {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastMonitorFrameTime >= 1.0 / 15.0,
+              let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer)
+        else {
+            return
+        }
+        lastMonitorFrameTime = now
+        let result = ProfessionalMonitor.process(
+            pixelBuffer,
+            focusPeaking: focusPeakingEnabled,
+            falseColor: falseColorEnabled
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.monitorOverlay = result.overlay
+            self?.redHistogram = result.redHistogram
+            self?.greenHistogram = result.greenHistogram
+            self?.blueHistogram = result.blueHistogram
+            self?.waveform = result.waveform
+            self?.vectorscope = result.vectorscope
+            self?.peakingCoverage = result.peakingCoverage
         }
     }
 

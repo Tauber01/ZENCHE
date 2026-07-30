@@ -43,6 +43,15 @@ enum AppSection: String, CaseIterable, Identifiable {
     }
 }
 
+enum ShootingTaskKind: String, CaseIterable, Identifiable {
+    case interval = "间隔拍摄"
+    case exposureBracket = "曝光包围"
+    case focusBracket = "焦点包围"
+    case bulb = "B 门计时"
+
+    var id: String { rawValue }
+}
+
 struct LibraryItem: Identifiable, Hashable {
     let url: URL
     let createdAt: Date
@@ -62,6 +71,7 @@ final class MediaLibrary: ObservableObject {
 
     private let fileManager = FileManager.default
     private let directory: URL
+    let workflow: CaptureWorkflow
     private let supportedExtensions: Set<String> = [
         "jpg", "jpeg", "heic", "heif", "png", "tif", "tiff", "nef", "nrw",
         "mov", "mp4", "m4v"
@@ -85,6 +95,7 @@ final class MediaLibrary: ObservableObject {
             )
         }
         directory = preferredDirectory
+        workflow = CaptureWorkflow(rootDirectory: preferredDirectory)
         try? fileManager.createDirectory(
             at: directory,
             withIntermediateDirectories: true,
@@ -103,15 +114,14 @@ final class MediaLibrary: ObservableObject {
 
     @discardableResult
     func saveCapture(_ data: Data, fileExtension: String) -> URL? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
         let safeExtension = fileExtension.lowercased() == "heic" ? "heic" : "jpg"
-        let url = directory
-            .appendingPathComponent("NL-\(formatter.string(from: Date()))")
-            .appendingPathExtension(safeExtension)
 
         do {
-            try data.write(to: url, options: .atomic)
+            let url = try workflow.store(
+                data: data,
+                originalFilename: "capture.\(safeExtension)",
+                cameraName: "iOS Camera"
+            )
             DiagnosticLogger.shared.info(
                 "capture",
                 "照片已保存；文件=\(url.lastPathComponent)；大小=\(data.count)"
@@ -132,14 +142,14 @@ final class MediaLibrary: ObservableObject {
 
     @discardableResult
     func saveRecordedVideo(at temporaryURL: URL) -> URL? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        let destination = directory
-            .appendingPathComponent("NL-VIDEO-\(formatter.string(from: Date()))")
-            .appendingPathExtension("mov")
-
         do {
-            try fileManager.moveItem(at: temporaryURL, to: destination)
+            let data = try Data(contentsOf: temporaryURL)
+            let destination = try workflow.store(
+                data: data,
+                originalFilename: "recording.mov",
+                cameraName: "iOS Camera"
+            )
+            try? fileManager.removeItem(at: temporaryURL)
             reload()
             selectedItemID = destination.path
             message = "视频已保存到 帧澈 ZENCHE 文件库"
@@ -160,23 +170,20 @@ final class MediaLibrary: ObservableObject {
 
     func importFiles(_ urls: [URL]) {
         var imported = 0
+        var pairNames: [String: String] = [:]
         for sourceURL in urls {
-            let scoped = sourceURL.startAccessingSecurityScopedResource()
-            defer {
-                if scoped { sourceURL.stopAccessingSecurityScopedResource() }
-            }
-
-            var destination = directory.appendingPathComponent(sourceURL.lastPathComponent)
-            if fileManager.fileExists(atPath: destination.path) {
-                let stem = destination.deletingPathExtension().lastPathComponent
-                let ext = destination.pathExtension
-                destination = directory
-                    .appendingPathComponent("\(stem)-\(UUID().uuidString.prefix(6))")
-                    .appendingPathExtension(ext)
-            }
-
             do {
-                try fileManager.copyItem(at: sourceURL, to: destination)
+                let pairKey = sourceURL.deletingPathExtension()
+                    .lastPathComponent
+                    .lowercased()
+                let reservedBase = pairNames[pairKey]
+                    ?? workflow.reserveBaseName(cameraName: "Imported")
+                pairNames[pairKey] = reservedBase
+                _ = try workflow.importFile(
+                    from: sourceURL,
+                    cameraName: "Imported",
+                    reservedBaseName: reservedBase
+                )
                 imported += 1
             } catch {
                 DiagnosticLogger.shared.error(
@@ -196,14 +203,12 @@ final class MediaLibrary: ObservableObject {
         let normalizedExtension = supportedExtensions.contains(
             fileExtension.lowercased()
         ) ? fileExtension.lowercased() : "jpg"
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        let destination = directory
-            .appendingPathComponent("相册-\(formatter.string(from: Date()))")
-            .appendingPathExtension(normalizedExtension)
-
         do {
-            try data.write(to: destination, options: .atomic)
+            let destination = try workflow.store(
+                data: data,
+                originalFilename: "album.\(normalizedExtension)",
+                cameraName: "System Album"
+            )
             reload()
             selectedItemID = destination.path
             message = "照片已从机主相册加入文件库"
@@ -261,11 +266,23 @@ final class MediaLibrary: ObservableObject {
 
     func reload() {
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .creationDateKey]
-        let urls = (try? fileManager.contentsOfDirectory(
+        let enumerator = fileManager.enumerator(
             at: directory,
             includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
-        )) ?? []
+        )
+        var urls: [URL] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if url.pathComponents.contains("Backup") {
+                if (try? url.resourceValues(
+                    forKeys: [.isDirectoryKey]
+                ).isDirectory) == true {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
+            urls.append(url)
+        }
 
         items = urls
             .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
@@ -290,6 +307,12 @@ final class AppModel: ObservableObject {
     @Published var showSafeGuide = false
     @Published var monitorVideoCodec: MonitorVideoCodec = .automatic
     @Published var monitorVideoSpec: MonitorVideoSpec = .automatic
+    @Published var shootingTaskKind: ShootingTaskKind = .interval
+    @Published var shootingTaskCount = 5
+    @Published var shootingTaskInterval = 3
+    @Published var shootingTaskStep = 1
+    @Published var shootingTaskRunning = false
+    @Published var shootingTaskStatus = "尚未开始拍摄任务"
     @Published var statusMessage = "选择相机后即可开始"
     @Published var language: AppLanguage {
         didSet {
@@ -302,9 +325,12 @@ final class AppModel: ObservableObject {
 
     let camera: CameraService
     let library: MediaLibrary
+    var captureWorkflow: CaptureWorkflow { library.workflow }
     let wireless: WirelessTransferServer
     let updater: UpdateController
     private var subscriptions: Set<AnyCancellable> = []
+    private var shootingTask: Task<Void, Never>?
+    private var taskCaptureContinuation: CheckedContinuation<URL, Error>?
 
     init() {
         language = AppLanguage(
@@ -351,6 +377,9 @@ final class AppModel: ObservableObject {
         library.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
+        library.workflow.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
         wireless.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
@@ -386,6 +415,8 @@ final class AppModel: ObservableObject {
                         self?.statusMessage = message
                     }
                 }
+                self.taskCaptureContinuation?.resume(returning: url)
+                self.taskCaptureContinuation = nil
             }
         }
 
@@ -413,6 +444,13 @@ final class AppModel: ObservableObject {
             }
             Task { @MainActor in
                 self?.statusMessage = message
+                if message.contains("拍摄失败"),
+                   let continuation = self?.taskCaptureContinuation {
+                    self?.taskCaptureContinuation = nil
+                    continuation.resume(
+                        throwing: CaptureTaskError.captureFailed(message)
+                    )
+                }
             }
         }
     }
@@ -429,5 +467,110 @@ final class AppModel: ObservableObject {
         monitorVideoSpec = spec
         UserDefaults.standard.set(spec.rawValue, forKey: "monitorVideoSpec")
         camera.setMonitorVideoSpec(spec)
+    }
+
+    func startShootingTask() {
+        guard camera.state == .ready, !shootingTaskRunning else {
+            statusMessage = "连接相机后才能开始拍摄任务"
+            return
+        }
+        shootingTask?.cancel()
+        let kind = shootingTaskKind
+        let count = max(1, min(999, shootingTaskCount))
+        let interval = max(1, min(3600, shootingTaskInterval))
+        let step = max(1, min(3, shootingTaskStep))
+        let originalBias = camera.exposureBias
+        shootingTaskRunning = true
+        shootingTaskStatus = "\(kind.rawValue)准备中"
+        shootingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                var total = kind == .bulb ? 1 : count
+                if kind == .exposureBracket, total.isMultiple(of: 2) {
+                    total += 1
+                }
+                for index in 0..<total {
+                    try Task.checkCancellation()
+                    if kind == .exposureBracket {
+                        let center = total / 2
+                        let requested =
+                            originalBias + Float(index - center) * Float(step)
+                        camera.setExposureBias(requested)
+                        try await Task.sleep(for: .milliseconds(350))
+                    }
+                    if kind == .focusBracket, index > 0 {
+                        camera.moveFocus(step)
+                        try await Task.sleep(for: .milliseconds(350))
+                    }
+                    if kind == .bulb {
+                        camera.setTimedExposure(seconds: Double(interval))
+                        try await Task.sleep(for: .milliseconds(500))
+                    }
+                    let url = try await captureForTask()
+                    shootingTaskStatus =
+                        "\(kind.rawValue) · \(index + 1)/\(total) · \(url.lastPathComponent)"
+                    statusMessage = shootingTaskStatus
+                    if kind == .interval, index + 1 < total {
+                        try await Task.sleep(for: .seconds(interval))
+                    }
+                }
+                if kind == .exposureBracket {
+                    camera.setExposureBias(originalBias)
+                }
+                shootingTaskRunning = false
+                shootingTaskStatus = "\(kind.rawValue)已完成"
+                statusMessage = shootingTaskStatus
+            } catch is CancellationError {
+                if kind == .exposureBracket {
+                    camera.setExposureBias(originalBias)
+                }
+                shootingTaskRunning = false
+                shootingTaskStatus = "拍摄任务已取消"
+                statusMessage = shootingTaskStatus
+            } catch {
+                if kind == .exposureBracket {
+                    camera.setExposureBias(originalBias)
+                }
+                shootingTaskRunning = false
+                shootingTaskStatus = "拍摄任务失败"
+                statusMessage = error.localizedDescription
+            }
+        }
+    }
+
+    func cancelShootingTask() {
+        shootingTask?.cancel()
+        shootingTask = nil
+        taskCaptureContinuation?.resume(throwing: CancellationError())
+        taskCaptureContinuation = nil
+        shootingTaskStatus = "正在取消拍摄任务…"
+    }
+
+    private func captureForTask() async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            taskCaptureContinuation = continuation
+            camera.capturePhoto()
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(20))
+                guard let self,
+                      let pending = self.taskCaptureContinuation else {
+                    return
+                }
+                self.taskCaptureContinuation = nil
+                pending.resume(throwing: CaptureTaskError.timeout)
+            }
+        }
+    }
+}
+
+private enum CaptureTaskError: LocalizedError {
+    case captureFailed(String)
+    case timeout
+
+    var errorDescription: String? {
+        switch self {
+        case .captureFailed(let message): return message
+        case .timeout: return "相机未在 20 秒内返回照片"
+        }
     }
 }

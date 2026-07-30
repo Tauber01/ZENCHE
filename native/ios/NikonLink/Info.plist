@@ -28,6 +28,12 @@
     <string>用于在可信局域网内通过 FTP、HTTP 或 WebDAV 接收照片。</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
+    <key>UIUserInterfaceStyle</key>
+    <string>Light</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDarkContent</string>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UIRequiresFullScreen</key>

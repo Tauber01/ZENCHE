@@ -70,6 +70,73 @@ private struct RuntimeLocalizedText: View {
     }
 }
 
+private enum IPalette {
+    static let paper = Color(red: 0.965, green: 0.973, blue: 0.988)
+    static let paperSecondary = Color(red: 0.937, green: 0.953, blue: 0.976)
+    static let surface = Color(red: 0.992, green: 0.996, blue: 1.0)
+    static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
+    static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
+    static let cobalt = Color(red: 0.02, green: 0.35, blue: 0.82)
+    static let cobaltSoft = Color(red: 0.88, green: 0.93, blue: 1.0)
+    static let video = Color(red: 0.82, green: 0.12, blue: 0.16)
+    static let videoSoft = Color(red: 1.0, green: 0.90, blue: 0.91)
+    static let graphite = Color(red: 0.045, green: 0.055, blue: 0.075)
+    static let rule = Color.black.opacity(0.10)
+    static let shadow = Color(red: 0.05, green: 0.09, blue: 0.16).opacity(0.10)
+}
+
+private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
+
+private struct SplashView: View {
+    var onComplete: () -> Void
+    @State private var markScale: CGFloat = 0.01
+    @State private var markOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            IPalette.paper.ignoresSafeArea()
+            VStack(spacing: 28) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(IPalette.graphite)
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(markScale)
+                        .opacity(markOpacity)
+                    Text("Z")
+                        .font(.system(size: 42, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .scaleEffect(markScale)
+                        .opacity(markOpacity)
+                }
+                VStack(spacing: 6) {
+                    Text("帧澈 ZENCHE")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(IPalette.ink)
+                    Text("Capture · Connect · Flow")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(IPalette.muted)
+                }
+                .opacity(textOpacity)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.65)) {
+                markScale = 1
+                markOpacity = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    textOpacity = 1
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                onComplete()
+            }
+        }
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
@@ -77,36 +144,46 @@ struct RootView: View {
     private var dismissedAnnouncementVersion = ""
     @State private var showingLaunchAnnouncement = false
     @State private var doNotRemindForCurrentVersion = false
+    @State private var showSplash = true
 
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.0.0"
+        ) as? String ?? "1.1.0"
     }
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                Color(red: 0.035, green: 0.045, blue: 0.06)
+                IPalette.paper
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     AppHeader()
-                    Divider().overlay(Color.white.opacity(0.08))
+                    Divider().overlay(IPalette.rule)
 
                     if proxy.size.width >= 820 {
                         HStack(spacing: 0) {
                             SideNavigation()
-                            Divider().overlay(Color.white.opacity(0.08))
+                            Divider().overlay(IPalette.rule)
                             CurrentPage()
                         }
                     } else {
                         CurrentPage()
-                        Divider().overlay(Color.white.opacity(0.08))
+                        Divider().overlay(IPalette.rule)
                         BottomNavigation()
                     }
 
                     StatusBar()
+                }
+            }
+        }
+        .overlay {
+            if showSplash {
+                SplashView {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        showSplash = false
+                    }
                 }
             }
         }
@@ -131,6 +208,9 @@ struct RootView: View {
                 showingLaunchAnnouncement = false
             }
             .interactiveDismissDisabled()
+            .presentationDetents([.large])
+            .presentationCornerRadius(28)
+            .preferredColorScheme(.light)
         }
         .onAppear {
             model.updater.checkAutomaticallyIfNeeded()
@@ -148,6 +228,8 @@ struct RootView: View {
                 model.wireless.stop()
             }
         }
+        .preferredColorScheme(.light)
+        .environment(\.colorScheme, .light)
     }
 }
 
@@ -174,26 +256,32 @@ private struct AppHeader: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .frame(minHeight: 68)
+        .background(IPalette.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(IPalette.rule).frame(height: 0.5)
+        }
+        .shadow(color: IPalette.shadow.opacity(0.45), radius: 10, y: 3)
     }
 
     private var brand: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 11)
+                RoundedRectangle(cornerRadius: 13)
                     .fill(Color(red: 0.08, green: 0.11, blue: 0.16))
                 Text("Z")
                     .font(.system(size: 24, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
             }
             .frame(width: 44, height: 44)
+            .shadow(color: IPalette.cobalt.opacity(0.18), radius: 8, y: 4)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("帧澈 ZENCHE")
                     .font(.headline)
                 Text("Capture · Connect · Flow")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(IPalette.muted)
             }
         }
     }
@@ -211,9 +299,14 @@ private struct AppHeader: View {
             }
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 12)
-            .frame(height: 38)
+            .frame(minHeight: 44)
+            .background(connectionColor.opacity(0.10), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(connectionColor.opacity(0.24), lineWidth: 1)
+            }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
     }
 
     private var settingsButton: some View {
@@ -222,9 +315,13 @@ private struct AppHeader: View {
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 17, weight: .semibold))
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
+                .background(IPalette.paperSecondary, in: Circle())
+                .overlay {
+                    Circle().stroke(IPalette.rule, lineWidth: 0.5)
+                }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
         .accessibilityLabel(Text("打开设置"))
     }
 
@@ -243,6 +340,15 @@ private struct SideNavigation: View {
 
     var body: some View {
         VStack(spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(IPalette.graphite)
+                    .frame(width: 34, height: 34)
+                Text("Z")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(.white)
+            }
+            .padding(.bottom, 10)
             groupLabel("创作")
             navigationButton(.capture)
             navigationButton(.monitor)
@@ -253,36 +359,47 @@ private struct SideNavigation: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 16)
-        .frame(width: 100)
-        .background(Color.black.opacity(0.12))
+        .frame(width: 108)
+        .background(IPalette.paperSecondary)
     }
 
     private func groupLabel(_ title: String) -> some View {
         Text(LocalizedStringKey(title))
             .font(.caption2.monospaced().weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(IPalette.muted)
             .frame(width: 78, alignment: .leading)
             .padding(.leading, 4)
     }
 
     private func navigationButton(_ section: AppSection) -> some View {
         let active = model.section == section
-        let accent = section == .monitor ? Color.red : Color.accentColor
+        let accent = section == .monitor ? IPalette.video : IPalette.cobalt
         return Button {
             model.section = section
         } label: {
             VStack(spacing: 7) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 20, weight: active ? .semibold : .medium))
                 Text(LocalizedStringKey(section.rawValue))
-                    .font(.caption.weight(.medium))
+                    .font(.caption.weight(active ? .semibold : .medium))
             }
-            .foregroundStyle(active ? accent : .secondary)
-            .frame(width: 78, height: 62)
+            .foregroundStyle(active ? accent : IPalette.muted)
+            .frame(width: 82, height: 64)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(active ? accent.opacity(0.14) : .clear)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(active ? IPalette.surface : .clear)
+                    .shadow(
+                        color: active ? IPalette.shadow.opacity(0.65) : .clear,
+                        radius: 7,
+                        y: 3
+                    )
             )
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(active ? accent : .clear)
+                    .frame(width: 3, height: 28)
+                    .offset(x: 3)
+            }
         }
         .buttonStyle(.plain)
     }
@@ -294,24 +411,35 @@ private struct BottomNavigation: View {
     var body: some View {
         HStack {
             ForEach(AppSection.allCases) { section in
+                let accent = section == .monitor ? IPalette.video : IPalette.cobalt
                 Button {
                     model.section = section
                 } label: {
                     VStack(spacing: 4) {
                         Image(systemName: section.icon)
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.system(size: 18, weight: model.section == section ? .semibold : .medium))
                         Text(LocalizedStringKey(section.rawValue))
                             .font(.caption2)
                     }
-                    .foregroundStyle(model.section == section ? Color.accentColor : .secondary)
+                    .foregroundStyle(model.section == section ? accent : IPalette.muted)
                     .frame(maxWidth: .infinity)
+                    .frame(minHeight: 48)
+                    .background(
+                        model.section == section
+                            ? accent.opacity(0.10)
+                            : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
+        .padding(.vertical, 9)
+        .background(IPalette.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(IPalette.rule).frame(height: 0.5)
+        }
     }
 }
 
@@ -345,6 +473,7 @@ private struct CapturePage: View {
                 }
                 CaptureActionBar()
                 CaptureParameterDeck()
+                ShootingTaskCard()
             }
             .padding(20)
         }
@@ -370,6 +499,15 @@ private struct CameraStage: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 20))
 
+                if model.section == .monitor,
+                   let overlay = model.camera.monitorOverlay {
+                    Image(decorative: overlay, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .allowsHitTesting(false)
+                }
+
                 if model.showGrid {
                     GridOverlay()
                         .stroke(Color.white.opacity(0.45), lineWidth: 0.7)
@@ -385,12 +523,12 @@ private struct CameraStage: View {
                 VStack(spacing: 13) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 46, weight: .light))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                     Text("等待相机画面")
                         .font(.title3.weight(.semibold))
                     Text("iPad 可搜索外接 UVC 相机；iPhone 可使用本机镜头。")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                         .multilineTextAlignment(.center)
                     Button("选择相机") {
                         model.showingConnection = true
@@ -398,6 +536,7 @@ private struct CameraStage: View {
                     .buttonStyle(.borderedProminent)
                 }
                 .padding(30)
+                .foregroundStyle(Color.white)
             }
         }
         .aspectRatio(16 / 10, contentMode: .fit)
@@ -412,6 +551,7 @@ private struct CameraStage: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
+            .foregroundStyle(Color.white)
             .background(.black.opacity(0.55), in: Capsule())
             .padding(12)
         }
@@ -461,10 +601,13 @@ private struct ImmersiveCameraView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var showsParameters = true
+    @State private var sensorLandscape: Bool?
     let mode: ImmersiveCameraMode
 
     var body: some View {
         GeometryReader { proxy in
+            let landscape =
+                sensorLandscape ?? (proxy.size.width > proxy.size.height)
             ZStack {
                 Color.black.ignoresSafeArea()
                 if model.camera.state == .ready {
@@ -473,6 +616,14 @@ private struct ImmersiveCameraView: View {
                         focusHandler: { model.camera.focus(at: $0) }
                     )
                     .ignoresSafeArea()
+                    if mode == .video,
+                       let overlay = model.camera.monitorOverlay {
+                        Image(decorative: overlay, scale: 1)
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
                 } else {
                     ContentUnavailableView(
                         "等待相机画面",
@@ -493,20 +644,25 @@ private struct ImmersiveCameraView: View {
                             Color.yellow.opacity(0.72),
                             style: StrokeStyle(lineWidth: 1, dash: [8])
                         )
-                        .padding(proxy.size.width > proxy.size.height ? 96 : 52)
+                        .padding(landscape ? 96 : 52)
                         .allowsHitTesting(false)
                 }
 
-                VStack {
-                    topBar
-                    Spacer()
-                    parameterBar
-                    exposureReadout
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
+                ImmersiveFocusReticle()
+                    .stroke(Color.yellow.opacity(0.82), lineWidth: 2)
+                    .frame(width: 82, height: 82)
+                    .allowsHitTesting(false)
 
-                if proxy.size.width > proxy.size.height {
+                if landscape {
+                    VStack {
+                        topBar
+                        Spacer()
+                        parameterBar
+                        exposureReadout
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+
                     HStack {
                         leftRail
                         Spacer()
@@ -515,18 +671,38 @@ private struct ImmersiveCameraView: View {
                     .padding(.horizontal, 18)
                 } else {
                     VStack {
+                        portraitTopBar
                         Spacer()
-                        HStack {
-                            leftRail
-                            Spacer()
-                            rightRail
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 58)
+                        parameterBar
+                        exposureReadout
+                        portraitCaptureShelf
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+
+                    HStack {
+                        leftRail
+                        Spacer()
+                    }
+                    .padding(.leading, 14)
+                    .padding(.bottom, 208)
                 }
             }
             .preferredColorScheme(.dark)
+        }
+        .onAppear {
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            updateSensorOrientation()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: UIDevice.orientationDidChangeNotification
+            )
+        ) { _ in
+            updateSensorOrientation()
+        }
+        .onDisappear {
+            UIDevice.current.endGeneratingDeviceOrientationNotifications()
         }
     }
 
@@ -564,6 +740,39 @@ private struct ImmersiveCameraView: View {
                 .padding(.horizontal, 12)
                 .frame(height: 44)
                 .background(.black.opacity(0.54), in: Capsule())
+        }
+    }
+
+    private var portraitTopBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "house")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(ImmersiveControlStyle())
+            .accessibilityLabel("退出全屏")
+
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(model.camera.state == .ready ? Color.green : Color.red)
+                    .frame(width: 7, height: 7)
+                RuntimeLocalizedText(model.camera.deviceName)
+                    .lineLimit(1)
+            }
+            .font(.caption2.monospaced().weight(.semibold))
+            .padding(.horizontal, 10)
+            .frame(height: 44)
+            .background(.black.opacity(0.58), in: Capsule())
+
+            Spacer()
+
+            Text(mode == .video ? model.camera.activeVideoSpecLabel : "JPEG")
+                .font(.caption2.monospaced().weight(.bold))
+                .padding(.horizontal, 10)
+                .frame(height: 44)
+                .background(.black.opacity(0.58), in: Capsule())
         }
     }
 
@@ -607,41 +816,7 @@ private struct ImmersiveCameraView: View {
             RuntimeLocalizedText(mode.title)
                 .font(.headline)
                 .foregroundStyle(mode.accent)
-
-            Button {
-                if mode == .video {
-                    model.camera.toggleVideoRecording()
-                } else {
-                    model.camera.capturePhoto()
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(mode.accent)
-                        .frame(width: 76, height: 76)
-                    Circle()
-                        .stroke(.white.opacity(0.88), lineWidth: 3)
-                        .frame(width: 88, height: 88)
-                    Image(
-                        systemName: mode == .photo
-                            ? "camera.fill"
-                            : model.camera.isRecording ? "stop.fill" : "circle.fill"
-                    )
-                        .font(.title2)
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 96, height: 96)
-            }
-            .buttonStyle(.plain)
-            .disabled(
-                model.camera.state != .ready
-                    || (mode == .video && !model.camera.supportsMovieRecording)
-            )
-            .accessibilityLabel(
-                mode == .photo
-                    ? "拍摄照片"
-                    : model.camera.isRecording ? "停止录制" : "开始录制"
-            )
+            captureButton
 
             Button {
                 model.showGrid.toggle()
@@ -659,6 +834,73 @@ private struct ImmersiveCameraView: View {
             }
             .buttonStyle(ImmersiveControlStyle(active: model.showSafeGuide))
         }
+    }
+
+    private var portraitCaptureShelf: some View {
+        VStack(spacing: 6) {
+            RuntimeLocalizedText(mode.title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(mode.accent)
+            HStack(spacing: 24) {
+                Button {
+                    model.showGrid.toggle()
+                } label: {
+                    Image(systemName: "grid")
+                        .frame(width: 52, height: 52)
+                }
+                .buttonStyle(ImmersiveControlStyle(active: model.showGrid))
+
+                captureButton
+
+                Button {
+                    model.showSafeGuide.toggle()
+                } label: {
+                    Image(systemName: "viewfinder")
+                        .frame(width: 52, height: 52)
+                }
+                .buttonStyle(
+                    ImmersiveControlStyle(active: model.showSafeGuide)
+                )
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var captureButton: some View {
+        Button {
+            if mode == .video {
+                model.camera.toggleVideoRecording()
+            } else {
+                model.camera.capturePhoto()
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(mode.accent)
+                    .frame(width: 76, height: 76)
+                Circle()
+                    .stroke(.white.opacity(0.88), lineWidth: 3)
+                    .frame(width: 88, height: 88)
+                Image(
+                    systemName: mode == .photo
+                        ? "camera.fill"
+                        : model.camera.isRecording ? "stop.fill" : "circle.fill"
+                )
+                    .font(.title2)
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 96, height: 96)
+        }
+        .buttonStyle(.plain)
+        .disabled(
+            model.camera.state != .ready
+                || (mode == .video && !model.camera.supportsMovieRecording)
+        )
+        .accessibilityLabel(
+            mode == .photo
+                ? "拍摄照片"
+                : model.camera.isRecording ? "停止录制" : "开始录制"
+        )
     }
 
     private var exposureReadout: some View {
@@ -789,6 +1031,35 @@ private struct ImmersiveCameraView: View {
         model.camera.setExposureBias(
             min(max(requested, model.camera.minExposureBias), model.camera.maxExposureBias)
         )
+    }
+
+    private func updateSensorOrientation() {
+        let orientation = UIDevice.current.orientation
+        if orientation.isLandscape {
+            sensorLandscape = true
+        } else if orientation.isPortrait {
+            sensorLandscape = false
+        }
+    }
+}
+
+private struct ImmersiveFocusReticle: Shape {
+    func path(in rect: CGRect) -> Path {
+        let arm = min(rect.width, rect.height) * 0.24
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + arm))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.minY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + arm))
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY - arm))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - arm))
+        return path
     }
 }
 
@@ -946,7 +1217,72 @@ private struct CaptureParameterDeck: View {
 
         }
         .padding(18)
-        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+        .shadow(color: IPalette.shadow, radius: 12, y: 6)
+    }
+}
+
+private struct ShootingTaskCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("拍摄任务")
+                .font(.headline)
+            Picker("任务类型", selection: $model.shootingTaskKind) {
+                ForEach(ShootingTaskKind.allCases) { kind in
+                    Text(kind.rawValue).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            Stepper(
+                "张数 · \(model.shootingTaskCount)",
+                value: $model.shootingTaskCount,
+                in: 1...999
+            )
+            Stepper(
+                model.shootingTaskKind == .bulb
+                    ? "曝光时长 · \(model.shootingTaskInterval) 秒"
+                    : "间隔 · \(model.shootingTaskInterval) 秒",
+                value: $model.shootingTaskInterval,
+                in: 1...3600
+            )
+            if model.shootingTaskKind == .exposureBracket
+                || model.shootingTaskKind == .focusBracket {
+                Stepper(
+                    model.shootingTaskKind == .exposureBracket
+                        ? "包围步长 · \(model.shootingTaskStep) EV"
+                        : "焦点步长 · \(model.shootingTaskStep)",
+                    value: $model.shootingTaskStep,
+                    in: 1...3
+                )
+            }
+            RuntimeLocalizedText(model.shootingTaskStatus)
+                .font(.caption.monospaced())
+                .foregroundStyle(IPalette.muted)
+            Button {
+                if model.shootingTaskRunning {
+                    model.cancelShootingTask()
+                } else {
+                    model.startShootingTask()
+                }
+            } label: {
+                Label(
+                    model.shootingTaskRunning ? "取消任务" : "开始任务",
+                    systemImage: model.shootingTaskRunning
+                        ? "xmark.circle.fill"
+                        : "camera.badge.clock"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(model.camera.state != .ready && !model.shootingTaskRunning)
+        }
+        .padding(18)
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+        .shadow(color: IPalette.shadow, radius: 12, y: 6)
     }
 }
 
@@ -980,7 +1316,8 @@ private struct MonitorPage: View {
             VStack(alignment: .leading, spacing: 18) {
                 PageTitle(
                     title: "视频监看",
-                    subtitle: "系统视频设备预览、监看参数与输出规格。"
+                    subtitle: "系统视频设备预览、监看参数与输出规格。",
+                    accent: IPalette.video
                 )
                 CameraStage {
                     showingFullscreen = true
@@ -1036,7 +1373,7 @@ private struct MonitorParameterDeck: View {
                 .font(.headline)
             Text("按当前视频设备公开的能力调整。")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(IPalette.muted)
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -1068,7 +1405,7 @@ private struct MonitorParameterDeck: View {
                 if !model.camera.supportsCustomExposure {
                     Text("当前设备未通过 AVFoundation 提供自定义曝光；快门角度和 ISO 保持只读。")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                 }
             }
 
@@ -1105,7 +1442,7 @@ private struct MonitorParameterDeck: View {
             }
             Text("AVFoundation 仅公开当前镜头光圈读数，不允许应用直接改写；请在镜头或相机端调整。")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(IPalette.muted)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -1190,14 +1527,135 @@ private struct MonitorOutputDeck: View {
                 }
             }
 
+            Toggle(
+                "峰值对焦",
+                isOn: Binding(
+                    get: { model.camera.focusPeakingEnabled },
+                    set: { model.camera.setFocusPeakingEnabled($0) }
+                )
+            )
+            Toggle(
+                "假色曝光",
+                isOn: Binding(
+                    get: { model.camera.falseColorEnabled },
+                    set: { model.camera.setFalseColorEnabled($0) }
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 6) {
+                scopeRow("R", value: model.camera.redHistogram, color: .red)
+                scopeRow("G", value: model.camera.greenHistogram, color: .green)
+                scopeRow("B", value: model.camera.blueHistogram, color: .blue)
+                scopeRow("波形", value: model.camera.waveform, color: .primary)
+                scopeRow("矢量", value: model.camera.vectorscope, color: .primary)
+                Text("峰值覆盖 · \(model.camera.peakingCoverage)%")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(IPalette.muted)
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+
             Text("画面尺寸/帧频会切换 AVFoundation 的采集格式；编码仅保存为输出偏好，不改变实时取景输入，也不会修改 Nikon 机身的视频文件类型。")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(IPalette.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func scopeRow(_ label: String, value: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(color)
+                .frame(width: 30, alignment: .leading)
+            Text(value)
+                .font(.caption2.monospaced())
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+    }
+}
+
+private struct CaptureSessionCard: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var name = "未命名会话"
+    @State private var namingTemplate = "{session}_{date}_{counter}"
+    @State private var creator = ""
+    @State private var rights = ""
+    @State private var rating = 0
+    @State private var dualBackupEnabled = true
+
+    var body: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 12) {
+                TextField("项目名称", text: $name)
+                TextField("命名模板", text: $namingTemplate)
+                    .font(.body.monospaced())
+                HStack {
+                    TextField("创作者", text: $creator)
+                    TextField("版权", text: $rights)
+                }
+                Stepper("默认评级 · \(rating) 星", value: $rating, in: 0...5)
+                Toggle("双目标备份", isOn: $dualBackupEnabled)
+                Text("支持 {session}、{date}、{counter}、{camera}；RAW + JPEG 使用同一基础文件名，并写入 XMP 与 SHA-256 清单。")
+                    .font(.caption)
+                    .foregroundStyle(IPalette.muted)
+                HStack {
+                    RuntimeLocalizedText(model.captureWorkflow.status)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(IPalette.muted)
+                    Spacer()
+                    Button(model.captureWorkflow.isActive ? "结束会话" : "开始会话") {
+                        toggleSession()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(.top, 12)
+        } label: {
+            Label(
+                "拍摄会话",
+                systemImage: model.captureWorkflow.isActive
+                    ? "folder.badge.gearshape"
+                    : "folder.badge.plus"
+            )
+            .font(.headline)
+        }
+        .onAppear(perform: loadConfiguration)
+    }
+
+    private func loadConfiguration() {
+        let configuration = model.captureWorkflow.configuration
+        name = configuration.name
+        namingTemplate = configuration.namingTemplate
+        creator = configuration.creator
+        rights = configuration.rights
+        rating = configuration.rating
+        dualBackupEnabled = configuration.dualBackupEnabled
+    }
+
+    private func toggleSession() {
+        if model.captureWorkflow.isActive {
+            model.captureWorkflow.end()
+            return
+        }
+        do {
+            try model.captureWorkflow.begin(
+                CaptureSessionConfiguration(
+                    name: name,
+                    namingTemplate: namingTemplate,
+                    creator: creator,
+                    rights: rights,
+                    rating: rating,
+                    dualBackupEnabled: dualBackupEnabled
+                )
+            )
+        } catch {
+            model.statusMessage = "无法开始拍摄会话：\(error.localizedDescription)"
+        }
     }
 }
 
@@ -1240,6 +1698,8 @@ private struct LibraryPage: View {
                     .buttonStyle(.bordered)
                 }
 
+                CaptureSessionCard()
+
                 DisclosureGroup(isExpanded: $systemAlbumExpanded) {
                     if systemAlbumItems.isEmpty {
                         ContentUnavailableView(
@@ -1265,7 +1725,7 @@ private struct LibraryPage: View {
                     }
                     Text("系统相册内容保持在原位置；帧澈 ZENCHE 只读取缩略图和预览。")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                 } label: {
                     Label(
                         "系统相册 · \(systemAlbumItems.count)",
@@ -1461,7 +1921,7 @@ private struct SystemAlbumThumbnail: View {
                     Color.black
                     Image(systemName: item.isVideo ? "video.fill" : "photo")
                         .font(.title)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                 }
                 if item.isVideo {
                     Label(
@@ -1625,12 +2085,12 @@ private struct CloudDriveGuideView: View {
                                         .font(.headline)
                                     RuntimeLocalizedText(provider.note)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(IPalette.muted)
                                         .multilineTextAlignment(.leading)
                                 }
                                 Spacer()
                                 Image(systemName: "arrow.up.right")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(IPalette.muted)
                             }
                         }
                         .buttonStyle(.plain)
@@ -1739,13 +2199,14 @@ private struct LibraryThumbnail: View {
                 } else {
                     Image(systemName: "photo")
                         .font(.largeTitle)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(height: 125)
             .clipped()
-            .background(Color.black.opacity(0.35))
+            .background(IPalette.graphite)
+        .foregroundStyle(Color.white.opacity(0.82))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(item.filename)
@@ -1782,12 +2243,12 @@ private struct WirelessTransferCard: View {
                         model.wireless.isRunning ? "接收中" : "已停止"
                     )
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                 }
 
                 RuntimeLocalizedText(model.wireless.status)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(IPalette.muted)
 
                 if model.wireless.isRunning {
                     VStack(alignment: .leading, spacing: 6) {
@@ -1827,7 +2288,7 @@ private struct WirelessTransferCard: View {
 
                 Text("相机端可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP PUT/POST 或 WebDAV PUT。接收完成后照片会直接进入上方文件库。HTTP 请求需提供 Content-Length；服务只在 帧澈 ZENCHE 位于前台时运行。")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(IPalette.muted)
             }
         }
     }
@@ -1856,7 +2317,7 @@ private struct AppSettingsSheet: View {
                             .pickerStyle(.segmented)
                             Text("语言更改会立即应用，并在下次启动时保留。")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(IPalette.muted)
                         }
                     }
 
@@ -1874,7 +2335,7 @@ private struct AppSettingsSheet: View {
                                 .font(.headline)
                             Text("按日写入、5 MB 滚动并保留 14 天；查询与上传前会自动脱敏。")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(IPalette.muted)
                             ViewThatFits(in: .horizontal) {
                                 HStack(spacing: 10) {
                                     logButtons
@@ -1882,6 +2343,9 @@ private struct AppSettingsSheet: View {
                                 VStack(spacing: 10) {
                                     logButtons
                                 }
+                            }
+                            FastFeedbackCallout {
+                                UIApplication.shared.open(afdianURL)
                             }
                         }
                     }
@@ -1896,7 +2360,7 @@ private struct AppSettingsSheet: View {
                                     .font(.headline)
                                 Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
                                     .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(IPalette.muted)
                             }
                             Spacer()
                             Button("请作者喝奶茶") {
@@ -1913,12 +2377,13 @@ private struct AppSettingsSheet: View {
                                 .font(.headline)
                             Text("帧澈 ZENCHE 不上传照片，也不包含分析服务。只有你点击上传并在 GitHub 确认时，预览中的脱敏日志才会发送。")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(IPalette.muted)
                         }
                     }
                 }
                 .padding(20)
             }
+            .background(IPalette.paper)
             .navigationTitle(
                 RuntimeLocalization.text("设置", locale: locale)
             )
@@ -1933,6 +2398,8 @@ private struct AppSettingsSheet: View {
         }
         .sheet(isPresented: $showingDonation) {
             DonationSheet()
+                .presentationCornerRadius(28)
+                .preferredColorScheme(.light)
         }
     }
 
@@ -1972,14 +2439,37 @@ private struct UpdateSettingsCard: View {
                         .font(.headline)
                 }
 
-                Text("当前版本 \(updater.currentVersion) · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。")
+                Text("当前版本 \(updater.currentVersion) · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(IPalette.muted)
+
+                SecureField(
+                    "Mirror酱 CDK（可选）",
+                    text: $updater.mirrorChyanCDK
+                )
+                .textContentType(.password)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 12)
+                .frame(height: 42)
+                .background(IPalette.paper)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                HStack {
+                    Text("CDK 保存在系统钥匙串中，不会写入诊断日志。")
+                        .font(.caption)
+                        .foregroundStyle(IPalette.muted)
+                    Spacer()
+                    Button("打开 Mirror酱") {
+                        updater.openMirrorChyan()
+                    }
+                    .buttonStyle(.borderless)
+                }
 
                 HStack(spacing: 10) {
                     RuntimeLocalizedText(updater.statusText)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                     Spacer()
                     if updater.isChecking {
                         ProgressView()
@@ -2014,6 +2504,7 @@ private struct DiagnosticLogViewer: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(18)
             }
+            .background(IPalette.paper)
             .navigationTitle("最近诊断日志")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -2029,26 +2520,106 @@ private struct DiagnosticLogViewer: View {
     }
 }
 
+private struct FastFeedbackCallout: View {
+    let openAfdian: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "bolt.horizontal.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(IPalette.cobalt)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("快速问题反馈")
+                        .font(.headline)
+                    Text("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。")
+                        .font(.subheadline)
+                        .foregroundStyle(IPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("官方 QQ 群：165315727")
+                        .font(.subheadline.monospacedDigit().weight(.bold))
+                        .foregroundStyle(IPalette.cobalt)
+                        .textSelection(.enabled)
+                }
+            }
+            Button {
+                openAfdian()
+            } label: {
+                Label("打开爱发电", systemImage: "arrow.up.right")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(IPalette.cobaltSoft, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(IPalette.cobalt.opacity(0.18), lineWidth: 0.5)
+        )
+    }
+}
+
 private struct DonationSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let image = UIImage(named: "wechat-donation") {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .padding(20)
-                } else {
-                    ContentUnavailableView(
-                        "二维码未找到",
-                        systemImage: "qrcode",
-                        description: Text("请重新安装 帧澈 ZENCHE 后再试。")
-                    )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 14) {
+                        Image(systemName: "heart.fill")
+                            .font(.title2)
+                            .foregroundStyle(IPalette.cobalt)
+                            .frame(width: 48, height: 48)
+                            .background(
+                                IPalette.cobaltSoft,
+                                in: RoundedRectangle(cornerRadius: 14)
+                            )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("爱发电赞助")
+                                .font(.title2.bold())
+                            Text("扫描二维码，或打开爱发电主页支持项目。")
+                                .font(.subheadline)
+                                .foregroundStyle(IPalette.muted)
+                        }
+                    }
+
+                    FastFeedbackCallout {
+                        UIApplication.shared.open(afdianURL)
+                    }
+
+                    if let image = UIImage(named: "wechat-donation") {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 440)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(IPalette.rule, lineWidth: 0.5)
+                            )
+                    } else {
+                        ContentUnavailableView(
+                            "二维码未找到",
+                            systemImage: "qrcode",
+                            description: Text("请重新安装 帧澈 ZENCHE 后再试。")
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("软件功能永久免费，赞助为自愿行为。")
+                        Text("赞助不会解锁软件功能，也不影响公开 Issue 的处理。")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(IPalette.muted)
                 }
+                .padding(20)
             }
-            .navigationTitle("请作者喝奶茶")
+            .background(IPalette.paper)
+            .navigationTitle("爱发电赞助")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
@@ -2079,11 +2650,11 @@ private struct LaunchAnnouncementSheet: View {
                                 Text(version)
                             }
                             .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(IPalette.muted)
                         }
                     }
 
-                    Text("• 新增启动更新公告，并支持按版本控制提醒。\n• 五端公告与赞助入口保持一致。\n• 更新赞助图片并优化多语言体验。")
+                    Text("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。")
                     .font(.subheadline)
                     .lineSpacing(5)
 
@@ -2101,18 +2672,29 @@ private struct LaunchAnnouncementSheet: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("自愿赞助")
+                        Label("爱发电赞助", systemImage: "heart.fill")
                             .font(.headline)
+                            .foregroundStyle(IPalette.cobalt)
                         Text("如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(IPalette.muted)
+                        FastFeedbackCallout {
+                            UIApplication.shared.open(afdianURL)
+                        }
                         if let image = UIImage(named: "wechat-donation") {
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFit()
+                                .frame(maxHeight: 340)
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                     }
+                    .padding(16)
+                    .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(IPalette.rule, lineWidth: 0.5)
+                    )
 
                     Button {
                         doNotRemind.toggle()
@@ -2138,7 +2720,14 @@ private struct LaunchAnnouncementSheet: View {
                 }
                 .padding(20)
             }
+            .background(IPalette.paper)
             .navigationTitle("更新公告")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("关闭公告", action: close)
+                }
+            }
         }
     }
 }
@@ -2154,7 +2743,8 @@ private struct SettingsCard<Content: View>: View {
         content
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18))
+            .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
     }
 }
 
@@ -2222,7 +2812,7 @@ private struct ConnectionSheet: View {
                         }
                         Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要控制 帧澈 ZENCHE 已适配的 EXPEED 6 / 7 相机并下载原图，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(IPalette.muted)
                     }
                     .padding(16)
                     .background(Color.yellow.opacity(0.075), in: RoundedRectangle(cornerRadius: 16))
@@ -2242,7 +2832,7 @@ private struct ConnectionSheet: View {
                                 : "正在使用本机镜头"
                             )
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(IPalette.muted)
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2251,6 +2841,7 @@ private struct ConnectionSheet: View {
                 }
                 .padding(20)
             }
+            .background(IPalette.paper)
             .navigationTitle("选择相机")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2289,7 +2880,7 @@ private struct ConnectionOption: View {
                         .font(.headline)
                     Text(LocalizedStringKey(subtitle))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(IPalette.muted)
                 }
                 Spacer()
                 Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
@@ -2308,14 +2899,22 @@ private struct ConnectionOption: View {
 private struct PageTitle: View {
     let title: String
     let subtitle: String
+    var accent = IPalette.cobalt
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(LocalizedStringKey(title))
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-            Text(LocalizedStringKey(subtitle))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        HStack(alignment: .top, spacing: 12) {
+            Capsule()
+                .fill(accent)
+                .frame(width: 4, height: 38)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(LocalizedStringKey(title))
+                    .font(.system(size: 29, weight: .bold))
+                    .foregroundStyle(IPalette.ink)
+                Text(LocalizedStringKey(subtitle))
+                    .font(.subheadline)
+                    .foregroundStyle(IPalette.muted)
+            }
         }
     }
 }
@@ -2331,12 +2930,13 @@ private struct StatusBar: View {
                 .lineLimit(1)
             Spacer()
             Text("本次 · \(model.library.items.count) 张")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(IPalette.muted)
         }
         .font(.caption)
         .padding(.horizontal, 14)
         .frame(height: 30)
-        .background(Color.black.opacity(0.35))
+        .background(IPalette.graphite)
+        .foregroundStyle(Color.white.opacity(0.82))
     }
 
     private var statusIcon: String {

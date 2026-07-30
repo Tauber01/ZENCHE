@@ -22,11 +22,15 @@ public sealed class PtpCamera : IDisposable
     private const ushort StartLiveViewOperation = 0x9201;
     private const ushort EndLiveViewOperation = 0x9202;
     private const ushort GetLiveViewImage = 0x9203;
+    private const ushort ManualFocusDriveOperation = 0x9204;
     private const ushort CaptureToSdram = 0x9207;
     private const ushort StartMovieRecordingOperation = 0x920a;
     private const ushort EndMovieRecordingOperation = 0x920b;
     private const ushort TerminateCapture = 0x920c;
     private const ushort ObjectAddedInSdram = 0xc101;
+    private const ushort ExposureTime = 0x500d;
+    private const ushort NikonExposureTime = 0xd100;
+    private const ushort NikonMovieExposureTime = 0xd1a8;
     private const int StillImageClass = 6;
     private const int MaximumContainerSize = 256 * 1024 * 1024;
 
@@ -218,6 +222,7 @@ public sealed class PtpCamera : IDisposable
         {
             EnsureConnected();
             var resumeLiveView = _liveView;
+            var releaseRemoteMode = false;
             if (resumeLiveView)
             {
                 await StopLiveViewCoreAsync(cancellationToken);
@@ -232,13 +237,14 @@ public sealed class PtpCamera : IDisposable
                         null,
                         10_000,
                         cancellationToken);
+                    releaseRemoteMode = true;
                     await SetPropertyCoreAsync(
                         0x500e,
                         LittleEndian16(1),
                         cancellationToken);
-                    await SetPropertyCoreAsync(
-                        0x500d,
-                        LittleEndian32(uint.MaxValue),
+                    await SetShutterRawAsync(
+                        false,
+                        uint.MaxValue,
                         cancellationToken);
                     await TransactAsync(
                         CaptureToSdram,
@@ -305,26 +311,40 @@ public sealed class PtpCamera : IDisposable
                     null,
                     60_000,
                     cancellationToken);
+                await WaitUntilDeviceReadyAsync(8_000, cancellationToken);
                 return ExtractJpeg(source);
             }
             finally
             {
-                if (resumeLiveView && IsConnected)
+                if (releaseRemoteMode && IsConnected)
                 {
                     try
                     {
-                        await TransactAsync(
-                            StartLiveViewOperation,
-                            null,
-                            null,
-                            10_000,
-                            cancellationToken);
-                        _liveView = true;
+                        await WaitUntilDeviceReadyAsync(8_000, cancellationToken);
                     }
                     catch
                     {
-                        _liveView = false;
+                        // Still try to release remote mode below.
                     }
+                    try
+                    {
+                        await TransactAsync(
+                            ChangeCameraMode,
+                            [0],
+                            null,
+                            10_000,
+                            cancellationToken);
+                    }
+                    catch
+                    {
+                        // The capture result is still valid. A reconnect will
+                        // release remote mode if the body disappeared.
+                    }
+                }
+                if (resumeLiveView && IsConnected)
+                {
+                    await ResumeLiveViewAfterExclusiveOperationAsync(
+                        cancellationToken);
                 }
             }
         }
@@ -340,6 +360,7 @@ public sealed class PtpCamera : IDisposable
         CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
+        var resumeLiveView = false;
         try
         {
             EnsureConnected();
@@ -356,6 +377,11 @@ public sealed class PtpCamera : IDisposable
             if (!CanAdjustParameter(name))
             {
                 throw new InvalidOperationException(ParameterLockReason(name));
+            }
+            resumeLiveView = _liveView;
+            if (resumeLiveView)
+            {
+                await StopLiveViewCoreAsync(cancellationToken);
             }
 
             if (name == "focusMode")
@@ -398,9 +424,12 @@ public sealed class PtpCamera : IDisposable
             switch (name)
             {
                 case "exposureTime":
-                    property = 0x500d;
-                    value = LittleEndian32((uint)Math.Round(number * 10_000));
-                    break;
+                case "videoExposureTime":
+                    await SetShutterSecondsAsync(
+                        number,
+                        name == "videoExposureTime",
+                        cancellationToken);
+                    return;
                 case "aperture":
                     property = 0x5007;
                     value = LittleEndian16((int)Math.Round(number * 100));
@@ -440,22 +469,9 @@ public sealed class PtpCamera : IDisposable
                     property = 0x500e;
                     if (requestedExposureMode == "bulb")
                     {
-                        await TransactAsync(
-                            ChangeCameraMode,
-                            [1],
-                            null,
-                            10_000,
-                            cancellationToken);
-                        await SetPropertyCoreAsync(
-                            property,
-                            LittleEndian16(1),
-                            cancellationToken);
-                        await SetPropertyCoreAsync(
-                            0x500d,
-                            LittleEndian32(uint.MaxValue),
-                            cancellationToken);
+                        // Keep Bulb local until CaptureAsync starts. Entering
+                        // Nikon remote mode here leaves the body shutter locked.
                         _exposureMode = requestedExposureMode;
-                        await RefreshParameterCapabilitiesAsync(cancellationToken);
                         return;
                     }
                     value = LittleEndian16(requestedExposureMode switch
@@ -480,11 +496,54 @@ public sealed class PtpCamera : IDisposable
         catch (CameraProtocolException error)
             when (error.ResponseCode == 0x200f)
         {
-            _deniedParameters.Add(name);
             throw new InvalidOperationException(
-                $"{CameraName} 报告此参数当前只读；" +
-                "帧澈 ZENCHE 已锁定该控件以防止重复报错。",
+                $"{CameraName} 当前状态暂时拒绝写入此参数。" +
+                "请确认机身处于允许调整的曝光模式后重试。",
                 error);
+        }
+        finally
+        {
+            if (resumeLiveView && IsConnected)
+            {
+                await ResumeLiveViewAfterExclusiveOperationAsync(
+                    cancellationToken);
+            }
+            _gate.Release();
+        }
+    }
+
+    public async Task MoveFocusAsync(
+        int signedStep,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureConnected();
+            if (!_liveView)
+            {
+                throw new InvalidOperationException(
+                    "焦点步进仅能在实时取景开启时使用。");
+            }
+            var normalized = Math.Clamp(signedStep, -3, 3);
+            if (normalized == 0)
+            {
+                return;
+            }
+            var direction = normalized < 0 ? 0x1u : 0x2u;
+            var amount = Math.Abs(normalized) switch
+            {
+                1 => 128u,
+                2 => 512u,
+                _ => 1024u
+            };
+            await TransactAsync(
+                ManualFocusDriveOperation,
+                [direction, amount],
+                null,
+                10_000,
+                cancellationToken);
+            await WaitUntilDeviceReadyAsync(4_000, cancellationToken);
         }
         finally
         {
@@ -918,6 +977,186 @@ public sealed class PtpCamera : IDisposable
             10_000,
             cancellationToken);
 
+    private async Task SetShutterSecondsAsync(
+        double seconds,
+        bool video,
+        CancellationToken cancellationToken)
+    {
+        if (!double.IsFinite(seconds) || seconds <= 0)
+        {
+            throw new InvalidOperationException("快门速度必须大于 0 秒。");
+        }
+        CameraProtocolException? finalError = null;
+        foreach (var property in ShutterProperties(video))
+        {
+            var encoded = property == ExposureTime
+                ? LittleEndian32((uint)Math.Round(seconds * 10_000))
+                : NikonShutterValue(seconds);
+            try
+            {
+                await SetPropertyCoreAsync(
+                    property,
+                    encoded,
+                    cancellationToken);
+                return;
+            }
+            catch (CameraProtocolException error)
+                when (IsPropertyCompatibilityResponse(error.ResponseCode))
+            {
+                finalError = error;
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 当前没有可写的{(video ? "视频" : "照片")}快门属性。" +
+            "请确认相机处于 M/S 模式，且未在机身菜单中锁定曝光参数。",
+            finalError);
+    }
+
+    private async Task SetShutterRawAsync(
+        bool video,
+        uint rawValue,
+        CancellationToken cancellationToken)
+    {
+        CameraProtocolException? finalError = null;
+        foreach (var property in ShutterProperties(video))
+        {
+            try
+            {
+                await SetPropertyCoreAsync(
+                    property,
+                    LittleEndian32(rawValue),
+                    cancellationToken);
+                return;
+            }
+            catch (CameraProtocolException error)
+                when (IsPropertyCompatibilityResponse(error.ResponseCode))
+            {
+                finalError = error;
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 当前不支持通过 USB/PTP 设置 B 门快门。",
+            finalError);
+    }
+
+    private static ushort[] ShutterProperties(bool video) => video
+        ? [NikonMovieExposureTime, ExposureTime, NikonExposureTime]
+        : [NikonExposureTime, ExposureTime];
+
+    private bool HasWritableShutterProperty(bool video)
+    {
+        var hasUnknownProperty = false;
+        foreach (var property in ShutterProperties(video))
+        {
+            if (!_writableProperties.TryGetValue(property, out var writable))
+            {
+                hasUnknownProperty = true;
+            }
+            else if (writable)
+            {
+                return true;
+            }
+        }
+        return hasUnknownProperty;
+    }
+
+    private static byte[] NikonShutterValue(double seconds)
+    {
+        long numerator;
+        long denominator;
+        if (seconds < 1)
+        {
+            numerator = 1;
+            denominator = Math.Max(1, (long)Math.Round(1 / seconds));
+        }
+        else if (Math.Abs(seconds - Math.Round(seconds)) < 0.000001)
+        {
+            numerator = (long)Math.Round(seconds);
+            denominator = 1;
+        }
+        else
+        {
+            denominator = 1_000;
+            numerator = (long)Math.Round(seconds * denominator);
+            var divisor = GreatestCommonDivisor(numerator, denominator);
+            numerator /= divisor;
+            denominator /= divisor;
+        }
+        numerator = Math.Clamp(numerator, 1, ushort.MaxValue);
+        denominator = Math.Clamp(denominator, 1, ushort.MaxValue);
+        return LittleEndian32(
+            (uint)((numerator << 16) | denominator));
+    }
+
+    private static long GreatestCommonDivisor(long left, long right)
+    {
+        while (right != 0)
+        {
+            var remainder = left % right;
+            left = right;
+            right = remainder;
+        }
+        return Math.Max(1, left);
+    }
+
+    private static bool IsPropertyCompatibilityResponse(ushort code) =>
+        code is 0x2005 or 0x200a or 0x200f or 0x201c or 0x201d;
+
+    private async Task WaitUntilDeviceReadyAsync(
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        CameraProtocolException? finalError = null;
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await TransactAsync(
+                    DeviceReady,
+                    null,
+                    null,
+                    3_000,
+                    cancellationToken);
+                return;
+            }
+            catch (CameraProtocolException error)
+            {
+                finalError = error;
+                await Task.Delay(180, cancellationToken);
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 在独占操作后未恢复就绪状态。",
+            finalError);
+    }
+
+    private async Task ResumeLiveViewAfterExclusiveOperationAsync(
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= 3 && IsConnected; attempt++)
+        {
+            try
+            {
+                await WaitUntilDeviceReadyAsync(4_000, cancellationToken);
+                await TransactAsync(
+                    StartLiveViewOperation,
+                    null,
+                    null,
+                    10_000,
+                    cancellationToken);
+                _liveView = true;
+                return;
+            }
+            catch when (!cancellationToken.IsCancellationRequested)
+            {
+                _liveView = false;
+                await Task.Delay(250 * attempt, cancellationToken);
+            }
+        }
+    }
+
     private async Task StopLiveViewCoreAsync(
         CancellationToken cancellationToken)
     {
@@ -947,10 +1186,7 @@ public sealed class PtpCamera : IDisposable
         {
             return false;
         }
-        var property = PropertyCode(name);
-        return property == 0 ||
-            !_writableProperties.TryGetValue(property, out var writable) ||
-            writable;
+        return true;
     }
 
     public string ParameterLockReason(string name)
@@ -963,15 +1199,12 @@ public sealed class PtpCamera : IDisposable
         {
             return "当前拍摄模式下由相机控制";
         }
-        return _writableProperties.TryGetValue(PropertyCode(name), out var writable)
-            && !writable
-                ? "相机固件报告此参数为只读"
-                : "当前不可调整";
+        return "当前不可调整";
     }
 
     private bool CanAdjust(string name) => name switch
     {
-        "exposureTime" =>
+        "exposureTime" or "videoExposureTime" =>
             _exposureMode is "manual" or "shutterPriority",
         "aperture" =>
             _exposureMode is "manual" or "aperturePriority" or "bulb",
@@ -988,8 +1221,9 @@ public sealed class PtpCamera : IDisposable
         _deniedParameters.Clear();
         ushort[] properties =
         [
-            0x5005, 0x5007, 0x500a, 0x500d,
-            0x500e, 0x500f, 0x5010, 0xd200
+            0x5005, 0x5007, 0x500a, ExposureTime,
+            0x500e, 0x500f, 0x5010,
+            NikonExposureTime, NikonMovieExposureTime, 0xd200
         ];
         foreach (var property in properties)
         {
@@ -1018,7 +1252,8 @@ public sealed class PtpCamera : IDisposable
         "whiteBalanceMode" => 0x5005,
         "aperture" => 0x5007,
         "focusMode" => 0x500a,
-        "exposureTime" => 0x500d,
+        "exposureTime" => ExposureTime,
+        "videoExposureTime" => NikonMovieExposureTime,
         "exposureMode" => 0x500e,
         "iso" => 0x500f,
         "exposureCompensation" => 0x5010,

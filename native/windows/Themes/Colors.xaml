@@ -7,6 +7,8 @@
   <Color x:Key="ColorPaper2">#EFF3F8</Color>
   <Color x:Key="ColorPaper3">#E5EBF3</Color>
   <Color x:Key="ColorSurface">#FCFDFE</Color>
+  <Color x:Key="ColorSurfaceRaised">#FFFFFF</Color>
+  <Color x:Key="ColorSidebar">#EFF3F8</Color>
   <Color x:Key="ColorRule">#D8DFE9</Color>
   <Color x:Key="ColorRuleStrong">#AEB8C7</Color>
   <Color x:Key="ColorNeutral">#6D7787</Color>
@@ -27,11 +29,14 @@
   <Color x:Key="ColorError">#B4232D</Color>
   <Color x:Key="ColorErrorSoft">#FCE9EA</Color>
   <Color x:Key="ColorSuccess">#247A53</Color>
+  <Color x:Key="ColorShadow">#2B17233A</Color>
 
   <SolidColorBrush x:Key="PaperBrush" Color="{StaticResource ColorPaper}" />
   <SolidColorBrush x:Key="Paper2Brush" Color="{StaticResource ColorPaper2}" />
   <SolidColorBrush x:Key="Paper3Brush" Color="{StaticResource ColorPaper3}" />
   <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource ColorSurface}" />
+  <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{StaticResource ColorSurfaceRaised}" />
+  <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource ColorSidebar}" />
   <SolidColorBrush x:Key="RuleBrush" Color="{StaticResource ColorRule}" />
   <SolidColorBrush x:Key="RuleStrongBrush" Color="{StaticResource ColorRuleStrong}" />
   <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource ColorNeutral}" />

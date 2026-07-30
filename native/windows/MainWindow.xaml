@@ -10,36 +10,81 @@
         WindowStartupLocation="CenterScreen">
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="68" />
+      <RowDefinition Height="76" />
       <RowDefinition Height="*" />
       <RowDefinition Height="34" />
     </Grid.RowDefinitions>
 
     <Border Grid.Row="0"
-            Background="{StaticResource SurfaceBrush}"
+            Background="{StaticResource SurfaceRaisedBrush}"
             BorderBrush="{StaticResource RuleBrush}"
             BorderThickness="0,0,0,1">
-      <Grid Margin="24,0">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="14"
+                          Color="{StaticResource ColorShadow}"
+                          Opacity="0.35"
+                          ShadowDepth="3" />
+      </Border.Effect>
+      <Grid Margin="20,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Style="{StaticResource DisplayText}"
-                     Text="帧澈 ZENCHE  ·  Capture · Connect · Flow" />
+        <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
+          <Border Width="44"
+                  Height="44"
+                  Background="{StaticResource GraphiteBrush}"
+                  CornerRadius="13">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="10"
+                                Color="{StaticResource ColorAccent}"
+                                Opacity="0.2"
+                                ShadowDepth="4" />
+            </Border.Effect>
+            <TextBlock HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontFamily="{StaticResource DisplayFont}"
+                       FontSize="22"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Text="Z" />
+          </Border>
+          <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+            <TextBlock FontFamily="{StaticResource DisplayFont}"
+                       FontSize="19"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource InkBrush}"
+                       Text="帧澈 ZENCHE" />
+            <TextBlock Margin="0,3,0,0"
+                       Style="{StaticResource MetaText}"
+                       Text="Capture · Connect · Flow" />
+          </StackPanel>
+        </StackPanel>
+        <Border Grid.Column="1"
+                Margin="16,0"
+                Padding="12,8"
+                VerticalAlignment="Center"
+                Background="{StaticResource Paper2Brush}"
+                BorderBrush="{StaticResource RuleBrush}"
+                BorderThickness="1"
+                CornerRadius="18">
           <TextBlock x:Name="CameraStatusText"
                      Style="{StaticResource MetaText}"
-                     Text="未连接 · WINDOWS USB/PTP" />
-        </StackPanel>
+                     MaxWidth="260"
+                     Text="未连接 · WINDOWS USB/PTP"
+                     TextTrimming="CharacterEllipsis"
+                     TextWrapping="NoWrap" />
+        </Border>
         <Button x:Name="ConnectButton"
-                Grid.Column="1"
+                Grid.Column="2"
                 Width="142"
                 Style="{StaticResource PrimaryButton}"
                 Content="连接相机"
                 Click="ConnectButton_Click" />
         <Button x:Name="SettingsButton"
-                Grid.Column="2"
+                Grid.Column="3"
                 Width="48"
                 Margin="10,0,0,0"
                 FontFamily="Segoe UI Symbol"
@@ -53,25 +98,25 @@
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="160" />
+        <ColumnDefinition Width="176" />
         <ColumnDefinition Width="*" MinWidth="380" />
         <ColumnDefinition x:Name="ParameterColumn" Width="300" />
       </Grid.ColumnDefinitions>
 
       <Border Grid.Column="0"
-              Background="{StaticResource Paper2Brush}"
+              Background="{StaticResource SidebarBrush}"
               BorderBrush="{StaticResource RuleBrush}"
               BorderThickness="0,0,1,0">
-        <DockPanel Margin="16">
+        <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.0.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.1.0" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
                        Text="照片保存在“图片\帧澈 ZENCHE”" />
           </StackPanel>
           <StackPanel>
-            <TextBlock Margin="12,0,0,12"
+            <TextBlock Margin="12,0,0,16"
                        Style="{StaticResource MetaText}"
                        Text="工作区" />
             <Button x:Name="CaptureNav"
@@ -93,16 +138,17 @@
         </DockPanel>
       </Border>
 
-      <Grid Grid.Column="1" Margin="20">
+      <Grid Grid.Column="1" Margin="24">
         <Grid x:Name="CapturePanel">
           <Grid.RowDefinitions>
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
           <Border Background="{StaticResource GraphiteBrush}"
                   BorderBrush="{StaticResource GraphiteRuleBrush}"
                   BorderThickness="1"
-                  CornerRadius="10"
+                  CornerRadius="18"
                   ClipToBounds="True">
             <Grid>
               <Image x:Name="PreviewImage"
@@ -168,10 +214,62 @@
                     IsEnabled="False"
                     Click="ShutterButton_Click" />
           </Grid>
+          <Expander x:Name="ShootingTaskPanel"
+                    Grid.Row="2"
+                    Margin="0,14,0,0"
+                    Header="拍摄任务"
+                    IsExpanded="False">
+            <Border Padding="14" Style="{StaticResource PanelCard}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="110" />
+                  <ColumnDefinition Width="110" />
+                  <ColumnDefinition Width="110" />
+                  <ColumnDefinition Width="132" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <ComboBox x:Name="ShootingTaskKindBox"
+                            SelectionChanged="ShootingTaskKindBox_SelectionChanged">
+                    <ComboBoxItem Tag="interval" Content="间隔拍摄" IsSelected="True" />
+                    <ComboBoxItem Tag="exposure" Content="曝光包围" />
+                    <ComboBoxItem Tag="focus" Content="焦点包围" />
+                    <ComboBoxItem Tag="bulb" Content="B 门计时" />
+                  </ComboBox>
+                  <TextBlock x:Name="ShootingTaskStatusText"
+                             Margin="0,6,12,0"
+                             FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             Text="尚未开始拍摄任务" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                  <TextBlock Text="张数" />
+                  <TextBox x:Name="ShootingTaskCountText" Text="5" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                  <TextBlock x:Name="ShootingTaskIntervalLabel" Text="间隔（秒）" />
+                  <TextBox x:Name="ShootingTaskIntervalText" Text="3" />
+                </StackPanel>
+                <StackPanel Grid.Column="3" Margin="10,0,0,0">
+                  <TextBlock Text="包围步长" />
+                  <TextBox x:Name="ShootingTaskStepText" Text="1" />
+                </StackPanel>
+                <Button x:Name="ShootingTaskButton"
+                        Grid.Column="4"
+                        Height="44"
+                        Margin="12,16,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="开始任务"
+                        Click="ShootingTaskButton_Click" />
+              </Grid>
+            </Border>
+          </Expander>
         </Grid>
 
         <Grid x:Name="LibraryPanel" Visibility="Collapsed">
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -202,6 +300,77 @@
             </StackPanel>
           </Grid>
           <Expander Grid.Row="1"
+                    Margin="0,18,0,0"
+                    Header="拍摄会话"
+                    IsExpanded="False">
+            <Border Padding="16" Style="{StaticResource PanelCard}">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="120" />
+                  <ColumnDefinition Width="150" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,10,0">
+                  <TextBlock Text="项目名称" />
+                  <TextBox x:Name="SessionNameText" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                  <TextBlock Text="命名模板" />
+                  <TextBox x:Name="SessionNamingTemplateText"
+                           FontFamily="{StaticResource MonoFont}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Margin="0,0,10,0">
+                  <TextBlock Text="默认评级" />
+                  <ComboBox x:Name="SessionRatingBox" SelectedIndex="0">
+                    <ComboBoxItem Content="0 星" Tag="0" />
+                    <ComboBoxItem Content="1 星" Tag="1" />
+                    <ComboBoxItem Content="2 星" Tag="2" />
+                    <ComboBoxItem Content="3 星" Tag="3" />
+                    <ComboBoxItem Content="4 星" Tag="4" />
+                    <ComboBoxItem Content="5 星" Tag="5" />
+                  </ComboBox>
+                </StackPanel>
+                <CheckBox x:Name="SessionDualBackupCheck"
+                          Grid.Column="3"
+                          Margin="0,20,0,0"
+                          VerticalAlignment="Center"
+                          Content="双目标备份"
+                          IsChecked="True" />
+                <StackPanel Grid.Row="1" Margin="0,10,10,0">
+                  <TextBlock Text="创作者" />
+                  <TextBox x:Name="SessionCreatorText" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,10,10,0">
+                  <TextBlock Text="版权" />
+                  <TextBox x:Name="SessionRightsText" />
+                </StackPanel>
+                <TextBlock x:Name="SessionStatusText"
+                           Grid.Row="2"
+                           Grid.ColumnSpan="3"
+                           Margin="0,12,12,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="尚未开始拍摄会话" />
+                <Button x:Name="SessionActionButton"
+                        Grid.Row="2"
+                        Grid.Column="3"
+                        Height="42"
+                        Margin="0,10,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="开始会话"
+                        Click="SessionActionButton_Click" />
+              </Grid>
+            </Border>
+          </Expander>
+          <Expander Grid.Row="2"
                     Margin="0,18,0,0"
                     Header="无线传输 · FTP / HTTP / WebDAV"
                     IsExpanded="False">
@@ -239,7 +408,7 @@
           </Border>
           </Expander>
           <ListBox x:Name="PhotoList"
-                   Grid.Row="2"
+                   Grid.Row="3"
                    Margin="0,20,0,12"
                    Background="Transparent"
                    BorderBrush="{StaticResource RuleBrush}"
@@ -295,7 +464,7 @@
               </DataTemplate>
             </ListBox.ItemTemplate>
           </ListBox>
-          <StackPanel Grid.Row="3"
+          <StackPanel Grid.Row="4"
                       HorizontalAlignment="Right"
                       Orientation="Horizontal">
             <TextBlock Margin="0,0,18,0"
@@ -350,6 +519,10 @@
               </Border>
               <Border Style="{StaticResource PanelCard}">
                 <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -379,6 +552,38 @@
                             Visibility="Collapsed"
                             Click="OpenUpdateButton_Click" />
                   </WrapPanel>
+                  <Grid Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <PasswordBox x:Name="MirrorChyanCdkBox"
+                                   Height="38"
+                                   Padding="10,7"
+                                   ToolTip="Mirror酱 CDK（可选）" />
+                      <TextBlock Margin="0,6,0,0"
+                                 Foreground="{StaticResource MutedBrush}"
+                                 Text="CDK 使用 Windows DPAPI 加密保存，不会写入诊断日志。" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Width="104"
+                            Height="38"
+                            Margin="10,0,0,0"
+                            Style="{StaticResource ButtonBase}"
+                            Content="保存 CDK"
+                            Click="SaveMirrorChyanCdkButton_Click" />
+                    <Button Grid.Column="2"
+                            Width="124"
+                            Height="38"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource ButtonBase}"
+                            Content="打开 Mirror酱"
+                            Click="OpenMirrorChyanButton_Click" />
+                  </Grid>
                 </Grid>
               </Border>
               <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
@@ -409,6 +614,33 @@
                              Foreground="{StaticResource MutedBrush}"
                              TextWrapping="Wrap"
                              Text="将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。" />
+                  <Border Margin="0,14,0,0"
+                          Padding="14"
+                          Background="{StaticResource AccentSoftBrush}"
+                          BorderBrush="#B6CFF5"
+                          BorderThickness="1"
+                          CornerRadius="12">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Margin="0,0,16,0">
+                        <TextBlock FontSize="15"
+                                   FontWeight="Bold"
+                                   Text="快速问题反馈" />
+                        <TextBlock Margin="0,4,0,0"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   Text="公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。" />
+                      </StackPanel>
+                      <Button Grid.Column="1"
+                              MinWidth="124"
+                              Style="{StaticResource ButtonBase}"
+                              Content="打开爱发电"
+                              Click="OpenAfdianButton_Click" />
+                    </Grid>
+                  </Border>
                 </StackPanel>
               </Border>
               <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
@@ -437,7 +669,7 @@
 
       <Border x:Name="ParameterPanelShell"
               Grid.Column="2"
-              Background="{StaticResource SurfaceBrush}"
+              Background="{StaticResource Paper2Brush}"
               BorderBrush="{StaticResource RuleBrush}"
               BorderThickness="1,0,0,0">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -547,6 +779,58 @@
               <ComboBoxItem Tag="landscape" Content="风景" />
               <ComboBoxItem Tag="flat" Content="平面" />
             </ComboBox>
+
+            <Expander x:Name="ProfessionalMonitorPanel"
+                      Margin="0,16,0,0"
+                      Header="专业监看"
+                      Visibility="Collapsed"
+                      IsExpanded="True">
+              <StackPanel Margin="0,8,0,0">
+                <CheckBox x:Name="FocusPeakingCheck"
+                          Content="峰值对焦"
+                          Click="FocusPeakingCheck_Click" />
+                <CheckBox x:Name="FalseColorCheck"
+                          Margin="0,6,0,0"
+                          Content="假色曝光"
+                          Click="FalseColorCheck_Click" />
+                <Border Margin="0,10,0,0"
+                        Padding="10"
+                        Background="{StaticResource Paper2Brush}"
+                        CornerRadius="6">
+                  <StackPanel>
+                    <TextBlock x:Name="RedHistogramText"
+                               Foreground="#D22D34"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="R —" />
+                    <TextBlock x:Name="GreenHistogramText"
+                               Foreground="#199152"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="G —" />
+                    <TextBlock x:Name="BlueHistogramText"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="B —" />
+                    <TextBlock x:Name="WaveformText"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="Y —" />
+                    <TextBlock x:Name="VectorscopeText"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="H —" />
+                    <TextBlock x:Name="PeakingCoverageText"
+                               Margin="0,4,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="峰值覆盖 0%" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Expander>
           </StackPanel>
         </ScrollViewer>
       </Border>

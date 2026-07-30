@@ -32,21 +32,61 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     'WeChat でスキャンしてください。ご支援ありがとうございます。'
   ),
   new TranslationEntry(
+    '爱发电赞助',
+    'Afdian Support',
+    'Afdian で支援'
+  ),
+  new TranslationEntry(
+    '扫描二维码，或打开爱发电主页支持项目。',
+    'Scan the QR code or open the Afdian page to support the project.',
+    'QR コードを読み取るか、Afdian ページを開いてプロジェクトを支援できます。'
+  ),
+  new TranslationEntry(
+    '快速问题反馈',
+    'Faster Problem Feedback',
+    'より迅速な問題フィードバック'
+  ),
+  new TranslationEntry(
+    '公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。',
+    'Public issues remain free on GitHub. Afdian sponsors can access a faster feedback channel.',
+    '公開 Issue は引き続き GitHub から無料で送信できます。Afdian で支援すると、より迅速なフィードバック窓口を利用できます。'
+  ),
+  new TranslationEntry(
+    '官方 QQ 群：165315727',
+    'Official QQ group: 165315727',
+    '公式 QQ グループ：165315727'
+  ),
+  new TranslationEntry(
+    '打开爱发电',
+    'Open Afdian',
+    'Afdian を開く'
+  ),
+  new TranslationEntry(
+    '赞助不会解锁软件功能，也不影响公开 Issue 的处理。',
+    'Sponsorship does not unlock app features or affect public issue handling.',
+    '支援によってアプリ機能が解除されたり、公開 Issue の対応が変わったりすることはありません。'
+  ),
+  new TranslationEntry(
+    '软件功能永久免费，赞助为自愿行为。',
+    'App features remain free; sponsorship is voluntary.',
+    'アプリの機能は無料のままで、ご支援は任意です。'
+  ),
+  new TranslationEntry(
     '更新公告',
     'What’s New',
     'アップデートのお知らせ'
   ),
   new TranslationEntry('本次更新', 'In This Update', '今回の更新'),
   new TranslationEntry(
-    '• 新增启动更新公告，并支持按版本控制提醒。\n' +
-      '• 五端公告与赞助入口保持一致。\n' +
-      '• 更新赞助图片并优化多语言体验。',
-    '• Added a launch announcement with per-version reminder control.\n' +
-      '• Kept announcements and support entry points consistent across all five platforms.\n' +
-      '• Updated the support image and improved the multilingual experience.',
-    '• 起動時のお知らせとバージョンごとの通知設定を追加しました。\n' +
-      '• 5 つのプラットフォームでお知らせと支援画面を統一しました。\n' +
-      '• 支援用画像を更新し、多言語表示を改善しました。'
+    '• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n' +
+      '• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n' +
+      '• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。',
+    '• Added interval capture, exposure bracketing, focus bracketing, and timed Bulb.\n' +
+      '• Added project sessions, naming templates, RAW + JPEG pairing, dual-destination backup, and SHA-256.\n' +
+      '• Added RGB histograms, waveform, vectorscope, focus peaking, and false color.',
+    '• インターバル撮影、露出ブラケット、フォーカスブラケット、バルブタイマーを追加しました。\n' +
+      '• プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、二重保存、SHA-256 を追加しました。\n' +
+      '• RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラーを追加しました。'
   ),
   new TranslationEntry(
     '谨防诈骗',
@@ -208,6 +248,82 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     'ソフトウェアアップデート'
   ),
   new TranslationEntry(
+    '优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。',
+    'Check MirrorChyan first and fall back to GitHub Releases when no CDN download is available.',
+    'MirrorChyan を優先して確認し、CDN ダウンロードがない場合は GitHub Releases に切り替えます。'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK（可选）',
+    'MirrorChyan CDK (Optional)',
+    'MirrorChyan CDK（任意）'
+  ),
+  new TranslationEntry(
+    'CDK 保存在应用私有设置中，不会写入诊断日志。',
+    'The CDK is stored in private app settings and is never written to diagnostic logs.',
+    'CDK はアプリの非公開設定に保存され、診断ログには記録されません。'
+  ),
+  new TranslationEntry('保存 CDK', 'Save CDK', 'CDK を保存'),
+  new TranslationEntry(
+    '打开 Mirror酱',
+    'Open MirrorChyan',
+    'MirrorChyan を開く'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 已清除',
+    'MirrorChyan CDK cleared',
+    'MirrorChyan CDK を消去しました'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 已保存',
+    'MirrorChyan CDK saved',
+    'MirrorChyan CDK を保存しました'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 保存失败',
+    'Failed to save MirrorChyan CDK',
+    'MirrorChyan CDK の保存に失敗しました'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 已过期，已回退 GitHub',
+    'MirrorChyan CDK expired; using GitHub',
+    'MirrorChyan CDK の期限が切れています。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 无效，已回退 GitHub',
+    'MirrorChyan CDK is invalid; using GitHub',
+    'MirrorChyan CDK が無効です。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱今日下载额度已用完，已回退 GitHub',
+    'MirrorChyan daily quota is exhausted; using GitHub',
+    'MirrorChyan の本日の上限に達しました。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 与资源不匹配，已回退 GitHub',
+    'MirrorChyan CDK does not match this resource; using GitHub',
+    'MirrorChyan CDK がリソースと一致しません。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱 CDK 已被停用，已回退 GitHub',
+    'MirrorChyan CDK is disabled; using GitHub',
+    'MirrorChyan CDK は無効化されています。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱资源尚未配置，已回退 GitHub',
+    'MirrorChyan resource is not configured; using GitHub',
+    'MirrorChyan リソースは未設定です。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱暂不可用，已回退 GitHub',
+    'MirrorChyan is unavailable; using GitHub',
+    'MirrorChyan は利用できません。GitHub を使用します'
+  ),
+  new TranslationEntry(
+    'Mirror酱未返回可直接安装的完整包，已回退 GitHub',
+    'MirrorChyan did not return a full installer; using GitHub',
+    'MirrorChyan から完全なインストーラーが返されなかったため、GitHub を使用します'
+  ),
+  new TranslationEntry(
     '检查更新',
     'Check for Updates',
     'アップデートを確認'
@@ -340,7 +456,44 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。',
     'Redacted logs are sent only after you review the prefilled content and confirm on GitHub.',
     '匿名化ログは入力済み内容を確認し、GitHub で送信を確定した後にのみ送信されます。'
-  )
+  ),
+  new TranslationEntry('拍摄任务', 'Shooting Task', '撮影タスク'),
+  new TranslationEntry('任务类型', 'Task Type', 'タスクの種類'),
+  new TranslationEntry('间隔拍摄', 'Interval Capture', 'インターバル撮影'),
+  new TranslationEntry('曝光包围', 'Exposure Bracketing', '露出ブラケット'),
+  new TranslationEntry('焦点包围', 'Focus Bracketing', 'フォーカスブラケット'),
+  new TranslationEntry('B 门计时', 'Timed Bulb', 'バルブタイマー'),
+  new TranslationEntry('开始任务', 'Start Task', 'タスクを開始'),
+  new TranslationEntry('取消任务', 'Cancel Task', 'タスクをキャンセル'),
+  new TranslationEntry('正在取消拍摄任务…', 'Cancelling shooting task…', '撮影タスクをキャンセル中…'),
+  new TranslationEntry('拍摄任务已取消', 'Shooting task cancelled', '撮影タスクをキャンセルしました'),
+  new TranslationEntry('拍摄任务失败', 'Shooting task failed', '撮影タスクに失敗しました'),
+  new TranslationEntry('准备中', 'Preparing', '準備中'),
+  new TranslationEntry('已完成', 'Completed', '完了'),
+  new TranslationEntry('张数', 'Shots', '枚数'),
+  new TranslationEntry('间隔', 'Interval', '間隔'),
+  new TranslationEntry('曝光时长', 'Exposure Duration', '露光時間'),
+  new TranslationEntry('秒', 'Seconds', '秒'),
+  new TranslationEntry('包围步长', 'Bracket Step', 'ブラケット幅'),
+  new TranslationEntry('专业监看', 'Professional Monitoring', 'プロモニター'),
+  new TranslationEntry('峰值对焦', 'Focus Peaking', 'フォーカスピーキング'),
+  new TranslationEntry('假色曝光', 'False Color', 'フォルスカラー'),
+  new TranslationEntry('波形', 'Waveform', '波形'),
+  new TranslationEntry('矢量', 'Vectorscope', 'ベクトルスコープ'),
+  new TranslationEntry('峰值覆盖', 'Peaking Coverage', 'ピーキング範囲'),
+  new TranslationEntry('拍摄会话', 'Capture Session', '撮影セッション'),
+  new TranslationEntry('项目名称', 'Project Name', 'プロジェクト名'),
+  new TranslationEntry('命名模板', 'Naming Template', '命名テンプレート'),
+  new TranslationEntry('创作者', 'Creator', '作成者'),
+  new TranslationEntry('版权', 'Rights', '著作権'),
+  new TranslationEntry('默认评级', 'Default Rating', '既定の評価'),
+  new TranslationEntry('双目标备份', 'Dual-Destination Backup', '二重保存'),
+  new TranslationEntry('开始会话', 'Start Session', 'セッションを開始'),
+  new TranslationEntry('结束会话', 'End Session', 'セッションを終了'),
+  new TranslationEntry('配置并开始', 'Configure and Start', '設定して開始'),
+  new TranslationEntry('尚未开始拍摄会话', 'No capture session started', '撮影セッションは未開始です'),
+  new TranslationEntry('会话进行中', 'Session Active', 'セッション実行中'),
+  new TranslationEntry('拍摄会话已结束', 'Capture session ended', '撮影セッションを終了しました')
 ];
 
 export function normalizeLanguage(language: string): string {

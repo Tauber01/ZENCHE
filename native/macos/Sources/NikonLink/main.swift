@@ -232,8 +232,12 @@ private final class GPhotoCamera {
     private var previewReadAttempts = 0
     private var previewFrameWindowStartedAt: Date?
     private var previewFramesInWindow = 0
+    private var liveViewErrorBuffer = Data()
     private(set) var profile: SupportedCamera?
     private(set) var parameterWritable: [String: Bool] = [:]
+    private var parameterConfigKeys: [String: [String]] = [:]
+
+    var isLiveViewActive: Bool { liveView }
 
     private var cameraName: String {
         profile?.name ?? "Nikon 相机"
@@ -583,7 +587,12 @@ private final class GPhotoCamera {
 
     private func refreshParameterCapabilities() {
         let keys: [String: [String]] = [
-            "exposureTime": ["shutterspeed"],
+            "exposureTime": ["shutterspeed2", "shutterspeed"],
+            "videoExposureTime": [
+                "movieshutterspeed",
+                "shutterspeed",
+                "shutterspeed2"
+            ],
             "aperture": ["f-number"],
             "iso": ["iso"],
             "exposureCompensation": ["exposurecompensation"],
@@ -593,6 +602,7 @@ private final class GPhotoCamera {
             "pictureControl": ["picturecontrol", "activepicctrlitem", "d200"]
         ]
         var result: [String: Bool] = [:]
+        var writableKeys: [String: [String]] = [:]
         for (name, candidates) in keys {
             var discovered: [Bool] = []
             for key in candidates {
@@ -604,17 +614,21 @@ private final class GPhotoCamera {
                     .map { $0.trimmingCharacters(in: .whitespaces) }
                     .first { $0.lowercased().hasPrefix("readonly:") }
                 if let readOnly {
-                    discovered.append(
+                    let isReadOnly =
                         readOnly.split(separator: ":").last?
-                            .trimmingCharacters(in: .whitespaces) != "0"
-                    )
+                        .trimmingCharacters(in: .whitespaces) != "0"
+                    discovered.append(isReadOnly)
+                    if !isReadOnly {
+                        writableKeys[name, default: []].append(key)
+                    }
                 }
             }
-            if !discovered.isEmpty {
-                result[name] = discovered.contains(false)
+            if discovered.contains(false) {
+                result[name] = true
             }
         }
         parameterWritable = result
+        parameterConfigKeys = writableKeys
     }
 
     func parameterCapabilitySnapshot() -> [String: Bool] {
@@ -676,6 +690,7 @@ private final class GPhotoCamera {
         liveViewOutput = output
         liveViewErrors = errors
         liveViewDecoder.reset()
+        liveViewErrorBuffer.removeAll(keepingCapacity: true)
         liveViewStartedAt = Date()
         lastPreviewAt = nil
         previewReadAttempts = 0
@@ -709,6 +724,7 @@ private final class GPhotoCamera {
             let deadline = Date().addingTimeInterval(1.5)
             while process.isRunning && Date() < deadline {
                 discardAvailableLiveViewOutput()
+                appendAvailableLiveViewErrors()
                 Thread.sleep(forTimeInterval: 0.02)
             }
         }
@@ -768,6 +784,31 @@ private final class GPhotoCamera {
         }
     }
 
+    private func appendAvailableLiveViewErrors() {
+        guard let errors = liveViewErrors else { return }
+        var descriptor = pollfd(
+            fd: errors.fileHandleForReading.fileDescriptor,
+            events: Int16(POLLIN),
+            revents: 0
+        )
+        var chunksRead = 0
+        while chunksRead < 8,
+              Darwin.poll(&descriptor, 1, 0) > 0,
+              descriptor.revents & Int16(POLLIN) != 0 {
+            guard let data = readAvailableLiveViewChunk(from: errors) else {
+                break
+            }
+            liveViewErrorBuffer.append(data)
+            if liveViewErrorBuffer.count > 256 * 1024 {
+                liveViewErrorBuffer.removeFirst(
+                    liveViewErrorBuffer.count - 256 * 1024
+                )
+            }
+            chunksRead += 1
+            descriptor.revents = 0
+        }
+    }
+
     private func readAvailableLiveViewChunk(from output: Pipe) -> Data? {
         var data = Data(count: 64 * 1024)
         let bytesRead = data.withUnsafeMutableBytes { buffer in
@@ -806,6 +847,7 @@ private final class GPhotoCamera {
         liveViewOutput = nil
         liveViewErrors = nil
         liveViewDecoder.reset()
+        liveViewErrorBuffer.removeAll(keepingCapacity: true)
         liveViewStartedAt = nil
         lastPreviewAt = nil
         previewReadAttempts = 0
@@ -814,8 +856,11 @@ private final class GPhotoCamera {
     }
 
     private func readLiveViewErrors() -> String {
-        guard let errors = liveViewErrors else { return "" }
-        let data = errors.fileHandleForReading.readDataToEndOfFile()
+        appendAvailableLiveViewErrors()
+        var data = liveViewErrorBuffer
+        if let errors = liveViewErrors {
+            data.append(errors.fileHandleForReading.readDataToEndOfFile())
+        }
         return String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -855,6 +900,7 @@ private final class GPhotoCamera {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             appendAvailableLiveViewOutput()
+            appendAvailableLiveViewErrors()
             if let frame = liveViewDecoder.latestFrame() {
                 let firstFrame = lastPreviewAt == nil
                 lastPreviewAt = Date()
@@ -1059,23 +1105,75 @@ private final class GPhotoCamera {
         }
     }
 
+    func moveFocus(_ signedStep: Int) throws {
+        guard connected else { throw CameraError.noCamera }
+        guard liveView else {
+            throw CameraError.command("焦点步进仅能在实时取景开启时使用。")
+        }
+        let normalized = max(-3, min(3, signedStep))
+        guard normalized != 0 else { return }
+        let amount: Int
+        switch abs(normalized) {
+        case 1: amount = 128
+        case 2: amount = 512
+        default: amount = 1024
+        }
+        let value = normalized < 0 ? -amount : amount
+        try performWithoutLiveView {
+            _ = try run([
+                "--set-config",
+                "viewfinder=1",
+                "--set-config",
+                "manualfocusdrive=\(value)"
+            ])
+        }
+    }
+
+    private func setShutterConfig(
+        name: String,
+        formatted: String
+    ) throws {
+        let fallbackKeys = name == "videoExposureTime"
+            ? ["movieshutterspeed", "shutterspeed", "shutterspeed2"]
+            : ["shutterspeed2", "shutterspeed"]
+        let candidates = parameterConfigKeys[name].flatMap {
+            $0.isEmpty ? nil : $0
+        } ?? fallbackKeys
+        var finalError: Error?
+        for key in candidates {
+            do {
+                _ = try run(["--set-config", "\(key)=\(formatted)"])
+                logger.info(
+                    "settings",
+                    "快门设置成功；config=\(key)；video=\(name == "videoExposureTime")"
+                )
+                return
+            } catch {
+                finalError = error
+            }
+        }
+        throw CameraError.command(
+            "\(cameraName) 当前没有可写的\(name == "videoExposureTime" ? "视频" : "照片")快门配置。"
+                + "请确认相机处于 M/S 模式，且未在机身菜单中锁定曝光参数。"
+                + (finalError.map { "（\($0.localizedDescription)）" } ?? "")
+        )
+    }
+
     private func setParameterWithoutLiveView(
         name: String,
         value: Any
     ) throws {
         guard connected else { throw CameraError.noCamera }
-        if parameterWritable[name] == false {
-            throw CameraError.command(
-                "\(cameraName) 报告“\(parameterDisplayName(name))”当前只读；帧澈 ZENCHE 已锁定该参数。"
-            )
-        }
         let key: String
         let formatted: String
         switch name {
-        case "exposureTime":
-            key = "shutterspeed"
+        case "exposureTime", "videoExposureTime":
             let number = (value as? NSNumber)?.doubleValue ?? 0.008
-            formatted = number < 1 ? "1/\(Int((1 / number).rounded()))" : String(number)
+            let shutterValue = number < 1
+                ? "1/\(Int((1 / number).rounded()))"
+                : String(number)
+            try setShutterConfig(name: name, formatted: shutterValue)
+            return
         case "aperture":
             key = "f-number"
             formatted = String(describing: value)
@@ -1118,7 +1216,6 @@ private final class GPhotoCamera {
             let mode = String(describing: value)
             if mode == "bulb" {
                 _ = try run(["--set-config", "expprogram=M"])
-                _ = try run(["--set-config", "shutterspeed=Bulb"])
                 return
             }
             key = "expprogram"
@@ -1167,6 +1264,7 @@ private final class GPhotoCamera {
     private func parameterDisplayName(_ name: String) -> String {
         [
             "exposureTime": "快门速度",
+            "videoExposureTime": "视频快门速度",
             "aperture": "光圈",
             "iso": "ISO",
             "exposureCompensation": "曝光补偿",
@@ -1190,6 +1288,7 @@ private final class GPhotoCamera {
         movieRecording = false
         profile = nil
         parameterWritable = [:]
+        parameterConfigKeys = [:]
         logger.info("camera", "相机已断开")
     }
 }
@@ -1212,8 +1311,8 @@ private enum AppSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var icon: String {
         switch self {
-        case .capture: return "camera.fill"
-        case .monitor: return "video.fill"
+        case .capture: return "camera.aperture"
+        case .monitor: return "movieclapper.fill"
         case .library: return "photo.on.rectangle.angled"
         }
     }
@@ -1241,6 +1340,15 @@ private enum MonitorVideoProfile: String, CaseIterable, Identifiable {
         case .hd1080: return NSSize(width: 1920, height: 1080)
         }
     }
+}
+
+private enum ShootingTaskKind: String, CaseIterable, Identifiable {
+    case interval = "间隔拍摄"
+    case exposureBracket = "曝光包围"
+    case focusBracket = "焦点包围"
+    case bulb = "B 门计时"
+
+    var id: String { rawValue }
 }
 
 private final class CameraModel: ObservableObject {
@@ -1276,6 +1384,20 @@ private final class CameraModel: ObservableObject {
     @Published var monitorVideoProfile: MonitorVideoProfile = .source
     @Published var videoFrameRate = 30.0
     @Published var videoShutterAngle = 180.0
+    @Published var focusPeakingEnabled = false
+    @Published var falseColorEnabled = false
+    @Published var redHistogram = "—"
+    @Published var greenHistogram = "—"
+    @Published var blueHistogram = "—"
+    @Published var waveform = "—"
+    @Published var vectorscope = "—"
+    @Published var peakingCoverage = 0
+    @Published var shootingTaskKind: ShootingTaskKind = .interval
+    @Published var shootingTaskCount = 5
+    @Published var shootingTaskInterval = 3
+    @Published var shootingTaskStep = 1
+    @Published var shootingTaskRunning = false
+    @Published var shootingTaskProgress = "尚未开始拍摄任务"
 
     private let camera = GPhotoCamera()
     private let logger = DiagnosticLogger.shared
@@ -1283,12 +1405,21 @@ private final class CameraModel: ObservableObject {
         label: "com.tauber.nikonlink.camera",
         qos: .userInitiated
     )
+    private let previewProcessingQueue = DispatchQueue(
+        label: "com.tauber.nikonlink.preview-processing",
+        qos: .userInteractive
+    )
+    private let previewProcessingLock = NSLock()
     private var previewToken = UUID()
+    private var pendingPreview: (token: UUID, image: NSImage)?
+    private var previewProcessingActive = false
     private var previewLUT: ColorCubeLUT?
     private var sourceFrame: NSImage?
     private var lastPreviewError: String?
     private var previewFailureCount = 0
+    private var shootingTaskToken = UUID()
     private let photoDirectory: URL
+    lazy var captureWorkflow = CaptureWorkflow(rootDirectory: photoDirectory)
     lazy var wirelessTransfer = WirelessTransferServer(
         directory: photoDirectory
     ) { [weak self] _ in
@@ -1385,6 +1516,7 @@ private final class CameraModel: ObservableObject {
     func disconnect() {
         logger.info("workflow", "用户请求断开相机")
         previewToken = UUID()
+        clearPendingPreviewProcessing()
         liveViewEnabled = false
         videoRecording = false
         cameraQueue.async { [weak self] in
@@ -1407,6 +1539,7 @@ private final class CameraModel: ObservableObject {
         if liveViewEnabled {
             logger.info("workflow", "用户关闭实时取景")
             previewToken = UUID()
+            clearPendingPreviewProcessing()
             liveViewEnabled = false
             cameraQueue.async { [weak self] in self?.camera.stopLiveView() }
         } else {
@@ -1447,8 +1580,7 @@ private final class CameraModel: ObservableObject {
             let pullStartedAt = Date()
             do {
                 let data = try self.camera.preview()
-                let image = NSImage(data: data)
-                let output = image.map { self.processedPreview(from: $0) }
+                let image = autoreleasepool { NSImage(data: data) }
                 let nextFrameDelay = max(
                     0,
                     (1.0 / 30.0) - Date().timeIntervalSince(pullStartedAt)
@@ -1466,10 +1598,7 @@ private final class CameraModel: ObservableObject {
                     guard token == self.previewToken else { return }
                     if let image {
                         self.photoFrame = image
-                    }
-                    if let output {
-                        self.frame = output.image
-                        self.zebraMask = output.zebraMask
+                        self.enqueuePreviewProcessing(image, token: token)
                     }
                     if self.detail.hasPrefix("实时取景重试") {
                         self.detail = "USB/PTP · 原生连接"
@@ -1559,26 +1688,33 @@ private final class CameraModel: ObservableObject {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
                 let filename = "NIKON_\(formatter.string(from: Date())).JPG"
-                let url = self.photoDirectory.appendingPathComponent(filename)
-                try data.write(to: url, options: .atomic)
+                let url = try self.captureWorkflow.store(
+                    data: data,
+                    originalFilename: filename,
+                    cameraName: self.activeCameraName
+                )
                 self.logger.info(
                     "capture",
-                    "照片已保存；文件=\(filename)；大小=\(data.count) 字节"
+                    "照片已保存；文件=\(url.lastPathComponent)；大小=\(data.count) 字节"
                 )
                 let image = NSImage(data: data)
-                let output = image.map { self.processedPreview(from: $0) }
                 DispatchQueue.main.async {
                     self.capturing = false
                     self.detail = "拍摄完成 · 已保存到本地照片库"
                     if let image {
                         self.photoFrame = image
                     }
-                    if let output {
-                        self.frame = output.image
-                        self.zebraMask = output.zebraMask
-                    }
                     self.reloadPhotos()
                     self.selectedPhoto = self.photos.first
+                }
+                if let image {
+                    self.previewProcessingQueue.async {
+                        let output = self.processedPreview(from: image)
+                        DispatchQueue.main.async {
+                            self.frame = output.image
+                            self.zebraMask = output.zebraMask
+                        }
+                    }
                 }
             } catch {
                 self.logger.error(
@@ -1592,6 +1728,118 @@ private final class CameraModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func startShootingTask() {
+        guard connected else {
+            errorMessage = "请先连接支持的 Nikon 相机。"
+            return
+        }
+        guard !shootingTaskRunning else { return }
+        let token = UUID()
+        shootingTaskToken = token
+        let kind = shootingTaskKind
+        let count = max(1, min(999, shootingTaskCount))
+        let interval = max(1, min(3600, shootingTaskInterval))
+        let step = max(1, min(3, shootingTaskStep))
+        let originalCompensation = compensation
+        shootingTaskRunning = true
+        shootingTaskProgress = "\(kind.rawValue)准备中"
+        cameraQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                var total = kind == .bulb ? 1 : count
+                if kind == .exposureBracket {
+                    total = max(3, count | 1)
+                }
+                if kind == .focusBracket, !self.camera.isLiveViewActive {
+                    try self.camera.startLiveView()
+                    DispatchQueue.main.async {
+                        self.liveViewEnabled = true
+                        self.startPreviewLoop()
+                    }
+                }
+                for index in 0..<total {
+                    guard token == self.shootingTaskToken else {
+                        throw CancellationError()
+                    }
+                    if kind == .exposureBracket {
+                        let center = total / 2
+                        let offset = Double(index - center) * Double(step)
+                        try self.camera.setParameter(
+                            name: "exposureCompensation",
+                            value: originalCompensation + offset
+                        )
+                    }
+                    if kind == .focusBracket, index > 0 {
+                        try self.camera.moveFocus(step)
+                    }
+                    let bulbSeconds = kind == .bulb ? interval : nil
+                    let data = try self.camera.capture(
+                        bulbSeconds: bulbSeconds
+                    )
+                    let url = try self.captureWorkflow.store(
+                        data: data,
+                        originalFilename: "capture.jpg",
+                        cameraName: self.activeCameraName
+                    )
+                    DispatchQueue.main.async {
+                        self.photoFrame = NSImage(data: data)
+                        self.shootingTaskProgress =
+                            "\(kind.rawValue) · \(index + 1)/\(total) · \(url.lastPathComponent)"
+                        self.reloadPhotos()
+                        self.selectedPhoto = self.photos.first
+                    }
+                    if kind == .interval, index + 1 < total {
+                        for _ in 0..<(interval * 10) {
+                            guard token == self.shootingTaskToken else {
+                                throw CancellationError()
+                            }
+                            Thread.sleep(forTimeInterval: 0.1)
+                        }
+                    }
+                }
+                if kind == .exposureBracket {
+                    try? self.camera.setParameter(
+                        name: "exposureCompensation",
+                        value: originalCompensation
+                    )
+                }
+                DispatchQueue.main.async {
+                    self.shootingTaskRunning = false
+                    self.shootingTaskProgress = "\(kind.rawValue)已完成"
+                    self.detail = self.shootingTaskProgress
+                }
+            } catch is CancellationError {
+                if kind == .exposureBracket {
+                    try? self.camera.setParameter(
+                        name: "exposureCompensation",
+                        value: originalCompensation
+                    )
+                }
+                DispatchQueue.main.async {
+                    self.shootingTaskRunning = false
+                    self.shootingTaskProgress = "拍摄任务已取消"
+                }
+            } catch {
+                if kind == .exposureBracket {
+                    try? self.camera.setParameter(
+                        name: "exposureCompensation",
+                        value: originalCompensation
+                    )
+                }
+                DispatchQueue.main.async {
+                    self.shootingTaskRunning = false
+                    self.shootingTaskProgress = "拍摄任务失败"
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    func cancelShootingTask() {
+        shootingTaskToken = UUID()
+        shootingTaskProgress = "正在取消拍摄任务…"
     }
 
     func toggleMovieRecording() {
@@ -1634,11 +1882,23 @@ private final class CameraModel: ObservableObject {
 
     func reloadPhotos() {
         let keys: Set<URLResourceKey> = [.creationDateKey, .contentModificationDateKey]
-        let urls = (try? FileManager.default.contentsOfDirectory(
+        let enumerator = FileManager.default.enumerator(
             at: photoDirectory,
             includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
-        )) ?? []
+        )
+        var urls: [URL] = []
+        while let url = enumerator?.nextObject() as? URL {
+            if url.pathComponents.contains("Backup") {
+                if (try? url.resourceValues(
+                    forKeys: [.isDirectoryKey]
+                ).isDirectory) == true {
+                    enumerator?.skipDescendants()
+                }
+                continue
+            }
+            urls.append(url)
+        }
         photos = urls
             .filter {
                 [
@@ -1674,27 +1934,20 @@ private final class CameraModel: ObservableObject {
 
     func importPhotos(from urls: [URL]) {
         var imported = 0
+        var pairNames: [String: String] = [:]
         for source in urls {
-            let scoped = source.startAccessingSecurityScopedResource()
-            defer {
-                if scoped {
-                    source.stopAccessingSecurityScopedResource()
-                }
-            }
-
-            var destination = photoDirectory.appendingPathComponent(
-                source.lastPathComponent
-            )
-            if FileManager.default.fileExists(atPath: destination.path) {
-                destination = photoDirectory
-                    .appendingPathComponent(
-                        source.deletingPathExtension().lastPathComponent
-                        + "-\(UUID().uuidString.prefix(6))"
-                    )
-                    .appendingPathExtension(source.pathExtension)
-            }
+            let pairKey = source.deletingPathExtension()
+                .lastPathComponent
+                .lowercased()
+            let reservedBase = pairNames[pairKey] ?? captureWorkflow
+                .reserveBaseName(cameraName: activeCameraName)
+            pairNames[pairKey] = reservedBase
             do {
-                try FileManager.default.copyItem(at: source, to: destination)
+                _ = try captureWorkflow.importFile(
+                    from: source,
+                    cameraName: activeCameraName,
+                    reservedBaseName: reservedBase
+                )
                 imported += 1
             } catch {
                 logger.error(
@@ -1737,7 +1990,7 @@ private final class CameraModel: ObservableObject {
     func canAdjustExposureParameter(_ name: String) -> Bool {
         let modeAllows: Bool
         switch name {
-        case "exposureTime":
+        case "exposureTime", "videoExposureTime":
             modeAllows = exposureMode == "manual" || exposureMode == "shutterPriority"
         case "aperture":
             modeAllows = exposureMode == "manual"
@@ -1788,6 +2041,16 @@ private final class CameraModel: ObservableObject {
         refreshPreviewProcessing()
     }
 
+    func setFocusPeakingEnabled(_ enabled: Bool) {
+        focusPeakingEnabled = enabled
+        refreshPreviewProcessing()
+    }
+
+    func setFalseColorEnabled(_ enabled: Bool) {
+        falseColorEnabled = enabled
+        refreshPreviewProcessing()
+    }
+
     func setMonitorVideoProfile(_ profile: MonitorVideoProfile) {
         monitorVideoProfile = profile
         UserDefaults.standard.set(profile.rawValue, forKey: "monitorVideoProfile")
@@ -1810,7 +2073,7 @@ private final class CameraModel: ObservableObject {
             return
         }
         applyParameter(
-            "exposureTime",
+            "videoExposureTime",
             value: shutter,
             label: "快门角度 \(angle.formatted())°"
         )
@@ -1818,7 +2081,7 @@ private final class CameraModel: ObservableObject {
 
     func importLUT(from url: URL) {
         detail = "正在导入 LUT…"
-        cameraQueue.async { [weak self] in
+        previewProcessingQueue.async { [weak self] in
             guard let self else { return }
             let accessing = url.startAccessingSecurityScopedResource()
             defer {
@@ -1861,7 +2124,7 @@ private final class CameraModel: ObservableObject {
     }
 
     func clearLUT() {
-        cameraQueue.async { [weak self] in
+        previewProcessingQueue.async { [weak self] in
             guard let self else { return }
             self.previewLUT = nil
             let output = self.sourceFrame.map { self.processedPreview(from: $0) }
@@ -1913,17 +2176,82 @@ private final class CameraModel: ObservableObject {
         }
     }
 
+    private func enqueuePreviewProcessing(_ image: NSImage, token: UUID) {
+        previewProcessingLock.lock()
+        pendingPreview = (token, image)
+        let shouldStart = !previewProcessingActive
+        if shouldStart {
+            previewProcessingActive = true
+        }
+        previewProcessingLock.unlock()
+        guard shouldStart else { return }
+        previewProcessingQueue.async { [weak self] in
+            self?.processNextPendingPreview()
+        }
+    }
+
+    private func processNextPendingPreview() {
+        previewProcessingLock.lock()
+        let pending = pendingPreview
+        pendingPreview = nil
+        previewProcessingLock.unlock()
+
+        if let pending, pending.token == previewToken {
+            let output = autoreleasepool {
+                processedPreview(from: pending.image)
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, pending.token == self.previewToken else {
+                    return
+                }
+                self.frame = output.image
+                self.zebraMask = output.zebraMask
+            }
+        }
+
+        previewProcessingLock.lock()
+        let shouldContinue = pendingPreview != nil
+        if !shouldContinue {
+            previewProcessingActive = false
+        }
+        previewProcessingLock.unlock()
+        if shouldContinue {
+            previewProcessingQueue.async { [weak self] in
+                self?.processNextPendingPreview()
+            }
+        }
+    }
+
+    private func clearPendingPreviewProcessing() {
+        previewProcessingLock.lock()
+        pendingPreview = nil
+        previewProcessingLock.unlock()
+    }
+
     private func processedPreview(from image: NSImage) -> (image: NSImage, zebraMask: NSImage?) {
         sourceFrame = image
         let graded = lutEnabled
             ? previewLUT?.applying(to: image) ?? image
             : image
+        let monitored = ProfessionalMonitor.process(
+            graded,
+            focusPeaking: focusPeakingEnabled,
+            falseColor: falseColorEnabled
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.redHistogram = monitored.redHistogram
+            self?.greenHistogram = monitored.greenHistogram
+            self?.blueHistogram = monitored.blueHistogram
+            self?.waveform = monitored.waveform
+            self?.vectorscope = monitored.vectorscope
+            self?.peakingCoverage = monitored.peakingCoverage
+        }
         let display = monitorVideoProfile.targetSize.flatMap {
             PreviewProcessor.resampledImage(
-                graded,
+                monitored.image,
                 fitting: $0
             )
-        } ?? graded
+        } ?? monitored.image
         let zebra = zebraEnabled
             ? PreviewProcessor.zebraMask(for: image, threshold: zebraThreshold)
             : nil
@@ -1931,7 +2259,7 @@ private final class CameraModel: ObservableObject {
     }
 
     private func refreshPreviewProcessing() {
-        cameraQueue.async { [weak self] in
+        previewProcessingQueue.async { [weak self] in
             guard let self, let sourceFrame = self.sourceFrame else { return }
             let output = self.processedPreview(from: sourceFrame)
             DispatchQueue.main.async {
@@ -1944,6 +2272,7 @@ private final class CameraModel: ObservableObject {
     func shutdown() {
         logger.info("app", "正在停止相机与传输服务")
         previewToken = UUID()
+        clearPendingPreviewProcessing()
         wirelessTransfer.stop()
         camera.disconnect()
     }
@@ -1951,7 +2280,8 @@ private final class CameraModel: ObservableObject {
 
 private enum Palette {
     static let paper = Color(red: 0.965, green: 0.973, blue: 0.988)
-    static let surface = Color.white
+    static let paperSecondary = Color(red: 0.937, green: 0.953, blue: 0.976)
+    static let surface = Color(red: 0.992, green: 0.996, blue: 1.0)
     static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
     static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
     static let cobalt = Color(red: 0.02, green: 0.35, blue: 0.82)
@@ -1960,6 +2290,7 @@ private enum Palette {
     static let videoSoft = Color(red: 1.0, green: 0.90, blue: 0.91)
     static let graphite = Color(red: 0.045, green: 0.055, blue: 0.075)
     static let rule = Color.black.opacity(0.10)
+    static let shadow = Color(red: 0.05, green: 0.09, blue: 0.16).opacity(0.10)
 }
 
 private struct NativeButtonStyle: ButtonStyle {
@@ -1972,13 +2303,30 @@ private struct NativeButtonStyle: ButtonStyle {
             .foregroundStyle(primary ? Color.white : Palette.ink)
             .padding(.horizontal, 16)
             .frame(minHeight: 40)
-            .background(primary ? accent : Palette.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 9))
+            .background(
+                primary
+                    ? accent
+                    : (
+                        configuration.isPressed
+                            ? Palette.paperSecondary
+                            : Palette.surface
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 11))
             .overlay {
-                RoundedRectangle(cornerRadius: 9)
-                    .stroke(primary ? Color.clear : Palette.rule, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(
+                        primary ? Color.clear : Palette.rule,
+                        lineWidth: 1
+                    )
             }
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .shadow(
+                color: primary ? accent.opacity(0.25) : Color.clear,
+                radius: primary ? 9 : 0,
+                y: primary ? 4 : 0
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -1987,6 +2335,7 @@ private struct PreviewStage: View {
     var compact = false
     var showsMonitorEffects = false
     var openFullscreen: (() -> Void)?
+    var monitoring = false
 
     var body: some View {
         let previewFrame = showsMonitorEffects ? model.frame : model.photoFrame
@@ -2065,6 +2414,7 @@ private struct PreviewStage: View {
         }
         .aspectRatio(16 / 10, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
         .overlay {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
@@ -2102,7 +2452,11 @@ private struct ImmersiveMacCameraView: View {
     let close: () -> Void
 
     var body: some View {
-        ZStack {
+        GeometryReader { proxy in
+            let edgeLayout = proxy.size.width > proxy.size.height
+                ? AnyLayout(HStackLayout())
+                : AnyLayout(VStackLayout())
+            ZStack {
             Color.black.ignoresSafeArea()
             if let frame = monitoring ? model.frame : model.photoFrame {
                 Image(nsImage: frame)
@@ -2126,6 +2480,11 @@ private struct ImmersiveMacCameraView: View {
                 )
                 .foregroundStyle(.white)
             }
+
+            ImmersiveMacFocusReticle()
+                .stroke(Color.yellow.opacity(0.82), lineWidth: 2)
+                .frame(width: 84, height: 84)
+                .allowsHitTesting(false)
 
             VStack {
                 HStack(spacing: 12) {
@@ -2170,7 +2529,7 @@ private struct ImmersiveMacCameraView: View {
             }
             .padding(20)
 
-            HStack {
+            edgeLayout {
                 VStack(spacing: 12) {
                     Text(model.exposureMode.uppercased())
                         .font(.system(size: 22, weight: .bold))
@@ -2238,6 +2597,11 @@ private struct ImmersiveMacCameraView: View {
                 }
             }
             .padding(.horizontal, 24)
+            .padding(
+                .vertical,
+                proxy.size.width > proxy.size.height ? 0 : 108
+            )
+            }
         }
         .preferredColorScheme(.dark)
         .onExitCommand(perform: close)
@@ -2261,7 +2625,7 @@ private struct ImmersiveMacCameraView: View {
                             parameterControl(
                                 "快门角度",
                                 model.videoShutterAngle.formatted() + "°",
-                                parameter: "exposureTime",
+                                parameter: "videoExposureTime",
                                 decrease: { adjustVideoShutterAngle(-1) },
                                 increase: { adjustVideoShutterAngle(1) }
                             )
@@ -2457,6 +2821,26 @@ private struct ImmersiveMacCameraView: View {
     }
 }
 
+private struct ImmersiveMacFocusReticle: Shape {
+    func path(in rect: CGRect) -> Path {
+        let arm = min(rect.width, rect.height) * 0.24
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + arm))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.minY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + arm))
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY - arm))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - arm))
+        return path
+    }
+}
+
 private struct ImmersiveMacParameterControl: View {
     let title: String
     let value: String
@@ -2613,12 +2997,13 @@ private struct TopBar: View {
         HStack(spacing: 16) {
             HStack(spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8).fill(Palette.graphite)
+                    RoundedRectangle(cornerRadius: 13).fill(Palette.graphite)
                     Text("Z")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 44, height: 44)
+                .shadow(color: Palette.cobalt.opacity(0.18), radius: 8, y: 4)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("帧澈 ZENCHE")
                         .font(.system(size: 18, weight: .bold))
@@ -2659,11 +3044,12 @@ private struct TopBar: View {
             .help(Text("设置"))
         }
         .padding(.horizontal, 20)
-        .frame(height: 74)
+        .frame(height: 76)
         .background(Palette.surface)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Palette.rule).frame(height: 1)
         }
+        .shadow(color: Palette.shadow.opacity(0.55), radius: 12, y: 4)
     }
 }
 
@@ -2676,14 +3062,14 @@ private struct Sidebar: View {
             navigationButton(.capture)
             navigationButton(.monitor)
             Divider()
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
             groupLabel("管理")
             navigationButton(.library)
             Spacer()
         }
-        .padding(.vertical, 16)
-        .frame(width: 94)
-        .background(Palette.surface)
+        .padding(.vertical, 18)
+        .frame(width: 104)
+        .background(Palette.paperSecondary)
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.rule).frame(width: 1)
         }
@@ -2700,21 +3086,62 @@ private struct Sidebar: View {
     private func navigationButton(_ section: AppSection) -> some View {
         let active = model.section == section
         let accent = section == .monitor ? Palette.video : Palette.cobalt
-        let background = section == .monitor ? Palette.videoSoft : Palette.cobaltSoft
         return Button {
-            model.section = section
+            withAnimation(.easeInOut(duration: 0.18)) {
+                model.section = section
+            }
         } label: {
             VStack(spacing: 6) {
-                Image(systemName: section.icon).font(.system(size: 19))
+                Image(systemName: section.icon)
+                    .font(.system(size: 19, weight: active ? .semibold : .regular))
                 Text(LocalizedStringKey(section.rawValue))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 12, weight: active ? .semibold : .medium))
             }
             .foregroundStyle(active ? accent : Palette.muted)
-            .frame(width: 72, height: 62)
-            .background(active ? background : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .frame(width: 80, height: 66)
+            .background(
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(active ? Palette.surface : Color.clear)
+                    .shadow(
+                        color: active ? Palette.shadow.opacity(0.7) : .clear,
+                        radius: 7,
+                        y: 3
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(active ? accent.opacity(0.25) : Color.clear, lineWidth: 1.5)
+            )
+            .overlay(alignment: .leading) {
+                Capsule()
+                    .fill(active ? accent : .clear)
+                    .frame(width: 3, height: 28)
+                    .offset(x: 3)
+            }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct WorkspaceHeading: View {
+    let title: String
+    let subtitle: String
+    var accent = Palette.cobalt
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Capsule()
+                .fill(accent)
+                .frame(width: 4, height: 42)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 6) {
+                RuntimeLocalizedText(title)
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(Palette.ink)
+                RuntimeLocalizedText(subtitle)
+                    .foregroundStyle(Palette.muted)
+            }
+        }
     }
 }
 
@@ -2726,12 +3153,10 @@ private struct CaptureView: View {
         HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("照片拍摄")
-                            .font(.system(size: 34, weight: .bold))
-                        Text("快门、曝光、对焦、白平衡与拍摄模式集中在当前页面。")
-                        .foregroundStyle(Palette.muted)
-                    }
+                    WorkspaceHeading(
+                        title: "照片拍摄",
+                        subtitle: "快门、曝光、对焦、白平衡与拍摄模式集中在当前页面。"
+                    )
                     PreviewStage(model: model) {
                         showMacImmersiveWindow(model: model, monitoring: false)
                     }
@@ -2762,6 +3187,7 @@ private struct CaptureView: View {
                         .buttonStyle(NativeButtonStyle(primary: true))
                         .disabled(model.capturing)
                     }
+                    ShootingTaskPanel(model: model)
                 }
                 .padding(28)
             }
@@ -2769,6 +3195,73 @@ private struct CaptureView: View {
             ParameterInspector(model: model)
                 .frame(width: 330)
         }
+    }
+}
+
+private struct ShootingTaskPanel: View {
+    @ObservedObject var model: CameraModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("拍摄任务")
+                .font(.system(size: 19, weight: .bold))
+            Picker("任务类型", selection: $model.shootingTaskKind) {
+                ForEach(ShootingTaskKind.allCases) { kind in
+                    Text(kind.rawValue).tag(kind)
+                }
+            }
+            .pickerStyle(.segmented)
+            HStack {
+                Stepper(
+                    "张数 \(model.shootingTaskCount)",
+                    value: $model.shootingTaskCount,
+                    in: 1...999
+                )
+                Stepper(
+                    model.shootingTaskKind == .bulb
+                        ? "曝光 \(model.shootingTaskInterval) 秒"
+                        : "间隔 \(model.shootingTaskInterval) 秒",
+                    value: $model.shootingTaskInterval,
+                    in: 1...3600
+                )
+                if model.shootingTaskKind == .exposureBracket
+                    || model.shootingTaskKind == .focusBracket {
+                    Stepper(
+                        "步长 \(model.shootingTaskStep)",
+                        value: $model.shootingTaskStep,
+                        in: 1...3
+                    )
+                }
+                Spacer()
+                Button(
+                    model.shootingTaskRunning ? "取消任务" : "开始任务"
+                ) {
+                    if model.shootingTaskRunning {
+                        model.cancelShootingTask()
+                    } else {
+                        model.startShootingTask()
+                    }
+                }
+                .buttonStyle(
+                    NativeButtonStyle(
+                        primary: true,
+                        accent: model.shootingTaskRunning ? .red : Palette.cobalt
+                    )
+                )
+                .disabled(!model.connected && !model.shootingTaskRunning)
+            }
+            RuntimeLocalizedText(model.shootingTaskProgress)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(18)
+        .background(Palette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Palette.rule, lineWidth: 1)
+        }
+        .shadow(color: Palette.shadow, radius: 12, y: 6)
     }
 }
 
@@ -3024,11 +3517,11 @@ private struct MonitorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("视频监看").font(.system(size: 34, weight: .bold))
-                        Text("\(model.cameraName ?? SupportedCamera.summary) · 视频取景与本地监看处理")
-                            .foregroundStyle(Palette.muted)
-                    }
+                    WorkspaceHeading(
+                        title: "视频监看",
+                        subtitle: "\(model.cameraName ?? SupportedCamera.summary) · 视频取景与本地监看处理",
+                        accent: Palette.video
+                    )
                     Spacer()
                     Button {
                         model.toggleMovieRecording()
@@ -3134,7 +3627,7 @@ private struct MonitorControlDeck: View {
                 }
                 .disabled(
                     model.connected
-                        && !model.canAdjustExposureParameter("exposureTime")
+                        && !model.canAdjustExposureParameter("videoExposureTime")
                 )
 
                 Picker(
@@ -3281,6 +3774,38 @@ private struct MonitorControlDeck: View {
                 .disabled(!model.zebraEnabled)
 
                 Toggle(
+                    "峰值对焦",
+                    isOn: Binding(
+                        get: { model.focusPeakingEnabled },
+                        set: { model.setFocusPeakingEnabled($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                Toggle(
+                    "假色曝光",
+                    isOn: Binding(
+                        get: { model.falseColorEnabled },
+                        set: { model.setFalseColorEnabled($0) }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    monitorScope("R", model.redHistogram, .red)
+                    monitorScope("G", model.greenHistogram, .green)
+                    monitorScope("B", model.blueHistogram, .blue)
+                    monitorScope("波形", model.waveform, Palette.ink)
+                    monitorScope("矢量", model.vectorscope, Palette.ink)
+                    Text("峰值覆盖 · \(model.peakingCoverage)%")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
+                }
+                .padding(10)
+                .background(Palette.paper)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Toggle(
                     "应用本地 LUT",
                     isOn: Binding(
                         get: { model.lutEnabled },
@@ -3331,6 +3856,99 @@ private struct MonitorControlDeck: View {
             }
         }
     }
+
+    private func monitorScope(
+        _ label: String,
+        _ value: String,
+        _ color: Color
+    ) -> some View {
+        HStack(spacing: 7) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(color)
+                .frame(width: 28, alignment: .leading)
+            Text(value)
+                .font(.system(size: 10, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+    }
+}
+
+private struct CaptureSessionPanel: View {
+    @ObservedObject var workflow: CaptureWorkflow
+    @State private var expanded = true
+    @State private var name = "未命名会话"
+    @State private var namingTemplate = "{session}_{date}_{counter}"
+    @State private var creator = ""
+    @State private var rights = ""
+    @State private var rating = 0
+    @State private var dualBackupEnabled = true
+
+    var body: some View {
+        DisclosureGroup("拍摄会话", isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    TextField("项目名称", text: $name)
+                    TextField("命名模板", text: $namingTemplate)
+                        .font(.system(.body, design: .monospaced))
+                }
+                HStack {
+                    TextField("创作者", text: $creator)
+                    TextField("版权", text: $rights)
+                    Stepper("评级 \(rating) 星", value: $rating, in: 0...5)
+                    Toggle("双目标备份", isOn: $dualBackupEnabled)
+                }
+                Text("命名支持 {session}、{date}、{counter}、{camera}；RAW + JPEG 自动配对，并生成 XMP 与 SHA-256 清单。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+                HStack {
+                    RuntimeLocalizedText(workflow.status)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Palette.muted)
+                    Spacer()
+                    Button(workflow.isActive ? "结束会话" : "开始会话") {
+                        toggleSession()
+                    }
+                    .buttonStyle(NativeButtonStyle(primary: true))
+                }
+            }
+            .padding(.top, 10)
+        }
+        .font(.system(size: 19, weight: .bold))
+        .onAppear(perform: loadConfiguration)
+    }
+
+    private func loadConfiguration() {
+        let configuration = workflow.configuration
+        name = configuration.name
+        namingTemplate = configuration.namingTemplate
+        creator = configuration.creator
+        rights = configuration.rights
+        rating = configuration.rating
+        dualBackupEnabled = configuration.dualBackupEnabled
+    }
+
+    private func toggleSession() {
+        if workflow.isActive {
+            workflow.end()
+        } else {
+            do {
+                try workflow.begin(
+                    CaptureSessionConfiguration(
+                        name: name,
+                        namingTemplate: namingTemplate,
+                        creator: creator,
+                        rights: rights,
+                        rating: rating,
+                        dualBackupEnabled: dualBackupEnabled
+                    )
+                )
+            } catch {
+                NSSound.beep()
+            }
+        }
+    }
 }
 
 private struct LibraryView: View {
@@ -3358,11 +3976,10 @@ private struct LibraryView: View {
         HSplitView {
             VStack(spacing: 0) {
                 HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("文件与传输").font(.system(size: 30, weight: .bold))
-                    Text("\(model.photos.count) 个本地文件 · 无线照片自动入库")
-                        .foregroundStyle(Palette.muted)
-                }
+                WorkspaceHeading(
+                    title: "文件与传输",
+                    subtitle: "\(model.photos.count) 个本地文件 · 无线照片自动入库"
+                )
                 Spacer()
                 Button("刷新相册") {
                     Task { await loadSystemAlbum() }
@@ -3386,6 +4003,8 @@ private struct LibraryView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    CaptureSessionPanel(workflow: model.captureWorkflow)
+
                     DisclosureGroup(
                         "系统相册 · \(systemAlbum.count)",
                         isExpanded: $systemExpanded
@@ -4022,6 +4641,56 @@ private struct TransferView: View {
     }
 }
 
+private struct SplashView: View {
+    var onComplete: () -> Void
+    @State private var markScale: CGFloat = 0.01
+    @State private var markOpacity: Double = 0
+    @State private var textOpacity: Double = 0
+
+    var body: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            VStack(spacing: 28) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(Palette.graphite)
+                        .frame(width: 80, height: 80)
+                        .scaleEffect(markScale)
+                        .opacity(markOpacity)
+                    Text("Z")
+                        .font(.system(size: 42, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .scaleEffect(markScale)
+                        .opacity(markOpacity)
+                }
+                VStack(spacing: 6) {
+                    Text("帧澈 ZENCHE")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(Palette.ink)
+                    Text("Capture · Connect · Flow")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Palette.muted)
+                }
+                .opacity(textOpacity)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.65)) {
+                markScale = 1
+                markOpacity = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                withAnimation(.easeOut(duration: 0.5)) {
+                    textOpacity = 1
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                onComplete()
+            }
+        }
+    }
+}
+
 private struct ConnectionSheet: View {
     @ObservedObject var model: CameraModel
     @Environment(\.dismiss) private var dismiss
@@ -4084,6 +4753,7 @@ private struct ConnectionSheet: View {
         }
         .padding(26)
         .frame(width: 560)
+        .background(Palette.paper)
     }
 }
 
@@ -4097,11 +4767,12 @@ private struct RootView: View {
     @State private var showSettings = false
     @State private var showLaunchAnnouncement = false
     @State private var doNotRemindForCurrentVersion = false
+    @State private var showSplash = true
 
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.0.0"
+        ) as? String ?? "1.1.0"
     }
 
     var body: some View {
@@ -4124,6 +4795,7 @@ private struct RootView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .animation(.easeInOut(duration: 0.22), value: model.section)
             }
             HStack {
                 HStack(spacing: 5) {
@@ -4146,6 +4818,15 @@ private struct RootView: View {
             .background(Palette.graphite)
         }
         .background(Palette.paper)
+        .overlay {
+            if showSplash {
+                SplashView {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        showSplash = false
+                    }
+                }
+            }
+        }
         .environment(
             \.locale,
             InterfaceLanguage(rawValue: languageRaw)?.locale

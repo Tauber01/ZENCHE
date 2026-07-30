@@ -11,7 +11,7 @@
     <AssemblyName>ZENCHE</AssemblyName>
     <RootNamespace>NikonLink.Windows</RootNamespace>
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Company>ZENCHE contributors</Company>
     <Product>帧澈 ZENCHE</Product>
     <Description>跨平台相机控制与影像传输工具 · Capture · Connect · Flow</Description>
@@ -24,6 +24,10 @@
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.3.1" />
     <PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('Windows'))">

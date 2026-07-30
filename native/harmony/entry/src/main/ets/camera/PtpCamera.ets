@@ -14,12 +14,16 @@ const OPEN_SESSION: number = 0x1002;
 const CLOSE_SESSION: number = 0x1003;
 const GET_OBJECT: number = 0x1009;
 const SET_DEVICE_PROPERTY: number = 0x1016;
+const EXPOSURE_TIME: number = 0x500d;
+const NIKON_EXPOSURE_TIME: number = 0xd100;
+const NIKON_MOVIE_EXPOSURE_TIME: number = 0xd1a8;
 const CHANGE_CAMERA_MODE: number = 0x90c2;
 const DEVICE_READY: number = 0x90c8;
 const GET_EVENT: number = 0x90c7;
 const START_LIVE_VIEW: number = 0x9201;
 const END_LIVE_VIEW: number = 0x9202;
 const GET_LIVE_VIEW_IMAGE: number = 0x9203;
+const MANUAL_FOCUS_DRIVE: number = 0x9204;
 const CAPTURE_TO_SDRAM: number = 0x9207;
 const START_MOVIE_RECORDING: number = 0x920a;
 const END_MOVIE_RECORDING: number = 0x920b;
@@ -249,14 +253,16 @@ export class PtpCamera {
   async capture(): Promise<Uint8Array> {
     this.ensureConnected();
     const resumeLiveView: boolean = this.liveView;
+    let releaseRemoteMode: boolean = false;
     if (resumeLiveView) {
       await this.stopLiveView();
     }
     try {
       if (this.exposureMode === 'bulb') {
         await this.transact(CHANGE_CAMERA_MODE, [1], undefined, 10000);
+        releaseRemoteMode = true;
         await this.setProperty(0x500e, this.littleEndian16(1));
-        await this.setProperty(0x500d, this.littleEndian32(0xffffffff));
+        await this.setShutterRaw(false, 0xffffffff);
         await this.transact(
           CAPTURE_TO_SDRAM,
           [0xffffffff, 1],
@@ -309,14 +315,21 @@ export class PtpCamera {
         undefined,
         60000
       );
+      await this.waitUntilDeviceReady(8000);
       return this.extractJpeg(source);
     } finally {
-      if (resumeLiveView && this.isConnected) {
+      if (releaseRemoteMode && this.isConnected) {
         try {
-          await this.startLiveView();
+          await this.waitUntilDeviceReady(8000);
         } catch (error) {
-          this.liveView = false;
         }
+        try {
+          await this.transact(CHANGE_CAMERA_MODE, [0], undefined, 10000);
+        } catch (error) {
+        }
+      }
+      if (resumeLiveView && this.isConnected) {
+        await this.resumeLiveViewAfterExclusiveOperation();
       }
     }
   }
@@ -325,19 +338,47 @@ export class PtpCamera {
     if (!this.canAdjustParameter(name)) {
       throw new Error(this.parameterLockReason(name));
     }
+    const resumeLiveView: boolean = this.liveView;
+    if (resumeLiveView) {
+      await this.stopLiveView();
+    }
     try {
       await this.setParameterCore(name, rawValue);
     } catch (error) {
       const message: string = (error as Error).message;
       if (message.includes('0x200F')) {
-        this.deniedParameters.add(name);
         throw new Error(
-          `${this.cameraName()} 报告此参数当前只读；` +
-          '帧澈 ZENCHE 已锁定该控件以防止重复报错。'
+          `${this.cameraName()} 当前状态暂时拒绝写入此参数。` +
+          '请确认机身处于允许调整的曝光模式后重试。'
         );
       }
       throw new Error(message);
+    } finally {
+      if (resumeLiveView && this.isConnected) {
+        await this.resumeLiveViewAfterExclusiveOperation();
+      }
     }
+  }
+
+  async moveFocus(signedStep: number): Promise<void> {
+    this.ensureConnected();
+    if (!this.liveView) {
+      throw new Error('焦点步进仅能在实时取景开启时使用。');
+    }
+    const normalized: number = Math.max(-3, Math.min(3, signedStep));
+    if (normalized === 0) {
+      return;
+    }
+    const direction: number = normalized < 0 ? 0x1 : 0x2;
+    const magnitude: number = Math.abs(normalized);
+    const amount: number = magnitude === 1 ? 128 : magnitude === 2 ? 512 : 1024;
+    await this.transact(
+      MANUAL_FOCUS_DRIVE,
+      [direction, amount],
+      undefined,
+      10000
+    );
+    await this.waitUntilDeviceReady(4000);
   }
 
   private async setParameterCore(
@@ -381,9 +422,12 @@ export class PtpCamera {
     const numericValue: number = Number(rawValue);
     switch (name) {
       case 'exposureTime':
-        property = 0x500d;
-        value = this.littleEndian32(Math.round(numericValue * 10000));
-        break;
+      case 'videoExposureTime':
+        await this.setShutterSeconds(
+          numericValue,
+          name === 'videoExposureTime'
+        );
+        return;
       case 'aperture':
         property = 0x5007;
         value = this.littleEndian16(Math.round(numericValue * 100));
@@ -410,12 +454,8 @@ export class PtpCamera {
         const requestedExposureMode: string = String(rawValue);
         property = 0x500e;
         if (requestedExposureMode === 'bulb') {
-          await this.transact(CHANGE_CAMERA_MODE, [1], undefined, 10000);
-          await this.setProperty(property, this.littleEndian16(1));
-          await this.setProperty(
-            0x500d,
-            this.littleEndian32(0xffffffff)
-          );
+          // Keep Bulb as local capture state until the user presses the
+          // shutter, so the app does not monopolize the physical shutter.
           this.exposureMode = requestedExposureMode;
           return;
         }
@@ -687,9 +727,155 @@ export class PtpCamera {
     );
   }
 
+  private async setShutterSeconds(
+    seconds: number,
+    video: boolean
+  ): Promise<void> {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error('快门速度必须大于 0 秒。');
+    }
+    let finalError: Error | undefined;
+    for (const property of this.shutterProperties(video)) {
+      const encoded: Uint8Array = property === EXPOSURE_TIME
+        ? this.littleEndian32(Math.round(seconds * 10000))
+        : this.nikonShutterValue(seconds);
+      try {
+        await this.setProperty(property, encoded);
+        return;
+      } catch (error) {
+        const candidate: Error = error as Error;
+        if (!this.isPropertyCompatibilityError(candidate)) {
+          throw candidate;
+        }
+        finalError = candidate;
+      }
+    }
+    throw new Error(
+      `${this.cameraName()} 当前没有可写的${video ? '视频' : '照片'}快门属性。` +
+      '请确认相机处于 M/S 模式，且未在机身菜单中锁定曝光参数。' +
+      (finalError === undefined ? '' : `（${finalError.message}）`)
+    );
+  }
+
+  private async setShutterRaw(
+    video: boolean,
+    rawValue: number
+  ): Promise<void> {
+    let finalError: Error | undefined;
+    for (const property of this.shutterProperties(video)) {
+      try {
+        await this.setProperty(property, this.littleEndian32(rawValue));
+        return;
+      } catch (error) {
+        const candidate: Error = error as Error;
+        if (!this.isPropertyCompatibilityError(candidate)) {
+          throw candidate;
+        }
+        finalError = candidate;
+      }
+    }
+    throw new Error(
+      `${this.cameraName()} 当前不支持通过 USB/PTP 设置 B 门快门。` +
+      (finalError === undefined ? '' : `（${finalError.message}）`)
+    );
+  }
+
+  private shutterProperties(video: boolean): Array<number> {
+    return video
+      ? [
+        NIKON_MOVIE_EXPOSURE_TIME,
+        EXPOSURE_TIME,
+        NIKON_EXPOSURE_TIME
+      ]
+      : [NIKON_EXPOSURE_TIME, EXPOSURE_TIME];
+  }
+
+  private nikonShutterValue(seconds: number): Uint8Array {
+    let numerator: number;
+    let denominator: number;
+    if (seconds < 1) {
+      numerator = 1;
+      denominator = Math.max(1, Math.round(1 / seconds));
+    } else if (Math.abs(seconds - Math.round(seconds)) < 0.000001) {
+      numerator = Math.round(seconds);
+      denominator = 1;
+    } else {
+      denominator = 1000;
+      numerator = Math.round(seconds * denominator);
+      const divisor: number =
+        this.greatestCommonDivisor(numerator, denominator);
+      numerator = Math.round(numerator / divisor);
+      denominator = Math.round(denominator / divisor);
+    }
+    numerator = Math.max(1, Math.min(0xffff, numerator));
+    denominator = Math.max(1, Math.min(0xffff, denominator));
+    return this.littleEndian32(
+      ((numerator << 16) | denominator) >>> 0
+    );
+  }
+
+  private greatestCommonDivisor(left: number, right: number): number {
+    let first: number = Math.round(left);
+    let second: number = Math.round(right);
+    while (second !== 0) {
+      const remainder: number = first % second;
+      first = second;
+      second = remainder;
+    }
+    return Math.max(1, first);
+  }
+
+  private isPropertyCompatibilityError(error: Error): boolean {
+    return error.message.includes('0x2005') ||
+      error.message.includes('0x200a') ||
+      error.message.includes('0x200A') ||
+      error.message.includes('0x200f') ||
+      error.message.includes('0x200F') ||
+      error.message.includes('0x201c') ||
+      error.message.includes('0x201C') ||
+      error.message.includes('0x201d') ||
+      error.message.includes('0x201D');
+  }
+
+  private async waitUntilDeviceReady(timeout: number): Promise<void> {
+    const deadline: number = Date.now() + timeout;
+    let finalError: Error | undefined;
+    while (Date.now() < deadline) {
+      try {
+        await this.transact(DEVICE_READY, [], undefined, 3000);
+        return;
+      } catch (error) {
+        finalError = error as Error;
+        await this.sleep(180);
+      }
+    }
+    throw new Error(
+      `${this.cameraName()} 在独占操作后未恢复就绪状态。` +
+      (finalError === undefined ? '' : `（${finalError.message}）`)
+    );
+  }
+
+  private async resumeLiveViewAfterExclusiveOperation(): Promise<void> {
+    for (
+      let attempt: number = 1;
+      attempt <= 3 && this.isConnected;
+      attempt++
+    ) {
+      try {
+        await this.waitUntilDeviceReady(4000);
+        await this.startLiveView();
+        return;
+      } catch (error) {
+        this.liveView = false;
+        await this.sleep(250 * attempt);
+      }
+    }
+  }
+
   private canAdjust(name: string): boolean {
     switch (name) {
       case 'exposureTime':
+      case 'videoExposureTime':
         return this.exposureMode === 'manual' ||
           this.exposureMode === 'shutterPriority';
       case 'aperture':

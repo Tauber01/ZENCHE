@@ -26,4 +26,20 @@ jobs:
       - name: Publish release assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --title "帧澈 ZENCHE $GITHUB_REF_NAME"
+        run: |
+          notes_file="docs/releases/$GITHUB_REF_NAME.md"
+          if [[ ! -s "$notes_file" ]]; then
+            echo "::error file=$notes_file::缺少详细的简体中文 Release 说明。"
+            exit 1
+          fi
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" \
+              --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
+              --notes-file "$notes_file"
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
+              --notes-file "$notes_file"
+          fi

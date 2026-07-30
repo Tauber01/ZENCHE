@@ -36,17 +36,37 @@ final class Localization {
         add("打开微信扫一扫，感谢支持。",
                 "Scan with WeChat. Thank you for your support.",
                 "WeChat でスキャンしてください。ご支援ありがとうございます。");
+        add("爱发电赞助", "Afdian Support", "Afdian で支援");
+        add("扫描二维码，或打开爱发电主页支持项目。",
+                "Scan the QR code or open the Afdian page to support the project.",
+                "QR コードを読み取るか、Afdian ページを開いてプロジェクトを支援できます。");
+        add("快速问题反馈",
+                "Faster Problem Feedback",
+                "より迅速な問題フィードバック");
+        add("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。",
+                "Public issues remain free on GitHub. Afdian sponsors can access a faster feedback channel.",
+                "公開 Issue は引き続き GitHub から無料で送信できます。Afdian で支援すると、より迅速なフィードバック窓口を利用できます。");
+        add("官方 QQ 群：165315727",
+                "Official QQ group: 165315727",
+                "公式 QQ グループ：165315727");
+        add("打开爱发电", "Open Afdian", "Afdian を開く");
+        add("赞助不会解锁软件功能，也不影响公开 Issue 的处理。",
+                "Sponsorship does not unlock app features or affect public issue handling.",
+                "支援によってアプリ機能が解除されたり、公開 Issue の対応が変わったりすることはありません。");
+        add("软件功能永久免费，赞助为自愿行为。",
+                "App features remain free; sponsorship is voluntary.",
+                "アプリの機能は無料のままで、ご支援は任意です。");
         add("更新公告", "What's New", "アップデートのお知らせ");
         add("本次更新", "In This Update", "今回の更新");
-        add("• 新增启动更新公告，并支持按版本控制提醒。\n"
-                        + "• 五端公告与赞助入口保持一致。\n"
-                        + "• 更新赞助图片并优化多语言体验。",
-                "• Added a launch announcement with per-version reminder control.\n"
-                        + "• Kept announcements and support entry points consistent across all five platforms.\n"
-                        + "• Updated the support image and improved the multilingual experience.",
-                "• 起動時のお知らせとバージョンごとの通知設定を追加しました。\n"
-                        + "• 5 つのプラットフォームでお知らせと支援画面を統一しました。\n"
-                        + "• 支援用画像を更新し、多言語表示を改善しました。");
+        add("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n"
+                        + "• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n"
+                        + "• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。",
+                "• Added interval capture, exposure bracketing, focus bracketing, and timed Bulb.\n"
+                        + "• Added project sessions, naming templates, RAW + JPEG pairing, dual-destination backup, and SHA-256.\n"
+                        + "• Added RGB histograms, waveform, vectorscope, focus peaking, and false color.",
+                "• インターバル撮影、露出ブラケット、フォーカスブラケット、バルブタイマーを追加しました。\n"
+                        + "• プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、二重保存、SHA-256 を追加しました。\n"
+                        + "• RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラーを追加しました。");
         add("谨防诈骗", "Scam Warning", "詐欺にご注意ください");
         add("帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”"
                         + "或要求付费购买软件的人都是骗子，请勿转账。",
@@ -162,6 +182,50 @@ final class Localization {
         add("正在检查…", "Checking…", "確認中…");
         add("获取更新", "Get Update", "アップデートを入手");
         add("尚未检查更新", "Updates have not been checked", "アップデートは未確認です");
+        add("优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。",
+                "Check MirrorChyan first and fall back to GitHub Releases when no CDN download is available.",
+                "MirrorChyan を優先して確認し、CDN ダウンロードがない場合は GitHub Releases に切り替えます。");
+        add("Mirror酱 CDK（可选）",
+                "MirrorChyan CDK (Optional)",
+                "MirrorChyan CDK（任意）");
+        add("CDK 使用 Android Keystore 加密保存，不会写入诊断日志。",
+                "The CDK is encrypted with Android Keystore and is never written to diagnostic logs.",
+                "CDK は Android Keystore で暗号化され、診断ログには記録されません。");
+        add("保存 CDK", "Save CDK", "CDK を保存");
+        add("打开 Mirror酱", "Open MirrorChyan", "MirrorChyan を開く");
+        add("Mirror酱 CDK 已清除",
+                "MirrorChyan CDK cleared",
+                "MirrorChyan CDK を消去しました");
+        add("Mirror酱 CDK 已安全保存",
+                "MirrorChyan CDK saved securely",
+                "MirrorChyan CDK を安全に保存しました");
+        add("Mirror酱 CDK 保存失败",
+                "Failed to save MirrorChyan CDK",
+                "MirrorChyan CDK の保存に失敗しました");
+        add("Mirror酱 CDK 已过期，已回退 GitHub",
+                "MirrorChyan CDK expired; using GitHub",
+                "MirrorChyan CDK の期限が切れています。GitHub を使用します");
+        add("Mirror酱 CDK 无效，已回退 GitHub",
+                "MirrorChyan CDK is invalid; using GitHub",
+                "MirrorChyan CDK が無効です。GitHub を使用します");
+        add("Mirror酱今日下载额度已用完，已回退 GitHub",
+                "MirrorChyan daily quota is exhausted; using GitHub",
+                "MirrorChyan の本日の上限に達しました。GitHub を使用します");
+        add("Mirror酱 CDK 与资源不匹配，已回退 GitHub",
+                "MirrorChyan CDK does not match this resource; using GitHub",
+                "MirrorChyan CDK がリソースと一致しません。GitHub を使用します");
+        add("Mirror酱 CDK 已被停用，已回退 GitHub",
+                "MirrorChyan CDK is disabled; using GitHub",
+                "MirrorChyan CDK は無効化されています。GitHub を使用します");
+        add("Mirror酱资源尚未配置，已回退 GitHub",
+                "MirrorChyan resource is not configured; using GitHub",
+                "MirrorChyan リソースは未設定です。GitHub を使用します");
+        add("Mirror酱暂不可用，已回退 GitHub",
+                "MirrorChyan is unavailable; using GitHub",
+                "MirrorChyan は利用できません。GitHub を使用します");
+        add("Mirror酱未返回可直接安装的完整包，已回退 GitHub",
+                "MirrorChyan did not return a full installer; using GitHub",
+                "MirrorChyan から完全なインストーラーが返されなかったため、GitHub を使用します");
         add("诊断日志", "Diagnostic Logs", "診断ログ");
         add("查询日志", "View Logs", "ログを表示");
         add("查询最近日志", "View Recent Logs", "最近のログを表示");
@@ -264,6 +328,43 @@ final class Localization {
         add("只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。",
                 "Redacted logs are sent only after you review the prefilled content and confirm on GitHub.",
                 "匿名化ログは入力済み内容を確認し、GitHub で送信を確定した後にのみ送信されます。");
+        add("拍摄任务", "Shooting Task", "撮影タスク");
+        add("任务类型", "Task Type", "タスクの種類");
+        add("间隔拍摄", "Interval Capture", "インターバル撮影");
+        add("曝光包围", "Exposure Bracketing", "露出ブラケット");
+        add("焦点包围", "Focus Bracketing", "フォーカスブラケット");
+        add("B 门计时", "Timed Bulb", "バルブタイマー");
+        add("开始任务", "Start Task", "タスクを開始");
+        add("取消任务", "Cancel Task", "タスクをキャンセル");
+        add("正在取消拍摄任务…", "Cancelling shooting task…", "撮影タスクをキャンセル中…");
+        add("拍摄任务已取消", "Shooting task cancelled", "撮影タスクをキャンセルしました");
+        add("拍摄任务失败", "Shooting task failed", "撮影タスクに失敗しました");
+        add("准备中", "Preparing", "準備中");
+        add("已完成", "Completed", "完了");
+        add("张数", "Shots", "枚数");
+        add("间隔", "Interval", "間隔");
+        add("曝光时长", "Exposure Duration", "露光時間");
+        add("秒", "Seconds", "秒");
+        add("包围步长", "Bracket Step", "ブラケット幅");
+        add("专业监看", "Professional Monitoring", "プロモニター");
+        add("峰值对焦", "Focus Peaking", "フォーカスピーキング");
+        add("假色曝光", "False Color", "フォルスカラー");
+        add("波形", "Waveform", "波形");
+        add("矢量", "Vectorscope", "ベクトルスコープ");
+        add("峰值覆盖", "Peaking Coverage", "ピーキング範囲");
+        add("拍摄会话", "Capture Session", "撮影セッション");
+        add("项目名称", "Project Name", "プロジェクト名");
+        add("命名模板", "Naming Template", "命名テンプレート");
+        add("创作者", "Creator", "作成者");
+        add("版权", "Rights", "著作権");
+        add("默认评级", "Default Rating", "既定の評価");
+        add("双目标备份", "Dual-Destination Backup", "二重保存");
+        add("开始会话", "Start Session", "セッションを開始");
+        add("结束会话", "End Session", "セッションを終了");
+        add("配置并开始", "Configure and Start", "設定して開始");
+        add("尚未开始拍摄会话", "No capture session started", "撮影セッションは未開始です");
+        add("会话进行中", "Session Active", "セッション実行中");
+        add("拍摄会话已结束", "Capture session ended", "撮影セッションを終了しました");
     }
 
     private Localization() {}

@@ -39,7 +39,13 @@ public sealed class PhotoLibrary
     public IReadOnlyList<PhotoItem> List()
     {
         Directory.CreateDirectory(DirectoryPath);
-        return Directory.EnumerateFiles(DirectoryPath)
+        return Directory.EnumerateFiles(
+                DirectoryPath,
+                "*",
+                SearchOption.AllDirectories)
+            .Where(path =>
+                !path.Split(Path.DirectorySeparatorChar)
+                    .Contains("Backup", StringComparer.OrdinalIgnoreCase))
             .Where(path => SupportedExtensions.Contains(
                 Path.GetExtension(path),
                 StringComparer.OrdinalIgnoreCase))

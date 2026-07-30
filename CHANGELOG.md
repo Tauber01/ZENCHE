@@ -3,7 +3,66 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
-## [Unreleased]
+## [1.1.0] - 2026-07-30
+
+### Added
+
+- Integrated MirrorChyan-first update checks, optional CDK input, platform
+  credential storage, full-package filtering, and automatic GitHub fallback
+  across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.
+- Added interval capture, exposure bracketing, focus bracketing, timed Bulb,
+  cancellation, and progress reporting across all five native applications.
+- Added capture sessions with project directories, naming templates,
+  RAW + JPEG pairing, XMP ratings, dual-destination backup, and SHA-256
+  manifests.
+- Added RGB histograms, waveform and vectorscope readouts, focus peaking, and
+  false-color monitoring without modifying original media.
+
+### Fixed
+
+- Added Nikon photo/video shutter-property fallback across macOS, Android,
+  HarmonyOS, and Windows for bodies that expose the standard PTP shutter
+  property as read-only.
+- Delayed Nikon remote-mode takeover until a Bulb capture actually starts,
+  restored body control afterward, and hardened live-view recovery after
+  exclusive camera operations.
+- Prevented macOS continuous live view from slowing over time when the bundled
+  `gphoto2` process fills its standard-error pipe.
+- Made tag release publication idempotent and required a detailed Simplified
+  Chinese release-notes file instead of generated notes.
+
+## [1.0.0] - 2026-07-30
+
+### Added
+
+- Added complete in-app Simplified Chinese, English, and Japanese language
+  selection across all five native applications.
+- Added the versioned launch announcement, anti-fraud notice, donation entry,
+  and update guidance to the native clients.
+- Added final bilingual promotional deliverables and English launch materials.
+
+### Changed
+
+- Promoted 帧澈 ZENCHE to the stable 1.0.0 release with aligned version/build
+  metadata, download names, and documentation.
+- Refined native layouts, runtime-localized connection states, and
+  platform-specific installation guidance.
+
+## [0.8.3] - 2026-07-30
+
+### Added
+
+- Added the canonical 帧澈 ZENCHE identity, geometric Z mark, bilingual lockup,
+  product descriptor, English brand line, and canonical slogan.
+- Added launch-promotion source assets and synchronized Chinese/English
+  promotional pages.
+
+### Changed
+
+- Renamed public-facing product copy and packages to ZENCHE while preserving
+  legacy internal identifiers required for upgrades and source compatibility.
+- Rewrote README documentation in complete Simplified Chinese, English, and
+  Japanese sections and synchronized packaging guidance.
 
 ## [0.8.1] - 2026-07-29
 
