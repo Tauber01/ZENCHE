@@ -7,8 +7,8 @@
 !ifndef APP_ARCHITECTURE
   !error "APP_ARCHITECTURE is required."
 !endif
-!ifndef PUBLISH_DIR
-  !error "PUBLISH_DIR is required."
+!ifndef PUBLISH_GLOB
+  !error "PUBLISH_GLOB is required."
 !endif
 !ifndef PROJECT_ROOT
   !error "PROJECT_ROOT is required."
@@ -83,7 +83,7 @@ Section "帧澈 ZENCHE" SecApplication
   SetRegView 64
 
   SetOutPath "$INSTDIR"
-  File /r /x ".DS_Store" "${PUBLISH_DIR}/*"
+  File /r /x ".DS_Store" "${PUBLISH_GLOB}"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKLM "Software\NikonLink" "InstallDir" "$INSTDIR"

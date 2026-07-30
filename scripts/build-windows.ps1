@@ -20,6 +20,11 @@ $ArchiveName = "ZENCHE-$PackageVersion-Windows-$Architecture.zip"
 $ArchivePath = Join-Path $DistDirectory $ArchiveName
 $InstallerName = "ZENCHE-$PackageVersion-Windows-$Architecture-Setup.exe"
 $InstallerPath = Join-Path $DistDirectory $InstallerName
+$PublishGlob = if ($env:OS -eq "Windows_NT") {
+    "$PublishDirectory\*"
+} else {
+    "$PublishDirectory/*"
+}
 
 function Resolve-MakeNsis {
     if (-not [string]::IsNullOrWhiteSpace($MakeNsisPath)) {
@@ -118,7 +123,7 @@ $NsisOptionPrefix = if ($env:OS -eq "Windows_NT") { "/" } else { "-" }
     "${NsisOptionPrefix}DPRODUCT_VERSION=$PackageVersion" `
     "${NsisOptionPrefix}DFILE_VERSION=$FileVersion" `
     "${NsisOptionPrefix}DAPP_ARCHITECTURE=$Architecture" `
-    "${NsisOptionPrefix}DPUBLISH_DIR=$PublishDirectory" `
+    "${NsisOptionPrefix}DPUBLISH_GLOB=$PublishGlob" `
     "${NsisOptionPrefix}DPROJECT_ROOT=$ProjectRoot" `
     "${NsisOptionPrefix}DOUTPUT_FILE=$InstallerPath" `
     $InstallerScript
