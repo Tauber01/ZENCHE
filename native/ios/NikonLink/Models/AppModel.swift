@@ -5,6 +5,28 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case simplifiedChinese = "zh-Hans"
+    case english = "en"
+    case japanese = "ja"
+
+    static let storageKey = "appLanguage"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .simplifiedChinese: return "简体中文"
+        case .english: return "English"
+        case .japanese: return "日本語"
+        }
+    }
+
+    var locale: Locale {
+        Locale(identifier: rawValue)
+    }
+}
+
 enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
     case monitor = "视频"
@@ -269,6 +291,14 @@ final class AppModel: ObservableObject {
     @Published var monitorVideoCodec: MonitorVideoCodec = .automatic
     @Published var monitorVideoSpec: MonitorVideoSpec = .automatic
     @Published var statusMessage = "选择相机后即可开始"
+    @Published var language: AppLanguage {
+        didSet {
+            UserDefaults.standard.set(
+                language.rawValue,
+                forKey: AppLanguage.storageKey
+            )
+        }
+    }
 
     let camera: CameraService
     let library: MediaLibrary
@@ -277,6 +307,12 @@ final class AppModel: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
+        language = AppLanguage(
+            rawValue: UserDefaults.standard.string(
+                forKey: AppLanguage.storageKey
+            ) ?? ""
+        ) ?? .simplifiedChinese
+
         if let rawCodec = UserDefaults.standard.string(
             forKey: "monitorVideoCodec"
         ), let codec = MonitorVideoCodec(rawValue: rawCodec) {

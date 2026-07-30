@@ -2009,7 +2009,11 @@ private struct PreviewStage: View {
                 VStack(spacing: 14) {
                     Image(systemName: "camera.aperture")
                         .font(.system(size: compact ? 38 : 54, weight: .light))
-                    Text(model.connected ? "等待实时取景画面" : "连接支持的 Nikon 相机后开启实时取景")
+                    RuntimeLocalizedText(
+                        model.connected
+                            ? "等待实时取景画面"
+                            : "连接支持的 Nikon 相机后开启实时取景"
+                    )
                         .font(.system(size: 15, weight: .medium))
                 }
                 .foregroundStyle(Color.white.opacity(0.48))
@@ -2044,7 +2048,7 @@ private struct PreviewStage: View {
                 }
                 Spacer()
                 HStack {
-                    Text(shutterLabel)
+                    RuntimeLocalizedText(shutterLabel)
                     Text("F\(model.aperture, specifier: "%.1f")")
                     Text("ISO \(model.iso)")
                     Spacer()
@@ -2153,7 +2157,7 @@ private struct ImmersiveMacCameraView: View {
                 Spacer()
                 immersiveParameterBar
                 HStack(spacing: 20) {
-                    Text(shutterLabel)
+                    RuntimeLocalizedText(shutterLabel)
                     Text("F\(model.aperture, specifier: "%.1f")")
                     Text("ISO \(model.iso)")
                     Text(monitoring ? "\(Int(model.videoFrameRate))P" : "JPEG")
@@ -2223,8 +2227,12 @@ private struct ImmersiveMacCameraView: View {
                             : "拍摄照片"
                     )
 
-                    Button(model.liveViewEnabled ? "停止取景" : "开启取景") {
+                    Button {
                         model.toggleLiveView()
+                    } label: {
+                        RuntimeLocalizedText(
+                            model.liveViewEnabled ? "停止取景" : "开启取景"
+                        )
                     }
                     .buttonStyle(ImmersiveMacButtonStyle())
                 }
@@ -2238,8 +2246,12 @@ private struct ImmersiveMacCameraView: View {
     @ViewBuilder
     private var immersiveParameterBar: some View {
         VStack(spacing: 8) {
-            Button(showsParameters ? "收起参数" : "展开参数") {
+            Button {
                 showsParameters.toggle()
+            } label: {
+                RuntimeLocalizedText(
+                    showsParameters ? "收起参数" : "展开参数"
+                )
             }
             .buttonStyle(ImmersiveMacButtonStyle())
             if showsParameters {
@@ -2455,7 +2467,7 @@ private struct ImmersiveMacParameterControl: View {
 
     var body: some View {
         VStack(spacing: 5) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.62))
             HStack(spacing: 5) {
@@ -2623,8 +2635,9 @@ private struct TopBar: View {
                     Image(systemName: model.connected ? "camera.fill" : "camera")
                         .foregroundStyle(model.connected ? Color.green : Palette.cobalt)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(model.status).font(.system(size: 14, weight: .bold))
-                        Text(model.detail)
+                        RuntimeLocalizedText(model.status)
+                            .font(.system(size: 14, weight: .bold))
+                        RuntimeLocalizedText(model.detail)
                             .font(.system(size: 11))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(1)
@@ -2643,7 +2656,7 @@ private struct TopBar: View {
                     .font(.system(size: 17, weight: .semibold))
             }
             .buttonStyle(NativeButtonStyle())
-            .help("设置")
+            .help(Text("设置"))
         }
         .padding(.horizontal, 20)
         .frame(height: 74)
@@ -2677,7 +2690,7 @@ private struct Sidebar: View {
     }
 
     private func groupLabel(_ title: String) -> some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .foregroundStyle(Palette.muted)
             .frame(width: 72, alignment: .leading)
@@ -2693,7 +2706,8 @@ private struct Sidebar: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: section.icon).font(.system(size: 19))
-                Text(section.rawValue).font(.system(size: 12, weight: .medium))
+                Text(LocalizedStringKey(section.rawValue))
+                    .font(.system(size: 12, weight: .medium))
             }
             .foregroundStyle(active ? accent : Palette.muted)
             .frame(width: 72, height: 62)
@@ -2722,8 +2736,14 @@ private struct CaptureView: View {
                         showMacImmersiveWindow(model: model, monitoring: false)
                     }
                     HStack {
-                        Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
+                        Button {
                             model.toggleLiveView()
+                        } label: {
+                            RuntimeLocalizedText(
+                                model.liveViewEnabled
+                                    ? "停止实时取景"
+                                    : "开启实时取景"
+                            )
                         }
                         .buttonStyle(NativeButtonStyle())
                         Spacer()
@@ -2733,7 +2753,9 @@ private struct CaptureView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: "camera.shutter.button.fill")
-                                Text(model.capturing ? "拍摄中…" : "拍摄")
+                                RuntimeLocalizedText(
+                                    model.capturing ? "拍摄中…" : "拍摄"
+                                )
                             }
                             .frame(minWidth: 120)
                         }
@@ -2752,6 +2774,7 @@ private struct CaptureView: View {
 
 private struct ParameterInspector: View {
     @ObservedObject var model: CameraModel
+    @Environment(\.locale) private var locale
 
     private let shutterOptions: [(String, Double)] = [
         ("1/8000", 0.000125), ("1/1000", 0.001), ("1/250", 0.004),
@@ -2966,12 +2989,19 @@ private struct ParameterInspector: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                 if let lockedReason {
-                    Label(lockedReason, systemImage: "lock.fill")
-                        .labelStyle(.titleAndIcon)
+                    HStack(spacing: 4) {
+                        Image(systemName: "lock.fill")
+                        RuntimeLocalizedText(lockedReason)
+                    }
                         .font(.system(size: 10, weight: .medium))
-                        .help(lockedReason)
+                        .help(
+                            RuntimeLocalization.text(
+                                lockedReason,
+                                locale: locale
+                            )
+                        )
                 }
                 Spacer()
             }
@@ -3000,8 +3030,12 @@ private struct MonitorView: View {
                             .foregroundStyle(Palette.muted)
                     }
                     Spacer()
-                    Button(model.videoRecording ? "停止录制" : "开始录制") {
+                    Button {
                         model.toggleMovieRecording()
+                    } label: {
+                        RuntimeLocalizedText(
+                            model.videoRecording ? "停止录制" : "开始录制"
+                        )
                     }
                     .buttonStyle(
                         NativeButtonStyle(
@@ -3010,8 +3044,14 @@ private struct MonitorView: View {
                         )
                     )
                     .disabled(!model.connected || model.capturing)
-                    Button(model.liveViewEnabled ? "停止实时取景" : "开启实时取景") {
+                    Button {
                         model.toggleLiveView()
+                    } label: {
+                        RuntimeLocalizedText(
+                            model.liveViewEnabled
+                                ? "停止实时取景"
+                                : "开启实时取景"
+                        )
                     }
                     .buttonStyle(
                         NativeButtonStyle(
@@ -3194,7 +3234,7 @@ private struct MonitorControlDeck: View {
                     )
                 ) {
                     ForEach(MonitorVideoProfile.allCases) { profile in
-                        Text(profile.label).tag(profile)
+                        RuntimeLocalizedText(profile.label).tag(profile)
                     }
                 }
 
@@ -3262,7 +3302,10 @@ private struct MonitorControlDeck: View {
                         .buttonStyle(.link)
                     }
                 }
-                Text(model.lutName ?? "尚未导入；LUT 只影响视频监看，不写入原片。")
+                RuntimeLocalizedText(
+                    model.lutName
+                        ?? "尚未导入；LUT 只影响视频监看，不写入原片。"
+                )
                     .font(.system(size: 12))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -3423,7 +3466,7 @@ private struct LibraryView: View {
                 model.deleteSelectedPhoto()
             }
         } message: {
-            Text(model.selectedPhoto?.name ?? "")
+            RuntimeLocalizedText(model.selectedPhoto?.name ?? "")
         }
         .fileImporter(
             isPresented: $showCloudImporter,
@@ -3612,7 +3655,9 @@ private struct SystemMacAlbumThumbnail: View {
             Text(item.name)
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
-            Text(item.isVideo ? "系统视频 · 双击播放" : "系统照片 · 双击查看")
+            RuntimeLocalizedText(
+                item.isVideo ? "系统视频 · 双击播放" : "系统照片 · 双击查看"
+            )
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.muted)
         }
@@ -3755,9 +3800,9 @@ private struct MacCloudDriveGuide: View {
                                     .background(Palette.cobaltSoft)
                                     .clipShape(RoundedRectangle(cornerRadius: 9))
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(provider.name)
+                                    RuntimeLocalizedText(provider.name)
                                         .font(.system(size: 14, weight: .bold))
-                                    Text(provider.note)
+                                    RuntimeLocalizedText(provider.note)
                                         .font(.system(size: 12))
                                         .foregroundStyle(Palette.muted)
                                 }
@@ -3887,13 +3932,19 @@ private struct TransferView: View {
                                 .foregroundStyle(Palette.muted)
                         }
                         Spacer()
-                        Button(wireless.isRunning ? "停止接收" : "开启无线接收") {
+                        Button {
                             if wireless.isRunning {
                                 wireless.stop()
                             } else {
                                 wireless.refreshAddress()
                                 wireless.start()
                             }
+                        } label: {
+                            RuntimeLocalizedText(
+                                wireless.isRunning
+                                    ? "停止接收"
+                                    : "开启无线接收"
+                            )
                         }
                         .buttonStyle(NativeButtonStyle(primary: !wireless.isRunning))
                     }
@@ -3940,10 +3991,10 @@ private struct TransferView: View {
 
     private func transferRow(_ title: String, _ value: String) -> some View {
         HStack {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .foregroundStyle(Palette.muted)
             Spacer()
-            Text(value)
+            RuntimeLocalizedText(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3956,8 +4007,8 @@ private struct TransferView: View {
             Image(systemName: icon)
                 .font(.system(size: 24))
                 .foregroundStyle(Palette.cobalt)
-            Text(title).font(.headline)
-            Text(value)
+            Text(LocalizedStringKey(title)).font(.headline)
+            RuntimeLocalizedText(value)
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundStyle(Palette.muted)
         }
@@ -4017,9 +4068,15 @@ private struct ConnectionSheet: View {
                 Spacer()
                 Button("取消") { dismiss() }
                     .buttonStyle(NativeButtonStyle())
-                Button(model.connecting ? "正在连接…" : "连接 Nikon 相机") {
+                Button {
                     model.connect()
                     dismiss()
+                } label: {
+                    RuntimeLocalizedText(
+                        model.connecting
+                            ? "正在连接…"
+                            : "连接 Nikon 相机"
+                    )
                 }
                 .buttonStyle(NativeButtonStyle(primary: true))
                 .disabled(model.connecting)
@@ -4033,8 +4090,19 @@ private struct ConnectionSheet: View {
 private struct RootView: View {
     @ObservedObject var model: CameraModel
     @StateObject private var updater = UpdateController()
+    @AppStorage("appLanguage") private var languageRaw = "zh-Hans"
+    @AppStorage("dismissedLaunchAnnouncementVersion")
+    private var dismissedAnnouncementVersion = ""
     @State private var showConnection = false
     @State private var showSettings = false
+    @State private var showLaunchAnnouncement = false
+    @State private var doNotRemindForCurrentVersion = false
+
+    private static var appVersion: String {
+        Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "1.0.0"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -4058,9 +4126,16 @@ private struct RootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             HStack {
-                Label(model.status, systemImage: model.connected ? "link" : "link.badge.plus")
+                HStack(spacing: 5) {
+                    Image(
+                        systemName: model.connected
+                            ? "link"
+                            : "link.badge.plus"
+                    )
+                    RuntimeLocalizedText(model.status)
+                }
                 Spacer()
-                Text(model.detail)
+                RuntimeLocalizedText(model.detail)
                 Spacer()
                 Text("本次照片 · \(model.photos.count) 张")
             }
@@ -4071,14 +4146,40 @@ private struct RootView: View {
             .background(Palette.graphite)
         }
         .background(Palette.paper)
+        .environment(
+            \.locale,
+            InterfaceLanguage(rawValue: languageRaw)?.locale
+                ?? InterfaceLanguage.simplifiedChinese.locale
+        )
         .sheet(isPresented: $showConnection) {
             ConnectionSheet(model: model)
         }
         .sheet(isPresented: $showSettings) {
-            SettingsSheet(updater: updater)
+            SettingsSheet(
+                updater: updater,
+                languageRaw: $languageRaw
+            )
+        }
+        .sheet(isPresented: $showLaunchAnnouncement) {
+            LaunchAnnouncementSheet(
+                version: Self.appVersion,
+                doNotRemind: $doNotRemindForCurrentVersion
+            ) {
+                if doNotRemindForCurrentVersion {
+                    dismissedAnnouncementVersion = Self.appVersion
+                }
+                showLaunchAnnouncement = false
+            }
+            .interactiveDismissDisabled()
         }
         .onAppear {
+            updateWindowTitle()
             updater.checkAutomaticallyIfNeeded()
+            showLaunchAnnouncement =
+                dismissedAnnouncementVersion != Self.appVersion
+        }
+        .onChange(of: languageRaw) { _, _ in
+            updateWindowTitle()
         }
         .alert(
             "帧澈 ZENCHE",
@@ -4099,8 +4200,15 @@ private struct RootView: View {
             }
             Button("好") { model.errorMessage = nil }
         } message: {
-            Text(model.errorMessage ?? "")
+            RuntimeLocalizedText(model.errorMessage ?? "")
         }
+    }
+
+    private func updateWindowTitle() {
+        let title = languageRaw == InterfaceLanguage.simplifiedChinese.rawValue
+            ? "帧澈 ZENCHE"
+            : "ZENCHE"
+        NSApp.mainWindow?.title = title
     }
 }
 

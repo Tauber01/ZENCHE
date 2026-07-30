@@ -21,6 +21,10 @@ namespace NikonLink.Windows;
 
 public partial class MainWindow : Window
 {
+    private static readonly string AnnouncementStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "dismissed-announcement-version.txt");
     private readonly PtpCamera _camera = new();
     private readonly PhotoLibrary _library = new();
     private readonly WirelessTransferServer _wirelessServer;
@@ -40,6 +44,7 @@ public partial class MainWindow : Window
     private double _photoShutterSeconds = 0.008;
     private string? _availableUpdateUrl;
     private bool _checkingForUpdates;
+    private bool _announcementShownThisLaunch;
     private Window? _immersivePreviewWindow;
     private Image? _immersivePreviewImage;
     private Button? _immersiveRecordButton;
@@ -56,8 +61,8 @@ public partial class MainWindow : Window
             Dispatcher.Invoke(() =>
             {
                 _diagnostics.Info("wireless", status);
-                WirelessStatusText.Text = status;
-                OperationStatusText.Text = status;
+                WirelessStatusText.Text = AppLocalization.T(status);
+                OperationStatusText.Text = AppLocalization.T(status);
             });
         _wirelessServer.FileReceived += (_, path) =>
             Dispatcher.Invoke(() =>
@@ -65,15 +70,18 @@ public partial class MainWindow : Window
                 _diagnostics.Info(
                     "wireless",
                     $"已接收文件；名称={Path.GetFileName(path)}");
-                OperationStatusText.Text = $"已接收 {Path.GetFileName(path)}";
+                OperationStatusText.Text = AppLocalization.T(
+                    $"已接收 {Path.GetFileName(path)}");
                 RefreshPhotoList();
             });
         _wirelessServer.Failed += (_, error) =>
             Dispatcher.Invoke(() =>
             {
                 _diagnostics.Error("wireless", error.ToString());
-                WirelessStatusText.Text = $"无线接收失败：{error.Message}";
-                WirelessButton.Content = "开启无线接收";
+                WirelessStatusText.Text = AppLocalization.T(
+                    $"无线接收失败：{error.Message}");
+                WirelessButton.Content =
+                    AppLocalization.T("开启无线接收");
                 ShowError(error.Message);
             });
         var fileHierarchy = new ListCollectionView(_photos);
@@ -82,15 +90,22 @@ public partial class MainWindow : Window
         fileHierarchy.GroupDescriptions.Add(
             new PropertyGroupDescription(nameof(PhotoItem.MediaTypeGroup)));
         PhotoList.ItemsSource = fileHierarchy;
-        DiagnosticLogPathText.Text =
-            "按日写入、5 MB 滚动、保留 14 天\n" +
+        DiagnosticLogPathText.Text = AppLocalization.T(
+            "按日写入、5 MB 滚动、保留 14 天\n") +
             _diagnostics.DirectoryPath;
-        CurrentVersionText.Text =
-            $"当前版本 {_updateService.CurrentVersion} · 从 GitHub Releases 检查新版本";
+        CurrentVersionText.Text = AppLocalization.T(
+            $"当前版本 {_updateService.CurrentVersion} · 从 GitHub Releases 检查新版本");
         ConfigureFineExposureControls();
         ConfigureShutterControl(false);
         RefreshPhotoList();
         SetCurrentNavigation(CaptureNav);
+        LanguageBox.SelectedIndex = AppLocalization.Current switch
+        {
+            InterfaceLanguage.English => 1,
+            InterfaceLanguage.Japanese => 2,
+            _ => 0
+        };
+        AppLocalization.Apply(this);
         _initializing = false;
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
@@ -113,6 +128,7 @@ public partial class MainWindow : Window
                 $"Windows 分享面板初始化失败：{error.Message}");
         }
 #endif
+        ShowLaunchAnnouncementIfNeeded();
         await CheckForUpdatesAsync(silent: true);
     }
 
@@ -129,7 +145,8 @@ public partial class MainWindow : Window
                 await StopPreviewLoopAsync();
                 await _camera.DisconnectAsync(token);
                 SetConnectionState(null);
-                OperationStatusText.Text = "相机已断开";
+                OperationStatusText.Text =
+                    AppLocalization.T("相机已断开");
             });
             return;
         }
@@ -138,7 +155,8 @@ public partial class MainWindow : Window
         {
             var profile = await _camera.ConnectAsync(token);
             SetConnectionState(profile);
-            OperationStatusText.Text = $"{profile.Name} 已连接";
+            OperationStatusText.Text =
+                AppLocalization.T($"{profile.Name} 已连接");
         });
     }
 
@@ -519,7 +537,8 @@ public partial class MainWindow : Window
             var path = await _library.SaveCaptureAsync(jpeg, token);
             DisplayJpeg(jpeg);
             RefreshPhotoList();
-            OperationStatusText.Text = $"已保存 {Path.GetFileName(path)}";
+            OperationStatusText.Text = AppLocalization.T(
+                $"已保存 {Path.GetFileName(path)}");
         });
     }
 
@@ -538,9 +557,10 @@ public partial class MainWindow : Window
                     await _camera.StartMovieRecordingAsync(token);
                 }
                 _videoRecording = _camera.IsMovieRecording;
-                OperationStatusText.Text = _videoRecording
-                    ? "● REC · 视频正在录制到相机存储卡"
-                    : "录制已停止 · 视频保存在相机存储卡";
+                OperationStatusText.Text = AppLocalization.T(
+                    _videoRecording
+                        ? "● REC · 视频正在录制到相机存储卡"
+                        : "录制已停止 · 视频保存在相机存储卡");
             });
         UpdateRecordingState();
     }
@@ -549,13 +569,13 @@ public partial class MainWindow : Window
     {
         if (_videoMode)
         {
-            ShutterButton.Content =
-                _videoRecording ? "停止录制" : "开始录制";
+            ShutterButton.Content = AppLocalization.T(
+                _videoRecording ? "停止录制" : "开始录制");
         }
         if (_immersiveRecordButton is not null)
         {
-            _immersiveRecordButton.Content =
-                _videoRecording ? "■\n停止" : "●\n录制";
+            _immersiveRecordButton.Content = AppLocalization.T(
+                _videoRecording ? "■\n停止" : "●\n录制");
         }
     }
 
@@ -619,7 +639,8 @@ public partial class MainWindow : Window
         await RunOperationAsync($"正在设置{item.Content}…", async token =>
         {
             await _camera.SetParameterAsync(parameter, value, token);
-            OperationStatusText.Text = $"已设置 {item.Content}";
+            OperationStatusText.Text =
+                AppLocalization.T($"已设置 {item.Content}");
         });
     }
 
@@ -640,7 +661,8 @@ public partial class MainWindow : Window
         {
             await _camera.SetParameterAsync("exposureMode", value, token);
             UpdateExposureAvailability();
-            OperationStatusText.Text = $"拍摄模式：{item.Content}";
+            OperationStatusText.Text =
+                AppLocalization.T($"拍摄模式：{item.Content}");
         });
     }
 
@@ -657,6 +679,25 @@ public partial class MainWindow : Window
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         ShowDestination(null, "settings");
+    }
+
+    private void LanguageBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            LanguageBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        var language = Convert.ToString(item.Tag) switch
+        {
+            "en" => InterfaceLanguage.English,
+            "ja" => InterfaceLanguage.Japanese,
+            _ => InterfaceLanguage.SimplifiedChinese
+        };
+        AppLocalization.SetLanguage(language);
+        AppLocalization.Apply(this);
     }
 
     private void ShowDestination(Button? navigation, string? destination)
@@ -683,13 +724,15 @@ public partial class MainWindow : Window
         {
             RefreshPhotoList();
         }
-        PreviewDetailText.Text = destination == "monitor"
-            ? "相机原生 JPEG · 监看输出 · 不修改原片"
-            : "相机原生 JPEG · 本地预览";
+        PreviewDetailText.Text = AppLocalization.T(
+            destination == "monitor"
+                ? "相机原生 JPEG · 监看输出 · 不修改原片"
+                : "相机原生 JPEG · 本地预览");
         ConfigureShutterControl(destination == "monitor");
-        ShutterButton.Content = destination == "monitor"
-            ? (_videoRecording ? "停止录制" : "开始录制")
-            : "拍摄照片";
+        ShutterButton.Content = AppLocalization.T(
+            destination == "monitor"
+                ? (_videoRecording ? "停止录制" : "开始录制")
+                : "拍摄照片");
     }
 
     private async void VideoFrameRateBox_SelectionChanged(
@@ -715,8 +758,8 @@ public partial class MainWindow : Window
         ConfigureShutterControl(true);
         if (!_camera.IsConnected || _operationInProgress)
         {
-            OperationStatusText.Text =
-                $"视频曝光参考：{_videoShutterAngle:g}° · {_videoFrameRate:g} fps";
+            OperationStatusText.Text = AppLocalization.T(
+                $"视频曝光参考：{_videoShutterAngle:g}° · {_videoFrameRate:g} fps");
             return;
         }
         var seconds = _videoShutterAngle / (360 * _videoFrameRate);
@@ -728,8 +771,8 @@ public partial class MainWindow : Window
                     "exposureTime",
                     seconds,
                     token);
-                OperationStatusText.Text =
-                    $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps";
+                OperationStatusText.Text = AppLocalization.T(
+                    $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps");
             });
     }
 
@@ -739,13 +782,14 @@ public partial class MainWindow : Window
         _configuringVideoControls = true;
         try
         {
-            ParameterPanelTitle.Text =
-                videoMode ? "视频曝光三要素与参数" : "照片曝光与参数";
+            ParameterPanelTitle.Text = AppLocalization.T(
+                videoMode ? "视频曝光三要素与参数" : "照片曝光与参数");
             VideoFrameRateLabel.Visibility =
                 videoMode ? Visibility.Visible : Visibility.Collapsed;
             VideoFrameRateBox.Visibility =
                 videoMode ? Visibility.Visible : Visibility.Collapsed;
-            ShutterLabel.Text = videoMode ? "快门角度" : "快门速度";
+            ShutterLabel.Text = AppLocalization.T(
+                videoMode ? "快门角度" : "快门速度");
             ShutterBox.Items.Clear();
             if (videoMode)
             {
@@ -827,9 +871,11 @@ public partial class MainWindow : Window
         {
             await _wirelessServer.StopAsync();
             _diagnostics.Info("wireless", "无线收件箱已停止");
-            WirelessButton.Content = "开启无线接收";
+            WirelessButton.Content =
+                AppLocalization.T("开启无线接收");
             WirelessAddressText.Text = "—";
-            OperationStatusText.Text = "无线收件箱已停止";
+            OperationStatusText.Text =
+                AppLocalization.T("无线收件箱已停止");
             return;
         }
         try
@@ -840,7 +886,8 @@ public partial class MainWindow : Window
                 $"无线收件箱已开启；FTP={_wirelessServer.LocalAddress}:" +
                 $"{WirelessTransferServer.FtpPort}；HTTP/WebDAV=" +
                 $"{_wirelessServer.LocalAddress}:{WirelessTransferServer.HttpPort}");
-            WirelessButton.Content = "停止无线接收";
+            WirelessButton.Content =
+                AppLocalization.T("停止无线接收");
             WirelessAddressText.Text =
                 $"FTP/PASV  {_wirelessServer.LocalAddress}:" +
                 $"{WirelessTransferServer.FtpPort}\n" +
@@ -848,7 +895,8 @@ public partial class MainWindow : Window
                 $"{WirelessTransferServer.HttpPort}/upload/文件名\n" +
                 $"WebDAV  http://{_wirelessServer.LocalAddress}:" +
                 $"{WirelessTransferServer.HttpPort}/";
-            OperationStatusText.Text = "无线收件箱已开启";
+            OperationStatusText.Text =
+                AppLocalization.T("无线收件箱已开启");
         }
         catch (Exception error)
         {
@@ -943,10 +991,12 @@ public partial class MainWindow : Window
         }
         _checkingForUpdates = true;
         CheckUpdateButton.IsEnabled = false;
-        CheckUpdateButton.Content = "正在检查…";
+        CheckUpdateButton.Content =
+            AppLocalization.T("正在检查…");
         if (!silent)
         {
-            UpdateStatusText.Text = "正在检查更新…";
+            UpdateStatusText.Text =
+                AppLocalization.T("正在检查更新…");
         }
         try
         {
@@ -954,14 +1004,17 @@ public partial class MainWindow : Window
             if (update.IsAvailable)
             {
                 _availableUpdateUrl = update.DownloadUrl;
-                UpdateStatusText.Text = $"发现新版本 {update.Version}";
-                OpenUpdateButton.Content = $"获取 {update.Version}";
+                UpdateStatusText.Text =
+                    AppLocalization.T($"发现新版本 {update.Version}");
+                OpenUpdateButton.Content =
+                    AppLocalization.T($"获取 {update.Version}");
                 OpenUpdateButton.Visibility = Visibility.Visible;
             }
             else
             {
                 _availableUpdateUrl = null;
-                UpdateStatusText.Text = "已是最新版本";
+                UpdateStatusText.Text =
+                    AppLocalization.T("已是最新版本");
                 OpenUpdateButton.Visibility = Visibility.Collapsed;
             }
         }
@@ -970,14 +1023,16 @@ public partial class MainWindow : Window
             _diagnostics.Error("update", $"检查更新失败：{error.Message}");
             if (!silent)
             {
-                UpdateStatusText.Text = "检查失败，请确认网络后重试";
+                UpdateStatusText.Text =
+                    AppLocalization.T("检查失败，请确认网络后重试");
             }
         }
         finally
         {
             _checkingForUpdates = false;
             CheckUpdateButton.IsEnabled = true;
-            CheckUpdateButton.Content = "检查更新";
+            CheckUpdateButton.Content =
+                AppLocalization.T("检查更新");
         }
     }
 
@@ -1078,6 +1133,205 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ShowLaunchAnnouncementIfNeeded()
+    {
+        if (_announcementShownThisLaunch)
+        {
+            return;
+        }
+        _announcementShownThisLaunch = true;
+        var version = _updateService.CurrentVersion;
+        try
+        {
+            if (File.Exists(AnnouncementStatePath) &&
+                string.Equals(
+                    File.ReadAllText(AnnouncementStatePath).Trim(),
+                    version,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "announcement",
+                $"读取公告提醒设置失败：{error.Message}");
+        }
+
+        var doNotRemind = new CheckBox
+        {
+            Content = AppLocalization.T(
+                "不再提醒（软件更新后仍会显示）"),
+            FontSize = 14,
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        var closeButton = new Button
+        {
+            Content = AppLocalization.T("关闭公告"),
+            MinWidth = 110,
+            Height = 38,
+            Padding = new Thickness(14, 0, 14, 0)
+        };
+        var footer = new DockPanel
+        {
+            Margin = new Thickness(0, 16, 0, 0)
+        };
+        DockPanel.SetDock(closeButton, Dock.Right);
+        footer.Children.Add(closeButton);
+        footer.Children.Add(doNotRemind);
+
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("本次更新"),
+            FontSize = 19,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "• 新增启动更新公告，并支持按版本控制提醒。\n" +
+                "• 五端公告与赞助入口保持一致。\n" +
+                "• 更新赞助图片并优化多语言体验。"),
+            FontSize = 14,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 22,
+            Margin = new Thickness(0, 0, 0, 18)
+        });
+
+        var warning = new StackPanel
+        {
+            Margin = new Thickness(0),
+        };
+        warning.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("谨防诈骗"),
+            FontSize = 17,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(178, 25, 35)),
+            Margin = new Thickness(0, 0, 0, 7)
+        });
+        warning.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”" +
+                "或要求付费购买软件的人都是骗子，请勿转账。"),
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(117, 20, 28)),
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 21
+        });
+        body.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(255, 238, 238)),
+            BorderBrush = new SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(244, 185, 185)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 0, 0, 18),
+            Child = warning
+        });
+
+        body.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("自愿赞助"),
+            FontSize = 17,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 6)
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。"),
+            FontSize = 13,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+        body.Children.Add(new Image
+        {
+            Source = new BitmapImage(
+                new Uri(
+                    "pack://application:,,,/Assets/wechat-donation.png",
+                    UriKind.Absolute)),
+            MaxHeight = 470,
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center
+        });
+
+        var header = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 0, 14)
+        };
+        header.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("更新公告"),
+            FontSize = 25,
+            FontWeight = FontWeights.Bold
+        });
+        header.Children.Add(new TextBlock
+        {
+            Text = $"{AppLocalization.T("当前版本")} {version}",
+            FontSize = 12,
+            FontFamily = new FontFamily("Consolas"),
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+
+        var root = new DockPanel
+        {
+            Margin = new Thickness(24)
+        };
+        DockPanel.SetDock(header, Dock.Top);
+        DockPanel.SetDock(footer, Dock.Bottom);
+        root.Children.Add(header);
+        root.Children.Add(footer);
+        root.Children.Add(new ScrollViewer
+        {
+            Content = body,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        });
+
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = AppLocalization.T("更新公告"),
+            Width = 660,
+            Height = 820,
+            MinWidth = 460,
+            MinHeight = 620,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = root
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        dialog.Closed += (_, _) =>
+        {
+            if (doNotRemind.IsChecked != true)
+            {
+                return;
+            }
+            try
+            {
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(AnnouncementStatePath)!);
+                File.WriteAllText(AnnouncementStatePath, version);
+            }
+            catch (Exception error)
+            {
+                _diagnostics.Warning(
+                    "announcement",
+                    $"保存公告提醒设置失败：{error.Message}");
+            }
+        };
+        dialog.ShowDialog();
+    }
+
     private void OpenPhotoFolder_Click(object sender, RoutedEventArgs e)
     {
         Process.Start(new ProcessStartInfo
@@ -1090,7 +1344,8 @@ public partial class MainWindow : Window
     private void OpenOwnerAlbum_Click(object sender, RoutedEventArgs e)
     {
         RefreshPhotoList();
-        OperationStatusText.Text = "已刷新系统相册与 帧澈 ZENCHE 文件库";
+        OperationStatusText.Text = AppLocalization.T(
+            "已刷新系统相册与 帧澈 ZENCHE 文件库");
     }
 
     private void LinkCloudDrive_Click(object sender, RoutedEventArgs e)
@@ -1117,10 +1372,10 @@ public partial class MainWindow : Window
         {
             var imported = _library.ImportFiles(dialog.FileNames);
             RefreshPhotoList();
-            OperationStatusText.Text =
+            OperationStatusText.Text = AppLocalization.T(
                 imported.Count > 0
                     ? $"已从网盘加入 {imported.Count} 张照片"
-                    : "没有可加入文件库的照片";
+                    : "没有可加入文件库的照片");
         }
         catch (Exception error)
         {
@@ -1532,7 +1787,8 @@ public partial class MainWindow : Window
         {
             File.Delete(item.Path);
             RefreshPhotoList();
-            OperationStatusText.Text = $"已删除 {item.Name}";
+            OperationStatusText.Text = AppLocalization.T(
+                $"已删除 {item.Name}");
         }
         catch (Exception error)
         {
@@ -1577,8 +1833,8 @@ public partial class MainWindow : Window
                     await Dispatcher.InvokeAsync(() =>
                     {
                         UpdateLiveViewState();
-                        OperationStatusText.Text =
-                            "实时取景已安全停止 · 机身控制已释放";
+                        OperationStatusText.Text = AppLocalization.T(
+                            "实时取景已安全停止 · 机身控制已释放");
                         ShowError(
                             "连续 3 次未收到实时取景画面，已停止重试并释放相机。");
                     });
@@ -1586,8 +1842,8 @@ public partial class MainWindow : Window
                 }
                 await Dispatcher.InvokeAsync(() =>
                 {
-                    OperationStatusText.Text =
-                        $"实时取景正在重试 · {failures}/3";
+                    OperationStatusText.Text = AppLocalization.T(
+                        $"实时取景正在重试 · {failures}/3");
                 });
                 await Task.Delay(600, cancellationToken);
             }
@@ -1620,7 +1876,7 @@ public partial class MainWindow : Window
     {
         _operationInProgress = true;
         _diagnostics.Info("operation", status);
-        OperationStatusText.Text = status;
+        OperationStatusText.Text = AppLocalization.T(status);
         UpdateEnabledState();
         try
         {
@@ -1634,7 +1890,7 @@ public partial class MainWindow : Window
             _diagnostics.Error(
                 "operation",
                 $"操作失败：{status}；错误={error}");
-            OperationStatusText.Text = error.Message;
+            OperationStatusText.Text = AppLocalization.T(error.Message);
             ShowError(error.Message);
         }
         finally
@@ -1647,10 +1903,12 @@ public partial class MainWindow : Window
 
     private void SetConnectionState(CameraProfile? profile)
     {
-        CameraStatusText.Text = profile is null
-            ? "未连接 · WINDOWS USB/PTP"
-            : $"{profile.Name} · USB/PTP";
-        ConnectButton.Content = profile is null ? "连接相机" : "断开相机";
+        CameraStatusText.Text = AppLocalization.T(
+            profile is null
+                ? "未连接 · WINDOWS USB/PTP"
+                : $"{profile.Name} · USB/PTP");
+        ConnectButton.Content = AppLocalization.T(
+            profile is null ? "连接相机" : "断开相机");
         PreviewEmpty.Visibility = profile is null
             ? Visibility.Visible
             : PreviewEmpty.Visibility;
@@ -1721,13 +1979,14 @@ public partial class MainWindow : Window
                 ? null
                 : connected
                     ? _camera.ParameterLockReason(parameter)
-                    : "连接相机后可调整");
+                    : AppLocalization.T("连接相机后可调整"));
     }
 
     private void UpdateLiveViewState()
     {
         var live = _camera.IsLiveView;
-        LiveViewButton.Content = live ? "停止取景" : "开启取景";
+        LiveViewButton.Content =
+            AppLocalization.T(live ? "停止取景" : "开启取景");
         LiveBadge.Text = live ? "LIVE VIEW ON" : "LIVE VIEW OFF";
         LiveBadge.Foreground = live
             ? (Brush)FindResource("AccentInkBrush")
@@ -1764,8 +2023,8 @@ public partial class MainWindow : Window
         {
             _photos.Add(item);
         }
-        PhotoCountText.Text =
-            $"{libraryItems.Count} 个本地文件 · {systemItems.Count} 个系统相册项目";
+        PhotoCountText.Text = AppLocalization.T(
+            $"{libraryItems.Count} 个本地文件 · {systemItems.Count} 个系统相册项目");
         DeletePhotoButton.IsEnabled = false;
         SharePhotoButton.IsEnabled = false;
     }
@@ -1798,7 +2057,7 @@ public partial class MainWindow : Window
     {
         DiagnosticLogger.Shared.Error("ui", message);
         MessageBox.Show(
-            message,
+            AppLocalization.T(message),
             "帧澈 ZENCHE",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);

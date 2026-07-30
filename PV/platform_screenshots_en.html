@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZENCHE PLATFORM INTERFACE PREVIEWS</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f4f6fa;
+        --surface: #ffffff;
+        --surface-2: #edf1f7;
+        --ink: #151922;
+        --muted: #667085;
+        --rule: #d9dee8;
+        --blue: #1264d9;
+        --blue-soft: #dceaff;
+        --graphite: #0a0e15;
+        --graphite-2: #141b26;
+        --yellow: #ffd229;
+        --red: #e83845;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans SC",
+          "Segoe UI", Arial, sans-serif;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+      }
+
+      .screen {
+        display: none;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: var(--paper);
+      }
+
+      body[data-platform="android"] .android,
+      body[data-platform="harmonyos"] .harmonyos,
+      body[data-platform="ios-ipados"] .ios-ipados,
+      body[data-platform="macos"] .macos,
+      body[data-platform="windows"] .windows {
+        display: flex;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .logo {
+        width: 68px;
+        height: 68px;
+        border-radius: 17px;
+        overflow: hidden;
+        background: #18202d;
+        box-shadow: 0 7px 18px rgba(24, 32, 45, 0.18);
+      }
+
+      .logo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 31px;
+        line-height: 1;
+      }
+
+      .brand small {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 19px;
+      }
+
+      .native-button {
+        display: grid;
+        min-width: 150px;
+        height: 60px;
+        place-items: center;
+        border: 1px solid var(--rule);
+        border-radius: 14px;
+        background: white;
+        font-size: 22px;
+        font-weight: 700;
+      }
+
+      .native-button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: white;
+      }
+
+      .preview {
+        position: relative;
+        display: grid;
+        min-height: 540px;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid #222b39;
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 50% 45%, #151c28, #080b11 62%),
+          var(--graphite);
+        color: #8e98a8;
+      }
+
+      .preview::before {
+        content: "";
+        width: 100px;
+        height: 100px;
+        border: 11px solid #6e7786;
+        border-top-color: transparent;
+        border-radius: 50%;
+        opacity: 0.74;
+        transform: rotate(-30deg);
+      }
+
+      .preview-copy {
+        position: absolute;
+        left: 50%;
+        top: 57%;
+        font-size: 22px;
+        font-weight: 700;
+        transform: translate(-50%, -50%);
+      }
+
+      .live-badge {
+        position: absolute;
+        left: 22px;
+        top: 20px;
+        color: #9aa4b5;
+        font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+        font-size: 17px;
+        font-weight: 800;
+      }
+
+      .output-badge {
+        position: absolute;
+        right: 22px;
+        bottom: 20px;
+        color: #c4cbd7;
+        font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+        font-size: 17px;
+      }
+
+      .full-button {
+        position: absolute;
+        right: 20px;
+        top: 18px;
+        padding: 13px 20px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #1a202b;
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .android,
+      .harmonyos,
+      .ios-ipados {
+        flex-direction: column;
+      }
+
+      .mobile-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        padding: 0 38px;
+        background: white;
+        font-size: 19px;
+        font-weight: 700;
+      }
+
+      .mobile-header {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        height: 118px;
+        padding: 18px 28px;
+        border-bottom: 1px solid var(--rule);
+        background: var(--surface);
+      }
+
+      .mobile-header .brand {
+        flex: 1;
+      }
+
+      .mobile-header .logo {
+        width: 62px;
+        height: 62px;
+        border-radius: 15px;
+        font-size: 34px;
+      }
+
+      .mobile-header .brand strong {
+        font-size: 29px;
+      }
+
+      .mobile-header .brand small {
+        font-size: 17px;
+      }
+
+      .mobile-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--rule);
+        background: var(--surface-2);
+      }
+
+      .mobile-tab {
+        display: grid;
+        height: 60px;
+        place-items: center;
+        border-radius: 13px;
+        color: #556174;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .mobile-tab.active {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .mobile-content {
+        flex: 1;
+        padding: 34px 34px 28px;
+        overflow: hidden;
+      }
+
+      .mobile-content h1 {
+        margin: 0;
+        font-size: 48px;
+        letter-spacing: -0.04em;
+      }
+
+      .mobile-content > p {
+        margin: 12px 0 30px;
+        color: var(--muted);
+        font-size: 22px;
+        line-height: 1.45;
+      }
+
+      .mobile-content .preview {
+        min-height: 780px;
+      }
+
+      .mobile-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .mobile-actions .native-button {
+        height: 72px;
+        font-size: 24px;
+      }
+
+      .parameter-card {
+        margin-top: 26px;
+        padding: 26px;
+        border: 1px solid var(--rule);
+        border-radius: 19px;
+        background: var(--surface);
+      }
+
+      .parameter-card h2 {
+        margin: 0 0 18px;
+        font-size: 27px;
+      }
+
+      .parameter-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        min-height: 58px;
+        border-top: 1px solid #e7eaf0;
+        font-size: 20px;
+      }
+
+      .parameter-row:first-of-type {
+        border-top: 0;
+      }
+
+      .parameter-row span:last-child {
+        color: var(--blue);
+        font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+        font-weight: 700;
+      }
+
+      .mobile-bottom {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        height: 112px;
+        padding: 10px 20px 18px;
+        border-top: 1px solid var(--rule);
+        background: var(--surface);
+      }
+
+      .mobile-bottom span {
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: var(--muted);
+        font-size: 21px;
+        font-weight: 700;
+      }
+
+      .mobile-bottom span:first-child {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .mobile-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 54px;
+        padding: 0 28px;
+        background: #10151e;
+        color: #bac3d1;
+        font-size: 17px;
+      }
+
+      .harmonyos {
+        --blue: #0a59ce;
+        --blue-soft: #e0ecff;
+        background: #f5f7fb;
+      }
+
+      .harmonyos .mobile-tabs {
+        background: #f0f3f8;
+      }
+
+      .harmonyos .mobile-content {
+        padding-top: 30px;
+      }
+
+      .harmonyos .preview {
+        min-height: 720px;
+        border-radius: 15px;
+      }
+
+      .harmony-tag {
+        display: inline-flex;
+        margin-left: 12px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: #e6f6ed;
+        color: #18794e;
+        font-size: 15px;
+        vertical-align: middle;
+      }
+
+      .ios-ipados {
+        --paper: #090b10;
+        --surface: #11141b;
+        --surface-2: #171b24;
+        --ink: #f5f7fb;
+        --muted: #9ba5b6;
+        --rule: #2b303b;
+        --blue: #0a84ff;
+        --blue-soft: #172f4a;
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      .ios-ipados .mobile-status,
+      .ios-ipados .mobile-header,
+      .ios-ipados .mobile-tabs,
+      .ios-ipados .mobile-bottom,
+      .ios-ipados .parameter-card {
+        background: var(--surface);
+      }
+
+      .ios-ipados .mobile-content .preview {
+        min-height: 1120px;
+      }
+
+      .ios-ipados .native-button {
+        border-color: var(--rule);
+        background: #20242d;
+        color: var(--ink);
+      }
+
+      .ios-ipados .native-button.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+      }
+
+      .ios-ipados .parameter-row {
+        border-color: var(--rule);
+      }
+
+      .windows,
+      .macos {
+        flex-direction: column;
+        background: #f5f6f8;
+      }
+
+      .macos .window-controls {
+        color: #ea4f4a;
+        letter-spacing: 0.28em;
+      }
+
+      .windows-titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 44px;
+        padding: 0 12px 0 18px;
+        background: #f9fafc;
+        color: #414a59;
+        font-family: "Segoe UI", Arial, sans-serif;
+        font-size: 14px;
+      }
+
+      .window-controls {
+        display: flex;
+        gap: 22px;
+        font-size: 17px;
+      }
+
+      .windows-header {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        height: 98px;
+        padding: 0 30px;
+        border-bottom: 1px solid var(--rule);
+        background: white;
+      }
+
+      .windows-header strong {
+        display: block;
+        font-size: 30px;
+      }
+
+      .windows-header small {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 14px;
+      }
+
+      .windows-header .native-button {
+        margin-left: 12px;
+      }
+
+      .windows-main {
+        display: grid;
+        grid-template-columns: 210px 1fr 340px;
+        flex: 1;
+        min-height: 0;
+      }
+
+      .windows-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 28px 20px;
+        border-right: 1px solid var(--rule);
+        background: #eef1f5;
+      }
+
+      .windows-nav small {
+        margin: 0 10px 10px;
+        color: var(--muted);
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 13px;
+      }
+
+      .windows-nav span {
+        padding: 16px 18px;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: 650;
+      }
+
+      .windows-nav span.active {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .windows-version {
+        margin-top: auto;
+        color: var(--muted);
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .windows-workspace {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 26px;
+      }
+
+      .windows-workspace .preview {
+        flex: 1;
+        min-height: 0;
+        border-radius: 13px;
+      }
+
+      .windows-actions {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      .windows-actions p {
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .windows-panel {
+        padding: 28px 26px;
+        overflow: hidden;
+        border-left: 1px solid var(--rule);
+        background: white;
+      }
+
+      .windows-panel h2 {
+        margin: 0 0 24px;
+        font-size: 27px;
+      }
+
+      .windows-panel .parameter-row,
+      .macos .parameter-row {
+        min-height: 78px;
+        font-size: 17px;
+      }
+
+      .windows-panel .parameter-row span:last-child,
+      .macos .parameter-row span:last-child {
+        padding: 11px 14px;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        background: #f3f5f8;
+        color: #9ba3b0;
+      }
+
+      .windows-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 42px;
+        padding: 0 26px;
+        background: #0c1119;
+        color: #bdc6d4;
+        font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="capture" class="screen android">
+      <div class="mobile-status"><span>09:41</span><span>●●●  Wi-Fi  100%</span></div>
+      <header class="mobile-header">
+        <div class="brand">
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
+          <div><strong>ZENCHE</strong><small>Android Native App</small></div>
+        </div>
+        <div class="native-button">Connect Camera</div>
+        <div class="native-button">Settings</div>
+      </header>
+      <nav class="mobile-tabs">
+        <div class="mobile-tab active">Photo Capture</div>
+        <div class="mobile-tab">Video Monitor</div>
+        <div class="mobile-tab">Files & Transfer</div>
+      </nav>
+      <main class="mobile-content">
+        <h1>Photo Capture</h1>
+        <p>Shutter, exposure, focus, white balance, and shooting mode in one view</p>
+        <div class="preview">
+          <span class="live-badge">● NO SOURCE</span>
+          <span class="full-button">Fullscreen</span>
+          <span class="preview-copy">Connect a supported Nikon camera to start Live View</span>
+          <span class="output-badge">PHOTO LIVE VIEW · JPEG</span>
+        </div>
+        <div class="mobile-actions">
+          <div class="native-button">Live View</div>
+          <div class="native-button primary">Capture</div>
+        </div>
+        <section class="parameter-card">
+          <h2>Pro Controls</h2>
+          <div class="parameter-row"><span>Shooting Mode</span><span>M · Manual</span></div>
+          <div class="parameter-row"><span>Shutter Speed</span><span>1/100 s</span></div>
+          <div class="parameter-row"><span>ISO</span><span>ISO 400</span></div>
+        </section>
+      </main>
+      <nav class="mobile-bottom"><span>Photos</span><span>Video</span><span>Files</span></nav>
+      <footer class="mobile-footer"><span>DISCONNECTED</span><strong>0 PHOTOS</strong></footer>
+    </section>
+
+    <section id="capture" class="screen harmonyos">
+      <div class="mobile-status"><span>09:41</span><span>HarmonyOS · 100%</span></div>
+      <header class="mobile-header">
+        <div class="brand">
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
+          <div>
+            <strong>ZENCHE <span class="harmony-tag">ArkUI</span></strong>
+            <small>HarmonyOS Native App</small>
+          </div>
+        </div>
+        <div class="native-button primary">Connect Camera</div>
+        <div class="native-button">Settings</div>
+      </header>
+      <nav class="mobile-tabs">
+        <div class="mobile-tab active">Photo Capture</div>
+        <div class="mobile-tab">Video Monitor</div>
+        <div class="mobile-tab">Files & Transfer</div>
+      </nav>
+      <main class="mobile-content">
+        <h1>Photo Capture</h1>
+        <p>Native USB Host, camera Live View, and a local file workflow</p>
+        <div class="preview">
+          <span class="live-badge">LIVE VIEW OFF</span>
+          <span class="full-button">Fullscreen</span>
+          <span class="preview-copy">Waiting for camera</span>
+          <span class="output-badge">CAMERA-NATIVE JPEG · LOCAL PREVIEW</span>
+        </div>
+        <div class="mobile-actions">
+          <div class="native-button">Start Live View</div>
+          <div class="native-button primary">Capture Photo</div>
+        </div>
+        <section class="parameter-card">
+          <h2>Camera Controls</h2>
+          <div class="parameter-row"><span>Shutter</span><span>1/100 s</span></div>
+          <div class="parameter-row"><span>Aperture</span><span>f/4</span></div>
+          <div class="parameter-row"><span>ISO</span><span>400</span></div>
+        </section>
+      </main>
+      <nav class="mobile-bottom"><span>Photo Capture</span><span>Video Monitor</span><span>Files & Transfer</span></nav>
+      <footer class="mobile-footer"><span>DISCONNECTED · USB/PTP</span><strong>ZENCHE · V1 OFFICIAL RELEASE</strong></footer>
+    </section>
+
+    <section id="capture" class="screen ios-ipados">
+      <div class="mobile-status"><span>09:41</span><span>5G　Wi-Fi　100%</span></div>
+      <header class="mobile-header">
+        <div class="brand">
+          <div class="logo"><img src="./assets/branding/zenche-z-mark.svg" alt="" /></div>
+          <div><strong>ZENCHE</strong><small>iOS / iPadOS Native App</small></div>
+        </div>
+        <div class="native-button primary">Select Camera</div>
+        <div class="native-button">Settings</div>
+      </header>
+      <nav class="mobile-tabs">
+        <div class="mobile-tab active">Connected Capture</div>
+        <div class="mobile-tab">Video Monitor</div>
+        <div class="mobile-tab">Files & Transfer</div>
+      </nav>
+      <main class="mobile-content">
+        <h1>Connected Capture</h1>
+        <p>System cameras, external UVC devices, and a wireless inbox feed one local workflow</p>
+        <div class="preview">
+          <span class="live-badge">● NO CAMERA</span>
+          <span class="full-button">Fullscreen</span>
+          <span class="preview-copy">Waiting for video device</span>
+          <span class="output-badge">SYSTEM CAMERA · UVC · LOCAL PREVIEW</span>
+        </div>
+        <div class="mobile-actions">
+          <div class="native-button">Open Live View</div>
+          <div class="native-button primary">Capture Photo</div>
+        </div>
+        <section class="parameter-card">
+          <h2>Local Workflow</h2>
+          <div class="parameter-row"><span>Wireless Inbox</span><span>FTP / HTTP / WebDAV</span></div>
+          <div class="parameter-row"><span>Photo Sources</span><span>System Photos / Files</span></div>
+          <div class="parameter-row"><span>File Handling</span><span>Local First</span></div>
+        </section>
+      </main>
+      <nav class="mobile-bottom"><span>Photos</span><span>Video</span><span>Files</span></nav>
+      <footer class="mobile-footer"><span>DISCONNECTED · CAMERA / UVC</span><strong>ZENCHE · V1 OFFICIAL RELEASE</strong></footer>
+    </section>
+
+    <section id="capture" class="screen macos">
+      <div class="windows-titlebar">
+        <span class="window-controls">● ● ●</span>
+        <span>ZENCHE</span>
+        <span></span>
+      </div>
+      <header class="windows-header">
+        <div><strong>ZENCHE</strong><small>DISCONNECTED · macOS USB/PTP</small></div>
+        <div class="native-button primary">Connect Camera</div>
+        <div class="native-button">Settings</div>
+      </header>
+      <main class="windows-main">
+        <nav class="windows-nav">
+          <small>WORKSPACE</small>
+          <span class="active">Photo Capture</span>
+          <span>Video Monitor</span>
+          <span>Files & Transfer</span>
+          <div class="windows-version">ZENCHE · V1 OFFICIAL RELEASE<br /><br />NATIVE SWIFTUI / APPKIT</div>
+        </nav>
+        <section class="windows-workspace">
+          <div class="preview">
+            <span class="live-badge">LIVE VIEW OFF</span>
+            <span class="full-button">Fullscreen</span>
+            <span class="preview-copy">Waiting for camera</span>
+            <span class="output-badge">CAMERA-NATIVE JPEG · LOCAL PREVIEW</span>
+          </div>
+          <div class="windows-actions">
+            <p>Connect a supported Nikon camera to start Live View</p>
+            <div class="native-button">Start Live View</div>
+            <div class="native-button primary">Capture Photo</div>
+          </div>
+        </section>
+        <aside class="windows-panel">
+          <h2>Photo Settings</h2>
+          <div class="parameter-row"><span>Shutter Speed</span><span>1/100</span></div>
+          <div class="parameter-row"><span>Aperture</span><span>F4.0</span></div>
+          <div class="parameter-row"><span>ISO</span><span>400</span></div>
+          <div class="parameter-row"><span>Exposure Comp.</span><span>+0.0 EV</span></div>
+          <div class="parameter-row"><span>Focus Mode</span><span>AF-S</span></div>
+          <div class="parameter-row"><span>Shooting Mode</span><span>M</span></div>
+        </aside>
+      </main>
+      <footer class="windows-footer">
+        <span>DISCONNECTED</span>
+        <span>USB/PTP · EXPEED 6 / 7</span>
+        <span>SESSION PHOTOS · 0</span>
+      </footer>
+    </section>
+
+    <section id="capture" class="screen windows">
+      <div class="windows-titlebar">
+        <span>ZENCHE</span>
+        <span class="window-controls">—　□　×</span>
+      </div>
+      <header class="windows-header">
+        <div><strong>ZENCHE</strong><small>DISCONNECTED · WINDOWS USB/PTP</small></div>
+        <div class="native-button primary">Connect Camera</div>
+        <div class="native-button">Settings</div>
+      </header>
+      <main class="windows-main">
+        <nav class="windows-nav">
+          <small>WORKSPACE</small>
+          <span class="active">Photo Capture</span>
+          <span>Video Monitor</span>
+          <span>Files & Transfer</span>
+          <div class="windows-version">ZENCHE · V1 OFFICIAL RELEASE<br /><br />PHOTOS SAVED TO "PICTURES\ZENCHE"</div>
+        </nav>
+        <section class="windows-workspace">
+          <div class="preview">
+            <span class="live-badge">LIVE VIEW OFF</span>
+            <span class="full-button">Fullscreen</span>
+            <span class="preview-copy">Waiting for camera</span>
+            <span class="output-badge">CAMERA-NATIVE JPEG · LOCAL PREVIEW</span>
+          </div>
+          <div class="windows-actions">
+            <p>Connect the camera to start Live View</p>
+            <div class="native-button">Start Live View</div>
+            <div class="native-button primary">Capture Photo</div>
+          </div>
+        </section>
+        <aside class="windows-panel">
+          <h2>Photo Settings</h2>
+          <div class="parameter-row"><span>Shutter Speed</span><span>1/100</span></div>
+          <div class="parameter-row"><span>Aperture</span><span>F4.0</span></div>
+          <div class="parameter-row"><span>ISO</span><span>400</span></div>
+          <div class="parameter-row"><span>Exposure Comp.</span><span>+0.0 EV</span></div>
+          <div class="parameter-row"><span>Focus Mode</span><span>AF-S</span></div>
+          <div class="parameter-row"><span>Shooting Mode</span><span>M</span></div>
+        </aside>
+      </main>
+      <footer class="windows-footer">
+        <span>DISCONNECTED</span>
+        <span>USB/PTP · EXPEED 6 / 7</span>
+        <span>SESSION PHOTOS · 0</span>
+      </footer>
+    </section>
+
+    <script>
+      const platform = new URLSearchParams(location.search).get("platform") || "android";
+      document.body.dataset.platform = platform;
+    </script>
+  </body>
+</html>

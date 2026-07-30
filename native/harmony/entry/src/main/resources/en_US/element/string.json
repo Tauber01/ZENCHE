@@ -1,0 +1,28 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Cross-platform camera control and image transfer · Capture · Connect · Flow"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "ZENCHE"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "ZENCHE"
+    },
+    {
+      "name": "permission_internet",
+      "value": "Used to check for updates and receive images over FTP, HTTP, or WebDAV on a trusted local network"
+    },
+    {
+      "name": "permission_wifi",
+      "value": "Used to show the local network address for wireless image transfer"
+    },
+    {
+      "name": "permission_album",
+      "value": "Used to show photos and videos from the system library on the Files page"
+    }
+  ]
+}

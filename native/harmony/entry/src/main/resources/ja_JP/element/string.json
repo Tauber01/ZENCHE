@@ -1,0 +1,28 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "クロスプラットフォームのカメラ制御と画像転送 · Capture · Connect · Flow"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "ZENCHE"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "ZENCHE"
+    },
+    {
+      "name": "permission_internet",
+      "value": "アップデートの確認、および信頼できるローカルネットワークで FTP、HTTP、WebDAV により画像を受信するために使用します"
+    },
+    {
+      "name": "permission_wifi",
+      "value": "ワイヤレス画像転送に必要なローカルネットワークアドレスを表示するために使用します"
+    },
+    {
+      "name": "permission_album",
+      "value": "ファイル画面にシステムライブラリの写真と動画を表示するために使用します"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=0.8.3
+VERSION=1.0.0
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 DIST_ROOT="$PROJECT_ROOT/dist"
@@ -29,6 +29,13 @@ xcrun swiftc -swift-version 5 -O \
 cp "$PROJECT_ROOT/native/macos/Info.plist" "$CONTENTS/Info.plist"
 cp "$PROJECT_ROOT/native/macos/Resources/wechat-donation.png" \
   "$RESOURCES/wechat-donation.png"
+for localization in zh-Hans en ja; do
+  mkdir -p "$RESOURCES/$localization.lproj"
+  cp "$PROJECT_ROOT/native/ios/NikonLink/$localization.lproj/Localizable.strings" \
+    "$RESOURCES/$localization.lproj/Localizable.strings"
+  cp "$PROJECT_ROOT/native/ios/NikonLink/$localization.lproj/InfoPlist.strings" \
+    "$RESOURCES/$localization.lproj/InfoPlist.strings"
+done
 
 ICONSET="$BUILD_ROOT/AppIcon.iconset"
 mkdir -p "$ICONSET"

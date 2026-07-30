@@ -1,13 +1,88 @@
 import AVFoundation
 import AVKit
+import Foundation
 import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private enum RuntimeLocalization {
+    private static let tables: [String: [String: String]] = [
+        "en": loadTable(language: "en"),
+        "ja": loadTable(language: "ja")
+    ]
+
+    static func text(_ source: String, locale: Locale) -> String {
+        let identifier = locale.identifier.lowercased()
+        let language = identifier.hasPrefix("ja")
+            ? "ja"
+            : identifier.hasPrefix("en") ? "en" : "zh-Hans"
+        guard language != "zh-Hans", let table = tables[language] else {
+            return source
+        }
+        if let exact = table[source] {
+            return exact
+        }
+        return table.keys
+            .filter {
+                $0.count > 1
+                    && !$0.contains("%")
+                    && source.contains($0)
+            }
+            .sorted { $0.count > $1.count }
+            .reduce(source) { partial, key in
+                partial.replacingOccurrences(of: key, with: table[key] ?? key)
+            }
+    }
+
+    private static func loadTable(language: String) -> [String: String] {
+        guard
+            let path = Bundle.main.path(forResource: language, ofType: "lproj"),
+            let bundle = Bundle(path: path),
+            let url = bundle.url(
+                forResource: "Localizable",
+                withExtension: "strings"
+            ),
+            let data = try? Data(contentsOf: url),
+            let plist = try? PropertyListSerialization.propertyList(
+                from: data,
+                options: [],
+                format: nil
+            ),
+            let table = plist as? [String: String]
+        else {
+            return [:]
+        }
+        return table
+    }
+}
+
+private struct RuntimeLocalizedText: View {
+    @Environment(\.locale) private var locale
+    let source: String
+
+    init(_ source: String) {
+        self.source = source
+    }
+
+    var body: some View {
+        Text(RuntimeLocalization.text(source, locale: locale))
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("dismissedLaunchAnnouncementVersion")
+    private var dismissedAnnouncementVersion = ""
+    @State private var showingLaunchAnnouncement = false
+    @State private var doNotRemindForCurrentVersion = false
+
+    private static var appVersion: String {
+        Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "1.0.0"
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -45,8 +120,22 @@ struct RootView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showingLaunchAnnouncement) {
+            LaunchAnnouncementSheet(
+                version: Self.appVersion,
+                doNotRemind: $doNotRemindForCurrentVersion
+            ) {
+                if doNotRemindForCurrentVersion {
+                    dismissedAnnouncementVersion = Self.appVersion
+                }
+                showingLaunchAnnouncement = false
+            }
+            .interactiveDismissDisabled()
+        }
         .onAppear {
             model.updater.checkAutomaticallyIfNeeded()
+            showingLaunchAnnouncement =
+                dismissedAnnouncementVersion != Self.appVersion
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -117,7 +206,7 @@ private struct AppHeader: View {
                 Circle()
                     .fill(connectionColor)
                     .frame(width: 8, height: 8)
-                Text(model.camera.state.title)
+                RuntimeLocalizedText(model.camera.state.title)
                     .lineLimit(1)
             }
             .font(.subheadline.weight(.semibold))
@@ -136,7 +225,7 @@ private struct AppHeader: View {
                 .frame(width: 38, height: 38)
         }
         .buttonStyle(.bordered)
-        .accessibilityLabel("打开设置")
+        .accessibilityLabel(Text("打开设置"))
     }
 
     private var connectionColor: Color {
@@ -169,7 +258,7 @@ private struct SideNavigation: View {
     }
 
     private func groupLabel(_ title: String) -> some View {
-        Text(title)
+        Text(LocalizedStringKey(title))
             .font(.caption2.monospaced().weight(.semibold))
             .foregroundStyle(.secondary)
             .frame(width: 78, alignment: .leading)
@@ -185,7 +274,7 @@ private struct SideNavigation: View {
             VStack(spacing: 7) {
                 Image(systemName: section.icon)
                     .font(.system(size: 20, weight: .medium))
-                Text(section.rawValue)
+                Text(LocalizedStringKey(section.rawValue))
                     .font(.caption.weight(.medium))
             }
             .foregroundStyle(active ? accent : .secondary)
@@ -211,7 +300,7 @@ private struct BottomNavigation: View {
                     VStack(spacing: 4) {
                         Image(systemName: section.icon)
                             .font(.system(size: 18, weight: .medium))
-                        Text(section.rawValue)
+                        Text(LocalizedStringKey(section.rawValue))
                             .font(.caption2)
                     }
                     .foregroundStyle(model.section == section ? Color.accentColor : .secondary)
@@ -317,7 +406,8 @@ private struct CameraStage: View {
                 Circle()
                     .fill(model.camera.state == .ready ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                Text(model.camera.deviceName.uppercased())
+                RuntimeLocalizedText(model.camera.deviceName)
+                    .textCase(.uppercase)
                     .font(.caption2.monospaced().weight(.semibold))
             }
             .padding(.horizontal, 10)
@@ -455,7 +545,7 @@ private struct ImmersiveCameraView: View {
                 Circle()
                     .fill(model.camera.state == .ready ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                Text(model.camera.deviceName)
+                RuntimeLocalizedText(model.camera.deviceName)
                     .lineLimit(1)
             }
             .font(.caption.monospaced().weight(.semibold))
@@ -465,9 +555,11 @@ private struct ImmersiveCameraView: View {
 
             Spacer()
 
-            Text(mode == .video
-                 ? "\(model.camera.isRecording ? "● REC" : "系统视频") · \(model.camera.activeVideoSpecLabel)"
-                 : "照片实时取景 · JPEG")
+            RuntimeLocalizedText(
+                mode == .video
+                    ? "\(model.camera.isRecording ? "● REC" : "系统视频") · \(model.camera.activeVideoSpecLabel)"
+                    : "照片实时取景 · JPEG"
+            )
                 .font(.caption2.monospaced().weight(.semibold))
                 .padding(.horizontal, 12)
                 .frame(height: 44)
@@ -512,7 +604,7 @@ private struct ImmersiveCameraView: View {
 
     private var rightRail: some View {
         VStack(spacing: 12) {
-            Text(mode.title)
+            RuntimeLocalizedText(mode.title)
                 .font(.headline)
                 .foregroundStyle(mode.accent)
 
@@ -715,7 +807,7 @@ private struct ImmersiveParameterStepper: View {
                     .frame(width: 44, height: 44)
             }
             VStack(spacing: 1) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.64))
                 Text(value)
@@ -831,7 +923,7 @@ private struct CaptureParameterDeck: View {
                         get: { Double(model.camera.zoomFactor) },
                         set: { model.camera.setZoomFactor(CGFloat($0)) }
                     ),
-                    in: 1...max(1, Double(model.camera.maxZoomFactor)),
+                    in: 1...max(1.1, Double(model.camera.maxZoomFactor)),
                     step: 0.1
                 )
                 .disabled(model.camera.state != .ready || model.camera.maxZoomFactor <= 1)
@@ -863,7 +955,14 @@ private struct CapabilityChip: View {
     let available: Bool
 
     var body: some View {
-        Label(title, systemImage: available ? "checkmark.circle.fill" : "minus.circle")
+        HStack(spacing: 5) {
+            Image(
+                systemName: available
+                    ? "checkmark.circle.fill"
+                    : "minus.circle"
+            )
+            RuntimeLocalizedText(title)
+        }
             .font(.caption.weight(.medium))
             .foregroundStyle(available ? Color.green : Color.secondary)
             .padding(.horizontal, 10)
@@ -1040,7 +1139,7 @@ private struct MonitorParameterDeck: View {
                         get: { Double(model.camera.zoomFactor) },
                         set: { model.camera.setZoomFactor(CGFloat($0)) }
                     ),
-                    in: 1...max(1, Double(model.camera.maxZoomFactor)),
+                    in: 1...max(1.1, Double(model.camera.maxZoomFactor)),
                     step: 0.1
                 )
                 .disabled(model.camera.state != .ready || model.camera.maxZoomFactor <= 1)
@@ -1522,9 +1621,9 @@ private struct CloudDriveGuideView: View {
                                     .frame(width: 32, height: 32)
                                     .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(provider.name)
+                                    RuntimeLocalizedText(provider.name)
                                         .font(.headline)
-                                    Text(provider.note)
+                                    RuntimeLocalizedText(provider.note)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .multilineTextAlignment(.leading)
@@ -1679,12 +1778,14 @@ private struct WirelessTransferCard: View {
                     Circle()
                         .fill(model.wireless.isRunning ? Color.green : Color.secondary)
                         .frame(width: 8, height: 8)
-                    Text(model.wireless.isRunning ? "接收中" : "已停止")
+                    RuntimeLocalizedText(
+                        model.wireless.isRunning ? "接收中" : "已停止"
+                    )
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
 
-                Text(model.wireless.status)
+                RuntimeLocalizedText(model.wireless.status)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
@@ -1735,6 +1836,7 @@ private struct WirelessTransferCard: View {
 private struct AppSettingsSheet: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @State private var showingLogs = false
     @State private var showingDonation = false
 
@@ -1742,6 +1844,22 @@ private struct AppSettingsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    SettingsCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label("语言", systemImage: "globe")
+                                .font(.headline)
+                            Picker("界面语言", selection: $model.language) {
+                                ForEach(AppLanguage.allCases) { language in
+                                    Text(language.displayName).tag(language)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            Text("语言更改会立即应用，并在下次启动时保留。")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     SettingsCard {
                         Toggle(isOn: $model.autoSaveToPhotos) {
                             Label("拍摄后自动存入“照片”", systemImage: "photo.badge.plus")
@@ -1801,7 +1919,9 @@ private struct AppSettingsSheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("设置")
+            .navigationTitle(
+                RuntimeLocalization.text("设置", locale: locale)
+            )
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") { dismiss() }
@@ -1857,7 +1977,7 @@ private struct UpdateSettingsCard: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
-                    Text(updater.statusText)
+                    RuntimeLocalizedText(updater.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -1934,6 +2054,91 @@ private struct DonationSheet: View {
                     Button("完成") { dismiss() }
                 }
             }
+        }
+    }
+}
+
+private struct LaunchAnnouncementSheet: View {
+    let version: String
+    @Binding var doNotRemind: Bool
+    let close: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles.rectangle.stack.fill")
+                            .font(.title2)
+                            .foregroundStyle(Color.accentColor)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("本次更新")
+                                .font(.title3.bold())
+                            HStack(spacing: 4) {
+                                Text("当前版本")
+                                Text(version)
+                            }
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text("• 新增启动更新公告，并支持按版本控制提醒。\n• 五端公告与赞助入口保持一致。\n• 更新赞助图片并优化多语言体验。")
+                    .font(.subheadline)
+                    .lineSpacing(5)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("谨防诈骗", systemImage: "exclamationmark.shield.fill")
+                            .font(.headline)
+                            .foregroundStyle(.red)
+                        Text("帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”或要求付费购买软件的人都是骗子，请勿转账。")
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("自愿赞助")
+                            .font(.headline)
+                        Text("如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if let image = UIImage(named: "wechat-donation") {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+
+                    Button {
+                        doNotRemind.toggle()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(
+                                systemName: doNotRemind
+                                    ? "checkmark.square.fill"
+                                    : "square"
+                            )
+                            .font(.title3)
+                            Text("不再提醒（软件更新后仍会显示）")
+                                .font(.subheadline)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button("关闭公告", action: close)
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(20)
+            }
+            .navigationTitle("更新公告")
         }
     }
 }
@@ -2080,9 +2285,9 @@ private struct ConnectionOption: View {
                     .font(.title2)
                     .frame(width: 38)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
+                    Text(LocalizedStringKey(title))
                         .font(.headline)
-                    Text(subtitle)
+                    Text(LocalizedStringKey(subtitle))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -2106,9 +2311,9 @@ private struct PageTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 28, weight: .bold, design: .rounded))
-            Text(subtitle)
+            Text(LocalizedStringKey(subtitle))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -2122,7 +2327,7 @@ private struct StatusBar: View {
         HStack(spacing: 8) {
             Image(systemName: statusIcon)
                 .foregroundStyle(statusColor)
-            Text(model.statusMessage)
+            RuntimeLocalizedText(model.statusMessage)
                 .lineLimit(1)
             Spacer()
             Text("本次 · \(model.library.items.count) 张")
