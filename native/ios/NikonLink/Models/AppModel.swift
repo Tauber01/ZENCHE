@@ -30,6 +30,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
     case monitor = "视频"
+    case editor = "编辑"
     case library = "文件"
 
     var id: String { rawValue }
@@ -38,6 +39,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         switch self {
         case .capture: return "camera.fill"
         case .monitor: return "video.fill"
+        case .editor: return "slider.horizontal.3"
         case .library: return "folder.fill"
         }
     }
@@ -218,6 +220,35 @@ final class MediaLibrary: ObservableObject {
                 "相册照片导入失败：\(error.localizedDescription)"
             )
             message = "相册照片导入失败：\(error.localizedDescription)"
+        }
+    }
+
+    @discardableResult
+    func saveEditedImage(
+        _ data: Data,
+        originalFilename: String
+    ) -> URL? {
+        do {
+            let destination = try workflow.store(
+                data: data,
+                originalFilename: "edited.jpg",
+                cameraName: "Editor"
+            )
+            reload()
+            selectedItemID = destination.path
+            message = "已保存编辑副本 · \(destination.lastPathComponent)"
+            DiagnosticLogger.shared.info(
+                "editor",
+                "编辑副本已保存；来源=\(originalFilename)；文件=\(destination.lastPathComponent)"
+            )
+            return destination
+        } catch {
+            DiagnosticLogger.shared.error(
+                "editor",
+                "保存编辑副本失败：\(error.localizedDescription)"
+            )
+            message = "保存编辑副本失败：\(error.localizedDescription)"
+            return nil
         }
     }
 

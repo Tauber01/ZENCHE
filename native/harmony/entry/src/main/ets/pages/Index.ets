@@ -81,6 +81,61 @@ class CloudProvider {
   }
 }
 
+interface LibraryBranchData {
+  id: string;
+  name: string;
+  children: Array<LibraryBranchData>;
+}
+
+interface LibraryFileAssignmentData {
+  path: string;
+  branchId: string;
+}
+
+class LibraryBranch {
+  readonly id: string;
+  readonly name: string;
+  readonly children: Array<LibraryBranch>;
+
+  constructor(
+    id: string,
+    name: string,
+    children: Array<LibraryBranch> = []
+  ) {
+    this.id = id;
+    this.name = name;
+    this.children = children;
+  }
+
+  toData(): LibraryBranchData {
+    return {
+      id: this.id,
+      name: this.name,
+      children: this.children.map(
+        (child: LibraryBranch): LibraryBranchData => child.toData()
+      )
+    };
+  }
+
+  static fromData(data: LibraryBranchData): LibraryBranch {
+    return new LibraryBranch(
+      data.id,
+      data.name,
+      data.children.map(
+        (child: LibraryBranchData): LibraryBranch =>
+          LibraryBranch.fromData(child)
+      )
+    );
+  }
+
+  collectIds(ids: Array<string>): void {
+    ids.push(this.id);
+    this.children.forEach((child: LibraryBranch): void => {
+      child.collectIds(ids);
+    });
+  }
+}
+
 const DOMESTIC_CLOUDS: Array<CloudProvider> = [
   new CloudProvider(
     '百度网盘',
@@ -173,7 +228,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.1.0';
+const CURRENT_VERSION: string = '1.2.0';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -187,6 +242,9 @@ const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
   'dismissedLaunchAnnouncementVersion';
 const AUTOMATIC_UPDATE_KEY: string = 'automaticallyCheckForUpdates';
 const MIRROR_CHYAN_CDK_KEY: string = 'mirrorChyanCdk';
+const LIBRARY_BRANCHES_KEY: string = 'libraryUserBranches';
+const LIBRARY_FILE_ASSIGNMENTS_KEY: string =
+  'libraryFileBranchAssignments';
 
 const EXPOSURE_MODES: Array<SelectEntry> = [
   new SelectEntry('P · 程序自动', 'program'),
@@ -435,14 +493,56 @@ struct Index {
   @State private immersivePreviewVisible: boolean = false;
   @State private immersiveMonitoring: boolean = false;
   @State private immersiveParametersExpanded: boolean = true;
+  @State private immersiveMoreParametersExpanded: boolean = false;
   @State private immersiveLandscape: boolean = false;
   @State private systemExpanded: boolean = true;
   @State private systemPhotosExpanded: boolean = true;
   @State private systemVideosExpanded: boolean = true;
   @State private wirelessExpanded: boolean = false;
-  @State private localExpanded: boolean = true;
   @State private localPhotosExpanded: boolean = true;
   @State private localVideosExpanded: boolean = true;
+  @State private localUnclassifiedExpanded: boolean = true;
+  @State private userLibraryBranches: Array<LibraryBranch> = [];
+  @State private expandedLibraryBranchIds: Array<string> = [];
+  @State private libraryFileAssignments: Array<LibraryFileAssignmentData> = [];
+  @State private draggedPhotoPath: string = '';
+  @State private libraryDropTargetId: string = '';
+  @State private branchCreatorVisible: boolean = false;
+  @State private branchDraft: string = '';
+  @State private branchParentId: string = '';
+  @State private branchParentName: string = '帧澈 ZENCHE 文件库';
+  @State private branchDeleteVisible: boolean = false;
+  @State private branchDeleteId: string = '';
+  @State private branchDeleteName: string = '';
+  @State private mobileBranchDrawerExpanded: boolean = false;
+  @State private editorSelectedPath: string = '';
+  @State private editorPanel: string = 'light';
+  @State private editorPreset: string = 'original';
+  @State private editorExposure: number = 0;
+  @State private editorContrast: number = 0;
+  @State private editorHighlights: number = 0;
+  @State private editorShadows: number = 0;
+  @State private editorWhites: number = 0;
+  @State private editorBlacks: number = 0;
+  @State private editorTemperature: number = 0;
+  @State private editorTint: number = 0;
+  @State private editorVibrance: number = 0;
+  @State private editorSaturation: number = 0;
+  @State private editorTexture: number = 0;
+  @State private editorClarity: number = 0;
+  @State private editorSharpening: number = 0;
+  @State private editorNoiseReduction: number = 0;
+  @State private editorDehaze: number = 0;
+  @State private editorVignette: number = 0;
+  @State private editorRotation: number = 0;
+  @State private editorFlipHorizontal: boolean = false;
+  @State private editorFlipVertical: boolean = false;
+  @State private editorCropRatio: string = 'original';
+  @State private editorShowingOriginal: boolean = false;
+  @State private editorSaving: boolean = false;
+  @State private currentFocusMode: string = 'single-shot';
+  @State private currentWhiteBalance: string = 'continuous';
+  @State private currentPictureControl: string = 'standard';
   @State private currentBreakpoint: string = 'lg';
   private largePreview?: image.PixelMap;
   private shootingTaskGeneration: number = 0;
@@ -529,6 +629,28 @@ struct Index {
           ''
         );
       this.mirrorChyanCdk = mirrorChyanCdk as string;
+      const savedBranches: preferences.ValueType =
+        await this.settingsPreferences.get(
+          LIBRARY_BRANCHES_KEY,
+          '[]'
+        );
+      const branchData: Array<LibraryBranchData> =
+        JSON.parse(savedBranches as string) as Array<LibraryBranchData>;
+      this.userLibraryBranches = branchData.map(
+        (data: LibraryBranchData): LibraryBranch =>
+          LibraryBranch.fromData(data)
+      );
+      this.expandedLibraryBranchIds = this.userLibraryBranches.map(
+        (branch: LibraryBranch): string => branch.id
+      );
+      const savedAssignments: preferences.ValueType =
+        await this.settingsPreferences.get(
+          LIBRARY_FILE_ASSIGNMENTS_KEY,
+          '[]'
+        );
+      this.libraryFileAssignments = JSON.parse(
+        savedAssignments as string
+      ) as Array<LibraryFileAssignmentData>;
       if (this.automaticUpdates) {
         setTimeout((): void => {
           this.checkForUpdates(true);
@@ -636,6 +758,12 @@ struct Index {
       if (this.cloudGuideVisible) {
         this.CloudDriveGuideOverlay()
       }
+      if (this.branchCreatorVisible) {
+        this.LibraryBranchCreatorOverlay()
+      }
+      if (this.branchDeleteVisible) {
+        this.LibraryBranchDeleteOverlay()
+      }
       if (this.immersivePreviewVisible) {
         this.ImmersivePreviewOverlay()
       }
@@ -716,6 +844,8 @@ struct Index {
       }) {
         if (this.section === 'library') {
           this.LibraryWorkspace()
+        } else if (this.section === 'editor') {
+          this.ImageEditorWorkspace()
         } else if (this.section === 'settings') {
           this.SettingsWorkspace()
         } else {
@@ -841,7 +971,8 @@ struct Index {
         Row({ space: 8 }) {
           this.NavButton('照片拍摄', 'capture')
           this.NavButton('视频监看', 'monitor')
-          this.NavButton('文件与传输', 'library')
+          this.NavButton('图像编辑', 'editor')
+          this.NavButton('分支文件库', 'library')
         }
         .padding({ left: 16, right: 16 })
       }
@@ -864,9 +995,10 @@ struct Index {
           .margin({ bottom: 8 })
         this.NavButton('照片拍摄', 'capture')
         this.NavButton('视频监看', 'monitor')
-        this.NavButton('文件与传输', 'library')
+        this.NavButton('图像编辑', 'editor')
+        this.NavButton('分支文件库', 'library')
         Blank()
-        Text('ZENCHE 1.1.0')
+        Text('ZENCHE 1.2.0')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -919,8 +1051,485 @@ struct Index {
         if (target === 'library') {
           this.refreshPhotos();
           this.loadSystemAlbum();
+        } else if (target === 'editor') {
+          this.refreshPhotos();
+          this.ensureEditorSelection();
         }
       })
+  }
+
+  @Builder
+  private ImageEditorWorkspace() {
+    Column({ space: 16 }) {
+      Text(this.tr('专业显影'))
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      Text(this.tr(
+        '分组调整光线、色彩、细节、效果与几何；始终保留原文件。'
+      ))
+        .fontSize(14)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      if (this.editablePhotos().length === 0) {
+        Column({ space: 8 }) {
+          Text(this.tr('文件库中没有可编辑照片'))
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr(
+            '视频与暂不支持解码的 RAW 文件不会进入编辑列表。'
+          ))
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+        .height(260)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 12
+        })
+      } else {
+        Select(
+          this.editablePhotos().map((item: PhotoItem): SelectEntry => {
+            return new SelectEntry(item.name, item.name);
+          })
+        )
+          .selected(this.editorSelectedIndex())
+          .width('100%')
+          .onSelect((index: number): void => {
+            this.editorSelectedPath = this.editablePhotos()[index].path;
+            this.resetImageEditor();
+          })
+        Select(
+          [
+            '原始',
+            '自然增强',
+            '人像柔和',
+            '风光通透',
+            '高反差黑白'
+          ].map((label: string): SelectEntry => {
+            return new SelectEntry(label, label);
+          })
+        )
+          .selected(this.editorPresetIndex())
+          .width('100%')
+          .onSelect((index: number): void => {
+            const presets: Array<string> = [
+              'original',
+              'natural',
+              'portrait',
+              'landscape',
+              'monochrome'
+            ];
+            this.applyEditorPreset(presets[index]);
+          })
+        Stack({ alignContent: Alignment.Center }) {
+          if (this.editorSelectedPath.length > 0) {
+            Image(`file://${this.editorSelectedPath}`)
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Contain)
+              .brightness(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.pow(2, this.editorExposure / 100)
+              )
+              .contrast(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.max(
+                    0,
+                    1 + this.editorContrast / 100
+                      + this.editorDehaze / 250
+                      + this.editorClarity / 400
+                  )
+              )
+              .saturate(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.max(
+                    0,
+                    1 + this.editorSaturation / 100
+                      + this.editorVibrance / 180
+                      + this.editorDehaze / 500
+                  )
+              )
+              .rotate({
+                angle: this.editorShowingOriginal
+                  ? 0
+                  : this.editorRotation
+              })
+              .scale({
+                x: this.editorShowingOriginal
+                  ? 1
+                  : (this.editorFlipHorizontal ? -1 : 1),
+                y: this.editorShowingOriginal
+                  ? 1
+                  : (this.editorFlipVertical ? -1 : 1)
+              })
+          }
+          Text(this.tr(
+            this.editorShowingOriginal ? '原图' : '调整后'
+          ))
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
+            .backgroundColor($r('app.color.graphite'))
+            .borderRadius(14)
+            .position({ x: 12, y: 12 })
+        }
+        .width('100%')
+        .height(this.isCompact() ? 320 : 460)
+        .padding(12)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(14)
+
+        Scroll() {
+          Row({ space: 8 }) {
+            this.EditorPanelButton('光线', 'light')
+            this.EditorPanelButton('色彩', 'color')
+            this.EditorPanelButton('细节', 'detail')
+            this.EditorPanelButton('效果', 'effects')
+            this.EditorPanelButton('几何', 'geometry')
+          }
+        }
+        .width('100%')
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        this.EditorAdjustmentPanel()
+
+        Row({ space: 8 }) {
+          Button(
+            this.tr(
+              this.editorShowingOriginal ? '返回调整' : '查看原图'
+            ),
+            { type: ButtonType.Normal }
+          )
+            .height(48)
+            .layoutWeight(1)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              this.editorShowingOriginal = !this.editorShowingOriginal;
+            })
+          Button(this.tr('全部重置'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              this.resetImageEditor();
+            })
+          Button(
+            this.tr(
+              this.editorSaving ? '正在保存…' : '保存高质量副本'
+            ),
+            { type: ButtonType.Normal }
+          )
+            .height(48)
+            .layoutWeight(1)
+            .enabled(!this.editorSaving)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .onClick((): void => {
+              this.saveEditedPhoto();
+            })
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .height(this.isCompact() ? 'auto' : '100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private EditorPanelButton(label: string, panel: string) {
+    Button(this.tr(label), { type: ButtonType.Normal })
+      .height(44)
+      .fontSize(13)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(
+        this.editorPanel === panel
+          ? $r('app.color.accent_ink')
+          : $r('app.color.ink')
+      )
+      .backgroundColor(
+        this.editorPanel === panel
+          ? $r('app.color.accent')
+          : $r('app.color.surface')
+      )
+      .border({
+        width: 1,
+        color: this.editorPanel === panel
+          ? $r('app.color.accent')
+          : $r('app.color.rule'),
+        radius: 22
+      })
+      .onClick((): void => {
+        this.editorPanel = panel;
+      })
+  }
+
+  @Builder
+  private EditorAdjustmentPanel() {
+    Column({ space: 8 }) {
+      if (this.editorPanel === 'light') {
+        this.EditorSlider(
+          '曝光',
+          this.editorExposure,
+          -200,
+          200,
+          true,
+          (value: number): void => {
+            this.editorExposure = value;
+          }
+        )
+        this.EditorSlider(
+          '对比度',
+          this.editorContrast,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorContrast = value;
+          }
+        )
+        this.EditorSlider(
+          '高光',
+          this.editorHighlights,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorHighlights = value;
+          }
+        )
+        this.EditorSlider(
+          '阴影',
+          this.editorShadows,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorShadows = value;
+          }
+        )
+        this.EditorSlider(
+          '白色色阶',
+          this.editorWhites,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorWhites = value;
+          }
+        )
+        this.EditorSlider(
+          '黑色色阶',
+          this.editorBlacks,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorBlacks = value;
+          }
+        )
+      } else if (this.editorPanel === 'color') {
+        this.EditorSlider(
+          '色温',
+          this.editorTemperature,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorTemperature = value;
+          }
+        )
+        this.EditorSlider(
+          '色调',
+          this.editorTint,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorTint = value;
+          }
+        )
+        this.EditorSlider(
+          '自然饱和度',
+          this.editorVibrance,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorVibrance = value;
+          }
+        )
+        this.EditorSlider(
+          '饱和度',
+          this.editorSaturation,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorSaturation = value;
+          }
+        )
+      } else if (this.editorPanel === 'detail') {
+        this.EditorSlider(
+          '纹理',
+          this.editorTexture,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorTexture = value;
+          }
+        )
+        this.EditorSlider(
+          '清晰度',
+          this.editorClarity,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorClarity = value;
+          }
+        )
+        this.EditorSlider(
+          '锐化',
+          this.editorSharpening,
+          0,
+          100,
+          false,
+          (value: number): void => {
+            this.editorSharpening = value;
+          }
+        )
+        this.EditorSlider(
+          '降噪',
+          this.editorNoiseReduction,
+          0,
+          100,
+          false,
+          (value: number): void => {
+            this.editorNoiseReduction = value;
+          }
+        )
+      } else if (this.editorPanel === 'effects') {
+        this.EditorSlider(
+          '去雾',
+          this.editorDehaze,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorDehaze = value;
+          }
+        )
+        this.EditorSlider(
+          '暗角',
+          this.editorVignette,
+          -100,
+          100,
+          false,
+          (value: number): void => {
+            this.editorVignette = value;
+          }
+        )
+      } else {
+        Text(this.tr('裁切比例'))
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Select(
+          ['原始比例', '1:1', '4:3', '3:2', '16:9']
+            .map((label: string): SelectEntry => {
+              return new SelectEntry(label, label);
+            })
+        )
+          .selected(this.editorCropRatioIndex())
+          .width('100%')
+          .onSelect((index: number): void => {
+            const ratios: Array<string> = [
+              'original', '1:1', '4:3', '3:2', '16:9'
+            ];
+            this.editorCropRatio = ratios[index];
+          })
+        Row({ space: 8 }) {
+          Button(this.tr('旋转 90°'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.editorRotation = (this.editorRotation + 90) % 360;
+            })
+          Button(this.tr('水平翻转'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.editorFlipHorizontal =
+                !this.editorFlipHorizontal;
+            })
+          Button(this.tr('垂直翻转'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .onClick((): void => {
+              this.editorFlipVertical = !this.editorFlipVertical;
+            })
+        }
+        .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 10
+    })
+  }
+
+  @Builder
+  private EditorSlider(
+    label: string,
+    value: number,
+    minimum: number,
+    maximum: number,
+    exposure: boolean,
+    onChange: (value: number) => void
+  ) {
+    Column({ space: 4 }) {
+      Text(
+        exposure
+          ? `${this.tr(label)} · ${(value / 100).toFixed(2)} EV`
+          : `${this.tr(label)} · ${Math.round(value)}`
+      )
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Slider({
+        value: value,
+        min: minimum,
+        max: maximum,
+        step: 1,
+        style: SliderStyle.OutSet
+      })
+        .onChange((next: number): void => {
+          onChange(Math.round(next));
+        })
+    }
+    .width('100%')
+    .constraintSize({ minHeight: 52 })
   }
 
   @Builder
@@ -1154,18 +1763,19 @@ struct Index {
   @Builder
   private LibraryWorkspace() {
     Column({ space: 16 }) {
-      Text(this.tr('文件与传输'))
+      Text(this.tr('分支文件库'))
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
       Text(this.tr(
         `${this.photos.length} 个 帧澈 ZENCHE 文件 · ` +
-        `${this.systemMedia.length} 个系统相册项目`
+        `${this.systemMedia.length} 个系统相册项目 · 拖动整理`
       ))
         .fontSize(14)
         .fontColor($r('app.color.muted'))
         .width('100%')
+      this.BranchWorkspace()
       Row({ space: 8 }) {
         Button(this.tr('刷新系统相册'), { type: ButtonType.Normal })
           .height(44)
@@ -1332,137 +1942,430 @@ struct Index {
       if (this.wirelessExpanded) {
         this.WirelessTransferCard()
       }
-      Button(
-        this.tr(
-          `${this.localExpanded ? '⌄' : '›'} 帧澈 ZENCHE 文件库 · ` +
-          `${this.photos.length}`
-        ),
-        { type: ButtonType.Normal }
-      )
-        .width('100%')
-        .height(44)
-        .fontColor($r('app.color.ink'))
-        .backgroundColor($r('app.color.paper_2'))
-        .onClick((): void => {
-          this.localExpanded = !this.localExpanded;
-        })
-      if (this.localExpanded && this.photos.length === 0) {
-        Column({ space: 12 }) {
-          Text(this.tr('本地图库还是空的'))
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-          Text(this.tr('连接相机拍摄，或在上方开启无线图片收件箱。'))
-            .fontSize(14)
-            .fontColor($r('app.color.muted'))
-        }
-        .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-      } else if (this.localExpanded) {
-        Row({ space: 8 }) {
-          Button(
-            this.tr(
-              `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
-              `${this.photos.filter((item: PhotoItem): boolean => !item.isVideo).length}`
-            )
-          )
-            .height(44)
-            .layoutWeight(1)
-            .onClick((): void => {
-              this.localPhotosExpanded = !this.localPhotosExpanded;
-            })
-          Button(
-            this.tr(
-              `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
-              `${this.photos.filter((item: PhotoItem): boolean => item.isVideo).length}`
-            )
-          )
-            .height(44)
-            .layoutWeight(1)
-            .onClick((): void => {
-              this.localVideosExpanded = !this.localVideosExpanded;
-            })
-        }
-        .width('100%')
-        List({ space: 8 }) {
-          ForEach(
-            this.photos.filter((item: PhotoItem): boolean => {
-              return item.isVideo
-                ? this.localVideosExpanded
-                : this.localPhotosExpanded;
-            }),
-            (item: PhotoItem) => {
-              ListItem() {
-                Row({ space: 12 }) {
-                  Column({ space: 4 }) {
-                    Text(item.name)
-                      .fontSize(14)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor($r('app.color.ink'))
-                      .maxLines(1)
-                      .textOverflow({ overflow: TextOverflow.Ellipsis })
-                    Text(item.detail)
-                      .fontSize(10)
-                      .fontFamily('monospace')
-                      .fontColor($r('app.color.muted'))
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-                  Button(this.tr('预览'), { type: ButtonType.Normal })
-                    .height(44)
-                    .fontColor($r('app.color.ink'))
-                    .backgroundColor($r('app.color.paper_2'))
-                    .borderRadius(6)
-                    .onClick((): void => {
-                      this.previewPhoto(item);
-                    })
-                  Button(this.tr('分享'), { type: ButtonType.Normal })
-                    .height(44)
-                    .fontColor($r('app.color.ink'))
-                    .backgroundColor($r('app.color.paper_2'))
-                    .borderRadius(6)
-                    .onClick((): void => {
-                      this.sharePhoto(item);
-                    })
-                  Button(this.tr('删除'), { type: ButtonType.Normal })
-                    .height(44)
-                    .fontColor($r('app.color.error'))
-                    .backgroundColor($r('app.color.surface'))
-                    .border({
-                      width: 1,
-                      color: $r('app.color.error'),
-                      radius: 6
-                    })
-                    .onClick((): void => {
-                      this.deletePhoto(item);
-                    })
-                }
-                .width('100%')
-                .padding(16)
-                .backgroundColor($r('app.color.surface'))
-                .border({
-                  width: 1,
-                  color: $r('app.color.rule'),
-                  radius: 8
-                })
-                .gesture(
-                  TapGesture({ count: 2 })
-                    .onAction((): void => {
-                      this.openLargePhoto(item);
-                    })
-                )
-              }
-            },
-            (item: PhotoItem): string => item.path
-          )
-        }
-        .width('100%')
-        .layoutWeight(1)
-      }
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
+  }
+
+  @Builder
+  private BranchWorkspace() {
+    if (this.isCompact()) {
+      Column({ space: 8 }) {
+        Button(
+          this.tr(
+            `${this.mobileBranchDrawerExpanded ? '⌄' : '›'} 分支抽屉 · ` +
+            `${this.userLibraryBranches.length} 个根分支`
+          ),
+          { type: ButtonType.Normal }
+        )
+          .width('100%')
+          .height(56)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.accent'),
+            radius: 12
+          })
+          .onClick((): void => {
+            this.mobileBranchDrawerExpanded =
+              !this.mobileBranchDrawerExpanded;
+          })
+        if (this.mobileBranchDrawerExpanded) {
+          this.BranchWorkspaceContent()
+        }
+      }
+      .width('100%')
+    } else {
+      this.BranchWorkspaceContent()
+    }
+  }
+
+  @Builder
+  private BranchWorkspaceContent() {
+    Column({ space: 10 }) {
+      Row({ space: 12 }) {
+        Text('分支')
+          .fontSize(16)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .width(54)
+          .height(54)
+          .textAlign(TextAlign.Center)
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(14)
+        Column({ space: 3 }) {
+          Text(this.tr('分支工作台'))
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('长按文件并拖到任意分支；拖回“未分类”即可移出分支。'))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .maxLines(2)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Button(this.tr('＋ 新建分支'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(8)
+          .onClick((): void => {
+            this.beginCreatingLibraryBranch('', '帧澈 ZENCHE 文件库');
+          })
+      }
+      .width('100%')
+      this.UserLibraryBranchTree()
+      Button(
+        this.tr(
+          `${this.localUnclassifiedExpanded ? '⌄' : '›'} 未分类 · ` +
+          `${this.unclassifiedPhotos().length}`
+        ),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(48)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor(
+          this.libraryDropTargetId === 'unclassified'
+            ? $r('app.color.accent_soft')
+            : $r('app.color.paper_2')
+        )
+        .border({
+          width: this.libraryDropTargetId === 'unclassified' ? 2 : 1,
+          color: this.libraryDropTargetId === 'unclassified'
+            ? $r('app.color.accent')
+            : $r('app.color.rule'),
+          radius: 8
+        })
+        .onClick((): void => {
+          this.localUnclassifiedExpanded =
+            !this.localUnclassifiedExpanded;
+        })
+        .onDragEnter((_event: DragEvent): void => {
+          this.libraryDropTargetId = 'unclassified';
+        })
+        .onDragLeave((_event: DragEvent): void => {
+          if (this.libraryDropTargetId === 'unclassified') {
+            this.libraryDropTargetId = '';
+          }
+        })
+        .onDrop((_event: DragEvent): void => {
+          this.assignPhotoToBranch(this.draggedPhotoPath, '');
+          this.libraryDropTargetId = '';
+        })
+      if (
+        this.localUnclassifiedExpanded &&
+        this.unclassifiedPhotos().length === 0
+      ) {
+        Column({ space: 6 }) {
+          Text(this.tr('未分类已清空'))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+          Text(this.tr('拍摄、导入或无线接收的新文件会先显示在这里。'))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+        .height(100)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.localUnclassifiedExpanded) {
+        this.LocalPhotoCollection(this.unclassifiedPhotos())
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.accent'),
+      radius: 16
+    })
+  }
+
+  @Builder
+  private LocalPhotoCollection(items: Array<PhotoItem>) {
+    Row({ space: 8 }) {
+      Button(
+        this.tr(
+          `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
+          `${items.filter((item: PhotoItem): boolean => !item.isVideo).length}`
+        )
+      )
+        .height(44)
+        .layoutWeight(1)
+        .onClick((): void => {
+          this.localPhotosExpanded = !this.localPhotosExpanded;
+        })
+      Button(
+        this.tr(
+          `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
+          `${items.filter((item: PhotoItem): boolean => item.isVideo).length}`
+        )
+      )
+        .height(44)
+        .layoutWeight(1)
+        .onClick((): void => {
+          this.localVideosExpanded = !this.localVideosExpanded;
+        })
+    }
+    .width('100%')
+    List({ space: 8 }) {
+      ForEach(
+        items.filter((item: PhotoItem): boolean => {
+          return item.isVideo
+            ? this.localVideosExpanded
+            : this.localPhotosExpanded;
+        }),
+        (item: PhotoItem) => {
+          ListItem() {
+            this.LocalPhotoRow(item)
+          }
+        },
+        (item: PhotoItem): string => item.path
+      )
+    }
+    .width('100%')
+    .height(Math.min(320, Math.max(96, items.length * 82)))
+  }
+
+  @Builder
+  private LocalPhotoRow(item: PhotoItem) {
+    Row({ space: 12 }) {
+      if (item.isVideo) {
+        Stack({ alignContent: Alignment.Center }) {
+          Text('▶')
+            .fontSize(20)
+            .fontColor(Color.White)
+        }
+        .width(68)
+        .height(50)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(6)
+      } else {
+        Image(`file://${item.path}`)
+          .width(68)
+          .height(50)
+          .objectFit(ImageFit.Cover)
+          .borderRadius(6)
+      }
+      Column({ space: 4 }) {
+        Text(item.name)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(item.detail)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Button(this.tr('预览'), { type: ButtonType.Normal })
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .borderRadius(6)
+        .onClick((): void => {
+          this.previewPhoto(item);
+        })
+      Button(this.tr('分享'), { type: ButtonType.Normal })
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .borderRadius(6)
+        .onClick((): void => {
+          this.sharePhoto(item);
+        })
+      Button(this.tr('删除'), { type: ButtonType.Normal })
+        .height(44)
+        .fontColor($r('app.color.error'))
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.error'),
+          radius: 6
+        })
+        .onClick((): void => {
+          this.deletePhoto(item);
+        })
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 8
+    })
+    .gesture(
+      TapGesture({ count: 2 })
+        .onAction((): void => {
+          this.openLargePhoto(item);
+        })
+    )
+    .onDragStart((_event: DragEvent): DragItemInfo => {
+      this.draggedPhotoPath = item.path;
+      return { extraInfo: item.path };
+    })
+    .dragPreview(item.name)
+  }
+
+  @Builder
+  private UserLibraryBranchTree() {
+    Column({ space: 4 }) {
+      Row({ space: 8 }) {
+        Text(this.tr('用户分支'))
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .layoutWeight(1)
+        Text(this.tr(`${this.userLibraryBranches.length} 个根节点`))
+          .fontSize(11)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+      }
+      .width('100%')
+      if (this.userLibraryBranches.length === 0) {
+        Text(this.tr('可建立项目、客户或拍摄日等分支；媒体仍保留在原始存储位置。'))
+          .fontSize(12)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+          .padding({ top: 8, bottom: 8 })
+      } else {
+        ForEach(
+          this.userLibraryBranches,
+          (branch: LibraryBranch) => {
+            this.LibraryBranchNode(branch, 0)
+          },
+          (branch: LibraryBranch): string => branch.id
+        )
+      }
+    }
+    .width('100%')
+    .padding({ top: 6, bottom: 8 })
+  }
+
+  @Builder
+  private LibraryBranchNode(
+    branch: LibraryBranch,
+    depth: number
+  ) {
+    Column({ space: 4 }) {
+      Row({ space: 6 }) {
+        Button(
+          this.isLibraryBranchExpanded(branch.id) ? '⌄' : '›',
+          { type: ButtonType.Normal }
+        )
+          .width(52)
+          .height(52)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor(Color.Transparent)
+          .onClick((): void => {
+            this.toggleLibraryBranch(branch.id);
+          })
+        Text(`▱  ${branch.name}`)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+          .height(52)
+          .onClick((): void => {
+            this.toggleLibraryBranch(branch.id);
+          })
+        Text(`${this.photosForBranch(branch.id).length} 文件`)
+          .fontSize(11)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+          .width(62)
+          .height(52)
+          .textAlign(TextAlign.Center)
+          .onClick((): void => {
+            this.toggleLibraryBranch(branch.id);
+          })
+        Button('＋', { type: ButtonType.Normal })
+          .width(44)
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor(Color.Transparent)
+          .onClick((): void => {
+            this.beginCreatingLibraryBranch(branch.id, branch.name);
+          })
+        Button(this.tr('删'), { type: ButtonType.Normal })
+          .width(44)
+          .height(44)
+          .fontColor($r('app.color.error'))
+          .backgroundColor(Color.Transparent)
+          .onClick((): void => {
+            this.beginDeletingLibraryBranch(branch);
+          })
+      }
+      .width('100%')
+      .height(52)
+      .padding({ left: 8 + depth * 14, right: 4 })
+      .backgroundColor(
+        this.libraryDropTargetId === branch.id
+          ? $r('app.color.accent_soft')
+          : depth === 0
+            ? $r('app.color.paper_2')
+            : $r('app.color.surface')
+      )
+      .border({
+        width: this.libraryDropTargetId === branch.id ? 2 : 1,
+        color: this.libraryDropTargetId === branch.id
+          ? $r('app.color.accent')
+          : $r('app.color.rule'),
+        radius: 8
+      })
+      .onDragEnter((_event: DragEvent): void => {
+        this.libraryDropTargetId = branch.id;
+      })
+      .onDragLeave((_event: DragEvent): void => {
+        if (this.libraryDropTargetId === branch.id) {
+          this.libraryDropTargetId = '';
+        }
+      })
+      .onDrop((_event: DragEvent): void => {
+        this.assignPhotoToBranch(this.draggedPhotoPath, branch.id);
+        this.libraryDropTargetId = '';
+      })
+      if (this.isLibraryBranchExpanded(branch.id)) {
+        ForEach(
+          this.photosForBranch(branch.id),
+          (item: PhotoItem) => {
+            this.LocalPhotoRow(item)
+          },
+          (item: PhotoItem): string => item.path
+        )
+        if (
+          this.photosForBranch(branch.id).length === 0 &&
+          branch.children.length === 0
+        ) {
+          Text(this.tr('拖动文件到这里'))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+            .height(32)
+            .padding({ left: 54 + (depth + 1) * 14 })
+        }
+        ForEach(
+          branch.children,
+          (child: LibraryBranch) => {
+            this.LibraryBranchNode(child, depth + 1)
+          },
+          (child: LibraryBranch): string => child.id
+        )
+      }
+    }
+    .width('100%')
   }
 
   @Builder
@@ -1786,6 +2689,125 @@ struct Index {
       offsetX: 0,
       offsetY: 10
     })
+  }
+
+  @Builder
+  private LibraryBranchCreatorOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 14 }) {
+        Text(this.tr('新建分支'))
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+        Text(this.tr(
+          `将在“${this.branchParentName}”下创建可继续展开的节点。`
+        ))
+          .fontSize(13)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        TextInput({
+          placeholder: this.tr('分支名称'),
+          text: this.branchDraft
+        })
+          .height(44)
+          .onChange((value: string): void => {
+            this.branchDraft = value;
+          })
+        Row({ space: 8 }) {
+          Button(this.tr('取消'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              this.branchCreatorVisible = false;
+            })
+          Button(this.tr('创建'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .enabled(this.branchDraft.trim().length > 0)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .onClick((): void => {
+              this.createLibraryBranch();
+            })
+        }
+        .width('100%')
+      }
+      .width(this.isCompact() ? '90%' : 460)
+      .padding(22)
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 14
+      })
+      .shadow({
+        radius: 24,
+        color: '#55000000',
+        offsetX: 0,
+        offsetY: 10
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#66000000')
+  }
+
+  @Builder
+  private LibraryBranchDeleteOverlay() {
+    Stack({ alignContent: Alignment.Center }) {
+      Column({ space: 14 }) {
+        Text(this.tr('删除分支？'))
+          .fontSize(22)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+        Text(this.tr(
+          `将同时删除“${this.branchDeleteName}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。`
+        ))
+          .fontSize(13)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Row({ space: 8 }) {
+          Button(this.tr('取消'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              this.branchDeleteVisible = false;
+            })
+          Button(this.tr('删除分支'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor(Color.White)
+            .backgroundColor($r('app.color.error'))
+            .onClick((): void => {
+              this.deleteLibraryBranch();
+            })
+        }
+        .width('100%')
+      }
+      .width(this.isCompact() ? '90%' : 460)
+      .padding(22)
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 14
+      })
+      .shadow({
+        radius: 24,
+        color: '#55000000',
+        offsetX: 0,
+        offsetY: 10
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#66000000')
   }
 
   @Builder
@@ -2307,20 +3329,44 @@ struct Index {
   @Builder
   private ImmersiveParameterBar() {
     Column({ space: 6 }) {
-      Button(
-        this.tr(
-          this.immersiveParametersExpanded ? '收起参数' : '展开参数'
-        ),
-        { type: ButtonType.Normal }
-      )
-        .height(44)
-        .fontColor(Color.White)
-        .backgroundColor('#99000000')
-        .borderRadius(10)
-        .onClick((): void => {
-          this.immersiveParametersExpanded =
-            !this.immersiveParametersExpanded;
-        })
+      Row({ space: 8 }) {
+        Button(
+          this.tr(
+            this.immersiveParametersExpanded ? '收起参数' : '展开参数'
+          ),
+          { type: ButtonType.Normal }
+        )
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor('#99000000')
+          .borderRadius(10)
+          .onClick((): void => {
+            this.immersiveParametersExpanded =
+              !this.immersiveParametersExpanded;
+          })
+        if (this.immersiveParametersExpanded) {
+          Button(
+            this.tr(
+              this.immersiveMoreParametersExpanded
+                ? '收起更多'
+                : '更多参数'
+            ),
+            { type: ButtonType.Normal }
+          )
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor(
+              this.immersiveMoreParametersExpanded
+                ? '#CC055AD2'
+                : '#99000000'
+            )
+            .borderRadius(10)
+            .onClick((): void => {
+              this.immersiveMoreParametersExpanded =
+                !this.immersiveMoreParametersExpanded;
+            })
+        }
+      }
       if (this.immersiveParametersExpanded) {
         Scroll() {
           Row({ space: 8 }) {
@@ -2347,6 +3393,43 @@ struct Index {
         }
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
+        if (this.immersiveMoreParametersExpanded) {
+          Scroll() {
+            Row({ space: 8 }) {
+              if (this.immersiveMonitoring) {
+                this.ImmersiveParameterControl(
+                  '视频帧率',
+                  `${this.videoFrameRate}p`,
+                  'videoFrameRate'
+                )
+              } else {
+                this.ImmersiveParameterControl(
+                  '拍摄模式',
+                  this.exposureMode.toUpperCase(),
+                  'exposureMode'
+                )
+              }
+              this.ImmersiveParameterControl(
+                '对焦模式',
+                this.currentFocusMode === 'continuous' ? 'AF-C' : 'AF-S',
+                'focusMode'
+              )
+              this.ImmersiveParameterControl(
+                '白平衡',
+                this.currentWhiteBalance === 'continuous' ? '自动' : '保留',
+                'whiteBalanceMode'
+              )
+              this.ImmersiveParameterControl(
+                '优化校准',
+                this.currentPictureControl === 'neutral' ? '自然' : '标准',
+                'pictureControl'
+              )
+            }
+            .padding({ left: 12, right: 12 })
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+        }
       }
     }
     .width('100%')
@@ -2385,7 +3468,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
       }
-      .width(64)
+      .width(52)
       Button('+', { type: ButtonType.Normal })
         .width(44)
         .height(44)
@@ -2399,8 +3482,8 @@ struct Index {
           this.adjustImmersiveParameter(parameter, 1);
         })
     }
-    .height(50)
-    .padding(4)
+    .height(48)
+    .padding(2)
     .backgroundColor('#99000000')
     .borderRadius(10)
   }
@@ -3346,6 +4429,16 @@ struct Index {
     if (!this.connected || this.busy) {
       return;
     }
+    if ([
+      'videoFrameRate',
+      'exposureMode',
+      'focusMode',
+      'whiteBalanceMode',
+      'pictureControl'
+    ].includes(parameter)) {
+      this.adjustImmersiveChoice(parameter, direction);
+      return;
+    }
     let entries: Array<SelectEntry>;
     let current: number;
     if (parameter === 'videoShutter') {
@@ -3396,9 +4489,64 @@ struct Index {
     }
   }
 
+  private adjustImmersiveChoice(
+    parameter: string,
+    direction: number
+  ): void {
+    let entries: Array<SelectEntry>;
+    let current: string;
+    if (parameter === 'videoFrameRate') {
+      entries = VIDEO_FRAME_RATES;
+      current = this.videoFrameRate.toString();
+    } else if (parameter === 'exposureMode') {
+      entries = EXPOSURE_MODES;
+      current = this.exposureMode;
+    } else if (parameter === 'focusMode') {
+      entries = FOCUS_MODES;
+      current = this.currentFocusMode;
+    } else if (parameter === 'whiteBalanceMode') {
+      entries = WHITE_BALANCES;
+      current = this.currentWhiteBalance;
+    } else {
+      entries = PICTURE_CONTROLS;
+      current = this.currentPictureControl;
+    }
+    let index: number = entries.findIndex(
+      (entry: SelectEntry): boolean => entry.value === current
+    );
+    if (index < 0) {
+      index = 0;
+    }
+    const next: number = Math.max(
+      0,
+      Math.min(entries.length - 1, index + direction)
+    );
+    const entry: SelectEntry = entries[next];
+    if (parameter === 'videoFrameRate') {
+      this.videoFrameRate = Number(entry.value);
+      this.applyVideoShutterAngle();
+      return;
+    }
+    if (parameter === 'exposureMode') {
+      this.exposureMode = entry.value;
+    } else if (parameter === 'focusMode') {
+      this.currentFocusMode = entry.value;
+    } else if (parameter === 'whiteBalanceMode') {
+      this.currentWhiteBalance = entry.value;
+    } else {
+      this.currentPictureControl = entry.value;
+    }
+    this.setCameraParameter(parameter, entry);
+  }
+
   private cameraParameter(parameter: string): string {
-    if (parameter === 'videoShutter' || parameter === 'photoShutter') {
+    if (
+      parameter === 'videoShutter' ||
+      parameter === 'photoShutter' ||
+      parameter === 'videoFrameRate'
+    ) {
       return parameter === 'videoShutter'
+        || parameter === 'videoFrameRate'
         ? 'videoExposureTime'
         : 'exposureTime';
     }
@@ -3441,6 +4589,239 @@ struct Index {
         exposureSeconds.toString()
       )
     );
+  }
+
+  private beginCreatingLibraryBranch(
+    parentId: string,
+    parentName: string
+  ): void {
+    this.branchParentId = parentId;
+    this.branchParentName = parentName;
+    this.branchDraft = '';
+    this.branchCreatorVisible = true;
+  }
+
+  private createLibraryBranch(): void {
+    const name: string = this.branchDraft.trim();
+    if (name.length === 0) {
+      return;
+    }
+    const branch: LibraryBranch = new LibraryBranch(
+      `${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+      name
+    );
+    if (this.branchParentId.length === 0) {
+      this.userLibraryBranches = [
+        ...this.userLibraryBranches,
+        branch
+      ];
+    } else {
+      const parent: LibraryBranch | undefined =
+        this.findLibraryBranch(
+          this.userLibraryBranches,
+          this.branchParentId
+        );
+      if (parent === undefined) {
+        return;
+      }
+      parent.children.push(branch);
+      this.userLibraryBranches = [...this.userLibraryBranches];
+      if (!this.isLibraryBranchExpanded(parent.id)) {
+        this.expandedLibraryBranchIds = [
+          ...this.expandedLibraryBranchIds,
+          parent.id
+        ];
+      }
+    }
+    this.expandedLibraryBranchIds = [
+      ...this.expandedLibraryBranchIds,
+      branch.id
+    ];
+    this.branchCreatorVisible = false;
+    this.persistLibraryBranches();
+  }
+
+  private beginDeletingLibraryBranch(branch: LibraryBranch): void {
+    this.branchDeleteId = branch.id;
+    this.branchDeleteName = branch.name;
+    this.branchDeleteVisible = true;
+  }
+
+  private deleteLibraryBranch(): void {
+    const branch: LibraryBranch | undefined = this.findLibraryBranch(
+      this.userLibraryBranches,
+      this.branchDeleteId
+    );
+    if (branch === undefined) {
+      this.branchDeleteVisible = false;
+      return;
+    }
+    const removedIds: Array<string> = [];
+    branch.collectIds(removedIds);
+    if (!this.removeLibraryBranch(
+      this.userLibraryBranches,
+      this.branchDeleteId
+    )) {
+      this.branchDeleteVisible = false;
+      return;
+    }
+    this.userLibraryBranches = [...this.userLibraryBranches];
+    this.expandedLibraryBranchIds =
+      this.expandedLibraryBranchIds.filter(
+        (id: string): boolean => !removedIds.includes(id)
+      );
+    this.libraryFileAssignments =
+      this.libraryFileAssignments.filter(
+        (assignment: LibraryFileAssignmentData): boolean =>
+          !removedIds.includes(assignment.branchId)
+      );
+    this.branchDeleteVisible = false;
+    this.branchDeleteId = '';
+    this.branchDeleteName = '';
+    this.status = '分支已删除，文件已回到未分类';
+    this.persistLibraryBranches();
+    this.persistLibraryFileAssignments();
+  }
+
+  private removeLibraryBranch(
+    branches: Array<LibraryBranch>,
+    id: string
+  ): boolean {
+    for (let index: number = 0; index < branches.length; index++) {
+      if (branches[index].id === id) {
+        branches.splice(index, 1);
+        return true;
+      }
+      if (this.removeLibraryBranch(branches[index].children, id)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private findLibraryBranch(
+    branches: Array<LibraryBranch>,
+    id: string
+  ): LibraryBranch | undefined {
+    for (let index: number = 0; index < branches.length; index++) {
+      if (branches[index].id === id) {
+        return branches[index];
+      }
+      const child: LibraryBranch | undefined =
+        this.findLibraryBranch(branches[index].children, id);
+      if (child !== undefined) {
+        return child;
+      }
+    }
+    return undefined;
+  }
+
+  private isLibraryBranchExpanded(id: string): boolean {
+    return this.expandedLibraryBranchIds.includes(id);
+  }
+
+  private toggleLibraryBranch(id: string): void {
+    if (this.isLibraryBranchExpanded(id)) {
+      this.expandedLibraryBranchIds =
+        this.expandedLibraryBranchIds.filter(
+          (candidate: string): boolean => candidate !== id
+        );
+    } else {
+      this.expandedLibraryBranchIds = [
+        ...this.expandedLibraryBranchIds,
+        id
+      ];
+    }
+  }
+
+  private branchIdForPhoto(path: string): string {
+    const assignment: LibraryFileAssignmentData | undefined =
+      this.libraryFileAssignments.find(
+        (candidate: LibraryFileAssignmentData): boolean =>
+          candidate.path === path
+      );
+    return assignment?.branchId ?? '';
+  }
+
+  private photosForBranch(branchId: string): Array<PhotoItem> {
+    return this.photos.filter(
+      (item: PhotoItem): boolean =>
+        this.branchIdForPhoto(item.path) === branchId
+    );
+  }
+
+  private unclassifiedPhotos(): Array<PhotoItem> {
+    return this.photos.filter(
+      (item: PhotoItem): boolean =>
+        this.branchIdForPhoto(item.path).length === 0
+    );
+  }
+
+  private assignPhotoToBranch(path: string, branchId: string): void {
+    if (path.length === 0) {
+      return;
+    }
+    const remaining: Array<LibraryFileAssignmentData> =
+      this.libraryFileAssignments.filter(
+        (assignment: LibraryFileAssignmentData): boolean =>
+          assignment.path !== path
+      );
+    this.libraryFileAssignments = branchId.length === 0
+      ? remaining
+      : [...remaining, { path: path, branchId: branchId }];
+    if (
+      branchId.length > 0 &&
+      !this.isLibraryBranchExpanded(branchId)
+    ) {
+      this.expandedLibraryBranchIds = [
+        ...this.expandedLibraryBranchIds,
+        branchId
+      ];
+    }
+    this.status = branchId.length === 0
+      ? '已移到未分类'
+      : '已移到分支';
+    this.persistLibraryFileAssignments();
+  }
+
+  private async persistLibraryBranches(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      const data: Array<LibraryBranchData> =
+        this.userLibraryBranches.map(
+          (branch: LibraryBranch): LibraryBranchData => branch.toData()
+        );
+      await this.settingsPreferences.put(
+        LIBRARY_BRANCHES_KEY,
+        JSON.stringify(data)
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'library',
+        `无法保存用户分支：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async persistLibraryFileAssignments(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      await this.settingsPreferences.put(
+        LIBRARY_FILE_ASSIGNMENTS_KEY,
+        JSON.stringify(this.libraryFileAssignments)
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'library',
+        `无法保存文件分支归属：${(error as BusinessError).message}`
+      );
+    }
   }
 
   private async toggleWireless(): Promise<void> {
@@ -3688,6 +5069,408 @@ struct Index {
     }
   }
 
+  private editablePhotos(): Array<PhotoItem> {
+    return this.photos.filter((item: PhotoItem): boolean => {
+      const lower: string = item.name.toLowerCase();
+      return !item.isVideo &&
+        !lower.endsWith('.nef') &&
+        !lower.endsWith('.nrw');
+    });
+  }
+
+  private ensureEditorSelection(): void {
+    const photos: Array<PhotoItem> = this.editablePhotos();
+    if (
+      this.editorSelectedPath.length === 0 ||
+      !photos.some((item: PhotoItem): boolean =>
+        item.path === this.editorSelectedPath
+      )
+    ) {
+      this.editorSelectedPath = photos.length > 0 ? photos[0].path : '';
+    }
+  }
+
+  private editorSelectedIndex(): number {
+    const index: number = this.editablePhotos().findIndex(
+      (item: PhotoItem): boolean =>
+        item.path === this.editorSelectedPath
+    );
+    return index < 0 ? 0 : index;
+  }
+
+  private editorPresetIndex(): number {
+    const values: Array<string> = [
+      'original',
+      'natural',
+      'portrait',
+      'landscape',
+      'monochrome'
+    ];
+    const index: number = values.indexOf(this.editorPreset);
+    return index < 0 ? 0 : index;
+  }
+
+  private editorCropRatioIndex(): number {
+    const values: Array<string> = [
+      'original', '1:1', '4:3', '3:2', '16:9'
+    ];
+    const index: number = values.indexOf(this.editorCropRatio);
+    return index < 0 ? 0 : index;
+  }
+
+  private resetImageEditor(): void {
+    this.editorPanel = 'light';
+    this.editorPreset = 'original';
+    this.editorExposure = 0;
+    this.editorContrast = 0;
+    this.editorHighlights = 0;
+    this.editorShadows = 0;
+    this.editorWhites = 0;
+    this.editorBlacks = 0;
+    this.editorTemperature = 0;
+    this.editorTint = 0;
+    this.editorVibrance = 0;
+    this.editorSaturation = 0;
+    this.editorTexture = 0;
+    this.editorClarity = 0;
+    this.editorSharpening = 0;
+    this.editorNoiseReduction = 0;
+    this.editorDehaze = 0;
+    this.editorVignette = 0;
+    this.editorRotation = 0;
+    this.editorFlipHorizontal = false;
+    this.editorFlipVertical = false;
+    this.editorCropRatio = 'original';
+    this.editorShowingOriginal = false;
+  }
+
+  private resetEditorTone(): void {
+    const rotation: number = this.editorRotation;
+    const flipHorizontal: boolean = this.editorFlipHorizontal;
+    const flipVertical: boolean = this.editorFlipVertical;
+    const cropRatio: string = this.editorCropRatio;
+    this.resetImageEditor();
+    this.editorRotation = rotation;
+    this.editorFlipHorizontal = flipHorizontal;
+    this.editorFlipVertical = flipVertical;
+    this.editorCropRatio = cropRatio;
+  }
+
+  private applyEditorPreset(preset: string): void {
+    this.resetEditorTone();
+    this.editorPreset = preset;
+    if (preset === 'natural') {
+      this.editorContrast = 8;
+      this.editorHighlights = -18;
+      this.editorShadows = 16;
+      this.editorWhites = 8;
+      this.editorBlacks = -8;
+      this.editorVibrance = 14;
+      this.editorTexture = 8;
+      this.editorClarity = 6;
+      this.editorSharpening = 24;
+      this.editorNoiseReduction = 8;
+    } else if (preset === 'portrait') {
+      this.editorContrast = -4;
+      this.editorHighlights = -24;
+      this.editorShadows = 18;
+      this.editorTemperature = 7;
+      this.editorTint = 4;
+      this.editorVibrance = 10;
+      this.editorTexture = -12;
+      this.editorClarity = -6;
+      this.editorSharpening = 16;
+      this.editorNoiseReduction = 22;
+      this.editorVignette = -8;
+    } else if (preset === 'landscape') {
+      this.editorContrast = 12;
+      this.editorHighlights = -28;
+      this.editorShadows = 14;
+      this.editorWhites = 12;
+      this.editorBlacks = -14;
+      this.editorVibrance = 24;
+      this.editorSaturation = 5;
+      this.editorTexture = 16;
+      this.editorClarity = 18;
+      this.editorSharpening = 30;
+      this.editorDehaze = 12;
+      this.editorVignette = -10;
+    } else if (preset === 'monochrome') {
+      this.editorContrast = 22;
+      this.editorHighlights = -18;
+      this.editorShadows = 12;
+      this.editorWhites = 10;
+      this.editorBlacks = -22;
+      this.editorSaturation = -100;
+      this.editorTexture = 12;
+      this.editorClarity = 24;
+      this.editorSharpening = 28;
+      this.editorVignette = -14;
+    }
+  }
+
+  private editorChannel(value: number): number {
+    return Math.max(0, Math.min(255, Math.round(value)));
+  }
+
+  private editorClampUnit(value: number): number {
+    return Math.max(0, Math.min(1, value));
+  }
+
+  private editorSmoothStep(
+    edge0: number,
+    edge1: number,
+    value: number
+  ): number {
+    const scaled: number = this.editorClampUnit(
+      (value - edge0) / (edge1 - edge0)
+    );
+    return scaled * scaled * (3 - 2 * scaled);
+  }
+
+  private processEditorPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): void {
+    const exposure: number = Math.pow(2, this.editorExposure / 100);
+    const contrast: number =
+      1 + this.editorContrast / 125 + this.editorDehaze / 210;
+    const baseSaturation: number =
+      1 + this.editorSaturation / 100 + this.editorDehaze / 520;
+    const temperature: number = this.editorTemperature / 100;
+    const tint: number = this.editorTint / 100;
+    for (let offset: number = 0; offset < pixels.length; offset += 4) {
+      let red: number = pixels[offset] / 255 * exposure;
+      let green: number = pixels[offset + 1] / 255 * exposure;
+      let blue: number = pixels[offset + 2] / 255 * exposure;
+
+      red += temperature * 0.12 + tint * 0.045;
+      green -= tint * 0.08;
+      blue -= temperature * 0.12 - tint * 0.045;
+
+      let luma: number =
+        red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const toneShift: number =
+        this.editorShadows / 100
+          * Math.pow(1 - this.editorClampUnit(luma), 2)
+          * 0.38
+        + this.editorHighlights / 100
+          * Math.pow(this.editorClampUnit(luma), 2)
+          * 0.30
+        + this.editorWhites / 100
+          * this.editorSmoothStep(0.55, 1, luma)
+          * 0.24
+        + this.editorBlacks / 100
+          * (1 - this.editorSmoothStep(0, 0.45, luma))
+          * 0.20;
+      red += toneShift;
+      green += toneShift;
+      blue += toneShift;
+
+      const clarityMask: number =
+        1 - Math.abs(this.editorClampUnit(luma) * 2 - 1);
+      const localContrast: number =
+        1 + this.editorClarity / 100 * clarityMask * 0.38;
+      red = (red - 0.5) * contrast * localContrast + 0.5;
+      green = (green - 0.5) * contrast * localContrast + 0.5;
+      blue = (blue - 0.5) * contrast * localContrast + 0.5;
+
+      luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const maximum: number = Math.max(red, Math.max(green, blue));
+      const minimum: number = Math.min(red, Math.min(green, blue));
+      const colorfulness: number = maximum - minimum;
+      const saturation: number = Math.max(
+        0,
+        baseSaturation
+          + this.editorVibrance / 100
+            * (1 - this.editorClampUnit(colorfulness))
+            * 0.82
+      );
+      red = luma + (red - luma) * saturation;
+      green = luma + (green - luma) * saturation;
+      blue = luma + (blue - luma) * saturation;
+
+      const index: number = offset / 4;
+      const x: number = index % width;
+      const y: number = Math.floor(index / width);
+      const normalizedX: number =
+        (x - width / 2) / Math.max(1, width / 2);
+      const normalizedY: number =
+        (y - height / 2) / Math.max(1, height / 2);
+      const edge: number = Math.min(
+        1,
+        Math.sqrt(
+          normalizedX * normalizedX + normalizedY * normalizedY
+        )
+      );
+      const vignette: number =
+        1 + this.editorVignette / 100 * edge * edge * 0.72;
+      pixels[offset] = this.editorChannel(red * vignette * 255);
+      pixels[offset + 1] = this.editorChannel(
+        green * vignette * 255
+      );
+      pixels[offset + 2] = this.editorChannel(
+        blue * vignette * 255
+      );
+    }
+    this.processEditorDetailPixels(pixels, width, height);
+  }
+
+  private processEditorDetailPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): void {
+    const smoothing: number =
+      this.editorNoiseReduction / 100 * 0.58
+        + Math.max(0, -this.editorTexture) / 100 * 0.24;
+    const sharpening: number =
+      this.editorSharpening / 100 * 1.15
+        + Math.max(0, this.editorTexture) / 100 * 0.48
+        + Math.max(0, this.editorClarity) / 100 * 0.25;
+    if (smoothing === 0 && sharpening === 0) {
+      return;
+    }
+    const source: Uint8Array = new Uint8Array(pixels);
+    for (let y: number = 1; y < height - 1; y++) {
+      for (let x: number = 1; x < width - 1; x++) {
+        const pixelIndex: number = y * width + x;
+        const offset: number = pixelIndex * 4;
+        const left: number = offset - 4;
+        const right: number = offset + 4;
+        const top: number = offset - width * 4;
+        const bottom: number = offset + width * 4;
+        for (let channel: number = 0; channel < 3; channel++) {
+          const centerValue: number = source[offset + channel];
+          const average: number = (
+            centerValue
+              + source[left + channel]
+              + source[right + channel]
+              + source[top + channel]
+              + source[bottom + channel]
+          ) / 5;
+          const smoothed: number =
+            centerValue * (1 - smoothing) + average * smoothing;
+          pixels[offset + channel] = this.editorChannel(
+            smoothed + (centerValue - average) * sharpening
+          );
+        }
+      }
+    }
+  }
+
+  private editorCropRatioValue(): number {
+    if (this.editorCropRatio === '1:1') {
+      return 1;
+    }
+    if (this.editorCropRatio === '4:3') {
+      return 4 / 3;
+    }
+    if (this.editorCropRatio === '3:2') {
+      return 3 / 2;
+    }
+    if (this.editorCropRatio === '16:9') {
+      return 16 / 9;
+    }
+    return 0;
+  }
+
+  private async saveEditedPhoto(): Promise<void> {
+    const library: PhotoLibrary | undefined = this.library;
+    const selected: PhotoItem | undefined = this.editablePhotos().find(
+      (item: PhotoItem): boolean =>
+        item.path === this.editorSelectedPath
+    );
+    if (library === undefined || selected === undefined) {
+      return;
+    }
+    this.editorSaving = true;
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    let packer: image.ImagePacker | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${selected.path}`);
+      pixelMap = await source.createPixelMap({
+        editable: true,
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const info: image.ImageInfo = await pixelMap.getImageInfo();
+      const buffer: ArrayBuffer = new ArrayBuffer(
+        info.size.width * info.size.height * 4
+      );
+      await pixelMap.readPixelsToBuffer(buffer);
+      const pixels: Uint8Array = new Uint8Array(buffer);
+      this.processEditorPixels(
+        pixels,
+        info.size.width,
+        info.size.height
+      );
+      await pixelMap.writeBufferToPixels(buffer);
+      if (this.editorRotation !== 0) {
+        await pixelMap.rotate(this.editorRotation);
+      }
+      if (this.editorFlipHorizontal || this.editorFlipVertical) {
+        await pixelMap.flip(
+          this.editorFlipHorizontal,
+          this.editorFlipVertical
+        );
+      }
+      const cropRatio: number = this.editorCropRatioValue();
+      if (cropRatio > 0) {
+        const geometryInfo: image.ImageInfo =
+          await pixelMap.getImageInfo();
+        let cropWidth: number = geometryInfo.size.width;
+        let cropHeight: number = Math.round(cropWidth / cropRatio);
+        if (cropHeight > geometryInfo.size.height) {
+          cropHeight = geometryInfo.size.height;
+          cropWidth = Math.round(cropHeight * cropRatio);
+        }
+        const region: image.Region = {
+          x: Math.max(
+            0,
+            Math.floor((geometryInfo.size.width - cropWidth) / 2)
+          ),
+          y: Math.max(
+            0,
+            Math.floor((geometryInfo.size.height - cropHeight) / 2)
+          ),
+          size: {
+            width: Math.max(1, cropWidth),
+            height: Math.max(1, cropHeight)
+          }
+        };
+        await pixelMap.crop(region);
+      }
+      packer = image.createImagePacker();
+      const packed: ArrayBuffer = await packer.packing(pixelMap, {
+        format: 'image/jpeg',
+        quality: 95
+      });
+      const destination: string = library.saveEditedCopy(
+        selected.name,
+        new Uint8Array(packed)
+      );
+      this.refreshPhotos();
+      this.editorSelectedPath = destination;
+      this.resetImageEditor();
+      this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
+    } catch (error) {
+      this.showError(
+        `保存编辑副本失败：${(error as BusinessError).message}`
+      );
+    } finally {
+      if (packer !== undefined) {
+        await packer.release();
+      }
+      if (pixelMap !== undefined) {
+        pixelMap.release();
+      }
+      source?.release();
+      this.editorSaving = false;
+    }
+  }
+
   private async previewPhoto(item: PhotoItem): Promise<void> {
     await this.openLargePhoto(item);
   }
@@ -3774,6 +5557,11 @@ struct Index {
     }
     try {
       this.library.remove(item);
+      this.libraryFileAssignments = this.libraryFileAssignments.filter(
+        (assignment: LibraryFileAssignmentData): boolean =>
+          assignment.path !== item.path
+      );
+      this.persistLibraryFileAssignments();
       this.refreshPhotos();
       this.status = `已删除 ${item.name}`;
     } catch (error) {

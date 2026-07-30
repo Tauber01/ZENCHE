@@ -493,7 +493,94 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('配置并开始', 'Configure and Start', '設定して開始'),
   new TranslationEntry('尚未开始拍摄会话', 'No capture session started', '撮影セッションは未開始です'),
   new TranslationEntry('会话进行中', 'Session Active', 'セッション実行中'),
-  new TranslationEntry('拍摄会话已结束', 'Capture session ended', '撮影セッションを終了しました')
+  new TranslationEntry('拍摄会话已结束', 'Capture session ended', '撮影セッションを終了しました'),
+  new TranslationEntry('编辑', 'Edit', '編集'),
+  new TranslationEntry('图像编辑', 'Image Editor', '画像編集'),
+  new TranslationEntry('分支抽屉', 'Branch Drawer', 'ブランチドロワー'),
+  new TranslationEntry(
+    '调整亮度、对比度、饱和度与方向；保存时生成 JPEG 副本。',
+    'Adjust brightness, contrast, saturation, and orientation; saving creates a JPEG copy.',
+    '明るさ、コントラスト、彩度、向きを調整し、保存時に JPEG のコピーを作成します。'
+  ),
+  new TranslationEntry(
+    '文件库中没有可编辑照片',
+    'There are no editable photos in the library',
+    'ライブラリに編集可能な写真がありません'
+  ),
+  new TranslationEntry(
+    '视频与暂不支持解码的 RAW 文件不会进入编辑列表。',
+    'Videos and RAW files that cannot yet be decoded are excluded from the editor.',
+    '動画と、まだデコードできない RAW ファイルは編集リストに表示されません。'
+  ),
+  new TranslationEntry('亮度', 'Brightness', '明るさ'),
+  new TranslationEntry('对比度', 'Contrast', 'コントラスト'),
+  new TranslationEntry('饱和度', 'Saturation', '彩度'),
+  new TranslationEntry('旋转 90°', 'Rotate 90°', '90° 回転'),
+  new TranslationEntry('重置', 'Reset', 'リセット'),
+  new TranslationEntry('保存副本', 'Save Copy', 'コピーを保存'),
+  new TranslationEntry('正在保存…', 'Saving…', '保存中…'),
+  new TranslationEntry(
+    '调整不会覆盖原文件',
+    'Adjustments do not overwrite the original',
+    '調整しても元のファイルは上書きされません'
+  ),
+  new TranslationEntry(
+    '保存编辑副本失败',
+    'Failed to save the edited copy',
+    '編集したコピーの保存に失敗しました'
+  ),
+  new TranslationEntry('已保存副本', 'Saved copy', 'コピーを保存しました'),
+  new TranslationEntry('专业显影', 'Pro Develop', 'プロ現像'),
+  new TranslationEntry(
+    '分组调整光线、色彩、细节、效果与几何；始终保留原文件。',
+    'Adjust light, color, detail, effects, and geometry in focused groups while always preserving the original.',
+    'ライト、カラー、ディテール、効果、ジオメトリをグループ別に調整し、元のファイルを常に保持します。'
+  ),
+  new TranslationEntry('光线', 'Light', 'ライト'),
+  new TranslationEntry('色彩', 'Color', 'カラー'),
+  new TranslationEntry('细节', 'Detail', 'ディテール'),
+  new TranslationEntry('效果', 'Effects', '効果'),
+  new TranslationEntry('几何', 'Geometry', 'ジオメトリ'),
+  new TranslationEntry('曝光', 'Exposure', '露光量'),
+  new TranslationEntry('高光', 'Highlights', 'ハイライト'),
+  new TranslationEntry('阴影', 'Shadows', 'シャドウ'),
+  new TranslationEntry('白色色阶', 'Whites', '白レベル'),
+  new TranslationEntry('黑色色阶', 'Blacks', '黒レベル'),
+  new TranslationEntry('色温', 'Temperature', '色温'),
+  new TranslationEntry('色调', 'Tint', '色かぶり補正'),
+  new TranslationEntry('自然饱和度', 'Vibrance', '自然な彩度'),
+  new TranslationEntry('纹理', 'Texture', 'テクスチャ'),
+  new TranslationEntry('清晰度', 'Clarity', '明瞭度'),
+  new TranslationEntry('锐化', 'Sharpening', 'シャープ'),
+  new TranslationEntry('降噪', 'Noise Reduction', 'ノイズ軽減'),
+  new TranslationEntry('去雾', 'Dehaze', 'かすみの除去'),
+  new TranslationEntry('暗角', 'Vignette', '周辺光量'),
+  new TranslationEntry('裁切比例', 'Crop Ratio', '切り抜き比率'),
+  new TranslationEntry('原始比例', 'Original Ratio', '元の比率'),
+  new TranslationEntry('水平翻转', 'Flip Horizontal', '左右反転'),
+  new TranslationEntry('垂直翻转', 'Flip Vertical', '上下反転'),
+  new TranslationEntry('预设', 'Preset', 'プリセット'),
+  new TranslationEntry('原始', 'Original', 'オリジナル'),
+  new TranslationEntry('自然增强', 'Natural Enhance', 'ナチュラル補正'),
+  new TranslationEntry('人像柔和', 'Soft Portrait', 'ソフトポートレート'),
+  new TranslationEntry('风光通透', 'Clear Landscape', 'クリア風景'),
+  new TranslationEntry('高反差黑白', 'High-Contrast B&W', 'ハイコントラスト白黒'),
+  new TranslationEntry('查看原图', 'Show Original', '元画像を表示'),
+  new TranslationEntry('返回调整', 'Back to Adjustments', '調整に戻る'),
+  new TranslationEntry('原图', 'Original', '元画像'),
+  new TranslationEntry('调整后', 'Adjusted', '調整後'),
+  new TranslationEntry('全部重置', 'Reset All', 'すべてリセット'),
+  new TranslationEntry(
+    '保存高质量副本',
+    'Save High-Quality Copy',
+    '高品質コピーを保存'
+  ),
+  new TranslationEntry(
+    '已保存高质量副本',
+    'Saved high-quality copy',
+    '高品質コピーを保存しました'
+  ),
+  new TranslationEntry('正在查看原图', 'Viewing original', '元画像を表示中')
 ];
 
 export function normalizeLanguage(language: string): string {

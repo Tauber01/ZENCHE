@@ -109,7 +109,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.1.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.2.0" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -129,10 +129,15 @@
                     Tag="monitor"
                     Content="视频监看"
                     Click="Navigate_Click" />
+            <Button x:Name="EditorNav"
+                    Style="{StaticResource NavButton}"
+                    Tag="editor"
+                    Content="图像编辑"
+                    Click="Navigate_Click" />
             <Button x:Name="LibraryNav"
                     Style="{StaticResource NavButton}"
                     Tag="library"
-                    Content="文件与传输"
+                    Content="分支文件库"
                     Click="Navigate_Click" />
           </StackPanel>
         </DockPanel>
@@ -275,30 +280,45 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Grid>
-            <StackPanel>
-              <TextBlock Style="{StaticResource DisplayText}" Text="文件与传输" />
-              <TextBlock Margin="0,4,0,0"
-                         Foreground="{StaticResource MutedBrush}"
-                         Text="系统“图片”与 帧澈 ZENCHE 文件库会直接合并显示；来源标注在每个文件下方。" />
-            </StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-              <Button Width="112"
-                      Style="{StaticResource ButtonBase}"
-                      Content="刷新相册"
-                      Click="OpenOwnerAlbum_Click" />
-              <Button Width="112"
-                      Margin="8,0,0,0"
-                      Style="{StaticResource ButtonBase}"
-                      Content="链接网盘"
-                      Click="LinkCloudDrive_Click" />
-              <Button Width="112"
-                      Margin="8,0,0,0"
-                      Style="{StaticResource ButtonBase}"
-                      Content="打开目录"
-                      Click="OpenPhotoFolder_Click" />
-            </StackPanel>
-          </Grid>
+          <Border Padding="18"
+                  Background="{StaticResource AccentSoftBrush}"
+                  BorderBrush="{StaticResource AccentBrush}"
+                  BorderThickness="1"
+                  CornerRadius="14">
+            <Grid>
+              <StackPanel>
+                <TextBlock Foreground="{StaticResource AccentBrush}"
+                           FontFamily="{StaticResource DisplayFont}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Text="分支文件库" />
+                <TextBlock Margin="0,4,0,0"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="拖动本地文件到任意分支；拖回“未分类”即可移出分支，原文件位置保持不变。" />
+              </StackPanel>
+              <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button Width="112"
+                        Style="{StaticResource ButtonBase}"
+                        Content="刷新相册"
+                        Click="OpenOwnerAlbum_Click" />
+                <Button Width="112"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource ButtonBase}"
+                        Content="链接网盘"
+                        Click="LinkCloudDrive_Click" />
+                <Button Width="112"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="新建分支"
+                        Click="CreateLibraryBranch_Click" />
+                <Button Width="112"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource ButtonBase}"
+                        Content="打开目录"
+                        Click="OpenPhotoFolder_Click" />
+              </StackPanel>
+            </Grid>
+          </Border>
           <Expander Grid.Row="1"
                     Margin="0,18,0,0"
                     Header="拍摄会话"
@@ -407,70 +427,85 @@
             </Grid>
           </Border>
           </Expander>
-          <ListBox x:Name="PhotoList"
-                   Grid.Row="3"
-                   Margin="0,20,0,12"
-                   Background="Transparent"
-                   BorderBrush="{StaticResource RuleBrush}"
-                   BorderThickness="1"
-                   MouseDoubleClick="PhotoList_MouseDoubleClick"
-                   SelectionChanged="PhotoList_SelectionChanged">
-            <ListBox.GroupStyle>
-              <GroupStyle>
-                <GroupStyle.ContainerStyle>
-                  <Style TargetType="{x:Type GroupItem}">
-                    <Setter Property="Template">
-                      <Setter.Value>
-                        <ControlTemplate TargetType="{x:Type GroupItem}">
-                          <Expander Margin="8,6"
-                                    IsExpanded="True"
-                                    Background="{StaticResource SurfaceBrush}">
-                            <Expander.Header>
-                              <StackPanel Orientation="Horizontal">
-                                <TextBlock FontWeight="Bold"
-                                           Text="{Binding Name}" />
-                                <TextBlock Margin="8,0,0,0"
-                                           Foreground="{StaticResource MutedBrush}"
-                                           Text="{Binding ItemCount, StringFormat=· {0}}" />
-                              </StackPanel>
-                            </Expander.Header>
-                            <ItemsPresenter Margin="12,4,0,8" />
-                          </Expander>
-                        </ControlTemplate>
-                      </Setter.Value>
-                    </Setter>
-                  </Style>
-                </GroupStyle.ContainerStyle>
-              </GroupStyle>
-            </ListBox.GroupStyle>
-            <ListBox.ItemTemplate>
-              <DataTemplate>
-                <Grid Margin="8">
+          <TreeView x:Name="PhotoTree"
+                    Grid.Row="3"
+                    Margin="0,20,0,12"
+                    Padding="8"
+                    AllowDrop="True"
+                    Background="{StaticResource SurfaceBrush}"
+                    BorderBrush="{StaticResource RuleBrush}"
+                    BorderThickness="1"
+                    DragLeave="PhotoTree_DragLeave"
+                    DragOver="PhotoTree_DragOver"
+                    Drop="PhotoTree_Drop"
+                    MouseDoubleClick="PhotoTree_MouseDoubleClick"
+                    PreviewMouseLeftButtonDown="PhotoTree_PreviewMouseLeftButtonDown"
+                    PreviewMouseLeftButtonUp="PhotoTree_PreviewMouseLeftButtonUp"
+                    PreviewMouseMove="PhotoTree_PreviewMouseMove"
+                    SelectedItemChanged="PhotoTree_SelectedItemChanged">
+            <TreeView.ItemContainerStyle>
+              <Style TargetType="{x:Type TreeViewItem}">
+                <Setter Property="IsExpanded"
+                        Value="{Binding IsExpanded, Mode=TwoWay}" />
+                <Setter Property="Padding" Value="4" />
+              </Style>
+            </TreeView.ItemContainerStyle>
+            <TreeView.ItemTemplate>
+              <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                <Grid Margin="4,3">
                   <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="64" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
                   </Grid.ColumnDefinitions>
-                  <StackPanel>
-                    <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                    <TextBlock Margin="0,4,0,0"
+                  <Grid Width="56"
+                        Height="42"
+                        VerticalAlignment="Top">
+                    <Image x:Name="NodeThumbnail"
+                           Source="{Binding Thumbnail}"
+                           Stretch="UniformToFill" />
+                    <TextBlock x:Name="NodeIcon"
+                               Visibility="Collapsed"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"
+                               FontSize="15"
+                               Text="{Binding Icon}" />
+                  </Grid>
+                  <StackPanel Grid.Column="1">
+                    <TextBlock FontWeight="SemiBold"
+                               Text="{Binding Name}" />
+                    <TextBlock Margin="0,2,0,0"
                                Style="{StaticResource MetaText}"
                                Text="{Binding Detail}" />
                   </StackPanel>
-                  <TextBlock Grid.Column="1"
-                             VerticalAlignment="Center"
-                             Foreground="{StaticResource MutedBrush}"
-                             Text="›" />
                 </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+                <HierarchicalDataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding Thumbnail}"
+                               Value="{x:Null}">
+                    <Setter TargetName="NodeThumbnail"
+                            Property="Visibility"
+                            Value="Collapsed" />
+                    <Setter TargetName="NodeIcon"
+                            Property="Visibility"
+                            Value="Visible" />
+                  </DataTrigger>
+                </HierarchicalDataTemplate.Triggers>
+              </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
           <StackPanel Grid.Row="4"
                       HorizontalAlignment="Right"
                       Orientation="Horizontal">
             <TextBlock Margin="0,0,18,0"
                        VerticalAlignment="Center"
                        Foreground="{StaticResource MutedBrush}"
-                       Text="双击文件查看大图" />
+                       Text="单击节点行展开 · 双击预览 · 拖动文件到分支" />
+            <Button x:Name="DeleteBranchButton"
+                    Width="118"
+                    Margin="0,0,8,0"
+                    Style="{StaticResource DangerButton}"
+                    Content="删除分支"
+                    IsEnabled="False"
+                    Click="DeleteLibraryBranch_Click" />
             <Button x:Name="SharePhotoButton"
                     Width="150"
                     Margin="0,0,8,0"
@@ -485,6 +520,121 @@
                     IsEnabled="False"
                     Click="DeletePhotoButton_Click" />
           </StackPanel>
+        </Grid>
+
+        <Grid x:Name="EditorPanel" Visibility="Collapsed">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <Border Padding="18"
+                  Background="{StaticResource AccentSoftBrush}"
+                  BorderBrush="{StaticResource AccentBrush}"
+                  BorderThickness="1"
+                  CornerRadius="14">
+            <StackPanel>
+              <TextBlock Foreground="{StaticResource AccentBrush}"
+                         FontFamily="{StaticResource DisplayFont}"
+                         FontSize="24"
+                         FontWeight="Bold"
+                         Text="专业显影" />
+              <TextBlock Margin="0,4,0,0"
+                         Foreground="{StaticResource MutedBrush}"
+                         Text="分组调整光线、色彩、细节、效果与几何；始终保留原文件。" />
+            </StackPanel>
+          </Border>
+          <Grid Grid.Row="1" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+            <Border Margin="0,0,18,0"
+                    Padding="14"
+                    Background="{StaticResource GraphiteBrush}"
+                    BorderBrush="{StaticResource GraphiteRuleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+              <Grid>
+                <Image x:Name="EditorPreviewImage"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <TextBlock x:Name="EditorPreviewEmpty"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource GraphiteMutedBrush}"
+                           FontSize="16"
+                           Text="选择一张照片开始编辑" />
+              </Grid>
+            </Border>
+            <Border Grid.Column="1"
+                    Padding="18"
+                    Style="{StaticResource PanelCard}">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="*" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontWeight="SemiBold" Text="编辑照片" />
+                <ComboBox x:Name="EditorPhotoBox"
+                          Grid.Row="1"
+                          Margin="0,8,0,10"
+                          SelectionChanged="EditorPhotoBox_SelectionChanged" />
+                <DockPanel Grid.Row="2" Margin="0,0,0,10">
+                  <TextBlock VerticalAlignment="Center"
+                             FontWeight="SemiBold"
+                             Text="预设" />
+                  <ComboBox x:Name="EditorPresetBox"
+                            Width="190"
+                            Margin="10,0,0,0"
+                            SelectionChanged="EditorPresetBox_SelectionChanged">
+                    <ComboBoxItem Tag="original" Content="原始" />
+                    <ComboBoxItem Tag="natural" Content="自然增强" />
+                    <ComboBoxItem Tag="portrait" Content="人像柔和" />
+                    <ComboBoxItem Tag="landscape" Content="风光通透" />
+                    <ComboBoxItem Tag="monochrome" Content="高反差黑白" />
+                  </ComboBox>
+                </DockPanel>
+                <ScrollViewer Grid.Row="3"
+                              VerticalScrollBarVisibility="Auto">
+                  <StackPanel x:Name="EditorAdjustmentHost" />
+                </ScrollViewer>
+                <TextBlock x:Name="EditorStatusText"
+                           Grid.Row="4"
+                           Margin="0,12,0,10"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="调整不会覆盖原文件"
+                           TextWrapping="Wrap" />
+                <StackPanel Grid.Row="5"
+                            Margin="0,0,0,8"
+                            Orientation="Horizontal">
+                  <Button x:Name="CompareEditorPhotoButton"
+                          Width="132"
+                          Style="{StaticResource ButtonBase}"
+                          Content="查看原图"
+                          Click="CompareEditorPhoto_Click" />
+                  <Button Width="132"
+                          Margin="8,0,0,0"
+                          Style="{StaticResource ButtonBase}"
+                          Content="全部重置"
+                          Click="ResetEditor_Click" />
+                </StackPanel>
+                <Button x:Name="SaveEditedPhotoButton"
+                        Grid.Row="6"
+                        Height="46"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="保存高质量副本"
+                        IsEnabled="False"
+                        Click="SaveEditedPhoto_Click" />
+              </Grid>
+            </Border>
+          </Grid>
         </Grid>
 
         <Grid x:Name="SettingsPanel" Visibility="Collapsed">

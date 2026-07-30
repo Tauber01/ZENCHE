@@ -95,6 +95,37 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - File management uses one native disclosure hierarchy on every platform:
   source → media type → file. Sources include System Album, Wireless Transfer,
   and 帧澈 ZENCHE Library; media types are Photos and Videos.
+- The 帧澈 ZENCHE Library source also exposes user-created organizational
+  branches. A branch may contain child branches at any depth and persists across
+  launches. Creating a branch never moves, duplicates, or mutates the underlying
+  media file; unassigned media remains under a clearly labelled Unclassified node.
+- Branch organization is a primary workspace, not a secondary subsection of
+  transfer settings. Its primary-navigation label is Branch or Branch Library,
+  the branch workbench appears before system albums and wireless-transfer
+  sources, and the workbench uses the photo accent for a clear visual anchor.
+- Phone layouts present the branch workbench as a default-collapsed Branch
+  Drawer so the file page opens at a practical density. The full drawer header
+  is the disclosure target and shows root-branch and unclassified counts.
+  Tablet, foldable-expanded, and desktop layouts keep the branch tree visible.
+- Local library files can be dragged between branches or back to Unclassified.
+  Desktop platforms start dragging directly; touch platforms use the native
+  press-and-hold drag gesture. Valid targets gain a cobalt border/background,
+  the destination expands after a successful drop, and the assignment persists
+  across launches.
+- Dragging changes only the file's organizational assignment inside 帧澈 ZENCHE.
+  It never renames, duplicates, or relocates the underlying file on disk.
+- Deleting a branch requires a destructive confirmation and recursively removes
+  its child-branch structure. Assigned media returns to Unclassified; the
+  underlying files remain untouched.
+- Tree rows use restrained guide lines, indentation, native disclosure affordances,
+  and counts. New-branch actions are available both at the library root and on
+  every user branch so hierarchy creation is discoverable without a context menu.
+- The disclosure hit target covers the chevron, branch name, and file count
+  region rather than only the small indicator. Create and delete actions remain
+  separate targets to prevent accidental toggles.
+- Photo rows keep a visible thumbnail after assignment to any user branch.
+  Unsupported image formats use the native photo placeholder; videos use an
+  explicit play-state placeholder.
 - Source and media-type rows are independently collapsible, retain their expanded
   state while the page is active, and show counts before the user expands them.
 - The file page reads the owner's system photo library directly after native
@@ -111,6 +142,38 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - The supported guide set is Baidu Netdisk, Aliyun Drive, Tencent Weiyun, Quark
   Cloud Drive, Xunlei Cloud Drive, and 115.
 
+## Image editor
+
+- Image Editor is a primary navigation destination on iOS / iPadOS, Android,
+  HarmonyOS, macOS, and Windows rather than an action hidden inside a file menu.
+- The professional-develop workspace follows the interaction depth of modern
+  non-destructive raw developers without copying Adobe Camera Raw branding,
+  proprietary icons, wording, panel order, or trade dress. It remains visibly
+  and structurally part of 帧澈 ZENCHE.
+- Adjustments are divided into five focused native groups:
+  Light (exposure, contrast, highlights, shadows, whites, blacks), Color
+  (temperature, tint, vibrance, saturation), Detail (texture, clarity,
+  sharpening, noise reduction), Effects (dehaze, vignette), and Geometry
+  (quarter rotation, horizontal/vertical flip, centered aspect-ratio crop).
+- Original, Natural Enhance, Soft Portrait, Clear Landscape, and High-Contrast
+  B&W presets provide transparent starting points by changing the same visible
+  sliders; presets are not opaque filters.
+- A direct before/after action switches the dominant preview between Original
+  and Adjusted states. Reset All clears every tonal and geometry change.
+- Preview changes are immediate and non-destructive. The original file is never
+  overwritten; Save High-Quality Copy exports a new 95-quality JPEG into the
+  帧澈 ZENCHE library and selects the saved result.
+- Apple targets use Core Image filters for exposure, white balance, tonal range,
+  vibrance, local contrast, sharpening, noise reduction, and vignette. Android,
+  HarmonyOS, and Windows use aligned pixel-domain tone, adaptive saturation,
+  detail, vignette, geometry, and export pipelines.
+- Videos and image formats that the platform cannot reliably decode, including
+  unsupported RAW files, do not appear in the editor picker. Empty states explain
+  this limitation instead of exposing controls that cannot complete.
+- The preview remains the dominant surface. Sliders use native controls and
+  preserve accessible touch targets; export is the single visually dominant
+  action in the adjustment panel.
+
 ## Immersive preview
 
 - Photo and video workspaces provide an explicit full-screen action with a minimum
@@ -123,6 +186,12 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - Full-screen camera parameters live in a collapsible, horizontally scrollable
   bottom tray. It exposes every genuinely writable core parameter without forcing
   the image to shrink.
+- The tray has two levels: a compact primary row for shutter/shutter angle,
+  aperture, ISO, and exposure compensation, plus an independently expandable
+  More Parameters row for shooting mode, frame rate, focus, white balance,
+  picture control, video specification, or monitor aids supported by that target.
+- On phone layouts, parameter value columns and visual chrome are compacted while
+  each decrement/increment action retains a minimum 44 × 44 point/dp/vp hit area.
 - Exposure time, aperture, ISO, exposure compensation, and shutter angle advance
   in camera-standard fine increments (normally 1/3 stop). Values outside the
   connected camera's enumerated or ranged capabilities never become selectable.

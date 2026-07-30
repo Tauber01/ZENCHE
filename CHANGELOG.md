@@ -3,6 +3,28 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.2.0] - 2026-07-30
+
+### Added
+
+- Added a prominent native branch-library workspace across all five platforms,
+  including nested user branches, branch deletion, persistent drag-and-drop
+  organization, full-row disclosure targets, and thumbnails inside branches.
+- Added a professional non-destructive image editor with grouped light, color,
+  detail, effects, and geometry adjustments, transparent presets, before/after
+  comparison, reset-all, and high-quality JPEG copy export.
+- Added expandable secondary full-screen camera controls while keeping the
+  primary mobile parameter tray compact and touch targets accessible.
+
+### Changed
+
+- Replaced phone branch trees with default-collapsed drawers while retaining
+  always-visible trees on tablet, foldable-expanded, and desktop layouts.
+- Aligned professional editing parameters, presets, geometry, localization,
+  and export behavior across iOS/iPadOS, Android, HarmonyOS, macOS, and Windows.
+- Promoted the native Image Editor to a primary navigation destination on every
+  supported platform.
+
 ## [1.1.0] - 2026-07-30
 
 ### Added

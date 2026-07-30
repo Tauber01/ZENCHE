@@ -365,6 +365,84 @@ final class Localization {
         add("尚未开始拍摄会话", "No capture session started", "撮影セッションは未開始です");
         add("会话进行中", "Session Active", "セッション実行中");
         add("拍摄会话已结束", "Capture session ended", "撮影セッションを終了しました");
+        add("编辑", "Edit", "編集");
+        add("图像编辑", "Image Editor", "画像編集");
+        add("分支抽屉", "Branch Drawer", "ブランチドロワー");
+        add("调整亮度、对比度、饱和度与方向；保存时生成 JPEG 副本。",
+                "Adjust brightness, contrast, saturation, and orientation; saving creates a JPEG copy.",
+                "明るさ、コントラスト、彩度、向きを調整し、保存時に JPEG のコピーを作成します。");
+        add("文件库中没有可编辑照片",
+                "There are no editable photos in the library",
+                "ライブラリに編集可能な写真がありません");
+        add("视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
+                "Videos and RAW files that cannot yet be decoded are excluded from the editor.",
+                "動画と、まだデコードできない RAW ファイルは編集リストに表示されません。");
+        add("亮度", "Brightness", "明るさ");
+        add("对比度", "Contrast", "コントラスト");
+        add("饱和度", "Saturation", "彩度");
+        add("旋转 90°", "Rotate 90°", "90° 回転");
+        add("重置", "Reset", "リセット");
+        add("保存副本", "Save Copy", "コピーを保存");
+        add("调整不会覆盖原文件",
+                "Adjustments do not overwrite the original",
+                "調整しても元のファイルは上書きされません");
+        add("正在保存编辑副本…",
+                "Saving edited copy…",
+                "編集したコピーを保存中…");
+        add("已保存编辑副本",
+                "Saved edited copy",
+                "編集したコピーを保存しました");
+        add("保存编辑副本失败",
+                "Failed to save the edited copy",
+                "編集したコピーの保存に失敗しました");
+        add("无法解码当前照片",
+                "Unable to decode the current photo",
+                "現在の写真をデコードできません");
+        add("专业显影", "Pro Develop", "プロ現像");
+        add("分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                "Adjust light, color, detail, effects, and geometry in focused groups while always preserving the original.",
+                "ライト、カラー、ディテール、効果、ジオメトリをグループ別に調整し、元のファイルを常に保持します。");
+        add("光线", "Light", "ライト");
+        add("色彩", "Color", "カラー");
+        add("细节", "Detail", "ディテール");
+        add("效果", "Effects", "効果");
+        add("几何", "Geometry", "ジオメトリ");
+        add("曝光", "Exposure", "露光量");
+        add("高光", "Highlights", "ハイライト");
+        add("阴影", "Shadows", "シャドウ");
+        add("白色色阶", "Whites", "白レベル");
+        add("黑色色阶", "Blacks", "黒レベル");
+        add("色温", "Temperature", "色温");
+        add("色调", "Tint", "色かぶり補正");
+        add("自然饱和度", "Vibrance", "自然な彩度");
+        add("纹理", "Texture", "テクスチャ");
+        add("清晰度", "Clarity", "明瞭度");
+        add("锐化", "Sharpening", "シャープ");
+        add("降噪", "Noise Reduction", "ノイズ軽減");
+        add("去雾", "Dehaze", "かすみの除去");
+        add("暗角", "Vignette", "周辺光量");
+        add("裁切比例", "Crop Ratio", "切り抜き比率");
+        add("原始比例", "Original Ratio", "元の比率");
+        add("水平翻转", "Flip Horizontal", "左右反転");
+        add("垂直翻转", "Flip Vertical", "上下反転");
+        add("预设", "Preset", "プリセット");
+        add("原始", "Original", "オリジナル");
+        add("自然增强", "Natural Enhance", "ナチュラル補正");
+        add("人像柔和", "Soft Portrait", "ソフトポートレート");
+        add("风光通透", "Clear Landscape", "クリア風景");
+        add("高反差黑白", "High-Contrast B&W", "ハイコントラスト白黒");
+        add("查看原图", "Show Original", "元画像を表示");
+        add("返回调整", "Back to Adjustments", "調整に戻る");
+        add("原图", "Original", "元画像");
+        add("调整后", "Adjusted", "調整後");
+        add("全部重置", "Reset All", "すべてリセット");
+        add("保存高质量副本",
+                "Save High-Quality Copy",
+                "高品質コピーを保存");
+        add("已保存高质量副本",
+                "Saved high-quality copy",
+                "高品質コピーを保存しました");
+        add("正在查看原图", "Viewing original", "元画像を表示中");
     }
 
     private Localization() {}

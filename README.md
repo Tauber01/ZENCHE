@@ -27,7 +27,7 @@
 Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、
 管理、导入与分享。
 
-- 当前源码版本：**1.1.0**
+- 当前源码版本：**1.2.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**17 款 Nikon EXPEED 6 / 7 机型**
@@ -57,7 +57,8 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 | Control · 控制 | 快门、光圈、ISO、曝光补偿、对焦模式、白平衡与 Picture Control |
 | Monitor · 监看 | 快门角度换算、RGB 直方图、波形、矢量示波器、峰值对焦、假色、条纹图案与自定义 3D `.cube` LUT |
 | Connect · 传输 | 内置 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
-| Flow · 管理 | 项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份、SHA-256，以及本地图库导入、预览与分享 |
+| Flow · 管理 | 显眼的树状分支工作区、任意层级新建与删除、拖拽归类、移动端折叠抽屉，以及项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份和 SHA-256 |
+| Develop · 修图 | 五组专业显影参数、透明预设、原图对比、旋转翻转、比例裁切与非破坏性高质量 JPEG 副本 |
 | Diagnose · 诊断 | 隐私脱敏的滚动日志、版本检查与预填 GitHub Issue |
 
 LUT、直方图、波形、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
@@ -113,16 +114,16 @@ USB 主机组合均已完成实机验证。请使用
 ## 下载与安装
 
 前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
-版本及同名 `.sha256` 校验文件。1.1.0 的交付文件命名如下：
+版本及同名 `.sha256` 校验文件。1.2.0 的交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.1.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.1.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.2.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.2.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.2.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.2.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.2.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.2.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -133,13 +134,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.1.0-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.2.0-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.1.0-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.2.0-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -298,7 +299,7 @@ implementations where the operating system permits it, provides live view and
 capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Source version: **1.1.0**
+- Source version: **1.2.0**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **17 Nikon EXPEED 6 / 7 bodies**
@@ -318,7 +319,8 @@ in a local library for review and export.
 | Control | Shutter speed, aperture, ISO, exposure compensation, focus mode, white balance, and Picture Control |
 | Monitor | Shutter-angle conversion, RGB histograms, waveform, vectorscope, focus peaking, false color, zebra, and custom 3D `.cube` LUTs |
 | Connect | Built-in FTP/PASV, HTTP PUT/POST, and WebDAV inboxes |
-| Flow | Project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, SHA-256, and local import, preview, and sharing |
+| Flow | A prominent branch-tree workspace with arbitrary nesting, creation, deletion, drag organization, a collapsible mobile drawer, project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, and SHA-256 |
+| Develop | Five professional adjustment groups, transparent presets, before/after comparison, rotation, flipping, aspect-ratio cropping, and non-destructive high-quality JPEG copies |
 | Diagnose | Privacy-redacted rolling logs, update checks, and prefilled GitHub Issues |
 
 LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
@@ -373,17 +375,17 @@ completed hardware validation.
 ### Download and install
 
 Download published packages and their matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.1.0
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.2.0
 uses the following delivery names:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.1.0-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.1.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.2.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.2.0-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.2.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.2.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.2.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.2.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -502,7 +504,7 @@ OS が許可する環境では Nikon カメラを USB/PTP で接続・制御し�
 WebDAV で画像を受信して、同じアプリ内でプレビュー、管理、読み込み、共有まで
 行えます。
 
-- 現在のソースバージョン：**1.1.0**
+- 現在のソースバージョン：**1.2.0**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon EXPEED 6 / 7 の 17 機種**
@@ -522,7 +524,8 @@ WebDAV で画像を受信して、同じアプリ内でプレビュー、管理�
 | Control · 制御 | シャッター速度、絞り、ISO、露出補正、フォーカスモード、ホワイトバランス、Picture Control |
 | Monitor · モニター | シャッター角度換算、RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT |
 | Connect · 転送 | 内蔵 FTP/PASV、HTTP PUT/POST、WebDAV 受信ボックス |
-| Flow · 管理 | プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256、ローカル読み込み、プレビュー、共有 |
+| Flow · 管理 | 目立つ分岐ツリー、任意階層の作成と削除、ドラッグ分類、モバイル折りたたみドロワー、プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256 |
+| Develop · 現像 | 5 グループのプロ調整、透明なプリセット、補正前後比較、回転・反転、縦横比クロップ、非破壊の高品質 JPEG コピー |
 | Diagnose · 診断 | プライバシー情報を除去したローテーションログ、更新確認、入力済み GitHub Issue |
 
 LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
@@ -575,17 +578,17 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 ### ダウンロードとインストール
 
 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から公開済み
-パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.1.0 の
+パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.2.0 の
 配布ファイル名は次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.1.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.1.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.1.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.1.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.1.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.1.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.2.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.2.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.2.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.2.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.2.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.2.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性

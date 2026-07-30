@@ -1,5 +1,6 @@
 import AppKit
 import AVKit
+import CoreImage
 import Darwin
 import Foundation
 import Photos
@@ -1306,13 +1307,15 @@ private struct PhotoRecord: Identifiable, Hashable {
 private enum AppSection: String, CaseIterable, Identifiable {
     case capture = "照片"
     case monitor = "视频"
-    case library = "文件与传输"
+    case editor = "编辑"
+    case library = "分支"
 
     var id: String { rawValue }
     var icon: String {
         switch self {
         case .capture: return "camera.aperture"
         case .monitor: return "movieclapper.fill"
+        case .editor: return "slider.horizontal.3"
         case .library: return "photo.on.rectangle.angled"
         }
     }
@@ -1963,6 +1966,35 @@ private final class CameraModel: ObservableObject {
             : "没有可加入文件库的照片"
     }
 
+    @discardableResult
+    func saveEditedPhoto(
+        _ data: Data,
+        originalFilename: String
+    ) -> URL? {
+        do {
+            let destination = try captureWorkflow.store(
+                data: data,
+                originalFilename: "edited.jpg",
+                cameraName: "Editor"
+            )
+            reloadPhotos()
+            selectedPhoto = photos.first { $0.url == destination }
+            detail = "已保存编辑副本 · \(destination.lastPathComponent)"
+            logger.info(
+                "editor",
+                "编辑副本已保存；来源=\(originalFilename)；文件=\(destination.lastPathComponent)"
+            )
+            return destination
+        } catch {
+            logger.error(
+                "editor",
+                "保存编辑副本失败：\(error.localizedDescription)"
+            )
+            errorMessage = "保存编辑副本失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
     func openOwnerAlbum() {
         guard let photosApp = NSWorkspace.shared.urlForApplication(
             withBundleIdentifier: "com.apple.Photos"
@@ -2448,6 +2480,7 @@ private struct PreviewStage: View {
 private struct ImmersiveMacCameraView: View {
     @ObservedObject var model: CameraModel
     @State private var showsParameters = true
+    @State private var showsMoreParameters = false
     let monitoring: Bool
     let close: () -> Void
 
@@ -2610,14 +2643,28 @@ private struct ImmersiveMacCameraView: View {
     @ViewBuilder
     private var immersiveParameterBar: some View {
         VStack(spacing: 8) {
-            Button {
-                showsParameters.toggle()
-            } label: {
-                RuntimeLocalizedText(
-                    showsParameters ? "收起参数" : "展开参数"
-                )
+            HStack(spacing: 8) {
+                Button {
+                    showsParameters.toggle()
+                } label: {
+                    RuntimeLocalizedText(
+                        showsParameters ? "收起参数" : "展开参数"
+                    )
+                }
+                .buttonStyle(ImmersiveMacButtonStyle())
+                if showsParameters {
+                    Button {
+                        showsMoreParameters.toggle()
+                    } label: {
+                        Label(
+                            showsMoreParameters ? "收起更多" : "更多参数",
+                            systemImage: "slider.horizontal.3"
+                        )
+                    }
+                    .buttonStyle(ImmersiveMacButtonStyle())
+                    .tint(showsMoreParameters ? Palette.cobalt : nil)
+                }
             }
-            .buttonStyle(ImmersiveMacButtonStyle())
             if showsParameters {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
@@ -2628,12 +2675,6 @@ private struct ImmersiveMacCameraView: View {
                                 parameter: "videoExposureTime",
                                 decrease: { adjustVideoShutterAngle(-1) },
                                 increase: { adjustVideoShutterAngle(1) }
-                            )
-                            ImmersiveMacParameterControl(
-                                title: "帧率",
-                                value: "\(Int(model.videoFrameRate)) fps",
-                                decrease: { adjustVideoFrameRate(-1) },
-                                increase: { adjustVideoFrameRate(1) }
                             )
                         } else {
                             parameterControl(
@@ -2665,22 +2706,53 @@ private struct ImmersiveMacCameraView: View {
                             decrease: { adjustCompensation(-1) },
                             increase: { adjustCompensation(1) }
                         )
-                        parameterControl(
-                            "白平衡",
-                            model.whiteBalance == "continuous" ? "自动" : "预设",
-                            parameter: "whiteBalanceMode",
-                            decrease: { setWhiteBalance("continuous") },
-                            increase: { setWhiteBalance("manual") }
-                        )
-                        parameterControl(
-                            "对焦",
-                            model.focusMode == "continuous" ? "AF-C" : "AF-S",
-                            parameter: "focusMode",
-                            decrease: { setFocusMode("single-shot") },
-                            increase: { setFocusMode("continuous") }
-                        )
                     }
                     .padding(.horizontal, 2)
+                }
+                if showsMoreParameters {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            if monitoring {
+                                ImmersiveMacParameterControl(
+                                    title: "视频帧率",
+                                    value: "\(Int(model.videoFrameRate)) fps",
+                                    decrease: { adjustVideoFrameRate(-1) },
+                                    increase: { adjustVideoFrameRate(1) }
+                                )
+                            } else {
+                                parameterControl(
+                                    "拍摄模式",
+                                    model.exposureMode.uppercased(),
+                                    parameter: "exposureMode",
+                                    decrease: { adjustExposureMode(-1) },
+                                    increase: { adjustExposureMode(1) }
+                                )
+                            }
+                            parameterControl(
+                                "白平衡",
+                                model.whiteBalance == "continuous" ? "自动" : "预设",
+                                parameter: "whiteBalanceMode",
+                                decrease: { setWhiteBalance("continuous") },
+                                increase: { setWhiteBalance("manual") }
+                            )
+                            parameterControl(
+                                "对焦",
+                                model.focusMode == "continuous" ? "AF-C" : "AF-S",
+                                parameter: "focusMode",
+                                decrease: { setFocusMode("single-shot") },
+                                increase: { setFocusMode("continuous") }
+                            )
+                            parameterControl(
+                                "优化校准",
+                                model.pictureControl == "neutral" ? "自然" : "标准",
+                                parameter: "pictureControl",
+                                decrease: { setPictureControl("neutral") },
+                                increase: { setPictureControl("standard") }
+                            )
+                        }
+                        .padding(.horizontal, 2)
+                    }
+                    .transition(.opacity)
                 }
             }
         }
@@ -2807,6 +2879,33 @@ private struct ImmersiveMacCameraView: View {
     private func setFocusMode(_ value: String) {
         model.focusMode = value
         model.applyParameter("focusMode", value: value, label: "对焦模式")
+    }
+
+    private func adjustExposureMode(_ offset: Int) {
+        let values = [
+            "program",
+            "shutterPriority",
+            "aperturePriority",
+            "manual",
+            "bulb"
+        ]
+        let current = values.firstIndex(of: model.exposureMode) ?? 3
+        let next = max(0, min(values.count - 1, current + offset))
+        model.exposureMode = values[next]
+        model.applyParameter(
+            "exposureMode",
+            value: values[next],
+            label: "拍摄模式"
+        )
+    }
+
+    private func setPictureControl(_ value: String) {
+        model.pictureControl = value
+        model.applyParameter(
+            "pictureControl",
+            value: value,
+            label: "优化校准"
+        )
     }
 
     private var shutterLabel: String {
@@ -3061,6 +3160,7 @@ private struct Sidebar: View {
             groupLabel("创作")
             navigationButton(.capture)
             navigationButton(.monitor)
+            navigationButton(.editor)
             Divider()
                 .padding(.vertical, 8)
             groupLabel("管理")
@@ -3951,11 +4051,363 @@ private struct CaptureSessionPanel: View {
     }
 }
 
+private struct MacLibraryBranch: Identifiable, Codable, Hashable {
+    let id: UUID
+    var name: String
+    var children: [MacLibraryBranch]
+
+    init(id: UUID = UUID(), name: String, children: [MacLibraryBranch] = []) {
+        self.id = id
+        self.name = name
+        self.children = children
+    }
+}
+
+@MainActor
+private final class MacLibraryBranchStore: ObservableObject {
+    @Published private(set) var branches: [MacLibraryBranch] = []
+    @Published private(set) var expandedIDs: Set<UUID> = []
+    @Published private(set) var assignments: [String: UUID] = [:]
+
+    private static let storageKey = "zenche.library.user-branches"
+    private static let assignmentStorageKey =
+        "zenche.library.file-branch-assignments"
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: Self.storageKey),
+           let saved = try? JSONDecoder().decode(
+            [MacLibraryBranch].self,
+            from: data
+           ) {
+            branches = saved
+            expandedIDs = Set(saved.map(\.id))
+        }
+        if let data = UserDefaults.standard.data(
+            forKey: Self.assignmentStorageKey
+        ),
+        let saved = try? JSONDecoder().decode(
+            [String: UUID].self,
+            from: data
+        ) {
+            assignments = saved
+        }
+    }
+
+    func addBranch(named rawName: String, parentID: UUID?) {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let branch = MacLibraryBranch(name: name)
+        if let parentID {
+            var updated = branches
+            guard insert(branch, under: parentID, in: &updated) else {
+                return
+            }
+            branches = updated
+            expandedIDs.insert(parentID)
+        } else {
+            branches.append(branch)
+        }
+        expandedIDs.insert(branch.id)
+        persist()
+    }
+
+    func toggle(_ id: UUID) {
+        if expandedIDs.contains(id) {
+            expandedIDs.remove(id)
+        } else {
+            expandedIDs.insert(id)
+        }
+    }
+
+    func branchID(for photoPath: String) -> UUID? {
+        assignments[photoPath]
+    }
+
+    func assign(_ photoPath: String, to branchID: UUID?) {
+        if let branchID {
+            assignments[photoPath] = branchID
+            expandedIDs.insert(branchID)
+        } else {
+            assignments.removeValue(forKey: photoPath)
+        }
+        persistAssignments()
+    }
+
+    func deleteBranch(_ id: UUID) {
+        var updated = branches
+        guard let removed = removeBranch(id, from: &updated) else {
+            return
+        }
+        let removedIDs = branchIDs(in: removed)
+        branches = updated
+        expandedIDs.subtract(removedIDs)
+        assignments = assignments.filter {
+            !removedIDs.contains($0.value)
+        }
+        persist()
+        persistAssignments()
+    }
+
+    private func insert(
+        _ branch: MacLibraryBranch,
+        under parentID: UUID,
+        in nodes: inout [MacLibraryBranch]
+    ) -> Bool {
+        for index in nodes.indices {
+            if nodes[index].id == parentID {
+                nodes[index].children.append(branch)
+                return true
+            }
+            if insert(branch, under: parentID, in: &nodes[index].children) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func removeBranch(
+        _ id: UUID,
+        from nodes: inout [MacLibraryBranch]
+    ) -> MacLibraryBranch? {
+        if let index = nodes.firstIndex(where: { $0.id == id }) {
+            return nodes.remove(at: index)
+        }
+        for index in nodes.indices {
+            if let removed = removeBranch(id, from: &nodes[index].children) {
+                return removed
+            }
+        }
+        return nil
+    }
+
+    private func branchIDs(in branch: MacLibraryBranch) -> Set<UUID> {
+        branch.children.reduce(into: Set([branch.id])) { ids, child in
+            ids.formUnion(branchIDs(in: child))
+        }
+    }
+
+    private func persist() {
+        guard let data = try? JSONEncoder().encode(branches) else { return }
+        UserDefaults.standard.set(data, forKey: Self.storageKey)
+    }
+
+    private func persistAssignments() {
+        guard let data = try? JSONEncoder().encode(assignments) else { return }
+        UserDefaults.standard.set(data, forKey: Self.assignmentStorageKey)
+    }
+}
+
+private struct MacLibraryBranchRow: View {
+    @ObservedObject var store: MacLibraryBranchStore
+    let branch: MacLibraryBranch
+    let depth: Int
+    let photos: [PhotoRecord]
+    let selectedPhoto: PhotoRecord?
+    let addChild: (MacLibraryBranch) -> Void
+    let deleteBranch: (MacLibraryBranch) -> Void
+    let selectPhoto: (PhotoRecord) -> Void
+    let previewPhoto: (PhotoRecord) -> Void
+    @State private var isDropTarget = false
+
+    private var assignedPhotos: [PhotoRecord] {
+        photos.filter {
+            store.branchID(for: $0.url.path) == branch.id
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Button {
+                    store.toggle(branch.id)
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(
+                            systemName: store.expandedIDs.contains(branch.id)
+                                ? "chevron.down"
+                                : "chevron.right"
+                        )
+                        .frame(width: 24)
+                        Label(branch.name, systemImage: "folder")
+                            .font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1)
+                        Spacer()
+                        Text("\(assignedPhotos.count) 文件")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(
+                    store.expandedIDs.contains(branch.id)
+                        ? "收起 \(branch.name)"
+                        : "展开 \(branch.name)"
+                )
+                Button {
+                    addChild(branch)
+                } label: {
+                    Image(systemName: "folder.badge.plus")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .help("在 \(branch.name) 下新建分支")
+                Button(role: .destructive) {
+                    deleteBranch(branch)
+                } label: {
+                    Image(systemName: "trash")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .help("删除分支 \(branch.name)")
+            }
+            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.horizontal, 8)
+            .frame(minHeight: 44)
+            .background(
+                isDropTarget
+                    ? Palette.cobaltSoft
+                    : depth == 0
+                        ? Palette.paperSecondary
+                        : Palette.surface,
+                in: RoundedRectangle(cornerRadius: 8)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isDropTarget ? Palette.cobalt : Palette.rule,
+                        lineWidth: isDropTarget ? 2 : 1
+                    )
+            }
+            .dropDestination(for: String.self) { paths, _ in
+                guard !paths.isEmpty else { return false }
+                paths.forEach { store.assign($0, to: branch.id) }
+                return true
+            } isTargeted: {
+                isDropTarget = $0
+            }
+
+            if store.expandedIDs.contains(branch.id) {
+                ForEach(assignedPhotos) { photo in
+                    MacLibraryBranchFileRow(
+                        photo: photo,
+                        selected: selectedPhoto == photo,
+                        depth: depth + 1,
+                        selectPhoto: selectPhoto,
+                        previewPhoto: previewPhoto
+                    )
+                }
+                if assignedPhotos.isEmpty && branch.children.isEmpty {
+                    Text("拖动文件到这里")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.muted)
+                        .padding(.leading, CGFloat(depth + 1) * 16 + 42)
+                        .frame(height: 28)
+                }
+                ForEach(branch.children) { child in
+                    MacLibraryBranchRow(
+                        store: store,
+                        branch: child,
+                        depth: depth + 1,
+                        photos: photos,
+                        selectedPhoto: selectedPhoto,
+                        addChild: addChild,
+                        deleteBranch: deleteBranch,
+                        selectPhoto: selectPhoto,
+                        previewPhoto: previewPhoto
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct MacLibraryBranchFileRow: View {
+    let photo: PhotoRecord
+    let selected: Bool
+    let depth: Int
+    let selectPhoto: (PhotoRecord) -> Void
+    let previewPhoto: (PhotoRecord) -> Void
+
+    private var thumbnail: NSImage? {
+        guard !photo.isVideo else { return nil }
+        return NSImage(contentsOf: photo.url)
+    }
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Group {
+                if photo.isVideo {
+                    ZStack {
+                        Palette.graphite
+                        Image(systemName: "play.fill")
+                            .foregroundStyle(.white)
+                    }
+                } else if let thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ZStack {
+                        Palette.paperSecondary
+                        Image(systemName: "photo")
+                            .foregroundStyle(Palette.cobalt)
+                    }
+                }
+            }
+            .frame(width: 72, height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            Text(photo.name)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(1)
+            Spacer()
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(.leading, CGFloat(depth) * 16 + 22)
+        .padding(.trailing, 10)
+        .frame(minHeight: 56)
+        .background(
+            selected ? Palette.cobaltSoft : Palette.surface,
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(selected ? Palette.cobalt : Palette.rule)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectPhoto(photo)
+        }
+        .onTapGesture(count: 2) {
+            selectPhoto(photo)
+            previewPhoto(photo)
+        }
+        .draggable(photo.url.path) {
+            Label(
+                photo.name,
+                systemImage: "arrow.up.and.down.and.arrow.left.and.right"
+            )
+            .font(.system(size: 12, weight: .semibold))
+            .padding(10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
+        }
+        .help("拖动到其他分支")
+    }
+}
+
 private struct LibraryView: View {
     @ObservedObject var model: CameraModel
+    @StateObject private var branchStore = MacLibraryBranchStore()
     @State private var confirmDelete = false
     @State private var showCloudImporter = false
     @State private var showCloudGuide = false
+    @State private var showBranchCreator = false
+    @State private var branchDraft = ""
+    @State private var branchParentID: UUID?
+    @State private var branchParentName = "帧澈 ZENCHE 文件库"
+    @State private var branchPendingDeletion: MacLibraryBranch?
     @State private var largePhoto: PhotoRecord?
     @State private var systemLargePhoto: SystemMacAlbumItem?
     @State private var systemAlbum: [SystemMacAlbumItem] = []
@@ -3963,10 +4415,11 @@ private struct LibraryView: View {
     @State private var systemExpanded = true
     @State private var systemPhotosExpanded = true
     @State private var systemVideosExpanded = true
-    @State private var localExpanded = true
+    @State private var uncategorizedExpanded = true
     @State private var localPhotosExpanded = true
     @State private var localVideosExpanded = true
     @State private var wirelessExpanded = true
+    @State private var unclassifiedDropTargeted = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 16)
@@ -3977,8 +4430,8 @@ private struct LibraryView: View {
             VStack(spacing: 0) {
                 HStack {
                 WorkspaceHeading(
-                    title: "文件与传输",
-                    subtitle: "\(model.photos.count) 个本地文件 · 无线照片自动入库"
+                    title: "分支文件库",
+                    subtitle: "\(model.photos.count) 个本地文件 · 拖动整理，不改动原文件"
                 )
                 Spacer()
                 Button("刷新相册") {
@@ -4003,6 +4456,7 @@ private struct LibraryView: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    branchWorkspace
                     CaptureSessionPanel(workflow: model.captureWorkflow)
 
                     DisclosureGroup(
@@ -4034,34 +4488,6 @@ private struct LibraryView: View {
                     }
                     .font(.system(size: 19, weight: .bold))
 
-                    DisclosureGroup(
-                        "帧澈 ZENCHE 文件库 · \(model.photos.count)",
-                        isExpanded: $localExpanded
-                    ) {
-                        if model.photos.isEmpty {
-                            ContentUnavailableView(
-                                "还没有联机拍摄文件",
-                                systemImage: "photo.on.rectangle.angled",
-                                description: Text("文件将保存在“图片/帧澈 ZENCHE”。")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 180)
-                        } else {
-                            DisclosureGroup(
-                                "照片 · \(model.photos.filter { !$0.isVideo }.count)",
-                                isExpanded: $localPhotosExpanded
-                            ) {
-                                localPhotoGrid(model.photos.filter { !$0.isVideo })
-                            }
-                            DisclosureGroup(
-                                "视频 · \(model.photos.filter(\.isVideo).count)",
-                                isExpanded: $localVideosExpanded
-                            ) {
-                                localPhotoGrid(model.photos.filter(\.isVideo))
-                            }
-                        }
-                    }
-                    .font(.system(size: 19, weight: .bold))
                 }
                 .padding(24)
             }
@@ -4082,10 +4508,55 @@ private struct LibraryView: View {
         .alert("将照片移到废纸篓？", isPresented: $confirmDelete) {
             Button("取消", role: .cancel) {}
             Button("移到废纸篓", role: .destructive) {
+                if let path = model.selectedPhoto?.url.path {
+                    branchStore.assign(path, to: nil)
+                }
                 model.deleteSelectedPhoto()
             }
         } message: {
             RuntimeLocalizedText(model.selectedPhoto?.name ?? "")
+        }
+        .alert("新建分支", isPresented: $showBranchCreator) {
+            TextField("分支名称", text: $branchDraft)
+            Button("取消", role: .cancel) {}
+            Button("创建") {
+                branchStore.addBranch(
+                    named: branchDraft,
+                    parentID: branchParentID
+                )
+            }
+            .disabled(
+                branchDraft.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty
+            )
+        } message: {
+            Text("将在“\(branchParentName)”下创建可继续展开的节点。")
+        }
+        .confirmationDialog(
+            "删除分支？",
+            isPresented: Binding(
+                get: { branchPendingDeletion != nil },
+                set: {
+                    if !$0 {
+                        branchPendingDeletion = nil
+                    }
+                }
+            )
+        ) {
+            Button("删除分支", role: .destructive) {
+                if let branchPendingDeletion {
+                    branchStore.deleteBranch(branchPendingDeletion.id)
+                }
+                branchPendingDeletion = nil
+            }
+            Button("取消", role: .cancel) {
+                branchPendingDeletion = nil
+            }
+        } message: {
+            Text(
+                "将同时删除“\(branchPendingDeletion?.name ?? "")”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"
+            )
         }
         .fileImporter(
             isPresented: $showCloudImporter,
@@ -4121,6 +4592,140 @@ private struct LibraryView: View {
         }
         .task {
             await loadSystemAlbum()
+        }
+    }
+
+    private func beginCreatingBranch(parent: MacLibraryBranch?) {
+        branchParentID = parent?.id
+        branchParentName = parent?.name ?? "帧澈 ZENCHE 文件库"
+        branchDraft = ""
+        showBranchCreator = true
+    }
+
+    private var unclassifiedPhotos: [PhotoRecord] {
+        model.photos.filter {
+            branchStore.branchID(for: $0.url.path) == nil
+        }
+    }
+
+    @ViewBuilder
+    private var branchWorkspace: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                Image(systemName: "point.3.connected.trianglepath.dotted")
+                    .font(.system(size: 27, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 54)
+                    .background(Palette.cobalt, in: RoundedRectangle(cornerRadius: 14))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("分支工作台")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("把文件拖到任意分支；拖回“未分类”即可移出分支。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Button {
+                    beginCreatingBranch(parent: nil)
+                } label: {
+                    Label("新建分支", systemImage: "folder.badge.plus")
+                }
+                .buttonStyle(NativeButtonStyle(primary: true))
+            }
+
+            if branchStore.branches.isEmpty {
+                Text("先建立项目、客户或拍摄日分支，再把本地文件拖入；文件仍保留在原始存储位置。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.muted)
+                    .padding(.vertical, 6)
+            } else {
+                ForEach(branchStore.branches) { branch in
+                    MacLibraryBranchRow(
+                        store: branchStore,
+                        branch: branch,
+                        depth: 0,
+                        photos: model.photos,
+                        selectedPhoto: model.selectedPhoto,
+                        addChild: {
+                            beginCreatingBranch(parent: $0)
+                        },
+                        deleteBranch: {
+                            branchPendingDeletion = $0
+                        },
+                        selectPhoto: {
+                            model.selectedPhoto = $0
+                        },
+                        previewPhoto: {
+                            model.selectedPhoto = $0
+                            largePhoto = $0
+                        }
+                    )
+                }
+            }
+
+            DisclosureGroup(
+                "未分类 · \(unclassifiedPhotos.count)",
+                isExpanded: $uncategorizedExpanded
+            ) {
+                if unclassifiedPhotos.isEmpty {
+                    ContentUnavailableView(
+                        "未分类已清空",
+                        systemImage: "checkmark.circle",
+                        description: Text("拍摄、导入或无线接收的新文件会先显示在这里。")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 140)
+                } else {
+                    DisclosureGroup(
+                        "照片 · \(unclassifiedPhotos.filter { !$0.isVideo }.count)",
+                        isExpanded: $localPhotosExpanded
+                    ) {
+                        localPhotoGrid(unclassifiedPhotos.filter { !$0.isVideo })
+                    }
+                    DisclosureGroup(
+                        "视频 · \(unclassifiedPhotos.filter(\.isVideo).count)",
+                        isExpanded: $localVideosExpanded
+                    ) {
+                        localPhotoGrid(unclassifiedPhotos.filter(\.isVideo))
+                    }
+                }
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .padding(12)
+            .background(
+                unclassifiedDropTargeted
+                    ? Palette.cobaltSoft
+                    : Palette.paperSecondary,
+                in: RoundedRectangle(cornerRadius: 11)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(
+                        unclassifiedDropTargeted
+                            ? Palette.cobalt
+                            : Palette.rule,
+                        lineWidth: unclassifiedDropTargeted ? 2 : 1
+                    )
+            }
+            .dropDestination(for: String.self) { paths, _ in
+                guard !paths.isEmpty else { return false }
+                paths.forEach { branchStore.assign($0, to: nil) }
+                return true
+            } isTargeted: {
+                unclassifiedDropTargeted = $0
+            }
+        }
+        .padding(18)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Palette.cobalt)
+                .frame(width: 4)
+                .padding(.vertical, 18)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Palette.cobalt.opacity(0.24), lineWidth: 1)
         }
     }
 
@@ -4194,6 +4799,19 @@ private struct LibraryView: View {
                         largePhoto = photo
                     }
                 )
+                .draggable(photo.url.path) {
+                    Label(
+                        photo.name,
+                        systemImage: "arrow.up.and.down.and.arrow.left.and.right"
+                    )
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(10)
+                    .background(
+                        .regularMaterial,
+                        in: RoundedRectangle(cornerRadius: 9)
+                    )
+                }
+                .help("拖动到分支")
             }
         }
     }
@@ -4227,6 +4845,720 @@ private struct LibraryView: View {
         systemAlbumStatus = status == .limited
             ? "已显示允许访问的 \(items.count) 项"
             : "最近 \(items.count) 项"
+    }
+}
+
+private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
+    case light = "光线"
+    case color = "色彩"
+    case detail = "细节"
+    case effects = "效果"
+    case geometry = "几何"
+
+    var id: String { rawValue }
+}
+
+private enum EditorCropRatio: String, CaseIterable, Identifiable {
+    case original = "原始比例"
+    case square = "1:1"
+    case fourThree = "4:3"
+    case threeTwo = "3:2"
+    case sixteenNine = "16:9"
+
+    var id: String { rawValue }
+
+    var value: CGFloat? {
+        switch self {
+        case .original: nil
+        case .square: 1
+        case .fourThree: 4 / 3
+        case .threeTwo: 3 / 2
+        case .sixteenNine: 16 / 9
+        }
+    }
+}
+
+private enum EditorPreset: String, CaseIterable, Identifiable {
+    case original = "原始"
+    case natural = "自然增强"
+    case portrait = "人像柔和"
+    case landscape = "风光通透"
+    case monochrome = "高反差黑白"
+
+    var id: String { rawValue }
+}
+
+private struct ProfessionalEditSettings {
+    var exposure = 0.0
+    var contrast = 0.0
+    var highlights = 0.0
+    var shadows = 0.0
+    var whites = 0.0
+    var blacks = 0.0
+    var temperature = 0.0
+    var tint = 0.0
+    var vibrance = 0.0
+    var saturation = 0.0
+    var texture = 0.0
+    var clarity = 0.0
+    var sharpening = 0.0
+    var noiseReduction = 0.0
+    var dehaze = 0.0
+    var vignette = 0.0
+    var rotation = 0
+    var flipHorizontal = false
+    var flipVertical = false
+    var cropRatio = EditorCropRatio.original
+
+    mutating func resetTone() {
+        let geometry = (
+            rotation,
+            flipHorizontal,
+            flipVertical,
+            cropRatio
+        )
+        self = ProfessionalEditSettings()
+        rotation = geometry.0
+        flipHorizontal = geometry.1
+        flipVertical = geometry.2
+        cropRatio = geometry.3
+    }
+
+    mutating func apply(_ preset: EditorPreset) {
+        resetTone()
+        switch preset {
+        case .original:
+            break
+        case .natural:
+            contrast = 8
+            highlights = -18
+            shadows = 16
+            whites = 8
+            blacks = -8
+            vibrance = 14
+            texture = 8
+            clarity = 6
+            sharpening = 24
+            noiseReduction = 8
+        case .portrait:
+            contrast = -4
+            highlights = -24
+            shadows = 18
+            temperature = 7
+            tint = 4
+            vibrance = 10
+            texture = -12
+            clarity = -6
+            sharpening = 16
+            noiseReduction = 22
+            vignette = -8
+        case .landscape:
+            contrast = 12
+            highlights = -28
+            shadows = 14
+            whites = 12
+            blacks = -14
+            vibrance = 24
+            saturation = 5
+            texture = 16
+            clarity = 18
+            sharpening = 30
+            dehaze = 12
+            vignette = -10
+        case .monochrome:
+            contrast = 22
+            highlights = -18
+            shadows = 12
+            whites = 10
+            blacks = -22
+            saturation = -100
+            texture = 12
+            clarity = 24
+            sharpening = 28
+            vignette = -14
+        }
+    }
+}
+
+private struct ImageEditorView: View {
+    @ObservedObject var model: CameraModel
+    @State private var selectedPhotoURL: URL?
+    @State private var selectedSection = EditorAdjustmentSection.light
+    @State private var settings = ProfessionalEditSettings()
+    @State private var selectedPreset = EditorPreset.original
+    @State private var showingOriginal = false
+    @State private var status = "请选择文件库中的照片"
+    @State private var isSaving = false
+    private let context = CIContext()
+
+    private var photos: [PhotoRecord] {
+        model.photos.filter {
+            !$0.isVideo
+                && Self.editableExtensions.contains(
+                    $0.url.pathExtension.lowercased()
+                )
+        }
+    }
+
+    private static let editableExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "heic", "heif", "tif", "tiff", "bmp"
+    ]
+
+    private var selectedPhoto: PhotoRecord? {
+        photos.first { $0.url == selectedPhotoURL }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            WorkspaceHeading(
+                title: "专业显影",
+                subtitle: "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
+            )
+            editorToolbar
+
+            HStack(alignment: .top, spacing: 18) {
+                preview
+                adjustmentSidebar
+            }
+        }
+        .padding(24)
+        .background(Palette.paper)
+        .onAppear {
+            selectInitialPhoto()
+        }
+        .onChange(of: selectedPhotoURL) {
+            resetAdjustments()
+            status = selectedPhoto == nil
+                ? "请选择文件库中的照片"
+                : "调整不会覆盖原文件"
+        }
+    }
+
+    private var editorToolbar: some View {
+        HStack(spacing: 10) {
+            Picker("编辑照片", selection: $selectedPhotoURL) {
+                Text("选择照片").tag(nil as URL?)
+                ForEach(photos) { photo in
+                    Text(photo.name).tag(photo.url as URL?)
+                }
+            }
+            .frame(maxWidth: 400)
+
+            Picker("预设", selection: $selectedPreset) {
+                ForEach(EditorPreset.allCases) { preset in
+                    Text(preset.rawValue).tag(preset)
+                }
+            }
+            .frame(width: 170)
+            .onChange(of: selectedPreset) {
+                settings.apply(selectedPreset)
+                showingOriginal = false
+                status = "已应用预设 · \(selectedPreset.rawValue)"
+            }
+
+            Button {
+                showingOriginal.toggle()
+            } label: {
+                Label(
+                    showingOriginal ? "返回调整" : "查看原图",
+                    systemImage: "circle.lefthalf.filled"
+                )
+            }
+            .buttonStyle(NativeButtonStyle())
+            Spacer()
+        }
+    }
+
+    private var preview: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Palette.graphite)
+            if let image = renderedImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(14)
+            } else {
+                ContentUnavailableView(
+                    "选择一张照片开始编辑",
+                    systemImage: "slider.horizontal.3",
+                    description: Text(
+                        "视频与暂不支持解码的 RAW 文件不会进入编辑列表。"
+                    )
+                )
+                .foregroundStyle(.white, Palette.muted)
+            }
+            Text(showingOriginal ? "原图" : "调整后")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .frame(minHeight: 28)
+                .background(Color.black.opacity(0.58))
+                .clipShape(Capsule())
+                .padding(12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var adjustmentSidebar: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionSelector
+            ScrollView {
+                adjustmentPanel
+            }
+            Divider()
+            HStack {
+                Button("全部重置") {
+                    resetAdjustments()
+                }
+                .buttonStyle(NativeButtonStyle())
+                Spacer()
+                Text(status)
+                    .lineLimit(2)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Palette.muted)
+            }
+            Button {
+                saveCopy()
+            } label: {
+                Label(
+                    isSaving ? "正在保存…" : "保存高质量副本",
+                    systemImage: "square.and.arrow.down"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NativeButtonStyle(primary: true))
+            .disabled(selectedPhoto == nil || isSaving)
+        }
+        .padding(16)
+        .frame(width: 390)
+        .frame(maxHeight: .infinity)
+        .background(
+            Palette.surface,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Palette.rule)
+        }
+    }
+
+    private var sectionSelector: some View {
+        HStack(spacing: 5) {
+            ForEach(EditorAdjustmentSection.allCases) { section in
+                Button(section.rawValue) {
+                    selectedSection = section
+                }
+                .buttonStyle(
+                    EditorSectionButtonStyle(
+                        selected: selectedSection == section
+                    )
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var adjustmentPanel: some View {
+        VStack(spacing: 10) {
+            switch selectedSection {
+            case .light:
+                editorSlider(
+                    title: "曝光",
+                    value: $settings.exposure,
+                    range: -2...2,
+                    step: 0.05,
+                    formatter: { String(format: "%+.2f EV", $0) }
+                )
+                standardSlider("对比度", value: $settings.contrast)
+                standardSlider("高光", value: $settings.highlights)
+                standardSlider("阴影", value: $settings.shadows)
+                standardSlider("白色色阶", value: $settings.whites)
+                standardSlider("黑色色阶", value: $settings.blacks)
+            case .color:
+                standardSlider("色温", value: $settings.temperature)
+                standardSlider("色调", value: $settings.tint)
+                standardSlider("自然饱和度", value: $settings.vibrance)
+                standardSlider("饱和度", value: $settings.saturation)
+            case .detail:
+                standardSlider("纹理", value: $settings.texture)
+                standardSlider("清晰度", value: $settings.clarity)
+                editorSlider(
+                    title: "锐化",
+                    value: $settings.sharpening,
+                    range: 0...100,
+                    step: 1,
+                    formatter: { "\(Int($0))" }
+                )
+                editorSlider(
+                    title: "降噪",
+                    value: $settings.noiseReduction,
+                    range: 0...100,
+                    step: 1,
+                    formatter: { "\(Int($0))" }
+                )
+            case .effects:
+                standardSlider("去雾", value: $settings.dehaze)
+                standardSlider("暗角", value: $settings.vignette)
+            case .geometry:
+                geometryControls
+            }
+        }
+    }
+
+    private func standardSlider(
+        _ title: String,
+        value: Binding<Double>
+    ) -> some View {
+        editorSlider(
+            title: title,
+            value: value,
+            range: -100...100,
+            step: 1,
+            formatter: { String(format: "%+.0f", $0) }
+        )
+    }
+
+    private var geometryControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Picker("裁切比例", selection: $settings.cropRatio) {
+                ForEach(EditorCropRatio.allCases) { ratio in
+                    Text(ratio.rawValue).tag(ratio)
+                }
+            }
+            HStack(spacing: 6) {
+                Button {
+                    settings.rotation = (settings.rotation + 90) % 360
+                } label: {
+                    Image(systemName: "rotate.right")
+                }
+                Button {
+                    settings.flipHorizontal.toggle()
+                } label: {
+                    Image(systemName: "arrow.left.and.right")
+                }
+                Button {
+                    settings.flipVertical.toggle()
+                } label: {
+                    Image(systemName: "arrow.up.and.down")
+                }
+            }
+            .buttonStyle(NativeButtonStyle())
+            Text("旋转 90° · 水平翻转 · 垂直翻转")
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.muted)
+        }
+    }
+
+    private var renderedImage: NSImage? {
+        guard let selectedPhoto else { return nil }
+        let source =
+            CIImage(contentsOf: selectedPhoto.url)
+            ?? NSImage(contentsOf: selectedPhoto.url)
+                .flatMap {
+                    CIImage(data: $0.tiffRepresentation ?? Data())
+                }
+        guard var output = source else { return nil }
+
+        if !showingOriginal {
+            output = applyTonePipeline(to: output)
+            output = applyGeometry(to: output)
+        }
+        let extent = output.extent.integral
+        guard let cgImage = context.createCGImage(output, from: extent) else {
+            return nil
+        }
+        return NSImage(
+            cgImage: cgImage,
+            size: NSSize(width: extent.width, height: extent.height)
+        )
+    }
+
+    private func applyTonePipeline(to source: CIImage) -> CIImage {
+        var output = source
+        output = filtered(
+            "CIExposureAdjust",
+            image: output,
+            values: [kCIInputEVKey: settings.exposure]
+        )
+        output = filtered(
+            "CITemperatureAndTint",
+            image: output,
+            values: [
+                "inputNeutral": CIVector(x: 6500, y: 0),
+                "inputTargetNeutral": CIVector(
+                    x: 6500 + settings.temperature * 24,
+                    y: settings.tint * 1.5
+                )
+            ]
+        )
+        output = filtered(
+            "CIHighlightShadowAdjust",
+            image: output,
+            values: [
+                "inputHighlightAmount":
+                    max(0, min(2, 1 + settings.highlights / 100)),
+                "inputShadowAmount": settings.shadows / 100
+            ]
+        )
+        output = filtered(
+            "CIVibrance",
+            image: output,
+            values: ["inputAmount": settings.vibrance / 100]
+        )
+        let combinedContrast =
+            settings.contrast / 100
+            + settings.dehaze / 260
+            + settings.clarity / 420
+        let combinedSaturation =
+            settings.saturation / 100
+            + settings.dehaze / 500
+        output = filtered(
+            "CIColorControls",
+            image: output,
+            values: [
+                kCIInputContrastKey: max(0, 1 + combinedContrast),
+                kCIInputSaturationKey: max(0, 1 + combinedSaturation)
+            ]
+        )
+        let gain = max(0.4, 1 + settings.whites / 260)
+        let lift = settings.blacks / 850
+        let tintShift = settings.tint / 1800
+        output = filtered(
+            "CIColorMatrix",
+            image: output,
+            values: [
+                "inputRVector": CIVector(x: gain, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: gain, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: gain, w: 0),
+                "inputBiasVector": CIVector(
+                    x: lift + tintShift,
+                    y: lift - tintShift,
+                    z: lift + tintShift,
+                    w: 0
+                )
+            ]
+        )
+        if settings.texture > 0 {
+            output = filtered(
+                "CIUnsharpMask",
+                image: output,
+                values: [
+                    kCIInputRadiusKey: 1.2,
+                    kCIInputIntensityKey: settings.texture / 140
+                ]
+            )
+        } else if settings.texture < 0 {
+            let extent = output.extent
+            output = filtered(
+                "CIGaussianBlur",
+                image: output,
+                values: [
+                    kCIInputRadiusKey: -settings.texture / 75
+                ]
+            )
+            .cropped(to: extent)
+        }
+        if settings.clarity > 0 {
+            output = filtered(
+                "CIUnsharpMask",
+                image: output,
+                values: [
+                    kCIInputRadiusKey: 8,
+                    kCIInputIntensityKey: settings.clarity / 180
+                ]
+            )
+        }
+        if settings.sharpening > 0 {
+            output = filtered(
+                "CISharpenLuminance",
+                image: output,
+                values: [
+                    kCIInputSharpnessKey: settings.sharpening / 70
+                ]
+            )
+        }
+        if settings.noiseReduction > 0 {
+            output = filtered(
+                "CINoiseReduction",
+                image: output,
+                values: [
+                    "inputNoiseLevel":
+                        0.02 + settings.noiseReduction / 1250,
+                    "inputSharpness":
+                        max(0, 0.4 - settings.noiseReduction / 300)
+                ]
+            )
+        }
+        if settings.vignette != 0 {
+            output = filtered(
+                "CIVignette",
+                image: output,
+                values: [
+                    kCIInputIntensityKey: -settings.vignette / 45,
+                    kCIInputRadiusKey:
+                        min(output.extent.width, output.extent.height) * 0.75
+                ]
+            )
+        }
+        return output
+    }
+
+    private func filtered(
+        _ name: String,
+        image: CIImage,
+        values: [String: Any]
+    ) -> CIImage {
+        guard let filter = CIFilter(name: name) else { return image }
+        filter.setValue(image, forKey: kCIInputImageKey)
+        values.forEach { filter.setValue($0.value, forKey: $0.key) }
+        return filter.outputImage ?? image
+    }
+
+    private func applyGeometry(to source: CIImage) -> CIImage {
+        var output = source
+        if settings.rotation != 0 {
+            output = output.transformed(
+                by: CGAffineTransform(
+                    rotationAngle:
+                        CGFloat(settings.rotation) * .pi / 180
+                )
+            )
+            output = normalized(output)
+        }
+        if settings.flipHorizontal {
+            output = output.transformed(
+                by: CGAffineTransform(scaleX: -1, y: 1)
+            )
+            output = normalized(output)
+        }
+        if settings.flipVertical {
+            output = output.transformed(
+                by: CGAffineTransform(scaleX: 1, y: -1)
+            )
+            output = normalized(output)
+        }
+        if let ratio = settings.cropRatio.value {
+            let extent = output.extent
+            var width = extent.width
+            var height = width / ratio
+            if height > extent.height {
+                height = extent.height
+                width = height * ratio
+            }
+            output = output.cropped(
+                to: CGRect(
+                    x: extent.midX - width / 2,
+                    y: extent.midY - height / 2,
+                    width: width,
+                    height: height
+                )
+            )
+            output = normalized(output)
+        }
+        return output
+    }
+
+    private func normalized(_ image: CIImage) -> CIImage {
+        let extent = image.extent
+        return image.transformed(
+            by: CGAffineTransform(
+                translationX: -extent.minX,
+                y: -extent.minY
+            )
+        )
+    }
+
+    private func editorSlider(
+        title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        formatter: @escaping (Double) -> String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(LocalizedStringKey(title))
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Text(formatter(value.wrappedValue))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Palette.muted)
+            }
+            Slider(value: value, in: range, step: step)
+        }
+        .frame(minHeight: 46)
+    }
+
+    private func selectInitialPhoto() {
+        if let selected = model.selectedPhoto,
+           photos.contains(where: { $0.url == selected.url }) {
+            selectedPhotoURL = selected.url
+        } else if selectedPhoto == nil {
+            selectedPhotoURL = photos.first?.url
+        }
+    }
+
+    private func resetAdjustments() {
+        settings = ProfessionalEditSettings()
+        selectedPreset = .original
+        showingOriginal = false
+    }
+
+    private func saveCopy() {
+        let wasShowingOriginal = showingOriginal
+        showingOriginal = false
+        guard let selectedPhoto,
+              let renderedImage,
+              let cgImage = renderedImage.cgImage(
+                forProposedRect: nil,
+                context: nil,
+                hints: nil
+              )
+        else {
+            showingOriginal = wasShowingOriginal
+            status = "无法渲染当前照片"
+            return
+        }
+        let representation = NSBitmapImageRep(cgImage: cgImage)
+        guard let data = representation.representation(
+            using: .jpeg,
+            properties: [.compressionFactor: 0.95]
+        ) else {
+            showingOriginal = wasShowingOriginal
+            status = "无法编码编辑副本"
+            return
+        }
+        isSaving = true
+        if let saved = model.saveEditedPhoto(
+            data,
+            originalFilename: selectedPhoto.name
+        ) {
+            selectedPhotoURL = saved
+            resetAdjustments()
+            status = "已保存高质量副本 · \(saved.lastPathComponent)"
+        } else {
+            status = model.errorMessage ?? "保存编辑副本失败"
+            showingOriginal = wasShowingOriginal
+        }
+        isSaving = false
+    }
+}
+
+private struct EditorSectionButtonStyle: ButtonStyle {
+    let selected: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(selected ? .white : Palette.ink)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
+            .background(
+                selected ? Palette.cobalt : Palette.paperSecondary,
+                in: Capsule()
+            )
+            .opacity(configuration.isPressed ? 0.72 : 1)
     }
 }
 
@@ -4772,7 +6104,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.1.0"
+        ) as? String ?? "1.2.0"
     }
 
     var body: some View {
@@ -4790,6 +6122,8 @@ private struct RootView: View {
                         CaptureView(model: model, showConnection: $showConnection)
                     case .monitor:
                         MonitorView(model: model)
+                    case .editor:
+                        ImageEditorView(model: model)
                     case .library:
                         LibraryView(model: model)
                     }
