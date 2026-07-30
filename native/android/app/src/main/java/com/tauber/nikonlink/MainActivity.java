@@ -17,6 +17,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.media.MediaMetadataRetriever;
@@ -41,6 +44,7 @@ import android.text.InputType;
 import android.util.Base64;
 import android.util.Size;
 import android.view.Gravity;
+import android.view.DragEvent;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -50,6 +54,7 @@ import android.util.TypedValue;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -90,9 +95,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -100,6 +107,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntConsumer;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -141,10 +149,100 @@ public final class MainActivity extends Activity {
     private static final String AUTOMATIC_UPDATE_KEY = "automaticallyCheckForUpdates";
     private static final String DISMISSED_ANNOUNCEMENT_VERSION_KEY =
             "dismissedLaunchAnnouncementVersion";
+    private static final String LIBRARY_BRANCHES_KEY = "libraryUserBranches";
+    private static final String LIBRARY_FILE_ASSIGNMENTS_KEY =
+            "libraryFileBranchAssignments";
+
+    private static final class EditorAdjustments {
+        int exposure;
+        int contrast;
+        int highlights;
+        int shadows;
+        int whites;
+        int blacks;
+        int temperature;
+        int tint;
+        int vibrance;
+        int saturation;
+        int texture;
+        int clarity;
+        int sharpening;
+        int noiseReduction;
+        int dehaze;
+        int vignette;
+        int rotation;
+        boolean flipHorizontal;
+        boolean flipVertical;
+        boolean showingOriginal;
+        String cropRatio = "original";
+
+        void reset() {
+            exposure = 0;
+            contrast = 0;
+            highlights = 0;
+            shadows = 0;
+            whites = 0;
+            blacks = 0;
+            temperature = 0;
+            tint = 0;
+            vibrance = 0;
+            saturation = 0;
+            texture = 0;
+            clarity = 0;
+            sharpening = 0;
+            noiseReduction = 0;
+            dehaze = 0;
+            vignette = 0;
+            rotation = 0;
+            flipHorizontal = false;
+            flipVertical = false;
+            showingOriginal = false;
+            cropRatio = "original";
+        }
+
+        void resetTone() {
+            int savedRotation = rotation;
+            boolean savedFlipHorizontal = flipHorizontal;
+            boolean savedFlipVertical = flipVertical;
+            String savedCropRatio = cropRatio;
+            reset();
+            rotation = savedRotation;
+            flipHorizontal = savedFlipHorizontal;
+            flipVertical = savedFlipVertical;
+            cropRatio = savedCropRatio;
+        }
+
+        EditorAdjustments copy() {
+            EditorAdjustments copy = new EditorAdjustments();
+            copy.exposure = exposure;
+            copy.contrast = contrast;
+            copy.highlights = highlights;
+            copy.shadows = shadows;
+            copy.whites = whites;
+            copy.blacks = blacks;
+            copy.temperature = temperature;
+            copy.tint = tint;
+            copy.vibrance = vibrance;
+            copy.saturation = saturation;
+            copy.texture = texture;
+            copy.clarity = clarity;
+            copy.sharpening = sharpening;
+            copy.noiseReduction = noiseReduction;
+            copy.dehaze = dehaze;
+            copy.vignette = vignette;
+            copy.rotation = rotation;
+            copy.flipHorizontal = flipHorizontal;
+            copy.flipVertical = flipVertical;
+            copy.showingOriginal = showingOriginal;
+            copy.cropRatio = cropRatio;
+            return copy;
+        }
+    }
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService previewExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService editorExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
     private final AtomicBoolean previewWorkerRunning = new AtomicBoolean();
@@ -153,6 +251,8 @@ public final class MainActivity extends Activity {
     private final Map<String, View> parameterControls = new HashMap<>();
     private final Map<String, TextView> parameterLabels = new HashMap<>();
     private final Map<String, Boolean> disclosureStates = new HashMap<>();
+    private final List<LibraryBranch> userLibraryBranches = new ArrayList<>();
+    private final Map<String, String> libraryFileAssignments = new HashMap<>();
 
     private PtpCamera camera;
     private DiagnosticLogger diagnostics;
@@ -192,6 +292,8 @@ public final class MainActivity extends Activity {
     private SensorManager immersiveSensorManager;
     private Sensor immersiveRotationSensor;
     private boolean immersiveLandscape;
+    private boolean immersiveParametersExpanded = true;
+    private boolean immersiveMoreParametersExpanded;
     private volatile boolean immersiveMonitoring;
     private File photoDirectory;
     private CaptureWorkflow captureWorkflow;
@@ -228,6 +330,9 @@ public final class MainActivity extends Activity {
     private volatile double currentAperture = 4.0;
     private volatile int currentIso = 400;
     private volatile double currentCompensation;
+    private volatile String currentFocusMode = "single-shot";
+    private volatile String currentWhiteBalance = "continuous";
+    private volatile String currentPictureControl = "standard";
     private volatile String shootingTaskKind = "interval";
     private volatile int shootingTaskCount = 5;
     private volatile int shootingTaskInterval = 3;
@@ -240,6 +345,9 @@ public final class MainActivity extends Activity {
     private volatile String availableVersion;
     private volatile String updateStatus = "尚未检查更新";
     private volatile String currentSection = "capture";
+    private String editorSelectedPath;
+    private final EditorAdjustments editorAdjustments =
+            new EditorAdjustments();
     private String appLanguage = Localization.SIMPLIFIED_CHINESE;
     private final float[] immersiveRotationMatrix = new float[9];
     private final float[] immersiveOrientation = new float[3];
@@ -281,6 +389,7 @@ public final class MainActivity extends Activity {
                         .getString(
                                 Localization.PREFERENCE_KEY,
                                 Localization.SIMPLIFIED_CHINESE));
+        loadLibraryBranches();
         Window window = getWindow();
         window.setStatusBarColor(PAPER);
         window.setNavigationBarColor(GRAPHITE);
@@ -1186,7 +1295,8 @@ public final class MainActivity extends Activity {
         navigation.setElevation(dp(8));
         navigation.addView(navButton("照片", "capture"));
         navigation.addView(navButton("视频", "monitor"));
-        navigation.addView(navButton("文件", "library"));
+        navigation.addView(navButton("编辑", "editor"));
+        navigation.addView(navButton("分支", "library"));
         return navigation;
     }
 
@@ -1203,6 +1313,9 @@ public final class MainActivity extends Activity {
                 iconResource = R.drawable.ic_nav_video;
                 break;
             case "library":
+                iconResource = R.drawable.ic_nav_library;
+                break;
+            case "editor":
                 iconResource = R.drawable.ic_nav_library;
                 break;
             default:
@@ -1250,6 +1363,9 @@ public final class MainActivity extends Activity {
                 break;
             case "library":
                 content = buildLibraryView();
+                break;
+            case "editor":
+                content = buildImageEditorView();
                 break;
             case "settings":
                 content = buildSettingsView();
@@ -1821,15 +1937,107 @@ public final class MainActivity extends Activity {
         immersiveExposureText = exposure;
         updateImmersiveExposureText();
 
+        String[] primaryParameters = immersiveMonitoring
+                ? new String[]{"角度", "光圈", "ISO", "补偿"}
+                : new String[]{"快门", "光圈", "ISO", "补偿"};
+        String[] moreParameters = immersiveMonitoring
+                ? new String[]{"帧率", "对焦", "白平衡", "优化"}
+                : new String[]{"模式", "对焦", "白平衡", "优化"};
+        HorizontalScrollView primaryScroller =
+                immersiveParameterScroller(primaryParameters);
+        HorizontalScrollView moreScroller =
+                immersiveParameterScroller(moreParameters);
+        moreScroller.setVisibility(
+                immersiveMoreParametersExpanded
+                        ? View.VISIBLE
+                        : View.GONE);
+
+        LinearLayout tray = new LinearLayout(this);
+        tray.setOrientation(LinearLayout.VERTICAL);
+        tray.setGravity(Gravity.CENTER);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+
+        Button toggle = nativeButton(
+                immersiveParametersExpanded ? "收起参数" : "展开参数",
+                false);
+        toggle.setTextColor(Color.WHITE);
+        toggle.setBackground(rounded(Color.argb(175, 0, 0, 0), 10, 0));
+        toggle.setOnClickListener(view -> {
+            immersiveParametersExpanded = !immersiveParametersExpanded;
+            primaryScroller.setVisibility(
+                    immersiveParametersExpanded
+                            ? View.VISIBLE
+                            : View.GONE);
+            moreScroller.setVisibility(
+                    immersiveParametersExpanded
+                            && immersiveMoreParametersExpanded
+                            ? View.VISIBLE
+                            : View.GONE);
+            toggle.setText(tr(
+                    immersiveParametersExpanded
+                            ? "收起参数"
+                            : "展开参数"));
+        });
+        actions.addView(
+                toggle,
+                new LinearLayout.LayoutParams(dp(96), dp(44)));
+
+        Button more = nativeButton(
+                immersiveMoreParametersExpanded ? "收起更多" : "更多参数",
+                false);
+        more.setTextColor(Color.WHITE);
+        more.setBackground(rounded(
+                immersiveMoreParametersExpanded
+                        ? Color.argb(205, 5, 90, 210)
+                        : Color.argb(175, 0, 0, 0),
+                10,
+                0));
+        more.setOnClickListener(view -> {
+            immersiveMoreParametersExpanded =
+                    !immersiveMoreParametersExpanded;
+            moreScroller.setVisibility(
+                    immersiveParametersExpanded
+                            && immersiveMoreParametersExpanded
+                            ? View.VISIBLE
+                            : View.GONE);
+            more.setText(tr(
+                    immersiveMoreParametersExpanded
+                            ? "收起更多"
+                            : "更多参数"));
+            more.setBackground(rounded(
+                    immersiveMoreParametersExpanded
+                            ? Color.argb(205, 5, 90, 210)
+                            : Color.argb(175, 0, 0, 0),
+                    10,
+                    0));
+        });
+        LinearLayout.LayoutParams moreParams =
+                new LinearLayout.LayoutParams(dp(96), dp(44));
+        moreParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(more, moreParams);
+        tray.addView(actions);
+        tray.addView(primaryScroller);
+        tray.addView(moreScroller);
+        primaryScroller.setVisibility(
+                immersiveParametersExpanded
+                        ? View.VISIBLE
+                        : View.GONE);
+
+        FrameLayout.LayoutParams parameterParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        parameterParams.setMargins(0, 0, 0, parameterBottom);
+        chrome.addView(tray, parameterParams);
+    }
+
+    private HorizontalScrollView immersiveParameterScroller(
+            String[] parameters) {
         LinearLayout parameterBar = new LinearLayout(this);
         parameterBar.setOrientation(LinearLayout.HORIZONTAL);
         parameterBar.setGravity(Gravity.CENTER);
-        String[] parameters = immersiveMonitoring
-                ? new String[]{"角度", "帧率", "光圈", "ISO", "白平衡", "优化"}
-                : new String[]{
-                        "模式", "快门", "光圈", "ISO",
-                        "补偿", "对焦", "白平衡", "优化"
-                };
         for (String parameter : parameters) {
             parameterBar.addView(immersiveParameterStepper(parameter));
         }
@@ -1838,31 +2046,11 @@ public final class MainActivity extends Activity {
         scroller.setFillViewport(true);
         scroller.setPadding(
                 immersiveLandscape ? dp(104) : dp(12),
-                0,
+                dp(4),
                 immersiveLandscape ? dp(104) : dp(12),
                 0);
         scroller.addView(parameterBar);
-        FrameLayout.LayoutParams parameterParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(64),
-                Gravity.BOTTOM);
-        parameterParams.setMargins(0, 0, 0, parameterBottom);
-        chrome.addView(scroller, parameterParams);
-
-        Button toggle = nativeButton("参数⌄", false);
-        toggle.setTextColor(Color.WHITE);
-        toggle.setBackground(rounded(Color.argb(175, 0, 0, 0), 10, 0));
-        toggle.setOnClickListener(view -> {
-            boolean show = scroller.getVisibility() != View.VISIBLE;
-            scroller.setVisibility(show ? View.VISIBLE : View.GONE);
-            toggle.setText(tr(show ? "参数⌄" : "参数⌃"));
-        });
-        FrameLayout.LayoutParams toggleParams = new FrameLayout.LayoutParams(
-                dp(96),
-                dp(44),
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        toggleParams.setMargins(0, 0, 0, toggleBottom);
-        chrome.addView(toggle, toggleParams);
+        return scroller;
     }
 
     private TextView immersiveReadout(String value, int width, int height) {
@@ -2163,7 +2351,7 @@ public final class MainActivity extends Activity {
         Button minus = nativeButton("−", false);
         TextView value = text(
                 immersiveParameterValue(parameter),
-                11,
+                10,
                 Typeface.BOLD,
                 Color.WHITE);
         value.setGravity(Gravity.CENTER);
@@ -2188,11 +2376,11 @@ public final class MainActivity extends Activity {
             value.setText(immersiveParameterValue(parameter));
         });
         group.addView(minus, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        group.addView(value, new LinearLayout.LayoutParams(dp(76), dp(44)));
+        group.addView(value, new LinearLayout.LayoutParams(dp(60), dp(44)));
         group.addView(plus, new LinearLayout.LayoutParams(dp(44), dp(44)));
         LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(dp(172), dp(56));
-        params.setMargins(dp(4), 0, dp(4), 0);
+                new LinearLayout.LayoutParams(dp(152), dp(52));
+        params.setMargins(dp(3), 0, dp(3), 0);
         group.setLayoutParams(params);
         return group;
     }
@@ -2212,13 +2400,25 @@ public final class MainActivity extends Activity {
             case "模式":
                 return "模式\n" + exposureMode.toUpperCase(Locale.ROOT);
             case "补偿":
-                return "补偿\n±1/3 EV";
+                return String.format(
+                        Locale.CHINA,
+                        "补偿\n%+.1f EV",
+                        currentCompensation);
             case "对焦":
-                return "对焦\nAF-S/AF-C";
+                return "对焦\n"
+                        + ("continuous".equals(currentFocusMode)
+                        ? "AF-C"
+                        : "AF-S");
             case "白平衡":
-                return "白平衡\n自动/保留";
+                return "白平衡\n"
+                        + ("continuous".equals(currentWhiteBalance)
+                        ? "自动"
+                        : "保留");
             case "优化":
-                return "优化\n标准/自然";
+                return "优化\n"
+                        + ("neutral".equals(currentPictureControl)
+                        ? "自然"
+                        : "标准");
             default:
                 return "ISO\n" + currentIso;
         }
@@ -2251,26 +2451,36 @@ public final class MainActivity extends Activity {
                     "program", "shutterPriority", "aperturePriority", "manual", "bulb"
             };
             int index = adjacentIndex(values, exposureMode, direction);
+            exposureMode = values[index];
             applyParameter("exposureMode", values[index], "拍摄模式");
         } else if ("补偿".equals(parameter)) {
+            currentCompensation = Math.max(
+                    -5,
+                    Math.min(5, currentCompensation + direction / 3.0));
             applyParameter(
                     "exposureCompensation",
-                    direction / 3.0,
+                    currentCompensation,
                     "曝光补偿");
         } else if ("对焦".equals(parameter)) {
+            currentFocusMode =
+                    direction < 0 ? "single-shot" : "continuous";
             applyParameter(
                     "focusMode",
-                    direction < 0 ? "single-shot" : "continuous",
+                    currentFocusMode,
                     "对焦模式");
         } else if ("白平衡".equals(parameter)) {
+            currentWhiteBalance =
+                    direction < 0 ? "continuous" : "preserve";
             applyParameter(
                     "whiteBalanceMode",
-                    direction < 0 ? "continuous" : "preserve",
+                    currentWhiteBalance,
                     "白平衡");
         } else if ("优化".equals(parameter)) {
+            currentPictureControl =
+                    direction < 0 ? "neutral" : "standard";
             applyParameter(
                     "pictureControl",
-                    direction < 0 ? "neutral" : "standard",
+                    currentPictureControl,
                     "优化校准");
         } else {
             Object[] supported = isoValues();
@@ -3124,10 +3334,32 @@ public final class MainActivity extends Activity {
         List<MediaEntry> systemMedia =
                 hasAlbumAccess() ? systemAlbumEntries() : Collections.emptyList();
         content.addView(sectionHeader(
-                "文件与传输",
+                "分支文件库",
                 files.size() + " 个 帧澈 ZENCHE 文件 · "
                         + systemMedia.size() + " 个系统相册项目",
                 COBALT));
+        LinearLayout branchHero = verticalContainer();
+        branchHero.setPadding(dp(16), dp(14), dp(16), dp(14));
+        branchHero.setBackground(rounded(COBALT_SOFT, 16, COBALT));
+        branchHero.addView(text(
+                "分支工作台",
+                20,
+                Typeface.BOLD,
+                INK));
+        branchHero.addView(text(
+                "长按文件并拖到任意分支；拖回“未分类”即可移出分支。",
+                13,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 0));
+        content.addView(
+                branchHero,
+                marginParams(-1, -2, 0, 0, 0, 12));
+        content.addView(
+                isPhoneLayout()
+                        ? buildMobileBranchDrawer(files)
+                        : buildBranchWorkspace(files));
+
         LinearLayout sourceActions = new LinearLayout(this);
         sourceActions.setOrientation(LinearLayout.HORIZONTAL);
         Button albumButton = nativeButton(
@@ -3202,38 +3434,998 @@ public final class MainActivity extends Activity {
                 wirelessRequested ? wirelessStatus : "FTP · HTTP · WebDAV",
                 buildWirelessTransferPanel(),
                 false));
+        scroll.addView(content);
+        return scroll;
+    }
 
-        LinearLayout localBody = verticalContainer();
-        if (files.isEmpty()) {
+    private boolean isPhoneLayout() {
+        return getResources().getConfiguration().screenWidthDp < 600;
+    }
+
+    private View buildMobileBranchDrawer(List<File> files) {
+        LinearLayout drawer = panel();
+        drawer.setPadding(dp(10), dp(10), dp(10), dp(10));
+        View body = buildBranchWorkspace(files);
+        boolean expanded = Boolean.TRUE.equals(
+                disclosureStates.get("mobile-branch-drawer"));
+        body.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        Button header = nativeButton("", false);
+        header.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        Runnable updateLabel = () -> header.setText(
+                (body.getVisibility() == View.VISIBLE ? "⌄  " : "›  ")
+                        + tr("分支抽屉")
+                        + " · "
+                        + userLibraryBranches.size()
+                        + " "
+                        + tr("个根分支"));
+        updateLabel.run();
+        header.setOnClickListener(view -> {
+            boolean next = body.getVisibility() != View.VISIBLE;
+            disclosureStates.put("mobile-branch-drawer", next);
+            body.setVisibility(next ? View.VISIBLE : View.GONE);
+            updateLabel.run();
+        });
+        drawer.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(56)));
+        drawer.addView(body);
+        drawer.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 16));
+        return drawer;
+    }
+
+    private View buildImageEditorView() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(20), dp(22), dp(20), dp(28));
+        content.addView(sectionHeader(
+                "专业显影",
+                "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                COBALT));
+
+        List<File> photos = new ArrayList<>();
+        for (File file : photoFiles()) {
+            if (isEditableImageFile(file)) {
+                photos.add(file);
+            }
+        }
+        if (photos.isEmpty()) {
             TextView empty = text(
-                    "还没有联机拍摄文件\n照片将保存在 帧澈 ZENCHE 本地照片库。",
-                    15,
+                    "文件库中没有可编辑照片\n视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
+                    14,
                     Typeface.NORMAL,
                     MUTED);
             empty.setGravity(Gravity.CENTER);
-            localBody.addView(empty, new LinearLayout.LayoutParams(
+            content.addView(empty, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(300)));
+                    dp(240)));
+            scroll.addView(content);
+            return scroll;
+        }
+
+        if (editorSelectedPath == null ||
+                photos.stream().noneMatch(
+                        file -> file.getAbsolutePath().equals(
+                                editorSelectedPath))) {
+            editorSelectedPath = photos.get(0).getAbsolutePath();
+        }
+
+        Spinner picker = new Spinner(this);
+        List<String> names = new ArrayList<>();
+        for (File file : photos) {
+            names.add(file.getName());
+        }
+        picker.setAdapter(new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_dropdown_item,
+                names));
+        for (int index = 0; index < photos.size(); index++) {
+            if (photos.get(index).getAbsolutePath().equals(
+                    editorSelectedPath)) {
+                picker.setSelection(index);
+                break;
+            }
+        }
+        content.addView(
+                picker,
+                marginParams(-1, dp(48), 0, 0, 0, 12));
+
+        HorizontalScrollView presetScroll = new HorizontalScrollView(this);
+        presetScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout presets = new LinearLayout(this);
+        presets.setOrientation(LinearLayout.HORIZONTAL);
+        presets.setGravity(Gravity.CENTER_VERTICAL);
+        addEditorPresetButton(presets, "原始", "original");
+        addEditorPresetButton(presets, "自然增强", "natural");
+        addEditorPresetButton(presets, "人像柔和", "portrait");
+        addEditorPresetButton(presets, "风光通透", "landscape");
+        addEditorPresetButton(presets, "高反差黑白", "monochrome");
+        presetScroll.addView(presets);
+        content.addView(
+                presetScroll,
+                marginParams(-1, dp(48), 0, 0, 0, 12));
+
+        ImageView preview = new ImageView(this);
+        preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        preview.setBackgroundColor(GRAPHITE);
+        content.addView(
+                preview,
+                marginParams(-1, dp(360), 0, 0, 0, 14));
+
+        TextView status = text(
+                "调整不会覆盖原文件",
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        Runnable refreshPreview = () -> {
+            File selected = new File(editorSelectedPath);
+            Bitmap rendered = renderEditedBitmap(
+                    selected,
+                    editorAdjustments,
+                    1600);
+            if (rendered == null) {
+                preview.setImageDrawable(null);
+                status.setText(tr("无法解码当前照片"));
+            } else {
+                preview.setImageBitmap(rendered);
+                status.setText(tr(
+                        editorAdjustments.showingOriginal
+                                ? "正在查看原图"
+                                : "调整不会覆盖原文件"));
+            }
+        };
+
+        picker.setOnItemSelectedListener(
+                new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(
+                            AdapterView<?> parent,
+                            View view,
+                            int position,
+                            long id) {
+                        String selectedPath =
+                                photos.get(position).getAbsolutePath();
+                        if (!selectedPath.equals(editorSelectedPath)) {
+                            editorAdjustments.reset();
+                        }
+                        editorSelectedPath = selectedPath;
+                        refreshPreview.run();
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                });
+
+        LinearLayout light = editorAdjustmentGroup();
+        addEditorAdjustment(
+                light,
+                "曝光",
+                editorAdjustments.exposure,
+                -200,
+                200,
+                true,
+                value -> editorAdjustments.exposure = value,
+                refreshPreview);
+        addEditorAdjustment(
+                light,
+                "对比度",
+                editorAdjustments.contrast,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.contrast = value,
+                refreshPreview);
+        addEditorAdjustment(
+                light,
+                "高光",
+                editorAdjustments.highlights,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.highlights = value,
+                refreshPreview);
+        addEditorAdjustment(
+                light,
+                "阴影",
+                editorAdjustments.shadows,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.shadows = value,
+                refreshPreview);
+        addEditorAdjustment(
+                light,
+                "白色色阶",
+                editorAdjustments.whites,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.whites = value,
+                refreshPreview);
+        addEditorAdjustment(
+                light,
+                "黑色色阶",
+                editorAdjustments.blacks,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.blacks = value,
+                refreshPreview);
+        content.addView(collapsibleGroup(
+                "editor-light",
+                "光线",
+                "6 项",
+                light,
+                true));
+
+        LinearLayout color = editorAdjustmentGroup();
+        addEditorAdjustment(
+                color,
+                "色温",
+                editorAdjustments.temperature,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.temperature = value,
+                refreshPreview);
+        addEditorAdjustment(
+                color,
+                "色调",
+                editorAdjustments.tint,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.tint = value,
+                refreshPreview);
+        addEditorAdjustment(
+                color,
+                "自然饱和度",
+                editorAdjustments.vibrance,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.vibrance = value,
+                refreshPreview);
+        addEditorAdjustment(
+                color,
+                "饱和度",
+                editorAdjustments.saturation,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.saturation = value,
+                refreshPreview);
+        content.addView(collapsibleGroup(
+                "editor-color",
+                "色彩",
+                "4 项",
+                color,
+                false));
+
+        LinearLayout detail = editorAdjustmentGroup();
+        addEditorAdjustment(
+                detail,
+                "纹理",
+                editorAdjustments.texture,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.texture = value,
+                refreshPreview);
+        addEditorAdjustment(
+                detail,
+                "清晰度",
+                editorAdjustments.clarity,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.clarity = value,
+                refreshPreview);
+        addEditorAdjustment(
+                detail,
+                "锐化",
+                editorAdjustments.sharpening,
+                0,
+                100,
+                false,
+                value -> editorAdjustments.sharpening = value,
+                refreshPreview);
+        addEditorAdjustment(
+                detail,
+                "降噪",
+                editorAdjustments.noiseReduction,
+                0,
+                100,
+                false,
+                value -> editorAdjustments.noiseReduction = value,
+                refreshPreview);
+        content.addView(collapsibleGroup(
+                "editor-detail",
+                "细节",
+                "4 项",
+                detail,
+                false));
+
+        LinearLayout effects = editorAdjustmentGroup();
+        addEditorAdjustment(
+                effects,
+                "去雾",
+                editorAdjustments.dehaze,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.dehaze = value,
+                refreshPreview);
+        addEditorAdjustment(
+                effects,
+                "暗角",
+                editorAdjustments.vignette,
+                -100,
+                100,
+                false,
+                value -> editorAdjustments.vignette = value,
+                refreshPreview);
+        content.addView(collapsibleGroup(
+                "editor-effects",
+                "效果",
+                "2 项",
+                effects,
+                false));
+
+        content.addView(collapsibleGroup(
+                "editor-geometry",
+                "几何",
+                "裁切与翻转",
+                buildEditorGeometryControls(refreshPreview),
+                false));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button compare = nativeButton("查看原图", false);
+        compare.setOnClickListener(view -> {
+            editorAdjustments.showingOriginal =
+                    !editorAdjustments.showingOriginal;
+            compare.setText(tr(
+                    editorAdjustments.showingOriginal
+                            ? "返回调整"
+                            : "查看原图"));
+            refreshPreview.run();
+        });
+        actions.addView(
+                compare,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button reset = nativeButton("全部重置", false);
+        reset.setOnClickListener(view -> {
+            editorAdjustments.reset();
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams resetParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        resetParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(reset, resetParams);
+        Button save = nativeButton("保存高质量副本", true);
+        save.setOnClickListener(view -> {
+            File source = new File(editorSelectedPath);
+            save.setEnabled(false);
+            status.setText(tr("正在保存编辑副本…"));
+            EditorAdjustments savedAdjustments =
+                    editorAdjustments.copy();
+            savedAdjustments.showingOriginal = false;
+            editorExecutor.execute(() -> {
+                Bitmap output = renderEditedBitmap(
+                        source,
+                        savedAdjustments,
+                        4096);
+                File destination = uniqueEditedFile(source);
+                boolean success = false;
+                if (output != null) {
+                    try (FileOutputStream stream =
+                                 new FileOutputStream(destination)) {
+                        success = output.compress(
+                                Bitmap.CompressFormat.JPEG,
+                                95,
+                                stream);
+                    } catch (Exception error) {
+                        diagnostics.error(
+                                "editor",
+                                "保存编辑副本失败：" + error.getMessage());
+                    }
+                    output.recycle();
+                }
+                boolean saved = success;
+                mainHandler.post(() -> {
+                    save.setEnabled(true);
+                    if (saved) {
+                        editorSelectedPath =
+                                destination.getAbsolutePath();
+                        editorAdjustments.reset();
+                        showToast("已保存编辑副本：" + destination.getName());
+                        updateFileCount();
+                        showSection("editor");
+                    } else {
+                        status.setText(tr("保存编辑副本失败"));
+                    }
+                });
+            });
+        });
+        LinearLayout.LayoutParams saveParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        saveParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(save, saveParams);
+        content.addView(actions);
+        content.addView(
+                status,
+                marginParams(-1, -2, 0, 8, 0, 0));
+        scroll.addView(content);
+        refreshPreview.run();
+        return scroll;
+    }
+
+    private LinearLayout editorAdjustmentGroup() {
+        LinearLayout group = verticalContainer();
+        group.setPadding(dp(12), dp(4), dp(12), dp(10));
+        return group;
+    }
+
+    private void addEditorPresetButton(
+            LinearLayout parent,
+            String label,
+            String preset) {
+        Button button = nativeButton(label, false);
+        button.setOnClickListener(view -> {
+            applyEditorPreset(preset);
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(dp(128), dp(44));
+        params.setMargins(0, 0, dp(8), 0);
+        parent.addView(button, params);
+    }
+
+    private void applyEditorPreset(String preset) {
+        editorAdjustments.resetTone();
+        switch (preset) {
+            case "natural":
+                editorAdjustments.contrast = 8;
+                editorAdjustments.highlights = -18;
+                editorAdjustments.shadows = 16;
+                editorAdjustments.whites = 8;
+                editorAdjustments.blacks = -8;
+                editorAdjustments.vibrance = 14;
+                editorAdjustments.texture = 8;
+                editorAdjustments.clarity = 6;
+                editorAdjustments.sharpening = 24;
+                editorAdjustments.noiseReduction = 8;
+                break;
+            case "portrait":
+                editorAdjustments.contrast = -4;
+                editorAdjustments.highlights = -24;
+                editorAdjustments.shadows = 18;
+                editorAdjustments.temperature = 7;
+                editorAdjustments.tint = 4;
+                editorAdjustments.vibrance = 10;
+                editorAdjustments.texture = -12;
+                editorAdjustments.clarity = -6;
+                editorAdjustments.sharpening = 16;
+                editorAdjustments.noiseReduction = 22;
+                editorAdjustments.vignette = -8;
+                break;
+            case "landscape":
+                editorAdjustments.contrast = 12;
+                editorAdjustments.highlights = -28;
+                editorAdjustments.shadows = 14;
+                editorAdjustments.whites = 12;
+                editorAdjustments.blacks = -14;
+                editorAdjustments.vibrance = 24;
+                editorAdjustments.saturation = 5;
+                editorAdjustments.texture = 16;
+                editorAdjustments.clarity = 18;
+                editorAdjustments.sharpening = 30;
+                editorAdjustments.dehaze = 12;
+                editorAdjustments.vignette = -10;
+                break;
+            case "monochrome":
+                editorAdjustments.contrast = 22;
+                editorAdjustments.highlights = -18;
+                editorAdjustments.shadows = 12;
+                editorAdjustments.whites = 10;
+                editorAdjustments.blacks = -22;
+                editorAdjustments.saturation = -100;
+                editorAdjustments.texture = 12;
+                editorAdjustments.clarity = 24;
+                editorAdjustments.sharpening = 28;
+                editorAdjustments.vignette = -14;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private SeekBar addEditorAdjustment(
+            LinearLayout parent,
+            String title,
+            int currentValue,
+            int minimum,
+            int maximum,
+            boolean exposure,
+            IntConsumer setter,
+            Runnable refreshPreview) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text(title, 13, Typeface.BOLD, INK);
+        row.addView(label, new LinearLayout.LayoutParams(dp(86), dp(48)));
+        SeekBar slider = new SeekBar(this);
+        slider.setMax(maximum - minimum);
+        slider.setProgress(currentValue - minimum);
+        TextView value = text(
+                editorAdjustmentValue(currentValue, exposure),
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        slider.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+                    @Override
+                    public void onProgressChanged(
+                            SeekBar seekBar,
+                            int progress,
+                            boolean fromUser) {
+                        int adjusted = progress + minimum;
+                        setter.accept(adjusted);
+                        value.setText(
+                                editorAdjustmentValue(
+                                        adjusted,
+                                        exposure));
+                        if (fromUser) refreshPreview.run();
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                    }
+                });
+        row.addView(slider, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        row.addView(value, new LinearLayout.LayoutParams(dp(44), dp(48)));
+        parent.addView(row);
+        return slider;
+    }
+
+    private String editorAdjustmentValue(
+            int value,
+            boolean exposure) {
+        if (exposure) {
+            return String.format(
+                    Locale.ROOT,
+                    "%+.2f EV",
+                    value / 100.0);
+        }
+        return String.format(Locale.ROOT, "%+d", value);
+    }
+
+    private View buildEditorGeometryControls(Runnable refreshPreview) {
+        LinearLayout group = editorAdjustmentGroup();
+        group.addView(
+                text("裁切比例", 12, Typeface.BOLD, MUTED),
+                marginParams(-1, dp(24), 0, 0, 0, 4));
+        Spinner crop = monitorSpinner(new String[]{
+                "原始比例",
+                "1:1",
+                "4:3",
+                "3:2",
+                "16:9"
+        });
+        String[] cropValues = new String[]{
+                "original", "1:1", "4:3", "3:2", "16:9"
+        };
+        int selected = Arrays.asList(cropValues)
+                .indexOf(editorAdjustments.cropRatio);
+        crop.setSelection(Math.max(0, selected));
+        crop.setOnItemSelectedListener(
+                new AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(
+                            AdapterView<?> parent,
+                            View view,
+                            int position,
+                            long id) {
+                        editorAdjustments.cropRatio =
+                                cropValues[position];
+                        refreshPreview.run();
+                    }
+
+                    @Override
+                    public void onNothingSelected(AdapterView<?> parent) {
+                    }
+                });
+        group.addView(
+                crop,
+                marginParams(-1, dp(48), 0, 6, 0, 10));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button rotate = nativeButton("旋转 90°", false);
+        rotate.setOnClickListener(view -> {
+            editorAdjustments.rotation =
+                    (editorAdjustments.rotation + 90) % 360;
+            refreshPreview.run();
+        });
+        actions.addView(
+                rotate,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button horizontal = nativeButton("水平翻转", false);
+        horizontal.setOnClickListener(view -> {
+            editorAdjustments.flipHorizontal =
+                    !editorAdjustments.flipHorizontal;
+            refreshPreview.run();
+        });
+        LinearLayout.LayoutParams horizontalParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        horizontalParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(horizontal, horizontalParams);
+        Button vertical = nativeButton("垂直翻转", false);
+        vertical.setOnClickListener(view -> {
+            editorAdjustments.flipVertical =
+                    !editorAdjustments.flipVertical;
+            refreshPreview.run();
+        });
+        LinearLayout.LayoutParams verticalParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        verticalParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(vertical, verticalParams);
+        group.addView(actions);
+        return group;
+    }
+
+    private static boolean isEditableImageFile(File file) {
+        String lower = file.getName().toLowerCase(Locale.ROOT);
+        return lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".png")
+                || lower.endsWith(".heic")
+                || lower.endsWith(".heif")
+                || lower.endsWith(".tif")
+                || lower.endsWith(".tiff");
+    }
+
+    private Bitmap renderEditedBitmap(
+            File file,
+            EditorAdjustments settings,
+            int maximumDimension) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        int sampleSize = 1;
+        while (Math.max(
+                bounds.outWidth / sampleSize,
+                bounds.outHeight / sampleSize) > maximumDimension) {
+            sampleSize *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sampleSize;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        Bitmap source = BitmapFactory.decodeFile(
+                file.getAbsolutePath(),
+                options);
+        if (source == null) return null;
+        if (settings.showingOriginal) {
+            return source;
+        }
+
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int[] pixels = new int[width * height];
+        source.getPixels(pixels, 0, width, 0, 0, width, height);
+        source.recycle();
+
+        double exposure = Math.pow(2, settings.exposure / 100.0);
+        double contrast =
+                1
+                        + settings.contrast / 125.0
+                        + settings.dehaze / 210.0;
+        double baseSaturation =
+                1
+                        + settings.saturation / 100.0
+                        + settings.dehaze / 520.0;
+        double temperature = settings.temperature / 100.0;
+        double tint = settings.tint / 100.0;
+        for (int index = 0; index < pixels.length; index++) {
+            int color = pixels[index];
+            double red = Color.red(color) / 255.0 * exposure;
+            double green = Color.green(color) / 255.0 * exposure;
+            double blue = Color.blue(color) / 255.0 * exposure;
+
+            red += temperature * 0.12 + tint * 0.045;
+            green -= tint * 0.08;
+            blue -= temperature * 0.12 - tint * 0.045;
+
+            double luma =
+                    red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            double toneShift =
+                    settings.shadows / 100.0
+                            * Math.pow(1 - clampUnit(luma), 2)
+                            * 0.38
+                    + settings.highlights / 100.0
+                            * Math.pow(clampUnit(luma), 2)
+                            * 0.30
+                    + settings.whites / 100.0
+                            * smoothStep(0.55, 1, luma)
+                            * 0.24
+                    + settings.blacks / 100.0
+                            * (1 - smoothStep(0, 0.45, luma))
+                            * 0.20;
+            red += toneShift;
+            green += toneShift;
+            blue += toneShift;
+
+            double clarityMask =
+                    1 - Math.abs(clampUnit(luma) * 2 - 1);
+            double localContrast =
+                    1 + settings.clarity / 100.0
+                            * clarityMask * 0.38;
+            red = (red - 0.5) * contrast * localContrast + 0.5;
+            green = (green - 0.5) * contrast * localContrast + 0.5;
+            blue = (blue - 0.5) * contrast * localContrast + 0.5;
+
+            luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            double colorfulness =
+                    Math.max(red, Math.max(green, blue))
+                            - Math.min(red, Math.min(green, blue));
+            double saturation =
+                    Math.max(
+                            0,
+                            baseSaturation
+                                    + settings.vibrance / 100.0
+                                    * (1 - clampUnit(colorfulness))
+                                    * 0.82);
+            red = luma + (red - luma) * saturation;
+            green = luma + (green - luma) * saturation;
+            blue = luma + (blue - luma) * saturation;
+
+            int x = index % width;
+            int y = index / width;
+            double normalizedX =
+                    (x - width / 2.0) / Math.max(1, width / 2.0);
+            double normalizedY =
+                    (y - height / 2.0) / Math.max(1, height / 2.0);
+            double edge = Math.min(
+                    1,
+                    Math.sqrt(
+                            normalizedX * normalizedX
+                                    + normalizedY * normalizedY));
+            double vignette =
+                    1 + settings.vignette / 100.0
+                            * edge * edge * 0.72;
+            red *= vignette;
+            green *= vignette;
+            blue *= vignette;
+
+            pixels[index] = Color.argb(
+                    Color.alpha(color),
+                    editorChannel(red * 255),
+                    editorChannel(green * 255),
+                    editorChannel(blue * 255));
+        }
+
+        applyEditorDetail(
+                pixels,
+                width,
+                height,
+                settings);
+        Bitmap adjusted = Bitmap.createBitmap(
+                pixels,
+                width,
+                height,
+                Bitmap.Config.ARGB_8888);
+        return applyEditorGeometry(adjusted, settings);
+    }
+
+    private void applyEditorDetail(
+            int[] pixels,
+            int width,
+            int height,
+            EditorAdjustments settings) {
+        double smoothing =
+                settings.noiseReduction / 100.0 * 0.58
+                        + Math.max(0, -settings.texture) / 100.0 * 0.24;
+        double sharpening =
+                settings.sharpening / 100.0 * 1.15
+                        + Math.max(0, settings.texture) / 100.0 * 0.48
+                        + Math.max(0, settings.clarity) / 100.0 * 0.25;
+        if (smoothing == 0 && sharpening == 0) {
+            return;
+        }
+        int[] source = pixels.clone();
+        for (int y = 1; y < height - 1; y++) {
+            for (int x = 1; x < width - 1; x++) {
+                int index = y * width + x;
+                int center = source[index];
+                int left = source[index - 1];
+                int right = source[index + 1];
+                int top = source[index - width];
+                int bottom = source[index + width];
+                int averageRed =
+                        (Color.red(center) + Color.red(left)
+                                + Color.red(right) + Color.red(top)
+                                + Color.red(bottom)) / 5;
+                int averageGreen =
+                        (Color.green(center) + Color.green(left)
+                                + Color.green(right) + Color.green(top)
+                                + Color.green(bottom)) / 5;
+                int averageBlue =
+                        (Color.blue(center) + Color.blue(left)
+                                + Color.blue(right) + Color.blue(top)
+                                + Color.blue(bottom)) / 5;
+                pixels[index] = Color.argb(
+                        Color.alpha(center),
+                        editorDetailChannel(
+                                Color.red(center),
+                                averageRed,
+                                smoothing,
+                                sharpening),
+                        editorDetailChannel(
+                                Color.green(center),
+                                averageGreen,
+                                smoothing,
+                                sharpening),
+                        editorDetailChannel(
+                                Color.blue(center),
+                                averageBlue,
+                                smoothing,
+                                sharpening));
+            }
+        }
+    }
+
+    private int editorDetailChannel(
+            int center,
+            int average,
+            double smoothing,
+            double sharpening) {
+        double smoothed = center * (1 - smoothing) + average * smoothing;
+        return editorChannel(
+                smoothed + (center - average) * sharpening);
+    }
+
+    private Bitmap applyEditorGeometry(
+            Bitmap bitmap,
+            EditorAdjustments settings) {
+        Bitmap transformed = bitmap;
+        if (settings.rotation != 0
+                || settings.flipHorizontal
+                || settings.flipVertical) {
+            Matrix matrix = new Matrix();
+            matrix.postScale(
+                    settings.flipHorizontal ? -1 : 1,
+                    settings.flipVertical ? -1 : 1);
+            matrix.postRotate(settings.rotation);
+            transformed = Bitmap.createBitmap(
+                    bitmap,
+                    0,
+                    0,
+                    bitmap.getWidth(),
+                    bitmap.getHeight(),
+                    matrix,
+                    true);
+            if (transformed != bitmap) bitmap.recycle();
+        }
+        double ratio = editorCropRatio(settings.cropRatio);
+        if (ratio <= 0) {
+            return transformed;
+        }
+        int width = transformed.getWidth();
+        int height = transformed.getHeight();
+        int cropWidth = width;
+        int cropHeight = (int)Math.round(width / ratio);
+        if (cropHeight > height) {
+            cropHeight = height;
+            cropWidth = (int)Math.round(height * ratio);
+        }
+        Bitmap cropped = Bitmap.createBitmap(
+                transformed,
+                Math.max(0, (width - cropWidth) / 2),
+                Math.max(0, (height - cropHeight) / 2),
+                Math.max(1, cropWidth),
+                Math.max(1, cropHeight));
+        if (cropped != transformed) transformed.recycle();
+        return cropped;
+    }
+
+    private double editorCropRatio(String cropRatio) {
+        switch (cropRatio) {
+            case "1:1":
+                return 1;
+            case "4:3":
+                return 4.0 / 3;
+            case "3:2":
+                return 3.0 / 2;
+            case "16:9":
+                return 16.0 / 9;
+            default:
+                return 0;
+        }
+    }
+
+    private static double smoothStep(
+            double edge0,
+            double edge1,
+            double value) {
+        double scaled = clampUnit((value - edge0) / (edge1 - edge0));
+        return scaled * scaled * (3 - 2 * scaled);
+    }
+
+    private static double clampUnit(double value) {
+        return Math.max(0, Math.min(1, value));
+    }
+
+    private static int editorChannel(double value) {
+        return (int)Math.max(0, Math.min(255, Math.round(value)));
+    }
+
+    private File uniqueEditedFile(File source) {
+        String filename = source.getName();
+        int dot = filename.lastIndexOf('.');
+        String stem = dot > 0 ? filename.substring(0, dot) : filename;
+        File destination = new File(
+                photoDirectory,
+                stem + "_edited.jpg");
+        if (!destination.exists()) return destination;
+        return new File(
+                photoDirectory,
+                stem + "_edited_" + System.currentTimeMillis() + ".jpg");
+    }
+
+    private View buildBranchWorkspace(List<File> files) {
+        LinearLayout workspace = panel();
+        workspace.setPadding(dp(14), dp(14), dp(14), dp(14));
+        workspace.addView(buildUserBranchTree(files));
+
+        List<File> unclassified = new ArrayList<>();
+        for (File file : files) {
+            if (!libraryFileAssignments.containsKey(file.getAbsolutePath())) {
+                unclassified.add(file);
+            }
+        }
+        LinearLayout uncategorizedBody = verticalContainer();
+        if (unclassified.isEmpty()) {
+            TextView empty = text(
+                    "未分类已清空\n拍摄、导入或无线接收的新文件会先显示在这里。",
+                    14,
+                    Typeface.NORMAL,
+                    MUTED);
+            empty.setGravity(Gravity.CENTER);
+            uncategorizedBody.addView(empty, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(120)));
         } else {
-            localBody.addView(localFileTypeGroup(
+            uncategorizedBody.addView(localFileTypeGroup(
                     "local-photos",
                     "照片",
-                    files,
+                    unclassified,
                     false));
-            localBody.addView(localFileTypeGroup(
+            uncategorizedBody.addView(localFileTypeGroup(
                     "local-videos",
                     "视频",
-                    files,
+                    unclassified,
                     true));
         }
-        content.addView(collapsibleGroup(
-                "local-library",
-                "帧澈 ZENCHE 文件库",
-                files.size() + " 个文件",
-                localBody,
-                true));
-        scroll.addView(content);
-        return scroll;
+        View unclassifiedGroup = collapsibleGroup(
+                "local-unclassified",
+                "未分类",
+                unclassified.size() + " 个文件",
+                uncategorizedBody,
+                true);
+        configureLibraryDropTarget(
+                unclassifiedGroup,
+                null,
+                SURFACE,
+                18);
+        workspace.addView(unclassifiedGroup);
+        workspace.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 16));
+        return workspace;
     }
 
     private View collapsibleGroup(
@@ -3271,6 +4463,341 @@ public final class MainActivity extends Activity {
         group.addView(body);
         group.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 12));
         return group;
+    }
+
+    private View buildUserBranchTree(List<File> files) {
+        LinearLayout tree = verticalContainer();
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.addView(
+                text("用户分支", 15, Typeface.BOLD, INK),
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button add = nativeButton("＋ 新建分支", false);
+        add.setOnClickListener(view -> showCreateLibraryBranchDialog(null));
+        heading.addView(add, new LinearLayout.LayoutParams(dp(132), dp(44)));
+        tree.addView(heading);
+
+        if (userLibraryBranches.isEmpty()) {
+            tree.addView(
+                    text(
+                            "可建立项目、客户或拍摄日等分支；媒体仍保留在原始存储位置。",
+                            12,
+                            Typeface.NORMAL,
+                            MUTED),
+                    marginParams(-1, -2, 0, 4, 0, 10));
+        } else {
+            for (LibraryBranch branch : userLibraryBranches) {
+                tree.addView(buildLibraryBranchView(branch, 0, files));
+            }
+        }
+        return tree;
+    }
+
+    private View buildLibraryBranchView(
+            LibraryBranch branch,
+            int depth,
+            List<File> files) {
+        LinearLayout group = verticalContainer();
+        String disclosureKey = "library-branch-" + branch.id;
+        boolean expanded = disclosureStates.containsKey(disclosureKey)
+                ? Boolean.TRUE.equals(disclosureStates.get(disclosureKey))
+                : true;
+        disclosureStates.put(disclosureKey, expanded);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(8 + depth * 14), 0, dp(4), 0);
+        header.setBackground(rounded(
+                depth == 0 ? PAPER_2 : Color.rgb(247, 249, 252),
+                10,
+                RULE));
+        Button toggle = nativeButton(expanded ? "⌄" : "›", false);
+        TextView name = text(
+                "▱  " + branch.name,
+                14,
+                Typeface.BOLD,
+                INK);
+        List<File> assignedFiles = filesAssignedToBranch(branch.id, files);
+        TextView count = text(
+                assignedFiles.size() + " 文件",
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        count.setGravity(Gravity.CENTER);
+        Button add = nativeButton("＋", false);
+        add.setContentDescription(tr("在 " + branch.name + " 下新建分支"));
+        add.setOnClickListener(
+                view -> showCreateLibraryBranchDialog(branch.id));
+        Button delete = nativeButton("删", false);
+        delete.setTextColor(VIDEO);
+        delete.setContentDescription(tr("删除分支 " + branch.name));
+        delete.setOnClickListener(
+                view -> showDeleteLibraryBranchDialog(branch));
+
+        LinearLayout body = verticalContainer();
+        for (File file : assignedFiles) {
+            body.addView(photoRow(file));
+        }
+        if (assignedFiles.isEmpty() && branch.children.isEmpty()) {
+            TextView empty = text(
+                    "拖动文件到这里",
+                    12,
+                    Typeface.NORMAL,
+                    MUTED);
+            empty.setPadding(dp(54 + (depth + 1) * 14), 0, 0, 0);
+            body.addView(empty, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(36)));
+        }
+        for (LibraryBranch child : branch.children) {
+            body.addView(buildLibraryBranchView(
+                    child,
+                    depth + 1,
+                    files));
+        }
+        body.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        View.OnClickListener toggleListener = view -> {
+            boolean next = body.getVisibility() != View.VISIBLE;
+            disclosureStates.put(disclosureKey, next);
+            body.setVisibility(next ? View.VISIBLE : View.GONE);
+            toggle.setText(next ? "⌄" : "›");
+        };
+        toggle.setOnClickListener(toggleListener);
+        name.setOnClickListener(toggleListener);
+        count.setOnClickListener(toggleListener);
+
+        header.addView(toggle, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        header.addView(name, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        header.addView(count, new LinearLayout.LayoutParams(dp(64), dp(52)));
+        header.addView(add, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        header.addView(delete, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        configureLibraryDropTarget(
+                header,
+                branch.id,
+                depth == 0 ? PAPER_2 : Color.rgb(247, 249, 252),
+                10);
+        group.addView(
+                header,
+                marginParams(-1, dp(52), 0, 0, 0, 4));
+        group.addView(body);
+        return group;
+    }
+
+    private void showCreateLibraryBranchDialog(String parentId) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint(tr("分支名称"));
+        input.setPadding(dp(16), dp(8), dp(16), dp(8));
+        LibraryBranch parent = findLibraryBranch(parentId);
+        new AlertDialog.Builder(this)
+                .setTitle(tr("新建分支"))
+                .setMessage(tr(
+                        "将在“"
+                                + (parent == null
+                                ? "帧澈 ZENCHE 文件库"
+                                : parent.name)
+                                + "”下创建可继续展开的节点。"))
+                .setView(input)
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(tr("创建"), (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        showToast("请输入分支名称。");
+                        return;
+                    }
+                    LibraryBranch branch = new LibraryBranch(
+                            UUID.randomUUID().toString(),
+                            name);
+                    if (parent == null) {
+                        userLibraryBranches.add(branch);
+                    } else {
+                        parent.children.add(branch);
+                        disclosureStates.put(
+                                "library-branch-" + parent.id,
+                                true);
+                    }
+                    saveLibraryBranches();
+                    showSection("library");
+                })
+                .show();
+    }
+
+    private void showDeleteLibraryBranchDialog(LibraryBranch branch) {
+        new AlertDialog.Builder(this)
+                .setTitle(tr("删除分支？"))
+                .setMessage(tr(
+                        "将同时删除“"
+                                + branch.name
+                                + "”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"))
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(tr("删除分支"), (dialog, which) -> {
+                    deleteLibraryBranch(branch.id);
+                    showSection("library");
+                })
+                .show();
+    }
+
+    private void deleteLibraryBranch(String id) {
+        LibraryBranch branch = findLibraryBranch(id);
+        if (branch == null) return;
+        Set<String> removedIds = new HashSet<>();
+        branch.collectIds(removedIds);
+        if (!removeLibraryBranch(userLibraryBranches, id)) return;
+        for (String removedId : removedIds) {
+            disclosureStates.remove("library-branch-" + removedId);
+        }
+        java.util.Iterator<Map.Entry<String, String>> assignments =
+                libraryFileAssignments.entrySet().iterator();
+        while (assignments.hasNext()) {
+            if (removedIds.contains(assignments.next().getValue())) {
+                assignments.remove();
+            }
+        }
+        saveLibraryBranches();
+        saveLibraryFileAssignments();
+        showToast("分支已删除，文件已回到未分类");
+    }
+
+    private boolean removeLibraryBranch(
+            List<LibraryBranch> branches,
+            String id) {
+        for (int index = 0; index < branches.size(); index++) {
+            LibraryBranch branch = branches.get(index);
+            if (branch.id.equals(id)) {
+                branches.remove(index);
+                return true;
+            }
+            if (removeLibraryBranch(branch.children, id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private LibraryBranch findLibraryBranch(String id) {
+        if (id == null) return null;
+        for (LibraryBranch branch : userLibraryBranches) {
+            LibraryBranch found = branch.find(id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void loadLibraryBranches() {
+        userLibraryBranches.clear();
+        libraryFileAssignments.clear();
+        android.content.SharedPreferences preferences =
+                getSharedPreferences("nikon-link", MODE_PRIVATE);
+        String serialized = preferences.getString(LIBRARY_BRANCHES_KEY, "[]");
+        try {
+            JSONArray array = new JSONArray(serialized);
+            for (int index = 0; index < array.length(); index++) {
+                userLibraryBranches.add(
+                        LibraryBranch.fromJson(array.getJSONObject(index)));
+            }
+        } catch (Exception ignored) {
+            userLibraryBranches.clear();
+        }
+        try {
+            JSONObject assignments = new JSONObject(
+                    preferences.getString(
+                            LIBRARY_FILE_ASSIGNMENTS_KEY,
+                            "{}"));
+            java.util.Iterator<String> keys = assignments.keys();
+            while (keys.hasNext()) {
+                String path = keys.next();
+                libraryFileAssignments.put(
+                        path,
+                        assignments.optString(path, ""));
+            }
+        } catch (Exception ignored) {
+            libraryFileAssignments.clear();
+        }
+    }
+
+    private void saveLibraryBranches() {
+        JSONArray array = new JSONArray();
+        for (LibraryBranch branch : userLibraryBranches) {
+            array.put(branch.toJson());
+        }
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putString(LIBRARY_BRANCHES_KEY, array.toString())
+                .apply();
+    }
+
+    private void saveLibraryFileAssignments() {
+        JSONObject assignments = new JSONObject();
+        try {
+            for (Map.Entry<String, String> entry
+                    : libraryFileAssignments.entrySet()) {
+                assignments.put(entry.getKey(), entry.getValue());
+            }
+        } catch (Exception ignored) {
+        }
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putString(
+                        LIBRARY_FILE_ASSIGNMENTS_KEY,
+                        assignments.toString())
+                .apply();
+    }
+
+    private List<File> filesAssignedToBranch(
+            String branchId,
+            List<File> files) {
+        List<File> assigned = new ArrayList<>();
+        for (File file : files) {
+            if (branchId.equals(
+                    libraryFileAssignments.get(file.getAbsolutePath()))) {
+                assigned.add(file);
+            }
+        }
+        return assigned;
+    }
+
+    private void configureLibraryDropTarget(
+            View target,
+            String branchId,
+            int normalColor,
+            int radius) {
+        target.setOnDragListener((view, event) -> {
+            switch (event.getAction()) {
+                case DragEvent.ACTION_DRAG_STARTED:
+                    return event.getLocalState() instanceof File;
+                case DragEvent.ACTION_DRAG_ENTERED:
+                    view.setBackground(rounded(COBALT_SOFT, radius, COBALT));
+                    return true;
+                case DragEvent.ACTION_DRAG_EXITED:
+                case DragEvent.ACTION_DRAG_ENDED:
+                    view.setBackground(rounded(normalColor, radius, RULE));
+                    return true;
+                case DragEvent.ACTION_DROP:
+                    if (!(event.getLocalState() instanceof File)) return false;
+                    File file = (File) event.getLocalState();
+                    if (branchId == null) {
+                        libraryFileAssignments.remove(file.getAbsolutePath());
+                    } else {
+                        libraryFileAssignments.put(
+                                file.getAbsolutePath(),
+                                branchId);
+                        disclosureStates.put(
+                                "library-branch-" + branchId,
+                                true);
+                    }
+                    saveLibraryFileAssignments();
+                    showToast(
+                            branchId == null
+                                    ? "已移到未分类"
+                                    : "已移到分支");
+                    showSection("library");
+                    return true;
+                default:
+                    return true;
+            }
+        });
     }
 
     private View systemMediaTypeGroup(
@@ -3471,6 +4998,11 @@ public final class MainActivity extends Activity {
                         showLargePhoto(file);
                         return true;
                     }
+
+                    @Override
+                    public void onLongPress(MotionEvent event) {
+                        startLibraryFileDrag(row, file);
+                    }
                 });
         row.setOnTouchListener((view, event) -> doubleTap.onTouchEvent(event));
 
@@ -3518,6 +5050,9 @@ public final class MainActivity extends Activity {
                 .setPositiveButton(tr("删除"), (dialog, which) -> {
                     if (!file.delete()) {
                         showToast("无法删除文件。");
+                    } else {
+                        libraryFileAssignments.remove(file.getAbsolutePath());
+                        saveLibraryFileAssignments();
                     }
                     showSection("library");
                     updateFileCount();
@@ -3529,6 +5064,18 @@ public final class MainActivity extends Activity {
         actions.addView(delete, deleteParams);
         row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(76)));
         return row;
+    }
+
+    private void startLibraryFileDrag(View source, File file) {
+        ClipData data = ClipData.newPlainText(
+                "zenche-library-file",
+                file.getAbsolutePath());
+        View.DragShadowBuilder shadow = new View.DragShadowBuilder(source);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            source.startDragAndDrop(data, shadow, file, 0);
+        } else {
+            source.startDrag(data, shadow, file, 0);
+        }
     }
 
     private View buildWirelessTransferPanel() {
@@ -5230,9 +6777,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.1.0" : version;
+            return version == null || version.isEmpty() ? "1.2.0" : version;
         } catch (Exception error) {
-            return "1.1.0";
+            return "1.2.0";
         }
     }
 
@@ -5499,6 +7046,62 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private static final class LibraryBranch {
+        final String id;
+        final String name;
+        final List<LibraryBranch> children = new ArrayList<>();
+
+        LibraryBranch(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        LibraryBranch find(String requestedId) {
+            if (id.equals(requestedId)) return this;
+            for (LibraryBranch child : children) {
+                LibraryBranch found = child.find(requestedId);
+                if (found != null) return found;
+            }
+            return null;
+        }
+
+        void collectIds(Set<String> ids) {
+            ids.add(id);
+            for (LibraryBranch child : children) {
+                child.collectIds(ids);
+            }
+        }
+
+        JSONObject toJson() {
+            JSONObject object = new JSONObject();
+            JSONArray childArray = new JSONArray();
+            try {
+                object.put("id", id);
+                object.put("name", name);
+                for (LibraryBranch child : children) {
+                    childArray.put(child.toJson());
+                }
+                object.put("children", childArray);
+            } catch (Exception ignored) {
+            }
+            return object;
+        }
+
+        static LibraryBranch fromJson(JSONObject object) throws Exception {
+            LibraryBranch branch = new LibraryBranch(
+                    object.optString("id", UUID.randomUUID().toString()),
+                    object.optString("name", "未命名分支"));
+            JSONArray childArray = object.optJSONArray("children");
+            if (childArray != null) {
+                for (int index = 0; index < childArray.length(); index++) {
+                    branch.children.add(
+                            fromJson(childArray.getJSONObject(index)));
+                }
+            }
+            return branch;
+        }
+    }
+
     private static final class MediaEntry {
         final Uri uri;
         final String name;
@@ -5539,6 +7142,7 @@ public final class MainActivity extends Activity {
         cameraExecutor.shutdown();
         previewExecutor.shutdownNow();
         updateExecutor.shutdownNow();
+        editorExecutor.shutdownNow();
         super.onDestroy();
     }
 }

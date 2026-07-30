@@ -5,13 +5,14 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Data;
 #if NIKONLINK_WINDOWS_SHARE
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -25,10 +26,142 @@ public partial class MainWindow : Window
         BitmapSource Display,
         ProfessionalMonitorResult Monitor);
 
+    private sealed class LibraryBranch
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Name { get; set; } = "未命名分支";
+        public List<LibraryBranch> Children { get; set; } = [];
+    }
+
+    private sealed class LibraryTreeNode
+    {
+        public required string Name { get; init; }
+        public string Detail { get; init; } = "";
+        public string Icon { get; init; } = "▱";
+        public BitmapSource? Thumbnail { get; init; }
+        public string? BranchId { get; init; }
+        public PhotoItem? Item { get; init; }
+        public bool IsUnclassified { get; init; }
+        public bool IsExpanded { get; set; }
+        public ObservableCollection<LibraryTreeNode> Children { get; } = [];
+    }
+
+    private sealed class EditorPhotoChoice
+    {
+        public required PhotoItem Item { get; init; }
+
+        public override string ToString() => Item.Name;
+    }
+
+    private sealed class EditorAdjustments
+    {
+        public double Exposure { get; set; }
+        public double Contrast { get; set; }
+        public double Highlights { get; set; }
+        public double Shadows { get; set; }
+        public double Whites { get; set; }
+        public double Blacks { get; set; }
+        public double Temperature { get; set; }
+        public double Tint { get; set; }
+        public double Vibrance { get; set; }
+        public double Saturation { get; set; }
+        public double Texture { get; set; }
+        public double Clarity { get; set; }
+        public double Sharpening { get; set; }
+        public double NoiseReduction { get; set; }
+        public double Dehaze { get; set; }
+        public double Vignette { get; set; }
+        public int Rotation { get; set; }
+        public bool FlipHorizontal { get; set; }
+        public bool FlipVertical { get; set; }
+        public bool ShowingOriginal { get; set; }
+        public string CropRatio { get; set; } = "original";
+
+        public void Reset()
+        {
+            Exposure = 0;
+            Contrast = 0;
+            Highlights = 0;
+            Shadows = 0;
+            Whites = 0;
+            Blacks = 0;
+            Temperature = 0;
+            Tint = 0;
+            Vibrance = 0;
+            Saturation = 0;
+            Texture = 0;
+            Clarity = 0;
+            Sharpening = 0;
+            NoiseReduction = 0;
+            Dehaze = 0;
+            Vignette = 0;
+            Rotation = 0;
+            FlipHorizontal = false;
+            FlipVertical = false;
+            ShowingOriginal = false;
+            CropRatio = "original";
+        }
+
+        public void ResetTone()
+        {
+            var geometry = (
+                Rotation,
+                FlipHorizontal,
+                FlipVertical,
+                CropRatio);
+            Reset();
+            Rotation = geometry.Rotation;
+            FlipHorizontal = geometry.FlipHorizontal;
+            FlipVertical = geometry.FlipVertical;
+            CropRatio = geometry.CropRatio;
+        }
+
+        public EditorAdjustments Copy() => new()
+        {
+            Exposure = Exposure,
+            Contrast = Contrast,
+            Highlights = Highlights,
+            Shadows = Shadows,
+            Whites = Whites,
+            Blacks = Blacks,
+            Temperature = Temperature,
+            Tint = Tint,
+            Vibrance = Vibrance,
+            Saturation = Saturation,
+            Texture = Texture,
+            Clarity = Clarity,
+            Sharpening = Sharpening,
+            NoiseReduction = NoiseReduction,
+            Dehaze = Dehaze,
+            Vignette = Vignette,
+            Rotation = Rotation,
+            FlipHorizontal = FlipHorizontal,
+            FlipVertical = FlipVertical,
+            ShowingOriginal = ShowingOriginal,
+            CropRatio = CropRatio
+        };
+    }
+
+    private sealed record EditorSliderSpec(
+        string Key,
+        string Label,
+        double Minimum,
+        double Maximum,
+        bool Exposure = false);
+
     private static readonly string AnnouncementStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "dismissed-announcement-version.txt");
+    private static readonly string LibraryBranchStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "library-branches.json");
+    private static readonly string LibraryFileAssignmentStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "library-file-assignments.json");
+    private const string LibraryDragFormat = "ZENCHE.LibraryFilePath";
     private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
     private readonly PtpCamera _camera = new();
     private readonly PhotoLibrary _library = new();
@@ -36,7 +169,8 @@ public partial class MainWindow : Window
     private readonly WirelessTransferServer _wirelessServer;
     private readonly DiagnosticLogger _diagnostics = DiagnosticLogger.Shared;
     private readonly UpdateService _updateService = new();
-    private readonly ObservableCollection<PhotoItem> _photos = [];
+    private readonly List<LibraryBranch> _libraryBranches;
+    private readonly Dictionary<string, string> _libraryFileAssignments;
     private CancellationTokenSource? _previewCancellation;
     private Task? _previewTask;
     private CancellationTokenSource? _shootingTaskCancellation;
@@ -61,6 +195,14 @@ public partial class MainWindow : Window
     private Window? _immersivePreviewWindow;
     private Image? _immersivePreviewImage;
     private Button? _immersiveRecordButton;
+    private Point _libraryDragStart;
+    private bool _libraryDragInProgress;
+    private TreeViewItem? _libraryDropTarget;
+    private string? _editorSelectedPath;
+    private readonly EditorAdjustments _editorAdjustments = new();
+    private readonly Dictionary<string, Slider> _editorSliders = [];
+    private ComboBox? _editorCropBox;
+    private bool _updatingEditorControls;
 #if NIKONLINK_WINDOWS_SHARE
     private DataTransferManager? _dataTransferManager;
 #endif
@@ -69,6 +211,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        BuildEditorAdjustmentControls();
+        EditorPresetBox.SelectedIndex = 0;
+        _libraryBranches = LoadLibraryBranches();
+        _libraryFileAssignments = LoadLibraryFileAssignments();
         _workflow = new CaptureWorkflow(_library.DirectoryPath);
         LoadCaptureSessionControls();
         _wirelessServer = new WirelessTransferServer(_library);
@@ -99,12 +245,6 @@ public partial class MainWindow : Window
                     AppLocalization.T("开启无线接收");
                 ShowError(error.Message);
             });
-        var fileHierarchy = new ListCollectionView(_photos);
-        fileHierarchy.GroupDescriptions.Add(
-            new PropertyGroupDescription(nameof(PhotoItem.SourceGroup)));
-        fileHierarchy.GroupDescriptions.Add(
-            new PropertyGroupDescription(nameof(PhotoItem.MediaTypeGroup)));
-        PhotoList.ItemsSource = fileHierarchy;
         DiagnosticLogPathText.Text = AppLocalization.T(
             "按日写入、5 MB 滚动、保留 14 天\n") +
             _diagnostics.DirectoryPath;
@@ -363,36 +503,69 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left
         };
         parameterBar.Children.Add(
-            ImmersiveParameterControl("拍摄模式", ExposureModeBox));
-        parameterBar.Children.Add(
             ImmersiveParameterControl(
                 _videoMode ? "快门角度" : "快门",
                 ShutterBox));
         parameterBar.Children.Add(
             ImmersiveParameterControl(
-                _videoMode ? "视频帧率" : "光圈",
-                _videoMode ? VideoFrameRateBox : ApertureBox));
+                "光圈",
+                ApertureBox));
         parameterBar.Children.Add(
             ImmersiveParameterControl("ISO", IsoBox));
         parameterBar.Children.Add(
             ImmersiveParameterControl("曝光补偿", ExposureCompensationBox));
-        parameterBar.Children.Add(
-            ImmersiveParameterControl("对焦", FocusModeBox));
-        parameterBar.Children.Add(
-            ImmersiveParameterControl("白平衡", WhiteBalanceBox));
-        parameterBar.Children.Add(
-            ImmersiveParameterControl("优化校准", PictureControlBox));
         var parameterScroller = new ScrollViewer
         {
             Content = parameterBar,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
+
+        var moreParameterBar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        if (_videoMode)
+        {
+            moreParameterBar.Children.Add(
+                ImmersiveParameterControl("视频帧率", VideoFrameRateBox));
+        }
+        else
+        {
+            moreParameterBar.Children.Add(
+                ImmersiveParameterControl("拍摄模式", ExposureModeBox));
+        }
+        moreParameterBar.Children.Add(
+            ImmersiveParameterControl("对焦", FocusModeBox));
+        moreParameterBar.Children.Add(
+            ImmersiveParameterControl("白平衡", WhiteBalanceBox));
+        moreParameterBar.Children.Add(
+            ImmersiveParameterControl("优化校准", PictureControlBox));
+        var moreParameterScroller = new ScrollViewer
+        {
+            Content = moreParameterBar,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        var moreParameterTray = new Expander
+        {
+            Header = "更多参数",
+            IsExpanded = false,
+            Content = moreParameterScroller,
+            Foreground = Brushes.White,
+            Background = new SolidColorBrush(Color.FromArgb(105, 0, 0, 0)),
+            Padding = new Thickness(6),
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        var parameterContent = new StackPanel();
+        parameterContent.Children.Add(parameterScroller);
+        parameterContent.Children.Add(moreParameterTray);
         var parameterTray = new Expander
         {
             Header = "参数",
             IsExpanded = true,
-            Content = parameterScroller,
+            Content = parameterContent,
             Foreground = Brushes.White,
             Background = new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)),
             Padding = new Thickness(8),
@@ -1099,6 +1272,10 @@ public partial class MainWindow : Window
             destination == "library"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        EditorPanel.Visibility =
+            destination == "editor"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         SettingsPanel.Visibility =
             destination == "settings"
                 ? Visibility.Visible
@@ -1112,6 +1289,10 @@ public partial class MainWindow : Window
         {
             RefreshPhotoList();
             LoadCaptureSessionControls();
+        }
+        if (destination == "editor")
+        {
+            RefreshImageEditor();
         }
         ShootingTaskPanel.Visibility =
             destination == "capture"
@@ -2204,16 +2385,23 @@ public partial class MainWindow : Window
         parent.Children.Add(button);
     }
 
-    private void PhotoList_SelectionChanged(
+    private void PhotoTree_SelectedItemChanged(
         object sender,
-        SelectionChangedEventArgs e)
+        RoutedPropertyChangedEventArgs<object> e)
     {
+        var selectedNode = PhotoTree.SelectedItem as LibraryTreeNode;
+        var item = selectedNode?.Item;
+        DeleteBranchButton.IsEnabled = selectedNode?.BranchId is not null;
         DeletePhotoButton.IsEnabled =
-            PhotoList.SelectedItem is PhotoItem { IsLibraryItem: true };
-        SharePhotoButton.IsEnabled = PhotoList.SelectedItem is PhotoItem;
-        if (PhotoList.SelectedItem is not PhotoItem item)
+            item is { IsLibraryItem: true };
+        SharePhotoButton.IsEnabled = item is not null;
+        if (item is null)
         {
             return;
+        }
+        if (!item.IsVideo && IsEditableImage(item.Path))
+        {
+            _editorSelectedPath = item.Path;
         }
         if (Path.GetExtension(item.Path).Equals(
             ".jpg",
@@ -2233,19 +2421,171 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PhotoList_MouseDoubleClick(
+    private void PhotoTree_MouseDoubleClick(
         object sender,
         MouseButtonEventArgs e)
     {
-        if (PhotoList.SelectedItem is PhotoItem item)
+        if ((PhotoTree.SelectedItem as LibraryTreeNode)?.Item is { } item)
         {
             ShowLargePhoto(item);
         }
     }
 
+    private void PhotoTree_PreviewMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        _libraryDragStart = e.GetPosition(PhotoTree);
+        _libraryDragInProgress = false;
+    }
+
+    private void PhotoTree_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_libraryDragInProgress ||
+            IsWithinToggleButton(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+        var container = FindTreeViewItem(
+            e.OriginalSource as DependencyObject);
+        if (container?.DataContext is LibraryTreeNode
+            {
+                Item: null
+            } node &&
+            node.Children.Count > 0)
+        {
+            container.IsExpanded = !container.IsExpanded;
+            e.Handled = true;
+        }
+    }
+
+    private void PhotoTree_PreviewMouseMove(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+        var position = e.GetPosition(PhotoTree);
+        if (Math.Abs(position.X - _libraryDragStart.X) <
+                SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - _libraryDragStart.Y) <
+                SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+        var container = FindTreeViewItem(e.OriginalSource as DependencyObject);
+        if (container?.DataContext is not LibraryTreeNode
+            {
+                Item: { IsLibraryItem: true } item
+            })
+        {
+            return;
+        }
+        var data = new DataObject(LibraryDragFormat, item.Path);
+        _libraryDragInProgress = true;
+        try
+        {
+            DragDrop.DoDragDrop(container, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            _libraryDragInProgress = false;
+        }
+    }
+
+    private void PhotoTree_DragOver(object sender, DragEventArgs e)
+    {
+        var container = FindTreeViewItem(e.OriginalSource as DependencyObject);
+        var node = container?.DataContext as LibraryTreeNode;
+        var validTarget =
+            e.Data.GetDataPresent(LibraryDragFormat) &&
+            node is not null &&
+            (node.BranchId is not null || node.IsUnclassified);
+        e.Effects = validTarget ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+        SetLibraryDropTarget(validTarget ? container : null);
+    }
+
+    private void PhotoTree_DragLeave(object sender, DragEventArgs e)
+    {
+        SetLibraryDropTarget(null);
+    }
+
+    private void PhotoTree_Drop(object sender, DragEventArgs e)
+    {
+        var container = FindTreeViewItem(e.OriginalSource as DependencyObject);
+        var node = container?.DataContext as LibraryTreeNode;
+        if (node is null ||
+            (node.BranchId is null && !node.IsUnclassified) ||
+            e.Data.GetData(LibraryDragFormat) is not string path)
+        {
+            SetLibraryDropTarget(null);
+            return;
+        }
+        if (node.IsUnclassified)
+        {
+            _libraryFileAssignments.Remove(path);
+            OperationStatusText.Text = AppLocalization.T("已移到未分类");
+        }
+        else
+        {
+            _libraryFileAssignments[path] = node.BranchId!;
+            OperationStatusText.Text = AppLocalization.T(
+                $"已移到分支“{node.Name}”");
+        }
+        SaveLibraryFileAssignments();
+        SetLibraryDropTarget(null);
+        RefreshPhotoList();
+        e.Handled = true;
+    }
+
+    private static TreeViewItem? FindTreeViewItem(DependencyObject? source)
+    {
+        while (source is not null && source is not TreeViewItem)
+        {
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return source as TreeViewItem;
+    }
+
+    private static bool IsWithinToggleButton(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ToggleButton)
+            {
+                return true;
+            }
+            source = VisualTreeHelper.GetParent(source);
+        }
+        return false;
+    }
+
+    private void SetLibraryDropTarget(TreeViewItem? target)
+    {
+        if (_libraryDropTarget == target)
+        {
+            return;
+        }
+        if (_libraryDropTarget is not null)
+        {
+            _libraryDropTarget.ClearValue(BackgroundProperty);
+        }
+        _libraryDropTarget = target;
+        if (_libraryDropTarget is not null)
+        {
+            _libraryDropTarget.Background =
+                (Brush)FindResource("AccentSoftBrush");
+        }
+    }
+
     private void SharePhotoButton_Click(object sender, RoutedEventArgs e)
     {
-        if (PhotoList.SelectedItem is PhotoItem item)
+        if ((PhotoTree.SelectedItem as LibraryTreeNode)?.Item is { } item)
         {
             BeginShare(item.Path);
         }
@@ -2441,7 +2781,7 @@ public partial class MainWindow : Window
 
     private void DeletePhotoButton_Click(object sender, RoutedEventArgs e)
     {
-        if (PhotoList.SelectedItem is not PhotoItem
+        if ((PhotoTree.SelectedItem as LibraryTreeNode)?.Item is not
             {
                 IsLibraryItem: true
             } item)
@@ -2451,6 +2791,8 @@ public partial class MainWindow : Window
         try
         {
             File.Delete(item.Path);
+            _libraryFileAssignments.Remove(item.Path);
+            SaveLibraryFileAssignments();
             RefreshPhotoList();
             OperationStatusText.Text = AppLocalization.T(
                 $"已删除 {item.Name}");
@@ -2727,19 +3069,1179 @@ public partial class MainWindow : Window
     {
         var libraryItems = _library.List();
         var systemItems = _library.ListSystemAlbum();
-        var items = libraryItems
-            .Concat(systemItems)
-            .OrderByDescending(item => File.GetLastWriteTimeUtc(item.Path))
-            .ToList();
-        _photos.Clear();
-        foreach (var item in items)
+        var roots = new ObservableCollection<LibraryTreeNode>
         {
-            _photos.Add(item);
-        }
+            BuildLocalLibraryNode(libraryItems),
+            BuildSourceNode(
+                "系统相册",
+                "只读 · 保留在 Windows 图片库",
+                systemItems),
+            new()
+            {
+                Name = "无线传输",
+                Detail = "FTP · HTTP · WebDAV",
+                Icon = "⌁",
+                IsExpanded = false
+            }
+        };
+        PhotoTree.ItemsSource = roots;
         PhotoCountText.Text = AppLocalization.T(
             $"{libraryItems.Count} 个本地文件 · {systemItems.Count} 个系统相册项目");
         DeletePhotoButton.IsEnabled = false;
+        DeleteBranchButton.IsEnabled = false;
         SharePhotoButton.IsEnabled = false;
+    }
+
+    private LibraryTreeNode BuildSourceNode(
+        string name,
+        string detail,
+        IReadOnlyList<PhotoItem> items)
+    {
+        var root = new LibraryTreeNode
+        {
+            Name = $"{name} · {items.Count}",
+            Detail = detail,
+            Icon = "▣",
+            IsExpanded = true
+        };
+        root.Children.Add(BuildMediaTypeNode("照片", items, false));
+        root.Children.Add(BuildMediaTypeNode("视频", items, true));
+        return root;
+    }
+
+    private LibraryTreeNode BuildLocalLibraryNode(
+        IReadOnlyList<PhotoItem> items)
+    {
+        var root = new LibraryTreeNode
+        {
+            Name = $"帧澈 ZENCHE 文件库 · {items.Count}",
+            Detail = "用户分支与未分类媒体",
+            Icon = "▣",
+            IsExpanded = true
+        };
+        foreach (var branch in _libraryBranches)
+        {
+            root.Children.Add(BuildBranchNode(branch, items));
+        }
+        var unassigned = items
+            .Where(item => !_libraryFileAssignments.ContainsKey(item.Path))
+            .ToList();
+        var unclassified = new LibraryTreeNode
+        {
+            Name = $"未分类 · {unassigned.Count}",
+            Detail = "尚未放入用户分支的原始媒体",
+            Icon = "▱",
+            IsUnclassified = true,
+            IsExpanded = true
+        };
+        unclassified.Children.Add(
+            BuildMediaTypeNode("照片", unassigned, false));
+        unclassified.Children.Add(
+            BuildMediaTypeNode("视频", unassigned, true));
+        root.Children.Add(unclassified);
+        return root;
+    }
+
+    private static LibraryTreeNode BuildMediaTypeNode(
+        string name,
+        IReadOnlyList<PhotoItem> items,
+        bool video)
+    {
+        var matches = items
+            .Where(item => item.IsVideo == video)
+            .OrderByDescending(item => File.GetLastWriteTimeUtc(item.Path))
+            .ToList();
+        var node = new LibraryTreeNode
+        {
+            Name = $"{name} · {matches.Count}",
+            Detail = matches.Count == 0 ? $"暂无{name}" : "",
+            Icon = video ? "▶" : "▧",
+            IsExpanded = true
+        };
+        foreach (var item in matches)
+        {
+            node.Children.Add(new LibraryTreeNode
+            {
+                Name = item.Name,
+                Detail = item.Detail,
+                Icon = item.IsVideo ? "▶" : "◫",
+                Thumbnail = CreateLibraryThumbnail(item),
+                Item = item
+            });
+        }
+        return node;
+    }
+
+    private LibraryTreeNode BuildBranchNode(
+        LibraryBranch branch,
+        IReadOnlyList<PhotoItem> items)
+    {
+        var assigned = items
+            .Where(item =>
+                _libraryFileAssignments.TryGetValue(
+                    item.Path,
+                    out var branchId) &&
+                branchId == branch.Id)
+            .ToList();
+        var node = new LibraryTreeNode
+        {
+            Name = branch.Name,
+            Detail = $"{assigned.Count} 个文件 · {branch.Children.Count} 个子分支",
+            Icon = "▱",
+            BranchId = branch.Id,
+            IsExpanded = true
+        };
+        foreach (var item in assigned)
+        {
+            node.Children.Add(new LibraryTreeNode
+            {
+                Name = item.Name,
+                Detail = item.Detail,
+                Icon = item.IsVideo ? "▶" : "◫",
+                Thumbnail = CreateLibraryThumbnail(item),
+                Item = item
+            });
+        }
+        foreach (var child in branch.Children)
+        {
+            node.Children.Add(BuildBranchNode(child, items));
+        }
+        return node;
+    }
+
+    private static BitmapSource? CreateLibraryThumbnail(PhotoItem item)
+    {
+        if (item.IsVideo)
+        {
+            return null;
+        }
+        try
+        {
+            var thumbnail = new BitmapImage();
+            thumbnail.BeginInit();
+            thumbnail.CacheOption = BitmapCacheOption.OnLoad;
+            thumbnail.DecodePixelWidth = 112;
+            thumbnail.UriSource = new Uri(item.Path, UriKind.Absolute);
+            thumbnail.EndInit();
+            thumbnail.Freeze();
+            return thumbnail;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private void RefreshImageEditor()
+    {
+        var previousPath = _editorSelectedPath;
+        var choices = _library.List()
+            .Where(item => !item.IsVideo && IsEditableImage(item.Path))
+            .Select(item => new EditorPhotoChoice { Item = item })
+            .ToList();
+        _updatingEditorControls = true;
+        EditorPhotoBox.ItemsSource = choices;
+        var selected = choices.FirstOrDefault(choice =>
+            string.Equals(
+                choice.Item.Path,
+                _editorSelectedPath,
+                StringComparison.OrdinalIgnoreCase)) ?? choices.FirstOrDefault();
+        EditorPhotoBox.SelectedItem = selected;
+        _editorSelectedPath = selected?.Item.Path;
+        _updatingEditorControls = false;
+        if (!string.Equals(
+                previousPath,
+                _editorSelectedPath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            ResetEditorControls();
+        }
+        UpdateEditorPreview();
+    }
+
+    private void EditorPhotoBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing || _updatingEditorControls)
+        {
+            return;
+        }
+        _editorSelectedPath =
+            (EditorPhotoBox.SelectedItem as EditorPhotoChoice)?.Item.Path;
+        ResetEditorControls();
+        UpdateEditorPreview();
+    }
+
+    private void BuildEditorAdjustmentControls()
+    {
+        EditorAdjustmentHost.Children.Clear();
+        _editorSliders.Clear();
+        EditorAdjustmentHost.Children.Add(CreateEditorGroup(
+            "光线",
+            true,
+            new EditorSliderSpec("exposure", "曝光", -2, 2, true),
+            new EditorSliderSpec("contrast", "对比度", -100, 100),
+            new EditorSliderSpec("highlights", "高光", -100, 100),
+            new EditorSliderSpec("shadows", "阴影", -100, 100),
+            new EditorSliderSpec("whites", "白色色阶", -100, 100),
+            new EditorSliderSpec("blacks", "黑色色阶", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorGroup(
+            "色彩",
+            false,
+            new EditorSliderSpec("temperature", "色温", -100, 100),
+            new EditorSliderSpec("tint", "色调", -100, 100),
+            new EditorSliderSpec("vibrance", "自然饱和度", -100, 100),
+            new EditorSliderSpec("saturation", "饱和度", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorGroup(
+            "细节",
+            false,
+            new EditorSliderSpec("texture", "纹理", -100, 100),
+            new EditorSliderSpec("clarity", "清晰度", -100, 100),
+            new EditorSliderSpec("sharpening", "锐化", 0, 100),
+            new EditorSliderSpec("noiseReduction", "降噪", 0, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorGroup(
+            "效果",
+            false,
+            new EditorSliderSpec("dehaze", "去雾", -100, 100),
+            new EditorSliderSpec("vignette", "暗角", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorGeometryGroup());
+    }
+
+    private Expander CreateEditorGroup(
+        string title,
+        bool expanded,
+        params EditorSliderSpec[] specifications)
+    {
+        var content = new StackPanel
+        {
+            Margin = new Thickness(8, 6, 8, 10)
+        };
+        foreach (var specification in specifications)
+        {
+            content.Children.Add(CreateEditorSlider(specification));
+        }
+        return new Expander
+        {
+            Header = AppLocalization.T(title),
+            IsExpanded = expanded,
+            Content = content,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+    }
+
+    private FrameworkElement CreateEditorSlider(
+        EditorSliderSpec specification)
+    {
+        var valueText = new TextBlock
+        {
+            Text = EditorAdjustmentValue(0, specification.Exposure),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var heading = new DockPanel();
+        heading.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(specification.Label),
+            FontWeight = FontWeights.SemiBold
+        });
+        DockPanel.SetDock(valueText, Dock.Right);
+        heading.Children.Add(valueText);
+
+        var slider = new Slider
+        {
+            Tag = specification.Key,
+            Minimum = specification.Minimum,
+            Maximum = specification.Maximum,
+            TickFrequency = specification.Exposure ? 0.05 : 1,
+            SmallChange = specification.Exposure ? 0.05 : 1,
+            IsSnapToTickEnabled = true
+        };
+        _editorSliders[specification.Key] = slider;
+        slider.ValueChanged += (_, _) =>
+        {
+            valueText.Text = EditorAdjustmentValue(
+                slider.Value,
+                specification.Exposure);
+            SetEditorAdjustment(specification.Key, slider.Value);
+            if (!_initializing && !_updatingEditorControls)
+            {
+                UpdateEditorPreview();
+            }
+        };
+
+        var row = new StackPanel
+        {
+            Margin = new Thickness(0, 2, 0, 8),
+            MinHeight = 52
+        };
+        row.Children.Add(heading);
+        row.Children.Add(slider);
+        return row;
+    }
+
+    private Expander CreateEditorGeometryGroup()
+    {
+        var ratios = new[] { "原始比例", "1:1", "4:3", "3:2", "16:9" };
+        _editorCropBox = new ComboBox
+        {
+            ItemsSource = ratios.Select(AppLocalization.T).ToList(),
+            SelectedIndex = 0,
+            Margin = new Thickness(0, 4, 0, 10)
+        };
+        _editorCropBox.SelectionChanged += (_, _) =>
+        {
+            if (_updatingEditorControls)
+            {
+                return;
+            }
+            _editorAdjustments.CropRatio =
+                _editorCropBox.SelectedIndex switch
+                {
+                    1 => "1:1",
+                    2 => "4:3",
+                    3 => "3:2",
+                    4 => "16:9",
+                    _ => "original"
+                };
+            UpdateEditorPreview();
+        };
+
+        var rotate = EditorGeometryButton("旋转 90°");
+        rotate.Click += (_, _) =>
+        {
+            _editorAdjustments.Rotation =
+                (_editorAdjustments.Rotation + 90) % 360;
+            UpdateEditorPreview();
+        };
+        var horizontal = EditorGeometryButton("水平翻转");
+        horizontal.Click += (_, _) =>
+        {
+            _editorAdjustments.FlipHorizontal =
+                !_editorAdjustments.FlipHorizontal;
+            UpdateEditorPreview();
+        };
+        var vertical = EditorGeometryButton("垂直翻转");
+        vertical.Click += (_, _) =>
+        {
+            _editorAdjustments.FlipVertical =
+                !_editorAdjustments.FlipVertical;
+            UpdateEditorPreview();
+        };
+        var actions = new UniformGrid
+        {
+            Columns = 3
+        };
+        actions.Children.Add(rotate);
+        actions.Children.Add(horizontal);
+        actions.Children.Add(vertical);
+
+        var content = new StackPanel
+        {
+            Margin = new Thickness(8, 6, 8, 10)
+        };
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("裁切比例"),
+            FontWeight = FontWeights.SemiBold
+        });
+        content.Children.Add(_editorCropBox);
+        content.Children.Add(actions);
+        return new Expander
+        {
+            Header = AppLocalization.T("几何"),
+            Content = content,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+    }
+
+    private Button EditorGeometryButton(string label) => new()
+    {
+        Content = AppLocalization.T(label),
+        MinHeight = 42,
+        Margin = new Thickness(2),
+        Style = (Style)FindResource("ButtonBase")
+    };
+
+    private static string EditorAdjustmentValue(
+        double value,
+        bool exposure) =>
+        exposure
+            ? $"{value:+0.00;-0.00;0.00} EV"
+            : $"{value:+0;-0;0}";
+
+    private void SetEditorAdjustment(string key, double value)
+    {
+        switch (key)
+        {
+            case "exposure":
+                _editorAdjustments.Exposure = value;
+                break;
+            case "contrast":
+                _editorAdjustments.Contrast = value;
+                break;
+            case "highlights":
+                _editorAdjustments.Highlights = value;
+                break;
+            case "shadows":
+                _editorAdjustments.Shadows = value;
+                break;
+            case "whites":
+                _editorAdjustments.Whites = value;
+                break;
+            case "blacks":
+                _editorAdjustments.Blacks = value;
+                break;
+            case "temperature":
+                _editorAdjustments.Temperature = value;
+                break;
+            case "tint":
+                _editorAdjustments.Tint = value;
+                break;
+            case "vibrance":
+                _editorAdjustments.Vibrance = value;
+                break;
+            case "saturation":
+                _editorAdjustments.Saturation = value;
+                break;
+            case "texture":
+                _editorAdjustments.Texture = value;
+                break;
+            case "clarity":
+                _editorAdjustments.Clarity = value;
+                break;
+            case "sharpening":
+                _editorAdjustments.Sharpening = value;
+                break;
+            case "noiseReduction":
+                _editorAdjustments.NoiseReduction = value;
+                break;
+            case "dehaze":
+                _editorAdjustments.Dehaze = value;
+                break;
+            case "vignette":
+                _editorAdjustments.Vignette = value;
+                break;
+        }
+    }
+
+    private void EditorPresetBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            _updatingEditorControls ||
+            EditorPresetBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        ApplyEditorPreset(Convert.ToString(item.Tag) ?? "original");
+        SyncEditorSliders();
+        UpdateEditorPreview();
+    }
+
+    private void ApplyEditorPreset(string preset)
+    {
+        _editorAdjustments.ResetTone();
+        switch (preset)
+        {
+            case "natural":
+                _editorAdjustments.Contrast = 8;
+                _editorAdjustments.Highlights = -18;
+                _editorAdjustments.Shadows = 16;
+                _editorAdjustments.Whites = 8;
+                _editorAdjustments.Blacks = -8;
+                _editorAdjustments.Vibrance = 14;
+                _editorAdjustments.Texture = 8;
+                _editorAdjustments.Clarity = 6;
+                _editorAdjustments.Sharpening = 24;
+                _editorAdjustments.NoiseReduction = 8;
+                break;
+            case "portrait":
+                _editorAdjustments.Contrast = -4;
+                _editorAdjustments.Highlights = -24;
+                _editorAdjustments.Shadows = 18;
+                _editorAdjustments.Temperature = 7;
+                _editorAdjustments.Tint = 4;
+                _editorAdjustments.Vibrance = 10;
+                _editorAdjustments.Texture = -12;
+                _editorAdjustments.Clarity = -6;
+                _editorAdjustments.Sharpening = 16;
+                _editorAdjustments.NoiseReduction = 22;
+                _editorAdjustments.Vignette = -8;
+                break;
+            case "landscape":
+                _editorAdjustments.Contrast = 12;
+                _editorAdjustments.Highlights = -28;
+                _editorAdjustments.Shadows = 14;
+                _editorAdjustments.Whites = 12;
+                _editorAdjustments.Blacks = -14;
+                _editorAdjustments.Vibrance = 24;
+                _editorAdjustments.Saturation = 5;
+                _editorAdjustments.Texture = 16;
+                _editorAdjustments.Clarity = 18;
+                _editorAdjustments.Sharpening = 30;
+                _editorAdjustments.Dehaze = 12;
+                _editorAdjustments.Vignette = -10;
+                break;
+            case "monochrome":
+                _editorAdjustments.Contrast = 22;
+                _editorAdjustments.Highlights = -18;
+                _editorAdjustments.Shadows = 12;
+                _editorAdjustments.Whites = 10;
+                _editorAdjustments.Blacks = -22;
+                _editorAdjustments.Saturation = -100;
+                _editorAdjustments.Texture = 12;
+                _editorAdjustments.Clarity = 24;
+                _editorAdjustments.Sharpening = 28;
+                _editorAdjustments.Vignette = -14;
+                break;
+        }
+        _editorAdjustments.ShowingOriginal = false;
+        CompareEditorPhotoButton.Content =
+            AppLocalization.T("查看原图");
+    }
+
+    private void SyncEditorSliders()
+    {
+        _updatingEditorControls = true;
+        foreach (var entry in _editorSliders)
+        {
+            entry.Value.Value = EditorAdjustmentForKey(entry.Key);
+        }
+        _updatingEditorControls = false;
+    }
+
+    private double EditorAdjustmentForKey(string key) => key switch
+    {
+        "exposure" => _editorAdjustments.Exposure,
+        "contrast" => _editorAdjustments.Contrast,
+        "highlights" => _editorAdjustments.Highlights,
+        "shadows" => _editorAdjustments.Shadows,
+        "whites" => _editorAdjustments.Whites,
+        "blacks" => _editorAdjustments.Blacks,
+        "temperature" => _editorAdjustments.Temperature,
+        "tint" => _editorAdjustments.Tint,
+        "vibrance" => _editorAdjustments.Vibrance,
+        "saturation" => _editorAdjustments.Saturation,
+        "texture" => _editorAdjustments.Texture,
+        "clarity" => _editorAdjustments.Clarity,
+        "sharpening" => _editorAdjustments.Sharpening,
+        "noiseReduction" => _editorAdjustments.NoiseReduction,
+        "dehaze" => _editorAdjustments.Dehaze,
+        "vignette" => _editorAdjustments.Vignette,
+        _ => 0
+    };
+
+    private void CompareEditorPhoto_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _editorAdjustments.ShowingOriginal =
+            !_editorAdjustments.ShowingOriginal;
+        CompareEditorPhotoButton.Content = AppLocalization.T(
+            _editorAdjustments.ShowingOriginal
+                ? "返回调整"
+                : "查看原图");
+        UpdateEditorPreview();
+    }
+
+    private void ResetEditor_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        ResetEditorControls();
+        UpdateEditorPreview();
+    }
+
+    private void ResetEditorControls()
+    {
+        _updatingEditorControls = true;
+        _editorAdjustments.Reset();
+        foreach (var slider in _editorSliders.Values)
+        {
+            slider.Value = 0;
+        }
+        if (_editorCropBox is not null)
+        {
+            _editorCropBox.SelectedIndex = 0;
+        }
+        EditorPresetBox.SelectedIndex = 0;
+        CompareEditorPhotoButton.Content =
+            AppLocalization.T("查看原图");
+        _updatingEditorControls = false;
+        EditorStatusText.Text = AppLocalization.T("调整不会覆盖原文件");
+    }
+
+    private void UpdateEditorPreview()
+    {
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            EditorPreviewImage.Source = null;
+            EditorPreviewEmpty.Visibility = Visibility.Visible;
+            SaveEditedPhotoButton.IsEnabled = false;
+            return;
+        }
+        try
+        {
+            EditorPreviewImage.Source = RenderEditedBitmap(
+                _editorSelectedPath,
+                _editorAdjustments,
+                1600);
+            EditorPreviewEmpty.Visibility = Visibility.Collapsed;
+            SaveEditedPhotoButton.IsEnabled = true;
+        }
+        catch (Exception error)
+        {
+            EditorPreviewImage.Source = null;
+            EditorPreviewEmpty.Visibility = Visibility.Visible;
+            SaveEditedPhotoButton.IsEnabled = false;
+            EditorStatusText.Text =
+                AppLocalization.T($"无法预览：{error.Message}");
+        }
+    }
+
+    private void SaveEditedPhoto_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            return;
+        }
+        try
+        {
+            SaveEditedPhotoButton.IsEnabled = false;
+            EditorStatusText.Text = AppLocalization.T("正在保存…");
+            var savedAdjustments = _editorAdjustments.Copy();
+            savedAdjustments.ShowingOriginal = false;
+            var bitmap = RenderEditedBitmap(
+                _editorSelectedPath,
+                savedAdjustments);
+            var destination = UniqueEditedPath(_editorSelectedPath);
+            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var stream = File.Create(destination))
+            {
+                encoder.Save(stream);
+            }
+            _editorSelectedPath = destination;
+            RefreshPhotoList();
+            RefreshImageEditor();
+            EditorStatusText.Text = AppLocalization.T(
+                $"已保存副本 {Path.GetFileName(destination)}");
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text =
+                AppLocalization.T($"保存失败：{error.Message}");
+            ShowError(error.Message);
+        }
+        finally
+        {
+            SaveEditedPhotoButton.IsEnabled =
+                !string.IsNullOrWhiteSpace(_editorSelectedPath);
+        }
+    }
+
+    private static bool IsEditableImage(string path)
+    {
+        return new[] { ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff" }
+            .Contains(
+                Path.GetExtension(path),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static BitmapSource RenderEditedBitmap(
+        string path,
+        EditorAdjustments settings,
+        int decodePixelWidth = 0)
+    {
+        using var stream = new MemoryStream(File.ReadAllBytes(path));
+        var decoder = BitmapDecoder.Create(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        BitmapSource source = decoder.Frames[0];
+        if (decodePixelWidth > 0 && source.PixelWidth > decodePixelWidth)
+        {
+            var scale = (double)decodePixelWidth / source.PixelWidth;
+            source = new TransformedBitmap(
+                source,
+                new ScaleTransform(scale, scale));
+        }
+        if (settings.ShowingOriginal)
+        {
+            source.Freeze();
+            return source;
+        }
+        var converted = new FormatConvertedBitmap(
+            source,
+            PixelFormats.Bgra32,
+            null,
+            0);
+        var stride = converted.PixelWidth * 4;
+        var pixels = new byte[stride * converted.PixelHeight];
+        converted.CopyPixels(pixels, stride, 0);
+        var exposure = Math.Pow(2, settings.Exposure);
+        var contrast =
+            1 + settings.Contrast / 125 + settings.Dehaze / 210;
+        var baseSaturation =
+            1 + settings.Saturation / 100 + settings.Dehaze / 520;
+        var temperature = settings.Temperature / 100;
+        var tint = settings.Tint / 100;
+        for (var index = 0; index < pixels.Length; index += 4)
+        {
+            var blue = pixels[index] / 255.0 * exposure;
+            var green = pixels[index + 1] / 255.0 * exposure;
+            var red = pixels[index + 2] / 255.0 * exposure;
+
+            red += temperature * 0.12 + tint * 0.045;
+            green -= tint * 0.08;
+            blue -= temperature * 0.12 - tint * 0.045;
+
+            var luminance =
+                red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            var toneShift =
+                settings.Shadows / 100
+                    * Math.Pow(1 - ClampUnit(luminance), 2)
+                    * 0.38
+                + settings.Highlights / 100
+                    * Math.Pow(ClampUnit(luminance), 2)
+                    * 0.30
+                + settings.Whites / 100
+                    * SmoothStep(0.55, 1, luminance)
+                    * 0.24
+                + settings.Blacks / 100
+                    * (1 - SmoothStep(0, 0.45, luminance))
+                    * 0.20;
+            red += toneShift;
+            green += toneShift;
+            blue += toneShift;
+
+            var clarityMask =
+                1 - Math.Abs(ClampUnit(luminance) * 2 - 1);
+            var localContrast =
+                1 + settings.Clarity / 100 * clarityMask * 0.38;
+            red = (red - 0.5) * contrast * localContrast + 0.5;
+            green = (green - 0.5) * contrast * localContrast + 0.5;
+            blue = (blue - 0.5) * contrast * localContrast + 0.5;
+
+            luminance =
+                red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            var colorfulness =
+                Math.Max(red, Math.Max(green, blue))
+                - Math.Min(red, Math.Min(green, blue));
+            var saturation = Math.Max(
+                0,
+                baseSaturation
+                + settings.Vibrance / 100
+                    * (1 - ClampUnit(colorfulness))
+                    * 0.82);
+            red = luminance + (red - luminance) * saturation;
+            green = luminance + (green - luminance) * saturation;
+            blue = luminance + (blue - luminance) * saturation;
+
+            var pixelIndex = index / 4;
+            var x = pixelIndex % converted.PixelWidth;
+            var y = pixelIndex / converted.PixelWidth;
+            var normalizedX =
+                (x - converted.PixelWidth / 2.0) /
+                Math.Max(1, converted.PixelWidth / 2.0);
+            var normalizedY =
+                (y - converted.PixelHeight / 2.0) /
+                Math.Max(1, converted.PixelHeight / 2.0);
+            var edge = Math.Min(
+                1,
+                Math.Sqrt(
+                    normalizedX * normalizedX +
+                    normalizedY * normalizedY));
+            var vignette =
+                1 + settings.Vignette / 100 * edge * edge * 0.72;
+            pixels[index] = ClampChannel(blue * vignette * 255);
+            pixels[index + 1] = ClampChannel(green * vignette * 255);
+            pixels[index + 2] = ClampChannel(red * vignette * 255);
+        }
+        ApplyEditorDetail(
+            pixels,
+            converted.PixelWidth,
+            converted.PixelHeight,
+            stride,
+            settings);
+        BitmapSource result = BitmapSource.Create(
+            converted.PixelWidth,
+            converted.PixelHeight,
+            converted.DpiX,
+            converted.DpiY,
+            PixelFormats.Bgra32,
+            null,
+            pixels,
+            stride);
+        if (settings.FlipHorizontal)
+        {
+            result = new TransformedBitmap(
+                result,
+                new ScaleTransform(-1, 1));
+        }
+        if (settings.FlipVertical)
+        {
+            result = new TransformedBitmap(
+                result,
+                new ScaleTransform(1, -1));
+        }
+        if (settings.Rotation % 360 != 0)
+        {
+            result = new TransformedBitmap(
+                result,
+                new RotateTransform(settings.Rotation));
+        }
+        var cropRatio = EditorCropRatio(settings.CropRatio);
+        if (cropRatio > 0)
+        {
+            var cropWidth = result.PixelWidth;
+            var cropHeight = (int)Math.Round(cropWidth / cropRatio);
+            if (cropHeight > result.PixelHeight)
+            {
+                cropHeight = result.PixelHeight;
+                cropWidth = (int)Math.Round(cropHeight * cropRatio);
+            }
+            result = new CroppedBitmap(
+                result,
+                new Int32Rect(
+                    Math.Max(0, (result.PixelWidth - cropWidth) / 2),
+                    Math.Max(0, (result.PixelHeight - cropHeight) / 2),
+                    Math.Max(1, cropWidth),
+                    Math.Max(1, cropHeight)));
+        }
+        result.Freeze();
+        return result;
+    }
+
+    private static void ApplyEditorDetail(
+        byte[] pixels,
+        int width,
+        int height,
+        int stride,
+        EditorAdjustments settings)
+    {
+        var smoothing =
+            settings.NoiseReduction / 100 * 0.58
+            + Math.Max(0, -settings.Texture) / 100 * 0.24;
+        var sharpening =
+            settings.Sharpening / 100 * 1.15
+            + Math.Max(0, settings.Texture) / 100 * 0.48
+            + Math.Max(0, settings.Clarity) / 100 * 0.25;
+        if (smoothing == 0 && sharpening == 0)
+        {
+            return;
+        }
+        var source = (byte[])pixels.Clone();
+        for (var y = 1; y < height - 1; y++)
+        {
+            for (var x = 1; x < width - 1; x++)
+            {
+                var offset = y * stride + x * 4;
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var center = source[offset + channel];
+                    var average =
+                        (center
+                         + source[offset - 4 + channel]
+                         + source[offset + 4 + channel]
+                         + source[offset - stride + channel]
+                         + source[offset + stride + channel]) / 5.0;
+                    var smoothed =
+                        center * (1 - smoothing) + average * smoothing;
+                    pixels[offset + channel] = ClampChannel(
+                        smoothed + (center - average) * sharpening);
+                }
+            }
+        }
+    }
+
+    private static double EditorCropRatio(string cropRatio) =>
+        cropRatio switch
+        {
+            "1:1" => 1,
+            "4:3" => 4.0 / 3,
+            "3:2" => 3.0 / 2,
+            "16:9" => 16.0 / 9,
+            _ => 0
+        };
+
+    private static double SmoothStep(
+        double edge0,
+        double edge1,
+        double value)
+    {
+        var scaled = ClampUnit((value - edge0) / (edge1 - edge0));
+        return scaled * scaled * (3 - 2 * scaled);
+    }
+
+    private static double ClampUnit(double value) =>
+        Math.Max(0, Math.Min(1, value));
+
+    private static byte ClampChannel(double value) =>
+        (byte)Math.Clamp(Math.Round(value), byte.MinValue, byte.MaxValue);
+
+    private string UniqueEditedPath(string originalPath)
+    {
+        var stem = Path.GetFileNameWithoutExtension(originalPath);
+        return _library.UniqueDestination(
+            $"{stem}_edited_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
+    }
+
+    private void CreateLibraryBranch_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var selectedNode = PhotoTree.SelectedItem as LibraryTreeNode;
+        var parent = FindLibraryBranch(selectedNode?.BranchId);
+        var input = new TextBox
+        {
+            MinWidth = 320,
+            Height = 36,
+            Margin = new Thickness(0, 10, 0, 14)
+        };
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = "新建分支",
+            Width = 430,
+            Height = 210,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = (Brush)FindResource("PaperBrush")
+        };
+        var layout = new StackPanel
+        {
+            Margin = new Thickness(22)
+        };
+        layout.Children.Add(new TextBlock
+        {
+            Text =
+                $"将在“{parent?.Name ?? "帧澈 ZENCHE 文件库"}”下创建可继续展开的节点。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        layout.Children.Add(input);
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var cancel = new Button
+        {
+            Content = "取消",
+            Width = 88,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        cancel.Click += (_, _) => dialog.Close();
+        actions.Children.Add(cancel);
+        var create = new Button
+        {
+            Content = "创建",
+            Width = 88,
+            Height = 40,
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("PrimaryButton")
+        };
+        create.Click += (_, _) =>
+        {
+            var name = input.Text.Trim();
+            if (name.Length == 0)
+            {
+                return;
+            }
+            var branch = new LibraryBranch { Name = name };
+            if (parent is null)
+            {
+                _libraryBranches.Add(branch);
+            }
+            else
+            {
+                parent.Children.Add(branch);
+            }
+            SaveLibraryBranches();
+            RefreshPhotoList();
+            dialog.Close();
+        };
+        actions.Children.Add(create);
+        layout.Children.Add(actions);
+        dialog.Content = layout;
+        dialog.Loaded += (_, _) => input.Focus();
+        dialog.ShowDialog();
+    }
+
+    private void DeleteLibraryBranch_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (PhotoTree.SelectedItem is not LibraryTreeNode
+            {
+                BranchId: { } branchId
+            } selectedNode)
+        {
+            return;
+        }
+        var branch = FindLibraryBranch(branchId);
+        if (branch is null)
+        {
+            return;
+        }
+        var confirmation = MessageBox.Show(
+            this,
+            $"将同时删除“{branch.Name}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。",
+            "删除分支？",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+        var removedIds = new HashSet<string>();
+        CollectLibraryBranchIds(branch, removedIds);
+        if (!RemoveLibraryBranch(_libraryBranches, branchId))
+        {
+            return;
+        }
+        foreach (var path in _libraryFileAssignments
+                     .Where(entry => removedIds.Contains(entry.Value))
+                     .Select(entry => entry.Key)
+                     .ToList())
+        {
+            _libraryFileAssignments.Remove(path);
+        }
+        SaveLibraryBranches();
+        SaveLibraryFileAssignments();
+        OperationStatusText.Text = AppLocalization.T(
+            $"分支“{selectedNode.Name}”已删除，文件已回到未分类");
+        RefreshPhotoList();
+    }
+
+    private static void CollectLibraryBranchIds(
+        LibraryBranch branch,
+        ISet<string> ids)
+    {
+        ids.Add(branch.Id);
+        foreach (var child in branch.Children)
+        {
+            CollectLibraryBranchIds(child, ids);
+        }
+    }
+
+    private static bool RemoveLibraryBranch(
+        IList<LibraryBranch> branches,
+        string id)
+    {
+        for (var index = 0; index < branches.Count; index++)
+        {
+            if (branches[index].Id == id)
+            {
+                branches.RemoveAt(index);
+                return true;
+            }
+            if (RemoveLibraryBranch(branches[index].Children, id))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private LibraryBranch? FindLibraryBranch(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+        return FindLibraryBranch(_libraryBranches, id);
+    }
+
+    private static LibraryBranch? FindLibraryBranch(
+        IEnumerable<LibraryBranch> branches,
+        string id)
+    {
+        foreach (var branch in branches)
+        {
+            if (branch.Id == id)
+            {
+                return branch;
+            }
+            var child = FindLibraryBranch(branch.Children, id);
+            if (child is not null)
+            {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private static List<LibraryBranch> LoadLibraryBranches()
+    {
+        try
+        {
+            if (!File.Exists(LibraryBranchStatePath))
+            {
+                return [];
+            }
+            return JsonSerializer.Deserialize<List<LibraryBranch>>(
+                File.ReadAllText(LibraryBranchStatePath)) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private void SaveLibraryBranches()
+    {
+        var directory = Path.GetDirectoryName(LibraryBranchStatePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+        File.WriteAllText(
+            LibraryBranchStatePath,
+            JsonSerializer.Serialize(
+                _libraryBranches,
+                new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static Dictionary<string, string> LoadLibraryFileAssignments()
+    {
+        try
+        {
+            if (!File.Exists(LibraryFileAssignmentStatePath))
+            {
+                return [];
+            }
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(
+                File.ReadAllText(LibraryFileAssignmentStatePath)) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private void SaveLibraryFileAssignments()
+    {
+        var directory = Path.GetDirectoryName(
+            LibraryFileAssignmentStatePath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+        File.WriteAllText(
+            LibraryFileAssignmentStatePath,
+            JsonSerializer.Serialize(
+                _libraryFileAssignments,
+                new JsonSerializerOptions { WriteIndented = true }));
     }
 
     private void SetCurrentNavigation(Button? current)
@@ -2749,6 +4251,7 @@ public partial class MainWindow : Window
                  {
                      CaptureNav,
                      MonitorNav,
+                     EditorNav,
                      LibraryNav
                  })
         {

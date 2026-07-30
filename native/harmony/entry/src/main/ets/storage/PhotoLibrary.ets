@@ -180,6 +180,13 @@ export class PhotoLibrary {
     }
   }
 
+  saveEditedCopy(originalName: string, bytes: Uint8Array): string {
+    const dot: number = originalName.lastIndexOf('.');
+    const stem: string =
+      dot > 0 ? originalName.substring(0, dot) : originalName;
+    return this.saveReceived(`${stem}_edited.jpg`, bytes);
+  }
+
   beginReceive(remoteName: string): IncomingPhotoFile {
     this.ensureDirectory();
     const filename: string = this.safeFilename(remoteName);
