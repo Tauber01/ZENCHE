@@ -33,13 +33,22 @@ jobs:
             exit 1
           fi
 
+          assets=()
+          for asset in dist/*; do
+            [[ -f "$asset" ]] && assets+=("$asset")
+          done
+          if (( ${#assets[@]} == 0 )); then
+            echo "::error::没有可发布的安装包。"
+            exit 1
+          fi
+
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release edit "$GITHUB_REF_NAME" \
               --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
               --notes-file "$notes_file"
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/* \
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
               --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
               --notes-file "$notes_file"
           fi

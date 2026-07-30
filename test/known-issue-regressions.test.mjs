@@ -71,6 +71,10 @@ test("release workflow is idempotent and requires detailed release notes", async
 
   assert.match(workflow, /docs\/releases\/\$GITHUB_REF_NAME\.md/);
   assert.match(workflow, /gh release view/);
-  assert.match(workflow, /gh release upload "\$GITHUB_REF_NAME" dist\/\* --clobber/);
+  assert.match(workflow, /\[\[ -f "\$asset" \]\]/);
+  assert.match(
+    workflow,
+    /gh release upload "\$GITHUB_REF_NAME" "\$\{assets\[@\]\}" --clobber/,
+  );
   assert.doesNotMatch(workflow, /--generate-notes/);
 });
