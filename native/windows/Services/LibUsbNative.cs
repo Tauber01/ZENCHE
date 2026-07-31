@@ -7,6 +7,7 @@ internal static class LibUsbNative
     private const string Library = "libusb-1.0";
 
     internal const int Success = 0;
+    internal const int ErrorAccess = -3;
     internal const int ErrorNotSupported = -12;
     internal const int TransferTypeMask = 0x03;
     internal const int TransferTypeBulk = 0x02;

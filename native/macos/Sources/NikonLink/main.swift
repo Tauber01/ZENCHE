@@ -16,6 +16,13 @@ private struct SupportedCamera: Equatable {
 
     static let all = [
         SupportedCamera(
+            name: "Nikon D500",
+            productID: 0x043a,
+            detectionTokens: ["nikon d500", "nikon d 500"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
             name: "Nikon Z7",
             productID: 0x0442,
             detectionTokens: ["nikon z7", "nikon z 7"],
@@ -33,6 +40,13 @@ private struct SupportedCamera: Equatable {
             name: "Nikon Z50",
             productID: 0x0444,
             detectionTokens: ["nikon z50", "nikon z 50"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D7500",
+            productID: 0x0445,
+            detectionTokens: ["nikon d7500", "nikon d 7500"],
             minimumISO: 100,
             maximumISO: 51200
         ),
@@ -56,6 +70,13 @@ private struct SupportedCamera: Equatable {
             detectionTokens: ["nikon z5", "nikon z 5"],
             minimumISO: 100,
             maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D850",
+            productID: 0x044a,
+            detectionTokens: ["nikon d850", "nikon d 850"],
+            minimumISO: 64,
+            maximumISO: 25600
         ),
         SupportedCamera(
             name: "Nikon Z7II",
@@ -1360,6 +1381,7 @@ private final class CameraModel: ObservableObject {
     @Published var liveViewEnabled = false
     @Published var capturing = false
     @Published var videoRecording = false
+    private var previewAnalysisSequence = 0
     @Published var frame: NSImage?
     @Published var photoFrame: NSImage?
     @Published var status = "未连接"
@@ -2262,6 +2284,18 @@ private final class CameraModel: ObservableObject {
 
     private func processedPreview(from image: NSImage) -> (image: NSImage, zebraMask: NSImage?) {
         sourceFrame = image
+        previewAnalysisSequence += 1
+        let analyzeFrame = videoRecording
+            ? previewAnalysisSequence % 6 == 0
+            : previewAnalysisSequence % 3 == 0
+        let visualProcessing = lutEnabled || focusPeakingEnabled
+            || falseColorEnabled || zebraEnabled
+        guard analyzeFrame || visualProcessing else {
+            let display = monitorVideoProfile.targetSize.flatMap {
+                PreviewProcessor.resampledImage(image, fitting: $0)
+            } ?? image
+            return (display, nil)
+        }
         let graded = lutEnabled
             ? previewLUT?.applying(to: image) ?? image
             : image

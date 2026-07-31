@@ -23,15 +23,18 @@ import java.util.concurrent.TimeoutException;
 final class PtpCamera {
     static final int NIKON_VENDOR_ID = 0x04b0;
     static final String SUPPORTED_CAMERA_SUMMARY =
-            "Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
+            "D500、Z7、Z6、Z50、D7500、D780、D6、Z5、D850、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
                     + "Z f、Z6III、Z50II、Z5II、ZR";
     private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
+            new CameraProfile("Nikon D500", 0x043a, 100, 51200),
             new CameraProfile("Nikon Z7", 0x0442, 64, 25600),
             new CameraProfile("Nikon Z6", 0x0443, 100, 51200),
             new CameraProfile("Nikon Z50", 0x0444, 100, 51200),
+            new CameraProfile("Nikon D7500", 0x0445, 100, 51200),
             new CameraProfile("Nikon D780", 0x0446, 100, 51200),
             new CameraProfile("Nikon D6", 0x0447, 100, 102400),
             new CameraProfile("Nikon Z5", 0x0448, 100, 51200),
+            new CameraProfile("Nikon D850", 0x044a, 64, 25600),
             new CameraProfile("Nikon Z7II", 0x044b, 64, 25600),
             new CameraProfile("Nikon Z6II", 0x044c, 100, 51200),
             new CameraProfile("Nikon Z fc", 0x044f, 100, 51200),
@@ -275,24 +278,32 @@ final class PtpCamera {
         boolean resumeLiveView = liveView;
         if (resumeLiveView) stopLiveView();
         try {
-            return setParameterCore(name, rawValue);
-        } catch (Exception error) {
-            if (error.getMessage() != null
-                    && error.getMessage().contains("0x200F")) {
-                diagnostics.warning(
-                        "camera",
-                        cameraName()
-                                + " 当前状态暂时拒绝写入"
-                                + parameterDisplayName(name)
-                                + "；控件保持可用，允许切换机身模式后重试");
-                throw new Exception(
-                        cameraName()
-                                + " 当前状态暂时拒绝写入“"
-                                + parameterDisplayName(name)
-                                + "”。请确认机身处于允许调整的曝光模式后重试。",
-                        error);
+            Exception lastError = null;
+            int maxRetries = 5;
+            for (int attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    return setParameterCore(name, rawValue);
+                } catch (Exception error) {
+                    lastError = error;
+                    if (!isTransientPtpError(error) || attempt >= maxRetries - 1) {
+                        throw enhanceTransientError(error, name);
+                    }
+                    diagnostics.warning(
+                            "camera",
+                            cameraName() + " PTP 瞬时繁忙，第 "
+                                    + (attempt + 1) + " 次重试 "
+                                    + parameterDisplayName(name)
+                                    + "：" + error.getMessage());
+                    try {
+                        Thread.sleep(200L * (attempt + 1));
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                        throw lastError;
+                    }
+                }
             }
-            throw error;
+            throw lastError != null ? lastError
+                    : new Exception(cameraName() + " 参数写入失败。");
         } finally {
             if (resumeLiveView) {
                 resumeLiveViewAfterExclusiveOperation();
@@ -540,6 +551,32 @@ final class PtpCamera {
                 || message.contains("0x201D");
     }
 
+    private boolean isTransientPtpError(Exception error) {
+        String message = error.getMessage();
+        if (message == null) return false;
+        return message.contains("0x200F") || message.contains("0x201C");
+    }
+
+    private Exception enhanceTransientError(Exception error, String name) {
+        String message = error.getMessage();
+        if (message == null) return error;
+        if (message.contains("0x200F") || message.contains("0x201C")) {
+            diagnostics.warning(
+                    "camera",
+                    cameraName()
+                            + " 当前状态暂时拒绝写入"
+                            + parameterDisplayName(name)
+                            + "；控件保持可用，允许切换机身模式后重试");
+            return new Exception(
+                    cameraName()
+                            + " 当前状态暂时拒绝写入“"
+                            + parameterDisplayName(name)
+                            + "”。请确认机身处于允许调整的曝光模式后重试。",
+                    error);
+        }
+        return error;
+    }
+
     private void waitUntilDeviceReady(long timeoutMillis) throws Exception {
         Exception finalError = null;
         long deadline = System.currentTimeMillis() + timeoutMillis;
@@ -704,6 +741,10 @@ final class PtpCamera {
         for (int attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
             transaction = 0;
             try {
+                if (attempt == 1) {
+                    resetPtpDevice();
+                    Thread.sleep(150);
+                }
                 diagnostics.info(
                         "usb",
                         "正在初始化 " + cameraName()
@@ -1115,6 +1156,44 @@ final class PtpCamera {
         }
 
         boolean input = endpoint.getDirection() == UsbConstants.USB_DIR_IN;
+        try {
+            return transferViaUsbRequest(
+                    activeConnection, endpoint, bytes,
+                    offset, length, timeout, input);
+        } catch (Exception asyncError) {
+            boolean isTimeout = asyncError.getMessage() != null
+                    && asyncError.getMessage().contains("超时");
+            if (!isTimeout) throw asyncError;
+            diagnostics.warning(
+                    "usb",
+                    "UsbRequest 超时，降级为同步 bulkTransfer；"
+                            + "端点=0x"
+                            + Integer.toHexString(endpoint.getAddress()));
+            try {
+                clearEndpointHalt(endpoint);
+                int result = transferViaBulkTransfer(
+                        activeConnection, endpoint, bytes,
+                        offset, length, timeout, input);
+                diagnostics.info(
+                        "usb",
+                        "bulkTransfer 降级成功；端点=0x"
+                                + Integer.toHexString(endpoint.getAddress())
+                                + "；传输=" + result + " 字节");
+                return result;
+            } catch (Exception syncError) {
+                throw asyncError;
+            }
+        }
+    }
+
+    private int transferViaUsbRequest(
+            UsbDeviceConnection activeConnection,
+            UsbEndpoint endpoint,
+            byte[] bytes,
+            int offset,
+            int length,
+            int timeout,
+            boolean input) throws Exception {
         ByteBuffer buffer = ByteBuffer.allocateDirect(length);
         if (!input) {
             buffer.put(bytes, offset, length);
@@ -1166,6 +1245,36 @@ final class PtpCamera {
         }
     }
 
+    private int transferViaBulkTransfer(
+            UsbDeviceConnection activeConnection,
+            UsbEndpoint endpoint,
+            byte[] bytes,
+            int offset,
+            int length,
+            int timeout,
+            boolean input) {
+        if (input) {
+            byte[] buffer = new byte[length];
+            int transferred = activeConnection.bulkTransfer(
+                    endpoint, buffer, length, timeout);
+            if (transferred < 0) {
+                throw new RuntimeException(
+                        "同步 bulkTransfer 读取失败，错误码=" + transferred);
+            }
+            System.arraycopy(buffer, 0, bytes, offset, transferred);
+            return transferred;
+        } else {
+            byte[] chunk = new byte[length];
+            System.arraycopy(bytes, offset, chunk, 0, length);
+            int transferred = activeConnection.bulkTransfer(
+                    endpoint, chunk, length, timeout);
+            if (transferred < 0) {
+                throw new RuntimeException(
+                        "同步 bulkTransfer 写入失败，错误码=" + transferred);
+            }
+            return transferred;
+        }
+    }
     private boolean clearEndpointHalt(UsbEndpoint endpoint) {
         if (connection == null || endpoint == null) return false;
         int requestType =

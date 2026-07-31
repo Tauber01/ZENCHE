@@ -620,7 +620,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。")
+                        Text("• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

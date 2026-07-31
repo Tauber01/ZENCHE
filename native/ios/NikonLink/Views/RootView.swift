@@ -4047,7 +4047,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。")
+                    Text("• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。")
                     .font(.subheadline)
                     .lineSpacing(5)
 

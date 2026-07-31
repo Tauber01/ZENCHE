@@ -2855,9 +2855,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n' +
-                '• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n' +
-                '• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。'
+                '• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n' +
+                '• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n' +
+                '• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n' +
+                '• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n' +
+                '• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。'
               ))
                 .fontSize(14)
                 .lineHeight(23)
@@ -5570,11 +5572,15 @@ struct Index {
   }
 
   private async displayJpeg(jpeg: Uint8Array): Promise<void> {
-    const source: image.ImageSource = image.createImageSource(jpeg.buffer);
-    const sourceMap: image.PixelMap = await source.createPixelMap({
+    const decodeOpts: image.DecodingOptions = {
       editable: false,
       desiredPixelFormat: image.PixelMapFormat.RGBA_8888
-    });
+    } as image.DecodingOptions;
+    if (this.videoRecording) {
+      decodeOpts.desiredSize = { width: 1280, height: 720 };
+    }
+    const source: image.ImageSource = image.createImageSource(jpeg.buffer);
+    const sourceMap: image.PixelMap = await source.createPixelMap(decodeOpts);
     source.release();
     let pixelMap: image.PixelMap = sourceMap;
     const monitoring: boolean =
@@ -5582,7 +5588,7 @@ struct Index {
     const visualProcessing: boolean =
       this.focusPeakingEnabled || this.falseColorEnabled;
     const analyzeFrame: boolean =
-      visualProcessing || this.previewAnalysisSequence++ % 3 === 0;
+      visualProcessing || this.previewAnalysisSequence++ % (this.videoRecording ? 6 : 3) === 0;
     if (monitoring && analyzeFrame) {
       const result: ProfessionalMonitorResult =
         await processProfessionalMonitor(

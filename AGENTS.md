@@ -45,6 +45,10 @@
 - Every GitHub Release description must be written in detailed Simplified
   Chinese. Do not publish an empty body, a terse commit list, or automatically
   generated notes as the final release description.
+- Every new version (every GitHub upload counts as a new version) must also
+  update the in-app update-announcement popup content across all five native
+  platforms. The announcement text describing new features and changes must
+  be materially equivalent in every platform's implementation.
 - A detailed Release description must cover the version highlights, platform
   changes, supported-camera or compatibility changes, package and signing
   status, validation performed, known limitations, upgrade guidance, and

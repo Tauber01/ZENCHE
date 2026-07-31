@@ -677,9 +677,11 @@ public sealed class PtpCamera : IDisposable
         var status = LibUsbNative.libusb_open(device, out _deviceHandle);
         if (status != LibUsbNative.Success || _deviceHandle == nint.Zero)
         {
+            var errorName = LibUsbNative.ErrorName(status);
             throw new InvalidOperationException(
-                $"无法打开 {profile.Name}：{LibUsbNative.ErrorName(status)}。" +
-                "请关闭 NX Tether，并确认相机接口已绑定 WinUSB。");
+                $"无法打开 {profile.Name}：{errorName}。" +
+                "请关闭 NX Tether、Camera Control Pro、照片等可能占用相机的软件，" +
+                "并使用 Zadig 将相机 PTP/Still Image 接口替换为 WinUSB 或 libusbK。");
         }
 
         var configStatus = LibUsbNative.libusb_get_active_config_descriptor(
@@ -714,9 +716,19 @@ public sealed class PtpCamera : IDisposable
             _interfaceNumber);
         if (status != LibUsbNative.Success)
         {
+            var errorName = LibUsbNative.ErrorName(status);
+            var guidance = status == LibUsbNative.ErrorAccess
+                ? "\n请依次排查：\n"
+                    + "1. 关闭 NX Tether、Camera Control Pro、照片、"
+                    + "文件资源管理器等可能占用相机的软件。\n"
+                    + "2. 在 Zadig 中选择正确的 PTP/Still Image 接口"
+                    + "（而非整个设备），替换为 WinUSB 或 libusbK。\n"
+                    + "3. 更换 USB 端口或数据线后重试。\n"
+                    + "4. 在设备管理器中确认相机接口驱动已替换，"
+                    + "未被 Windows 内置驱动重新抢占。"
+                : "。请安装 WinUSB/libusbK 驱动。";
             throw new InvalidOperationException(
-                $"无法声明 {profile.Name} 的 PTP 接口：" +
-                $"{LibUsbNative.ErrorName(status)}。请安装 WinUSB/libusbK 驱动。");
+                $"无法声明 {profile.Name} 的 PTP 接口：{errorName}{guidance}");
         }
         _transaction = 0;
         Profile = profile;

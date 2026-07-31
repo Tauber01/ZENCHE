@@ -343,16 +343,32 @@ export class PtpCamera {
       await this.stopLiveView();
     }
     try {
-      await this.setParameterCore(name, rawValue);
-    } catch (error) {
-      const message: string = (error as Error).message;
-      if (message.includes('0x200F')) {
-        throw new Error(
-          `${this.cameraName()} 当前状态暂时拒绝写入此参数。` +
-          '请确认机身处于允许调整的曝光模式后重试。'
-        );
+      let lastError: Error | undefined;
+      const maxRetries: number = 5;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          await this.setParameterCore(name, rawValue);
+          return;
+        } catch (error) {
+          lastError = error as Error;
+          const message: string = lastError.message;
+          if (!this.isTransientPtpError(lastError)
+              || attempt >= maxRetries - 1) {
+            if (message.includes('0x200F') || message.includes('0x201C')) {
+              throw new Error(
+                `${this.cameraName()} 当前状态暂时拒绝写入此参数。` +
+                '请确认机身处于允许调整的曝光模式后重试。'
+              );
+            }
+            throw lastError;
+          }
+          await new Promise<void>(
+            (resolve) => setTimeout(
+              resolve, 200 * (attempt + 1)));
+        }
       }
-      throw new Error(message);
+      throw lastError ?? new Error(
+        `${this.cameraName()} 参数写入失败。`);
     } finally {
       if (resumeLiveView && this.isConnected) {
         await this.resumeLiveViewAfterExclusiveOperation();
@@ -835,6 +851,12 @@ export class PtpCamera {
       error.message.includes('0x201C') ||
       error.message.includes('0x201d') ||
       error.message.includes('0x201D');
+  }
+
+  private isTransientPtpError(error: Error): boolean {
+    const message: string = error.message;
+    return message.includes('0x200f') || message.includes('0x200F') ||
+      message.includes('0x201c') || message.includes('0x201C');
   }
 
   private async waitUntilDeviceReady(timeout: number): Promise<void> {

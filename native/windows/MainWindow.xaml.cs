@@ -180,6 +180,7 @@ public partial class MainWindow : Window
     private bool _configuringVideoControls;
     private bool _videoMode;
     private bool _videoRecording;
+    private int _previewAnalysisSequence;
     private double _videoFrameRate = 30;
     private double _videoShutterAngle = 180;
     private double _photoShutterSeconds = 0.008;
@@ -2000,9 +2001,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n" +
-                "• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n" +
-                "• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。"),
+                "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n" +
+                "• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n" +
+                "• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n" +
+                "• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n" +
+                "• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -2814,23 +2817,34 @@ public partial class MainWindow : Window
     private async Task PreviewLoopAsync(CancellationToken cancellationToken)
     {
         var failures = 0;
+        Task<byte[]>? pendingFetch = null;
         while (!cancellationToken.IsCancellationRequested &&
                _camera.IsConnected &&
                _camera.IsLiveView)
         {
             try
             {
-                var jpeg = await _camera.GetLiveViewFrameAsync(cancellationToken);
+                // Start next fetch before processing current frame
+                var fetchTask = pendingFetch
+                    ?? _camera.GetLiveViewFrameAsync(cancellationToken);
+                pendingFetch = _camera.GetLiveViewFrameAsync(cancellationToken);
+                var jpeg = await fetchTask;
                 failures = 0;
                 var videoMode = _videoMode;
-                var focusPeaking = videoMode && _focusPeakingEnabled;
-                var falseColor = videoMode && _falseColorEnabled;
+                var recording = _videoRecording;
+                var sequence = ++_previewAnalysisSequence;
+                var analyzeFrame = !recording
+                    || sequence % 6 == 0
+                    || (_focusPeakingEnabled || _falseColorEnabled);
+                var focusPeaking = videoMode && _focusPeakingEnabled && analyzeFrame;
+                var falseColor = videoMode && _falseColorEnabled && analyzeFrame;
                 var prepared = await Task.Run(
                     () => PrepareJpeg(
                         jpeg,
                         videoMode,
                         focusPeaking,
-                        falseColor),
+                        falseColor,
+                        recording),
                     cancellationToken);
                 await Dispatcher.InvokeAsync(
                     () => DisplayPreparedPreview(prepared));
@@ -3030,12 +3044,17 @@ public partial class MainWindow : Window
         byte[] jpeg,
         bool videoMode,
         bool focusPeaking,
-        bool falseColor)
+        bool falseColor,
+        bool recording = false)
     {
         using var stream = new MemoryStream(jpeg, writable: false);
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        if (recording)
+        {
+            bitmap.DecodePixelWidth = 1280;
+        }
         bitmap.StreamSource = stream;
         bitmap.EndInit();
         bitmap.Freeze();
