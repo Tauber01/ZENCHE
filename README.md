@@ -30,7 +30,7 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 - 当前源码版本：**1.2.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
-- 相机档案：**17 款 Nikon EXPEED 6 / 7 机型**
+- 相机档案：**20 款 Nikon EXPEED 5 / 6 / 7 机型**
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
 - 安装包：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
 
@@ -83,8 +83,9 @@ iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，
 
 ## 支持的相机
 
-项目内置以下 17 款机型的 USB 档案：
+项目内置以下 20 款机型的 USB 档案：
 
+- **EXPEED 5：** D500、D7500、D850
 - **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 
@@ -93,15 +94,16 @@ iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，
 
 | 机型 | Product ID | 机型 | Product ID |
 | --- | --- | --- | --- |
-| Z7 | `0x0442` | Z6 | `0x0443` |
-| Z50 | `0x0444` | D780 | `0x0446` |
+| D500 | `0x043a` | Z7 | `0x0442` |
+| Z6 | `0x0443` | Z50 | `0x0444` |
+| D7500 | `0x0445` | D780 | `0x0446` |
 | D6 | `0x0447` | Z5 | `0x0448` |
-| Z7II | `0x044b` | Z6II | `0x044c` |
-| Z fc | `0x044f` | Z9 | `0x0450` |
-| Z8 | `0x0451` | Z30 | `0x0452` |
-| Z f | `0x0453` | Z6III | `0x0454` |
-| Z50II | `0x0455` | Z5II | `0x0456` |
-| ZR | `0x0457` |  |  |
+| D850 | `0x044a` | Z7II | `0x044b` |
+| Z6II | `0x044c` | Z fc | `0x044f` |
+| Z9 | `0x0450` | Z8 | `0x0451` |
+| Z30 | `0x0452` | Z f | `0x0453` |
+| Z6III | `0x0454` | Z50II | `0x0455` |
+| Z5II | `0x0456` | ZR | `0x0457` |
 
 Nikon USB Vendor ID 为 `0x04b0`。
 
@@ -294,7 +296,7 @@ Nikon 及文中相机型号为 Nikon Corporation 的商标。本项目与 Nikon 
 **帧澈 ZENCHE** is a local-first, cross-platform camera control and image
 transfer tool for macOS, Windows, Android, HarmonyOS, and iOS/iPadOS.
 
-It connects supported Nikon EXPEED 6/7 cameras through native USB/PTP
+It connects supported Nikon EXPEED 5/6/7 cameras through native USB/PTP
 implementations where the operating system permits it, provides live view and
 capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
@@ -302,7 +304,7 @@ in a local library for review and export.
 - Source version: **1.2.0**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
-- Camera profiles: **17 Nikon EXPEED 6 / 7 bodies**
+- Camera profiles: **20 Nikon EXPEED 5 / 6 / 7 bodies**
 - Downloads: [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
 - Hardware validation: [Camera test checklist](docs/CAMERA_TEST_CHECKLIST.md)
 
@@ -347,6 +349,7 @@ foreground FTP/HTTP/WebDAV receiving.
 
 ### Supported cameras
 
+- **EXPEED 5:** D500, D7500, and D850
 - **EXPEED 6:** Z7, Z6, Z50, D780, D6, Z5, Z7II, Z6II, Z fc, and Z30
 - **EXPEED 7:** Z9, Z8, Z f, Z6III, Z50II, Z5II, and ZR
 
@@ -360,15 +363,16 @@ completed hardware validation.
 
 | Camera | Product ID | Camera | Product ID |
 | --- | --- | --- | --- |
-| Z7 | `0x0442` | Z6 | `0x0443` |
-| Z50 | `0x0444` | D780 | `0x0446` |
+| D500 | `0x043a` | Z7 | `0x0442` |
+| Z6 | `0x0443` | Z50 | `0x0444` |
+| D7500 | `0x0445` | D780 | `0x0446` |
 | D6 | `0x0447` | Z5 | `0x0448` |
-| Z7II | `0x044b` | Z6II | `0x044c` |
-| Z fc | `0x044f` | Z9 | `0x0450` |
-| Z8 | `0x0451` | Z30 | `0x0452` |
-| Z f | `0x0453` | Z6III | `0x0454` |
-| Z50II | `0x0455` | Z5II | `0x0456` |
-| ZR | `0x0457` |  |  |
+| D850 | `0x044a` | Z7II | `0x044b` |
+| Z6II | `0x044c` | Z fc | `0x044f` |
+| Z9 | `0x0450` | Z8 | `0x0451` |
+| Z30 | `0x0452` | Z f | `0x0453` |
+| Z6III | `0x0454` | Z50II | `0x0455` |
+| Z5II | `0x0456` | ZR | `0x0457` |
 
 </details>
 
@@ -507,7 +511,7 @@ WebDAV で画像を受信して、同じアプリ内でプレビュー、管理�
 - 現在のソースバージョン：**1.2.0**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
-- カメラプロファイル：**Nikon EXPEED 6 / 7 の 17 機種**
+- カメラプロファイル：**Nikon EXPEED 5 / 6 / 7 の 20 機種**
 - ダウンロード：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
 - 実機検証：[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
 
@@ -550,6 +554,7 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 
 ### 対応カメラ
 
+- **EXPEED 5：** D500、D7500、D850
 - **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 
@@ -563,15 +568,16 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 
 | 機種 | Product ID | 機種 | Product ID |
 | --- | --- | --- | --- |
-| Z7 | `0x0442` | Z6 | `0x0443` |
-| Z50 | `0x0444` | D780 | `0x0446` |
+| D500 | `0x043a` | Z7 | `0x0442` |
+| Z6 | `0x0443` | Z50 | `0x0444` |
+| D7500 | `0x0445` | D780 | `0x0446` |
 | D6 | `0x0447` | Z5 | `0x0448` |
-| Z7II | `0x044b` | Z6II | `0x044c` |
-| Z fc | `0x044f` | Z9 | `0x0450` |
-| Z8 | `0x0451` | Z30 | `0x0452` |
-| Z f | `0x0453` | Z6III | `0x0454` |
-| Z50II | `0x0455` | Z5II | `0x0456` |
-| ZR | `0x0457` |  |  |
+| D850 | `0x044a` | Z7II | `0x044b` |
+| Z6II | `0x044c` | Z fc | `0x044f` |
+| Z9 | `0x0450` | Z8 | `0x0451` |
+| Z30 | `0x0452` | Z f | `0x0453` |
+| Z6III | `0x0454` | Z50II | `0x0455` |
+| Z5II | `0x0456` | ZR | `0x0457` |
 
 </details>
 
