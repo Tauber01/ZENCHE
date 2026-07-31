@@ -118,7 +118,7 @@ const formatTime = (dateValue) => {
 const filenameForBlob = (blob) => {
   const extension = blob.type === "image/png" ? "png" : "jpg";
   const timestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
-  return `NIKON_${timestamp}.${extension}`;
+  return `ZENCHE_${timestamp}.${extension}`;
 };
 
 const setButtonBusy = (button, busy) => {
@@ -452,7 +452,7 @@ const updateMonitorDetails = () => {
     camera.mode === "demo"
       ? "演示源就绪"
       : camera.mode === "native"
-        ? "Nikon PTP 会话正常"
+        ? "PTP 会话正常"
         : camera.track?.readyState === "live"
           ? "视频流正常"
           : "未连接";
@@ -541,7 +541,7 @@ const setSourceUi = (mode) => {
   cameraScene.classList.remove("is-off");
   shutterButton.disabled = !(realStream || native || demo);
   liveStatus.hidden = !(realStream || native || demo) || !state.liveEnabled;
-  $("#liveStatusText").textContent = demo ? "DEMO" : native ? "NIKON LIVE" : "LIVE";
+  $("#liveStatusText").textContent = demo ? "DEMO" : native ? "PTP LIVE" : "LIVE";
   $("#pictureInPictureButton").disabled = !realStream || !document.pictureInPictureEnabled;
 
   const label = camera.device?.label || (demo ? "内置演示场景" : "未连接");
@@ -555,7 +555,7 @@ const setSourceUi = (mode) => {
   $("#monitorStatus").textContent = demo
     ? "演示画面已就绪"
     : native
-      ? "Nikon 实时取景已就绪"
+      ? "USB 实时取景已就绪"
       : "实时视频流已就绪";
   $("#connectionStatus").lastChild.textContent = demo ? " 演示源已连接" : ` ${label}`;
   $("#viewfinderStatus").textContent =
@@ -569,7 +569,7 @@ const setSourceUi = (mode) => {
   $("#viewfinderCodec").textContent = demo
     ? "本地演示图像"
     : native
-      ? "Nikon PTP / JPEG"
+      ? "PTP · JPEG"
       : "UVC / MediaStream";
   $("#cameraMeta span").textContent = width && height ? `${width}×${height}` : "已连接";
   updateMonitorDetails();
@@ -689,15 +689,15 @@ const updateConnectionChoice = (mode) => {
   });
   deviceField.hidden = mode !== "media";
   const labels = {
-    native: "连接 EXPEED 7 相机",
+    native: "连接 USB 相机",
     media: "连接视频设备",
-    webusb: "检测 Nikon USB",
+    webusb: "检测 USB 相机",
     demo: "进入演示",
   };
   connectButton.textContent = labels[mode];
   connectionNotice.textContent =
     mode === "native"
-      ? "请用 USB 数据线直连支持的 Nikon EXPEED 7 相机，并选择 MTP/PTP 模式。"
+      ? "请用 USB 数据线直连支持的相机，并选择 MTP/PTP 模式。"
       : mode === "webusb"
       ? "只读取设备身份，不会发送拍摄或参数指令。"
       : mode === "demo"
@@ -721,7 +721,7 @@ const connectSelectedSource = async () => {
   connectionNotice.textContent = "正在连接…";
   try {
     if (state.connectionMode === "webusb") {
-      const device = await camera.detectNikonUsb();
+      const device = await camera.detectCameraUsb();
       $("#cameraName").textContent = device.productName;
       $("#cameraConnection").textContent = "已识别 · 需要原生相机适配";
       $("#cameraMeta span").textContent = `PID ${device.productId.toString(16).toUpperCase()}`;
@@ -1201,7 +1201,7 @@ camera.addEventListener("disconnected", () => {
 camera.addEventListener("previewerror", (event) => {
   $("#monitorStatus").textContent = "实时取景正在重试";
   if (event.detail?.error?.code === "DEVICE_DISCONNECTED") {
-    setDisconnectedUi("Nikon 相机已断开");
+    setDisconnectedUi("相机已断开");
   }
 });
 liveVideo.addEventListener("loadedmetadata", () => {
@@ -1275,7 +1275,7 @@ if (camera.nativeSupported) {
   state.connectionMode = "native";
   $("#storageLocation").textContent = "帧澈 ZENCHE 本地照片库";
   setRuntimeNotice(
-    `${window.NikonNativeBridge.platform === "android" ? "Android" : "macOS"} 原生版已就绪，可连接支持的 Nikon EXPEED 7 相机。`,
+    `${window.NikonNativeBridge.platform === "android" ? "Android" : "macOS"} 原生版已就绪，可连接支持的相机。`,
   );
 }
 updateConnectionChoice(state.connectionMode);

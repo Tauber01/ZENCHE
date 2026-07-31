@@ -1,4 +1,4 @@
-const NIKON_VENDOR_ID = 0x04b0;
+const SUPPORTED_VENDOR_IDS = new Set([0x04b0, 0x054c, 0x04a9]);
 
 const makeError = (code, message, cause) => {
   const error = new Error(message, cause ? { cause } : undefined);
@@ -62,14 +62,14 @@ export class CameraService extends EventTarget {
 
   async connectNative() {
     if (!this.nativeSupported) {
-      throw makeError("NATIVE_UNAVAILABLE", "请使用 帧澈 ZENCHE 原生安装版连接 EXPEED 7 相机。");
+      throw makeError("NATIVE_UNAVAILABLE", "请使用 帧澈 ZENCHE 原生安装版连接相机。");
     }
     await this.disconnect();
     const result = await window.NikonNativeBridge.call("connect", {}, 45_000);
     this.mode = "native";
     this.device = result.device || {
-      id: "nikon-expeed7",
-      label: "Nikon EXPEED 7 相机",
+      id: "usb-ptp-camera",
+      label: "USB 相机",
     };
     this.capabilities = result.capabilities || {};
     this.settings = result.settings || {};
@@ -215,30 +215,29 @@ export class CameraService extends EventTarget {
     };
   }
 
-  async detectNikonUsb() {
+  async detectCameraUsb() {
     if (!this.webUsbSupported) {
       throw makeError(
         "WEBUSB_UNSUPPORTED",
-        "当前浏览器不支持 WebUSB。可改用系统视频设备，或在原生版本中接入尼康 SDK。",
+        "当前浏览器不支持 WebUSB。可改用系统视频设备，或在原生版本中接入相机 SDK。",
       );
     }
 
     try {
-      const device = await navigator.usb.requestDevice({
-        filters: [{ vendorId: NIKON_VENDOR_ID }],
-      });
+      const filters = [...SUPPORTED_VENDOR_IDS].map(v => ({ vendorId: v }));
+      const device = await navigator.usb.requestDevice({ filters });
       return {
-        productName: device.productName || "Nikon USB Camera",
-        manufacturerName: device.manufacturerName || "Nikon",
+        productName: device.productName || "USB 相机",
+        manufacturerName: device.manufacturerName || "相机厂商",
         serialNumber: device.serialNumber || "",
         vendorId: device.vendorId,
         productId: device.productId,
       };
     } catch (error) {
       if (error.name === "NotFoundError") {
-        throw makeError("USB_CANCELLED", "没有选择尼康 USB 设备。", error);
+        throw makeError("USB_CANCELLED", "没有选择 USB 相机设备。", error);
       }
-      throw makeError("USB_DETECTION_FAILED", `无法检测尼康 USB 设备：${error.message}`, error);
+      throw makeError("USB_DETECTION_FAILED", `无法检测 USB 相机设备：${error.message}`, error);
     }
   }
 

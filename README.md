@@ -30,7 +30,7 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 - 当前源码版本：**1.2.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
-- 相机档案：**20 款 Nikon EXPEED 5 / 6 / 7 机型**
+- 相机档案：**30 款 Nikon / Sony / Canon 微单相机**
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
 - 安装包：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
 
@@ -83,11 +83,13 @@ iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，
 
 ## 支持的相机
 
-项目内置以下 20 款机型的 USB 档案：
+项目内置以下机型的 USB 档案：
 
-- **EXPEED 5：** D500、D7500、D850
-- **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
-- **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
+- **Nikon EXPEED 5** (3)：D500、D7500、D850
+- **Nikon EXPEED 6** (10)：Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
+- **Nikon EXPEED 7** (7)：Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
+- **Sony α** (5)：A1、A7R V、A7 IV、A7S III、A7C II — ⚠️ 实验性，待实机验证
+- **Canon EOS R** (5)：EOS R5、R6 Mark II、R3、R7、R8 — ⚠️ 实验性，待实机验证
 
 <details>
 <summary>查看 USB Product ID</summary>

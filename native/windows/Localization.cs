@@ -343,8 +343,8 @@ internal static class AppLocalization
                 new("Capturing and Downloading JPEG…", "JPEG を撮影してダウンロード中…"),
             ["正在断开相机…"] =
                 new("Disconnecting Camera…", "カメラを切断中…"),
-            ["正在连接 Nikon 相机…"] =
-                new("Connecting Nikon Camera…", "Nikon カメラに接続中…"),
+            ["正在连接相机…"] =
+                new("Connecting Camera…", "カメラに接続中…"),
             ["相机已断开"] =
                 new("Camera Disconnected", "カメラを切断しました"),
             ["录制"] = new("Record", "録画"),

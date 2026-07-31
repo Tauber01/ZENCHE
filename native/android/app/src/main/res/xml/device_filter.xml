@@ -36,4 +36,8 @@
     <usb-device vendor-id="1200" product-id="1111" />
     <!-- Name-based fallback for newly reported Nikon still-image interfaces. -->
     <usb-device vendor-id="1200" class="6" subclass="1" protocol="1" />
+    <!-- Sony still-image class fallback. -->
+    <usb-device vendor-id="1356" class="6" subclass="1" protocol="1" />
+    <!-- Canon still-image class fallback. -->
+    <usb-device vendor-id="1193" class="6" subclass="1" protocol="1" />
 </resources>

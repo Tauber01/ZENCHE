@@ -14,5 +14,7 @@ repository; release builders obtain it from the official upstream release:
 - https://github.com/libusb/libusb
 
 帧澈 ZENCHE does not contain or redistribute Nikon's proprietary SDK. Nikon,
-EXPEED and Nikon camera model names are trademarks of Nikon Corporation. This
+Nikon, EXPEED and all Nikon camera model names are trademarks of Nikon Corporation.
+Sony, Alpha and all Sony camera model names are trademarks of Sony Group Corporation.
+Canon, EOS and all Canon camera model names are trademarks of Canon Inc. This
 project is independent and is not endorsed by Nikon Corporation.

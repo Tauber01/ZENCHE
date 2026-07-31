@@ -227,7 +227,7 @@
                 <div class="scene__leaf scene__leaf--two"></div>
               </div>
               <video class="live-video" id="liveVideo" autoplay muted playsinline hidden></video>
-              <img class="live-video native-preview" id="nativePreview" alt="Nikon 相机实时取景" hidden />
+              <img class="live-video native-preview" id="nativePreview" alt="相机实时取景" hidden />
 
               <div class="grid-overlay" aria-hidden="true"></div>
               <div class="focus-box" aria-label="对焦点">
@@ -307,7 +307,7 @@
                   <div class="scene__fruit"></div>
                 </div>
                 <video class="monitor-video" id="monitorVideo" autoplay muted playsinline hidden></video>
-                <img class="monitor-video native-preview" id="nativeMonitorPreview" alt="Nikon 相机视频监看画面" hidden />
+                <img class="monitor-video native-preview" id="nativeMonitorPreview" alt="相机视频监看画面" hidden />
                 <div class="focus-box monitor-focus-box" aria-label="视频对焦区域">
                   <span></span><span></span><span></span><span></span>
                 </div>
@@ -551,7 +551,7 @@
             <div class="detail-stack">
               <div><span>保存方式</span><strong>IndexedDB 本地存储</strong></div>
               <div><span>网络上传</span><strong>未启用</strong></div>
-              <div><span>文件命名</span><strong>NIKON_日期时间</strong></div>
+              <div><span>文件命名</span><strong>ZENCHE_日期时间</strong></div>
             </div>
           </div>
         </aside>
@@ -591,7 +591,7 @@
       <div class="dialog__titlebar">
         <div>
           <h2 id="connectionTitle">连接相机</h2>
-          <p>原生安装版支持 7 款 Nikon EXPEED 7 相机 USB 联机；浏览器版也可连接系统视频设备。</p>
+          <p>原生安装版支持 Nikon / Sony / Canon 相机 USB 联机；浏览器版也可连接系统视频设备。</p>
         </div>
         <button class="icon-button dialog-close" type="button" aria-label="关闭连接窗口">
           <svg class="icon"><use href="#icon-x"></use></svg>
@@ -600,7 +600,7 @@
       <div class="connection-options">
         <button class="connection-option" type="button" aria-pressed="false" data-connection="native" data-native-only hidden>
           <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
-          <span><strong>Nikon EXPEED 7 原生 USB</strong><small>Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR</small></span>
+          <span><strong>USB 相机原生连接</strong><small>Nikon · Sony · Canon</small></span>
           <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
         </button>
         <button class="connection-option is-selected" type="button" aria-pressed="true" data-connection="media">
@@ -610,7 +610,7 @@
         </button>
         <button class="connection-option" type="button" aria-pressed="false" data-connection="webusb">
           <span class="connection-option__icon"><svg class="icon"><use href="#icon-camera"></use></svg></span>
-          <span><strong>检测 Nikon USB</strong><small>实验性设备识别，不发送相机控制指令</small></span>
+          <span><strong>检测 USB 相机</strong><small>实验性设备识别，不发送相机控制指令</small></span>
           <svg class="icon connection-option__check"><use href="#icon-check"></use></svg>
         </button>
         <button class="connection-option" type="button" aria-pressed="false" data-connection="demo">

@@ -66,7 +66,7 @@ export class PhotoStorage {
     const extension = blob.type === "image/png" ? "png" : "jpg";
     const record = {
       id: options.id || createId(),
-      name: options.name || `NIKON_${capturedAt.replace(/\D/g, "").slice(0, 14)}.${extension}`,
+      name: options.name || `ZENCHE_${capturedAt.replace(/\D/g, "").slice(0, 14)}.${extension}`,
       blob,
       type: blob.type || "application/octet-stream",
       size: blob.size,

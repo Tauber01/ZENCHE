@@ -9,21 +9,49 @@ import UniformTypeIdentifiers
 
 private struct SupportedCamera: Equatable {
     let name: String
+    let vendorName: String
+    let vendorID: Int
     let productID: Int
     let detectionTokens: [String]
     let minimumISO: Int
     let maximumISO: Int
 
+    static let supportedVendorIDs: Set<Int> = [0x04b0, 0x054c, 0x04a9]
+
     static let all = [
+        // ── Nikon EXPEED 5 ──
         SupportedCamera(
             name: "Nikon D500",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x043a,
             detectionTokens: ["nikon d500", "nikon d 500"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
+            name: "Nikon D7500",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x0445,
+            detectionTokens: ["nikon d7500", "nikon d 7500"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D850",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x044a,
+            detectionTokens: ["nikon d850", "nikon d 850"],
+            minimumISO: 64,
+            maximumISO: 25600
+        ),
+        // ── Nikon EXPEED 6 ──
+        SupportedCamera(
             name: "Nikon Z7",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0442,
             detectionTokens: ["nikon z7", "nikon z 7"],
             minimumISO: 64,
@@ -31,6 +59,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0443,
             detectionTokens: ["nikon z6", "nikon z 6"],
             minimumISO: 100,
@@ -38,20 +68,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z50",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0444,
             detectionTokens: ["nikon z50", "nikon z 50"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
-            name: "Nikon D7500",
-            productID: 0x0445,
-            detectionTokens: ["nikon d7500", "nikon d 7500"],
-            minimumISO: 100,
-            maximumISO: 51200
-        ),
-        SupportedCamera(
             name: "Nikon D780",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0446,
             detectionTokens: ["nikon d780", "nikon d 780"],
             minimumISO: 100,
@@ -59,6 +86,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon D6",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0447,
             detectionTokens: ["nikon d6", "nikon d 6"],
             minimumISO: 100,
@@ -66,20 +95,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z5",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0448,
             detectionTokens: ["nikon z5", "nikon z 5"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
-            name: "Nikon D850",
-            productID: 0x044a,
-            detectionTokens: ["nikon d850", "nikon d 850"],
-            minimumISO: 64,
-            maximumISO: 25600
-        ),
-        SupportedCamera(
             name: "Nikon Z7II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044b,
             detectionTokens: [
                 "nikon z7 2", "nikon z7 ii", "nikon z7ii", "nikon z 7ii"
@@ -89,6 +115,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044c,
             detectionTokens: [
                 "nikon z6 2", "nikon z6 ii", "nikon z6ii", "nikon z 6ii"
@@ -98,13 +126,27 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z fc",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044f,
             detectionTokens: ["nikon zfc", "nikon z fc"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
+            name: "Nikon Z30",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x0452,
+            detectionTokens: ["nikon z30", "nikon z 30"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        // ── Nikon EXPEED 7 ──
+        SupportedCamera(
             name: "Nikon Z9",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0450,
             detectionTokens: ["nikon z9", "nikon z 9"],
             minimumISO: 64,
@@ -112,20 +154,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z8",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0451,
             detectionTokens: ["nikon z8", "nikon z 8"],
             minimumISO: 64,
             maximumISO: 25600
         ),
         SupportedCamera(
-            name: "Nikon Z30",
-            productID: 0x0452,
-            detectionTokens: ["nikon z30", "nikon z 30"],
-            minimumISO: 100,
-            maximumISO: 51200
-        ),
-        SupportedCamera(
             name: "Nikon Z f",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0453,
             detectionTokens: ["nikon zf", "nikon z f"],
             minimumISO: 100,
@@ -133,6 +172,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6III",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0454,
             detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"],
             minimumISO: 100,
@@ -140,6 +181,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z50II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0455,
             detectionTokens: [
                 "nikon z50 2", "nikon z50 ii", "nikon z50ii", "nikon z50_2"
@@ -149,6 +192,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z5II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0456,
             detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"],
             minimumISO: 100,
@@ -156,15 +201,109 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon ZR",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0457,
             detectionTokens: ["nikon zr", "nikon z r"],
             minimumISO: 100,
             maximumISO: 51200
-        )
+        ),
+        // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        SupportedCamera(
+            name: "Sony A1",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a1", "sony ilce-1", "sony a 1"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A7R V",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7r v", "sony a7r 5", "sony ilce-7rm5", "sony a7rv"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A7 IV",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7 iv", "sony a7 4", "sony ilce-7m4", "sony a7m4"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Sony A7S III",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7s iii", "sony a7s 3", "sony ilce-7sm3", "sony a7s3"],
+            minimumISO: 80,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Sony A7C II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7c ii", "sony a7c 2", "sony ilce-7cm2", "sony a7c2"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        SupportedCamera(
+            name: "Canon EOS R5",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r5", "canon r5", "eos r5"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Canon EOS R6 Mark II",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r6 mark ii", "canon eos r6 mk ii", "canon r6 mark ii", "canon r6 mk2", "canon r6 2", "eos r6 mark ii"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R3",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r3", "canon r3", "eos r3"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R7",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r7", "canon r7", "eos r7"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R8",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r8", "canon r8", "eos r8"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
     ]
 
     static var summary: String {
-        all.map { $0.name.replacingOccurrences(of: "Nikon ", with: "") }
+        all.map { $0.name }
             .joined(separator: " · ")
     }
 
@@ -188,8 +327,8 @@ private struct SupportedCamera: Equatable {
         .camera
     }
 
-    static func matching(productID: Int) -> SupportedCamera? {
-        all.first { $0.productID == productID }
+    static func matching(productID: Int, vendorID: Int) -> SupportedCamera? {
+        all.first { $0.productID == productID && $0.vendorID == vendorID }
     }
 
     static func isoOptions(for cameraName: String?) -> [Int] {
@@ -224,7 +363,7 @@ private enum CameraError: LocalizedError {
         case .liveViewBusy(let value):
             return "\(value) 正在处理拍摄操作，已暂停实时取景。请等待存储卡写入、间隔拍摄或长曝光结束后再开启。"
         case .noCamera:
-            return "没有检测到支持的 Nikon 相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
+            return "没有检测到支持的相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
         case .wrongCamera(let value):
             return "检测到 \(value)，当前版本支持 \(SupportedCamera.summary)。"
         case .noImage:
@@ -262,7 +401,7 @@ private final class GPhotoCamera {
     var isLiveViewActive: Bool { liveView }
 
     private var cameraName: String {
-        profile?.name ?? "Nikon 相机"
+        profile?.name ?? "相机"
     }
 
     private var executable: URL {
@@ -549,9 +688,13 @@ private final class GPhotoCamera {
         if let dictionary = value as? [String: Any] {
             let vendor = hexValue(dictionary["vendor_id"])
             let product = hexValue(dictionary["product_id"])
-            if vendor == 0x04b0 {
+            if let vendor,
+               SupportedCamera.supportedVendorIDs.contains(vendor) {
                 if let product,
-                   let match = SupportedCamera.matching(productID: product) {
+                   let match = SupportedCamera.matching(
+                    productID: product,
+                    vendorID: vendor
+                   ) {
                     return match
                 }
                 let descriptor = dictionary.values
@@ -590,12 +733,12 @@ private final class GPhotoCamera {
             SupportedCamera.matching(detection: detected)
             ?? detectedUSBProfile()
         guard let matchedProfile else {
-            if !detected.localizedCaseInsensitiveContains("nikon"),
-               !detected.localizedCaseInsensitiveContains("ptp class camera") {
+            let detectedLower = detected.lowercased()
+            if !detectedLower.contains("ptp class camera") {
                 logger.error("camera", "连接失败：未检测到支持的相机")
                 throw CameraError.noCamera
             }
-            let name = detected.split(separator: "\n").last.map(String.init) ?? "其他 Nikon 相机"
+            let name = detected.split(separator: "\n").last.map(String.init) ?? "其他相机"
             logger.error("camera", "连接失败：检测到不支持的相机 \(name)")
             throw CameraError.wrongCamera(name)
         }
@@ -1453,7 +1596,7 @@ private final class CameraModel: ObservableObject {
     }
 
     var activeCameraName: String {
-        cameraName ?? "Nikon 相机"
+        cameraName ?? "相机"
     }
 
     init() {
@@ -1558,7 +1701,7 @@ private final class CameraModel: ObservableObject {
 
     func toggleLiveView() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         if liveViewEnabled {
@@ -1698,7 +1841,7 @@ private final class CameraModel: ObservableObject {
 
     func capture() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !capturing else { return }
@@ -1712,7 +1855,7 @@ private final class CameraModel: ObservableObject {
                 let data = try self.camera.capture(bulbSeconds: duration)
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
-                let filename = "NIKON_\(formatter.string(from: Date())).JPG"
+                let filename = "ZENCHE_\(formatter.string(from: Date())).JPG"
                 let url = try self.captureWorkflow.store(
                     data: data,
                     originalFilename: filename,
@@ -1757,7 +1900,7 @@ private final class CameraModel: ObservableObject {
 
     func startShootingTask() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !shootingTaskRunning else { return }
@@ -1869,7 +2012,7 @@ private final class CameraModel: ObservableObject {
 
     func toggleMovieRecording() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !capturing else { return }
@@ -2195,7 +2338,7 @@ private final class CameraModel: ObservableObject {
 
     func applyParameter(_ name: String, value: Any, label: String) {
         guard connected else {
-            errorMessage = "连接支持的 Nikon 相机后才能调整参数。"
+            errorMessage = "连接支持的相机后才能调整参数。"
             return
         }
         guard canAdjustExposureParameter(name) else {
@@ -2427,7 +2570,7 @@ private struct PreviewStage: View {
                     RuntimeLocalizedText(
                         model.connected
                             ? "等待实时取景画面"
-                            : "连接支持的 Nikon 相机后开启实时取景"
+                            : "连接支持的相机后开启实时取景"
                     )
                         .font(.system(size: 15, weight: .medium))
                 }
@@ -6110,7 +6253,7 @@ private struct ConnectionSheet: View {
                     RuntimeLocalizedText(
                         model.connecting
                             ? "正在连接…"
-                            : "连接 Nikon 相机"
+                            : "连接相机"
                     )
                 }
                 .buttonStyle(NativeButtonStyle(primary: true))

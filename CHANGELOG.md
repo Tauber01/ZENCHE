@@ -3,6 +3,37 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [Unreleased]
+
+### Added
+
+- Multi-brand camera support: added Sony α (5 models) and Canon EOS R (5 models)
+  camera profiles alongside the existing 20 Nikon EXPEED 5/6/7 profiles.
+- Vendor-abstraction layer (PtpVendorOps) on Windows, enabling per-manufacturer
+  PTP operation codes, property IDs, and shutter value encodings.
+- Sony and Canon USB Vendor ID fallback entries in the Android device filter,
+  so the system attachment prompt appears for supported Sony/Canon still-image
+  interfaces.
+- macOS gphoto2 path now supports Sony and Canon cameras via multi-vendor
+  detection tokens and vendor-routed gphoto2 configuration key names.
+- Experimental Sony and Canon PTP vendor ops stubs on Windows (opcodes from
+  libgphoto2 camlibs/ptp2; pending hardware validation).
+
+### Changed
+
+- Camera profiles on all platforms now include `vendorId` and `vendorName`
+  fields; USB device enumeration uses a `SupportedVendorIds` set instead of a
+  single hardcoded `NIKON_VENDOR_ID`.
+- User-facing camera status text, connection labels, and error messages
+  replaced Nikon-specific branding with vendor-generic terms or dynamic camera
+  names.
+- Default captured-file prefix updated from `NIKON_` to `ZENCHE_` across the
+  web layer, macOS, and the shared storage service.
+- Web USB detection renamed from `detectNikonUsb()` to `detectCameraUsb()` and
+  accepts all three supported vendor IDs.
+- Test suite updated to validate multi-brand profile consistency across all
+  four native platforms.
+
 ## [1.2.0] - 2026-07-30
 
 ### Added
