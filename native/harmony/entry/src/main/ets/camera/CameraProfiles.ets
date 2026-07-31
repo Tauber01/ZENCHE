@@ -52,17 +52,31 @@ export const SUPPORTED_CAMERAS: Array<CameraProfile> = [
   new CameraProfile('Nikon Z5II', 'Nikon', 0x04b0, 0x0456, 100, 64000),
   new CameraProfile('Nikon ZR', 'Nikon', 0x04b0, 0x0457, 100, 51200),
   // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+  // Full-frame E-mount
   new CameraProfile('Sony A1', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony A1 II', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony A9 III', 'Sony', 0x054c, 0x0000, 100, 51200),
   new CameraProfile('Sony A7R V', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony A7 IV', 'Sony', 0x054c, 0x0000, 100, 51200),
   new CameraProfile('Sony A7S III', 'Sony', 0x054c, 0x0000, 80, 102400),
   new CameraProfile('Sony A7C II', 'Sony', 0x054c, 0x0000, 100, 51200),
+  new CameraProfile('Sony A7C R', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony ZV-E1', 'Sony', 0x054c, 0x0000, 80, 102400),
+  // APS-C E-mount
+  new CameraProfile('Sony A6700', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony FX30', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony ZV-E10 II', 'Sony', 0x054c, 0x0000, 100, 32000),
   // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
-  new CameraProfile('Canon EOS R5', 'Canon', 0x04a9, 0x0000, 100, 51200),
-  new CameraProfile('Canon EOS R6 Mark II', 'Canon', 0x04a9, 0x0000, 100, 102400),
+  new CameraProfile('Canon EOS R1', 'Canon', 0x04a9, 0x0000, 100, 102400),
   new CameraProfile('Canon EOS R3', 'Canon', 0x04a9, 0x0000, 100, 102400),
+  new CameraProfile('Canon EOS R5', 'Canon', 0x04a9, 0x0000, 100, 51200),
+  new CameraProfile('Canon EOS R5 Mark II', 'Canon', 0x04a9, 0x0000, 100, 51200),
+  new CameraProfile('Canon EOS R6 Mark II', 'Canon', 0x04a9, 0x0000, 100, 102400),
   new CameraProfile('Canon EOS R7', 'Canon', 0x04a9, 0x0000, 100, 12800),
   new CameraProfile('Canon EOS R8', 'Canon', 0x04a9, 0x0000, 100, 102400),
+  new CameraProfile('Canon EOS R10', 'Canon', 0x04a9, 0x0000, 100, 12800),
+  new CameraProfile('Canon EOS R50', 'Canon', 0x04a9, 0x0000, 100, 12800),
+  new CameraProfile('Canon EOS R100', 'Canon', 0x04a9, 0x0000, 100, 12800),
 ];
 
 export function profileForProduct(vendorId: number, productId: number): CameraProfile | undefined {

@@ -209,6 +209,7 @@ private struct SupportedCamera: Equatable {
             maximumISO: 51200
         ),
         // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        // Full-frame E-mount
         SupportedCamera(
             name: "Sony A1",
             vendorName: "Sony",
@@ -217,6 +218,24 @@ private struct SupportedCamera: Equatable {
             detectionTokens: ["sony a1", "sony ilce-1", "sony a 1"],
             minimumISO: 100,
             maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A1 II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a1 ii", "sony a1 2", "sony a1ii", "sony a1 mk2", "sony ilce-1m2"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A9 III",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a9 iii", "sony a9 3", "sony a9iii", "sony ilce-9m3"],
+            minimumISO: 100,
+            maximumISO: 51200
         ),
         SupportedCamera(
             name: "Sony A7R V",
@@ -254,7 +273,71 @@ private struct SupportedCamera: Equatable {
             minimumISO: 100,
             maximumISO: 51200
         ),
+        SupportedCamera(
+            name: "Sony A7C R",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7c r", "sony a7cr", "sony ilce-7cr"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony ZV-E1",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony zv-e1", "sony zve1", "sony zv e1"],
+            minimumISO: 80,
+            maximumISO: 102400
+        ),
+        // APS-C E-mount
+        SupportedCamera(
+            name: "Sony A6700",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a6700", "sony a 6700", "sony ilce-6700"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony FX30",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony fx30", "sony fx 30", "sony ilme-fx30"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony ZV-E10 II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony zv-e10 ii", "sony zv e10 ii", "sony zv-e10 2", "sony zve10 ii", "sony zve10 2", "sony zve10m2"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
         // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        SupportedCamera(
+            name: "Canon EOS R1",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r1", "canon r1", "eos r1"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R3",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r3", "canon r3", "eos r3"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
         SupportedCamera(
             name: "Canon EOS R5",
             vendorName: "Canon",
@@ -265,20 +348,20 @@ private struct SupportedCamera: Equatable {
             maximumISO: 51200
         ),
         SupportedCamera(
+            name: "Canon EOS R5 Mark II",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r5 mark ii", "canon eos r5 mk ii", "canon eos r5 mk2", "canon eos r5 2", "canon r5 mark ii", "canon r5 mk2", "eos r5 mark ii"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
             name: "Canon EOS R6 Mark II",
             vendorName: "Canon",
             vendorID: 0x04a9,
             productID: 0x0000,
             detectionTokens: ["canon eos r6 mark ii", "canon eos r6 mk ii", "canon r6 mark ii", "canon r6 mk2", "canon r6 2", "eos r6 mark ii"],
-            minimumISO: 100,
-            maximumISO: 102400
-        ),
-        SupportedCamera(
-            name: "Canon EOS R3",
-            vendorName: "Canon",
-            vendorID: 0x04a9,
-            productID: 0x0000,
-            detectionTokens: ["canon eos r3", "canon r3", "eos r3"],
             minimumISO: 100,
             maximumISO: 102400
         ),
@@ -299,6 +382,33 @@ private struct SupportedCamera: Equatable {
             detectionTokens: ["canon eos r8", "canon r8", "eos r8"],
             minimumISO: 100,
             maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R10",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r10", "canon r10", "eos r10"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R50",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r50", "canon r50", "eos r50"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R100",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r100", "canon r100", "eos r100"],
+            minimumISO: 100,
+            maximumISO: 12800
         ),
     ]
 

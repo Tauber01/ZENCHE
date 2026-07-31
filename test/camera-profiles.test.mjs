@@ -29,18 +29,30 @@ const nikonProfiles = [
 
 const sonyProfiles = [
   ["Sony A1", 0x0000, 100, 32000],
+  ["Sony A1 II", 0x0000, 100, 32000],
+  ["Sony A9 III", 0x0000, 100, 51200],
   ["Sony A7R V", 0x0000, 100, 32000],
   ["Sony A7 IV", 0x0000, 100, 51200],
   ["Sony A7S III", 0x0000, 80, 102400],
   ["Sony A7C II", 0x0000, 100, 51200],
+  ["Sony A7C R", 0x0000, 100, 32000],
+  ["Sony ZV-E1", 0x0000, 80, 102400],
+  ["Sony A6700", 0x0000, 100, 32000],
+  ["Sony FX30", 0x0000, 100, 32000],
+  ["Sony ZV-E10 II", 0x0000, 100, 32000],
 ];
 
 const canonProfiles = [
-  ["Canon EOS R5", 0x0000, 100, 51200],
-  ["Canon EOS R6 Mark II", 0x0000, 100, 102400],
+  ["Canon EOS R1", 0x0000, 100, 102400],
   ["Canon EOS R3", 0x0000, 100, 102400],
+  ["Canon EOS R5", 0x0000, 100, 51200],
+  ["Canon EOS R5 Mark II", 0x0000, 100, 51200],
+  ["Canon EOS R6 Mark II", 0x0000, 100, 102400],
   ["Canon EOS R7", 0x0000, 100, 12800],
   ["Canon EOS R8", 0x0000, 100, 102400],
+  ["Canon EOS R10", 0x0000, 100, 12800],
+  ["Canon EOS R50", 0x0000, 100, 12800],
+  ["Canon EOS R100", 0x0000, 100, 12800],
 ];
 
 const allProfiles = [...nikonProfiles, ...sonyProfiles, ...canonProfiles];
