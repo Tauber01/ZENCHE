@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0a0d12">
+    <meta name="description" content="帧澈 ZENCHE：跨平台相机控制与影像传输工具。Capture · Connect · Flow。">
+    <meta property="og:title" content="帧澈 ZENCHE · Capture · Connect · Flow">
+    <meta property="og:description" content="连接相机，也连接完整工作流。原生支持 macOS、Windows、Android、HarmonyOS 与 iOS / iPadOS。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://zenche.top/">
+    <meta property="og:image" content="https://zenche.top/assets/hero-control.png">
+    <link rel="icon" href="assets/app-icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <title>帧澈 ZENCHE · Capture · Connect · Flow</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">跳到主要内容</a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="帧澈 ZENCHE home">
+          <img src="assets/app-icon.svg" alt="">
+          <span class="brand-copy"><strong>帧澈</strong><b>ZENCHE</b></span>
+        </a>
+        <nav class="desktop-nav" aria-label="主导航">
+          <a href="#workflow" data-i18n="navWorkflow">工作流</a>
+          <a href="#platforms" data-i18n="navPlatforms">平台</a>
+          <a href="#cameras" data-i18n="navCameras">相机</a>
+          <a href="#download" data-i18n="navDownload">下载</a>
+        </nav>
+        <div class="header-actions">
+          <button class="language-toggle" type="button" aria-label="切换语言" data-lang-toggle>
+            <span class="language-active">中</span><span>/</span><span>EN</span>
+          </button>
+          <a class="header-cta" href="#download"><span data-i18n="headerCta">获取应用</span><span aria-hidden="true">↗</span></a>
+          <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="打开菜单" data-menu-toggle>
+            <span></span><span></span>
+          </button>
+        </div>
+      </div>
+      <nav class="mobile-nav" id="mobile-nav" aria-label="移动端导航" data-mobile-nav>
+        <a href="#workflow" data-i18n="navWorkflow">工作流</a>
+        <a href="#platforms" data-i18n="navPlatforms">平台</a>
+        <a href="#cameras" data-i18n="navCameras">相机</a>
+        <a href="#download" data-i18n="navDownload">下载</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-grid shell">
+          <div class="hero-copy reveal">
+            <div class="eyebrow"><span class="eyebrow-line"></span><span data-i18n="heroEyebrow">CROSS-PLATFORM CAMERA WORKFLOW</span></div>
+            <h1><span data-i18n="heroTitleA">连接相机，</span><em data-i18n="heroTitleB">连接完整工作流。</em></h1>
+            <p class="hero-lede" data-i18n="heroLede">从 USB / PTP 取景与控制，到 FTP、HTTP、WebDAV 收图，再到本地整理与非破坏性显影。帧澈把拍摄现场和后续工作放在同一个节奏里。</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#download"><span data-i18n="heroPrimary">下载帧澈</span><span aria-hidden="true">↗</span></a>
+              <a class="button button-quiet" href="#workflow"><span data-i18n="heroSecondary">探索工作流</span><span aria-hidden="true">↓</span></a>
+            </div>
+            <div class="hero-meta">
+              <span><b>v1.2.0</b><small data-i18n="heroVersion">当前版本</small></span>
+              <span><b>5</b><small data-i18n="heroPlatforms">原生平台</small></span>
+              <span><b>20</b><small data-i18n="heroModels">Nikon 机型档案</small></span>
+            </div>
+          </div>
+          <div class="hero-visual reveal reveal-delay">
+            <figure class="hero-frame">
+              <div class="frame-label frame-label-top"><span class="status-dot"></span><span data-i18n="heroFrameLabel">帧澈 ZENCHE · NATIVE CONTROL</span></div>
+              <img src="assets/hero-control.png" alt="帧澈 ZENCHE 原生相机控制界面" data-i18n-alt="heroImageAlt">
+              <figcaption><span data-i18n="heroCaption">原生控制 · 实时取景 · 参数写入</span><span>01 / 06</span></figcaption>
+            </figure>
+            <div class="visual-note visual-note-left"><span>USB / PTP</span><small data-i18n="visualNoteA">直接连接相机</small></div>
+            <div class="visual-note visual-note-right"><span>CAPTURE</span><small data-i18n="visualNoteB">现场到文件库</small></div>
+          </div>
+        </div>
+        <div class="hero-scroll shell"><span data-i18n="scrollHint">向下查看完整工作流</span><span class="scroll-line"></span></div>
+      </section>
+
+      <section class="statement section-pad" aria-labelledby="statement-title">
+        <div class="shell statement-grid">
+          <p class="section-kicker reveal" data-i18n="statementKicker">A TOOL FOR THE WHOLE SET</p>
+          <div class="statement-copy reveal reveal-delay">
+            <h2 id="statement-title"><span data-i18n="statementA">拍下的每一帧，</span><em data-i18n="statementB">都应该顺利抵达。</em></h2>
+            <p data-i18n="statementBody">帧澈是开源、本地优先的相机工作流工具。它不把你的影像送进陌生的云端，也不要求你在不同应用之间来回切换。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="workflow section-pad" id="workflow" aria-labelledby="workflow-title">
+        <div class="shell">
+          <div class="section-heading reveal">
+            <div>
+              <p class="section-kicker" data-i18n="workflowKicker">THE WORKFLOW</p>
+              <h2 id="workflow-title"><span data-i18n="workflowTitleA">从拍摄现场，</span><br><em data-i18n="workflowTitleB">一路到成片。</em></h2>
+            </div>
+            <p class="section-intro" data-i18n="workflowIntro">一套原生应用，覆盖拍摄、监看、传输、整理与显影。每一个环节都保留清晰的下一步。</p>
+          </div>
+          <div class="workflow-layout">
+            <div class="workflow-index reveal">
+              <button class="workflow-tab is-active" type="button" data-workflow-tab="capture"><span>01</span><strong data-i18n="workCapture">Capture</strong><small data-i18n="workCaptureSub">连接与拍摄</small></button>
+              <button class="workflow-tab" type="button" data-workflow-tab="monitor"><span>02</span><strong data-i18n="workMonitor">Monitor</strong><small data-i18n="workMonitorSub">实时监看</small></button>
+              <button class="workflow-tab" type="button" data-workflow-tab="transfer"><span>03</span><strong data-i18n="workTransfer">Transfer</strong><small data-i18n="workTransferSub">无线收图</small></button>
+              <button class="workflow-tab" type="button" data-workflow-tab="flow"><span>04</span><strong data-i18n="workFlow">Flow</strong><small data-i18n="workFlowSub">整理与显影</small></button>
+            </div>
+            <div class="workflow-detail reveal reveal-delay">
+              <div class="workflow-panel is-active" data-workflow-panel="capture">
+                <figure class="workflow-image"><img src="assets/platform-control.png" alt="帧澈原生拍摄控制界面"><figcaption><span>USB / PTP</span><span data-i18n="captureCaption">实时取景与相机参数</span></figcaption></figure>
+                <div class="workflow-text"><p class="panel-tag">CAPTURE / 01</p><h3 data-i18n="captureTitle">连接，取景，按下快门。</h3><p data-i18n="captureBody">通过原生 USB / PTP 连接 Nikon 相机，读取能力、调整拍摄参数、开启实时取景并触发快门。</p><ul><li data-i18n="captureBullet1">快门、光圈、ISO、曝光补偿</li><li data-i18n="captureBullet2">对焦模式、白平衡、Picture Control</li><li data-i18n="captureBullet3">间隔拍摄、曝光包围、焦点包围与 B 门计时</li></ul></div>
+              </div>
+              <div class="workflow-panel" data-workflow-panel="monitor">
+                <figure class="workflow-image"><img src="assets/monitoring.png" alt="帧澈专业监看工具"><figcaption><span>MONITOR</span><span data-i18n="monitorCaption">只影响预览，不写入原片</span></figcaption></figure>
+                <div class="workflow-text"><p class="panel-tag">MONITOR / 02</p><h3 data-i18n="monitorTitle">专业监看更强，原片保持原样。</h3><p data-i18n="monitorBody">把快门角度、直方图、波形、矢量示波器、峰值对焦、假色、条纹图案和自定义 3D LUT 放进同一块画面。</p><ul><li data-i18n="monitorBullet1">快门角度换算</li><li data-i18n="monitorBullet2">RGB 直方图、波形与矢量示波器</li><li data-i18n="monitorBullet3">预览增强不修改相机设置或原片</li></ul></div>
+              </div>
+              <div class="workflow-panel" data-workflow-panel="transfer">
+                <figure class="workflow-image"><img src="assets/transfer.png" alt="帧澈无线传输界面"><figcaption><span>FTP · HTTP · WebDAV</span><span data-i18n="transferCaption">同一份本地文件库</span></figcaption></figure>
+                <div class="workflow-text"><p class="panel-tag">TRANSFER / 03</p><h3 data-i18n="transferTitle">三种协议，汇入同一本地库。</h3><p data-i18n="transferBody">相机或移动设备通过 FTP、HTTP 与 WebDAV 传入照片，帧澈统一接收、整理和管理。</p><ul><li data-i18n="transferBullet1">FTP / PASV 相机收图</li><li data-i18n="transferBullet2">HTTP PUT / POST 快速上传</li><li data-i18n="transferBullet3">WebDAV 接入系统文件工具</li></ul></div>
+              </div>
+              <div class="workflow-panel" data-workflow-panel="flow">
+                <figure class="workflow-image"><img src="assets/library.png" alt="帧澈文件库界面"><figcaption><span>LOCAL LIBRARY</span><span data-i18n="flowCaption">本地优先 · 不改动原文件</span></figcaption></figure>
+                <div class="workflow-text"><p class="panel-tag">FLOW / 04</p><h3 data-i18n="flowTitle">整理、显影，再把选择交给你。</h3><p data-i18n="flowBody">在同一个项目会话里完成树状分支、拖拽归类、RAW + JPEG 配对、XMP 评级、双目标备份与非破坏性高质量副本。</p><ul><li data-i18n="flowBullet1">项目会话、命名模板与 SHA-256</li><li data-i18n="flowBullet2">五组显影参数与透明预设</li><li data-i18n="flowBullet3">原始文件永不被覆盖</li></ul></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="platforms section-pad" id="platforms" aria-labelledby="platforms-title">
+        <div class="shell">
+          <div class="section-heading reveal">
+            <div><p class="section-kicker" data-i18n="platformKicker">NATIVE BY DEFAULT</p><h2 id="platforms-title"><span data-i18n="platformTitleA">五个平台，</span><em data-i18n="platformTitleB">一套工作流。</em></h2></div>
+            <p class="section-intro" data-i18n="platformIntro">不是 WebView 拼起来的界面。每个目标都使用自己的原生控件、权限和文件系统约定。</p>
+          </div>
+          <div class="platform-grid">
+            <article class="platform-card platform-card-wide reveal"><div class="platform-card-copy"><p class="panel-tag">DESKTOP</p><h3>macOS <span>·</span> Windows</h3><p data-i18n="desktopBody">把实时取景、参数控制和本地文件库放到更大的工作台上。</p><a href="#download" class="text-link"><span data-i18n="desktopLink">查看桌面版下载</span><span>↗</span></a></div><img src="assets/platforms-desktop.png" alt="帧澈桌面端界面"></article>
+            <article class="platform-card reveal reveal-delay"><p class="panel-tag">MOBILE</p><h3>iOS <span>·</span> Android</h3><p data-i18n="mobileBody">移动拍摄、无线收图与本地管理，跟着现场走。</p><div class="platform-pills"><span>iPhone</span><span>iPad</span><span>Android</span></div><a href="#download" class="text-link"><span data-i18n="mobileLink">查看移动版下载</span><span>↗</span></a></article>
+            <article class="platform-card platform-card-accent reveal reveal-delay-2"><p class="panel-tag">HARMONYOS</p><h3>HarmonyOS</h3><p data-i18n="harmonyBody">面向 HarmonyOS 的原生工作流体验，持续扩大设备覆盖。</p><div class="platform-mark">鸿</div><a href="#download" class="text-link"><span data-i18n="harmonyLink">查看安装说明</span><span>↗</span></a></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="compatibility section-pad" id="cameras" aria-labelledby="cameras-title">
+        <div class="shell compatibility-grid">
+          <div class="compatibility-copy reveal"><p class="section-kicker" data-i18n="cameraKicker">CAMERA PROFILES</p><h2 id="cameras-title"><span data-i18n="cameraTitleA">从 D500 到 ZR，</span><em data-i18n="cameraTitleB">准备好连接。</em></h2><p data-i18n="cameraBody">项目内置 20 款 Nikon EXPEED 5 / 6 / 7 机型的 USB / PTP 档案。档案代表应用能正确识别设备与参数范围，不等同于所有固件、镜头和主机组合都已完成实机验证。</p><a class="text-link" href="https://github.com/Tauber01/ZENCHE/blob/main/docs/CAMERA_TEST_CHECKLIST.md" target="_blank" rel="noreferrer"><span data-i18n="cameraLink">查看实机验收清单</span><span>↗</span></a></div>
+          <div class="camera-list reveal reveal-delay"><div class="camera-group"><span>EXPEED 5</span><strong>D500 · D7500 · D850</strong></div><div class="camera-group"><span>EXPEED 6</span><strong>Z7 · Z6 · Z50 · D780 · D6 · Z5 · Z7II · Z6II · Z fc · Z30</strong></div><div class="camera-group"><span>EXPEED 7</span><strong>Z9 · Z8 · Z f · Z6III · Z50II · Z5II · ZR</strong></div><div class="camera-foot"><span class="status-dot"></span><span data-i18n="cameraFoot">Nikon USB Vendor ID · 0x04b0</span></div></div>
+        </div>
+      </section>
+
+      <section class="download section-pad" id="download" aria-labelledby="download-title">
+        <div class="shell">
+          <div class="download-header reveal"><div><p class="section-kicker" data-i18n="downloadKicker">READY WHEN YOU ARE</p><h2 id="download-title"><span data-i18n="downloadTitleA">把帧澈带到你的</span><em data-i18n="downloadTitleB">下一次拍摄。</em></h2></div><p data-i18n="downloadIntro">v1.2.0 已发布。安装包、校验文件与详细发布说明均来自 GitHub Releases。</p></div>
+          <div class="download-toolbar reveal"><div class="platform-switch" role="tablist" aria-label="选择平台"><button type="button" class="is-active" role="tab" aria-selected="true" data-platform="desktop">macOS / Windows</button><button type="button" role="tab" aria-selected="false" data-platform="mobile">Android / iOS</button><button type="button" role="tab" aria-selected="false" data-platform="harmony">HarmonyOS</button></div><a class="text-link" href="https://github.com/Tauber01/ZENCHE/releases" target="_blank" rel="noreferrer"><span data-i18n="allReleases">全部版本</span><span>↗</span></a></div>
+          <div class="download-panels reveal reveal-delay">
+            <div class="download-panel is-active" data-download-panel="desktop"><article class="download-item"><div class="download-icon">⌘</div><div><h3>macOS</h3><p>Apple Silicon · DMG</p></div><a href="https://github.com/Tauber01/ZENCHE/releases/download/v1.2.0/ZENCHE-1.2.0-macOS-arm64.dmg" class="download-button" target="_blank" rel="noreferrer" aria-label="下载 macOS"><span>1.2.0</span><span>↓</span></a></article><article class="download-item"><div class="download-icon">▣</div><div><h3>Windows</h3><p>x64 · Setup.exe</p></div><a href="https://github.com/Tauber01/ZENCHE/releases/download/v1.2.0/ZENCHE-1.2.0-Windows-x64-Setup.exe" class="download-button" target="_blank" rel="noreferrer" aria-label="下载 Windows"><span>1.2.0</span><span>↓</span></a></article></div>
+            <div class="download-panel" data-download-panel="mobile"><article class="download-item"><div class="download-icon">A</div><div><h3>Android</h3><p>APK · sideload</p></div><a href="https://github.com/Tauber01/ZENCHE/releases/download/v1.2.0/ZENCHE-1.2.0-android.apk" class="download-button" target="_blank" rel="noreferrer" aria-label="下载 Android"><span>1.2.0</span><span>↓</span></a></article><article class="download-item"><div class="download-icon">iOS</div><div><h3>iOS / iPadOS</h3><p>Unsigned IPA · 需重新签名</p></div><a href="https://github.com/Tauber01/ZENCHE/releases/download/v1.2.0/ZENCHE-1.2.0-ios-unsigned.ipa" class="download-button" target="_blank" rel="noreferrer" aria-label="下载 iOS"><span>1.2.0</span><span>↓</span></a></article></div>
+            <div class="download-panel" data-download-panel="harmony"><article class="download-item"><div class="download-icon">鸿</div><div><h3>HarmonyOS</h3><p>HAP · 需开发者签名与 Profile</p></div><a href="https://github.com/Tauber01/ZENCHE/releases/download/v1.2.0/ZENCHE-1.2.0-HarmonyOS.hap" class="download-button" target="_blank" rel="noreferrer" aria-label="下载 HarmonyOS"><span>1.2.0</span><span>↓</span></a></article></div>
+          </div>
+          <p class="download-note reveal" data-i18n="downloadNote">下载前请阅读对应平台的安装与签名说明。重要拍摄请保留机内存储卡，不要把任何联机应用当作唯一备份。</p>
+        </div>
+      </section>
+
+      <section class="open-source section-pad">
+        <div class="shell open-source-grid reveal"><div><p class="section-kicker">OPEN SOURCE</p><h2><span data-i18n="openTitleA">工具应该</span><em data-i18n="openTitleB">站在你这边。</em></h2></div><div><p data-i18n="openBody">帧澈以本地优先、开源和可验证为基础。查看源码、版本记录、安全策略和贡献方式，了解它如何工作。</p><a class="button button-outline" href="https://github.com/Tauber01/ZENCHE" target="_blank" rel="noreferrer"><span data-i18n="openButton">访问 GitHub</span><span>↗</span></a></div></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-top"><a class="brand" href="#top"><img src="assets/app-icon.svg" alt=""><span class="brand-copy"><strong>帧澈</strong><b>ZENCHE</b></span></a><p data-i18n="footerLine">连接相机，也连接完整工作流</p><a class="footer-up" href="#top" aria-label="返回顶部">↑</a></div>
+      <div class="shell footer-bottom"><span>© 2026 ZENCHE</span><span data-i18n="footerOpen">开源免费 · 本地优先</span><span><a href="https://github.com/Tauber01/ZENCHE/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a> · <a href="https://github.com/Tauber01/ZENCHE/blob/main/SECURITY.md" target="_blank" rel="noreferrer">Security</a></span></div>
+    </footer>
+    <script src="script.js"></script>
+  </body>
+</html>
