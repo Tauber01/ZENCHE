@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -204,6 +205,162 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, Slider> _editorSliders = [];
     private ComboBox? _editorCropBox;
     private bool _updatingEditorControls;
+    private string _aiPrompt = "";
+    private int _aiMode; // 0=edit, 1=generate
+    private int _aiRatioIndex;
+    private int _aiResolutionIndex;
+    private string? _aiResultPath;
+    private bool _aiGenerating;
+    private bool _editorInAiMode;
+
+    private static readonly string[] AiSizes =
+    [
+        "1024x1024", "1792x1024", "1024x1792", "1365x1024", "1536x1024"
+    ];
+
+    private const int AiMaxUsage = 100;
+    private static readonly string AiDataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink");
+
+    private static bool IsAiActivated()
+    {
+        var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+        return File.Exists(activatedPath);
+    }
+
+    private static int GetRemainingUsage()
+    {
+        var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
+        var count = 0;
+        if (File.Exists(countPath))
+            int.TryParse(File.ReadAllText(countPath).Trim(), out count);
+        return Math.Max(0, AiMaxUsage - count);
+    }
+
+    private static void RecordAiUsage()
+    {
+        Directory.CreateDirectory(AiDataDir);
+        var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
+        var count = 0;
+        if (File.Exists(countPath))
+            int.TryParse(File.ReadAllText(countPath).Trim(), out count);
+        count++;
+        File.WriteAllText(countPath, count.ToString());
+        if (count >= AiMaxUsage)
+        {
+            var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+            if (File.Exists(activatedPath)) File.Delete(activatedPath);
+        }
+    }
+
+    private static string GetDeviceId()
+    {
+        var devicePath = Path.Combine(AiDataDir, "ai-device-id.txt");
+        if (File.Exists(devicePath))
+            return File.ReadAllText(devicePath).Trim();
+        var id = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
+                 ?? Guid.NewGuid().ToString();
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(devicePath, id);
+        return id;
+    }
+
+    private static string LoadAiServerUrl()
+    {
+        try
+        {
+            var serverPath = Path.Combine(AiDataDir, "ai-server-url.txt");
+            if (File.Exists(serverPath))
+            {
+                var value = File.ReadAllText(serverPath).Trim();
+                if (value.Length > 0) return value;
+            }
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"读取 AI 服务器地址失败：{error.Message}");
+        }
+        return "http://101.34.255.115:8787";
+    }
+
+    private static string LoadActivationCode()
+    {
+        try
+        {
+            var codePath = Path.Combine(AiDataDir, "ai-activation-code.txt");
+            if (File.Exists(codePath))
+            {
+                var value = File.ReadAllText(codePath).Trim();
+                if (value.Length > 0) return value;
+            }
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"读取激活码失败：{error.Message}");
+        }
+        return string.Empty;
+    }
+
+    private static void SaveActivationCode(string code)
+    {
+        try
+        {
+            Directory.CreateDirectory(AiDataDir);
+            var codePath = Path.Combine(AiDataDir, "ai-activation-code.txt");
+            File.WriteAllText(codePath, code.Trim());
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"保存激活码失败：{error.Message}");
+        }
+    }
+
+    private static void SaveAiServerUrl(string url)
+    {
+        try
+        {
+            Directory.CreateDirectory(AiDataDir);
+            var serverPath = Path.Combine(AiDataDir, "ai-server-url.txt");
+            File.WriteAllText(serverPath, url.Trim());
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"保存服务器地址失败：{error.Message}");
+        }
+    }
+
+    private void AiBuy_Click(object sender, RoutedEventArgs e)
+    {
+        OpenAfdian();
+    }
+
+    private void AiActivate_Click(object sender, RoutedEventArgs e)
+    {
+        var code = AiActivationCodeBox.Text.Trim();
+        if (string.IsNullOrEmpty(code))
+        {
+            AiActivationStatusText.Text = AppLocalization.T("请输入激活码");
+            return;
+        }
+        // 保存服务器地址（如果用户填了）
+        var serverUrl = AiServerUrlBox.Text.Trim();
+        if (!string.IsNullOrEmpty(serverUrl))
+        {
+            SaveAiServerUrl(serverUrl);
+        }
+        // 本地验签激活（RSA 公钥在客户端），服务器端负责真正计数
+        SaveActivationCode(code);
+        var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(activatedPath, "1");
+        AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
+        AiActivationCodeBox.Text = "";
+    }
 #if NIKONLINK_WINDOWS_SHARE
     private DataTransferManager? _dataTransferManager;
 #endif
@@ -1293,6 +1450,15 @@ public partial class MainWindow : Window
         }
         if (destination == "editor")
         {
+            _editorInAiMode = !_editorInAiMode;
+            if (!_editorInAiMode)
+            {
+                EditorProGrid.Visibility = Visibility.Visible;
+                EditorAiGrid.Visibility = Visibility.Collapsed;
+                EditorHeaderTitle.Text = AppLocalization.T("专业显影");
+                EditorHeaderSubtitle.Text = AppLocalization.T(
+                    "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
+            }
             RefreshImageEditor();
         }
         ShootingTaskPanel.Visibility =
@@ -2001,6 +2167,7 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
+                "• 新增 AI 修图与生图工具，内置一键美颜等快捷预设，激活码解锁后即可使用。\n" +
                 "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n" +
                 "• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n" +
                 "• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n" +
@@ -3253,6 +3420,11 @@ public partial class MainWindow : Window
 
     private void RefreshImageEditor()
     {
+        if (_editorInAiMode)
+        {
+            RefreshAiEditor();
+            return;
+        }
         var previousPath = _editorSelectedPath;
         var choices = _library.List()
             .Where(item => !item.IsVideo && IsEditableImage(item.Path))
@@ -3276,6 +3448,239 @@ public partial class MainWindow : Window
             ResetEditorControls();
         }
         UpdateEditorPreview();
+    }
+
+    private void RefreshAiEditor()
+    {
+        EditorHeaderTitle.Text = AppLocalization.T("AI 工具");
+        EditorHeaderSubtitle.Text = AppLocalization.T(
+            "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中输入激活码解锁。");
+        EditorProGrid.Visibility = Visibility.Collapsed;
+        EditorAiGrid.Visibility = Visibility.Visible;
+        AiEditModeBtn.Style = (Style)FindResource(
+            _aiMode == 0 ? "PrimaryButton" : "ButtonBase");
+        AiGenModeBtn.Style = (Style)FindResource(
+            _aiMode == 1 ? "PrimaryButton" : "ButtonBase");
+        AiPromptBox.Text = _aiPrompt;
+        AiStatusText.Text = AppLocalization.T(
+            _aiResultPath != null ? "生成完成" : "请输入提示词");
+        AiPreviewBadge.Visibility = _aiResultPath != null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AiSaveBtn.Visibility = _aiResultPath != null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AiPreviewEmpty.Visibility = _aiResultPath != null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (_aiResultPath != null)
+        {
+            try
+            {
+                AiPreviewImage.Source = new BitmapImage(
+                    new Uri(_aiResultPath));
+            }
+            catch { }
+        }
+        else
+        {
+            AiPreviewImage.Source = null;
+        }
+        RefreshAiPresets();
+    }
+
+    private void RefreshAiPresets()
+    {
+        AiPresetPanel.Children.Clear();
+        var presets = _aiMode == 0
+            ? new (string Label, string Prompt)[]
+            {
+                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
+                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
+                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
+                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
+                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
+                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
+                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
+                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
+            }
+            : new (string Label, string Prompt)[]
+            {
+                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
+                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
+                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
+                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
+            };
+        foreach (var preset in presets)
+        {
+            var button = new Button
+            {
+                Content = preset.Label,
+                Height = 30,
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(10, 0, 10, 0),
+                Style = (Style)FindResource("ButtonBase")
+            };
+            var prompt = preset.Prompt;
+            button.Click += (_, _) =>
+            {
+                AiPromptBox.Text = prompt;
+            };
+            AiPresetPanel.Children.Add(button);
+        }
+    }
+
+    private void AiEditMode_Click(object sender, RoutedEventArgs e)
+    {
+        _aiMode = 0;
+        RefreshAiEditor();
+        RefreshAiPresets();
+    }
+
+    private void AiGenMode_Click(object sender, RoutedEventArgs e)
+    {
+        _aiMode = 1;
+        RefreshAiEditor();
+        RefreshAiPresets();
+    }
+
+    private async void AiGenerate_Click(object sender, RoutedEventArgs e)
+    {
+        _aiPrompt = AiPromptBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(_aiPrompt))
+        {
+            AiStatusText.Text = AppLocalization.T("请输入提示词");
+            return;
+        }
+        if (!IsAiActivated())
+        {
+            AiStatusText.Text = AppLocalization.T(
+                "请先在设置中输入激活码解锁 AI 功能");
+            return;
+        }
+        var activationCode = LoadActivationCode();
+        _aiGenerating = true;
+        AiGenerateBtn.IsEnabled = false;
+        AiGenerateBtn.Content = AppLocalization.T("正在生成…");
+        AiStatusText.Text = AppLocalization.T("正在调用 AI 模型…");
+        try
+        {
+            var endpoint = $"{LoadAiServerUrl().TrimEnd('/')}/v1/ai";
+            var size = AiSizes[Math.Clamp(_aiRatioIndex, 0, AiSizes.Length - 1)];
+            var body = new Dictionary<string, object>
+            {
+                ["activationCode"] = activationCode,
+                ["deviceId"] = GetDeviceId(),
+                ["prompt"] = _aiPrompt,
+                ["size"] = size
+            };
+            if (_aiMode == 0 && _editorSelectedPath != null &&
+                File.Exists(_editorSelectedPath))
+            {
+                var sourceBytes = await File.ReadAllBytesAsync(
+                    _editorSelectedPath);
+                var b64 = Convert.ToBase64String(sourceBytes);
+                body["image"] = $"data:image/jpeg;base64,{b64}";
+            }
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(60);
+            var content = new StringContent(
+                JsonSerializer.Serialize(body),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            var response = await client.PostAsync(endpoint, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var code = (int)response.StatusCode;
+                if (code == 403)
+                    throw new Exception("激活码无效或次数用完");
+                if (code == 502)
+                    throw new Exception("AI 服务暂时不可用");
+                throw new Exception($"API 服务返回错误 {code}");
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var dataArr = doc.RootElement.GetProperty("data");
+            if (dataArr.GetArrayLength() == 0)
+                throw new Exception("AI 未返回有效图片");
+            var first = dataArr[0];
+            byte[] imageBytes;
+            if (first.TryGetProperty("b64_json", out var b64El) &&
+                b64El.GetString() is { Length: > 0 } b64Str)
+            {
+                imageBytes = Convert.FromBase64String(b64Str);
+            }
+            else if (first.TryGetProperty("url", out var urlEl) &&
+                     urlEl.GetString() is { Length: > 0 } imageUrl)
+            {
+                imageBytes = await client.GetByteArrayAsync(imageUrl);
+            }
+            else
+            {
+                throw new Exception("AI 未返回有效图片");
+            }
+            var tempPath = Path.Combine(
+                Path.GetTempPath(),
+                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}.jpg");
+            await File.WriteAllBytesAsync(tempPath, imageBytes);
+            _aiResultPath = tempPath;
+            RecordAiUsage();
+            AiStatusText.Text = AppLocalization.T("生成完成");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error("ai", $"AI 调用失败：{error.Message}");
+            AiStatusText.Text = AppLocalization.T(
+                $"AI 生成失败：{error.Message}");
+        }
+        finally
+        {
+            _aiGenerating = false;
+            AiGenerateBtn.IsEnabled = true;
+            AiGenerateBtn.Content = AppLocalization.T("生成");
+            RefreshAiEditor();
+        }
+    }
+
+    private void AiSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_aiResultPath == null || !File.Exists(_aiResultPath))
+        {
+            return;
+        }
+        try
+        {
+            var stem = _aiMode == 0 ? "edited" : "generated";
+            var dest = new FileInfo(
+                UniqueDestination(
+                    $"ai_{stem}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
+            using var source = File.OpenRead(_aiResultPath);
+            var bytes = new byte[source.Length];
+            source.ReadExactly(bytes);
+            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+            using var memStream = new MemoryStream(bytes);
+            var decoder = BitmapDecoder.Create(
+                memStream,
+                BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
+            encoder.Frames.Add(BitmapFrame.Create(decoder.Frames[0]));
+            using var fileStream = dest.OpenWrite();
+            encoder.Save(fileStream);
+            _editorSelectedPath = dest.FullName;
+            RefreshPhotoList();
+            AiStatusText.Text = AppLocalization.T(
+                $"已保存 AI 结果 · {dest.Name}");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error("ai", $"保存 AI 结果失败：{error.Message}");
+            AiStatusText.Text = AppLocalization.T("保存 AI 结果失败");
+        }
+    }
+
+    public string UniqueDestination(string filename)
+    {
+        return Path.Combine(_library.DirectoryPath, filename);
     }
 
     private void EditorPhotoBox_SelectionChanged(

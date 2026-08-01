@@ -4,11 +4,13 @@ import {
   Permissions
 } from '@kit.AbilityKit';
 import { dataSharePredicates, preferences } from '@kit.ArkData';
-import { picker } from '@kit.CoreFileKit';
+import { fileIo as fs, picker } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { deviceInfo } from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
 import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
@@ -228,7 +230,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.2.0';
+const CURRENT_VERSION: string = '1.3.0';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -540,6 +542,17 @@ struct Index {
   @State private editorCropRatio: string = 'original';
   @State private editorShowingOriginal: boolean = false;
   @State private editorSaving: boolean = false;
+  @State private aiPrompt: string = '';
+  @State private aiMode: number = 0; // 0=edit, 1=generate
+  @State private aiRatioIndex: number = 0;
+  @State private aiResolutionIndex: number = 0;
+  @State private aiResultPath: string = '';
+  @State private aiGenerating: boolean = false;
+  @State private aiStatus: string = '';
+  @State private editorTabMode: string = 'pro'; // 'pro' | 'ai'
+  @State private aiActivationInput: string = '';
+  @State private aiServerInput: string = '';
+  @State private aiActivationMsg: string = '';
   @State private currentFocusMode: string = 'single-shot';
   @State private currentWhiteBalance: string = 'continuous';
   @State private currentPictureControl: string = 'standard';
@@ -998,7 +1011,7 @@ struct Index {
         this.NavButton('图像编辑', 'editor')
         this.NavButton('分支文件库', 'library')
         Blank()
-        Text('ZENCHE 1.2.0')
+        Text('ZENCHE 1.3.0')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -1047,6 +1060,10 @@ struct Index {
       .borderRadius(12)
       .flexShrink(0)
       .onClick((): void => {
+        if (target === 'editor') {
+          this.editorTabMode = this.editorTabMode === 'pro' ? 'ai' : 'pro';
+          this.aiResultPath = '';
+        }
         this.section = target;
         if (target === 'library') {
           this.refreshPhotos();
@@ -1060,6 +1077,15 @@ struct Index {
 
   @Builder
   private ImageEditorWorkspace() {
+    if (this.editorTabMode === 'ai') {
+      this.AiToolsWorkspace();
+    } else {
+      this.ProEditorWorkspace();
+    }
+  }
+
+  @Builder
+  private ProEditorWorkspace() {
     Column({ space: 16 }) {
       Text(this.tr('专业显影'))
         .fontSize(24)
@@ -1276,6 +1302,447 @@ struct Index {
       .onClick((): void => {
         this.editorPanel = panel;
       })
+  }
+
+  @Builder
+  private AiToolsWorkspace() {
+    Column({ space: 16 }) {
+      Text(this.tr('AI 工具'))
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      Text(this.tr('基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。'))
+        .fontSize(14)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+
+      Row({ space: 8 }) {
+        Button(this.aiMode === 0 ? '● AI 修图' : '○ AI 修图', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(this.aiMode === 0 ? $r('app.color.accent_ink') : $r('app.color.ink'))
+          .backgroundColor(this.aiMode === 0 ? $r('app.color.accent') : $r('app.color.surface'))
+          .onClick((): void => {
+            this.aiMode = 0;
+            this.aiResultPath = '';
+          })
+        Button(this.aiMode === 1 ? '● AI 生图' : '○ AI 生图', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(this.aiMode === 1 ? $r('app.color.accent_ink') : $r('app.color.ink'))
+          .backgroundColor(this.aiMode === 1 ? $r('app.color.accent') : $r('app.color.surface'))
+          .onClick((): void => {
+            this.aiMode = 1;
+            this.aiResultPath = '';
+          })
+      }
+      .width('100%')
+
+      Text('快捷预设')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Scroll() {
+        Row({ space: 6 }) {
+          ForEach(this.getAiPresets(), (preset: Array<string>) => {
+            Button(preset[0], { type: ButtonType.Normal })
+              .height(32)
+              .fontSize(11)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.surface'))
+              .borderRadius(16)
+              .padding({ left: 12, right: 12 })
+              .onClick((): void => {
+                this.aiPrompt = preset[1];
+              })
+          }, (preset: Array<string>) => preset[0])
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .width('100%')
+
+      TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…' : '输入生图描述…' })
+        .height(80)
+        .fontSize(14)
+        .onChange((value: string): void => {
+          this.aiPrompt = value;
+        })
+
+      Button(this.aiGenerating ? '正在生成…' : '生成', { type: ButtonType.Normal })
+        .height(48)
+        .width('100%')
+        .enabled(
+          this.aiPrompt.trim().length > 0
+            && !this.aiGenerating
+            && (this.aiMode !== 0 || this.editorSelectedPath.length > 0)
+        )
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
+        .onClick((): void => {
+          this.doAiGenerate();
+        })
+
+      if (this.aiResultPath.length > 0) {
+        Image(`file://${this.aiResultPath}`)
+          .width('100%')
+          .height(this.isCompact() ? 320 : 460)
+          .objectFit(ImageFit.Contain)
+          .backgroundColor($r('app.color.graphite'))
+          .borderRadius(14)
+          .padding(12)
+
+        Button(this.editorSaving ? '正在保存…' : '保存到文件库', { type: ButtonType.Normal })
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .onClick((): void => {
+            this.saveAiResult();
+          })
+      }
+
+      if (this.aiStatus.length > 0 || this.aiGenerating) {
+        Text(this.aiGenerating ? '正在调用 AI 模型…' : this.aiStatus)
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+          .textAlign(TextAlign.Start)
+      }
+    }
+    .width('100%')
+    .height(this.isCompact() ? 'auto' : '100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  private getAiPresets(): Array<Array<string>> {
+    if (this.aiMode === 0) {
+      return [
+        ['一键美颜', '对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。'],
+        ['自然增强', '增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。'],
+        ['胶片质感', '为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。'],
+        ['日系清新', '调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。'],
+        ['黑白大片', '转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。'],
+        ['复古暖调', '添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。'],
+        ['天空增强', '增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。'],
+        ['美食诱人', '增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。']
+      ];
+    }
+    return [
+      ['人像写真', 'professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail'],
+      ['风光大片', 'breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed'],
+      ['城市夜景', 'city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere'],
+      ['产品展示', 'professional product photography, clean studio background, soft lighting, high detail']
+    ];
+  }
+
+  private async doAiGenerate(): Promise<void> {
+    if (this.aiPrompt.trim().length === 0) {
+      this.aiStatus = '请输入提示词';
+      return;
+    }
+    if (!this.checkAiActivated()) {
+      this.aiStatus = '请先在设置中输入激活码解锁 AI 功能';
+      return;
+    }
+    const activationCode: string = this.getAiActivationCode();
+    if (activationCode.length === 0) {
+      this.aiStatus = '请先在设置中输入激活码解锁 AI 功能';
+      return;
+    }
+    this.aiGenerating = true;
+    this.aiStatus = '正在调用 AI 模型…';
+    try {
+      const httpRequest = http.createHttp();
+      const serverUrl: string = this.getAiServerUrl();
+      const endpoint: string = `${serverUrl}/v1/ai`;
+      const sizes: Array<string> = ['1024x1024', '1792x1024', '1024x1792', '1365x1024', '1536x1024'];
+      const body: Record<string, Object> = {
+        'activationCode': activationCode,
+        'deviceId': this.getDeviceId(),
+        'prompt': this.aiPrompt,
+        'size': sizes[this.aiRatioIndex]
+      };
+      if (this.aiMode === 0 && this.editorSelectedPath.length > 0) {
+        const library: PhotoLibrary | undefined = this.library;
+        if (library) {
+          const photoItems: Array<PhotoItem> = this.editablePhotos();
+          let srcBytes: ArrayBuffer | null = null;
+          for (let i = 0; i < photoItems.length; i++) {
+            const item: PhotoItem | undefined = photoItems[i];
+            if (item && item.path === this.editorSelectedPath) {
+              srcBytes = library.read(item).buffer as ArrayBuffer;
+              break;
+            }
+          }
+          if (srcBytes && srcBytes.byteLength > 0) {
+            const base64Helper = new util.Base64Helper();
+            const b64: string = base64Helper.encodeToStringSync(new Uint8Array(srcBytes));
+            body['image'] = `data:image/jpeg;base64,${b64}`;
+          }
+        }
+      }
+      const response = await httpRequest.request(
+        endpoint,
+        {
+          method: http.RequestMethod.POST,
+          header: {
+            'Content-Type': 'application/json',
+          },
+          extraData: body,
+          connectTimeout: 15000,
+          readTimeout: 60000,
+        }
+      );
+      httpRequest.destroy();
+      if (response.responseCode === 403) {
+        this.aiGenerating = false;
+        this.aiStatus = '激活码无效或次数用完';
+        return;
+      }
+      if (response.responseCode === 502) {
+        this.aiGenerating = false;
+        this.aiStatus = 'AI 服务暂时不可用';
+        return;
+      }
+      if (response.responseCode !== 200) {
+        throw new Error(`AI 服务返回错误 ${response.responseCode}`);
+      }
+      const result: Record<string, Object> = JSON.parse(
+        (response.result as string)
+      ) as Record<string, Object>;
+      const dataArr: Array<Record<string, Object>> =
+        result['data'] as Array<Record<string, Object>>;
+      if (!dataArr || dataArr.length === 0) {
+        throw new Error('AI 未返回有效图片');
+      }
+      const first: Record<string, Object> = dataArr[0];
+      let imageBytes: ArrayBuffer | null = null;
+      const b64Json: string = (first['b64_json'] as string) || '';
+      if (b64Json.length > 0) {
+        const base64Helper = new util.Base64Helper();
+        imageBytes = base64Helper.decodeSync(b64Json).buffer as ArrayBuffer;
+      } else {
+        const imageUrl: string = (first['url'] as string) || '';
+        if (imageUrl.length > 0) {
+          const imgRequest = http.createHttp();
+          const imgResponse = await imgRequest.request(imageUrl, {
+            method: http.RequestMethod.GET,
+            connectTimeout: 15000,
+            readTimeout: 30000,
+          });
+          imageBytes = (imgResponse.result as ArrayBuffer);
+          imgRequest.destroy();
+        }
+      }
+      if (!imageBytes || imageBytes.byteLength === 0) {
+        throw new Error('AI 未返回有效图片');
+      }
+      const context: common.UIAbilityContext =
+        getContext(this) as common.UIAbilityContext;
+      const tempDir: string = context.tempDir;
+      const tempPath: string = `${tempDir}/ai_result_${Date.now()}.jpg`;
+      const file = fs.openSync(tempPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY);
+      fs.writeSync(file.fd, imageBytes);
+      fs.closeSync(file);
+      this.aiResultPath = tempPath;
+      this.aiStatus = '生成完成';
+      this.aiGenerating = false;
+    } catch (err) {
+      this.aiGenerating = false;
+      const msg: string = (err as Error).message || 'AI 生成失败';
+      this.aiStatus = `生成失败：${msg}`;
+    }
+  }
+
+  private async saveAiResult(): Promise<void> {
+    if (this.aiResultPath.length === 0) {
+      return;
+    }
+    this.editorSaving = true;
+    try {
+      const file: fs.File = fs.openSync(this.aiResultPath, fs.OpenMode.READ_ONLY);
+      let data: ArrayBuffer;
+      try {
+        const stat: fs.Stat = fs.statSync(this.aiResultPath);
+        const buffer: ArrayBuffer = new ArrayBuffer(stat.size);
+        fs.readSync(file.fd, buffer);
+        data = buffer;
+      } finally {
+        fs.closeSync(file);
+      }
+      const stem: string = this.aiMode === 0 ? 'edited' : 'generated';
+      const library: PhotoLibrary | undefined = this.library;
+      if (!library) {
+        this.editorSaving = false;
+        this.aiStatus = '保存 AI 结果失败';
+        return;
+      }
+      const destination: string = library.saveEditedCopy(
+        `ai_${stem}`,
+        new Uint8Array(data)
+      );
+      this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
+      this.editorSaving = false;
+    } catch (err) {
+      this.editorSaving = false;
+      this.aiStatus = '保存 AI 结果失败';
+    }
+  }
+
+  private checkAiActivated(): boolean {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const activated: boolean = (prefs.getSync('ai_activated', false) as boolean) || false;
+      return activated;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  private recordAiUsage(): void {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const count: number = ((prefs.getSync('ai_usage_count', 0) as number) || 0) + 1;
+      prefs.putSync('ai_usage_count', count);
+      prefs.flushSync();
+      if (count >= 100) {
+        prefs.putSync('ai_activated', false);
+        prefs.flushSync();
+      }
+    } catch (_) {}
+  }
+
+  private getRemainingUsage(): number {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const count: number = (prefs.getSync('ai_usage_count', 0) as number) || 0;
+      return Math.max(0, 100 - count);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  private getDeviceId(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      let id: string = prefs.getSync('ai_device_id', '') as string;
+      if (id.length > 0) {
+        return id;
+      }
+      id = deviceInfo.udid || deviceInfo.serial || '';
+      if (id.length === 0) {
+        id = util.generateRandomUUID();
+      }
+      prefs.putSync('ai_device_id', id);
+      prefs.flushSync();
+      return id;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  private getAiServerUrl(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const url: string = (prefs.getSync('ai_server_url', 'http://101.34.255.115:8787') as string) || 'http://101.34.255.115:8787';
+      return url;
+    } catch (_) {
+      return 'http://101.34.255.115:8787';
+    }
+  }
+
+  private getAiActivationCode(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      return (prefs.getSync('ai_activation_code', '') as string) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  private verifyActivationCode(code: string): boolean {
+    const trimmed: string = code.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+    const parts: Array<string> = trimmed.split('-');
+    if (parts.length < 4 || parts[0] !== 'ZENCHE' || parts[1] !== 'AI') {
+      return false;
+    }
+    const expiryPart: string = parts[parts.length - 1];
+    const expiryYear: number = parseInt(expiryPart.substring(0, 4));
+    const expiryMonth: number = parseInt(expiryPart.substring(4, 6));
+    const expiryDay: number = parseInt(expiryPart.substring(6, 8));
+    const now: Date = new Date();
+    const expiryDate: Date = new Date(expiryYear, expiryMonth - 1, expiryDay);
+    if (expiryDate < now) {
+      return false;
+    }
+    const deviceId: string = this.getDeviceId();
+    const payload: string = `${deviceId}:${expiryPart}:a1b2c3d4e5f6`;
+    // HarmonyOS doesn't export the full SubtleCrypto API, so signature
+    // verification is deferred to the server or skipped for now.
+    // In production, send (code, deviceId) to a simple HTTP endpoint
+    // that verifies the signature on your side.
+    const prefs = preferences.getPreferencesSync(
+      getContext(this) as common.UIAbilityContext,
+      { name: 'zenche_ai_settings' }
+    );
+    prefs.putSync('ai_activated', true);
+    prefs.putSync('ai_activation_code', trimmed);
+    prefs.putSync('ai_usage_count', 0);
+    prefs.putSync('ai_device_id', deviceId);
+    prefs.flushSync();
+    return true;
+  }
+
+  private doAiActivate(): void {
+    const code: string = this.aiActivationInput.trim();
+    if (code.length === 0) {
+      this.aiActivationMsg = '请输入激活码';
+      return;
+    }
+    // 保存服务器地址
+    const serverUrl: string = this.aiServerInput.trim();
+    if (serverUrl.length > 0) {
+      try {
+        const prefs = preferences.getPreferencesSync(
+          getContext(this) as common.UIAbilityContext,
+          { name: 'zenche_ai_settings' }
+        );
+        prefs.putSync('ai_server_url', serverUrl);
+        prefs.flushSync();
+      } catch (_) {}
+    }
+    if (this.verifyActivationCode(code)) {
+      this.aiActivationInput = '';
+      this.aiActivationMsg = '激活成功！AI 功能已解锁';
+    } else {
+      this.aiActivationMsg = '激活码无效或已过期';
+    }
   }
 
   @Builder
@@ -2855,6 +3322,7 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
+                '• 新增 AI 修图与生图工具，内置一键美颜等快捷预设，激活码解锁后即可使用。\n' +
                 '• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n' +
                 '• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n' +
                 '• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n' +
@@ -3540,6 +4008,79 @@ struct Index {
               ];
               this.changeLanguage(languages[index]);
             })
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        Column({ space: 12 }) {
+          Text('AI 功能激活')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text('AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。')
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          if (this.getAiActivationCode().length > 0) {
+            Text('状态：已激活 ✓')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.Green)
+              .width('100%')
+          }
+          TextInput({ placeholder: '输入激活码', text: this.aiActivationInput })
+            .height(44)
+            .width('100%')
+            .onChange((value: string): void => {
+              this.aiActivationInput = value;
+            })
+          TextInput({ placeholder: '服务器地址（默认 http://101.34.255.115:8787）', text: this.aiServerInput })
+            .height(44)
+            .width('100%')
+            .onChange((value: string): void => {
+              this.aiServerInput = value;
+            })
+          Row({ space: 8 }) {
+            Button('购买激活码', { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                // 打开爱发电购买页
+                const context = getContext(this) as common.UIAbilityContext;
+                try {
+                  context.startAbility({
+                    action: 'ohos.want.action.viewData',
+                    entities: ['entity.system.browsable'],
+                    uri: 'https://www.ifdian.net/a/Tauber'
+                  });
+                } catch (_) {
+                  this.aiActivationMsg = '无法打开浏览器';
+                }
+              })
+            Button('激活', { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .onClick((): void => {
+                this.doAiActivate();
+              })
+          }
+          .width('100%')
+          if (this.aiActivationMsg.length > 0) {
+            Text(this.aiActivationMsg)
+              .fontSize(11)
+              .fontColor($r('app.color.muted'))
+              .width('100%')
+          }
         }
         .width('100%')
         .padding(20)

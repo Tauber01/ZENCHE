@@ -3,6 +3,21 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.3.0] - 2026-08-01
+
+### Added
+
+- Added AI photo editing and image generation to the native Image Editor across
+  all five platforms, powered by the nano-banana image model.
+- Added quick preset prompts including one-tap beautify, natural enhance, film
+  grain, Japanese-clean, high-contrast B&W, retro warm tone, sky enhance, and
+  food enhance, plus generation presets for portraits, landscapes, city night,
+  and product shots.
+- Added an activation-code licensing flow: each code binds to one device,
+  enables 100 generations, and is counted server-side. The open-source clients
+  embed no model API key; the author's proxy server holds the key and forwards
+  requests.
+
 ## [1.2.0] - 2026-07-30
 
 ### Added

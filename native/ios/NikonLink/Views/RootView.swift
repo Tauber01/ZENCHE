@@ -150,7 +150,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.2.0"
+        ) as? String ?? "1.3.0"
     }
 
     var body: some View {
@@ -475,8 +475,122 @@ private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
     case detail = "细节"
     case effects = "效果"
     case geometry = "几何"
+    case aiTools = "AI 工具"
 
     var id: String { rawValue }
+}
+
+private enum AiImageMode: String, CaseIterable, Identifiable {
+    case edit = "AI 修图"; case generate = "AI 生图"
+    var id: String { rawValue }
+}
+private enum AiAspectRatio: String, CaseIterable, Identifiable {
+    case square = "1:1"; case landscape = "16:9"; case portrait = "9:16"
+    case fourThree = "4:3"; case threeTwo = "3:2"
+    var id: String { rawValue }
+    var size: String {
+        switch self {
+        case .square: "1024x1024"; case .landscape: "1792x1024"; case .portrait: "1024x1792"
+        case .fourThree: "1365x1024"; case .threeTwo: "1536x1024"
+        }
+    }
+}
+private enum AiResolution: String, CaseIterable, Identifiable {
+    case k1 = "1K"; case k2 = "2K"; case k4 = "4K"
+    var id: String { rawValue }
+}
+
+final class ActivationManager {
+    private static let ak = "ai_activated"; private static let dk = "ai_device_id"
+    static var isActivated: Bool {
+        UserDefaults.standard.bool(forKey: ak)
+    }
+    static var deviceId: String {
+        if let e = UserDefaults.standard.string(forKey: dk), !e.isEmpty { return e }
+        let id = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        UserDefaults.standard.set(id, forKey: dk); return id
+    }
+    static func verifyAndActivate(code: String) -> Bool {
+        let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        let p = t.components(separatedBy: "-")
+        guard p.count >= 4, p[0] == "ZENCHE", p[1] == "AI" else { return false }
+        let exp = p.last ?? "19700101"
+        let df = DateFormatter(); df.dateFormat = "yyyyMMdd"
+        if let ed = df.date(from: exp), ed < Date() { return false }
+        let did = deviceId
+        let sigPart = p[2..<(p.count - 1)].joined(separator: "-")
+        guard let sig = Data(base64Encoded: sigPart), let pk = publicKey else { return false }
+        let payload = "\(did):\(exp):a1b2c3d4e5f6"
+        guard let pd = payload.data(using: .utf8) else { return false }
+        var err: Unmanaged<CFError>?
+        let ok = SecKeyVerifySignature(pk, .rsaSignatureMessagePKCS1v15SHA256, pd as CFData, sig as CFData, &err)
+        if ok {
+            UserDefaults.standard.set(true, forKey: ak)
+            UserDefaults.standard.set(did, forKey: dk)
+            UserDefaults.standard.set(t, forKey: "ai_activation_code")
+        }
+        return ok
+    }
+    static var savedCode: String? {
+        UserDefaults.standard.string(forKey: "ai_activation_code")
+    }
+    private static var publicKey: SecKey? {
+        let k = ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB","FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt","PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ","9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8","+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN","VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ","MjQzRwIDAQAB"].joined()
+        guard let d = Data(base64Encoded: k) else { return nil }
+        return SecKeyCreateWithData(d as CFData, [kSecAttrKeyClass as String: kSecAttrKeyClassPublic, kSecAttrKeyType as String: kSecAttrKeyTypeRSA, kSecAttrKeySizeInBits as String: 2048] as CFDictionary, nil)
+    }
+}
+
+private final class AiImageService {
+    private static var serverURL: String {
+        UserDefaults.standard.string(forKey: "aiServerURL") ?? "http://101.34.255.115:8787"
+    }
+    private static var endpoint: URL? {
+        URL(string: "\(serverURL.trimmingCharacters(in: .whitespacesAndNewlines))/v1/ai")
+    }
+    func generate(prompt: String, src: Data?, size: String, activationCode: String, deviceId: String) async throws -> Data {
+        guard let url = Self.endpoint else { throw AiError.invalidEndpoint }
+        var body: [String: Any] = [
+            "activationCode": activationCode,
+            "deviceId": deviceId,
+            "prompt": prompt,
+            "size": size
+        ]
+        if let s = src { body["image"] = s.base64EncodedString() }
+        var r = URLRequest(url: url); r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.timeoutInterval = 60; r.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let hr = resp as? HTTPURLResponse else { throw AiError.networkError }
+        guard (200..<300).contains(hr.statusCode) else {
+            if hr.statusCode == 403 { throw AiError.invalidActivationCode }
+            if hr.statusCode == 502 { throw AiError.serverUnavailable }
+            if hr.statusCode == 429 { throw AiError.rateLimited }
+            throw AiError.serverError(hr.statusCode)
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let arr = json["data"] as? [[String: Any]], let f = arr.first else { throw AiError.noImageReturned }
+        if let b64 = f["b64_json"] as? String, let d = Data(base64Encoded: b64) { return d }
+        if let u = f["url"] as? String, let url = URL(string: u) { let (d,_) = try await URLSession.shared.data(from: url); return d }
+        throw AiError.noImageReturned
+    }
+}
+
+enum AiError: LocalizedError {
+    case missingActivation, invalidActivationCode, invalidEndpoint, networkError, serverError(Int), rateLimited, noImageReturned, serverUnavailable
+    var errorDescription: String? {
+        switch self {
+        case .missingActivation: "请先在设置中输入激活码解锁 AI 功能"
+        case .invalidActivationCode: "激活码无效或已过期，请联系开发者"
+        case .invalidEndpoint: "API 端点地址无效"
+        case .networkError: "网络连接失败"
+        case .serverError(let c): "AI 服务返回错误（\(c)）"
+        case .rateLimited: "请求太频繁，请稍后重试"
+        case .noImageReturned: "AI 未返回有效图片"
+        case .serverUnavailable: "AI 服务暂不可用，请稍后重试"
+        }
+    }
 }
 
 private enum EditorCropRatio: String, CaseIterable, Identifiable {
@@ -611,6 +725,13 @@ private struct ImageEditorPage: View {
     @State private var status = "请选择文件库中的照片"
     @State private var isSaving = false
     private let context = CIContext()
+    @State private var aiMode = AiImageMode.edit
+    @State private var aiPrompt = ""
+    @State private var aiRatio = AiAspectRatio.square
+    @State private var aiResolution = AiResolution.k1
+    @State private var aiResultImage: UIImage?
+    @State private var aiIsGenerating = false
+    private let aiService = AiImageService()
 
     private var photos: [LibraryItem] {
         model.library.items.filter {
@@ -633,13 +754,15 @@ private struct ImageEditorPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 PageTitle(
-                    title: "专业显影",
-                    subtitle: "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
+                    title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
+                    subtitle: selectedSection == .aiTools
+                        ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                        : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
                 )
-                editorToolbar
+                if selectedSection == .aiTools { aiToolsToolbar } else { editorToolbar }
                 preview
                 sectionSelector
-                adjustmentPanel
+                if selectedSection == .aiTools { aiToolsPanel } else { adjustmentPanel }
                 editorFooter
             }
             .padding(20)
@@ -652,6 +775,95 @@ private struct ImageEditorPage: View {
             status = selectedItem == nil
                 ? "请选择文件库中的照片"
                 : "调整不会覆盖原文件"
+        }
+    }
+
+    private var aiToolsToolbar: some View {
+        HStack(spacing: 10) {
+            Picker("编辑照片", selection: $selectedItemID) {
+                Text("选择照片").tag(nil as LibraryItem.ID?)
+                ForEach(photos) { item in Text(item.filename).tag(item.id as LibraryItem.ID?) }
+            }.pickerStyle(.menu).frame(maxWidth: 340, alignment: .leading)
+            Picker("AI 模式", selection: $aiMode) {
+                ForEach(AiImageMode.allCases) { m in Text(m.rawValue).tag(m) }
+            }.pickerStyle(.menu)
+            Spacer()
+            if aiResultImage != nil {
+                Button { aiResultImage = nil } label: {
+                    Label("清除结果", systemImage: "xmark.circle")
+                }.buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private var aiToolsPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("提示词").font(.subheadline.weight(.semibold))
+                TextField(aiMode == .edit ? "输入修图描述…" : "输入生图描述…", text: $aiPrompt, axis: .vertical)
+                    .lineLimit(3...6).textFieldStyle(.roundedBorder)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("快捷预设").font(.caption.weight(.semibold))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 6)], alignment: .leading, spacing: 6) {
+                    ForEach(aiPresets, id: \.0) { preset in
+                        Button {
+                            aiPrompt = preset.1
+                            status = "已应用预设 · \(preset.0)"
+                        } label: {
+                            Text(preset.0).font(.caption).lineLimit(1)
+                                .frame(maxWidth: .infinity).frame(minHeight: 30)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+            HStack(spacing: 12) {
+                Picker("宽高比", selection: $aiRatio) {
+                    ForEach(AiAspectRatio.allCases) { r in Text(r.rawValue).tag(r) }
+                }.pickerStyle(.menu)
+                Picker("分辨率", selection: $aiResolution) {
+                    ForEach(AiResolution.allCases) { r in Text(r.rawValue).tag(r) }
+                }.pickerStyle(.menu)
+                Spacer()
+            }
+            HStack {
+                Button { generateAi() } label: {
+                    Label(aiIsGenerating ? "正在生成…" : "生成", systemImage: "sparkles")
+                }.buttonStyle(.borderedProminent)
+                .disabled(aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || aiIsGenerating || (selectedItem == nil && aiMode == .edit))
+                if aiResultImage != nil {
+                    Button { saveAiResult() } label: {
+                        Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
+                    }.buttonStyle(.borderedProminent).disabled(isSaving)
+                }
+                Spacer()
+            }
+            Text(aiIsGenerating ? "正在调用 AI 模型…" : status).font(.caption.monospaced()).foregroundStyle(IPalette.muted)
+        }
+        .padding(16).background(IPalette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(IPalette.rule) }
+    }
+
+    private var aiPresets: [(String, String)] {
+        if aiMode == .edit {
+            return [
+                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
+                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
+                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
+                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
+                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
+                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
+                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
+                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
+            ]
+        } else {
+            return [
+                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
+                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
+                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
+                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
+            ]
         }
     }
 
@@ -699,7 +911,9 @@ private struct ImageEditorPage: View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 18)
                 .fill(IPalette.graphite)
-            if let image = renderedImage {
+            if selectedSection == .aiTools, let ai = aiResultImage {
+                Image(uiImage: ai).resizable().scaledToFit().padding(12)
+            } else if let image = renderedImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
@@ -714,14 +928,25 @@ private struct ImageEditorPage: View {
                 )
                 .foregroundStyle(.white, IPalette.muted)
             }
-            Text(showingOriginal ? "原图" : "调整后")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .frame(minHeight: 30)
-                .background(.black.opacity(0.58))
-                .clipShape(Capsule())
-                .padding(12)
+            if selectedSection != .aiTools {
+                Text(showingOriginal ? "原图" : "调整后")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 30)
+                    .background(.black.opacity(0.58))
+                    .clipShape(Capsule())
+                    .padding(12)
+            } else if aiResultImage != nil {
+                Text("AI 生成")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 30)
+                    .background(.black.opacity(0.58))
+                    .clipShape(Capsule())
+                    .padding(12)
+            }
         }
         .frame(maxWidth: .infinity)
         .frame(minHeight: 300, idealHeight: 460, maxHeight: 560)
@@ -788,6 +1013,8 @@ private struct ImageEditorPage: View {
                 standardSlider("暗角", value: $settings.vignette)
             case .geometry:
                 geometryControls
+            case .aiTools:
+                EmptyView()
             }
         }
         .padding(16)
@@ -1117,6 +1344,37 @@ private struct ImageEditorPage: View {
         } else if selectedItem == nil {
             selectedItemID = photos.first?.id
         }
+    }
+
+    private func generateAi() {
+        guard !aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "请输入提示词"; return }
+        guard ActivationManager.isActivated else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
+        guard let code = ActivationManager.savedCode, !code.isEmpty else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
+        let src: Data? = aiMode == .edit ? selectedItem.flatMap { try? Data(contentsOf: $0.url) } : nil
+        if aiMode == .edit, src == nil { status = "请先选择一张照片用于 AI 修图"; return }
+        aiIsGenerating = true; status = "正在调用 AI 模型…"
+        Task {
+            do {
+                let d = try await aiService.generate(prompt: aiPrompt, src: src, size: aiRatio.size, activationCode: code, deviceId: ActivationManager.deviceId)
+                let img = UIImage(data: d)
+                await MainActor.run {
+                    aiResultImage = img; aiIsGenerating = false
+                    status = img != nil ? "生成完成" : "无法解码 AI 返回的图片"
+                }
+            } catch {
+                await MainActor.run { aiIsGenerating = false; status = error.localizedDescription }
+            }
+        }
+    }
+
+    private func saveAiResult() {
+        guard let img = aiResultImage, let data = img.jpegData(compressionQuality: 0.95) else { status = "没有可保存的 AI 结果"; return }
+        isSaving = true
+        let fn = "ai_\(aiMode == .edit ? "edited" : "generated").jpg"
+        if let saved = model.library.saveEditedImage(data, originalFilename: fn) {
+            selectedItemID = saved.path; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
+        } else { status = model.library.message }
+        isSaving = false
     }
 
     private func resetAdjustments() {
@@ -3693,6 +3951,9 @@ private struct AppSettingsSheet: View {
     @Environment(\.locale) private var locale
     @State private var showingLogs = false
     @State private var showingDonation = false
+    @State private var activationCode = ""
+    @State private var activationStatus = ""
+    @AppStorage("aiServerURL") private var aiServerURL = "http://101.34.255.115:8787"
 
     var body: some View {
         NavigationStack {
@@ -3740,6 +4001,38 @@ private struct AppSettingsSheet: View {
                             FastFeedbackCallout {
                                 UIApplication.shared.open(afdianURL)
                             }
+                        }
+                    }
+
+                    SettingsCard {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "key.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(IPalette.cobalt)
+                                .frame(width: 36, height: 36).background(IPalette.cobaltSoft).clipShape(RoundedRectangle(cornerRadius: 8))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("AI 功能激活").font(.system(size: 15, weight: .bold))
+                                Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: 12)).foregroundStyle(IPalette.muted)
+                                if ActivationManager.isActivated {
+                                    Text("状态：已激活").font(.caption.weight(.semibold)).foregroundStyle(Color.green)
+                                }
+                            }
+                            Spacer()
+                        }
+                        SecureField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
+                        TextField("AI 服务地址", text: $aiServerURL)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            .autocorrectionDisabled()
+                        HStack {
+                            Spacer()
+                            if !activationStatus.isEmpty { Text(activationStatus).font(.caption).foregroundStyle(IPalette.muted) }
+                            Button("购买激活码") { if let url = URL(string: "https://www.ifdian.net/a/Tauber") { UIApplication.shared.open(url) } }.buttonStyle(.bordered)
+                            Button("激活") {
+                                let c = activationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !c.isEmpty else { activationStatus = "请输入激活码"; return }
+                                activationStatus = ActivationManager.verifyAndActivate(code: c) ? "激活成功！" : "激活码无效"
+                                if activationStatus.hasPrefix("激活成功") { activationCode = "" }
+                            }.buttonStyle(.borderedProminent)
                         }
                     }
 

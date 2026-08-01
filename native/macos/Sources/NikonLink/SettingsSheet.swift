@@ -113,6 +113,9 @@ struct SettingsSheet: View {
     @State private var showDonation = false
     @State private var showLogViewer = false
     @State private var logExportMessage: String?
+    @State private var activationCode = ""
+    @State private var activationStatus = ""
+    @State private var serverURL = UserDefaults.standard.string(forKey: "aiServerURL") ?? "http://101.34.255.115:8787"
 
     var body: some View {
         ScrollView {
@@ -277,6 +280,41 @@ struct SettingsSheet: View {
                         }
                     }
                     fastFeedbackCallout
+                }
+            }
+
+            settingsCard {
+                HStack(alignment: .top, spacing: 14) {
+                    settingIcon("key.fill", color: SettingsPalette.cobalt)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("AI 功能激活").font(.system(size: 16, weight: .bold))
+                        Text("AI 修图与生图功能需购买激活码解锁。每个激活码可使用 100 次，绑定当前设备。")
+                            .font(.system(size: 13)).foregroundStyle(SettingsPalette.muted).fixedSize(horizontal: false, vertical: true)
+                        if ActivationManager.isActivated {
+                            Text("状态：已激活 ✓ · 剩余 \(ActivationManager.remainingUsage) 次")
+                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.green)
+                        }
+                    }
+                    Spacer()
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("激活码").font(.system(size: 12, weight: .semibold))
+                    TextField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
+                    Text("AI 服务器").font(.system(size: 12, weight: .semibold))
+                    TextField("服务器地址（如 http://101.34.255.115:8787）", text: $serverURL).textFieldStyle(.roundedBorder)
+                }
+                HStack(spacing: 10) {
+                    Spacer()
+                    if !activationStatus.isEmpty { Text(activationStatus).font(.system(size: 11)).foregroundStyle(SettingsPalette.muted) }
+                    actionButton("购买激活码") { NSWorkspace.shared.open(URL(string: "https://www.ifdian.net/a/Tauber")!) }
+                    actionButton("激活", primary: true) {
+                        let c = activationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !c.isEmpty else { activationStatus = "请输入激活码"; return }
+                        UserDefaults.standard.set(serverURL.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "aiServerURL")
+                        activationStatus = ActivationManager.verifyAndActivate(code: c) ? "激活成功！AI 功能已解锁" : "激活码无效或已过期"
+                        if activationStatus.hasPrefix("激活成功") { activationCode = "" }
+                    }
                 }
             }
 
@@ -620,7 +658,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。")
+                        Text("• 新增 AI 修图与生图工具，内置一键美颜等快捷预设，激活码解锁后即可使用。\n• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

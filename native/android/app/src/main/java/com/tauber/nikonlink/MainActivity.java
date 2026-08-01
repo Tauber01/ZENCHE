@@ -348,6 +348,173 @@ public final class MainActivity extends Activity {
     private String editorSelectedPath;
     private final EditorAdjustments editorAdjustments =
             new EditorAdjustments();
+    private String aiPrompt = "";
+    private int aiMode = 0; // 0=edit, 1=generate
+    private int aiRatioIndex = 0;
+    private int aiResolutionIndex = 0;
+    private android.graphics.Bitmap aiResultBitmap;
+    private boolean aiIsGenerating = false;
+    private EditorState editorState = EditorState.PRO;
+
+    private enum EditorState {
+        PRO, AI
+    }
+
+    private static boolean aiActivated = false;
+    private static int aiUsageCount = 0;
+    private static final int AI_MAX_USAGE = 100;
+
+    private boolean isAiActivated() {
+        if (!aiActivated) {
+            aiActivated = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .getBoolean("ai_activated", false);
+        }
+        return aiActivated;
+    }
+
+    private int getRemainingUsage() {
+        return Math.max(0, AI_MAX_USAGE - aiUsageCount);
+    }
+
+    private void recordAiUsage() {
+        aiUsageCount++;
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit().putInt("ai_usage_count", aiUsageCount).apply();
+        if (aiUsageCount >= AI_MAX_USAGE) {
+            aiActivated = false;
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit().putBoolean("ai_activated", false).apply();
+        }
+    }
+
+    private String aiDeviceId() {
+        String existing = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_device_id", "");
+        if (existing != null && !existing.isEmpty()) return existing;
+        String id = android.provider.Settings.Secure.getString(
+                getContentResolver(),
+                android.provider.Settings.Secure.ANDROID_ID);
+        if (id == null) id = java.util.UUID.randomUUID().toString();
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit().putString("ai_device_id", id).apply();
+        return id;
+    }
+
+    private String loadActivationCode() {
+        return getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_activated_code", "");
+    }
+
+    private String aiServerUrl() {
+        return getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("aiServerURL", "http://101.34.255.115:8787");
+    }
+
+    private static final String AI_PUBLIC_KEY =
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
+            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt" +
+            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ" +
+            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8" +
+            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN" +
+            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ" +
+            "MjQzRwIDAQAB";
+
+    private boolean verifyActivationCode(String code) {
+        if (code == null) return false;
+        String trimmed = code.trim();
+        if (trimmed.isEmpty()) return false;
+        try {
+            String[] parts = trimmed.split("-");
+            if (parts.length < 4 || !"ZENCHE".equals(parts[0])
+                    || !"AI".equals(parts[1])) {
+                return false;
+            }
+            String expiryPart = parts[parts.length - 1];
+            java.text.SimpleDateFormat sdf =
+                    new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US);
+            java.util.Date expiry = sdf.parse(expiryPart);
+            if (expiry != null && expiry.before(new java.util.Date())) {
+                return false;
+            }
+            StringBuilder sigBuilder = new StringBuilder();
+            for (int i = 2; i < parts.length - 1; i++) {
+                if (sigBuilder.length() > 0) sigBuilder.append("-");
+                sigBuilder.append(parts[i]);
+            }
+            byte[] sigBytes = android.util.Base64.decode(
+                    sigBuilder.toString(), android.util.Base64.DEFAULT);
+            String deviceId = aiDeviceId();
+            String payload = deviceId + ":" + expiryPart + ":a1b2c3d4e5f6";
+            byte[] payloadBytes = payload.getBytes("UTF-8");
+
+            java.security.spec.X509EncodedKeySpec keySpec =
+                    new java.security.spec.X509EncodedKeySpec(
+                            android.util.Base64.decode(AI_PUBLIC_KEY,
+                                    android.util.Base64.DEFAULT));
+            java.security.KeyFactory keyFactory =
+                    java.security.KeyFactory.getInstance("RSA");
+            java.security.PublicKey publicKey = keyFactory.generatePublic(keySpec);
+            java.security.Signature signature =
+                    java.security.Signature.getInstance("SHA256withRSA");
+            signature.initVerify(publicKey);
+            signature.update(payloadBytes);
+            boolean valid = signature.verify(sigBytes);
+            if (valid) {
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("ai_activated", true)
+                        .putString("ai_activated_code", trimmed)
+                        .putInt("ai_usage_count", 0)
+                        .putString("ai_device_id", deviceId)
+                        .apply();
+                aiActivated = true;
+                aiUsageCount = 0;
+            }
+            return valid;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+    private static final String[][] AI_RATIOS = {
+            {"1:1", "1024x1024"},
+            {"16:9", "1792x1024"},
+            {"9:16", "1024x1792"},
+            {"4:3", "1365x1024"},
+            {"3:2", "1536x1024"},
+    };
+
+    private static final String[] AI_RESOLUTIONS = {"1K", "2K", "4K"};
+    private static final String[][] AI_EDIT_PRESETS = {
+            {"一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"},
+            {"自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"},
+            {"胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"},
+            {"日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"},
+            {"黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"},
+            {"复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"},
+            {"天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"},
+            {"美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。"},
+    };
+    private static final String[][] AI_GEN_PRESETS = {
+            {"人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"},
+            {"风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"},
+            {"城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"},
+            {"产品展示", "professional product photography, clean studio background, soft lighting, high detail"},
+    };
+    private static final String[] AI_PROVIDERS = {
+            "aimlapi.com",
+            "fal.ai",
+            "crazyrouter.com"
+    };
+    private static final String[] AI_ENDPOINTS = {
+            "https://api.aimlapi.com/v1/images/generations",
+            "https://fal.run/fal-ai/nano-banana-2",
+            "https://cn.crazyrouter.com/v1/images/generations"
+    };
+    private static final String[] AI_WEBSITES = {
+            "https://aimlapi.com",
+            "https://fal.ai",
+            "https://crazyrouter.com"
+    };
     private String appLanguage = Localization.SIMPLIFIED_CHINESE;
     private final float[] immersiveRotationMatrix = new float[9];
     private final float[] immersiveOrientation = new float[3];
@@ -1326,7 +1493,17 @@ public final class MainActivity extends Activity {
         icon.setTint(MUTED);
         icon.setBounds(0, 0, dp(20), dp(20));
         button.setCompoundDrawables(null, icon, null, null);
-        button.setOnClickListener(view -> showSection(section));
+        button.setOnClickListener(view -> {
+            if ("editor".equals(section)) {
+                if (editorState == EditorState.PRO) {
+                    editorState = EditorState.AI;
+                } else {
+                    editorState = EditorState.PRO;
+                }
+                aiResultBitmap = null;
+            }
+            showSection(section);
+        });
         navigationButtons.add(button);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(54), 1f);
         params.setMargins(dp(4), 0, dp(4), 0);
@@ -3478,10 +3655,19 @@ public final class MainActivity extends Activity {
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         content.addView(sectionHeader(
-                "专业显影",
-                "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                editorState == EditorState.AI ? "AI 工具" : "专业显影",
+                editorState == EditorState.AI
+                        ? "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。"
+                        : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
                 COBALT));
 
+        if (editorState == EditorState.AI) {
+            return buildAiToolsView(scroll, content);
+        }
+        return buildProEditorView(scroll, content);
+    }
+
+    private View buildProEditorView(ScrollView scroll, LinearLayout content) {
         List<File> photos = new ArrayList<>();
         for (File file : photoFiles()) {
             if (isEditableImageFile(file)) {
@@ -3859,6 +4045,390 @@ public final class MainActivity extends Activity {
         scroll.addView(content);
         refreshPreview.run();
         return scroll;
+    }
+
+    private View buildAiToolsView(ScrollView scroll, LinearLayout content) {
+        List<File> photos = new ArrayList<>();
+        for (File file : photoFiles()) {
+            if (isEditableImageFile(file)) {
+                photos.add(file);
+            }
+        }
+        if (aiMode == 0 && photos.isEmpty()) {
+            aiMode = 1;
+        }
+
+        Spinner picker = null;
+        if (aiMode == 0) {
+            picker = new Spinner(this);
+            List<String> names = new ArrayList<>();
+            for (File file : photos) {
+                names.add(file.getName());
+            }
+            picker.setAdapter(new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_dropdown_item, names));
+            if (editorSelectedPath == null || photos.stream().noneMatch(
+                    f -> f.getAbsolutePath().equals(editorSelectedPath))) {
+                editorSelectedPath = photos.isEmpty()
+                        ? null
+                        : photos.get(0).getAbsolutePath();
+            }
+            for (int i = 0; i < photos.size(); i++) {
+                if (photos.get(i).getAbsolutePath().equals(editorSelectedPath)) {
+                    picker.setSelection(i);
+                    break;
+                }
+            }
+            content.addView(picker, marginParams(-1, dp(48), 0, 0, 0, 10));
+        }
+
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button editBtn = nativeButton(aiMode == 0 ? "● AI 修图" : "○ AI 修图", aiMode == 0);
+        editBtn.setOnClickListener(v -> {
+            aiMode = 0;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        modeRow.addView(editBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button genBtn = nativeButton(aiMode == 1 ? "● AI 生图" : "○ AI 生图", aiMode == 1);
+        genBtn.setOnClickListener(v -> {
+            aiMode = 1;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams genParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        genParams.setMargins(dp(8), 0, 0, 0);
+        modeRow.addView(genBtn, genParams);
+        content.addView(modeRow, marginParams(-1, -2, 0, 0, 0, 10));
+
+        EditText promptInput = new EditText(this);
+        promptInput.setHint(aiMode == 0 ? tr("输入修图描述…") : tr("输入生图描述…"));
+        promptInput.setText(aiPrompt);
+        promptInput.setMinLines(2);
+        promptInput.setMaxLines(4);
+        promptInput.setBackgroundColor(SURFACE);
+        promptInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        TextView aiStatus = text("请输入提示词", 11, Typeface.NORMAL, MUTED);
+        content.addView(buildAiPresetRow(promptInput, aiStatus),
+                marginParams(-1, -2, 0, 0, 0, 10));
+        content.addView(promptInput, marginParams(-1, -2, 0, 0, 0, 10));
+
+        LinearLayout paramRow = new LinearLayout(this);
+        paramRow.setOrientation(LinearLayout.HORIZONTAL);
+        Spinner ratioSpinner = new Spinner(this);
+        String[] ratioLabels = new String[AI_RATIOS.length];
+        for (int i = 0; i < AI_RATIOS.length; i++) {
+            ratioLabels[i] = AI_RATIOS[i][0];
+        }
+        ratioSpinner.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_dropdown_item, ratioLabels));
+        ratioSpinner.setSelection(aiRatioIndex);
+        ratioSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                aiRatioIndex = pos;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> p) {}
+        });
+        paramRow.addView(ratioSpinner, new LinearLayout.LayoutParams(0, dp(44), 1f));
+
+        Spinner resSpinner = new Spinner(this);
+        resSpinner.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_dropdown_item, AI_RESOLUTIONS));
+        resSpinner.setSelection(aiResolutionIndex);
+        resSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                aiResolutionIndex = pos;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> p) {}
+        });
+        LinearLayout.LayoutParams resParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        resParams.setMargins(dp(8), 0, 0, 0);
+        paramRow.addView(resSpinner, resParams);
+        content.addView(paramRow, marginParams(-1, -2, 0, 0, 0, 10));
+
+        Button generateBtn = nativeButton("生成", true);
+        generateBtn.setOnClickListener(v -> {
+            aiPrompt = promptInput.getText().toString().trim();
+            if (aiPrompt.isEmpty()) {
+                aiStatus.setText(tr("请输入提示词"));
+                return;
+            }
+            if (!isAiActivated()) {
+                aiStatus.setText(tr("请先在设置中输入激活码解锁 AI 功能"));
+                return;
+            }
+            if (aiMode == 0 && (photos.isEmpty() || editorSelectedPath == null)) {
+                aiStatus.setText(tr("请先选择一张照片用于 AI 修图"));
+                return;
+            }
+            aiIsGenerating = true;
+            generateBtn.setEnabled(false);
+            generateBtn.setText(tr("正在生成…"));
+            aiStatus.setText(tr("正在调用 AI 模型…"));
+            String size = AI_RATIOS[aiRatioIndex][1];
+            boolean isEditMode = aiMode == 0;
+            String sourcePath = isEditMode ? editorSelectedPath : null;
+            editorExecutor.execute(() -> {
+                boolean ok = false;
+                try {
+                    byte[] result = callAiImageApi(
+                            loadActivationCode(), aiDeviceId(),
+                            aiPrompt, sourcePath, size);
+                    if (result != null) {
+                        aiResultBitmap = BitmapFactory.decodeByteArray(
+                                result, 0, result.length);
+                        ok = aiResultBitmap != null;
+                    }
+                } catch (Exception e) {
+                    diagnostics.error("ai", "AI 调用失败：" + e.getMessage());
+                }
+                boolean success = ok;
+                mainHandler.post(() -> {
+                    aiIsGenerating = false;
+                    generateBtn.setEnabled(true);
+                    generateBtn.setText(tr("生成"));
+                    if (success) {
+                        aiStatus.setText(tr("生成完成"));
+                        showSection("editor");
+                    } else {
+                        aiStatus.setText(tr("AI 生成失败"));
+                    }
+                });
+            });
+        });
+        content.addView(generateBtn, marginParams(-1, dp(48), 0, 8, 0, 8));
+        content.addView(aiStatus, marginParams(-1, -2, 0, 8, 0, 0));
+
+        if (aiResultBitmap != null) {
+            ImageView aiPreview = new ImageView(this);
+            aiPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            aiPreview.setImageBitmap(aiResultBitmap);
+            aiPreview.setBackgroundColor(GRAPHITE);
+            content.addView(aiPreview, marginParams(-1, dp(360), 0, 0, 0, 12));
+
+            Button saveBtn = nativeButton("保存到文件库", true);
+            saveBtn.setOnClickListener(v -> {
+                saveBtn.setEnabled(false);
+                Bitmap bmp = aiResultBitmap;
+                editorExecutor.execute(() -> {
+                    String stem = aiMode == 0 ? "edited" : "generated";
+                    File dest = new File(
+                            photoDirectory,
+                            "ai_" + stem + "_" + new java.text.SimpleDateFormat(
+                                    "yyyyMMdd_HHmmss", java.util.Locale.US)
+                                    .format(new Date()) + ".jpg");
+                    boolean ok = false;
+                    try (FileOutputStream stream = new FileOutputStream(dest)) {
+                        ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
+                    } catch (Exception e) {
+                        diagnostics.error("ai", "保存失败：" + e.getMessage());
+                    }
+                    boolean saved = ok;
+                    mainHandler.post(() -> {
+                        saveBtn.setEnabled(true);
+                        if (saved) {
+                            editorSelectedPath = dest.getAbsolutePath();
+                            showToast("已保存 AI 结果：" + dest.getName());
+                            updateFileCount();
+                        } else {
+                            aiStatus.setText(tr("保存 AI 结果失败"));
+                        }
+                    });
+                });
+            });
+            content.addView(saveBtn, marginParams(-1, dp(48), 0, 0, 0, 0));
+        }
+        content.addView(aiStatus, marginParams(-1, -2, 0, 8, 0, 0));
+        scroll.addView(content);
+        return scroll;
+    }
+
+    private LinearLayout buildAiPresetRow(EditText promptInput, TextView aiStatus) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.addView(text("快捷预设", 11, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 8, 0, 2));
+        String[][] presets = aiMode == 0 ? AI_EDIT_PRESETS : AI_GEN_PRESETS;
+        LinearLayout current = null;
+        for (int i = 0; i < presets.length; i++) {
+            if (i % 4 == 0) {
+                current = new LinearLayout(this);
+                current.setOrientation(LinearLayout.HORIZONTAL);
+                container.addView(current, marginParams(-1, -2, 0, 0, 0, 4));
+            }
+            String[] preset = presets[i];
+            Button chip = nativeButton(preset[0], false);
+            chip.setOnClickListener(v -> {
+                promptInput.setText(preset[1]);
+                aiStatus.setText("已应用预设 · " + preset[0]);
+            });
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(36), 1f);
+            if (i % 4 != 0) {
+                chipParams.setMargins(dp(8), 0, 0, 0);
+            }
+            current.addView(chip, chipParams);
+        }
+        return container;
+    }
+
+    private byte[] callAiImageApi(
+            String activationCode,
+            String deviceId,
+            String prompt,
+            String sourcePath,
+            String size) throws Exception {
+        String url = aiServerUrl() + "/v1/ai";
+
+        java.net.URL endpoint = new java.net.URL(url);
+        java.net.HttpURLConnection conn =
+                (java.net.HttpURLConnection) endpoint.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(45_000);
+        conn.setDoOutput(true);
+
+        org.json.JSONObject body = new org.json.JSONObject();
+        try {
+            body.put("activationCode", activationCode);
+            body.put("deviceId", deviceId);
+            body.put("prompt", prompt);
+            body.put("size", size);
+            if (sourcePath != null) {
+                byte[] srcBytes = java.nio.file.Files.readAllBytes(
+                        new File(sourcePath).toPath());
+                String b64 = android.util.Base64.encodeToString(
+                        srcBytes, android.util.Base64.NO_WRAP);
+                body.put("image", "data:image/jpeg;base64," + b64);
+            }
+        } catch (Exception ignored) {}
+
+        java.io.OutputStream os = conn.getOutputStream();
+        os.write(body.toString().getBytes("UTF-8"));
+        os.close();
+
+        int code = conn.getResponseCode();
+        if (code != 200) {
+            if (code == 403) {
+                throw new Exception("激活码无效或次数用完");
+            }
+            if (code == 502) {
+                throw new Exception("AI 服务暂时不可用");
+            }
+            throw new Exception("API 服务返回错误 " + code);
+        }
+
+        java.io.InputStream is = conn.getInputStream();
+        byte[] respBytes = readAllBytes(is);
+        is.close();
+        conn.disconnect();
+
+        org.json.JSONObject json = new org.json.JSONObject(
+                new String(respBytes, "UTF-8"));
+        org.json.JSONArray dataArr = json.getJSONArray("data");
+        if (dataArr.length() == 0) {
+            throw new Exception("AI 未返回有效图片");
+        }
+        org.json.JSONObject first = dataArr.getJSONObject(0);
+        String b64Json = first.optString("b64_json", null);
+        if (b64Json != null && !b64Json.isEmpty()) {
+            return android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT);
+        }
+        String imageUrl = first.optString("url", null);
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            java.net.URL imgUrl = new java.net.URL(imageUrl);
+            java.net.HttpURLConnection imgConn =
+                    (java.net.HttpURLConnection) imgUrl.openConnection();
+            imgConn.setConnectTimeout(15_000);
+            imgConn.setReadTimeout(30_000);
+            java.io.InputStream imgIs = imgConn.getInputStream();
+            byte[] data = readAllBytes(imgIs);
+            imgIs.close();
+            imgConn.disconnect();
+            return data;
+        }
+        throw new Exception("AI 未返回有效图片");
+    }
+
+    private String loadAiApiKey() {
+        try {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance(
+                    "AndroidKeyStore");
+            keyStore.load(null);
+            java.security.KeyStore.SecretKeyEntry entry =
+                    (java.security.KeyStore.SecretKeyEntry) keyStore.getEntry(
+                            "_zenche_ai_key_", null);
+            if (entry != null) {
+                javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(
+                        "AES/GCM/NoPadding");
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE,
+                        entry.getSecretKey());
+                byte[] encrypted = android.util.Base64.decode(
+                        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                                .getString("aiApiKeyEnc", ""),
+                        android.util.Base64.DEFAULT);
+                if (encrypted.length > 0) {
+                    byte[] decrypted = cipher.doFinal(encrypted);
+                    return new String(decrypted, "UTF-8");
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    private static byte[] readAllBytes(java.io.InputStream input) throws Exception {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = input.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
+    private void saveAiApiKey(String key) {
+        try {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance(
+                    "AndroidKeyStore");
+            keyStore.load(null);
+            if (!keyStore.containsAlias("_zenche_ai_key_")) {
+                javax.crypto.KeyGenerator keyGen = javax.crypto.KeyGenerator.getInstance(
+                        "AES", "AndroidKeyStore");
+                keyGen.init(new android.security.keystore.KeyGenParameterSpec.Builder(
+                        "_zenche_ai_key_",
+                        android.security.keystore.KeyProperties.PURPOSE_ENCRYPT
+                                | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(
+                                android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(
+                                android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .build());
+                keyGen.generateKey();
+            }
+            java.security.KeyStore.SecretKeyEntry entry =
+                    (java.security.KeyStore.SecretKeyEntry) keyStore.getEntry(
+                            "_zenche_ai_key_", null);
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(
+                    "AES/GCM/NoPadding");
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE,
+                    entry.getSecretKey());
+            byte[] encrypted = cipher.doFinal(key.getBytes("UTF-8"));
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putString(
+                            "aiApiKeyEnc",
+                            android.util.Base64.encodeToString(
+                                    encrypted, android.util.Base64.DEFAULT))
+                    .apply();
+        } catch (Exception e) {
+            diagnostics.error("ai", "保存 API Key 失败：" + e.getMessage());
+        }
     }
 
     private LinearLayout editorAdjustmentGroup() {
@@ -5182,6 +5752,47 @@ public final class MainActivity extends Activity {
                 dp(48)));
         content.addView(
                 languagePanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
+        LinearLayout aiPanel = panel();
+        aiPanel.addView(text("AI 服务", 18, Typeface.BOLD, INK));
+        aiPanel.addView(text(
+                "AI 修图与生图通过代理服务器调用；服务器负责计数与扣减次数。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        EditText aiServerUrlInput = new EditText(this);
+        aiServerUrlInput.setHint(tr("AI 服务器地址"));
+        aiServerUrlInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_URI);
+        aiServerUrlInput.setSingleLine(true);
+        aiServerUrlInput.setText(aiServerUrl());
+        aiServerUrlInput.setBackground(rounded(PAPER_2, 8, RULE));
+        aiServerUrlInput.setPadding(dp(12), 0, dp(12), 0);
+        aiPanel.addView(
+                aiServerUrlInput,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        aiPanel.addView(text(
+                "留空使用默认地址 " + "http://101.34.255.115:8787。",
+                11,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 8));
+        Button saveAiServerUrl = nativeButton("保存服务器地址", false);
+        saveAiServerUrl.setOnClickListener(view -> {
+            String value = aiServerUrlInput.getText().toString().trim();
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putString("aiServerURL", value)
+                    .apply();
+            showToast(value.isEmpty() ? "AI 服务器地址已重置" : "AI 服务器地址已保存");
+        });
+        aiPanel.addView(
+                saveAiServerUrl,
+                marginParams(-1, dp(44), 0, 0, 0, 0));
+        content.addView(
+                aiPanel,
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout updatePanel = panel();
@@ -6786,9 +7397,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.2.0" : version;
+            return version == null || version.isEmpty() ? "1.3.0" : version;
         } catch (Exception error) {
-            return "1.2.0";
+            return "1.3.0";
         }
     }
 
@@ -6936,7 +7547,8 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n"
+                        "• 新增 AI 修图与生图工具，内置一键美颜等快捷预设，激活码解锁后即可使用。\n"
+                                + "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n"
                                 + "• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n"
                                 + "• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n"
                                 + "• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n"

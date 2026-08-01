@@ -41,3 +41,27 @@ PV/assets/
 PV/archive/
 PV/work/
 PV/output/
+
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  ⚠️  永久忽略 — 绝不提交到 Git，所有智能体也不要上传  ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# AI 激活码私钥 — 泄漏等同于所有激活码可被伪造
+zenche_ai_private.pem
+*.pem
+
+# AI 激活码生成脚本 — 含私钥路径，只在本地使用
+native/generate_key.sh
+
+# AI 功能内部文档 — 含 API Key，仅供开发者参考
+native/AI_ACTIVATION.md
+
+# 智能体警告文件 — 仅本地参考，含密钥存储位置
+native/DO_NOT_UPLOAD.txt
+
+# AI 中转代理服务器 — 私有部署代码，含公钥与 API 调用逻辑，
+# 绝不公开到开源仓库（客户端不内置 API Key，由该服务器持有）
+ai-server/
+
+# SECURITY.md 中的 AI 章节更新 — 本地编辑
+SECURITY.md
