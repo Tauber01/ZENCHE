@@ -361,6 +361,12 @@ public partial class MainWindow : Window
         AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
         AiActivationCodeBox.Text = "";
     }
+
+    private void AiCopyDeviceId_Click(object sender, RoutedEventArgs e)
+    {
+        Clipboard.SetText(GetDeviceId());
+        AiActivationStatusText.Text = AppLocalization.T("设备 ID 已复制，请发给作者生成激活码");
+    }
 #if NIKONLINK_WINDOWS_SHARE
     private DataTransferManager? _dataTransferManager;
 #endif
@@ -1438,6 +1444,13 @@ public partial class MainWindow : Window
             destination == "settings"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        if (destination == "settings")
+        {
+            if (AiDeviceIdText is not null)
+            {
+                AiDeviceIdText.Text = GetDeviceId();
+            }
+        }
         var cameraWorkspace = destination is "capture" or "monitor";
         ParameterPanelShell.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;

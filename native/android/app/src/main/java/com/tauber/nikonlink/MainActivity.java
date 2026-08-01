@@ -5762,6 +5762,78 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
+        LinearLayout deviceIdHeader = new LinearLayout(this);
+        deviceIdHeader.setOrientation(LinearLayout.HORIZONTAL);
+        deviceIdHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView deviceIdLabel = text("我的设备 ID", 11, Typeface.BOLD, MUTED);
+        deviceIdHeader.addView(deviceIdLabel, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button copyDeviceId = nativeButton("复制", false);
+        copyDeviceId.setOnClickListener(view -> {
+            ((android.content.ClipboardManager) getSystemService(
+                    android.content.Context.CLIPBOARD_SERVICE))
+                    .setPrimaryClip(ClipData.newPlainText(
+                            "deviceId", aiDeviceId()));
+            showToast("设备 ID 已复制，请发给作者生成激活码");
+        });
+        deviceIdHeader.addView(copyDeviceId, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36)));
+        aiPanel.addView(deviceIdHeader, marginParams(-1, -2, 0, 0, 0, 4));
+        TextView deviceIdValue = new TextView(this);
+        deviceIdValue.setText(aiDeviceId());
+        deviceIdValue.setTextSize(11);
+        deviceIdValue.setTextColor(MUTED);
+        deviceIdValue.setTypeface(Typeface.create(
+                Typeface.MONOSPACE, Typeface.NORMAL));
+        deviceIdValue.setGravity(Gravity.CENTER_VERTICAL);
+        deviceIdValue.setTextIsSelectable(true);
+        aiPanel.addView(deviceIdValue, marginParams(-1, -2, 0, 0, 0, 4));
+        aiPanel.addView(text(
+                "每个激活码绑定此设备，请将上面的设备 ID 发送给作者。",
+                11,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 10));
+        TextView aiActivationLabel = text("激活码", 12, Typeface.BOLD, MUTED);
+        aiPanel.addView(aiActivationLabel, marginParams(-1, -2, 0, 0, 0, 4));
+        EditText aiActivationCodeInput = new EditText(this);
+        aiActivationCodeInput.setHint(tr("输入激活码"));
+        aiActivationCodeInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        aiActivationCodeInput.setSingleLine(true);
+        String savedCode = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_activated_code", "");
+        aiActivationCodeInput.setText(savedCode == null ? "" : savedCode);
+        aiActivationCodeInput.setBackground(rounded(PAPER_2, 8, RULE));
+        aiActivationCodeInput.setPadding(dp(12), 0, dp(12), 0);
+        aiPanel.addView(
+                aiActivationCodeInput,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        TextView aiActivationStatus = text(
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .getBoolean("ai_activated", false)
+                        ? "已激活 ✓"
+                        : "未激活",
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        aiPanel.addView(aiActivationStatus, marginParams(-1, -2, 0, 0, 0, 6));
+        Button activateAiBtn = nativeButton("激活", true);
+        activateAiBtn.setOnClickListener(view -> {
+            String code = aiActivationCodeInput.getText().toString().trim();
+            if (code.isEmpty()) {
+                aiActivationStatus.setText(tr("请输入激活码"));
+                return;
+            }
+            if (verifyActivationCode(code)) {
+                aiActivationStatus.setText(tr("激活成功！AI 功能已解锁"));
+                aiActivationCodeInput.setText("");
+            } else {
+                aiActivationStatus.setText(tr("激活码无效或已过期"));
+            }
+        });
+        aiPanel.addView(
+                activateAiBtn,
+                marginParams(-1, dp(44), 0, 0, 0, 0));
         EditText aiServerUrlInput = new EditText(this);
         aiServerUrlInput.setHint(tr("AI 服务器地址"));
         aiServerUrlInput.setInputType(InputType.TYPE_CLASS_TEXT

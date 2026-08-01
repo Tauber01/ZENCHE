@@ -299,6 +299,28 @@ struct SettingsSheet: View {
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("我的设备 ID").font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                        Button("复制") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(ActivationManager.deviceId, forType: .string)
+                            activationStatus = "设备 ID 已复制，请发给作者生成激活码"
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(SettingsPalette.cobalt)
+                    }
+                    Text(ActivationManager.deviceId)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(SettingsPalette.muted)
+                        .textSelection(.enabled)
+                    Text("每个激活码绑定此设备，请将上面的设备 ID 发送给作者。")
+                        .font(.system(size: 10))
+                        .foregroundStyle(SettingsPalette.muted)
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
                     Text("激活码").font(.system(size: 12, weight: .semibold))
                     TextField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
                     Text("AI 服务器").font(.system(size: 12, weight: .semibold))

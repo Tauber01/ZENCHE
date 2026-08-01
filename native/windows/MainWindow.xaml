@@ -829,6 +829,25 @@
                              Foreground="{StaticResource MutedBrush}"
                              TextWrapping="Wrap"
                              Text="AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。" />
+                  <DockPanel Margin="0,0,0,6">
+                    <Button DockPanel.Dock="Right"
+                            Style="{StaticResource ButtonBase}"
+                            Content="复制"
+                            Click="AiCopyDeviceId_Click" />
+                    <TextBlock VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="我的设备 ID" />
+                  </DockPanel>
+                  <TextBlock x:Name="AiDeviceIdText"
+                             Margin="0,0,0,8"
+                             FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap" />
+                  <TextBlock Margin="0,0,0,12"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="每个激活码绑定此设备，请将上面的设备 ID 发送给作者。" />
                   <TextBox x:Name="AiActivationCodeBox"
                            Height="38"
                            Padding="10,7"

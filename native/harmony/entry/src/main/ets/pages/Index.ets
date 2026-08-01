@@ -9,8 +9,11 @@ import { util } from '@kit.ArkTS';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { deviceInfo } from '@kit.BasicServicesKit';
+import {
+  BusinessError,
+  deviceInfo,
+  pasteboard
+} from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
 import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
@@ -1655,6 +1658,20 @@ struct Index {
       return id;
     } catch (_) {
       return '';
+    }
+  }
+
+  private copyDeviceIdToClipboard(): void {
+    try {
+      const pb = pasteboard.getSystemPasteboard();
+      const data = pasteboard.createData(
+        pasteboard.MIMETYPE_TEXT_PLAIN,
+        this.getDeviceId()
+      );
+      pb.setData(data);
+      this.aiActivationMsg = '设备 ID 已复制，请发给作者生成激活码';
+    } catch (_) {
+      this.aiActivationMsg = '复制设备 ID 失败';
     }
   }
 
@@ -4034,6 +4051,36 @@ struct Index {
               .fontColor(Color.Green)
               .width('100%')
           }
+          Row() {
+            Text('我的设备 ID')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .layoutWeight(1)
+            Button('复制', { type: ButtonType.Normal })
+              .height(32)
+              .fontSize(12)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(8)
+              .padding({ left: 14, right: 14 })
+              .onClick((): void => {
+                this.copyDeviceIdToClipboard();
+              })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          Text(this.getDeviceId())
+            .fontSize(11)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('每个激活码绑定此设备，请将上面的设备 ID 发送给作者。')
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
           TextInput({ placeholder: '输入激活码', text: this.aiActivationInput })
             .height(44)
             .width('100%')

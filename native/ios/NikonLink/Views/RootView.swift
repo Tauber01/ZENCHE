@@ -4017,6 +4017,23 @@ private struct AppSettingsSheet: View {
                             }
                             Spacer()
                         }
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("我的设备 ID")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(IPalette.muted)
+                                Spacer()
+                                Button("复制") {
+                                    UIPasteboard.general.string = ActivationManager.deviceId
+                                    activationStatus = "设备 ID 已复制，请发给作者生成激活码"
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            Text(ActivationManager.deviceId)
+                                .font(.caption.monospaced())
+                                .foregroundStyle(IPalette.ink)
+                                .textSelection(.enabled)
+                        }
                         SecureField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
                         TextField("AI 服务地址", text: $aiServerURL)
                             .textFieldStyle(.roundedBorder)
