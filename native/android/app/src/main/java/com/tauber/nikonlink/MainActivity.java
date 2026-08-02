@@ -120,17 +120,19 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_OWNER_PHOTO = 4103;
     private static final int REQUEST_CLOUD_PHOTOS = 4104;
     private static final int REQUEST_MEDIA_LIBRARY = 4105;
-    private static final int PAPER = Color.rgb(246, 248, 252);
-    private static final int PAPER_2 = Color.rgb(239, 243, 248);
-    private static final int SURFACE = Color.WHITE;
-    private static final int INK = Color.rgb(20, 24, 32);
-    private static final int MUTED = Color.rgb(91, 102, 119);
-    private static final int COBALT = Color.rgb(5, 90, 210);
-    private static final int COBALT_SOFT = Color.rgb(225, 237, 255);
-    private static final int VIDEO = Color.rgb(202, 31, 42);
-    private static final int VIDEO_SOFT = Color.rgb(255, 230, 232);
-    private static final int GRAPHITE = Color.rgb(12, 15, 21);
-    private static final int RULE = Color.rgb(220, 225, 234);
+    private static final int PAPER = Color.rgb(233, 237, 242);
+    private static final int PAPER_2 = Color.rgb(228, 233, 239);
+    private static final int SURFACE = Color.rgb(248, 250, 252);
+    private static final int INK = Color.rgb(23, 28, 38);
+    private static final int MUTED = Color.rgb(90, 97, 108);
+    private static final int COBALT = Color.rgb(22, 115, 230);
+    private static final int COBALT_SOFT = Color.rgb(220, 234, 253);
+    private static final int VIDEO = Color.rgb(216, 50, 58);
+    private static final int VIDEO_SOFT = Color.rgb(251, 226, 227);
+    private static final int POSITIVE = Color.rgb(31, 168, 105);
+    private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
+    private static final int GRAPHITE = Color.rgb(10, 11, 13);
+    private static final int RULE = Color.rgb(207, 214, 223);
     private static final int RULE_STRONG = Color.rgb(174, 184, 199);
     private static final String LATEST_RELEASE_API =
             "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
@@ -146,6 +148,7 @@ public final class MainActivity extends Activity {
             "NikonLink.MirrorChyanCDK";
     private static final String AFDIAN_URL =
             "https://www.ifdian.net/a/Tauber";
+    private static final String ZENCHE_WEBSITE_URL = "https://zenche.top";
     private static final String AUTOMATIC_UPDATE_KEY = "automaticallyCheckForUpdates";
     private static final String DISMISSED_ANNOUNCEMENT_VERSION_KEY =
             "dismissedLaunchAnnouncementVersion";
@@ -237,6 +240,55 @@ public final class MainActivity extends Activity {
             copy.cropRatio = cropRatio;
             return copy;
         }
+
+        void copyFrom(EditorAdjustments source) {
+            exposure = source.exposure;
+            contrast = source.contrast;
+            highlights = source.highlights;
+            shadows = source.shadows;
+            whites = source.whites;
+            blacks = source.blacks;
+            temperature = source.temperature;
+            tint = source.tint;
+            vibrance = source.vibrance;
+            saturation = source.saturation;
+            texture = source.texture;
+            clarity = source.clarity;
+            sharpening = source.sharpening;
+            noiseReduction = source.noiseReduction;
+            dehaze = source.dehaze;
+            vignette = source.vignette;
+            rotation = source.rotation;
+            flipHorizontal = source.flipHorizontal;
+            flipVertical = source.flipVertical;
+            showingOriginal = source.showingOriginal;
+            cropRatio = source.cropRatio;
+        }
+    }
+
+    private static final class EditorAIAnalysis {
+        double meanLuma;
+        double contrast;
+        double shadowRatio;
+        double highlightRatio;
+        double saturation;
+        double red;
+        double green;
+        double blue;
+        double detail;
+
+        String summary() {
+            if (meanLuma < 0.38) {
+                return "检测到画面偏暗，已提亮阴影并保护高光";
+            }
+            if (meanLuma > 0.64 || highlightRatio > 0.08) {
+                return "检测到画面偏亮，已回收高光并恢复层次";
+            }
+            if (contrast < 0.16) {
+                return "检测到动态范围偏平，已增强层次与色彩";
+            }
+            return "曝光均衡，已优化色彩与细节";
+        }
     }
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
@@ -289,6 +341,17 @@ public final class MainActivity extends Activity {
     private FrameLayout immersiveChrome;
     private Button immersiveRecordButton;
     private TextView immersiveExposureText;
+    private TextView connectionDot;
+    private TextView sourceReadoutValue;
+    private TextView modeReadoutValue;
+    private TextView shutterReadoutLabel;
+    private TextView shutterReadoutValue;
+    private TextView apertureReadoutLabel;
+    private TextView apertureReadoutValue;
+    private TextView isoReadoutLabel;
+    private TextView isoReadoutValue;
+    private TextView compensationReadoutLabel;
+    private TextView compensationReadoutValue;
     private SensorManager immersiveSensorManager;
     private Sensor immersiveRotationSensor;
     private boolean immersiveLandscape;
@@ -348,6 +411,179 @@ public final class MainActivity extends Activity {
     private String editorSelectedPath;
     private final EditorAdjustments editorAdjustments =
             new EditorAdjustments();
+    private String aiPrompt = "";
+    private int aiMode = 0; // 0=edit, 1=generate
+    private int aiRatioIndex = 0;
+    private int aiResolutionIndex = 0;
+    private android.graphics.Bitmap aiResultBitmap;
+    private boolean aiIsGenerating = false;
+    private EditorState editorState = EditorState.PRO;
+
+    private enum EditorState {
+        PRO, AI
+    }
+
+    private static boolean aiActivated = false;
+    private static int aiUsageCount = 0;
+    private static final int AI_MAX_USAGE = 100;
+
+    private boolean isAiActivated() {
+        if (!aiActivated) {
+            aiActivated = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .getBoolean("ai_activated", false);
+        }
+        return aiActivated;
+    }
+
+    private int getRemainingUsage() {
+        return Math.max(0, AI_MAX_USAGE - aiUsageCount);
+    }
+
+    private void recordAiUsage() {
+        aiUsageCount++;
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit().putInt("ai_usage_count", aiUsageCount).apply();
+        if (aiUsageCount >= AI_MAX_USAGE) {
+            aiActivated = false;
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit().putBoolean("ai_activated", false).apply();
+        }
+    }
+
+    private String aiDeviceId() {
+        String existing = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_device_id", "");
+        if (existing != null && !existing.isEmpty()) return existing;
+        String id = android.provider.Settings.Secure.getString(
+                getContentResolver(),
+                android.provider.Settings.Secure.ANDROID_ID);
+        if (id == null) id = java.util.UUID.randomUUID().toString();
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit().putString("ai_device_id", id).apply();
+        return id;
+    }
+
+    private String loadActivationCode() {
+        return getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_activated_code", "");
+    }
+
+    private String aiServerUrl() {
+        return getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("aiServerURL", "http://101.34.255.115:8787");
+    }
+
+    private static final String AI_PUBLIC_KEY =
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
+            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt" +
+            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ" +
+            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8" +
+            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN" +
+            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ" +
+            "MjQzRwIDAQAB";
+
+    private boolean verifyActivationCode(String code) {
+        if (code == null) return false;
+        String trimmed = code.trim();
+        if (trimmed.isEmpty()) return false;
+        try {
+            String[] parts = trimmed.split("-");
+            if (parts.length < 4 || !"ZENCHE".equals(parts[0])
+                    || !"AI".equals(parts[1])) {
+                return false;
+            }
+            String expiryPart = parts[parts.length - 1];
+            java.text.SimpleDateFormat sdf =
+                    new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US);
+            java.util.Date expiry = sdf.parse(expiryPart);
+            if (expiry != null && expiry.before(new java.util.Date())) {
+                return false;
+            }
+            StringBuilder sigBuilder = new StringBuilder();
+            for (int i = 2; i < parts.length - 1; i++) {
+                if (sigBuilder.length() > 0) sigBuilder.append("-");
+                sigBuilder.append(parts[i]);
+            }
+            byte[] sigBytes = android.util.Base64.decode(
+                    sigBuilder.toString(), android.util.Base64.DEFAULT);
+            String deviceId = aiDeviceId();
+            String payload = deviceId + ":" + expiryPart + ":a1b2c3d4e5f6";
+            byte[] payloadBytes = payload.getBytes("UTF-8");
+
+            java.security.spec.X509EncodedKeySpec keySpec =
+                    new java.security.spec.X509EncodedKeySpec(
+                            android.util.Base64.decode(AI_PUBLIC_KEY,
+                                    android.util.Base64.DEFAULT));
+            java.security.KeyFactory keyFactory =
+                    java.security.KeyFactory.getInstance("RSA");
+            java.security.PublicKey publicKey = keyFactory.generatePublic(keySpec);
+            java.security.Signature signature =
+                    java.security.Signature.getInstance("SHA256withRSA");
+            signature.initVerify(publicKey);
+            signature.update(payloadBytes);
+            boolean valid = signature.verify(sigBytes);
+            if (valid) {
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .edit()
+                        .putBoolean("ai_activated", true)
+                        .putString("ai_activated_code", trimmed)
+                        .putInt("ai_usage_count", 0)
+                        .putString("ai_device_id", deviceId)
+                        .apply();
+                aiActivated = true;
+                aiUsageCount = 0;
+            }
+            return valid;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+    private static final String[][] AI_RATIOS = {
+            {"1:1", "1024x1024"},
+            {"16:9", "1792x1024"},
+            {"9:16", "1024x1792"},
+            {"4:3", "1365x1024"},
+            {"3:2", "1536x1024"},
+    };
+
+    private static final String[] AI_RESOLUTIONS = {"1K", "2K", "4K"};
+    private static final String[][] AI_EDIT_PRESETS = {
+            {"一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"},
+            {"自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"},
+            {"胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"},
+            {"日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"},
+            {"黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"},
+            {"复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"},
+            {"天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"},
+            {"美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。"},
+    };
+    private static final String[][] AI_GEN_PRESETS = {
+            {"人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"},
+            {"风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"},
+            {"城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"},
+            {"产品展示", "professional product photography, clean studio background, soft lighting, high detail"},
+    };
+    private static final String[] AI_PROVIDERS = {
+            "aimlapi.com",
+            "fal.ai",
+            "crazyrouter.com"
+    };
+    private static final String[] AI_ENDPOINTS = {
+            "https://api.aimlapi.com/v1/images/generations",
+            "https://fal.run/fal-ai/nano-banana-2",
+            "https://cn.crazyrouter.com/v1/images/generations"
+    };
+    private static final String[] AI_WEBSITES = {
+            "https://aimlapi.com",
+            "https://fal.ai",
+            "https://crazyrouter.com"
+    };
+
+    private EditorAdjustments editorSettingsBeforeAI;
+    private EditorAdjustments editorAICopiedSettings;
+    private EditorAIAnalysis editorAIAnalysis;
+    private int editorAIIntensity = 72;
+    private String editorAISummary = "等待分析当前照片";
     private String appLanguage = Localization.SIMPLIFIED_CHINESE;
     private final float[] immersiveRotationMatrix = new float[9];
     private final float[] immersiveOrientation = new float[3];
@@ -809,7 +1045,6 @@ public final class MainActivity extends Activity {
                 }
             }
             int finalImported = imported;
-            String finalLastName = lastName;
             mainHandler.post(() -> {
                 showSection("library");
                 updateFileCount();
@@ -817,9 +1052,6 @@ public final class MainActivity extends Activity {
                     showToast(
                             "已从" + (ownerAlbum ? "机主相册" : "网盘")
                                     + "加入 " + finalImported + " 张照片");
-                    if (finalLastName != null) {
-                        statusText.setText(tr("已加入 ") + finalLastName);
-                    }
                 } else {
                     showError("没有可加入文件库的照片。");
                 }
@@ -1071,7 +1303,7 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
         FrameLayout markBox = new FrameLayout(this);
-        markBox.setBackground(rounded(GRAPHITE, 24, 0));
+        markBox.setBackground(brandGradient(24));
         int size = dp(80);
         FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(size, size);
         markParams.gravity = Gravity.CENTER;
@@ -1251,7 +1483,7 @@ public final class MainActivity extends Activity {
 
         TextView logo = text("Z", 20, Typeface.BOLD, Color.WHITE);
         logo.setGravity(Gravity.CENTER);
-        logo.setBackground(rounded(GRAPHITE, 13, 0));
+        logo.setBackground(brandGradient(13));
         logo.setElevation(dp(5));
         top.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
@@ -1261,6 +1493,10 @@ public final class MainActivity extends Activity {
         brand.addView(text("帧澈 ZENCHE", 15, Typeface.BOLD, INK));
         brand.addView(text("Capture · Connect · Flow", 10, Typeface.NORMAL, MUTED));
         top.addView(brand, new LinearLayout.LayoutParams(dp(142), dp(44)));
+
+        connectionDot = text("●", 13, Typeface.BOLD, MUTED);
+        connectionDot.setGravity(Gravity.CENTER);
+        top.addView(connectionDot, new LinearLayout.LayoutParams(dp(22), dp(44)));
 
         connectButton = nativeButton("连接相机", true);
         connectButton.setOnClickListener(view -> {
@@ -1326,7 +1562,14 @@ public final class MainActivity extends Activity {
         icon.setTint(MUTED);
         icon.setBounds(0, 0, dp(20), dp(20));
         button.setCompoundDrawables(null, icon, null, null);
-        button.setOnClickListener(view -> showSection(section));
+        button.setOnClickListener(view -> {
+            if ("editor".equals(section)) {
+                // Navigation opens the stable default; mode changes live in the editor.
+                editorState = EditorState.PRO;
+                aiResultBitmap = null;
+            }
+            showSection(section);
+        });
         navigationButtons.add(button);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(54), 1f);
         params.setMargins(dp(4), 0, dp(4), 0);
@@ -1397,9 +1640,11 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         content.addView(sectionHeader(
                 "照片拍摄",
-                "快门、曝光、对焦、白平衡与拍摄模式集中在当前页面",
+                "会话、曝光、对焦与交付按拍摄流程组织",
                 COBALT));
+        content.addView(buildCaptureSessionPanel());
         content.addView(buildPreviewStage(false));
+        content.addView(buildExposureReadoutRail());
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -1423,9 +1668,119 @@ public final class MainActivity extends Activity {
         return scroll;
     }
 
+    private View buildExposureReadoutRail() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFillViewport(true);
+        scroll.setBackground(rounded(GRAPHITE, 14, Color.rgb(32, 39, 55)));
+
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setGravity(Gravity.CENTER_VERTICAL);
+        rail.setPadding(dp(6), dp(10), dp(6), dp(10));
+        sourceReadoutValue = addReadoutCell(rail, tr("来源"), dp(92));
+        addReadoutDivider(rail);
+        modeReadoutValue = addReadoutCell(rail, tr("模式"), dp(82));
+        addReadoutDivider(rail);
+        shutterReadoutValue = addReadoutCell(rail, tr("快门"), dp(112));
+        shutterReadoutLabel = (TextView) shutterReadoutValue.getTag();
+        addReadoutDivider(rail);
+        apertureReadoutValue = addReadoutCell(rail, tr("光圈"), dp(104));
+        apertureReadoutLabel = (TextView) apertureReadoutValue.getTag();
+        addReadoutDivider(rail);
+        isoReadoutValue = addReadoutCell(rail, "ISO", dp(94));
+        isoReadoutLabel = (TextView) isoReadoutValue.getTag();
+        addReadoutDivider(rail);
+        compensationReadoutValue = addReadoutCell(
+                rail,
+                tr("曝光补偿"),
+                dp(120));
+        compensationReadoutLabel = (TextView) compensationReadoutValue.getTag();
+        scroll.addView(rail);
+        updateExposureReadoutRail();
+        return scroll;
+    }
+
+    private TextView addReadoutCell(LinearLayout rail, String label, int width) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_VERTICAL);
+        cell.setPadding(dp(12), 0, dp(12), 0);
+        TextView labelView = text(label, 9, Typeface.BOLD, Color.rgb(142, 151, 165));
+        labelView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        TextView valueView = text("—", 21, Typeface.BOLD, Color.WHITE);
+        valueView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        valueView.setTag(labelView);
+        cell.addView(labelView);
+        cell.addView(valueView, marginParams(-1, -2, 0, 4, 0, 0));
+        rail.addView(cell, new LinearLayout.LayoutParams(width, dp(62)));
+        return valueView;
+    }
+
+    private void addReadoutDivider(LinearLayout rail) {
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.argb(28, 255, 255, 255));
+        rail.addView(divider, new LinearLayout.LayoutParams(dp(1), dp(42)));
+    }
+
+    private void updateExposureReadoutRail() {
+        if (sourceReadoutValue == null) return;
+        sourceReadoutValue.setText(connected ? "USB/PTP" : "—");
+        modeReadoutValue.setText(connected ? exposureModeCode() : "—");
+        shutterReadoutValue.setText(connected ? shutterDisplayValue() : "—");
+        apertureReadoutValue.setText(
+                connected ? String.format(Locale.CHINA, "f/%.1f", currentAperture) : "—");
+        isoReadoutValue.setText(connected ? String.valueOf(currentIso) : "—");
+        compensationReadoutValue.setText(
+                connected
+                        ? String.format(Locale.CHINA, "%+.1f EV", currentCompensation)
+                        : "—");
+        updateReadoutState(shutterReadoutLabel, shutterReadoutValue, "快门", "exposureTime");
+        updateReadoutState(apertureReadoutLabel, apertureReadoutValue, "光圈", "aperture");
+        updateReadoutState(isoReadoutLabel, isoReadoutValue, "ISO", "iso");
+        updateReadoutState(
+                compensationReadoutLabel,
+                compensationReadoutValue,
+                "曝光补偿",
+                "exposureCompensation");
+    }
+
+    private void updateReadoutState(
+            TextView label,
+            TextView value,
+            String title,
+            String parameter) {
+        boolean writable = connected && camera.isParameterWritable(parameter);
+        label.setText(tr(title) + (connected && !writable ? " · " + tr("自动") : ""));
+        value.setTextColor(writable ? READOUT_GLOW : Color.rgb(235, 238, 244));
+    }
+
+    private String shutterDisplayValue() {
+        return currentShutterSeconds < 1
+                ? "1/" + Math.round(1 / currentShutterSeconds)
+                : String.format(Locale.CHINA, "%.1fs", currentShutterSeconds);
+    }
+
+    private String exposureModeCode() {
+        switch (exposureMode) {
+            case "program": return "P";
+            case "shutterPriority": return "S";
+            case "aperturePriority": return "A";
+            case "bulb": return "B";
+            default: return "M";
+        }
+    }
+
     private View buildShootingTaskPanel() {
         LinearLayout panel = panel();
-        panel.addView(text("拍摄任务", 18, Typeface.BOLD, INK));
+        panel.addView(text("拍摄自动化", 18, Typeface.BOLD, INK));
+        panel.addView(
+                text(
+                        "间隔、包围与 B 门任务集中管理",
+                        13,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 3, 0, 12));
         String[] kinds = new String[]{"interval", "exposure", "focus", "bulb"};
         Spinner kind = monitorSpinner(new String[]{
                 "间隔拍摄",
@@ -1523,7 +1878,7 @@ public final class MainActivity extends Activity {
                 "视频监看",
                 connected
                         ? connectedCameraName + " · 视频取景与本地监看处理"
-                        : "EXPEED 6 / 7 · " + PtpCamera.SUPPORTED_CAMERA_SUMMARY,
+                        : "连接相机后显示当前机型与实时画面",
                 VIDEO));
         content.addView(buildPreviewStage(true), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -2706,8 +3061,6 @@ public final class MainActivity extends Activity {
                         .putString("monitorVideoProfile", monitorVideoProfile)
                         .apply();
                 refreshPreviewProcessing();
-                statusText.setText(
-                        tr("监看显示尺寸 · ") + tr(monitorProfileLabel()));
             }
 
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
@@ -2984,7 +3337,7 @@ public final class MainActivity extends Activity {
 
     private View buildProfessionalControls() {
         LinearLayout panel = panel();
-        panel.addView(text("相机参数", 18, Typeface.BOLD, INK));
+        panel.addView(text("拍摄控制", 18, Typeface.BOLD, INK));
         panel.addView(text(
                 connected
                         ? "参数通过 USB/PTP 写入 " + connectedCameraName
@@ -2994,6 +3347,27 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 14));
 
+        addParameterGroupHeading(
+                panel,
+                "曝光",
+                "模式决定快门、光圈与曝光补偿的可调范围");
+        addSpinnerControl(
+                panel,
+                "拍摄模式",
+                new String[]{
+                        "P 程序自动",
+                        "S 快门优先自动",
+                        "A 光圈优先自动",
+                        "M 手动",
+                        "M · B门"},
+                new Object[]{
+                        "program",
+                        "shutterPriority",
+                        "aperturePriority",
+                        "manual",
+                        "bulb"},
+                exposureModeIndex(),
+                "exposureMode");
         addSpinnerControl(
                 panel,
                 "快门速度",
@@ -3017,51 +3391,11 @@ public final class MainActivity extends Activity {
                 "iso");
         addSpinnerControl(
                 panel,
-                "对焦模式",
-                new String[]{"AF-S 单次AF", "AF-C 连续AF", "MF 手动对焦"},
-                new Object[]{"single-shot", "continuous", "manual"},
-                0,
-                "focusMode");
-        addSpinnerControl(
-                panel,
-                "拍摄模式",
-                new String[]{
-                        "P 程序自动",
-                        "S 快门优先自动",
-                        "A 光圈优先自动",
-                        "M 手动",
-                        "M · B门"},
-                new Object[]{
-                        "program",
-                        "shutterPriority",
-                        "aperturePriority",
-                        "manual",
-                        "bulb"},
-                exposureModeIndex(),
-                "exposureMode");
-        addSpinnerControl(
-                panel,
                 "B门曝光时长（由应用控制）",
                 new String[]{"1 秒", "2 秒", "5 秒", "10 秒", "30 秒", "60 秒"},
                 new Object[]{1, 2, 5, 10, 30, 60},
                 2,
                 "bulbDuration");
-        addSpinnerControl(
-                panel,
-                "设定优化校准",
-                new String[]{"自动", "标准", "自然", "鲜艳", "单色", "人像", "风景", "平面"},
-                new Object[]{
-                        "auto",
-                        "standard",
-                        "neutral",
-                        "vivid",
-                        "monochrome",
-                        "portrait",
-                        "landscape",
-                        "flat"},
-                1,
-                "pictureControl");
-
         TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, MUTED);
         compensationLabel.setTag("曝光补偿");
         LinearLayout.LayoutParams labelParams = marginParams(-1, -2, 0, 12, 0, 2);
@@ -3093,8 +3427,55 @@ public final class MainActivity extends Activity {
         parameterLabels.put("exposureCompensation", compensationLabel);
         panel.addView(compensation);
 
+        addParameterGroupHeading(
+                panel,
+                "对焦与色彩",
+                "对焦、白平衡与优化校准按相机能力启用");
+        addSpinnerControl(
+                panel,
+                "对焦模式",
+                new String[]{"AF-S 单次AF", "AF-C 连续AF", "MF 手动对焦"},
+                new Object[]{"single-shot", "continuous", "manual"},
+                0,
+                "focusMode");
+        addSpinnerControl(
+                panel,
+                "白平衡",
+                new String[]{"自动", "预设手动"},
+                new Object[]{"continuous", "manual"},
+                0,
+                "whiteBalanceMode");
+        addSpinnerControl(
+                panel,
+                "设定优化校准",
+                new String[]{"自动", "标准", "自然", "鲜艳", "单色", "人像", "风景", "平面"},
+                new Object[]{
+                        "auto",
+                        "standard",
+                        "neutral",
+                        "vivid",
+                        "monochrome",
+                        "portrait",
+                        "landscape",
+                        "flat"},
+                1,
+                "pictureControl");
+
         updateCameraControls();
         return panel;
+    }
+
+    private void addParameterGroupHeading(
+            LinearLayout parent,
+            String title,
+            String detail) {
+        View divider = new View(this);
+        divider.setBackgroundColor(RULE);
+        parent.addView(divider, marginParams(-1, dp(1), 0, 18, 0, 16));
+        parent.addView(text(title, 15, Typeface.BOLD, INK));
+        parent.addView(
+                text(detail, 12, Typeface.NORMAL, MUTED),
+                marginParams(-1, -2, 0, 3, 0, 10));
     }
 
     private String[] isoLabels() {
@@ -3385,8 +3766,6 @@ public final class MainActivity extends Activity {
                         Typeface.NORMAL,
                         MUTED),
                 marginParams(-1, -2, 0, 0, 0, 16));
-        content.addView(buildCaptureSessionPanel());
-
         LinearLayout systemBody = verticalContainer();
         if (!hasAlbumAccess()) {
             TextView permission = text(
@@ -3478,10 +3857,43 @@ public final class MainActivity extends Activity {
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         content.addView(sectionHeader(
-                "专业显影",
-                "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                editorState == EditorState.AI ? "AI 工具" : "专业显影",
+                editorState == EditorState.AI
+                        ? "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。"
+                        : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
                 COBALT));
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button proMode = nativeButton(
+                editorState == EditorState.PRO ? "● 专业显影" : "○ 专业显影",
+                editorState == EditorState.PRO);
+        proMode.setOnClickListener(view -> {
+            editorState = EditorState.PRO;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        modeRow.addView(proMode, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button aiModeButton = nativeButton(
+                editorState == EditorState.AI ? "● AI 工具" : "○ AI 工具",
+                editorState == EditorState.AI);
+        aiModeButton.setOnClickListener(view -> {
+            editorState = EditorState.AI;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams aiModeParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        aiModeParams.setMargins(dp(8), 0, 0, 0);
+        modeRow.addView(aiModeButton, aiModeParams);
+        content.addView(modeRow, marginParams(-1, -2, 0, 12, 0, 0));
 
+        if (editorState == EditorState.AI) {
+            return buildAiToolsView(scroll, content);
+        }
+        return buildProEditorView(scroll, content);
+    }
+
+    private View buildProEditorView(ScrollView scroll, LinearLayout content) {
         List<File> photos = new ArrayList<>();
         for (File file : photoFiles()) {
             if (isEditableImageFile(file)) {
@@ -3528,6 +3940,163 @@ public final class MainActivity extends Activity {
         content.addView(
                 picker,
                 marginParams(-1, dp(48), 0, 0, 0, 12));
+
+        LinearLayout aiPanel = panel();
+        aiPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
+        LinearLayout aiHeading = new LinearLayout(this);
+        aiHeading.setOrientation(LinearLayout.HORIZONTAL);
+        aiHeading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView aiTitle = text(
+                "AI 智能修图 · 工作台",
+                16,
+                Typeface.BOLD,
+                INK);
+        aiHeading.addView(aiTitle, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f));
+        TextView aiBadge = text(
+                "设备端",
+                11,
+                Typeface.BOLD,
+                COBALT);
+        aiBadge.setGravity(Gravity.CENTER);
+        aiHeading.addView(aiBadge, new LinearLayout.LayoutParams(
+                dp(64),
+                dp(30)));
+        aiPanel.addView(aiHeading);
+        TextView aiSummary = text(
+                editorAISummary,
+                13,
+                Typeface.NORMAL,
+                MUTED);
+        aiPanel.addView(
+                aiSummary,
+                marginParams(-1, -2, 0, 6, 0, 8));
+        aiPanel.addView(
+                text("设备端处理 · 照片不会上传",
+                        11,
+                        Typeface.BOLD,
+                        COBALT),
+                marginParams(-1, -2, 0, 4, 0, 6));
+        LinearLayout aiMetrics = new LinearLayout(this);
+        aiMetrics.setOrientation(LinearLayout.HORIZONTAL);
+        addEditorAIMetric(aiMetrics, "曝光", editorAIAnalysis == null
+                ? 0 : editorAIAnalysis.meanLuma);
+        addEditorAIMetric(aiMetrics, "动态范围", editorAIAnalysis == null
+                ? 0 : editorAIAnalysis.contrast);
+        addEditorAIMetric(aiMetrics, "色彩", editorAIAnalysis == null
+                ? 0 : editorAIAnalysis.saturation);
+        addEditorAIMetric(aiMetrics, "细节", editorAIAnalysis == null
+                ? 0 : editorAIAnalysis.detail);
+        aiMetrics.setVisibility(editorAIAnalysis == null ? View.GONE : View.VISIBLE);
+        aiPanel.addView(aiMetrics, marginParams(-1, -2, 0, 6, 0, 4));
+        TextView aiStrengthLabel = text(
+                "AI 强度 · " + editorAIIntensity + "%",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        aiPanel.addView(aiStrengthLabel);
+        SeekBar aiStrength = new SeekBar(this);
+        aiStrength.setMax(65);
+        aiStrength.setProgress(editorAIIntensity - 35);
+        aiStrength.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+                    @Override
+                    public void onProgressChanged(
+                            SeekBar seekBar,
+                            int progress,
+                            boolean fromUser) {
+                        editorAIIntensity = progress + 35;
+                        aiStrengthLabel.setText(
+                                tr("AI 强度") + " · "
+                                        + editorAIIntensity + "%");
+                    }
+
+                    @Override
+                    public void onStartTrackingTouch(SeekBar seekBar) {
+                    }
+
+                    @Override
+                    public void onStopTrackingTouch(SeekBar seekBar) {
+                    }
+                });
+        aiPanel.addView(aiStrength);
+        HorizontalScrollView aiActionScroll = new HorizontalScrollView(this);
+        aiActionScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout aiActions = new LinearLayout(this);
+        aiActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button analyze = nativeButton("分析画面", false);
+        analyze.setOnClickListener(view -> {
+            EditorAIAnalysis analysis = analyzeEditorPhoto(new File(editorSelectedPath));
+            if (analysis == null) {
+                showToast("无法分析当前照片");
+                return;
+            }
+            editorAIAnalysis = analysis;
+            editorAISummary = analysis.summary();
+            showSection("editor");
+        });
+        aiActions.addView(analyze, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button optimize = nativeButton("智能优化", true);
+        optimize.setOnClickListener(view -> {
+            EditorAIAnalysis analysis = editorAIAnalysis != null
+                    ? editorAIAnalysis
+                    : analyzeEditorPhoto(new File(editorSelectedPath));
+            if (analysis == null) {
+                showToast("无法分析当前照片");
+                return;
+            }
+            editorSettingsBeforeAI = editorAdjustments.copy();
+            editorAIAnalysis = analysis;
+            applyEditorAI(analysis, editorAIIntensity / 100.0);
+            editorAISummary = analysis.summary();
+            showSection("editor");
+        });
+        aiActions.addView(
+                optimize,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button undoAI = nativeButton("撤销 AI", false);
+        undoAI.setEnabled(editorSettingsBeforeAI != null);
+        undoAI.setOnClickListener(view -> {
+            if (editorSettingsBeforeAI == null) return;
+            editorAdjustments.copyFrom(editorSettingsBeforeAI);
+            editorSettingsBeforeAI = null;
+            editorAIAnalysis = null;
+            editorAISummary = "已撤销 AI 优化";
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams undoParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        undoParams.setMargins(dp(8), 0, 0, 0);
+        aiActions.addView(undoAI, undoParams);
+        Button copyAI = nativeButton("复制 AI", false);
+        copyAI.setEnabled(editorSettingsBeforeAI != null);
+        copyAI.setOnClickListener(view -> {
+            editorAICopiedSettings = editorAdjustments.copy();
+            showToast("已复制 AI 调整，可应用到下一张照片");
+        });
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        copyParams.setMargins(dp(8), 0, 0, 0);
+        aiActions.addView(copyAI, copyParams);
+        Button pasteAI = nativeButton("粘贴 AI", false);
+        pasteAI.setEnabled(editorAICopiedSettings != null);
+        pasteAI.setOnClickListener(view -> {
+            if (editorAICopiedSettings == null) return;
+            editorAdjustments.copyFrom(editorAICopiedSettings);
+            editorAISummary = "已粘贴 AI 调整";
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        pasteParams.setMargins(dp(8), 0, 0, 0);
+        aiActions.addView(pasteAI, pasteParams);
+        aiActionScroll.addView(aiActions, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        aiPanel.addView(aiActionScroll);
+        content.addView(
+                aiPanel,
+                marginParams(-1, -2, 0, 0, 0, 12));
 
         HorizontalScrollView presetScroll = new HorizontalScrollView(this);
         presetScroll.setHorizontalScrollBarEnabled(false);
@@ -3586,6 +4155,9 @@ public final class MainActivity extends Activity {
                                 photos.get(position).getAbsolutePath();
                         if (!selectedPath.equals(editorSelectedPath)) {
                             editorAdjustments.reset();
+                            editorSettingsBeforeAI = null;
+                            editorAIAnalysis = null;
+                            editorAISummary = "等待分析当前照片";
                         }
                         editorSelectedPath = selectedPath;
                         refreshPreview.run();
@@ -3797,6 +4369,9 @@ public final class MainActivity extends Activity {
         Button reset = nativeButton("全部重置", false);
         reset.setOnClickListener(view -> {
             editorAdjustments.reset();
+            editorSettingsBeforeAI = null;
+            editorAIAnalysis = null;
+            editorAISummary = "等待分析当前照片";
             showSection("editor");
         });
         LinearLayout.LayoutParams resetParams =
@@ -3839,8 +4414,8 @@ public final class MainActivity extends Activity {
                         editorSelectedPath =
                                 destination.getAbsolutePath();
                         editorAdjustments.reset();
-                        showToast("已保存编辑副本：" + destination.getName());
                         updateFileCount();
+                        showToast("已保存编辑副本：" + destination.getName());
                         showSection("editor");
                     } else {
                         status.setText(tr("保存编辑副本失败"));
@@ -3861,10 +4436,441 @@ public final class MainActivity extends Activity {
         return scroll;
     }
 
+    private View buildAiToolsView(ScrollView scroll, LinearLayout content) {
+        List<File> photos = new ArrayList<>();
+        for (File file : photoFiles()) {
+            if (isEditableImageFile(file)) {
+                photos.add(file);
+            }
+        }
+        if (aiMode == 0 && photos.isEmpty()) {
+            aiMode = 1;
+        }
+
+        LinearLayout aiIntro = new LinearLayout(this);
+        aiIntro.setOrientation(LinearLayout.VERTICAL);
+        aiIntro.setPadding(dp(14), dp(12), dp(14), dp(12));
+        aiIntro.setBackground(rounded(COBALT_SOFT, 12, COBALT));
+        aiIntro.addView(text("AI 创作", 16, Typeface.BOLD, INK));
+        aiIntro.addView(text(
+                "联网生成与修图 · 结果保存为新文件",
+                12,
+                Typeface.NORMAL,
+                MUTED), marginParams(-1, -2, 0, 6, 0, 0));
+        aiIntro.addView(text(
+                isAiActivated()
+                        ? "已解锁 · 剩余 " + getRemainingUsage() + " 次"
+                        : "需要激活 · 请在设置中输入激活码",
+                11,
+                Typeface.BOLD,
+                isAiActivated() ? POSITIVE : MUTED));
+        content.addView(aiIntro, marginParams(-1, -2, 0, 0, 0, 12));
+
+        Spinner picker = null;
+        if (aiMode == 0) {
+            picker = new Spinner(this);
+            List<String> names = new ArrayList<>();
+            for (File file : photos) {
+                names.add(file.getName());
+            }
+            picker.setAdapter(new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_dropdown_item, names));
+            if (editorSelectedPath == null || photos.stream().noneMatch(
+                    f -> f.getAbsolutePath().equals(editorSelectedPath))) {
+                editorSelectedPath = photos.isEmpty()
+                        ? null
+                        : photos.get(0).getAbsolutePath();
+            }
+            for (int i = 0; i < photos.size(); i++) {
+                if (photos.get(i).getAbsolutePath().equals(editorSelectedPath)) {
+                    picker.setSelection(i);
+                    break;
+                }
+            }
+            content.addView(picker, marginParams(-1, dp(48), 0, 0, 0, 10));
+        }
+
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button editBtn = nativeButton(aiMode == 0 ? "● AI 修图" : "○ AI 修图", aiMode == 0);
+        editBtn.setOnClickListener(v -> {
+            aiMode = 0;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        modeRow.addView(editBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button genBtn = nativeButton(aiMode == 1 ? "● AI 生图" : "○ AI 生图", aiMode == 1);
+        genBtn.setOnClickListener(v -> {
+            aiMode = 1;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams genParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        genParams.setMargins(dp(8), 0, 0, 0);
+        modeRow.addView(genBtn, genParams);
+        content.addView(modeRow, marginParams(-1, -2, 0, 0, 0, 10));
+
+        EditText promptInput = new EditText(this);
+        promptInput.setHint(aiMode == 0 ? tr("输入修图描述…") : tr("输入生图描述…"));
+        promptInput.setText(aiPrompt);
+        promptInput.setMinLines(2);
+        promptInput.setMaxLines(4);
+        promptInput.setBackgroundColor(SURFACE);
+        promptInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        TextView aiStatus = text("请输入提示词", 11, Typeface.NORMAL, MUTED);
+        LinearLayout promptSection = new LinearLayout(this);
+        promptSection.setOrientation(LinearLayout.VERTICAL);
+        promptSection.setPadding(dp(12), dp(10), dp(12), dp(10));
+        promptSection.setBackground(rounded(SURFACE, 12, RULE));
+        promptSection.addView(text("提示词", 12, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        promptSection.addView(promptInput, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        promptSection.addView(buildAiPresetRow(promptInput, aiStatus),
+                marginParams(-1, -2, 0, 8, 0, 0));
+        content.addView(promptSection, marginParams(-1, -2, 0, 0, 0, 10));
+
+        content.addView(text("输出参数", 12, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        LinearLayout paramRow = new LinearLayout(this);
+        paramRow.setOrientation(LinearLayout.HORIZONTAL);
+        Spinner ratioSpinner = new Spinner(this);
+        String[] ratioLabels = new String[AI_RATIOS.length];
+        for (int i = 0; i < AI_RATIOS.length; i++) {
+            ratioLabels[i] = AI_RATIOS[i][0];
+        }
+        ratioSpinner.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_dropdown_item, ratioLabels));
+        ratioSpinner.setSelection(aiRatioIndex);
+        ratioSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                aiRatioIndex = pos;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> p) {}
+        });
+        paramRow.addView(ratioSpinner, new LinearLayout.LayoutParams(0, dp(44), 1f));
+
+        Spinner resSpinner = new Spinner(this);
+        resSpinner.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_dropdown_item, AI_RESOLUTIONS));
+        resSpinner.setSelection(aiResolutionIndex);
+        resSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
+                aiResolutionIndex = pos;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> p) {}
+        });
+        LinearLayout.LayoutParams resParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        resParams.setMargins(dp(8), 0, 0, 0);
+        paramRow.addView(resSpinner, resParams);
+        content.addView(paramRow, marginParams(-1, -2, 0, 0, 0, 10));
+
+        Button generateBtn = nativeButton("生成", true);
+        generateBtn.setOnClickListener(v -> {
+            aiPrompt = promptInput.getText().toString().trim();
+            if (aiPrompt.isEmpty()) {
+                aiStatus.setText(tr("请输入提示词"));
+                return;
+            }
+            if (!isAiActivated()) {
+                aiStatus.setText(tr("请先在设置中输入激活码解锁 AI 功能"));
+                return;
+            }
+            if (aiMode == 0 && (photos.isEmpty() || editorSelectedPath == null)) {
+                aiStatus.setText(tr("请先选择一张照片用于 AI 修图"));
+                return;
+            }
+            aiIsGenerating = true;
+            generateBtn.setEnabled(false);
+            generateBtn.setText(tr("正在生成…"));
+            aiStatus.setText(tr("正在调用 AI 模型…"));
+            String size = AI_RATIOS[aiRatioIndex][1];
+            boolean isEditMode = aiMode == 0;
+            String sourcePath = isEditMode ? editorSelectedPath : null;
+            editorExecutor.execute(() -> {
+                boolean ok = false;
+                try {
+                    byte[] result = callAiImageApi(
+                            loadActivationCode(), aiDeviceId(),
+                            aiPrompt, sourcePath, size);
+                    if (result != null) {
+                        aiResultBitmap = BitmapFactory.decodeByteArray(
+                                result, 0, result.length);
+                        ok = aiResultBitmap != null;
+                    }
+                } catch (Exception e) {
+                    diagnostics.error("ai", "AI 调用失败：" + e.getMessage());
+                }
+                boolean success = ok;
+                mainHandler.post(() -> {
+                    aiIsGenerating = false;
+                    generateBtn.setEnabled(true);
+                    generateBtn.setText(tr("生成"));
+                    if (success) {
+                        aiStatus.setText(tr("生成完成"));
+                        showSection("editor");
+                    } else {
+                        aiStatus.setText(tr("AI 生成失败"));
+                    }
+                });
+            });
+        });
+        content.addView(generateBtn, marginParams(-1, dp(48), 0, 8, 0, 8));
+        content.addView(aiStatus, marginParams(-1, -2, 0, 8, 0, 0));
+
+        if (aiResultBitmap != null) {
+            ImageView aiPreview = new ImageView(this);
+            aiPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            aiPreview.setImageBitmap(aiResultBitmap);
+            aiPreview.setBackgroundColor(GRAPHITE);
+            content.addView(aiPreview, marginParams(-1, dp(360), 0, 0, 0, 12));
+
+            Button saveBtn = nativeButton("保存到文件库", true);
+            saveBtn.setOnClickListener(v -> {
+                saveBtn.setEnabled(false);
+                Bitmap bmp = aiResultBitmap;
+                editorExecutor.execute(() -> {
+                    String stem = aiMode == 0 ? "edited" : "generated";
+                    File dest = new File(
+                            photoDirectory,
+                            "ai_" + stem + "_" + new java.text.SimpleDateFormat(
+                                    "yyyyMMdd_HHmmss", java.util.Locale.US)
+                                    .format(new Date()) + ".jpg");
+                    boolean ok = false;
+                    try (FileOutputStream stream = new FileOutputStream(dest)) {
+                        ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
+                    } catch (Exception e) {
+                        diagnostics.error("ai", "保存失败：" + e.getMessage());
+                    }
+                    boolean saved = ok;
+                    mainHandler.post(() -> {
+                        saveBtn.setEnabled(true);
+                        if (saved) {
+                            editorSelectedPath = dest.getAbsolutePath();
+                            showToast("已保存 AI 结果：" + dest.getName());
+                            updateFileCount();
+                        } else {
+                            aiStatus.setText(tr("保存 AI 结果失败"));
+                        }
+                    });
+                });
+            });
+            content.addView(saveBtn, marginParams(-1, dp(48), 0, 0, 0, 0));
+        }
+        scroll.addView(content);
+        return scroll;
+    }
+
+    private LinearLayout buildAiPresetRow(EditText promptInput, TextView aiStatus) {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.addView(text("快捷预设", 11, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 8, 0, 2));
+        String[][] presets = aiMode == 0 ? AI_EDIT_PRESETS : AI_GEN_PRESETS;
+        LinearLayout current = null;
+        for (int i = 0; i < presets.length; i++) {
+            if (i % 4 == 0) {
+                current = new LinearLayout(this);
+                current.setOrientation(LinearLayout.HORIZONTAL);
+                container.addView(current, marginParams(-1, -2, 0, 0, 0, 4));
+            }
+            String[] preset = presets[i];
+            Button chip = nativeButton(preset[0], false);
+            chip.setOnClickListener(v -> {
+                promptInput.setText(preset[1]);
+                aiStatus.setText("已应用预设 · " + preset[0]);
+            });
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(36), 1f);
+            if (i % 4 != 0) {
+                chipParams.setMargins(dp(8), 0, 0, 0);
+            }
+            current.addView(chip, chipParams);
+        }
+        return container;
+    }
+
+    private byte[] callAiImageApi(
+            String activationCode,
+            String deviceId,
+            String prompt,
+            String sourcePath,
+            String size) throws Exception {
+        String url = aiServerUrl() + "/v1/ai";
+
+        java.net.URL endpoint = new java.net.URL(url);
+        java.net.HttpURLConnection conn =
+                (java.net.HttpURLConnection) endpoint.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setConnectTimeout(15_000);
+        conn.setReadTimeout(45_000);
+        conn.setDoOutput(true);
+
+        org.json.JSONObject body = new org.json.JSONObject();
+        try {
+            body.put("activationCode", activationCode);
+            body.put("deviceId", deviceId);
+            body.put("prompt", prompt);
+            body.put("size", size);
+            if (sourcePath != null) {
+                byte[] srcBytes = java.nio.file.Files.readAllBytes(
+                        new File(sourcePath).toPath());
+                String b64 = android.util.Base64.encodeToString(
+                        srcBytes, android.util.Base64.NO_WRAP);
+                body.put("image", "data:image/jpeg;base64," + b64);
+            }
+        } catch (Exception ignored) {}
+
+        java.io.OutputStream os = conn.getOutputStream();
+        os.write(body.toString().getBytes("UTF-8"));
+        os.close();
+
+        int code = conn.getResponseCode();
+        if (code != 200) {
+            if (code == 403) {
+                throw new Exception("激活码无效或次数用完");
+            }
+            if (code == 502) {
+                throw new Exception("AI 服务暂时不可用");
+            }
+            throw new Exception("API 服务返回错误 " + code);
+        }
+
+        java.io.InputStream is = conn.getInputStream();
+        byte[] respBytes = readAllBytes(is);
+        is.close();
+        conn.disconnect();
+
+        org.json.JSONObject json = new org.json.JSONObject(
+                new String(respBytes, "UTF-8"));
+        org.json.JSONArray dataArr = json.getJSONArray("data");
+        if (dataArr.length() == 0) {
+            throw new Exception("AI 未返回有效图片");
+        }
+        org.json.JSONObject first = dataArr.getJSONObject(0);
+        String b64Json = first.optString("b64_json", null);
+        if (b64Json != null && !b64Json.isEmpty()) {
+            return android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT);
+        }
+        String imageUrl = first.optString("url", null);
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            java.net.URL imgUrl = new java.net.URL(imageUrl);
+            java.net.HttpURLConnection imgConn =
+                    (java.net.HttpURLConnection) imgUrl.openConnection();
+            imgConn.setConnectTimeout(15_000);
+            imgConn.setReadTimeout(30_000);
+            java.io.InputStream imgIs = imgConn.getInputStream();
+            byte[] data = readAllBytes(imgIs);
+            imgIs.close();
+            imgConn.disconnect();
+            return data;
+        }
+        throw new Exception("AI 未返回有效图片");
+    }
+
+    private String loadAiApiKey() {
+        try {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance(
+                    "AndroidKeyStore");
+            keyStore.load(null);
+            java.security.KeyStore.SecretKeyEntry entry =
+                    (java.security.KeyStore.SecretKeyEntry) keyStore.getEntry(
+                            "_zenche_ai_key_", null);
+            if (entry != null) {
+                javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(
+                        "AES/GCM/NoPadding");
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE,
+                        entry.getSecretKey());
+                byte[] encrypted = android.util.Base64.decode(
+                        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                                .getString("aiApiKeyEnc", ""),
+                        android.util.Base64.DEFAULT);
+                if (encrypted.length > 0) {
+                    byte[] decrypted = cipher.doFinal(encrypted);
+                    return new String(decrypted, "UTF-8");
+                }
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
+
+    private static byte[] readAllBytes(java.io.InputStream input) throws Exception {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[8192];
+        int read;
+        while ((read = input.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
+    private void saveAiApiKey(String key) {
+        try {
+            java.security.KeyStore keyStore = java.security.KeyStore.getInstance(
+                    "AndroidKeyStore");
+            keyStore.load(null);
+            if (!keyStore.containsAlias("_zenche_ai_key_")) {
+                javax.crypto.KeyGenerator keyGen = javax.crypto.KeyGenerator.getInstance(
+                        "AES", "AndroidKeyStore");
+                keyGen.init(new android.security.keystore.KeyGenParameterSpec.Builder(
+                        "_zenche_ai_key_",
+                        android.security.keystore.KeyProperties.PURPOSE_ENCRYPT
+                                | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+                        .setBlockModes(
+                                android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(
+                                android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                        .build());
+                keyGen.generateKey();
+            }
+            java.security.KeyStore.SecretKeyEntry entry =
+                    (java.security.KeyStore.SecretKeyEntry) keyStore.getEntry(
+                            "_zenche_ai_key_", null);
+            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance(
+                    "AES/GCM/NoPadding");
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE,
+                    entry.getSecretKey());
+            byte[] encrypted = cipher.doFinal(key.getBytes("UTF-8"));
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putString(
+                            "aiApiKeyEnc",
+                            android.util.Base64.encodeToString(
+                                    encrypted, android.util.Base64.DEFAULT))
+                    .apply();
+        } catch (Exception e) {
+            diagnostics.error("ai", "保存 API Key 失败：" + e.getMessage());
+        }
+    }
+
     private LinearLayout editorAdjustmentGroup() {
         LinearLayout group = verticalContainer();
         group.setPadding(dp(12), dp(4), dp(12), dp(10));
         return group;
+    }
+
+    private void addEditorAIMetric(
+            LinearLayout parent,
+            String title,
+            double value) {
+        TextView metric = text(
+                tr(title) + "\n"
+                        + Math.round(Math.max(0, Math.min(1, value)) * 100)
+                        + "%",
+                10,
+                Typeface.BOLD,
+                INK);
+        metric.setGravity(Gravity.CENTER_VERTICAL);
+        metric.setPadding(dp(8), 0, dp(8), 0);
+        metric.setBackground(rounded(SURFACE, 8, 1));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        params.setMargins(0, 0, dp(6), 0);
+        parent.addView(metric, params);
     }
 
     private void addEditorPresetButton(
@@ -3884,6 +4890,9 @@ public final class MainActivity extends Activity {
 
     private void applyEditorPreset(String preset) {
         editorAdjustments.resetTone();
+        editorSettingsBeforeAI = null;
+        editorAIAnalysis = null;
+        editorAISummary = "等待分析当前照片";
         switch (preset) {
             case "natural":
                 editorAdjustments.contrast = 8;
@@ -3939,6 +4948,160 @@ public final class MainActivity extends Activity {
             default:
                 break;
         }
+    }
+
+    private void applyEditorAI(
+            EditorAIAnalysis analysis,
+            double intensity) {
+        editorAdjustments.resetTone();
+        double amount = Math.max(0.35, Math.min(1, intensity));
+        double targetExposure = Math.max(
+                -0.8,
+                Math.min(
+                        0.8,
+                        Math.log(0.48 / Math.max(0.08, analysis.meanLuma))
+                                / Math.log(2)
+                                * 0.68));
+        editorAdjustments.exposure = (int)Math.round(
+                targetExposure * 100 * amount);
+        editorAdjustments.contrast = editorAIValue(
+                Math.max(-8, Math.min(24,
+                        (0.20 - analysis.contrast) * 130)),
+                amount);
+        editorAdjustments.highlights = -editorAIValue(
+                Math.max(6, Math.min(48,
+                        analysis.highlightRatio * 360
+                                + Math.max(0, analysis.meanLuma - 0.55) * 70)),
+                amount);
+        editorAdjustments.shadows = editorAIValue(
+                Math.max(6, Math.min(46,
+                        analysis.shadowRatio * 330
+                                + Math.max(0, 0.44 - analysis.meanLuma) * 75)),
+                amount);
+        editorAdjustments.whites = editorAIValue(
+                Math.max(-8, Math.min(14,
+                        (0.58 - analysis.meanLuma) * 28)),
+                amount);
+        editorAdjustments.blacks = -editorAIValue(
+                Math.max(4, Math.min(18,
+                        (0.21 - analysis.contrast) * 55 + 5)),
+                amount);
+        editorAdjustments.temperature = editorAIValue(
+                Math.max(-18, Math.min(18,
+                        (analysis.blue - analysis.red) * 95)),
+                amount);
+        double greenExcess = analysis.green
+                - (analysis.red + analysis.blue) / 2;
+        editorAdjustments.tint = editorAIValue(
+                Math.max(-14, Math.min(14, greenExcess * 85)),
+                amount);
+        editorAdjustments.vibrance = editorAIValue(
+                Math.max(4, Math.min(26,
+                        (0.30 - analysis.saturation) * 95 + 6)),
+                amount);
+        editorAdjustments.saturation = editorAIValue(
+                Math.max(-4, Math.min(8,
+                        (0.22 - analysis.saturation) * 28)),
+                amount);
+        editorAdjustments.texture = editorAIValue(
+                Math.max(4, Math.min(16,
+                        (0.075 - analysis.detail) * 170 + 7)),
+                amount);
+        editorAdjustments.clarity = editorAIValue(
+                Math.max(3, Math.min(18,
+                        (0.19 - analysis.contrast) * 70 + 6)),
+                amount);
+        editorAdjustments.sharpening = editorAIValue(
+                Math.max(14, Math.min(34,
+                        (0.08 - analysis.detail) * 210 + 20)),
+                amount);
+        editorAdjustments.noiseReduction = editorAIValue(
+                Math.max(6, Math.min(30,
+                        analysis.shadowRatio * 120
+                                + Math.max(0, 0.38 - analysis.meanLuma) * 42
+                                + 6)),
+                amount);
+        editorAdjustments.dehaze = editorAIValue(
+                Math.max(0, Math.min(16,
+                        (0.18 - analysis.contrast) * 75)),
+                amount);
+        editorAdjustments.showingOriginal = false;
+    }
+
+    private static int editorAIValue(double value, double amount) {
+        return (int)Math.round(value * amount);
+    }
+
+    private EditorAIAnalysis analyzeEditorPhoto(File file) {
+        Bitmap bitmap = renderEditorAnalysisBitmap(file, 128);
+        if (bitmap == null) return null;
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        int[] pixels = new int[width * height];
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+        bitmap.recycle();
+        EditorAIAnalysis analysis = new EditorAIAnalysis();
+        double[] lumas = new double[pixels.length];
+        double lumaSum = 0;
+        int shadows = 0;
+        int highlights = 0;
+        for (int index = 0; index < pixels.length; index++) {
+            int color = pixels[index];
+            double red = Color.red(color) / 255.0;
+            double green = Color.green(color) / 255.0;
+            double blue = Color.blue(color) / 255.0;
+            double luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            lumas[index] = luma;
+            lumaSum += luma;
+            analysis.red += red;
+            analysis.green += green;
+            analysis.blue += blue;
+            analysis.saturation += Math.max(red, Math.max(green, blue))
+                    - Math.min(red, Math.min(green, blue));
+            if (luma < 0.10) shadows++;
+            if (luma > 0.90) highlights++;
+        }
+        double count = pixels.length;
+        analysis.meanLuma = lumaSum / count;
+        double variance = 0;
+        double detail = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int index = y * width + x;
+                double delta = lumas[index] - analysis.meanLuma;
+                variance += delta * delta;
+                if (x > 0) {
+                    detail += Math.abs(lumas[index] - lumas[index - 1]);
+                }
+            }
+        }
+        analysis.contrast = Math.sqrt(variance / count);
+        analysis.shadowRatio = shadows / count;
+        analysis.highlightRatio = highlights / count;
+        analysis.saturation /= count;
+        analysis.red /= count;
+        analysis.green /= count;
+        analysis.blue /= count;
+        analysis.detail = detail / Math.max(1, height * (width - 1));
+        return analysis;
+    }
+
+    private Bitmap renderEditorAnalysisBitmap(
+            File file,
+            int maximumDimension) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        int sampleSize = 1;
+        while (Math.max(
+                bounds.outWidth / sampleSize,
+                bounds.outHeight / sampleSize) > maximumDimension) {
+            sampleSize *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sampleSize;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
     }
 
     private SeekBar addEditorAdjustment(
@@ -5054,8 +6217,8 @@ public final class MainActivity extends Activity {
                         libraryFileAssignments.remove(file.getAbsolutePath());
                         saveLibraryFileAssignments();
                     }
-                    showSection("library");
                     updateFileCount();
+                    showSection("library");
                 })
                 .show());
         LinearLayout.LayoutParams deleteParams =
@@ -5182,6 +6345,135 @@ public final class MainActivity extends Activity {
                 dp(48)));
         content.addView(
                 languagePanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
+        LinearLayout aiPanel = panel();
+        aiPanel.addView(text("AI 功能激活", 18, Typeface.BOLD, INK));
+        aiPanel.addView(text(
+                "AI 修图与生图需购买激活码解锁；每个激活码绑定当前设备，服务器负责计数与扣减次数。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        Button officialWebsiteButton = nativeButton("前往官网兑换密钥", true);
+        officialWebsiteButton.setOnClickListener(
+                view -> openExternalUrl(ZENCHE_WEBSITE_URL));
+        aiPanel.addView(officialWebsiteButton,
+                marginParams(-1, dp(44), 0, 0, 0, 8));
+        aiPanel.addView(text(
+                "复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。",
+                11,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 10));
+        aiPanel.addView(text(
+                "没有兑换码？在爱发电购买兑换码",
+                13,
+                Typeface.BOLD,
+                INK),
+                marginParams(-1, -2, 0, 0, 0, 8));
+        try (InputStream stream = getAssets().open("wechat-donation.png")) {
+            ImageView afdianQrCode = new ImageView(this);
+            afdianQrCode.setImageBitmap(BitmapFactory.decodeStream(stream));
+            afdianQrCode.setAdjustViewBounds(true);
+            afdianQrCode.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            afdianQrCode.setMaxHeight(dp(420));
+            afdianQrCode.setContentDescription(tr("在爱发电购买兑换码"));
+            afdianQrCode.setBackground(rounded(SURFACE, 8, RULE));
+            afdianQrCode.setOnClickListener(
+                    view -> openExternalUrl(AFDIAN_URL));
+            aiPanel.addView(afdianQrCode,
+                    marginParams(-1, -2, 0, 0, 0, 8));
+        } catch (Exception error) {
+            diagnostics.warning(
+                    "settings",
+                    "无法载入爱发电二维码：" + error.getMessage());
+        }
+        Button afdianPurchaseButton = nativeButton(
+                "在爱发电购买兑换码", false);
+        afdianPurchaseButton.setOnClickListener(
+                view -> openExternalUrl(AFDIAN_URL));
+        aiPanel.addView(afdianPurchaseButton,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        aiPanel.addView(text(
+                "兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。",
+                10,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 12));
+        LinearLayout deviceIdHeader = new LinearLayout(this);
+        deviceIdHeader.setOrientation(LinearLayout.HORIZONTAL);
+        deviceIdHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView deviceIdLabel = text("我的设备 ID", 11, Typeface.BOLD, MUTED);
+        deviceIdHeader.addView(deviceIdLabel, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button copyDeviceId = nativeButton("复制", false);
+        copyDeviceId.setOnClickListener(view -> {
+            ((android.content.ClipboardManager) getSystemService(
+                    android.content.Context.CLIPBOARD_SERVICE))
+                    .setPrimaryClip(ClipData.newPlainText(
+                            "deviceId", aiDeviceId()));
+            showToast("设备 ID 已复制，可前往官网兑换密钥");
+        });
+        deviceIdHeader.addView(copyDeviceId, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36)));
+        aiPanel.addView(deviceIdHeader, marginParams(-1, -2, 0, 0, 0, 4));
+        TextView deviceIdValue = new TextView(this);
+        deviceIdValue.setText(aiDeviceId());
+        deviceIdValue.setTextSize(11);
+        deviceIdValue.setTextColor(MUTED);
+        deviceIdValue.setTypeface(Typeface.create(
+                Typeface.MONOSPACE, Typeface.NORMAL));
+        deviceIdValue.setGravity(Gravity.CENTER_VERTICAL);
+        deviceIdValue.setTextIsSelectable(true);
+        aiPanel.addView(deviceIdValue, marginParams(-1, -2, 0, 0, 0, 4));
+        aiPanel.addView(text(
+                "每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。",
+                11,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 10));
+        aiPanel.addView(text("激活码", 12, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 0, 0, 4));
+        EditText aiActivationCodeInput = new EditText(this);
+        aiActivationCodeInput.setHint(tr("输入激活码"));
+        aiActivationCodeInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        aiActivationCodeInput.setSingleLine(true);
+        String savedCode = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("ai_activated_code", "");
+        aiActivationCodeInput.setText(savedCode == null ? "" : savedCode);
+        aiActivationCodeInput.setBackground(rounded(PAPER_2, 8, RULE));
+        aiActivationCodeInput.setPadding(dp(12), 0, dp(12), 0);
+        aiPanel.addView(aiActivationCodeInput,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        TextView aiActivationStatus = text(
+                getSharedPreferences("nikon-link", MODE_PRIVATE)
+                        .getBoolean("ai_activated", false)
+                        ? "已激活 ✓"
+                        : "未激活",
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        aiPanel.addView(aiActivationStatus,
+                marginParams(-1, -2, 0, 0, 0, 6));
+        Button activateAiBtn = nativeButton("激活", true);
+        activateAiBtn.setOnClickListener(view -> {
+            String code = aiActivationCodeInput.getText().toString().trim();
+            if (code.isEmpty()) {
+                aiActivationStatus.setText(tr("请输入激活码"));
+                return;
+            }
+            if (verifyActivationCode(code)) {
+                aiActivationStatus.setText(tr("激活成功！AI 功能已解锁"));
+                aiActivationCodeInput.setText("");
+            } else {
+                aiActivationStatus.setText(tr("激活码无效或已过期"));
+            }
+        });
+        aiPanel.addView(activateAiBtn,
+                marginParams(-1, dp(44), 0, 0, 0, 0));
+        content.addView(
+                aiPanel,
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout updatePanel = panel();
@@ -5384,9 +6676,9 @@ public final class MainActivity extends Activity {
         LinearLayout card = verticalContainer();
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
         card.setBackground(rounded(COBALT_SOFT, 14, 0));
-        card.addView(text("Nikon Z 系列原生 USB", 18, Typeface.BOLD, INK));
+        card.addView(text("原生 USB/PTP 相机", 18, Typeface.BOLD, INK));
         card.addView(text(
-                PtpCamera.SUPPORTED_CAMERA_SUMMARY.replace("、", " · "),
+                "连接后自动识别当前机型与可用参数",
                 12,
                 Typeface.BOLD,
                 COBALT),
@@ -5433,8 +6725,6 @@ public final class MainActivity extends Activity {
                     previewFailureCount = 0;
                     showSection(currentSection);
                     updateConnectionUi();
-                    statusText.setText(tr(
-                            connectedCameraName + " 已连接 · 机身快门可用"));
                     showToast(
                             connectedCameraName
                                     + " 已连接；实时取景仅在你主动开启后接管相机。");
@@ -5533,8 +6823,6 @@ public final class MainActivity extends Activity {
 
                 mainHandler.post(() -> {
                     if (generation != previewGeneration) return;
-                    statusText.setText(
-                            connectedCameraName + " LIVE · USB/PTP");
                     // next pull triggered immediately after enqueue
                 });
             } catch (Exception error) {
@@ -5553,14 +6841,10 @@ public final class MainActivity extends Activity {
                         previewFailureCount = 0;
                         cameraExecutor.submit(camera::stopLiveView);
                         updateConnectionUi();
-                        statusText.setText(
-                                tr("实时取景已安全停止 · 机身控制已释放"));
                         showError(
                                 "连续 3 次未收到实时取景画面，帧澈 ZENCHE 已停止重试并释放相机。"
                                         + "请检查 USB 线与相机实时取景状态后再开启。");
                     } else {
-                        statusText.setText(
-                                tr("实时取景正在重试 · ") + failures + "/3");
                         mainHandler.postDelayed(
                                 () -> pullPreview(generation),
                                 1200);
@@ -5664,7 +6948,9 @@ public final class MainActivity extends Activity {
                     }
                     if (shutterButton != null) shutterButton.setText(tr("拍摄"));
                     updateFileCount();
-                    statusText.setText(tr("已保存 ") + file.getName());
+                    if (statusText != null) {
+                        statusText.setText(tr("已保存 ") + file.getName());
+                    }
                     showToast("拍摄完成，已保存到本地照片库。");
                 });
                 previewExecutor.submit(() -> {
@@ -5778,7 +7064,7 @@ public final class MainActivity extends Activity {
                     shootingTaskRunning = false;
                     shootingTaskStatus = tr(taskLabel(kind)) + tr("已完成");
                     showSection(currentSection);
-                    statusText.setText(shootingTaskStatus);
+                    if (statusText != null) statusText.setText(shootingTaskStatus);
                 });
             } catch (InterruptedException cancelled) {
                 restoreTaskCameraState(kind, originalCompensation, originalMode);
@@ -5786,6 +7072,7 @@ public final class MainActivity extends Activity {
                     shootingTaskRunning = false;
                     shootingTaskStatus = tr("拍摄任务已取消");
                     showSection(currentSection);
+                    if (statusText != null) statusText.setText(shootingTaskStatus);
                 });
             } catch (Exception error) {
                 restoreTaskCameraState(kind, originalCompensation, originalMode);
@@ -5796,6 +7083,7 @@ public final class MainActivity extends Activity {
                     shootingTaskRunning = false;
                     shootingTaskStatus = tr("拍摄任务失败");
                     showSection(currentSection);
+                    if (statusText != null) statusText.setText(shootingTaskStatus);
                     showError(error.getMessage());
                 });
             }
@@ -5858,10 +7146,6 @@ public final class MainActivity extends Activity {
                     videoRecording = nowRecording;
                     capturing = false;
                     updateRecordingButtons();
-                    statusText.setText(tr(
-                            nowRecording
-                                    ? "● REC · 视频正在录制到相机存储卡"
-                                    : "录制已停止 · 视频保存在相机存储卡"));
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -6050,7 +7334,10 @@ public final class MainActivity extends Activity {
                         currentCompensation =
                                 ((Number) value).doubleValue();
                     }
-                    statusText.setText(tr(label) + tr("已应用"));
+                    if (statusText != null) {
+                        statusText.setText(tr(label) + tr("已应用"));
+                    }
+                    updateExposureReadoutRail();
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -6065,6 +7352,9 @@ public final class MainActivity extends Activity {
     }
 
     private void updateConnectionUi() {
+        if (connectionDot != null) {
+            connectionDot.setTextColor(connected ? POSITIVE : MUTED);
+        }
         if (connectButton != null) {
             connectButton.setText(tr(
                     connecting
@@ -6110,6 +7400,7 @@ public final class MainActivity extends Activity {
                             : tr(base) + " · " + tr(reason));
             entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
         }
+        updateExposureReadoutRail();
     }
 
     private boolean canAdjustExposureParameter(String name) {
@@ -6140,15 +7431,11 @@ public final class MainActivity extends Activity {
     }
 
     private void updateFileCount() {
-        if (countText != null) {
-            countText.setText(
-                    photoFiles().size()
-                            + (Localization.ENGLISH.equals(appLanguage)
-                                    ? " items"
-                                    : Localization.JAPANESE.equals(appLanguage)
-                                            ? " 件"
-                                            : " 张"));
-        }
+        if (countText == null) return;
+        String suffix = Localization.ENGLISH.equals(appLanguage)
+                ? " items"
+                : Localization.JAPANESE.equals(appLanguage) ? " 件" : " 张";
+        countText.setText(photoFiles().size() + suffix);
     }
 
     private List<File> photoFiles() {
@@ -6315,7 +7602,6 @@ public final class MainActivity extends Activity {
         updateConnectionUi();
         updateWirelessUi();
         refreshUpdateUi();
-        updateFileCount();
         if (latestSourceFrame != null) {
             refreshPreviewProcessing();
         }
@@ -6385,6 +7671,14 @@ public final class MainActivity extends Activity {
         drawable.setColor(color);
         drawable.setCornerRadius(dp(radiusDp));
         if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        return drawable;
+    }
+
+    private GradientDrawable brandGradient(int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{COBALT, Color.rgb(46, 134, 224)});
+        drawable.setCornerRadius(dp(radiusDp));
         return drawable;
     }
 
@@ -6786,9 +8080,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.2.0" : version;
+            return version == null || version.isEmpty() ? "1.3.1" : version;
         } catch (Exception error) {
-            return "1.2.0";
+            return "1.3.1";
         }
     }
 
@@ -6936,11 +8230,12 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n"
-                                + "• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n"
-                                + "• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n"
-                                + "• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n"
-                                + "• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。",
+                        "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n"
+                                + "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n"
+                                + "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n"
+                                + "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n"
+                                + "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n"
+                                + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
                         14,
                         Typeface.NORMAL,
                         INK),

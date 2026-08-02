@@ -4,11 +4,16 @@ import {
   Permissions
 } from '@kit.AbilityKit';
 import { dataSharePredicates, preferences } from '@kit.ArkData';
-import { picker } from '@kit.CoreFileKit';
+import { fileIo as fs, picker } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
-import { BusinessError } from '@kit.BasicServicesKit';
+import {
+  BusinessError,
+  deviceInfo,
+  pasteboard
+} from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
 import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
@@ -45,6 +50,31 @@ class SelectEntry {
   constructor(label: string, value: string) {
     this.label = label;
     this.value = value;
+  }
+}
+
+class EditorAIAnalysis {
+  meanLuma: number = 0;
+  contrast: number = 0;
+  shadowRatio: number = 0;
+  highlightRatio: number = 0;
+  saturation: number = 0;
+  red: number = 0;
+  green: number = 0;
+  blue: number = 0;
+  detail: number = 0;
+
+  summary(): string {
+    if (this.meanLuma < 0.38) {
+      return '检测到画面偏暗，已提亮阴影并保护高光';
+    }
+    if (this.meanLuma > 0.64 || this.highlightRatio > 0.08) {
+      return '检测到画面偏亮，已回收高光并恢复层次';
+    }
+    if (this.contrast < 0.16) {
+      return '检测到动态范围偏平，已增强层次与色彩';
+    }
+    return '曝光均衡，已优化色彩与细节';
   }
 }
 
@@ -228,7 +258,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.2.0';
+const CURRENT_VERSION: string = '1.3.1';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -238,6 +268,7 @@ const RELEASES_URL: string =
   'https://github.com/Tauber01/ZENCHE/releases';
 const AFDIAN_URL: string =
   'https://www.ifdian.net/a/Tauber';
+const ZENCHE_WEBSITE_URL: string = 'https://zenche.top';
 const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
   'dismissedLaunchAnnouncementVersion';
 const AUTOMATIC_UPDATE_KEY: string = 'automaticallyCheckForUpdates';
@@ -473,6 +504,7 @@ struct Index {
   @State private sessionRights: string = '';
   @State private sessionRating: number = 0;
   @State private sessionDualBackup: boolean = true;
+  @State private captureSessionExpanded: boolean = false;
   @State private videoRecording: boolean = false;
   @State private recentLogs: string = '点击“查询最近日志”后显示。';
   @State private updateStatus: string = '尚未检查更新';
@@ -540,6 +572,22 @@ struct Index {
   @State private editorCropRatio: string = 'original';
   @State private editorShowingOriginal: boolean = false;
   @State private editorSaving: boolean = false;
+  @State private aiPrompt: string = '';
+  @State private aiMode: number = 0; // 0=edit, 1=generate
+  @State private aiRatioIndex: number = 0;
+  @State private aiResolutionIndex: number = 0;
+  @State private aiResultPath: string = '';
+  @State private aiGenerating: boolean = false;
+  @State private aiStatus: string = '';
+  @State private editorTabMode: string = 'pro'; // 'pro' | 'ai'
+  @State private aiActivationInput: string = '';
+  @State private aiActivationMsg: string = '';
+  @State private editorAIIntensity: number = 72;
+  @State private editorAISummary: string = '等待分析当前照片';
+  @State private editorAICanUndo: boolean = false;
+  @State private editorAIAnalysis: EditorAIAnalysis | undefined = undefined;
+  @State private editorAICopiedTone: Array<number | string | boolean> = [];
+  private editorAIBackup: Array<number | string | boolean> = [];
   @State private currentFocusMode: string = 'single-shot';
   @State private currentWhiteBalance: string = 'continuous';
   @State private currentPictureControl: string = 'standard';
@@ -744,10 +792,10 @@ struct Index {
           .width('100%')
           .layoutWeight(1)
           .scrollBar(BarState.Auto)
+          this.CompactBottomNavigation()
         } else {
           this.MainGrid()
         }
-        this.StatusBar()
       }
       .width('100%')
       .height('100%')
@@ -795,7 +843,10 @@ struct Index {
         .width(80)
         .height(80)
         .borderRadius(24)
-        .backgroundColor($r('app.color.graphite'))
+        .linearGradient({
+          angle: 135,
+          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+        })
         .justifyContent(FlexAlign.Center)
         .scale({ x: 1, y: 1 })
         .animation({ duration: 600, curve: Curve.Friction })
@@ -831,8 +882,10 @@ struct Index {
       },
       gutter: { x: 0, y: 0 }
     }) {
-      GridCol({ span: { xs: 4, sm: 4, md: 8, lg: 2 } }) {
-        this.NavigationRail()
+      if (!this.isCompact()) {
+        GridCol({ span: { xs: 4, sm: 4, md: 8, lg: 2 } }) {
+          this.NavigationRail()
+        }
       }
       GridCol({
         span: {
@@ -880,7 +933,10 @@ struct Index {
         .width(44)
         .height(44)
         .justifyContent(FlexAlign.Center)
-        .backgroundColor($r('app.color.graphite'))
+        .linearGradient({
+          angle: 135,
+          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+        })
         .borderRadius(13)
         .shadow({
           radius: 8,
@@ -913,6 +969,14 @@ struct Index {
       }
       .alignItems(VerticalAlign.Center)
       .layoutWeight(1)
+      Text('●')
+        .fontSize(13)
+        .fontColor(
+          this.connected
+            ? $r('app.color.positive')
+            : $r('app.color.muted')
+        )
+        .margin({ right: 8 })
       Button(
         this.isCompact()
           ? this.tr(this.connected ? '断开' : '连接')
@@ -966,58 +1030,55 @@ struct Index {
 
   @Builder
   private NavigationRail() {
-    if (this.isCompact()) {
-      Scroll() {
-        Row({ space: 8 }) {
-          this.NavButton('照片拍摄', 'capture')
-          this.NavButton('视频监看', 'monitor')
-          this.NavButton('图像编辑', 'editor')
-          this.NavButton('分支文件库', 'library')
-        }
-        .padding({ left: 16, right: 16 })
-      }
-      .width('100%')
-      .height(60)
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
-      .backgroundColor($r('app.color.paper_2'))
-      .border({
-        width: { bottom: 1 },
-        color: $r('app.color.rule')
-      })
-    } else {
-      Column({ space: 8 }) {
-        Text(this.tr('工作区'))
-          .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor($r('app.color.muted'))
-          .width('100%')
-          .margin({ bottom: 8 })
-        this.NavButton('照片拍摄', 'capture')
-        this.NavButton('视频监看', 'monitor')
-        this.NavButton('图像编辑', 'editor')
-        this.NavButton('分支文件库', 'library')
-        Blank()
-        Text('ZENCHE 1.2.0')
-          .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor($r('app.color.muted'))
-      }
-      .width('100%')
-      .height('100%')
-      .padding(16)
-      .backgroundColor($r('app.color.paper_2'))
-      .border({
-        width: { right: 1 },
-        color: $r('app.color.rule')
-      })
+    Column({ space: 8 }) {
+      Text(this.tr('工作区'))
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+        .margin({ bottom: 8 })
+      this.NavButton('照片拍摄', 'capture')
+      this.NavButton('视频监看', 'monitor')
+      this.NavButton('图像编辑', 'editor')
+      this.NavButton('分支文件库', 'library')
+      Blank()
+      Text('ZENCHE 1.3.1')
+        .fontSize(10)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.muted'))
     }
+    .width('100%')
+    .height('100%')
+    .padding(16)
+    .backgroundColor($r('app.color.paper_2'))
+    .border({
+      width: { right: 1 },
+      color: $r('app.color.rule')
+    })
+  }
+
+  @Builder
+  private CompactBottomNavigation() {
+    Row() {
+      this.NavButton('照片', 'capture')
+      this.NavButton('视频', 'monitor')
+      this.NavButton('编辑', 'editor')
+      this.NavButton('分支', 'library')
+    }
+    .width('100%')
+    .height(68)
+    .padding({ left: 8, right: 8, top: 10, bottom: 4 })
+    .backgroundColor($r('app.color.paper_2'))
+    .border({
+      width: { top: 1 },
+      color: $r('app.color.rule')
+    })
   }
 
   @Builder
   private NavButton(label: string, target: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
-      .width(this.isCompact() ? 104 : '100%')
+      .width(this.isCompact() ? '25%' : '100%')
       .height(44)
       .fontSize(14)
       .fontWeight(
@@ -1047,6 +1108,11 @@ struct Index {
       .borderRadius(12)
       .flexShrink(0)
       .onClick((): void => {
+        if (target === 'editor') {
+          // Navigation opens the stable default; mode changes live in the editor.
+          this.editorTabMode = 'pro';
+          this.aiResultPath = '';
+        }
         this.section = target;
         if (target === 'library') {
           this.refreshPhotos();
@@ -1060,6 +1126,43 @@ struct Index {
 
   @Builder
   private ImageEditorWorkspace() {
+    Column({ space: 12 }) {
+      this.EditorModeSwitcher()
+      if (this.editorTabMode === 'ai') {
+        this.AiToolsWorkspace();
+      } else {
+        this.ProEditorWorkspace();
+      }
+    }
+  }
+
+  @Builder
+  private EditorModeSwitcher() {
+    Row({ space: 8 }) {
+      Button(this.editorTabMode === 'pro' ? '● 专业显影' : '○ 专业显影', { type: ButtonType.Normal })
+        .height(44)
+        .layoutWeight(1)
+        .fontColor(this.editorTabMode === 'pro' ? $r('app.color.accent_ink') : $r('app.color.ink'))
+        .backgroundColor(this.editorTabMode === 'pro' ? $r('app.color.accent') : $r('app.color.surface'))
+        .onClick((): void => {
+          this.editorTabMode = 'pro';
+          this.aiResultPath = '';
+        })
+      Button(this.editorTabMode === 'ai' ? '● AI 工具' : '○ AI 工具', { type: ButtonType.Normal })
+        .height(44)
+        .layoutWeight(1)
+        .fontColor(this.editorTabMode === 'ai' ? $r('app.color.accent_ink') : $r('app.color.ink'))
+        .backgroundColor(this.editorTabMode === 'ai' ? $r('app.color.accent') : $r('app.color.surface'))
+        .onClick((): void => {
+          this.editorTabMode = 'ai';
+          this.aiResultPath = '';
+        })
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private ProEditorWorkspace() {
     Column({ space: 16 }) {
       Text(this.tr('专业显影'))
         .fontSize(24)
@@ -1105,6 +1208,122 @@ struct Index {
             this.editorSelectedPath = this.editablePhotos()[index].path;
             this.resetImageEditor();
           })
+        Column({ space: 10 }) {
+          Scroll() {
+            Row({ space: 8 }) {
+            Text(this.tr('AI 智能修图 · 工作台'))
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .layoutWeight(1)
+            Text(this.tr('设备端'))
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.accent_ink'))
+              .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+              .backgroundColor($r('app.color.accent_soft'))
+              .borderRadius(12)
+            }
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .width('100%')
+          Text(this.tr(this.editorAISummary))
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.tr('设备端处理 · 照片不会上传'))
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.accent_ink'))
+            .width('100%')
+          if (this.editorAIAnalysis !== undefined) {
+            Row({ space: 6 }) {
+              this.EditorAIMetric('曝光', this.editorAIAnalysis.meanLuma)
+              this.EditorAIMetric('动态范围', this.editorAIAnalysis.contrast)
+              this.EditorAIMetric('色彩', this.editorAIAnalysis.saturation)
+              this.EditorAIMetric('细节', this.editorAIAnalysis.detail)
+            }
+            .width('100%')
+          }
+          Text(`${this.tr('AI 强度')} · ${this.editorAIIntensity}%`)
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Slider({
+            value: this.editorAIIntensity,
+            min: 35,
+            max: 100,
+            step: 5,
+            style: SliderStyle.OutSet
+          })
+            .onChange((value: number): void => {
+              this.editorAIIntensity = Math.round(value);
+            })
+          Row({ space: 8 }) {
+            Button(this.tr('分析画面'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                this.analyzeEditorPhoto().then((analysis: EditorAIAnalysis | undefined): void => {
+                  if (analysis !== undefined) {
+                    this.editorAIAnalysis = analysis;
+                    this.editorAISummary = analysis.summary();
+                    this.status = '画面分析完成 · 可应用 AI 建议';
+                  }
+                });
+              })
+            Button(this.tr('智能优化'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .onClick((): void => {
+                this.applyEditorAI();
+              })
+            Button(this.tr('撤销 AI'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .enabled(this.editorAICanUndo)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                this.undoEditorAI();
+              })
+            Button(this.tr('复制 AI'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .enabled(this.editorAICanUndo)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                this.editorAICopiedTone = this.captureEditorTone();
+                this.status = '已复制 AI 调整，可应用到下一张照片';
+              })
+            Button(this.tr('粘贴 AI'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .enabled(this.editorAICopiedTone.length > 0)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                this.restoreEditorTone(this.editorAICopiedTone);
+                this.editorAISummary = '已粘贴 AI 调整';
+                this.status = '已粘贴 AI 调整';
+              })
+          }
+          .width('100%')
+        }
+        .width('100%')
+        .padding(14)
+        .backgroundColor($r('app.color.accent_soft'))
+        .border({
+          width: 1,
+          color: $r('app.color.accent'),
+          radius: 12
+        })
         Select(
           [
             '原始',
@@ -1251,6 +1470,26 @@ struct Index {
   }
 
   @Builder
+  private EditorAIMetric(title: string, value: number) {
+    Column({ space: 2 }) {
+      Text(this.tr(title))
+        .fontSize(10)
+        .fontColor($r('app.color.muted'))
+      Text(`${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+    }
+    .layoutWeight(1)
+    .height(46)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 8, right: 8 })
+    .backgroundColor($r('app.color.surface_raised'))
+    .borderRadius(8)
+  }
+
+  @Builder
   private EditorPanelButton(label: string, panel: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
       .height(44)
@@ -1276,6 +1515,517 @@ struct Index {
       .onClick((): void => {
         this.editorPanel = panel;
       })
+  }
+
+  @Builder
+  private AiToolsWorkspace() {
+    Column({ space: 16 }) {
+      Text(this.tr('AI 工具'))
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      Text(this.tr('基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。'))
+        .fontSize(14)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+
+      Row({ space: 10 }) {
+        Column({ space: 3 }) {
+          Text(this.tr('AI 创作'))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('联网生成与修图 · 结果保存为新文件'))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(this.checkAiActivated()
+          ? `${this.tr('已解锁')} · ${this.getRemainingUsage()} ${this.tr('次剩余')}`
+          : this.tr('需要激活'))
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.checkAiActivated()
+            ? $r('app.color.positive')
+            : $r('app.color.muted'))
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .backgroundColor(this.checkAiActivated()
+            ? $r('app.color.accent_soft')
+            : $r('app.color.paper_2'))
+          .borderRadius(14)
+      }
+      .width('100%')
+      .padding(12)
+      .backgroundColor($r('app.color.surface'))
+      .border({ width: 1, color: $r('app.color.rule'), radius: 12 })
+
+      Row({ space: 8 }) {
+        Button(this.aiMode === 0 ? '● AI 修图' : '○ AI 修图', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(this.aiMode === 0 ? $r('app.color.accent_ink') : $r('app.color.ink'))
+          .backgroundColor(this.aiMode === 0 ? $r('app.color.accent') : $r('app.color.surface'))
+          .onClick((): void => {
+            this.aiMode = 0;
+            this.aiResultPath = '';
+          })
+        Button(this.aiMode === 1 ? '● AI 生图' : '○ AI 生图', { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(this.aiMode === 1 ? $r('app.color.accent_ink') : $r('app.color.ink'))
+          .backgroundColor(this.aiMode === 1 ? $r('app.color.accent') : $r('app.color.surface'))
+          .onClick((): void => {
+            this.aiMode = 1;
+            this.aiResultPath = '';
+          })
+      }
+      .width('100%')
+
+      Text('快捷预设')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Scroll() {
+        Row({ space: 6 }) {
+          ForEach(this.getAiPresets(), (preset: Array<string>) => {
+            Button(preset[0], { type: ButtonType.Normal })
+              .height(32)
+              .fontSize(11)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.surface'))
+              .borderRadius(16)
+              .padding({ left: 12, right: 12 })
+              .onClick((): void => {
+                this.aiPrompt = preset[1];
+              })
+          }, (preset: Array<string>) => preset[0])
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .width('100%')
+
+      TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…' : '输入生图描述…' })
+        .height(80)
+        .fontSize(14)
+        .onChange((value: string): void => {
+          this.aiPrompt = value;
+        })
+
+      Text(this.tr('输出参数'))
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Row({ space: 8 }) {
+        Select([
+          '1:1',
+          '16:9',
+          '9:16',
+          '4:3',
+          '3:2'
+        ].map((label: string): SelectEntry => {
+          return new SelectEntry(label, label);
+        }))
+          .selected(this.aiRatioIndex)
+          .layoutWeight(1)
+          .height(44)
+          .onSelect((index: number): void => {
+            this.aiRatioIndex = index;
+          })
+        Select([
+          '1K',
+          '2K',
+          '4K'
+        ].map((label: string): SelectEntry => {
+          return new SelectEntry(label, label);
+        }))
+          .selected(this.aiResolutionIndex)
+          .layoutWeight(1)
+          .height(44)
+          .onSelect((index: number): void => {
+            this.aiResolutionIndex = index;
+          })
+      }
+      .width('100%')
+
+      Button(this.aiGenerating ? '正在生成…' : '生成', { type: ButtonType.Normal })
+        .height(48)
+        .width('100%')
+        .enabled(
+          this.aiPrompt.trim().length > 0
+            && !this.aiGenerating
+            && (this.aiMode !== 0 || this.editorSelectedPath.length > 0)
+        )
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
+        .onClick((): void => {
+          this.doAiGenerate();
+        })
+
+      if (this.aiResultPath.length > 0) {
+        Image(`file://${this.aiResultPath}`)
+          .width('100%')
+          .height(this.isCompact() ? 320 : 460)
+          .objectFit(ImageFit.Contain)
+          .backgroundColor($r('app.color.graphite'))
+          .borderRadius(14)
+          .padding(12)
+
+        Button(this.editorSaving ? '正在保存…' : '保存到文件库', { type: ButtonType.Normal })
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .onClick((): void => {
+            this.saveAiResult();
+          })
+      }
+
+      if (this.aiStatus.length > 0 || this.aiGenerating) {
+        Text(this.aiGenerating ? '正在调用 AI 模型…' : this.aiStatus)
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+          .textAlign(TextAlign.Start)
+      }
+    }
+    .width('100%')
+    .height(this.isCompact() ? 'auto' : '100%')
+    .padding(16)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  private getAiPresets(): Array<Array<string>> {
+    if (this.aiMode === 0) {
+      return [
+        ['一键美颜', '对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。'],
+        ['自然增强', '增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。'],
+        ['胶片质感', '为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。'],
+        ['日系清新', '调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。'],
+        ['黑白大片', '转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。'],
+        ['复古暖调', '添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。'],
+        ['天空增强', '增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。'],
+        ['美食诱人', '增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。']
+      ];
+    }
+    return [
+      ['人像写真', 'professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail'],
+      ['风光大片', 'breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed'],
+      ['城市夜景', 'city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere'],
+      ['产品展示', 'professional product photography, clean studio background, soft lighting, high detail']
+    ];
+  }
+
+  private async doAiGenerate(): Promise<void> {
+    if (this.aiPrompt.trim().length === 0) {
+      this.aiStatus = '请输入提示词';
+      return;
+    }
+    if (!this.checkAiActivated()) {
+      this.aiStatus = '请先在设置中输入激活码解锁 AI 功能';
+      return;
+    }
+    const activationCode: string = this.getAiActivationCode();
+    if (activationCode.length === 0) {
+      this.aiStatus = '请先在设置中输入激活码解锁 AI 功能';
+      return;
+    }
+    this.aiGenerating = true;
+    this.aiStatus = '正在调用 AI 模型…';
+    try {
+      const httpRequest = http.createHttp();
+      const serverUrl: string = this.getAiServerUrl();
+      const endpoint: string = `${serverUrl}/v1/ai`;
+      const sizes: Array<string> = ['1024x1024', '1792x1024', '1024x1792', '1365x1024', '1536x1024'];
+      const body: Record<string, Object> = {
+        'activationCode': activationCode,
+        'deviceId': this.getDeviceId(),
+        'prompt': this.aiPrompt,
+        'size': sizes[this.aiRatioIndex]
+      };
+      if (this.aiMode === 0 && this.editorSelectedPath.length > 0) {
+        const library: PhotoLibrary | undefined = this.library;
+        if (library) {
+          const photoItems: Array<PhotoItem> = this.editablePhotos();
+          let srcBytes: ArrayBuffer | null = null;
+          for (let i = 0; i < photoItems.length; i++) {
+            const item: PhotoItem | undefined = photoItems[i];
+            if (item && item.path === this.editorSelectedPath) {
+              srcBytes = library.read(item).buffer as ArrayBuffer;
+              break;
+            }
+          }
+          if (srcBytes && srcBytes.byteLength > 0) {
+            const base64Helper = new util.Base64Helper();
+            const b64: string = base64Helper.encodeToStringSync(new Uint8Array(srcBytes));
+            body['image'] = `data:image/jpeg;base64,${b64}`;
+          }
+        }
+      }
+      const response = await httpRequest.request(
+        endpoint,
+        {
+          method: http.RequestMethod.POST,
+          header: {
+            'Content-Type': 'application/json',
+          },
+          extraData: body,
+          connectTimeout: 15000,
+          readTimeout: 60000,
+        }
+      );
+      httpRequest.destroy();
+      if (response.responseCode === 403) {
+        this.aiGenerating = false;
+        this.aiStatus = '激活码无效或次数用完';
+        return;
+      }
+      if (response.responseCode === 502) {
+        this.aiGenerating = false;
+        this.aiStatus = 'AI 服务暂时不可用';
+        return;
+      }
+      if (response.responseCode !== 200) {
+        throw new Error(`AI 服务返回错误 ${response.responseCode}`);
+      }
+      const result: Record<string, Object> = JSON.parse(
+        (response.result as string)
+      ) as Record<string, Object>;
+      const dataArr: Array<Record<string, Object>> =
+        result['data'] as Array<Record<string, Object>>;
+      if (!dataArr || dataArr.length === 0) {
+        throw new Error('AI 未返回有效图片');
+      }
+      const first: Record<string, Object> = dataArr[0];
+      let imageBytes: ArrayBuffer | null = null;
+      const b64Json: string = (first['b64_json'] as string) || '';
+      if (b64Json.length > 0) {
+        const base64Helper = new util.Base64Helper();
+        imageBytes = base64Helper.decodeSync(b64Json).buffer as ArrayBuffer;
+      } else {
+        const imageUrl: string = (first['url'] as string) || '';
+        if (imageUrl.length > 0) {
+          const imgRequest = http.createHttp();
+          const imgResponse = await imgRequest.request(imageUrl, {
+            method: http.RequestMethod.GET,
+            connectTimeout: 15000,
+            readTimeout: 30000,
+          });
+          imageBytes = (imgResponse.result as ArrayBuffer);
+          imgRequest.destroy();
+        }
+      }
+      if (!imageBytes || imageBytes.byteLength === 0) {
+        throw new Error('AI 未返回有效图片');
+      }
+      const context: common.UIAbilityContext =
+        getContext(this) as common.UIAbilityContext;
+      const tempDir: string = context.tempDir;
+      const tempPath: string = `${tempDir}/ai_result_${Date.now()}.jpg`;
+      const file = fs.openSync(tempPath, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY);
+      fs.writeSync(file.fd, imageBytes);
+      fs.closeSync(file);
+      this.aiResultPath = tempPath;
+      this.aiStatus = '生成完成';
+      this.aiGenerating = false;
+    } catch (err) {
+      this.aiGenerating = false;
+      const msg: string = (err as Error).message || 'AI 生成失败';
+      this.aiStatus = `生成失败：${msg}`;
+    }
+  }
+
+  private async saveAiResult(): Promise<void> {
+    if (this.aiResultPath.length === 0) {
+      return;
+    }
+    this.editorSaving = true;
+    try {
+      const file: fs.File = fs.openSync(this.aiResultPath, fs.OpenMode.READ_ONLY);
+      let data: ArrayBuffer;
+      try {
+        const stat: fs.Stat = fs.statSync(this.aiResultPath);
+        const buffer: ArrayBuffer = new ArrayBuffer(stat.size);
+        fs.readSync(file.fd, buffer);
+        data = buffer;
+      } finally {
+        fs.closeSync(file);
+      }
+      const stem: string = this.aiMode === 0 ? 'edited' : 'generated';
+      const library: PhotoLibrary | undefined = this.library;
+      if (!library) {
+        this.editorSaving = false;
+        this.aiStatus = '保存 AI 结果失败';
+        return;
+      }
+      const destination: string = library.saveEditedCopy(
+        `ai_${stem}`,
+        new Uint8Array(data)
+      );
+      this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
+      this.editorSaving = false;
+    } catch (err) {
+      this.editorSaving = false;
+      this.aiStatus = '保存 AI 结果失败';
+    }
+  }
+
+  private checkAiActivated(): boolean {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const activated: boolean = (prefs.getSync('ai_activated', false) as boolean) || false;
+      return activated;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  private recordAiUsage(): void {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const count: number = ((prefs.getSync('ai_usage_count', 0) as number) || 0) + 1;
+      prefs.putSync('ai_usage_count', count);
+      prefs.flushSync();
+      if (count >= 100) {
+        prefs.putSync('ai_activated', false);
+        prefs.flushSync();
+      }
+    } catch (_) {}
+  }
+
+  private getRemainingUsage(): number {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const count: number = (prefs.getSync('ai_usage_count', 0) as number) || 0;
+      return Math.max(0, 100 - count);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  private getDeviceId(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      let id: string = prefs.getSync('ai_device_id', '') as string;
+      if (id.length > 0) {
+        return id;
+      }
+      id = deviceInfo.udid || deviceInfo.serial || '';
+      if (id.length === 0) {
+        id = util.generateRandomUUID();
+      }
+      prefs.putSync('ai_device_id', id);
+      prefs.flushSync();
+      return id;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  private getAiServerUrl(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const url: string = (prefs.getSync('ai_server_url', 'http://101.34.255.115:8787') as string) || 'http://101.34.255.115:8787';
+      return url;
+    } catch (_) {
+      return 'http://101.34.255.115:8787';
+    }
+  }
+
+  private copyDeviceIdToClipboard(): void {
+    try {
+      const pb = pasteboard.getSystemPasteboard();
+      const data = pasteboard.createData(
+        pasteboard.MIMETYPE_TEXT_PLAIN,
+        this.getDeviceId()
+      );
+      pb.setData(data);
+      this.aiActivationMsg = '设备 ID 已复制，可前往官网兑换密钥';
+    } catch (_) {
+      this.aiActivationMsg = '复制设备 ID 失败';
+    }
+  }
+
+  private getAiActivationCode(): string {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      return (prefs.getSync('ai_activation_code', '') as string) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  private verifyActivationCode(code: string): boolean {
+    const trimmed: string = code.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+    const parts: Array<string> = trimmed.split('-');
+    if (parts.length < 4 || parts[0] !== 'ZENCHE' || parts[1] !== 'AI') {
+      return false;
+    }
+    const expiryPart: string = parts[parts.length - 1];
+    const expiryYear: number = parseInt(expiryPart.substring(0, 4));
+    const expiryMonth: number = parseInt(expiryPart.substring(4, 6));
+    const expiryDay: number = parseInt(expiryPart.substring(6, 8));
+    const now: Date = new Date();
+    const expiryDate: Date = new Date(expiryYear, expiryMonth - 1, expiryDay);
+    if (expiryDate < now) {
+      return false;
+    }
+    const deviceId: string = this.getDeviceId();
+    const payload: string = `${deviceId}:${expiryPart}:a1b2c3d4e5f6`;
+    // HarmonyOS doesn't export the full SubtleCrypto API, so signature
+    // verification is deferred to the server or skipped for now.
+    // In production, send (code, deviceId) to a simple HTTP endpoint
+    // that verifies the signature on your side.
+    const prefs = preferences.getPreferencesSync(
+      getContext(this) as common.UIAbilityContext,
+      { name: 'zenche_ai_settings' }
+    );
+    prefs.putSync('ai_activated', true);
+    prefs.putSync('ai_activation_code', trimmed);
+    prefs.putSync('ai_usage_count', 0);
+    prefs.putSync('ai_device_id', deviceId);
+    prefs.flushSync();
+    return true;
+  }
+
+  private doAiActivate(): void {
+    const code: string = this.aiActivationInput.trim();
+    if (code.length === 0) {
+      this.aiActivationMsg = '请输入激活码';
+      return;
+    }
+    if (this.verifyActivationCode(code)) {
+      this.aiActivationInput = '';
+      this.aiActivationMsg = '激活成功！AI 功能已解锁';
+    } else {
+      this.aiActivationMsg = '激活码无效或已过期';
+    }
   }
 
   @Builder
@@ -1535,6 +2285,9 @@ struct Index {
   @Builder
   private CameraWorkspace() {
     Column({ space: 16 }) {
+      if (this.section === 'capture') {
+        this.CaptureSessionPanel()
+      }
       Stack({ alignContent: Alignment.TopStart }) {
         if (this.preview !== undefined) {
           Image(this.preview)
@@ -1587,6 +2340,8 @@ struct Index {
         color: $r('app.color.graphite_rule'),
         radius: 18
       })
+
+      this.ExposureReadoutRail()
 
       Row({ space: 8 }) {
         Text(this.tr(
@@ -1648,12 +2403,118 @@ struct Index {
   }
 
   @Builder
+  private ExposureReadoutRail() {
+    Scroll() {
+      Row() {
+        this.ReadoutCell('来源', this.connected ? 'USB/PTP' : '—', false, false)
+        this.ReadoutDivider()
+        this.ReadoutCell(
+          '模式',
+          this.connected ? this.exposureModeCode() : '—',
+          false,
+          false
+        )
+        this.ReadoutDivider()
+        this.ReadoutCell(
+          '快门',
+          this.connected ? this.shutterDisplay() : '—',
+          this.connected && this.camera.canAdjustParameter('exposureTime'),
+          true
+        )
+        this.ReadoutDivider()
+        this.ReadoutCell(
+          '光圈',
+          this.connected ? `f/${this.currentAperture.toFixed(1)}` : '—',
+          this.connected && this.camera.canAdjustParameter('aperture'),
+          true
+        )
+        this.ReadoutDivider()
+        this.ReadoutCell(
+          'ISO',
+          this.connected ? `${this.currentIso}` : '—',
+          this.connected && this.camera.canAdjustParameter('iso'),
+          true
+        )
+        this.ReadoutDivider()
+        this.ReadoutCell(
+          '曝光补偿',
+          this.connected ? `${this.currentCompensation.toFixed(1)} EV` : '—',
+          this.connected &&
+            this.camera.canAdjustParameter('exposureCompensation'),
+          true
+        )
+      }
+      .padding({ left: 8, right: 8 })
+    }
+    .width('100%')
+    .height(82)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .backgroundColor($r('app.color.graphite'))
+    .border({
+      width: 1,
+      color: $r('app.color.graphite_rule'),
+      radius: 14
+    })
+  }
+
+  @Builder
+  private ReadoutCell(
+    label: string,
+    value: string,
+    writable: boolean,
+    showsAuto: boolean
+  ) {
+    Column({ space: 6 }) {
+      Text(
+        this.tr(label) +
+          (this.connected && showsAuto && !writable
+            ? ` · ${this.tr('自动')}`
+            : '')
+      )
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.graphite_muted'))
+        .maxLines(1)
+      Text(value)
+        .fontSize(21)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(
+          writable
+            ? $r('app.color.readout_glow')
+            : $r('app.color.graphite_ink')
+        )
+        .maxLines(1)
+    }
+    .width(116)
+    .height(62)
+    .padding({ left: 12, right: 12 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private ReadoutDivider() {
+    Divider()
+      .vertical(true)
+      .height(42)
+      .strokeWidth(1)
+      .color('#1FFFFFFF')
+  }
+
+  @Builder
   private ShootingTaskPanel() {
     Column({ space: 10 }) {
-      Text(this.tr('拍摄任务'))
+      Text(this.tr('拍摄自动化'))
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
+        .width('100%')
+      Text(this.tr('间隔、包围与 B 门任务集中管理'))
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
         .width('100%')
       Select([
         { value: this.tr('间隔拍摄') },
@@ -1801,7 +2662,6 @@ struct Index {
         .fontSize(12)
         .fontColor($r('app.color.muted'))
         .width('100%')
-      this.CaptureSessionPanel()
       Button(
         this.tr(
           `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
@@ -2371,11 +3231,20 @@ struct Index {
   @Builder
   private CaptureSessionPanel() {
     Column({ space: 8 }) {
-      Text(this.tr('拍摄会话'))
+      Button(
+        `${this.captureSessionExpanded ? '⌄' : '›'} ${this.tr('拍前会话与交付')}`,
+        { type: ButtonType.Normal }
+      )
+        .height(44)
         .fontSize(17)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
+        .backgroundColor(Color.Transparent)
         .width('100%')
+        .onClick((): void => {
+          this.captureSessionExpanded = !this.captureSessionExpanded;
+        })
+      if (this.captureSessionExpanded) {
       TextInput({
         placeholder: this.tr('项目名称'),
         text: this.sessionName
@@ -2471,6 +3340,7 @@ struct Index {
         .onClick((): void => {
           this.toggleCaptureSession();
         })
+      }
     }
     .width('100%')
     .padding(16)
@@ -2855,11 +3725,12 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n' +
-                '• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n' +
-                '• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n' +
-                '• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n' +
-                '• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。'
+                '• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n' +
+                '• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n' +
+                '• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n' +
+                '• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n' +
+                '• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n' +
+                '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
               ))
                 .fontSize(14)
                 .lineHeight(23)
@@ -3551,6 +4422,169 @@ struct Index {
           radius: 8
         })
         Column({ space: 12 }) {
+          Text('AI 功能激活')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text('AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。')
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          if (this.getAiActivationCode().length > 0) {
+            Text('状态：已激活 ✓')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(Color.Green)
+              .width('100%')
+          }
+          Button(this.tr('前往官网兑换密钥'), { type: ButtonType.Normal })
+            .height(44)
+            .width('100%')
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .onClick((): void => {
+              const context = getContext(this) as common.UIAbilityContext;
+              try {
+                context.startAbility({
+                  action: 'ohos.want.action.viewData',
+                  entities: ['entity.system.browsable'],
+                  uri: ZENCHE_WEBSITE_URL
+                });
+              } catch (_) {
+                this.aiActivationMsg = '无法打开浏览器';
+              }
+            })
+          Text(this.tr(
+            '复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。'
+          ))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.tr('没有兑换码？在爱发电购买兑换码'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .width('100%')
+          Image($r('app.media.afdian_donation'))
+            .width(this.isCompact() ? '100%' : 300)
+            .height(this.isCompact() ? 390 : 416)
+            .objectFit(ImageFit.Contain)
+            .borderRadius(8)
+            .onClick((): void => {
+              const context = getContext(this) as common.UIAbilityContext;
+              try {
+                context.startAbility({
+                  action: 'ohos.want.action.viewData',
+                  entities: ['entity.system.browsable'],
+                  uri: AFDIAN_URL
+                });
+              } catch (_) {
+                this.aiActivationMsg = '无法打开浏览器';
+              }
+            })
+          Button(this.tr('在爱发电购买兑换码'), { type: ButtonType.Normal })
+            .height(40)
+            .width('100%')
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              const context = getContext(this) as common.UIAbilityContext;
+              try {
+                context.startAbility({
+                  action: 'ohos.want.action.viewData',
+                  entities: ['entity.system.browsable'],
+                  uri: AFDIAN_URL
+                });
+              } catch (_) {
+                this.aiActivationMsg = '无法打开浏览器';
+              }
+            })
+          Text(this.tr('兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。'))
+            .fontSize(10)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Row() {
+            Text('我的设备 ID')
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .layoutWeight(1)
+            Button('复制', { type: ButtonType.Normal })
+              .height(32)
+              .fontSize(12)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(8)
+              .padding({ left: 14, right: 14 })
+              .onClick((): void => {
+                this.copyDeviceIdToClipboard();
+              })
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          Text(this.getDeviceId())
+            .fontSize(11)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(this.tr('每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。'))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          TextInput({ placeholder: '输入激活码', text: this.aiActivationInput })
+            .height(44)
+            .width('100%')
+            .onChange((value: string): void => {
+              this.aiActivationInput = value;
+            })
+          Row({ space: 8 }) {
+            Button('购买激活码', { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .onClick((): void => {
+                // 打开爱发电购买页
+                const context = getContext(this) as common.UIAbilityContext;
+                try {
+                  context.startAbility({
+                    action: 'ohos.want.action.viewData',
+                    entities: ['entity.system.browsable'],
+                    uri: AFDIAN_URL
+                  });
+                } catch (_) {
+                  this.aiActivationMsg = '无法打开浏览器';
+                }
+              })
+            Button('激活', { type: ButtonType.Normal })
+              .height(40)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .onClick((): void => {
+                this.doAiActivate();
+              })
+          }
+          .width('100%')
+          if (this.aiActivationMsg.length > 0) {
+            Text(this.aiActivationMsg)
+              .fontSize(11)
+              .fontColor($r('app.color.muted'))
+              .width('100%')
+          }
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        Column({ space: 12 }) {
           Text(this.tr('软件更新'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
@@ -3757,7 +4791,7 @@ struct Index {
   private ParameterPanel() {
     Scroll() {
       Column({ space: 8 }) {
-        Text(this.tr('相机参数'))
+        Text(this.tr('拍摄控制'))
           .fontSize(17)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
@@ -3789,6 +4823,12 @@ struct Index {
           )
           this.ProfessionalMonitorPanel()
         } else {
+          Text(this.tr('曝光'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+            .margin({ top: 4 })
           this.ParameterSelect(
             '拍摄模式',
             EXPOSURE_MODES,
@@ -3823,6 +4863,14 @@ struct Index {
               this.exposureMode === 'shutterPriority',
             'exposureCompensation'
           )
+          Divider()
+            .color($r('app.color.rule'))
+            .margin({ top: 8, bottom: 4 })
+          Text(this.tr('对焦与色彩'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
           this.ParameterSelect(
             '对焦模式',
             FOCUS_MODES,
@@ -4039,37 +5087,6 @@ struct Index {
         this.videoShutterAngle = Number(SHUTTER_ANGLES[index].value);
         this.applyVideoShutterAngle();
       })
-  }
-
-  @Builder
-  private StatusBar() {
-    Row() {
-      Text(this.tr(this.status))
-        .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor($r('app.color.graphite_ink'))
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .layoutWeight(1)
-      Text(
-        this.language === LANGUAGE_ENGLISH
-          ? `${this.photos.length} photos`
-          : this.language === LANGUAGE_JAPANESE
-            ? `${this.photos.length} 枚の写真`
-            : `${this.photos.length} 张照片`
-      )
-        .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor($r('app.color.graphite_muted'))
-    }
-    .width('100%')
-    .height(34)
-    .padding({ left: 16, right: 16 })
-      .backgroundColor($r('app.color.graphite_2'))
-    .border({
-      width: { top: 1 },
-      color: $r('app.color.graphite_rule')
-    })
   }
 
   private async toggleCameraConnection(): Promise<void> {
@@ -4422,6 +5439,16 @@ struct Index {
       return `1/${Math.round(1 / this.currentShutterSpeed)}`;
     }
     return `${this.currentShutterSpeed.toFixed(1)}s`;
+  }
+
+  private exposureModeCode(): string {
+    switch (this.exposureMode) {
+      case 'program': return 'P';
+      case 'shutterPriority': return 'S';
+      case 'aperturePriority': return 'A';
+      case 'bulb': return 'B';
+      default: return 'M';
+    }
   }
 
   private adjustImmersiveParameter(
@@ -5144,6 +6171,10 @@ struct Index {
     this.editorFlipVertical = false;
     this.editorCropRatio = 'original';
     this.editorShowingOriginal = false;
+    this.editorAIBackup = [];
+    this.editorAICanUndo = false;
+    this.editorAISummary = '等待分析当前照片';
+    this.editorAIAnalysis = undefined;
   }
 
   private resetEditorTone(): void {
@@ -5160,6 +6191,10 @@ struct Index {
 
   private applyEditorPreset(preset: string): void {
     this.resetEditorTone();
+    this.editorAIBackup = [];
+    this.editorAICanUndo = false;
+    this.editorAISummary = '等待分析当前照片';
+    this.editorAIAnalysis = undefined;
     this.editorPreset = preset;
     if (preset === 'natural') {
       this.editorContrast = 8;
@@ -5208,6 +6243,248 @@ struct Index {
       this.editorClarity = 24;
       this.editorSharpening = 28;
       this.editorVignette = -14;
+    }
+  }
+
+  private captureEditorTone(): Array<number | string | boolean> {
+    return [
+      this.editorExposure,
+      this.editorContrast,
+      this.editorHighlights,
+      this.editorShadows,
+      this.editorWhites,
+      this.editorBlacks,
+      this.editorTemperature,
+      this.editorTint,
+      this.editorVibrance,
+      this.editorSaturation,
+      this.editorTexture,
+      this.editorClarity,
+      this.editorSharpening,
+      this.editorNoiseReduction,
+      this.editorDehaze,
+      this.editorVignette,
+      this.editorPreset,
+      this.editorShowingOriginal
+    ];
+  }
+
+  private restoreEditorTone(values: Array<number | string | boolean>): void {
+    if (values.length < 18) {
+      return;
+    }
+    this.editorExposure = values[0] as number;
+    this.editorContrast = values[1] as number;
+    this.editorHighlights = values[2] as number;
+    this.editorShadows = values[3] as number;
+    this.editorWhites = values[4] as number;
+    this.editorBlacks = values[5] as number;
+    this.editorTemperature = values[6] as number;
+    this.editorTint = values[7] as number;
+    this.editorVibrance = values[8] as number;
+    this.editorSaturation = values[9] as number;
+    this.editorTexture = values[10] as number;
+    this.editorClarity = values[11] as number;
+    this.editorSharpening = values[12] as number;
+    this.editorNoiseReduction = values[13] as number;
+    this.editorDehaze = values[14] as number;
+    this.editorVignette = values[15] as number;
+    this.editorPreset = values[16] as string;
+    this.editorShowingOriginal = values[17] as boolean;
+  }
+
+  private async applyEditorAI(): Promise<void> {
+    const analysis: EditorAIAnalysis | undefined =
+      await this.analyzeEditorPhoto();
+    if (analysis === undefined) {
+      this.showError('无法分析当前照片');
+      return;
+    }
+    const previousTone: Array<number | string | boolean> =
+      this.captureEditorTone();
+    this.resetEditorTone();
+    this.editorAIBackup = previousTone;
+    this.editorAIAnalysis = analysis;
+    this.editorAICanUndo = true;
+    const amount: number = Math.max(
+      0.35,
+      Math.min(1, this.editorAIIntensity / 100)
+    );
+    const targetExposure: number = Math.max(
+      -0.8,
+      Math.min(
+        0.8,
+        Math.log2(0.48 / Math.max(0.08, analysis.meanLuma)) * 0.68
+      )
+    );
+    this.editorExposure = Math.round(targetExposure * 100 * amount);
+    this.editorContrast = this.editorAIValue(
+      Math.max(-8, Math.min(24, (0.20 - analysis.contrast) * 130)),
+      amount
+    );
+    this.editorHighlights = -this.editorAIValue(
+      Math.max(6, Math.min(
+        48,
+        analysis.highlightRatio * 360
+          + Math.max(0, analysis.meanLuma - 0.55) * 70
+      )),
+      amount
+    );
+    this.editorShadows = this.editorAIValue(
+      Math.max(6, Math.min(
+        46,
+        analysis.shadowRatio * 330
+          + Math.max(0, 0.44 - analysis.meanLuma) * 75
+      )),
+      amount
+    );
+    this.editorWhites = this.editorAIValue(
+      Math.max(-8, Math.min(14, (0.58 - analysis.meanLuma) * 28)),
+      amount
+    );
+    this.editorBlacks = -this.editorAIValue(
+      Math.max(4, Math.min(18, (0.21 - analysis.contrast) * 55 + 5)),
+      amount
+    );
+    this.editorTemperature = this.editorAIValue(
+      Math.max(-18, Math.min(18, (analysis.blue - analysis.red) * 95)),
+      amount
+    );
+    const greenExcess: number =
+      analysis.green - (analysis.red + analysis.blue) / 2;
+    this.editorTint = this.editorAIValue(
+      Math.max(-14, Math.min(14, greenExcess * 85)),
+      amount
+    );
+    this.editorVibrance = this.editorAIValue(
+      Math.max(4, Math.min(26, (0.30 - analysis.saturation) * 95 + 6)),
+      amount
+    );
+    this.editorSaturation = this.editorAIValue(
+      Math.max(-4, Math.min(8, (0.22 - analysis.saturation) * 28)),
+      amount
+    );
+    this.editorTexture = this.editorAIValue(
+      Math.max(4, Math.min(16, (0.075 - analysis.detail) * 170 + 7)),
+      amount
+    );
+    this.editorClarity = this.editorAIValue(
+      Math.max(3, Math.min(18, (0.19 - analysis.contrast) * 70 + 6)),
+      amount
+    );
+    this.editorSharpening = this.editorAIValue(
+      Math.max(14, Math.min(34, (0.08 - analysis.detail) * 210 + 20)),
+      amount
+    );
+    this.editorNoiseReduction = this.editorAIValue(
+      Math.max(6, Math.min(
+        30,
+        analysis.shadowRatio * 120
+          + Math.max(0, 0.38 - analysis.meanLuma) * 42 + 6
+      )),
+      amount
+    );
+    this.editorDehaze = this.editorAIValue(
+      Math.max(0, Math.min(16, (0.18 - analysis.contrast) * 75)),
+      amount
+    );
+    this.editorPreset = 'original';
+    this.editorShowingOriginal = false;
+    this.editorAISummary = analysis.summary();
+    this.status = 'AI 优化已应用 · 可继续微调';
+  }
+
+  private undoEditorAI(): void {
+    if (this.editorAIBackup.length === 0) {
+      return;
+    }
+    this.restoreEditorTone(this.editorAIBackup);
+    this.editorAIBackup = [];
+    this.editorAICanUndo = false;
+    this.editorAISummary = '已撤销 AI 优化';
+    this.status = '已恢复 AI 优化前的参数';
+  }
+
+  private editorAIValue(value: number, amount: number): number {
+    return Math.round(value * amount);
+  }
+
+  private async analyzeEditorPhoto(): Promise<EditorAIAnalysis | undefined> {
+    if (this.editorSelectedPath.length === 0) {
+      return undefined;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      pixelMap = await source.createPixelMap({
+        editable: false,
+        desiredSize: { width: 128, height: 128 },
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const info: image.ImageInfo = await pixelMap.getImageInfo();
+      const buffer: ArrayBuffer = new ArrayBuffer(
+        info.size.width * info.size.height * 4
+      );
+      await pixelMap.readPixelsToBuffer(buffer);
+      const pixels: Uint8Array = new Uint8Array(buffer);
+      const analysis: EditorAIAnalysis = new EditorAIAnalysis();
+      const lumas: Array<number> = new Array<number>(pixels.length / 4);
+      let lumaSum: number = 0;
+      let shadows: number = 0;
+      let highlights: number = 0;
+      for (let offset: number = 0; offset < pixels.length; offset += 4) {
+        const red: number = pixels[offset] / 255;
+        const green: number = pixels[offset + 1] / 255;
+        const blue: number = pixels[offset + 2] / 255;
+        const luma: number =
+          red * 0.2126 + green * 0.7152 + blue * 0.0722;
+        const index: number = offset / 4;
+        lumas[index] = luma;
+        lumaSum += luma;
+        analysis.red += red;
+        analysis.green += green;
+        analysis.blue += blue;
+        analysis.saturation += Math.max(red, Math.max(green, blue))
+          - Math.min(red, Math.min(green, blue));
+        if (luma < 0.10) shadows++;
+        if (luma > 0.90) highlights++;
+      }
+      const count: number = lumas.length;
+      analysis.meanLuma = lumaSum / count;
+      let variance: number = 0;
+      let detail: number = 0;
+      for (let y: number = 0; y < info.size.height; y++) {
+        for (let x: number = 0; x < info.size.width; x++) {
+          const index: number = y * info.size.width + x;
+          const delta: number = lumas[index] - analysis.meanLuma;
+          variance += delta * delta;
+          if (x > 0) {
+            detail += Math.abs(lumas[index] - lumas[index - 1]);
+          }
+        }
+      }
+      analysis.contrast = Math.sqrt(variance / count);
+      analysis.shadowRatio = shadows / count;
+      analysis.highlightRatio = highlights / count;
+      analysis.saturation /= count;
+      analysis.red /= count;
+      analysis.green /= count;
+      analysis.blue /= count;
+      analysis.detail = detail / Math.max(
+        1,
+        info.size.height * (info.size.width - 1)
+      );
+      return analysis;
+    } catch (error) {
+      this.diagnostics?.error(
+        'editor',
+        `AI 分析失败：${(error as BusinessError).message}`
+      );
+      return undefined;
+    } finally {
+      pixelMap?.release();
+      source?.release();
     }
   }
 

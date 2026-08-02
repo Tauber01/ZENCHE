@@ -2,11 +2,11 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#055AD2</item>
-        <item name="android:navigationBarColor">#0C0F15</item>
-        <item name="android:statusBarColor">#F7F9FC</item>
+        <item name="android:colorAccent">#1673E6</item>
+        <item name="android:navigationBarColor">#0A0B0D</item>
+        <item name="android:statusBarColor">#E9EDF2</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowBackground">#F7F9FC</item>
+        <item name="android:windowBackground">#E9EDF2</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:alertDialogTheme">@style/AppAlertDialogTheme</item>
@@ -14,7 +14,7 @@
 
     <style name="AppAlertDialogTheme" parent="android:style/Theme.Material.Light.Dialog.Alert">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#055AD2</item>
+        <item name="android:colorAccent">#1673E6</item>
         <item name="android:windowBackground">@drawable/dialog_surface</item>
         <item name="android:windowElevation">20dp</item>
         <item name="android:windowMinWidthMajor">88%</item>

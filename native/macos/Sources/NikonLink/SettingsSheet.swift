@@ -94,25 +94,94 @@ enum InterfaceLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+/// 界面主题三态。system 跟随系统外观，light/dark 强制亮或暗。
+enum ThemeMode: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light: return "亮色"
+        case .dark: return "暗色"
+        }
+    }
+
+    /// SwiftUI 环境用的配色方案；system 返回 nil 表示不覆盖。
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+
+    /// AppKit 全局外观；system 返回 nil 表示跟随系统。
+    var appKitAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
+/// 设置面板专用色板，与主界面 Palette 一致地随主题动态解析明/暗。
 private enum SettingsPalette {
-    static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
-    static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
-    static let cobalt = Color(red: 0.02, green: 0.35, blue: 0.82)
-    static let cobaltSoft = Color(red: 0.88, green: 0.93, blue: 1.0)
-    static let support = Color(red: 0.96, green: 0.48, blue: 0.33)
-    static let supportSoft = Color(red: 1.0, green: 0.94, blue: 0.90)
-    static let rule = Color.black.opacity(0.10)
+    private static func dynamic(
+        light: (Double, Double, Double),
+        dark: (Double, Double, Double)
+    ) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let rgb = isDark ? dark : light
+            return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+        })
+    }
+
+    static let ink = dynamic(
+        light: (0.090, 0.110, 0.149), dark: (0.925, 0.933, 0.949))
+    static let muted = dynamic(
+        light: (0.353, 0.380, 0.424), dark: (0.604, 0.631, 0.678))
+    static let cobalt = dynamic(
+        light: (0.086, 0.451, 0.902), dark: (0.180, 0.525, 0.878))
+    static let cobaltSoft = dynamic(
+        light: (0.863, 0.918, 0.992), dark: (0.078, 0.161, 0.243))
+    static let support = dynamic(
+        light: (0.941, 0.451, 0.298), dark: (0.980, 0.560, 0.404))
+    static let supportSoft = dynamic(
+        light: (1.0, 0.941, 0.902), dark: (0.243, 0.157, 0.110))
+    static let rule = Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark
+            ? NSColor(white: 1, alpha: 0.12)
+            : NSColor(srgbRed: 207.0 / 255.0, green: 214.0 / 255.0,
+                      blue: 223.0 / 255.0, alpha: 1)
+    })
+    /// 卡片面：亮色为纯白，暗色为提升面板，替代原先硬编码的 Color.white。
+    static let card = dynamic(
+        light: (1.0, 1.0, 1.0), dark: (0.137, 0.153, 0.180))
+    /// 面板底：亮色淡灰、暗色应用底，用于 Sheet 背景。
+    static let base = dynamic(
+        light: (0.914, 0.929, 0.949), dark: (0.075, 0.082, 0.098))
 }
 
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
+private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
 struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     @Binding var languageRaw: String
+    @Binding var themeRaw: String
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
     @State private var showLogViewer = false
     @State private var logExportMessage: String?
+    @State private var activationCode = ""
+    @State private var activationStatus = ""
 
     var body: some View {
         ScrollView {
@@ -161,6 +230,57 @@ struct SettingsSheet: View {
                 .fixedSize()
                 Button("完成") { dismiss() }
                     .buttonStyle(.plain)
+            }
+
+            settingsCard {
+                HStack(alignment: .top, spacing: 14) {
+                    settingIcon("circle.lefthalf.filled", color: SettingsPalette.cobalt)
+                    VStack(alignment: .leading, spacing: 5) {
+                        RuntimeLocalizedText("外观")
+                            .font(.system(size: 16, weight: .bold))
+                        RuntimeLocalizedText("选择界面主题。跟随系统会随 macOS 明暗外观自动切换；实时画面区在任一主题下都保持石墨黑以保证取景判断。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        ForEach(ThemeMode.allCases) { mode in
+                            Button {
+                                themeRaw = mode.rawValue
+                            } label: {
+                                RuntimeLocalizedText(mode.displayName)
+                                    .font(
+                                        .system(
+                                            size: 12,
+                                            weight: mode.rawValue == themeRaw
+                                                ? .bold
+                                                : .medium
+                                        )
+                                    )
+                                    .foregroundStyle(
+                                        mode.rawValue == themeRaw
+                                            ? SettingsPalette.cobalt
+                                            : SettingsPalette.muted
+                                    )
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 30)
+                                    .background(
+                                        mode.rawValue == themeRaw
+                                            ? SettingsPalette.cobaltSoft
+                                            : Color.clear
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(mode.displayName))
+                        }
+                    }
+                    .padding(3)
+                    .background(SettingsPalette.base)
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .fixedSize()
+                }
             }
 
             settingsCard {
@@ -281,8 +401,116 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
+                HStack(alignment: .top, spacing: 14) {
+                    settingIcon("key.fill", color: SettingsPalette.cobalt)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("AI 功能激活").font(.system(size: 16, weight: .bold))
+                        Text("AI 修图与生图功能需购买激活码解锁。每个激活码可使用 100 次，绑定当前设备。")
+                            .font(.system(size: 13)).foregroundStyle(SettingsPalette.muted).fixedSize(horizontal: false, vertical: true)
+                        if ActivationManager.isActivated {
+                            Text("状态：已激活 ✓ · 剩余 \(ActivationManager.remainingUsage) 次")
+                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.green)
+                        }
+                    }
+                    Spacer()
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 10) {
+                    Button {
+                        NSWorkspace.shared.open(zencheWebsiteURL)
+                    } label: {
+                        Label("前往官网兑换密钥", systemImage: "globe")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Text("复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(SettingsPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("没有兑换码？在爱发电购买兑换码")
+                        .font(.system(size: 12, weight: .semibold))
+
+                    if let url = Bundle.main.url(
+                        forResource: "wechat-donation",
+                        withExtension: "png"
+                    ), let image = NSImage(contentsOf: url) {
+                        Button {
+                            NSWorkspace.shared.open(afdianURL)
+                        } label: {
+                            Image(nsImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 280)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(SettingsPalette.rule, lineWidth: 1)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("在爱发电购买兑换码")
+                    }
+
+                    actionButton("在爱发电购买兑换码") {
+                        NSWorkspace.shared.open(afdianURL)
+                    }
+
+                    Text("兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。")
+                        .font(.system(size: 10))
+                        .foregroundStyle(SettingsPalette.muted)
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text("我的设备 ID").font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                        Button("复制") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(ActivationManager.deviceId, forType: .string)
+                            activationStatus = "设备 ID 已复制，可前往官网兑换密钥"
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(SettingsPalette.cobalt)
+                    }
+                    Text(ActivationManager.deviceId)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(SettingsPalette.muted)
+                        .textSelection(.enabled)
+                    Text("每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。")
+                        .font(.system(size: 10))
+                        .foregroundStyle(SettingsPalette.muted)
+                }
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("激活码").font(.system(size: 12, weight: .semibold))
+                    TextField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
+                }
+                HStack(spacing: 10) {
+                    Spacer()
+                    if !activationStatus.isEmpty { Text(activationStatus).font(.system(size: 11)).foregroundStyle(SettingsPalette.muted) }
+                    actionButton("购买激活码") { NSWorkspace.shared.open(URL(string: "https://www.ifdian.net/a/Tauber")!) }
+                    actionButton("激活", primary: true) {
+                        let c = activationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !c.isEmpty else { activationStatus = "请输入激活码"; return }
+                        activationStatus = ActivationManager.verifyAndActivate(code: c) ? "激活成功！AI 功能已解锁" : "激活码无效或已过期"
+                        if activationStatus.hasPrefix("激活成功") { activationCode = "" }
+                    }
+                }
+            }
+
+            settingsCard {
                 HStack(spacing: 14) {
-                    settingIcon("cup.and.saucer.fill", color: SettingsPalette.support)
+                    settingIcon(
+                        "cup.and.saucer.fill",
+                        color: SettingsPalette.support,
+                        soft: SettingsPalette.supportSoft
+                    )
                     VStack(alignment: .leading, spacing: 4) {
                         Text("喜欢 帧澈 ZENCHE？")
                             .font(.system(size: 16, weight: .bold))
@@ -346,7 +574,7 @@ struct SettingsSheet: View {
             content()
         }
         .padding(18)
-        .background(Color.white)
+        .background(SettingsPalette.card)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
@@ -354,16 +582,16 @@ struct SettingsSheet: View {
         }
     }
 
-    private func settingIcon(_ name: String, color: Color) -> some View {
+    private func settingIcon(
+        _ name: String,
+        color: Color,
+        soft: Color = SettingsPalette.cobaltSoft
+    ) -> some View {
         Image(systemName: name)
             .font(.system(size: 19, weight: .semibold))
             .foregroundStyle(color)
             .frame(width: 42, height: 42)
-            .background(
-                color == SettingsPalette.support
-                    ? SettingsPalette.supportSoft
-                    : SettingsPalette.cobaltSoft
-            )
+            .background(soft)
             .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
@@ -377,7 +605,7 @@ struct SettingsSheet: View {
             .foregroundStyle(primary ? Color.white : SettingsPalette.ink)
             .padding(.horizontal, 14)
             .frame(height: 36)
-            .background(primary ? SettingsPalette.cobalt : Color.white)
+            .background(primary ? SettingsPalette.cobalt : SettingsPalette.card)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay {
                 RoundedRectangle(cornerRadius: 8)
@@ -468,7 +696,7 @@ private struct DiagnosticLogViewer: View {
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(14)
             }
-            .background(Color.black.opacity(0.04))
+            .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .padding(22)
@@ -620,7 +848,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。")
+                        Text("• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n• 设置页移除可编辑的“AI 服务地址”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }
@@ -656,7 +884,7 @@ struct LaunchAnnouncementSheet: View {
                         }
                     }
                     .padding(18)
-                    .background(Color.white)
+                    .background(SettingsPalette.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay {
                         RoundedRectangle(cornerRadius: 14)
@@ -691,7 +919,7 @@ struct LaunchAnnouncementSheet: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white)
+        .background(SettingsPalette.card)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)

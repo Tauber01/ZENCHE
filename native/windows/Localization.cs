@@ -20,6 +20,46 @@ internal static class AppLocalization
     private static readonly Dictionary<string, Translation> Strings =
         new(StringComparer.Ordinal)
         {
+            ["AI 创作"] = new("AI Create", "AI クリエイト"),
+            ["联网生成与修图 · 结果保存为新文件"] = new("Online generation and editing · Results are saved as new files", "オンライン生成・編集 · 結果は新規ファイルとして保存"),
+            ["需要激活"] = new("Activation required", "アクティベーションが必要"),
+            ["已解锁"] = new("Unlocked", "ロック解除済み"),
+            ["输出参数"] = new("Output parameters", "出力パラメータ"),
+            ["次剩余"] = new("uses remaining", "回残り"),
+            ["前往官网兑换密钥"] =
+                new("Redeem Key on Official Website", "公式サイトでキーを交換"),
+            ["复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。"] =
+                new(
+                    "Copy the device ID, then redeem a key bound to this device at zenche.top.",
+                    "デバイス ID をコピーし、zenche.top でこのデバイス用のキーに交換してください。"),
+            ["没有兑换码？在爱发电购买兑换码"] =
+                new(
+                    "Need a redemption code? Buy one on Afdian",
+                    "交換コードをお持ちでない場合は Afdian で購入できます"),
+            ["在爱发电购买兑换码"] =
+                new("Buy Redemption Code on Afdian", "Afdian で交換コードを購入"),
+            ["兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。"] =
+                new(
+                    "Redemption codes cover AI cloud usage only; ZENCHE remains free and open source.",
+                    "交換コードは AI クラウド利用分のみが対象で、ZENCHE 本体は無料・オープンソースです。"),
+            ["设备 ID 已复制，可前往官网兑换密钥"] =
+                new(
+                    "Device ID copied. You can now redeem a key on the official website.",
+                    "デバイス ID をコピーしました。公式サイトでキーを交換できます。"),
+            ["每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。"] =
+                new(
+                    "Each activation key is bound to this device. Copy the device ID above and redeem it on the official website.",
+                    "各アクティベーションキーはこのデバイスに紐づきます。上のデバイス ID をコピーして公式サイトで交換してください。"),
+            ["拍前会话与交付"] =
+                new("Session & Delivery", "撮影前セッションと納品"),
+            ["拍摄控制"] =
+                new("Capture Controls", "撮影コントロール"),
+            ["视频曝光与监看"] =
+                new("Video Exposure & Monitoring", "動画露出とモニタリング"),
+            ["对焦与色彩"] =
+                new("Focus & Color", "フォーカスとカラー"),
+            ["拍摄自动化"] =
+                new("Capture Automation", "撮影オートメーション"),
             ["语言更改会立即应用，并在下次启动时保留。"] =
                 new(
                     "Language changes apply immediately and are remembered for the next launch.",
@@ -72,16 +112,25 @@ internal static class AppLocalization
                 new("What's New", "アップデートのお知らせ"),
             ["本次更新"] =
                 new("In This Update", "今回の更新"),
-            ["• 新增间隔拍摄、曝光包围、焦点包围与 B 门计时。\n" +
-             "• 新增项目会话、命名模板、RAW + JPEG 配对、双目标备份与 SHA-256。\n" +
-             "• 新增 RGB 直方图、波形、矢量示波器、峰值对焦与假色。"] =
+            ["• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n" +
+             "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n" +
+             "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n" +
+             "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n" +
+             "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n" +
+             "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"] =
                 new(
-                    "• Added interval capture, exposure bracketing, focus bracketing, and timed Bulb.\n" +
-                    "• Added project sessions, naming templates, RAW + JPEG pairing, dual-destination backup, and SHA-256.\n" +
-                    "• Added RGB histograms, waveform, vectorscope, focus peaking, and false color.",
-                    "• インターバル撮影、露出ブラケット、フォーカスブラケット、バルブタイマーを追加しました。\n" +
-                    "• プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、二重保存、SHA-256 を追加しました。\n" +
-                    "• RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラーを追加しました。"),
+                    "• Unified the AI photo editing and generation workspace: editing now opens Professional Develop by default, with an explicit AI Tools switch; quick presets, ratios, resolutions, and library export remain.\n" +
+                    "• Restored the device-code system: each activation key is bound to the current device and AI cloud usage is counted server-side; ZENCHE itself remains free and open source.\n" +
+                    "• Added the official redemption path: copy the device ID and visit https://zenche.top to redeem a key bound to this device.\n" +
+                    "• Added an Afdian redemption-code purchase prompt, QR code, and purchase entry. Only the official website and in-app Afdian entry are trusted.\n" +
+                    "• Removed the editable AI Server window from Settings while retaining legacy configuration reads; Sony / Canon / Nikon camera compatibility remains.\n" +
+                    "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
+                    "• AI の写真編集・生成ワークスペースを統一改善。編集画面は「プロ現像」を既定にし、「AI ツール」へ明示的に切り替え可能。クイックプリセット、比率、解像度、ライブラリ保存を維持。\n" +
+                    "• デバイスコードシステムを復旧。各アクティベーションキーは現在のデバイスに紐づき、AI クラウド利用回数はサーバーで計数。ZENCHE 本体は無料オープンソースのまま。\n" +
+                    "• 公式交換導線を追加。デバイス ID をコピーし、https://zenche.top でこのデバイス用キーに交換。\n" +
+                    "• Afdian で交換コードを購入する案内、QR コード、購入導線を追加。公式サイトとアプリ内 Afdian 導線だけを利用してください。\n" +
+                    "• 設定から編集可能な AI サーバー欄を削除し、過去の設定読み込み互換性は維持。Sony / Canon / Nikon 対応は継続。\n" +
+                    "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。"),
             ["谨防诈骗"] =
                 new("Scam Warning", "詐欺にご注意ください"),
             ["帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”" +
@@ -110,6 +159,9 @@ internal static class AppLocalization
             ["语言"] = new("Language", "言語"),
             ["界面语言"] = new("Interface Language", "表示言語"),
             ["设置"] = new("Settings", "設定"),
+            ["来源"] = new("Source", "入力"),
+            ["模式"] = new("Mode", "モード"),
+            ["快门"] = new("Shutter", "シャッター"),
             ["照片拍摄"] = new("Photo Capture", "写真撮影"),
             ["视频监看"] = new("Video Monitor", "動画モニター"),
             ["编辑"] = new("Edit", "編集"),
@@ -169,6 +221,52 @@ internal static class AppLocalization
                 new(
                     "Adjust light, color, detail, effects, and geometry in focused groups while always preserving the original.",
                     "ライト、カラー、ディテール、効果、ジオメトリをグループ別に調整し、元のファイルを常に保持します。"),
+            ["AI 智能修图"] = new("AI Retouch", "AI レタッチ"),
+            ["设备端分析画面并生成可继续微调的专业参数；照片不会上传。"] =
+                new(
+                    "Analyze the image on-device and generate professional settings you can keep refining; photos are never uploaded.",
+                    "デバイス上で画像を解析し、さらに微調整できるプロ設定を生成します。写真はアップロードされません。"),
+            ["智能优化"] = new("Smart Enhance", "スマート補正"),
+            ["AI 修图工作台"] = new("AI Retouch Workbench", "AI レタッチワークベンチ"),
+            ["设备端 · 不上传"] = new("On-device · Never uploaded", "デバイス内 · アップロードなし"),
+            ["分析画面"] = new("Analyze Image", "画像を解析"),
+            ["画面分析完成 · 可应用 AI 建议"] = new("Analysis complete · Ready to apply AI", "解析完了 · AI 補正を適用できます"),
+            ["已复制 AI 调整，可应用到下一张照片"] = new("AI settings copied; apply them to the next photo", "AI 補正をコピーしました。次の写真に適用できます"),
+            ["已粘贴 AI 调整"] = new("AI settings pasted", "AI 補正を貼り付けました"),
+            ["动态范围"] = new("Dynamic range", "ダイナミックレンジ"),
+            ["设备端"] = new("On-device", "デバイス内"),
+            ["AI 强度"] = new("AI Strength", "AI 強度"),
+            ["撤销 AI"] = new("Undo AI", "AI を元に戻す"),
+            ["等待分析当前照片"] =
+                new("Ready to analyze this photo", "この写真を解析できます"),
+            ["检测到画面偏暗，已提亮阴影并保护高光"] =
+                new(
+                    "The image is dark; shadows were lifted while highlights were protected.",
+                    "暗めの画像を検出し、ハイライトを保護しながらシャドウを明るくしました。"),
+            ["检测到画面偏亮，已回收高光并恢复层次"] =
+                new(
+                    "The image is bright; highlights were recovered to restore tonal detail.",
+                    "明るめの画像を検出し、ハイライトを抑えて階調を復元しました。"),
+            ["检测到动态范围偏平，已增强层次与色彩"] =
+                new(
+                    "The tonal range is flat; depth and color were enhanced.",
+                    "階調がフラットなため、立体感と色彩を強調しました。"),
+            ["曝光均衡，已优化色彩与细节"] =
+                new(
+                    "Exposure is balanced; color and detail were refined.",
+                    "露出は良好です。色彩とディテールを最適化しました。"),
+            ["已撤销 AI 优化"] =
+                new("AI enhancement undone", "AI 補正を元に戻しました"),
+            ["AI 优化已应用 · 可继续微调"] =
+                new(
+                    "AI enhancement applied · Continue refining any setting",
+                    "AI 補正を適用しました · 各設定を引き続き調整できます"),
+            ["已恢复 AI 优化前的参数"] =
+                new(
+                    "Restored the settings from before AI enhancement",
+                    "AI 補正前の設定に戻しました"),
+            ["无法分析当前照片"] =
+                new("Unable to analyze this photo", "この写真を解析できません"),
             ["光线"] = new("Light", "ライト"),
             ["色彩"] = new("Color", "カラー"),
             ["细节"] = new("Detail", "ディテール"),
@@ -343,8 +441,8 @@ internal static class AppLocalization
                 new("Capturing and Downloading JPEG…", "JPEG を撮影してダウンロード中…"),
             ["正在断开相机…"] =
                 new("Disconnecting Camera…", "カメラを切断中…"),
-            ["正在连接 Nikon 相机…"] =
-                new("Connecting Nikon Camera…", "Nikon カメラに接続中…"),
+            ["正在连接相机…"] =
+                new("Connecting Camera…", "カメラに接続中…"),
             ["相机已断开"] =
                 new("Camera Disconnected", "カメラを切断しました"),
             ["录制"] = new("Record", "録画"),

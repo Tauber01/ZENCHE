@@ -36,10 +36,10 @@ $env:NIKONLINK_LIBUSB_DLL = "C:\path\to\libusb-1.0.dll"
 输出：
 
 ```text
-dist/ZENCHE-1.2.0-Windows-x64-Setup.exe
-dist/ZENCHE-1.2.0-Windows-x64-Setup.exe.sha256
-dist/ZENCHE-1.2.0-Windows-x64.zip
-dist/ZENCHE-1.2.0-Windows-x64.zip.sha256
+dist/ZENCHE-1.3.1-Windows-x64-Setup.exe
+dist/ZENCHE-1.3.1-Windows-x64-Setup.exe.sha256
+dist/ZENCHE-1.3.1-Windows-x64.zip
+dist/ZENCHE-1.3.1-Windows-x64.zip.sha256
 ```
 
 `Setup.exe` 是默认交付物，安装到 `Program Files\帧澈 ZENCHE`，创建开始菜单和

@@ -7,6 +7,8 @@ const sources = {
   harmony: "native/harmony/entry/src/main/ets/camera/PtpCamera.ets",
   macos: "native/macos/Sources/NikonLink/main.swift",
   windows: "native/windows/Services/PtpCamera.cs",
+  "windows-ptp": "native/windows/Services/PtpCamera.cs",
+  "windows-vendor-ops": "native/windows/Services/PtpVendorOps.cs",
 };
 
 async function source(name) {
@@ -14,15 +16,16 @@ async function source(name) {
 }
 
 test("native Nikon transports fall back to photo and movie shutter properties", async () => {
-  const [android, harmony, windows] = await Promise.all([
+  const [android, harmony, windowsPtp, windowsOps] = await Promise.all([
     source("android"),
     source("harmony"),
-    source("windows"),
+    source("windows-ptp"),
+    source("windows-vendor-ops"),
   ]);
 
-  for (const text of [android, harmony, windows]) {
-    assert.match(text, /0xd100/i, "missing Nikon photo shutter property");
-    assert.match(text, /0xd1a8/i, "missing Nikon movie shutter property");
+  for (const text of [android, harmony, windowsOps]) {
+    assert.match(text, /0xd100/i, "missing Nikon photo shutter property (0xd100)");
+    assert.match(text, /0xd1a8/i, "missing Nikon movie shutter property (0xd1a8)");
     assert.match(text, /videoExposureTime/, "missing video shutter routing");
   }
   assert.ok(
@@ -32,7 +35,7 @@ test("native Nikon transports fall back to photo and movie shutter properties", 
     "Android must still try state-sensitive Nikon properties",
   );
   assert.doesNotMatch(
-    windows,
+    windowsPtp,
     /TryGetValue\\(property, out var writable\\)[\\s\\S]{0,120}continue;/,
     "Windows must still try state-sensitive Nikon properties",
   );

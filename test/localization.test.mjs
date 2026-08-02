@@ -88,11 +88,27 @@ test("dynamic native status text goes through runtime localization", async () =>
     source("native/windows/MainWindow.xaml.cs"),
   ]);
 
-  assert.match(ios, /RuntimeLocalizedText\(model\.statusMessage\)/);
-  assert.match(android, /statusText\.setText\(tr\(/);
-  assert.match(harmony, /Text\(this\.tr\(this\.status\)\)/);
+  assert.match(ios, /RuntimeLocalizedText\(model\.shootingTaskStatus\)/);
+  assert.match(android, /lutStatusText\.setText\(tr\("已载入 · "\)/);
+  assert.match(harmony, /Text\(this\.tr\(this\.shootingTaskStatus\)\)/);
   assert.match(macos, /RuntimeLocalizedText\(model\.status\)/);
   assert.match(windows, /OperationStatusText\.Text = AppLocalization\.T\(/);
+});
+
+test("mobile targets keep the status strip while respecting safe-area layout", async () => {
+  const [ios, android, harmony] = await Promise.all([
+    source("native/ios/NikonLink/Views/RootView.swift"),
+    source("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    source("native/harmony/entry/src/main/ets/pages/Index.ets"),
+  ]);
+
+  assert.doesNotMatch(ios, /private struct StatusBar/);
+  assert.match(ios, /offset\(y: min\(bottomInset \* 0\.38, 14\)\)/);
+  assert.match(android, /buildStatusBar|statusText|countText/);
+  assert.match(android, /applySystemBarInsets\(root, topBar, statusBar\)/);
+  assert.match(android, /statusPaddingBottom \+ bottom/);
+  assert.doesNotMatch(harmony, /private StatusBar\(\)/);
+  assert.match(harmony, /this\.CompactBottomNavigation\(\)/);
 });
 
 test("fragment translators prefer longer phrases before short labels", async () => {
