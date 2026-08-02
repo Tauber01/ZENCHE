@@ -247,8 +247,12 @@ final class PtpCamera {
         ensureConnected();
         boolean resumeLiveView = liveView;
         boolean releaseRemoteMode = false;
-        if (resumeLiveView) stopLiveView();
         try {
+            if (resumeLiveView) {
+                stopLiveView();
+                waitUntilDeviceReady(6_000);
+            }
+            waitUntilDeviceReady(6_000);
             if ("bulb".equals(exposureMode)) {
                 transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
                 releaseRemoteMode = true;
@@ -264,7 +268,7 @@ final class PtpCamera {
             } else {
                 transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
             }
-            long handle = 0xffff0001L;
+            long handle = 0;
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
                 try {
@@ -279,8 +283,40 @@ final class PtpCamera {
                 }
                 Thread.sleep(180);
             }
-            byte[] jpeg = extractJpeg(
-                    transact(GET_OBJECT, new long[]{handle}, null, 60_000));
+            if (handle == 0) {
+                waitUntilDeviceReady(8_000);
+                handle = 0xffff0001L;
+            }
+            byte[] objectData = null;
+            Exception objectError = null;
+            for (int attempt = 0; attempt < 4; attempt++) {
+                try {
+                    objectData = transact(
+                            GET_OBJECT,
+                            new long[]{handle},
+                            null,
+                            60_000);
+                    break;
+                } catch (Exception error) {
+                    objectError = error;
+                    String message = error.getMessage();
+                    if (message == null || !message.contains("0x2009")) {
+                        throw error;
+                    }
+                    diagnostics.warning(
+                            "capture",
+                            cameraName()
+                                    + " 读取照片时相机忙，第 "
+                                    + (attempt + 1)
+                                    + " 次重试："
+                                    + message);
+                    waitUntilDeviceReady(3_000);
+                }
+            }
+            if (objectData == null && objectError != null) {
+                throw objectError;
+            }
+            byte[] jpeg = extractJpeg(objectData);
             waitUntilDeviceReady(8_000);
             return jpeg;
         } finally {

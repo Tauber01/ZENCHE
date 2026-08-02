@@ -229,6 +229,7 @@ public sealed class PtpCamera : IDisposable
             }
             try
             {
+                await WaitUntilDeviceReadyAsync(8_000, cancellationToken);
                 if (_exposureMode == "bulb")
                 {
                     await TransactAsync(

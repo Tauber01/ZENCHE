@@ -6871,9 +6871,6 @@ public final class MainActivity extends Activity {
                     return;
                 }
                 BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
-                if (packet.monitoring) {
-                    decodeOpts.inSampleSize = 2;
-                }
                 Bitmap source = BitmapFactory.decodeByteArray(
                         packet.jpeg,
                         0,

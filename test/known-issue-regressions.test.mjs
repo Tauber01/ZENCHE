@@ -69,6 +69,48 @@ test("macOS selects writable Nikon shutter keys and drains live-view stderr", as
   assert.match(macos, /liveViewErrorBuffer/);
 });
 
+test("direct camera capture waits for readiness and retries busy downloads", async () => {
+  const [android, harmony, macos, windows, androidActivity] = await Promise.all([
+    source("android"),
+    source("harmony"),
+    source("macos"),
+    source("windows"),
+    readFile(
+      "native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java",
+      "utf8",
+    ),
+  ]);
+
+  assert.match(android, /waitUntilDeviceReady\(6_000\)/);
+  assert.match(android, /message\.contains\("0x2009"\)/);
+  assert.match(android, /for \(int attempt = 0; attempt < 4; attempt\+\+\)/);
+  assert.doesNotMatch(
+    androidActivity,
+    /if \(packet\.monitoring\) \{\s*decodeOpts\.inSampleSize = 2;/,
+  );
+
+  assert.match(harmony, /waitUntilDeviceReady\(6000\)/);
+  assert.match(harmony, /candidate\.message\.includes\('0x2009'\)/);
+  assert.match(harmony, /for \(let attempt: number = 0; attempt < 4; attempt\+\+\)/);
+
+  assert.match(macos, /private func retryBusy/);
+  assert.match(macos, /private func isBusyFailure/);
+  assert.match(macos, /private func waitUntilDeviceReady/);
+  assert.match(windows, /WaitUntilDeviceReadyAsync\(8_000, cancellationToken\)/);
+});
+
+test("Windows activation rejects codes that fail local RSA verification", async () => {
+  const windows = await readFile("native/windows/MainWindow.xaml.cs", "utf8");
+
+  assert.match(windows, /private const string AiActivationPublicKey/);
+  assert.match(windows, /private static bool VerifyActivationCode/);
+  assert.match(windows, /rsa\.VerifyData/);
+  assert.match(
+    windows,
+    /if \(!VerifyActivationCode\(code, GetDeviceId\(\)\)\)[\s\S]{0,180}return;/,
+  );
+});
+
 test("release workflow is idempotent and requires detailed release notes", async () => {
   const workflow = await readFile(".github/workflows/release.yml", "utf8");
 

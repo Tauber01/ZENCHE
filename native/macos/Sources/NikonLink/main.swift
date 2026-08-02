@@ -652,6 +652,13 @@ private final class GPhotoCamera {
             if isThermalFailure(result.output) {
                 throw CameraError.thermal(cameraName)
             }
+            if isBusyFailure(result.output) {
+                return try retryBusy(
+                    arguments,
+                    result: result,
+                    timeout: timeout
+                )
+            }
             if attempt == 0,
                reclaimUSB,
                isUSBClaimFailure(result.output)
@@ -671,6 +678,48 @@ private final class GPhotoCamera {
             throw CameraError.command(userFacingError(for: result.output))
         }
         throw CameraError.command("\(cameraName) 返回了错误状态。")
+    }
+
+    private func retryBusy(
+        _ arguments: [String],
+        result: CommandResult,
+        timeout: TimeInterval
+    ) throws -> String {
+        let name = diagnosticCommandName(arguments)
+        for busyAttempt in 1...3 {
+            logger.warning(
+                "camera",
+                "\(name) 检测到相机正忙，等待后重试（第 \(busyAttempt)/3 次）；输出=\(result.output.isEmpty ? "<无>" : result.output)"
+            )
+            Thread.sleep(forTimeInterval: 0.4)
+            let retry = try execute(
+                arguments,
+                timeout: timeout,
+                guardUSBClaim: false
+            )
+            if retry.status == 0 {
+                logger.info(
+                    "camera",
+                    "\(name) 忙后重试成功（第 \(busyAttempt) 次）"
+                )
+                return retry.output
+            }
+            if isThermalFailure(retry.output) {
+                throw CameraError.thermal(cameraName)
+            }
+            if !isBusyFailure(retry.output) {
+                throw CameraError.command(
+                    userFacingError(for: retry.output)
+                )
+            }
+        }
+        logger.warning(
+            "camera",
+            "\(name) 重试 3 次后相机仍忙，放弃本次操作"
+        )
+        throw CameraError.command(
+            "\(cameraName) 正在处理拍摄操作（存储卡写入、间隔拍摄或长曝光），暂时无法响应。请稍后重试。"
+        )
     }
 
     private func resetUSBConnection() {
@@ -726,6 +775,14 @@ private final class GPhotoCamera {
             || normalized.contains("无法获取 usb 设备的控制权")
             || normalized.contains("error (-53")
             || normalized.contains("错误 (-53")
+    }
+
+    private func isBusyFailure(_ output: String) -> Bool {
+        let normalized = output.lowercased()
+        return normalized.contains("busy")
+            || normalized.contains("processing of shooting operation")
+            || normalized.contains("相机正忙")
+            || normalized.contains("正在处理拍摄操作")
     }
 
     private func userFacingError(for output: String) -> String {
@@ -1234,6 +1291,39 @@ private final class GPhotoCamera {
         throw CameraError.noImage
     }
 
+    private func waitUntilDeviceReady(
+        timeout: TimeInterval = 4
+    ) throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        var attempt = 0
+        while Date() < deadline {
+            attempt += 1
+            do {
+                let output = try execute(
+                    ["--get-config", "shutterspeed"],
+                    timeout: 5,
+                    guardUSBClaim: false
+                )
+                if output.status == 0, !isBusyFailure(output.output) {
+                    if attempt > 1 {
+                        logger.info(
+                            "camera",
+                            "相机已就绪；就绪探测第 \(attempt) 次成功"
+                        )
+                    }
+                    return
+                }
+            } catch {
+                // The camera may reject PTP commands while it is still busy.
+            }
+            Thread.sleep(forTimeInterval: 0.15)
+        }
+        logger.warning(
+            "camera",
+            "相机就绪等待超时（\(timeout) 秒），继续执行操作"
+        )
+    }
+
     private func performWithoutLiveView<T>(
         _ operation: () throws -> T
     ) throws -> T {
@@ -1241,6 +1331,7 @@ private final class GPhotoCamera {
         if shouldResume {
             stopLiveViewProcess()
             Thread.sleep(forTimeInterval: 0.2)
+            try waitUntilDeviceReady()
         }
         defer {
             if shouldResume {
