@@ -173,6 +173,13 @@ public final class MainActivity extends Activity {
         int noiseReduction;
         int dehaze;
         int vignette;
+        int wheelLift;
+        int wheelGamma;
+        int wheelGain;
+        int curveContrast;
+        int curvePivot = 50;
+        boolean maskEnabled;
+        int maskFeather = 55;
         int rotation;
         boolean flipHorizontal;
         boolean flipVertical;
@@ -196,6 +203,13 @@ public final class MainActivity extends Activity {
             noiseReduction = 0;
             dehaze = 0;
             vignette = 0;
+            wheelLift = 0;
+            wheelGamma = 0;
+            wheelGain = 0;
+            curveContrast = 0;
+            curvePivot = 50;
+            maskEnabled = false;
+            maskFeather = 55;
             rotation = 0;
             flipHorizontal = false;
             flipVertical = false;
@@ -233,6 +247,13 @@ public final class MainActivity extends Activity {
             copy.noiseReduction = noiseReduction;
             copy.dehaze = dehaze;
             copy.vignette = vignette;
+            copy.wheelLift = wheelLift;
+            copy.wheelGamma = wheelGamma;
+            copy.wheelGain = wheelGain;
+            copy.curveContrast = curveContrast;
+            copy.curvePivot = curvePivot;
+            copy.maskEnabled = maskEnabled;
+            copy.maskFeather = maskFeather;
             copy.rotation = rotation;
             copy.flipHorizontal = flipHorizontal;
             copy.flipVertical = flipVertical;
@@ -258,6 +279,13 @@ public final class MainActivity extends Activity {
             noiseReduction = source.noiseReduction;
             dehaze = source.dehaze;
             vignette = source.vignette;
+            wheelLift = source.wheelLift;
+            wheelGamma = source.wheelGamma;
+            wheelGain = source.wheelGain;
+            curveContrast = source.curveContrast;
+            curvePivot = source.curvePivot;
+            maskEnabled = source.maskEnabled;
+            maskFeather = source.maskFeather;
             rotation = source.rotation;
             flipHorizontal = source.flipHorizontal;
             flipVertical = source.flipVertical;
@@ -425,14 +453,20 @@ public final class MainActivity extends Activity {
 
     private static boolean aiActivated = false;
     private static int aiUsageCount = 0;
+    private static boolean aiUsageLoaded;
     private static final int AI_MAX_USAGE = 100;
 
     private boolean isAiActivated() {
-        if (!aiActivated) {
-            aiActivated = getSharedPreferences("nikon-link", MODE_PRIVATE)
-                    .getBoolean("ai_activated", false);
+        if (!aiUsageLoaded) {
+            android.content.SharedPreferences preferences =
+                    getSharedPreferences("nikon-link", MODE_PRIVATE);
+            aiActivated = preferences.getBoolean("ai_activated", false);
+            aiUsageCount = Math.max(
+                    0,
+                    preferences.getInt("ai_usage_count", 0));
+            aiUsageLoaded = true;
         }
-        return aiActivated;
+        return aiActivated && aiUsageCount < AI_MAX_USAGE;
     }
 
     private int getRemainingUsage() {
@@ -440,7 +474,7 @@ public final class MainActivity extends Activity {
     }
 
     private void recordAiUsage() {
-        aiUsageCount++;
+        aiUsageCount = Math.min(AI_MAX_USAGE, aiUsageCount + 1);
         getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .edit().putInt("ai_usage_count", aiUsageCount).apply();
         if (aiUsageCount >= AI_MAX_USAGE) {
@@ -534,6 +568,7 @@ public final class MainActivity extends Activity {
                         .apply();
                 aiActivated = true;
                 aiUsageCount = 0;
+                aiUsageLoaded = true;
             }
             return valid;
         } catch (Exception ignored) {
@@ -580,6 +615,16 @@ public final class MainActivity extends Activity {
             "https://fal.ai",
             "https://crazyrouter.com"
     };
+
+    private static final class AiImageResponse {
+        final byte[] image;
+        final Integer remaining;
+
+        AiImageResponse(byte[] image, Integer remaining) {
+            this.image = image;
+            this.remaining = remaining;
+        }
+    }
 
     private EditorAdjustments editorSettingsBeforeAI;
     private EditorAdjustments editorAICopiedSettings;
@@ -4276,6 +4321,57 @@ public final class MainActivity extends Activity {
                 color,
                 false));
 
+        // Secondary grading tools mirror the iOS and Harmony editor tabs.
+        LinearLayout wheels = editorAdjustmentGroup();
+        wheels.addView(text("Lift / Gamma / Gain", 12, Typeface.BOLD, MUTED));
+        addEditorAdjustment(wheels, "Lift", editorAdjustments.wheelLift, -100, 100, false,
+                value -> editorAdjustments.wheelLift = value, refreshPreview);
+        addEditorAdjustment(wheels, "Gamma", editorAdjustments.wheelGamma, -100, 100, false,
+                value -> editorAdjustments.wheelGamma = value, refreshPreview);
+        addEditorAdjustment(wheels, "Gain", editorAdjustments.wheelGain, -100, 100, false,
+                value -> editorAdjustments.wheelGain = value, refreshPreview);
+        content.addView(collapsibleGroup("editor-wheels", "色轮", "三向色轮", wheels, false));
+
+        LinearLayout curves = editorAdjustmentGroup();
+        TextView curvePreview = text("╲\n  ╲\n    ╲", 26, Typeface.BOLD, COBALT);
+        curvePreview.setGravity(Gravity.CENTER);
+        curvePreview.setBackground(rounded(GRAPHITE, 8, RULE));
+        curves.addView(curvePreview, marginParams(-1, dp(108), 0, 0, 0, 8));
+        addEditorAdjustment(curves, "对比度", editorAdjustments.curveContrast, -100, 100, false,
+                value -> editorAdjustments.curveContrast = value, refreshPreview);
+        addEditorAdjustment(curves, "中点", editorAdjustments.curvePivot, 0, 100, false,
+                value -> editorAdjustments.curvePivot = value, refreshPreview);
+        content.addView(collapsibleGroup("editor-curves", "曲线", "主曲线", curves, false));
+
+        LinearLayout picker = editorAdjustmentGroup();
+        TextView pickerValue = text("RGB 取样：点击取样器读取中心像素", 12, Typeface.NORMAL, MUTED);
+        picker.addView(pickerValue, marginParams(-1, -2, 0, 0, 0, 6));
+        Button sample = nativeButton("取样当前照片", false);
+        sample.setOnClickListener(view -> {
+            Bitmap bitmap = renderEditorAnalysisBitmap(new File(editorSelectedPath), 256);
+            if (bitmap == null) { pickerValue.setText("无法读取当前照片"); return; }
+            int colorValue = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
+            pickerValue.setText(String.format(Locale.ROOT, "RGB 取样：#%06X", 0xFFFFFF & colorValue));
+            bitmap.recycle();
+        });
+        picker.addView(sample, new LinearLayout.LayoutParams(-1, dp(44)));
+        content.addView(collapsibleGroup("editor-picker", "取色器", "中心像素", picker, false));
+
+        LinearLayout mask = editorAdjustmentGroup();
+        Switch maskSwitch = new Switch(this);
+        maskSwitch.setText("启用径向蒙版");
+        maskSwitch.setTextColor(INK);
+        maskSwitch.setChecked(editorAdjustments.maskEnabled);
+        maskSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            editorAdjustments.maskEnabled = enabled;
+            refreshPreview.run();
+        });
+        mask.addView(maskSwitch);
+        addEditorAdjustment(mask, "羽化", editorAdjustments.maskFeather, 0, 100, false,
+                value -> editorAdjustments.maskFeather = value, refreshPreview);
+        mask.addView(text("中心保留，边缘渐隐", 11, Typeface.NORMAL, MUTED));
+        content.addView(collapsibleGroup("editor-mask", "蒙版", "径向范围", mask, false));
+
         LinearLayout detail = editorAdjustmentGroup();
         addEditorAdjustment(
                 detail,
@@ -4455,7 +4551,7 @@ public final class MainActivity extends Activity {
         aiIntro.setBackground(rounded(COBALT_SOFT, 12, COBALT));
         aiIntro.addView(text("AI 创作", 16, Typeface.BOLD, INK));
         aiIntro.addView(text(
-                "联网生成与修图 · 结果保存为新文件",
+                "修图覆盖原图 · 生图保存新文件",
                 12,
                 Typeface.NORMAL,
                 MUTED), marginParams(-1, -2, 0, 6, 0, 0));
@@ -4597,13 +4693,21 @@ public final class MainActivity extends Activity {
             editorExecutor.execute(() -> {
                 boolean ok = false;
                 try {
-                    byte[] result = callAiImageApi(
+                    AiImageResponse result = callAiImageApi(
                             loadActivationCode(), aiDeviceId(),
                             aiPrompt, sourcePath, size);
                     if (result != null) {
                         aiResultBitmap = BitmapFactory.decodeByteArray(
-                                result, 0, result.length);
+                                result.image, 0, result.image.length);
                         ok = aiResultBitmap != null;
+                        if (ok) {
+                            if (result.remaining != null) {
+                                setAiRemainingUsage(result.remaining);
+                            } else {
+                                // Older proxies did not expose the server count.
+                                recordAiUsage();
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     diagnostics.error("ai", "AI 调用失败：" + e.getMessage());
@@ -4637,16 +4741,43 @@ public final class MainActivity extends Activity {
                 saveBtn.setEnabled(false);
                 Bitmap bmp = aiResultBitmap;
                 editorExecutor.execute(() -> {
+                    File source = aiMode == 0 && editorSelectedPath != null
+                            ? new File(editorSelectedPath)
+                            : null;
                     String stem = aiMode == 0 ? "edited" : "generated";
-                    File dest = new File(
-                            photoDirectory,
-                            "ai_" + stem + "_" + new java.text.SimpleDateFormat(
-                                    "yyyyMMdd_HHmmss", java.util.Locale.US)
-                                    .format(new Date()) + ".jpg");
+                    File dest = source != null
+                            ? source
+                            : new File(
+                                    photoDirectory,
+                                    "ai_" + stem + "_" + new java.text.SimpleDateFormat(
+                                            "yyyyMMdd_HHmmss", java.util.Locale.US)
+                                            .format(new Date()) + ".jpg");
+                    File temporary = source != null
+                            ? new File(dest.getAbsolutePath() + ".ai.tmp")
+                            : dest;
                     boolean ok = false;
-                    try (FileOutputStream stream = new FileOutputStream(dest)) {
+                    try (FileOutputStream stream = new FileOutputStream(temporary)) {
                         ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
+                        stream.getFD().sync();
+                        if (ok && source != null) {
+                            try {
+                                java.nio.file.Files.move(
+                                        temporary.toPath(),
+                                        dest.toPath(),
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                                java.nio.file.Files.move(
+                                        temporary.toPath(),
+                                        dest.toPath(),
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            }
+                        }
                     } catch (Exception e) {
+                        if (source != null && temporary.exists()) {
+                            // Best-effort cleanup of an interrupted atomic write.
+                            temporary.delete();
+                        }
                         diagnostics.error("ai", "保存失败：" + e.getMessage());
                     }
                     boolean saved = ok;
@@ -4696,7 +4827,7 @@ public final class MainActivity extends Activity {
         return container;
     }
 
-    private byte[] callAiImageApi(
+    private AiImageResponse callAiImageApi(
             String activationCode,
             String deviceId,
             String prompt,
@@ -4714,19 +4845,21 @@ public final class MainActivity extends Activity {
         conn.setDoOutput(true);
 
         org.json.JSONObject body = new org.json.JSONObject();
-        try {
-            body.put("activationCode", activationCode);
-            body.put("deviceId", deviceId);
-            body.put("prompt", prompt);
-            body.put("size", size);
-            if (sourcePath != null) {
-                byte[] srcBytes = java.nio.file.Files.readAllBytes(
-                        new File(sourcePath).toPath());
-                String b64 = android.util.Base64.encodeToString(
-                        srcBytes, android.util.Base64.NO_WRAP);
-                body.put("image", "data:image/jpeg;base64," + b64);
+        body.put("activationCode", activationCode);
+        body.put("deviceId", deviceId);
+        body.put("prompt", prompt);
+        body.put("size", size);
+        if (sourcePath != null && !sourcePath.isEmpty()) {
+            File source = new File(sourcePath);
+            byte[] srcBytes = java.nio.file.Files.readAllBytes(source.toPath());
+            if (srcBytes.length == 0) {
+                throw new Exception("原图为空，未发送 AI 修图请求");
             }
-        } catch (Exception ignored) {}
+            String b64 = android.util.Base64.encodeToString(
+                    srcBytes, android.util.Base64.NO_WRAP);
+            body.put("image", "data:" + imageMimeType(source.getName())
+                    + ";base64," + b64);
+        }
 
         java.io.OutputStream os = conn.getOutputStream();
         os.write(body.toString().getBytes("UTF-8"));
@@ -4743,6 +4876,7 @@ public final class MainActivity extends Activity {
             throw new Exception("API 服务返回错误 " + code);
         }
 
+        Integer remaining = parseAiRemaining(conn.getHeaderField("X-ZENCHE-Remaining"));
         java.io.InputStream is = conn.getInputStream();
         byte[] respBytes = readAllBytes(is);
         is.close();
@@ -4757,7 +4891,9 @@ public final class MainActivity extends Activity {
         org.json.JSONObject first = dataArr.getJSONObject(0);
         String b64Json = first.optString("b64_json", null);
         if (b64Json != null && !b64Json.isEmpty()) {
-            return android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT);
+            return new AiImageResponse(
+                    android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT),
+                    remaining);
         }
         String imageUrl = first.optString("url", null);
         if (imageUrl != null && !imageUrl.isEmpty()) {
@@ -4770,9 +4906,40 @@ public final class MainActivity extends Activity {
             byte[] data = readAllBytes(imgIs);
             imgIs.close();
             imgConn.disconnect();
-            return data;
+            return new AiImageResponse(data, remaining);
         }
         throw new Exception("AI 未返回有效图片");
+    }
+
+    private static Integer parseAiRemaining(String value) {
+        if (value == null) return null;
+        try {
+            int remaining = Integer.parseInt(value.trim());
+            return Math.max(0, Math.min(AI_MAX_USAGE, remaining));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String imageMimeType(String filename) {
+        String ext = filename == null ? "" : filename.toLowerCase(Locale.US);
+        if (ext.endsWith(".png")) return "image/png";
+        if (ext.endsWith(".heic") || ext.endsWith(".heif")) return "image/heic";
+        if (ext.endsWith(".tif") || ext.endsWith(".tiff")) return "image/tiff";
+        if (ext.endsWith(".bmp")) return "image/bmp";
+        return "image/jpeg";
+    }
+
+    private void setAiRemainingUsage(int remaining) {
+        int bounded = Math.max(0, Math.min(AI_MAX_USAGE, remaining));
+        aiUsageCount = AI_MAX_USAGE - bounded;
+        aiUsageLoaded = true;
+        aiActivated = bounded > 0;
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putInt("ai_usage_count", aiUsageCount)
+                .putBoolean("ai_activated", aiActivated)
+                .apply();
     }
 
     private String loadAiApiKey() {
@@ -5295,8 +5462,8 @@ public final class MainActivity extends Activity {
                 1
                         + settings.saturation / 100.0
                         + settings.dehaze / 520.0;
-        double temperature = settings.temperature / 100.0;
-        double tint = settings.tint / 100.0;
+            double temperature = settings.temperature / 100.0;
+            double tint = settings.tint / 100.0;
         for (int index = 0; index < pixels.length; index++) {
             int color = pixels[index];
             double red = Color.red(color) / 255.0 * exposure;
@@ -5306,6 +5473,14 @@ public final class MainActivity extends Activity {
             red += temperature * 0.12 + tint * 0.045;
             green -= tint * 0.08;
             blue -= temperature * 0.12 - tint * 0.045;
+
+            // Compact Lift/Gamma/Gain and curve controls.
+            double lift = settings.wheelLift / 100.0 * 0.12;
+            double gamma = settings.wheelGamma / 100.0 * 0.10;
+            double gain = 1 + settings.wheelGain / 100.0 * 0.18;
+            red = (red + lift + gamma) * gain;
+            green = (green + lift) * gain;
+            blue = (blue + lift - gamma) * gain;
 
             double luma =
                     red * 0.2126 + green * 0.7152 + blue * 0.0722;
@@ -5335,6 +5510,13 @@ public final class MainActivity extends Activity {
             green = (green - 0.5) * contrast * localContrast + 0.5;
             blue = (blue - 0.5) * contrast * localContrast + 0.5;
 
+            if (settings.curveContrast != 0) {
+                double curve = settings.curveContrast / 100.0 * 0.45;
+                red = (red - 0.5) * (1 + curve) + 0.5;
+                green = (green - 0.5) * (1 + curve) + 0.5;
+                blue = (blue - 0.5) * (1 + curve) + 0.5;
+            }
+
             luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
             double colorfulness =
                     Math.max(red, Math.max(green, blue))
@@ -5361,6 +5543,13 @@ public final class MainActivity extends Activity {
                     Math.sqrt(
                             normalizedX * normalizedX
                                     + normalizedY * normalizedY));
+            if (settings.maskEnabled) {
+                double feather = Math.max(0.01, settings.maskFeather / 100.0);
+                double mask = 1 - smoothStep(0.32, 0.32 + feather * 0.68, edge);
+                red = red * (0.82 + 0.18 * mask);
+                green = green * (0.82 + 0.18 * mask);
+                blue = blue * (0.82 + 0.18 * mask);
+            }
             double vignette =
                     1 + settings.vignette / 100.0
                             * edge * edge * 0.72;
@@ -8079,9 +8268,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.3.1" : version;
+            return version == null || version.isEmpty() ? "1.4.0" : version;
         } catch (Exception error) {
-            return "1.3.1";
+            return "1.4.0";
         }
     }
 
@@ -8229,11 +8418,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n"
-                                + "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n"
-                                + "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n"
-                                + "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n"
-                                + "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n"
+                        "• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n"
+                                + "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n"
+                                + "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n"
+                                + "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n"
+                                + "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n"
                                 + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
                         14,
                         Typeface.NORMAL,

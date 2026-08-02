@@ -848,7 +848,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n• 设置页移除可编辑的“AI 服务地址”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                        Text("• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

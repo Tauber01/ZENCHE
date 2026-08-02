@@ -53,7 +53,7 @@ final class PtpCamera {
             new CameraProfile("Nikon Z50II", "Nikon", 0x04b0, 0x0455, 100, 51200),
             new CameraProfile("Nikon Z5II", "Nikon", 0x04b0, 0x0456, 100, 64000),
             new CameraProfile("Nikon ZR", "Nikon", 0x04b0, 0x0457, 100, 51200),
-            // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+            // ── Sony α ── (Product ID 0 means vendor wildcard)
             // Full-frame E-mount
             new CameraProfile("Sony A1", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony A1 II", "Sony", 0x054c, 0x0000, 100, 32000),
@@ -1499,7 +1499,11 @@ final class PtpCamera {
 
     private static CameraProfile profileFor(int vendorId, int productId) {
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-            if (candidate.vendorId == vendorId && candidate.productId == productId) return candidate;
+            if (candidate.vendorId == vendorId
+                    && candidate.productId != 0
+                    && candidate.productId == productId) {
+                return candidate;
+            }
         }
         return null;
     }
@@ -1508,33 +1512,51 @@ final class PtpCamera {
         CameraProfile byProductId = profileFor(device.getVendorId(), device.getProductId());
         if (byProductId != null) return byProductId;
         String descriptor = device.getProductName();
-        if (descriptor == null) return null;
-        String normalized = descriptor
-                .toLowerCase(Locale.ROOT)
-                .replace("_", "")
-                .replace("-", "")
-                .replace(" ", "");
-        String generationAlias = normalized
-                .replace("iii", "3")
-                .replace("ii", "2");
         CameraProfile bestMatch = null;
         int bestMatchLength = 0;
-        for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-            String candidateName = candidate.name
+        if (descriptor != null) {
+            String normalized = descriptor
                     .toLowerCase(Locale.ROOT)
-                    .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
+                    .replace("_", "")
+                    .replace("-", "")
                     .replace(" ", "");
-            String candidateAlias = candidateName
+            String generationAlias = normalized
                     .replace("iii", "3")
                     .replace("ii", "2");
-            if ((normalized.contains(candidateName)
-                    || generationAlias.contains(candidateAlias))
-                    && candidateAlias.length() > bestMatchLength) {
-                bestMatch = candidate;
-                bestMatchLength = candidateAlias.length();
+            for (CameraProfile candidate : SUPPORTED_CAMERAS) {
+                String candidateName = candidate.name
+                        .toLowerCase(Locale.ROOT)
+                        .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
+                        .replace(" ", "");
+                String candidateAlias = candidateName
+                        .replace("iii", "3")
+                        .replace("ii", "2");
+                if ((normalized.contains(candidateName)
+                        || generationAlias.contains(candidateAlias))
+                        && candidateAlias.length() > bestMatchLength) {
+                    bestMatch = candidate;
+                    bestMatchLength = candidateAlias.length();
+                }
             }
         }
-        return bestMatch;
+        if (bestMatch != null) return bestMatch;
+        // Sony and Canon may expose model-specific Product IDs that are not
+        // stable across firmware generations. Keep the fallback generic when
+        // Android cannot expose a product descriptor, rather than guessing a
+        // specific model.
+        return vendorFallbackProfile(device.getVendorId());
+    }
+
+    private static CameraProfile vendorFallbackProfile(int vendorId) {
+        if (vendorId == 0x054c) {
+            return new CameraProfile(
+                    "Sony " + "α USB/PTP", "Sony", vendorId, 0, 100, 102400);
+        }
+        if (vendorId == 0x04a9) {
+            return new CameraProfile(
+                    "Canon " + "EOS USB/PTP", "Canon", vendorId, 0, 100, 102400);
+        }
+        return null;
     }
 
     private static final class CameraProfile {

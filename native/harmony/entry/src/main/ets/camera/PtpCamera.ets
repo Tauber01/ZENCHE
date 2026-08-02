@@ -11,6 +11,7 @@ const CONTAINER_COMMAND: number = 1;
 const CONTAINER_DATA: number = 2;
 const CONTAINER_RESPONSE: number = 3;
 const RESPONSE_OK: number = 0x2001;
+const RESPONSE_SESSION_ALREADY_OPEN: number = 0x201e;
 const OPEN_SESSION: number = 0x1002;
 const CLOSE_SESSION: number = 0x1003;
 const GET_OBJECT: number = 0x1009;
@@ -615,8 +616,10 @@ export class PtpCamera {
     timeout: number
   ): Promise<Uint8Array> {
     this.ensureConnectedForOperation(operation);
-    this.transaction = (this.transaction + 1) >>> 0;
-    const current: number = this.transaction;
+    const current: number = operation === OPEN_SESSION
+      ? 0
+      : ((this.transaction + 1) >>> 0);
+    this.transaction = current;
     const parameterBytes: Uint8Array = new Uint8Array(parameters.length * 4);
     const parameterView: DataView = new DataView(parameterBytes.buffer);
     parameters.forEach((parameter: number, index: number) => {
@@ -658,7 +661,11 @@ export class PtpCamera {
     ) {
       throw new Error(`${this.cameraName()} 返回了不匹配的 PTP 事务编号。`);
     }
-    if (response.code !== RESPONSE_OK) {
+    if (
+      response.code !== RESPONSE_OK &&
+      !(operation === OPEN_SESSION &&
+        response.code === RESPONSE_SESSION_ALREADY_OPEN)
+    ) {
       throw new Error(
         `${this.cameraName()} PTP 错误 0x${response.code
           .toString(16)

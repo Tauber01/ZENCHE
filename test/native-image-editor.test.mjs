@@ -243,6 +243,56 @@ test("all native AI workspaces keep creation controls and make authorization sta
   assert.match(windows, /AiResolutionBox_SelectionChanged/);
 });
 
+test("Windows AI uses server quota and overwrites the selected source for retouch", async () => {
+  const windows = await read("native/windows/MainWindow.xaml.cs");
+
+  assert.match(windows, /X-ZENCHE-Remaining/);
+  assert.match(windows, /ReadServerRemainingUsage\(response\)/);
+  assert.match(windows, /if \(serverRemaining is null\)[\s\S]*RecordAiUsage\(\)/);
+  assert.match(windows, /_aiServerRemainingUsage = remaining/);
+  assert.match(
+    windows,
+    /if \(_aiMode == 0[\s\S]*SaveBitmapAtomically\(originalPath, frame\)/,
+  );
+  assert.match(windows, /File\.Replace\(temporary, destination, null\)/);
+  assert.match(windows, /ai_generated_/);
+});
+
+test("all native AI clients consume server quota and replace retouched originals", async () => {
+  const [ios, android, harmony, macos, windows] = await Promise.all([
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/MainWindow.xaml.cs"),
+  ]);
+
+  assert.match(ios, /X-ZENCHE-Remaining/);
+  assert.match(ios, /ActivationManager\.updateServerRemaining/);
+  assert.match(ios, /ActivationManager\.recordUsageFallback/);
+  assert.match(ios, /replaceEditedImage/);
+
+  assert.match(android, /parseAiRemaining\(conn\.getHeaderField\("X-ZENCHE-Remaining"\)\)/);
+  assert.match(android, /setAiRemainingUsage\(result\.remaining\)/);
+  assert.match(android, /recordAiUsage\(\)/);
+  assert.match(android, /StandardCopyOption\.ATOMIC_MOVE/);
+
+  assert.match(harmony, /parseAiRemaining\(/);
+  assert.match(harmony, /setAiRemainingUsage\(/);
+  assert.match(harmony, /recordAiUsage\(\)/);
+  assert.match(harmony, /library\.replaceFile\(/);
+
+  assert.match(macos, /X-ZENCHE-Remaining/);
+  assert.match(macos, /ActivationManager\.updateServerRemaining/);
+  assert.match(macos, /ActivationManager\.recordUsageFallback/);
+  assert.match(macos, /replaceEditedPhoto/);
+
+  assert.match(windows, /X-ZENCHE-Remaining/);
+  assert.match(windows, /ReadServerRemainingUsage\(response\)/);
+  assert.match(windows, /if \(serverRemaining is null\)[\s\S]*RecordAiUsage\(\)/);
+  assert.match(windows, /SaveBitmapAtomically\(originalPath, frame\)/);
+});
+
 test("AI server address is no longer editable in native Settings while legacy readers remain", async () => {
   const [ios, android, harmony, macosSettings, macosMain, windowsXaml, windows] =
     await Promise.all([
@@ -271,6 +321,20 @@ test("AI server address is no longer editable in native Settings while legacy re
   assert.doesNotMatch(windowsXaml, /AiServerUrlBox/);
   assert.doesNotMatch(windows, /SaveAiServerUrl|AiServerUrlBox|保存服务器地址/);
   assert.match(windows, /Path\.Combine\(AiDataDir, "ai-server-url\.txt"\)/);
+});
+
+test("Apple packages allow the legacy HTTP AI proxy through ATS", async () => {
+  const [iosInfo, macosInfo] = await Promise.all([
+    read("native/ios/NikonLink/Info.plist"),
+    read("native/macos/Info.plist"),
+  ]);
+
+  for (const info of [iosInfo, macosInfo]) {
+    assert.match(
+      info,
+      /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>\s*<\/dict>/,
+    );
+  }
 });
 
 test("mobile editor navigation opens professional develop and exposes an explicit AI mode switch", async () => {

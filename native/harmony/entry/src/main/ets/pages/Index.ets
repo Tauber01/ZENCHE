@@ -258,7 +258,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.3.1';
+const CURRENT_VERSION: string = '1.4.0';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -1050,7 +1050,7 @@ struct Index {
       this.NavButton('图像编辑', 'editor')
       this.NavButton('分支文件库', 'library')
       Blank()
-      Text('ZENCHE 1.3.1')
+      Text('ZENCHE 1.4.0')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
@@ -1544,7 +1544,7 @@ struct Index {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text(this.tr('联网生成与修图 · 结果保存为新文件'))
+          Text(this.tr('修图覆盖原图 · 生图保存新文件'))
             .fontSize(11)
             .fontColor($r('app.color.muted'))
         }
@@ -1771,8 +1771,12 @@ struct Index {
           if (srcBytes && srcBytes.byteLength > 0) {
             const base64Helper = new util.Base64Helper();
             const b64: string = base64Helper.encodeToStringSync(new Uint8Array(srcBytes));
-            body['image'] = `data:image/jpeg;base64,${b64}`;
+            body['image'] = `data:${this.imageMimeType(this.editorSelectedPath)};base64,${b64}`;
+          } else {
+            throw new Error('无法读取原图，未发送 AI 修图请求');
           }
+        } else if (this.aiMode === 0) {
+          throw new Error('无法读取原图，未发送 AI 修图请求');
         }
       }
       const response = await httpRequest.request(
@@ -1782,7 +1786,9 @@ struct Index {
           header: {
             'Content-Type': 'application/json',
           },
-          extraData: body,
+          // Send explicit JSON so the reference image is not dropped by the
+          // HTTP client while coercing a Record into request data.
+          extraData: JSON.stringify(body),
           connectTimeout: 15000,
           readTimeout: 60000,
         }
@@ -1831,6 +1837,15 @@ struct Index {
       if (!imageBytes || imageBytes.byteLength === 0) {
         throw new Error('AI 未返回有效图片');
       }
+      const remaining: number | undefined = this.parseAiRemaining(
+        response.header as Record<string, string>
+      );
+      if (remaining !== undefined) {
+        this.setAiRemainingUsage(remaining);
+      } else {
+        // Keep compatibility with older proxies that did not expose a count.
+        this.recordAiUsage();
+      }
       const context: common.UIAbilityContext =
         getContext(this) as common.UIAbilityContext;
       const tempDir: string = context.tempDir;
@@ -1871,10 +1886,11 @@ struct Index {
         this.aiStatus = '保存 AI 结果失败';
         return;
       }
-      const destination: string = library.saveEditedCopy(
-        `ai_${stem}`,
-        new Uint8Array(data)
-      );
+      const destination: string = this.aiMode === 0 && this.editorSelectedPath.length > 0
+        ? library.replaceFile(this.editorSelectedPath, new Uint8Array(data))
+        : library.saveEditedCopy(`ai_${stem}`, new Uint8Array(data));
+      this.refreshPhotos();
+      this.editorSelectedPath = destination;
       this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
       this.editorSaving = false;
     } catch (err) {
@@ -1890,7 +1906,8 @@ struct Index {
         { name: 'zenche_ai_settings' }
       );
       const activated: boolean = (prefs.getSync('ai_activated', false) as boolean) || false;
-      return activated;
+      const count: number = (prefs.getSync('ai_usage_count', 0) as number) || 0;
+      return activated && count < 100;
     } catch (_) {
       return false;
     }
@@ -1910,6 +1927,48 @@ struct Index {
         prefs.flushSync();
       }
     } catch (_) {}
+  }
+
+  private parseAiRemaining(
+    headers: Record<string, string>
+  ): number | undefined {
+    const raw: string = headers['X-ZENCHE-Remaining']
+      || headers['x-zenche-remaining']
+      || '';
+    if (raw.length === 0) {
+      return undefined;
+    }
+    const value: number = Number(raw);
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return Math.max(0, Math.min(100, Math.floor(value)));
+  }
+
+  private imageMimeType(path: string): string {
+    const lower: string = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
+    if (lower.endsWith('.tif') || lower.endsWith('.tiff')) return 'image/tiff';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    return 'image/jpeg';
+  }
+
+  private setAiRemainingUsage(remaining: number): void {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const bounded: number = Math.max(0, Math.min(100, remaining));
+      prefs.putSync('ai_usage_count', 100 - bounded);
+      prefs.putSync('ai_activated', bounded > 0);
+      prefs.flushSync();
+      if (bounded === 0) {
+        this.aiStatus = 'AI 次数已用完';
+      }
+    } catch (_) {
+    }
   }
 
   private getRemainingUsage(): number {
@@ -3762,11 +3821,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n' +
-                '• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n' +
-                '• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n' +
-                '• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n' +
-                '• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n' +
+                '• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n' +
+                '• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n' +
+                '• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n' +
+                '• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n' +
+                '• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n' +
                 '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
               ))
                 .fontSize(14)

@@ -2,8 +2,8 @@
 
 > 快照时间：2026-08-02（Asia/Shanghai）
 > 基线分支：`main`
-> 当前版本：1.3.1 / build 22
-> 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；不要只写“完成”，必须附证据与剩余限制。
+> 当前版本：1.4.0 / build 23
+> 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
 
@@ -18,9 +18,9 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码版本为 **1.3.0**；四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
+- 当前源码版本为 **1.4.0 / build 23**；四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- `dist/` 中已生成 1.3.0 的 Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS DMG、Windows x64 Setup.exe/ZIP 及 SHA-256；均为当前恢复后的源码构建产物。
+- `dist/` 中已生成 1.4.0 的 Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS DMG、Windows x64 Setup.exe/ZIP 及 SHA-256；均为当前恢复后的源码构建产物。
 - AI 全链路已通过端到端验证：激活码验签 → 服务器计数 → 转发 grsai → 返回图片，计数递减正常。
 - 最大未闭环风险仍是跨 42 款相机的系统实机矩阵、生产签名、公证与商店级分发；Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -114,7 +114,7 @@ npm test
 
 - 无效激活码 → HTTP 403 `{"error":"激活码无效"}`
 - 设备不匹配 → HTTP 403
-- 有效激活码 + 正确设备 → 验签通过、服务器计数、转发 grsai（nano-banana-fast）、返回 `{data:[{b64_json}]}`，解码为有效 JPEG（438 KB）
+- 有效激活码 + 正确设备 → 验签通过、服务器计数、转发 grsai（nano-banana-fast）；修图原图通过上游 `images` 数组传递，返回 `{data:[{b64_json}]}`，解码为有效 JPEG（438 KB）
 - 连续调用计数递减：`X-ZENCHE-Remaining` 96 → 95 → 94
 
 ### 5.4 本次编辑器迭代验证记录
@@ -230,9 +230,20 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 五端启动公告已重写为 1.3.1 语义：AI 工作台切换、设备码绑定、服务器计数、官网兑换、爱发电购买二维码、AI 服务器历史配置兼容、Sony / Canon / Nikon 保留和防诈骗提示。
 - 版本元数据已提升为 `1.3.1 / build 22`；README 三语、CHANGELOG、构建脚本和发布说明已同步。
 - 验证完成：47 项测试通过，`git diff --check` 通过；Android、HarmonyOS、iOS unsigned、macOS、Windows Setup/ZIP 六个 1.3.1 包已生成并完成 `.sha256` 回验。
-- 1.3.1 SHA-256：Android `3df1cb9db26c30d62b88ea0585a26f82ad93b050f77cf3d7f13876bba6341454`；HarmonyOS `a85a2084577435cb5a706d2e704ae32189e20571bac4ce17382ced528aa53887`；iOS unsigned `1d764cf424c4002fc97ee373572820508881e41fd270254f274edad2aaf25310`；macOS `8fa3397c363ee4eb3698fa02e52291189f03833616c5e17ac78b747ac5cf4d0b`；Windows Setup `ff69f037bfd4b9a21f78a5dddda8abc833f615f955a7c66ebdff1b4ec5b95842`；Windows ZIP `030e1fe686fd47574143ff195f5029d5eec673e25fff485a72dd7ef8d254caf9`。
-- 待完成：创建并核对 GitHub Release `v1.3.1`。
+- 1.3.1 GitHub Release 最终 SHA-256（已下载线上附件并逐个回验）：Android `8d3608f3cabdffae7407f734e700f5590edd1d62321ceafeabf88d8e9777d1c9`；HarmonyOS `a85a2084577435cb5a706d2e704ae32189e20571bac4ce17382ced528aa53887`；iOS unsigned `f1257053f61a0c6d3885c323b21b25baaa90310fafe26427831d09fd73574e1d`；macOS `e36fa5f7e9a41a16d424a2613e36d5e479647f68ec54291c5d5dfa83115b5f37`；Windows Setup `ff69f037bfd4b9a21f78a5dddda8abc833f615f955a7c66ebdff1b4ec5b95842`；Windows ZIP `030e1fe686fd47574143ff195f5029d5eec673e25fff485a72dd7ef8d254caf9`。
+- GitHub Release `v1.3.1` 已创建并核对，发布地址为 https://github.com/Tauber01/ZENCHE/releases/tag/v1.3.1；后续每次上传 GitHub 后必须立即回写本节及三份基线文档的发布事实。
+- 已将最终线上 SHA-256 回写 `docs/releases/v1.3.1.md` 并同步 GitHub Release 正文；Release 当前包含 12 个附件（六个交付包及六个 `.sha256`），线上校验全部通过。
 - 已知限制保持：HarmonyOS / iOS 签名缺口、macOS 未公证、Windows 非 Windows 主机交叉构建、官网 TLS 需公网侧确认。
+
+## 8. 1.4.0 发布收敛（2026-08-02）
+
+- 五端 AI 修图统一发送完整原图 data URL，经代理 `images` 数组进入 Grsai；修图成功覆盖原图，生图另存新文件。
+- 服务器成功扣减 AI 次数并返回 `X-ZENCHE-Remaining`；失败请求回滚次数。代理生产端到端验证成功。
+- 版本元数据已提升为 `1.4.0 / build 23`；README 三语、CHANGELOG、公告、构建脚本和发布说明同步。
+- 验证完成：`npm test` 59/59 通过，`git diff --check` 通过；五端包和六份 SHA-256 均已生成并本地回验。
+- 本地附件 SHA-256：Android `f89f873db175e393b47e5195fbfce396a63c536782048b424ba7e060ff61f444`；HarmonyOS `ce81c588af1de6da7ecc7c1898dcf7094cda3810fb2c6465f67b2325a72cba9b`；iOS unsigned `8e70058c3e0a6004de6e81098cb7b69c28ac77fbf9f5c6c1320fd32c8be66dfb`；macOS `531a206288bf1f669d6e96566527da14970857da33deae7d077e40ca809aacea`；Windows Setup `486052d2cd398bbb62eedd983f7bb544e431fd35d7225ba75789ee1caa010499`；Windows ZIP `d33cc4696eec6a36f0b7866d9155b82bcc2b1993f8cc8ea4071752b9b74a4c22`。
+- 签名状态：macOS ad-hoc 未公证，Android debug，HarmonyOS/iOS unsigned，Windows 无商业代码签名；仍需各平台正式签名和真机验收。
+- 待完成：创建提交 `release: 帧澈 ZENCHE v1.4.0`、标签 `v1.4.0`、推送 `main` 与标签，并创建详细中文 GitHub Release。
 
 ## 8. 已知文档债务
 
@@ -278,4 +289,17 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 5. 哪些事项因主机、工具链、凭据或硬件而阻塞。
 6. 下一位智能体应从哪个具体步骤继续。
 
-不要把计划写成完成，不要把静态测试写成实机通过，也不要把未签名容器写成可安装正式包。
+不要把计划写成完成，不要把静态测试写成实机通过，也不要把未签名容器写成可安装正式包。每次 GitHub 上传后，必须把实际发布状态同步回本文件、`docs/PROJECT_OUTLINE.md` 和 `docs/TECHNICAL_APPROACH.md`，不得只依赖聊天记录。
+
+### 5.6 多端拍摄修复与监看画质优化（2026-08-02）
+
+修复 GitHub issue #39（Android Nikon Z50 拍摄失败）并同步多端同类问题：
+
+- **Android**（`PtpCamera.java`）：停实时取景后等待相机就绪再拍摄、拍摄前再等就绪、GET_OBJECT 遇 PTP 0x2009 DeviceBusy 重试 4 次；`MainActivity.java` 监看实时取景改为全分辨率解码，去除 inSampleSize=2 画质减半。
+- **macOS**（`main.swift`）：新增 isBusyFailure 识别 gphoto2 busy/processing 输出，run() 忙时重试 3 次；停实时取景后轮询 `--get-config` 等待相机就绪。
+- **Windows**（`PtpCamera.cs`）：CaptureToSdram 前 `WaitUntilDeviceReadyAsync(8000)`；`MainWindow.xaml.cs` 补齐激活码本地 RSA 验签（此前任意码都被接受为激活成功）。
+- **HarmonyOS**（`PtpCamera.ets`）：停实时取景后等待就绪、GET_OBJECT 遇 0x2009 重试 4 次。
+
+提交：`606a6ec`（分支 `claude/modest-albattani-34402d`，6 文件 +235/-15）。Android/macOS/HarmonyOS 产物已重建并上传 GitHub Release `v1.3.0`。
+
+本次同步检查：iOS 使用 AVFoundation 无 PTP 拍摄，不受影响；四端监看画质仅 Android 存在减半问题（已修复），其余平台全分辨率。AI 兑换码逻辑确认 NONCE（a1b2c3d4e5f6）在兑换服务、AI 代理、各客户端验签间一致；Windows 激活验签已补齐对齐。

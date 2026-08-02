@@ -109,6 +109,20 @@ test("direct camera capture waits for readiness and retries busy downloads", asy
   assert.match(windows, /WaitUntilDeviceReadyAsync\(8_000, cancellationToken\)/);
 });
 
+test("strict PTP hosts use transaction zero for OpenSession", async () => {
+  const [android, harmony, windows] = await Promise.all([
+    source("android"),
+    source("harmony"),
+    source("windows"),
+  ]);
+  assert.match(android, /operation == OPEN_SESSION[\s\S]*current = 0/);
+  assert.match(harmony, /operation === OPEN_SESSION[\s\S]*\? 0/);
+  assert.match(windows, /operation == OpenSession \? 0 : \+\+_transaction/);
+  for (const text of [harmony, windows]) {
+    assert.match(text, /SESSION_ALREADY_OPEN|SessionAlreadyOpen/);
+  }
+});
+
 test("Windows activation rejects codes that fail local RSA verification", async () => {
   const windows = await readFile("native/windows/MainWindow.xaml.cs", "utf8");
 

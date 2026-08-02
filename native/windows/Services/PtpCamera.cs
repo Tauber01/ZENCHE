@@ -11,6 +11,7 @@ public sealed class PtpCamera : IDisposable
     private const ushort ContainerData = 2;
     private const ushort ContainerResponse = 3;
     private const ushort ResponseOk = 0x2001;
+    private const ushort ResponseSessionAlreadyOpen = 0x201e;
     private const ushort OpenSession = 0x1002;
     private const ushort CloseSession = 0x1003;
     private const ushort GetObject = 0x1009;
@@ -813,7 +814,8 @@ public sealed class PtpCamera : IDisposable
         CancellationToken cancellationToken)
     {
         EnsureConnectedForOperation(operation);
-        var transaction = ++_transaction;
+        var transaction = operation == OpenSession ? 0 : ++_transaction;
+        _transaction = transaction;
         var parameterBytes = new byte[(parameters?.Length ?? 0) * 4];
         if (parameters is not null)
         {
@@ -862,7 +864,9 @@ public sealed class PtpCamera : IDisposable
             throw new CameraProtocolException(
                 $"{CameraName} 返回了不匹配的 PTP 事务编号。");
         }
-        if (response.Code != ResponseOk)
+        if (response.Code != ResponseOk &&
+            !(operation == OpenSession &&
+              response.Code == ResponseSessionAlreadyOpen))
         {
             throw new CameraProtocolException(
                 $"{CameraName} PTP 错误 0x{response.Code:X4}（操作 0x{operation:X4}）",

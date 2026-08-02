@@ -72,6 +72,21 @@ public partial class MainWindow : Window
         public double NoiseReduction { get; set; }
         public double Dehaze { get; set; }
         public double Vignette { get; set; }
+        // DaVinci-style grading controls. Values are intentionally normalized
+        // to the existing -100...100 editor range so presets and reset remain
+        // backwards compatible.
+        public double Lift { get; set; }
+        public double Gamma { get; set; }
+        public double Gain { get; set; }
+        public double CurveShadows { get; set; }
+        public double CurveMidtones { get; set; }
+        public double CurveHighlights { get; set; }
+        public string MaskType { get; set; } = "无";
+        public double MaskAmount { get; set; }
+        public double MaskFeather { get; set; } = 50;
+        public bool MaskInvert { get; set; }
+        public bool PickerEnabled { get; set; }
+        public string PickedColorHex { get; set; } = "未取样";
         public int Rotation { get; set; }
         public bool FlipHorizontal { get; set; }
         public bool FlipVertical { get; set; }
@@ -96,6 +111,18 @@ public partial class MainWindow : Window
             NoiseReduction = 0;
             Dehaze = 0;
             Vignette = 0;
+            Lift = 0;
+            Gamma = 0;
+            Gain = 0;
+            CurveShadows = 0;
+            CurveMidtones = 0;
+            CurveHighlights = 0;
+            MaskType = "无";
+            MaskAmount = 0;
+            MaskFeather = 50;
+            MaskInvert = false;
+            PickerEnabled = false;
+            PickedColorHex = "未取样";
             Rotation = 0;
             FlipHorizontal = false;
             FlipVertical = false;
@@ -135,6 +162,18 @@ public partial class MainWindow : Window
             NoiseReduction = NoiseReduction,
             Dehaze = Dehaze,
             Vignette = Vignette,
+            Lift = Lift,
+            Gamma = Gamma,
+            Gain = Gain,
+            CurveShadows = CurveShadows,
+            CurveMidtones = CurveMidtones,
+            CurveHighlights = CurveHighlights,
+            MaskType = MaskType,
+            MaskAmount = MaskAmount,
+            MaskFeather = MaskFeather,
+            MaskInvert = MaskInvert,
+            PickerEnabled = PickerEnabled,
+            PickedColorHex = PickedColorHex,
             Rotation = Rotation,
             FlipHorizontal = FlipHorizontal,
             FlipVertical = FlipVertical,
@@ -228,13 +267,20 @@ public partial class MainWindow : Window
     private EditorAdjustments? _editorAICopiedSettings;
     private EditorAIAnalysis? _editorAIAnalysis;
     private readonly Dictionary<string, Slider> _editorSliders = [];
+    private readonly Dictionary<string, Slider> _editorGradeSliders = [];
     private ComboBox? _editorCropBox;
+    private ComboBox? _editorMaskBox;
+    private Slider? _editorMaskAmountSlider;
+    private Slider? _editorMaskFeatherSlider;
+    private TextBlock? _editorPickedColorText;
+    private bool _editorPickerArmed;
     private bool _updatingEditorControls;
     private string _aiPrompt = "";
     private int _aiMode; // 0=edit, 1=generate
     private int _aiRatioIndex;
     private int _aiResolutionIndex;
     private string? _aiResultPath;
+    private int? _aiServerRemainingUsage;
     private bool _aiGenerating;
     private bool _editorInAiMode;
 
@@ -251,16 +297,65 @@ public partial class MainWindow : Window
     private static bool IsAiActivated()
     {
         var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
-        return File.Exists(activatedPath);
+        return File.Exists(activatedPath) && GetRemainingUsage() > 0;
     }
 
     private static int GetRemainingUsage()
+    {
+        var serverRemainingPath = Path.Combine(
+            AiDataDir,
+            "ai-server-remaining.txt");
+        if (File.Exists(serverRemainingPath) &&
+            int.TryParse(
+                File.ReadAllText(serverRemainingPath).Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var serverRemaining))
+        {
+            return Math.Clamp(serverRemaining, 0, AiMaxUsage);
+        }
+        return GetLocalRemainingUsage();
+    }
+
+    private static int GetLocalRemainingUsage()
     {
         var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
         var count = 0;
         if (File.Exists(countPath))
             int.TryParse(File.ReadAllText(countPath).Trim(), out count);
         return Math.Max(0, AiMaxUsage - count);
+    }
+
+    private static void SaveServerRemainingUsage(int remaining)
+    {
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(
+            Path.Combine(AiDataDir, "ai-server-remaining.txt"),
+            Math.Clamp(remaining, 0, AiMaxUsage).ToString(
+                CultureInfo.InvariantCulture));
+    }
+
+    private int CurrentRemainingUsage() =>
+        _aiServerRemainingUsage ?? GetRemainingUsage();
+
+    private bool HasAiUsageAvailable() => CurrentRemainingUsage() > 0;
+
+    private static int? ReadServerRemainingUsage(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues(
+                "X-ZENCHE-Remaining",
+                out var values))
+        {
+            return null;
+        }
+        var value = values.FirstOrDefault();
+        return int.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var remaining)
+            ? Math.Clamp(remaining, 0, AiMaxUsage)
+            : null;
     }
 
     private static void RecordAiUsage()
@@ -441,8 +536,19 @@ public partial class MainWindow : Window
         SaveActivationCode(code);
         var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
         Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(
+            Path.Combine(AiDataDir, "ai-usage-count.txt"),
+            "0");
         File.WriteAllText(activatedPath, "1");
+        var serverRemainingPath = Path.Combine(
+            AiDataDir,
+            "ai-server-remaining.txt");
+        if (File.Exists(serverRemainingPath))
+        {
+            File.Delete(serverRemainingPath);
+        }
         AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
+        _aiServerRemainingUsage = null;
         AiActivationCodeBox.Text = "";
     }
 
@@ -2264,11 +2370,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n" +
-                "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n" +
-                "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n" +
-                "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n" +
-                "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n" +
+                "• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n" +
+                "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n" +
+                "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n" +
+                "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n" +
+                "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
@@ -3632,7 +3738,7 @@ public partial class MainWindow : Window
             _aiMode == 1 ? "PrimaryButton" : "ButtonBase");
         AiPromptBox.Text = _aiPrompt;
         AiUnlockStatus.Text = IsAiActivated()
-            ? AppLocalization.T($"已解锁 · 剩余 {GetRemainingUsage()} 次")
+            ? AppLocalization.T($"已解锁 · 剩余 {CurrentRemainingUsage()} 次")
             : AppLocalization.T("需要激活");
         AiUnlockStatus.Foreground = IsAiActivated()
             ? (System.Windows.Media.Brush)FindResource("PositiveBrush")
@@ -3751,6 +3857,19 @@ public partial class MainWindow : Window
                 "请先在设置中输入激活码解锁 AI 功能");
             return;
         }
+        if (!HasAiUsageAvailable())
+        {
+            AiStatusText.Text = AppLocalization.T("AI 次数已用完，请重新兑换激活码");
+            return;
+        }
+        if (_aiMode == 0 &&
+            (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+             !File.Exists(_editorSelectedPath)))
+        {
+            AiStatusText.Text = AppLocalization.T(
+                "请先选择一张照片用于 AI 修图");
+            return;
+        }
         var activationCode = LoadActivationCode();
         _aiGenerating = true;
         AiGenerateBtn.IsEnabled = false;
@@ -3767,13 +3886,17 @@ public partial class MainWindow : Window
                 ["prompt"] = _aiPrompt,
                 ["size"] = size
             };
-            if (_aiMode == 0 && _editorSelectedPath != null &&
-                File.Exists(_editorSelectedPath))
+            if (_aiMode == 0 && _editorSelectedPath != null)
             {
                 var sourceBytes = await File.ReadAllBytesAsync(
                     _editorSelectedPath);
+                if (sourceBytes.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        "原图为空，未发送 AI 修图请求");
+                }
                 var b64 = Convert.ToBase64String(sourceBytes);
-                body["image"] = $"data:image/jpeg;base64,{b64}";
+                body["image"] = $"data:{ImageMimeType(_editorSelectedPath)};base64,{b64}";
             }
             using var client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(60);
@@ -3782,14 +3905,27 @@ public partial class MainWindow : Window
                 System.Text.Encoding.UTF8,
                 "application/json");
             var response = await client.PostAsync(endpoint, content);
+            var serverRemaining = ReadServerRemainingUsage(response);
             if (!response.IsSuccessStatusCode)
             {
                 var code = (int)response.StatusCode;
+                if (code == 403)
+                {
+                    _aiServerRemainingUsage = serverRemaining ?? 0;
+                    SaveServerRemainingUsage(_aiServerRemainingUsage.Value);
+                }
                 if (code == 403)
                     throw new Exception("激活码无效或次数用完");
                 if (code == 502)
                     throw new Exception("AI 服务暂时不可用");
                 throw new Exception($"API 服务返回错误 {code}");
+            }
+            // The proxy is authoritative. Keep the local counter only for old
+            // proxy deployments that do not return the remaining-use header.
+            if (serverRemaining is { } remaining)
+            {
+                _aiServerRemainingUsage = remaining;
+                SaveServerRemainingUsage(remaining);
             }
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
@@ -3814,10 +3950,15 @@ public partial class MainWindow : Window
             }
             var tempPath = Path.Combine(
                 Path.GetTempPath(),
-                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}.jpg");
+                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid():N}.jpg");
             await File.WriteAllBytesAsync(tempPath, imageBytes);
             _aiResultPath = tempPath;
-            RecordAiUsage();
+            if (serverRemaining is null)
+            {
+                RecordAiUsage();
+                _aiServerRemainingUsage = GetLocalRemainingUsage();
+                SaveServerRemainingUsage(_aiServerRemainingUsage.Value);
+            }
             AiStatusText.Text = AppLocalization.T("生成完成");
         }
         catch (Exception error)
@@ -3843,26 +3984,37 @@ public partial class MainWindow : Window
         }
         try
         {
-            var stem = _aiMode == 0 ? "edited" : "generated";
-            var dest = new FileInfo(
-                UniqueDestination(
-                    $"ai_{stem}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
             using var source = File.OpenRead(_aiResultPath);
             var bytes = new byte[source.Length];
             source.ReadExactly(bytes);
-            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
             using var memStream = new MemoryStream(bytes);
             var decoder = BitmapDecoder.Create(
                 memStream,
                 BitmapCreateOptions.PreservePixelFormat,
                 BitmapCacheOption.OnLoad);
-            encoder.Frames.Add(BitmapFrame.Create(decoder.Frames[0]));
-            using var fileStream = dest.OpenWrite();
-            encoder.Save(fileStream);
-            _editorSelectedPath = dest.FullName;
-            RefreshPhotoList();
-            AiStatusText.Text = AppLocalization.T(
-                $"已保存 AI 结果 · {dest.Name}");
+            var frame = decoder.Frames[0];
+            if (_aiMode == 0 &&
+                !string.IsNullOrWhiteSpace(_editorSelectedPath) &&
+                File.Exists(_editorSelectedPath))
+            {
+                var originalPath = _editorSelectedPath;
+                SaveBitmapAtomically(originalPath, frame);
+                RefreshPhotoList();
+                RefreshImageEditor();
+                AiStatusText.Text = AppLocalization.T(
+                    $"已覆盖原图 · {Path.GetFileName(originalPath)}");
+            }
+            else
+            {
+                var dest = new FileInfo(
+                    UniqueDestination(
+                        $"ai_generated_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.jpg"));
+                SaveBitmapAtomically(dest.FullName, frame);
+                _editorSelectedPath = dest.FullName;
+                RefreshPhotoList();
+                AiStatusText.Text = AppLocalization.T(
+                    $"已保存 AI 结果 · {dest.Name}");
+            }
         }
         catch (Exception error)
         {
@@ -3874,6 +4026,61 @@ public partial class MainWindow : Window
     public string UniqueDestination(string filename)
     {
         return Path.Combine(_library.DirectoryPath, filename);
+    }
+
+    private static void SaveBitmapAtomically(
+        string destination,
+        BitmapSource bitmap)
+    {
+        var temporary = destination + $".zenche-{Guid.NewGuid():N}.tmp";
+        try
+        {
+            var extension = Path.GetExtension(destination);
+            BitmapEncoder encoder = extension.ToLowerInvariant() switch
+            {
+                ".png" => new PngBitmapEncoder(),
+                ".bmp" => new BmpBitmapEncoder(),
+                ".tif" or ".tiff" => new TiffBitmapEncoder(),
+                _ => new JpegBitmapEncoder { QualityLevel = 95 }
+            };
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var fileStream = new FileStream(
+                       temporary,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                encoder.Save(fileStream);
+                fileStream.Flush(true);
+            }
+            if (File.Exists(destination))
+            {
+                File.Replace(temporary, destination, null);
+            }
+            else
+            {
+                File.Move(temporary, destination);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+    }
+
+    private static string ImageMimeType(string? path)
+    {
+        return Path.GetExtension(path ?? string.Empty).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".heic" or ".heif" => "image/heic",
+            ".tif" or ".tiff" => "image/tiff",
+            ".bmp" => "image/bmp",
+            _ => "image/jpeg"
+        };
     }
 
     private void EditorPhotoBox_SelectionChanged(
@@ -3922,7 +4129,166 @@ public partial class MainWindow : Window
             false,
             new EditorSliderSpec("dehaze", "去雾", -100, 100),
             new EditorSliderSpec("vignette", "暗角", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorColorWheelsGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorCurvesGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorPickerGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorMaskGroup());
         EditorAdjustmentHost.Children.Add(CreateEditorGeometryGroup());
+    }
+
+    private Expander CreateEditorColorWheelsGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        var intro = new TextBlock
+        {
+            Text = AppLocalization.T("Lift / Gamma / Gain · 三向色轮"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        content.Children.Add(intro);
+        var wheels = new UniformGrid { Columns = 3, Rows = 1 };
+        wheels.Children.Add(CreateColorWheel("lift", "阴影", "#43B7FF"));
+        wheels.Children.Add(CreateColorWheel("gamma", "中间调", "#C68CFF"));
+        wheels.Children.Add(CreateColorWheel("gain", "高光", "#FFD36A"));
+        content.Children.Add(wheels);
+        return new Expander
+        {
+            Header = AppLocalization.T("色轮"),
+            Content = content,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+    }
+
+    private FrameworkElement CreateColorWheel(string key, string label, string color)
+    {
+        var amount = new TextBlock
+        {
+            Text = "0",
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var slider = new Slider
+        {
+            Tag = $"grade:{key}",
+            Minimum = -100,
+            Maximum = 100,
+            TickFrequency = 1,
+            IsSnapToTickEnabled = true,
+            Width = 76,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        _editorGradeSliders[key] = slider;
+        slider.ValueChanged += (_, _) =>
+        {
+            amount.Text = $"{slider.Value:+0;-0;0}";
+            SetEditorAdjustment(key, slider.Value);
+            if (!_initializing && !_updatingEditorControls) UpdateEditorPreview();
+        };
+        var panel = new StackPanel { Margin = new Thickness(3, 0, 3, 0) };
+        panel.Children.Add(new Border
+        {
+            Width = 66,
+            Height = 66,
+            CornerRadius = new CornerRadius(33),
+            BorderThickness = new Thickness(2),
+            BorderBrush = (Brush)new BrushConverter().ConvertFromString(color)!,
+            Background = (Brush)FindResource("GraphiteBrush"),
+            Child = new TextBlock
+            {
+                Text = "●",
+                FontSize = 24,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = (Brush)new BrushConverter().ConvertFromString(color)!
+            }
+        });
+        panel.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 0) });
+        panel.Children.Add(amount);
+        panel.Children.Add(slider);
+        return panel;
+    }
+
+    private Expander CreateEditorCurvesGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        content.Children.Add(new Border
+        {
+            Height = 132,
+            Background = (Brush)FindResource("GraphiteBrush"),
+            BorderBrush = (Brush)FindResource("GraphiteRuleBrush"),
+            BorderThickness = new Thickness(1),
+            Child = new Canvas
+            {
+                Children =
+                {
+                    new Polyline { Points = new PointCollection { new Point(0, 124), new Point(34, 107), new Point(70, 85), new Point(108, 48), new Point(145, 8), new Point(180, 0) }, Stroke = (Brush)FindResource("AccentBrush"), StrokeThickness = 2 },
+                    new Line { X1 = 0, Y1 = 124, X2 = 180, Y2 = 0, Stroke = (Brush)FindResource("GraphiteMutedBrush"), StrokeThickness = 1, Opacity = 0.4 }
+                }
+            }
+        });
+        content.Children.Add(CreateEditorGradeSlider("curveShadows", "阴影曲线", -100, 100));
+        content.Children.Add(CreateEditorGradeSlider("curveMidtones", "中间调曲线", -100, 100));
+        content.Children.Add(CreateEditorGradeSlider("curveHighlights", "高光曲线", -100, 100));
+        return new Expander { Header = AppLocalization.T("曲线"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private FrameworkElement CreateEditorGradeSlider(string key, string label, double min, double max)
+    {
+        var valueText = new TextBlock { Text = "0", Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), HorizontalAlignment = HorizontalAlignment.Right };
+        var heading = new DockPanel();
+        heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
+        DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
+        var slider = new Slider { Tag = $"grade:{key}", Minimum = min, Maximum = max, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
+        _editorGradeSliders[key] = slider;
+        slider.ValueChanged += (_, _) => { valueText.Text = $"{slider.Value:+0;-0;0}"; SetEditorAdjustment(key, slider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
+        var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
+        row.Children.Add(heading); row.Children.Add(slider); return row;
+    }
+
+    private Expander CreateEditorPickerGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        _editorPickedColorText = new TextBlock { Text = AppLocalization.T("未取样"), Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), Margin = new Thickness(0, 0, 0, 8) };
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("在预览画面点击取样色彩，自动微调色温与色调"), Foreground = (Brush)FindResource("MutedBrush"), FontSize = 11, Margin = new Thickness(0, 0, 0, 6) });
+        var arm = new Button { Content = AppLocalization.T("取色器"), Style = (Style)FindResource("ButtonBase") };
+        arm.Click += (_, _) => { _editorPickerArmed = !_editorPickerArmed; _editorAdjustments.PickerEnabled = _editorPickerArmed; arm.Content = AppLocalization.T(_editorPickerArmed ? "点击预览取色 · 再次关闭" : "取色器"); EditorStatusText.Text = AppLocalization.T(_editorPickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭"); };
+        content.Children.Add(arm); content.Children.Add(_editorPickedColorText);
+        return new Expander { Header = AppLocalization.T("取色器"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private Expander CreateEditorMaskGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        _editorMaskBox = new ComboBox { ItemsSource = new[] { "无", "线性渐变", "径向渐变", "主体" }.Select(AppLocalization.T).ToList(), SelectedIndex = 0 };
+        _editorMaskBox.SelectionChanged += (_, _) => { if (!_updatingEditorControls) { _editorAdjustments.MaskType = _editorMaskBox.SelectedIndex switch { 1 => "线性渐变", 2 => "径向渐变", 3 => "主体", _ => "无" }; UpdateEditorPreview(); } };
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("蒙版类型"), FontWeight = FontWeights.SemiBold });
+        content.Children.Add(_editorMaskBox);
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("强度"), FontWeight = FontWeights.SemiBold });
+        _editorMaskAmountSlider = CreateEditorMaskSlider("maskAmount", "强度");
+        content.Children.Add(_editorMaskAmountSlider.Parent as FrameworkElement ?? _editorMaskAmountSlider);
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("羽化"), FontWeight = FontWeights.SemiBold });
+        _editorMaskFeatherSlider = CreateEditorMaskSlider("maskFeather", "羽化");
+        content.Children.Add(_editorMaskFeatherSlider.Parent as FrameworkElement ?? _editorMaskFeatherSlider);
+        var invert = new CheckBox { Content = AppLocalization.T("反相蒙版") };
+        invert.Checked += (_, _) => { _editorAdjustments.MaskInvert = true; UpdateEditorPreview(); };
+        invert.Unchecked += (_, _) => { _editorAdjustments.MaskInvert = false; UpdateEditorPreview(); };
+        content.Children.Add(invert);
+        return new Expander { Header = AppLocalization.T("蒙版"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private Slider CreateEditorMaskSlider(string key, string label)
+    {
+        var valueText = new TextBlock { Text = "0", Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), HorizontalAlignment = HorizontalAlignment.Right };
+        var heading = new DockPanel();
+        heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
+        DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
+        var slider = new Slider { Tag = $"grade:{key}", Minimum = 0, Maximum = 100, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
+        slider.ValueChanged += (_, _) => { valueText.Text = $"{slider.Value:0}"; SetEditorAdjustment(key, slider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
+        var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
+        row.Children.Add(heading); row.Children.Add(slider); row.Tag = slider;
+        return slider;
     }
 
     private Expander CreateEditorGroup(

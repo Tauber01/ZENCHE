@@ -209,7 +209,7 @@ private struct SupportedCamera: Equatable {
             minimumISO: 100,
             maximumISO: 51200
         ),
-        // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        // ── Sony α ── (Product ID 0 means vendor wildcard)
         // Full-frame E-mount
         SupportedCamera(
             name: "Sony A1",
@@ -439,7 +439,38 @@ private struct SupportedCamera: Equatable {
     }
 
     static func matching(productID: Int, vendorID: Int) -> SupportedCamera? {
-        all.first { $0.productID == productID && $0.vendorID == vendorID }
+        all.first {
+            $0.vendorID == vendorID
+                && $0.productID != 0
+                && $0.productID == productID
+        }
+    }
+
+    static func matchingVendor(vendorID: Int) -> SupportedCamera? {
+        switch vendorID {
+        case 0x054c:
+            return SupportedCamera(
+                name: "Sony " + "α USB/PTP",
+                vendorName: "Sony",
+                vendorID: vendorID,
+                productID: 0,
+                detectionTokens: [],
+                minimumISO: 100,
+                maximumISO: 102400
+            )
+        case 0x04a9:
+            return SupportedCamera(
+                name: "Canon " + "EOS USB/PTP",
+                vendorName: "Canon",
+                vendorID: vendorID,
+                productID: 0,
+                detectionTokens: [],
+                minimumISO: 100,
+                maximumISO: 102400
+            )
+        default:
+            return nil
+        }
     }
 
     static func isoOptions(for cameraName: String?) -> [Int] {
@@ -869,6 +900,9 @@ private final class GPhotoCamera {
                     .compactMap { $0 as? String }
                     .joined(separator: " ")
                 if let match = SupportedCamera.matching(detection: descriptor) {
+                    return match
+                }
+                if let match = SupportedCamera.matchingVendor(vendorID: vendor) {
                     return match
                 }
             }
@@ -2358,6 +2392,37 @@ private final class CameraModel: ObservableObject {
                 "保存编辑副本失败：\(error.localizedDescription)"
             )
             errorMessage = "保存编辑副本失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    @discardableResult
+    func replaceEditedPhoto(
+        _ data: Data,
+        at sourceURL: URL,
+        originalFilename: String
+    ) -> URL? {
+        do {
+            let destination = try captureWorkflow.replace(
+                data: data,
+                at: sourceURL,
+                originalFilename: originalFilename,
+                cameraName: "Editor"
+            )
+            reloadPhotos()
+            selectedPhoto = photos.first { $0.url == destination }
+            detail = "已替换原图 · \(destination.lastPathComponent)"
+            logger.info(
+                "editor",
+                "AI 修图已原子替换原图；文件=\(destination.lastPathComponent)"
+            )
+            return destination
+        } catch {
+            logger.error(
+                "editor",
+                "替换原图失败：\(error.localizedDescription)"
+            )
+            errorMessage = "替换原图失败：\(error.localizedDescription)"
             return nil
         }
     }
@@ -5548,6 +5613,7 @@ final class ActivationManager {
     private static let deviceIdKeychainService = "com.tauber.nikonlink.ai-device-id"
     private static let deviceIdKeychainAccount = "ai_device_id"
     private static let usageCountKey = "ai_usage_count"
+    private static let serverRemainingKey = "ai_server_remaining"
     private static let maxUsage = 100
     private static let stableDeviceId: String = {
         if let existing = UserDefaults.standard.string(forKey: deviceIdKey),
@@ -5578,16 +5644,28 @@ final class ActivationManager {
 
     static var isActivated: Bool {
         guard UserDefaults.standard.bool(forKey: activatedKey) else { return false }
-        return UserDefaults.standard.integer(forKey: usageCountKey) < maxUsage
+        return remainingUsage > 0
     }
 
     static var remainingUsage: Int {
-        max(0, maxUsage - UserDefaults.standard.integer(forKey: usageCountKey))
+        if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
+            return max(0, min(maxUsage, server))
+        }
+        return max(0, maxUsage - UserDefaults.standard.integer(forKey: usageCountKey))
     }
 
-    static func recordUsage() {
+    static func updateServerRemaining(_ remaining: Int) {
+        UserDefaults.standard.set(max(0, min(maxUsage, remaining)), forKey: serverRemainingKey)
+        if remaining <= 0 { UserDefaults.standard.set(false, forKey: activatedKey) }
+    }
+
+    static func recordUsageFallback() {
         let c = UserDefaults.standard.integer(forKey: usageCountKey) + 1
         UserDefaults.standard.set(c, forKey: usageCountKey)
+        if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
+            updateServerRemaining(server - 1)
+        }
+        if c >= maxUsage { UserDefaults.standard.set(false, forKey: activatedKey) }
     }
 
     static var deviceId: String {
@@ -5620,6 +5698,7 @@ final class ActivationManager {
         if ok {
             UserDefaults.standard.set(true, forKey: activatedKey)
             UserDefaults.standard.set(0, forKey: usageCountKey)
+            UserDefaults.standard.removeObject(forKey: serverRemainingKey)
             UserDefaults.standard.set(did, forKey: deviceIdKey)
             UserDefaults.standard.set(t, forKey: "ai_activation_code")
         }
@@ -5701,12 +5780,34 @@ private final class AiImageService {
 
     struct ImageData: Decodable { let b64_json: String?; let url: String? }
     struct ResponseData: Decodable { let data: [ImageData] }
+    struct Result {
+        let data: Data
+        let remainingUsage: Int?
+    }
 
-    func generate(prompt: String, sourceImageData: Data?, size: String, activationCode: String, deviceId: String) async throws -> Data {
+    func generate(
+        prompt: String,
+        sourceImageData: Data?,
+        sourceFilename: String?,
+        size: String,
+        activationCode: String,
+        deviceId: String
+    ) async throws -> Result {
         let base = Self.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let url = URL(string: base + "/v1/ai") else { throw AiServiceError.invalidEndpoint }
         var req = Request(activationCode: activationCode, deviceId: deviceId, prompt: prompt, size: size)
-        if let src = sourceImageData { req.image = src.base64EncodedString() }
+        if let src = sourceImageData, !src.isEmpty {
+            let ext = (sourceFilename as NSString?)?.pathExtension.lowercased() ?? "jpg"
+            let mime: String
+            switch ext {
+            case "png": mime = "image/png"
+            case "heic", "heif": mime = "image/heic"
+            case "tif", "tiff": mime = "image/tiff"
+            case "bmp": mime = "image/bmp"
+            default: mime = "image/jpeg"
+            }
+            req.image = "data:\(mime);base64,\(src.base64EncodedString())"
+        }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.timeoutInterval = 60; r.httpBody = try JSONEncoder().encode(req)
@@ -5719,9 +5820,13 @@ private final class AiImageService {
         }
         let result = try JSONDecoder().decode(ResponseData.self, from: data)
         guard let first = result.data.first else { throw AiServiceError.noImageReturned }
-        if let b64 = first.b64_json, let img = Data(base64Encoded: b64) { return img }
+        let remaining = hr.value(forHTTPHeaderField: "X-ZENCHE-Remaining").flatMap(Int.init)
+        if let b64 = first.b64_json, let img = Data(base64Encoded: b64) {
+            return Result(data: img, remainingUsage: remaining)
+        }
         if let u = first.url, let url = URL(string: u) {
-            let (d, _) = try await URLSession.shared.data(from: url); return d
+            let (d, _) = try await URLSession.shared.data(from: url)
+            return Result(data: d, remainingUsage: remaining)
         }
         throw AiServiceError.noImageReturned
     }
@@ -6036,12 +6141,12 @@ private struct ImageEditorView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Label("AI 创作", systemImage: "sparkles")
                         .font(.system(size: 15, weight: .semibold))
-                    Text("联网生成与修图 · 结果保存为新文件")
+                    Text("修图覆盖原图 · 生图保存新文件")
                         .font(.system(size: 11))
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
-                Text(ActivationManager.isActivated ? "已解锁" : "需要激活")
+                Text(ActivationManager.isActivated ? "已解锁 · 剩余 \(ActivationManager.remainingUsage) 次" : "需要激活")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(ActivationManager.isActivated ? Palette.positive : Palette.muted)
                     .padding(.horizontal, 10)
@@ -6871,16 +6976,32 @@ private struct ImageEditorView: View {
     private func generateAi() {
         guard !aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "请输入提示词"; return }
         guard let code = ActivationManager.savedCode else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
-        let src: Data? = aiMode == .edit ? selectedPhoto.flatMap { try? Data(contentsOf: $0.url) } : nil
-        if aiMode == .edit && src == nil { status = "请先选择一张照片用于 AI 修图"; return }
+        let sourceFilename = aiMode == .edit ? selectedPhoto?.name : nil
+        let src: Data?
+        if aiMode == .edit {
+            guard let photo = selectedPhoto,
+                  let data = try? Data(contentsOf: photo.url),
+                  !data.isEmpty else {
+                status = "无法读取原图，未发送 AI 修图请求"
+                return
+            }
+            src = data
+        } else {
+            src = nil
+        }
         aiIsGenerating = true; status = "正在调用 AI 模型…"
         let sz = aiRatio.size
         let did = ActivationManager.deviceId
         Task {
             do {
-                let d = try await aiService.generate(prompt: aiPrompt, sourceImageData: src, size: sz, activationCode: code, deviceId: did)
-                let img = NSImage(data: d)
+                let result = try await aiService.generate(prompt: aiPrompt, sourceImageData: src, sourceFilename: sourceFilename, size: sz, activationCode: code, deviceId: did)
+                let img = NSImage(data: result.data)
                 await MainActor.run {
+                    if let remaining = result.remainingUsage {
+                        ActivationManager.updateServerRemaining(remaining)
+                    } else {
+                        ActivationManager.recordUsageFallback()
+                    }
                     aiResultImage = img; aiIsGenerating = false
                     status = img != nil ? "生成完成" : "无法解码 AI 返回的图片"
                 }
@@ -6895,8 +7016,17 @@ private struct ImageEditorView: View {
         let rep = NSBitmapImageRep(cgImage: cg)
         guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.95]) else { status = "无法编码 AI 结果"; return }
         isSaving = true
-        let fn = "ai_\(aiMode == .edit ? "edited" : "generated").jpg"
-        if let saved = model.saveEditedPhoto(data, originalFilename: fn) {
+        let saved: URL?
+        if aiMode == .edit, let selectedPhoto {
+            saved = model.replaceEditedPhoto(
+                data,
+                at: selectedPhoto.url,
+                originalFilename: selectedPhoto.name
+            )
+        } else {
+            saved = model.saveEditedPhoto(data, originalFilename: "ai_generated.jpg")
+        }
+        if let saved {
             selectedPhotoURL = saved; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
         } else { status = model.errorMessage ?? "保存 AI 结果失败" }
         isSaving = false
@@ -7473,7 +7603,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.3.1"
+        ) as? String ?? "1.4.0"
     }
 
     var body: some View {

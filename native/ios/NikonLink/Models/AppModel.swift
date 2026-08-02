@@ -252,6 +252,37 @@ final class MediaLibrary: ObservableObject {
         }
     }
 
+    @discardableResult
+    func replaceEditedImage(
+        _ data: Data,
+        at sourceURL: URL,
+        originalFilename: String
+    ) -> URL? {
+        do {
+            let destination = try workflow.replace(
+                data: data,
+                at: sourceURL,
+                originalFilename: originalFilename,
+                cameraName: "Editor"
+            )
+            reload()
+            selectedItemID = destination.path
+            message = "已替换原图 · \(destination.lastPathComponent)"
+            DiagnosticLogger.shared.info(
+                "editor",
+                "AI 修图已原子替换原图；文件=\(destination.lastPathComponent)"
+            )
+            return destination
+        } catch {
+            DiagnosticLogger.shared.error(
+                "editor",
+                "替换原图失败：\(error.localizedDescription)"
+            )
+            message = "替换原图失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
     func deleteSelected() {
         guard let selectedItem else { return }
         do {

@@ -173,7 +173,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.3.1"
+        ) as? String ?? "1.4.0"
     }
 
     var body: some View {
@@ -507,6 +507,10 @@ private struct CurrentPage: View {
 private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
     case light = "光线"
     case color = "色彩"
+    case wheels = "色轮"
+    case curves = "曲线"
+    case picker = "取色器"
+    case mask = "蒙版"
     case detail = "细节"
     case effects = "效果"
     case geometry = "几何"
@@ -537,6 +541,9 @@ private enum AiResolution: String, CaseIterable, Identifiable {
 
 final class ActivationManager {
     private static let ak = "ai_activated"; private static let dk = "ai_device_id"
+    private static let usageCountKey = "ai_usage_count"
+    private static let serverRemainingKey = "ai_server_remaining"
+    private static let maxUsage = 100
     private static let deviceIdKeychainService = "com.tauber.nikonlink.ai-device-id"
     private static let deviceIdKeychainAccount = "ai_device_id"
     private static let stableDeviceId: String = {
@@ -554,7 +561,25 @@ final class ActivationManager {
         return id
     }()
     static var isActivated: Bool {
-        UserDefaults.standard.bool(forKey: ak)
+        UserDefaults.standard.bool(forKey: ak) && remainingUsage > 0
+    }
+    static var remainingUsage: Int {
+        if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
+            return max(0, min(maxUsage, server))
+        }
+        return max(0, maxUsage - UserDefaults.standard.integer(forKey: usageCountKey))
+    }
+    static func updateServerRemaining(_ remaining: Int) {
+        UserDefaults.standard.set(max(0, min(maxUsage, remaining)), forKey: serverRemainingKey)
+        if remaining <= 0 { UserDefaults.standard.set(false, forKey: ak) }
+    }
+    static func recordUsageFallback() {
+        let count = UserDefaults.standard.integer(forKey: usageCountKey) + 1
+        UserDefaults.standard.set(count, forKey: usageCountKey)
+        if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
+            updateServerRemaining(server - 1)
+        }
+        if count >= maxUsage { UserDefaults.standard.set(false, forKey: ak) }
     }
     static var deviceId: String {
         stableDeviceId
@@ -583,6 +608,8 @@ final class ActivationManager {
         let ok = SecKeyVerifySignature(pk, .rsaSignatureMessagePKCS1v15SHA256, pd as CFData, sig as CFData, &err)
         if ok {
             UserDefaults.standard.set(true, forKey: ak)
+            UserDefaults.standard.removeObject(forKey: usageCountKey)
+            UserDefaults.standard.removeObject(forKey: serverRemainingKey)
             UserDefaults.standard.set(did, forKey: dk)
             UserDefaults.standard.set(t, forKey: "ai_activation_code")
         }
@@ -637,7 +664,19 @@ private final class AiImageService {
     private static var endpoint: URL? {
         URL(string: "\(serverURL.trimmingCharacters(in: .whitespacesAndNewlines))/v1/ai")
     }
-    func generate(prompt: String, src: Data?, size: String, activationCode: String, deviceId: String) async throws -> Data {
+    struct Result {
+        let data: Data
+        let remainingUsage: Int?
+    }
+
+    func generate(
+        prompt: String,
+        src: Data?,
+        sourceFilename: String?,
+        size: String,
+        activationCode: String,
+        deviceId: String
+    ) async throws -> Result {
         guard let url = Self.endpoint else { throw AiError.invalidEndpoint }
         var body: [String: Any] = [
             "activationCode": activationCode,
@@ -645,7 +684,18 @@ private final class AiImageService {
             "prompt": prompt,
             "size": size
         ]
-        if let s = src { body["image"] = s.base64EncodedString() }
+        if let s = src, !s.isEmpty {
+            let ext = (sourceFilename as NSString?)?.pathExtension.lowercased() ?? "jpg"
+            let mime: String
+            switch ext {
+            case "png": mime = "image/png"
+            case "heic", "heif": mime = "image/heic"
+            case "tif", "tiff": mime = "image/tiff"
+            case "bmp": mime = "image/bmp"
+            default: mime = "image/jpeg"
+            }
+            body["image"] = "data:\(mime);base64,\(s.base64EncodedString())"
+        }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.timeoutInterval = 60; r.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -659,8 +709,14 @@ private final class AiImageService {
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let arr = json["data"] as? [[String: Any]], let f = arr.first else { throw AiError.noImageReturned }
-        if let b64 = f["b64_json"] as? String, let d = Data(base64Encoded: b64) { return d }
-        if let u = f["url"] as? String, let url = URL(string: u) { let (d,_) = try await URLSession.shared.data(from: url); return d }
+        let remaining = hr.value(forHTTPHeaderField: "X-ZENCHE-Remaining").flatMap(Int.init)
+        if let b64 = f["b64_json"] as? String, let d = Data(base64Encoded: b64) {
+            return Result(data: d, remainingUsage: remaining)
+        }
+        if let u = f["url"] as? String, let url = URL(string: u) {
+            let (d, _) = try await URLSession.shared.data(from: url)
+            return Result(data: d, remainingUsage: remaining)
+        }
         throw AiError.noImageReturned
     }
 }
@@ -753,6 +809,14 @@ private struct ProfessionalEditSettings {
     var noiseReduction = 0.0
     var dehaze = 0.0
     var vignette = 0.0
+    // DaVinci-inspired secondary grading tools.
+    var wheelLift = 0.0
+    var wheelGamma = 0.0
+    var wheelGain = 0.0
+    var curveContrast = 0.0
+    var curvePivot = 50.0
+    var maskEnabled = false
+    var maskFeather = 55.0
     var rotation = 0
     var flipHorizontal = false
     var flipVertical = false
@@ -886,6 +950,8 @@ private struct ImageEditorPage: View {
     @State private var aiResolution = AiResolution.k1
     @State private var aiResultImage: UIImage?
     @State private var aiIsGenerating = false
+    @State private var pickerSample = "—"
+    @State private var pickerColor = Color.white.opacity(0.12)
     private let aiService = AiImageService()
 
     private var photos: [LibraryItem] {
@@ -959,12 +1025,12 @@ private struct ImageEditorPage: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Label("AI 创作", systemImage: "sparkles")
                         .font(.headline)
-                    Text("联网生成与修图 · 结果保存为新文件")
+                    Text("修图覆盖原图 · 生图保存新文件")
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
                 }
                 Spacer()
-                Text(ActivationManager.isActivated ? "已解锁" : "需要激活")
+                Text(ActivationManager.isActivated ? "已解锁 · 剩余 \(ActivationManager.remainingUsage) 次" : "需要激活")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ActivationManager.isActivated ? IPalette.positive : IPalette.muted)
                     .padding(.horizontal, 10)
@@ -1297,6 +1363,14 @@ private struct ImageEditorPage: View {
                 standardSlider("色调", value: $settings.tint)
                 standardSlider("自然饱和度", value: $settings.vibrance)
                 standardSlider("饱和度", value: $settings.saturation)
+            case .wheels:
+                colorWheelsPanel
+            case .curves:
+                curvesPanel
+            case .picker:
+                pickerPanel
+            case .mask:
+                maskPanel
             case .detail:
                 standardSlider("纹理", value: $settings.texture)
                 standardSlider("清晰度", value: $settings.clarity)
@@ -1331,6 +1405,92 @@ private struct ImageEditorPage: View {
         .overlay {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(IPalette.rule)
+        }
+    }
+
+    private var colorWheelsPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("三向色轮 · Lift / Gamma / Gain")
+                .font(.subheadline.weight(.semibold))
+            HStack(spacing: 12) {
+                EditorColorWheel(title: "Lift", value: $settings.wheelLift, tint: .blue)
+                EditorColorWheel(title: "Gamma", value: $settings.wheelGamma, tint: .green)
+                EditorColorWheel(title: "Gain", value: $settings.wheelGain, tint: .orange)
+            }
+            standardSlider("Lift", value: $settings.wheelLift)
+            standardSlider("Gamma", value: $settings.wheelGamma)
+            standardSlider("Gain", value: $settings.wheelGain)
+        }
+    }
+
+    private var curvesPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("主曲线")
+                .font(.subheadline.weight(.semibold))
+            GeometryReader { proxy in
+                ZStack {
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: proxy.size.height))
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: 0))
+                    }
+                    .stroke(IPalette.rule, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    Path { path in
+                        let amount = settings.curveContrast / 100
+                        path.move(to: CGPoint(x: 0, y: proxy.size.height))
+                        path.addCurve(
+                            to: CGPoint(x: proxy.size.width, y: 0),
+                            control1: CGPoint(x: proxy.size.width * 0.28, y: proxy.size.height * (0.82 - amount * 0.3)),
+                            control2: CGPoint(x: proxy.size.width * 0.72, y: proxy.size.height * (0.18 + amount * 0.3))
+                        )
+                    }
+                    .stroke(IPalette.cobalt, lineWidth: 3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(IPalette.cobalt)
+                        .frame(width: 8, height: 8)
+                        .position(x: proxy.size.width * settings.curvePivot / 100,
+                                  y: proxy.size.height * (1 - settings.curvePivot / 100))
+                }
+                .background(IPalette.graphite)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).stroke(IPalette.rule) }
+            }
+            .frame(height: 190)
+            standardSlider("曲线对比度", value: $settings.curveContrast)
+            editorSlider(title: "中点", value: $settings.curvePivot, range: 0...100, step: 1, formatter: { "\(Int($0))" })
+        }
+    }
+
+    private var pickerPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("颜色取样器")
+                .font(.subheadline.weight(.semibold))
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(pickerColor)
+                    .frame(width: 48, height: 48)
+                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(IPalette.rule) }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(pickerSample).font(.caption.monospaced())
+                    Text("从当前照片中心读取 RGB")
+                        .font(.caption)
+                        .foregroundStyle(IPalette.muted)
+                }
+                Spacer()
+                Button { sampleCurrentColor() } label: {
+                    Label("取样", systemImage: "eyedropper")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var maskPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("启用径向蒙版", isOn: $settings.maskEnabled)
+            editorSlider(title: "羽化", value: $settings.maskFeather, range: 0...100, step: 1, formatter: { "\(Int($0))%" })
+            Text(settings.maskEnabled ? "蒙版范围：中心保留，边缘渐隐" : "未启用蒙版")
+                .font(.caption)
+                .foregroundStyle(IPalette.muted)
         }
     }
 
@@ -1494,6 +1654,28 @@ private struct ImageEditorPage: View {
             ]
         )
 
+        // Apply compact Lift/Gamma/Gain controls as channel offsets and gain.
+        let lift = settings.wheelLift / 260
+        let gamma = settings.wheelGamma / 180
+        let wheelGainValue = max(0.35, 1 + settings.wheelGain / 140)
+        output = filtered(
+            "CIColorMatrix",
+            image: output,
+            values: [
+                "inputRVector": CIVector(x: wheelGainValue, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: wheelGainValue, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: wheelGainValue, w: 0),
+                "inputBiasVector": CIVector(x: lift + gamma, y: lift, z: lift - gamma, w: 0)
+            ]
+        )
+        if settings.curveContrast != 0 {
+            output = filtered(
+                "CIColorControls",
+                image: output,
+                values: [kCIInputContrastKey: max(0.1, 1 + settings.curveContrast / 120)]
+            )
+        }
+
         if settings.texture > 0 {
             output = filtered(
                 "CIUnsharpMask",
@@ -1656,14 +1838,30 @@ private struct ImageEditorPage: View {
         guard !aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "请输入提示词"; return }
         guard ActivationManager.isActivated else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
         guard let code = ActivationManager.savedCode, !code.isEmpty else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
-        let src: Data? = aiMode == .edit ? selectedItem.flatMap { try? Data(contentsOf: $0.url) } : nil
-        if aiMode == .edit, src == nil { status = "请先选择一张照片用于 AI 修图"; return }
+        let sourceFilename = aiMode == .edit ? selectedItem?.filename : nil
+        let src: Data?
+        if aiMode == .edit {
+            guard let item = selectedItem,
+                  let data = try? Data(contentsOf: item.url),
+                  !data.isEmpty else {
+                status = "无法读取原图，未发送 AI 修图请求"
+                return
+            }
+            src = data
+        } else {
+            src = nil
+        }
         aiIsGenerating = true; status = "正在调用 AI 模型…"
         Task {
             do {
-                let d = try await aiService.generate(prompt: aiPrompt, src: src, size: aiRatio.size, activationCode: code, deviceId: ActivationManager.deviceId)
-                let img = UIImage(data: d)
+                let result = try await aiService.generate(prompt: aiPrompt, src: src, sourceFilename: sourceFilename, size: aiRatio.size, activationCode: code, deviceId: ActivationManager.deviceId)
+                let img = UIImage(data: result.data)
                 await MainActor.run {
+                    if let remaining = result.remainingUsage {
+                        ActivationManager.updateServerRemaining(remaining)
+                    } else {
+                        ActivationManager.recordUsageFallback()
+                    }
                     aiResultImage = img; aiIsGenerating = false
                     status = img != nil ? "生成完成" : "无法解码 AI 返回的图片"
                 }
@@ -1676,8 +1874,17 @@ private struct ImageEditorPage: View {
     private func saveAiResult() {
         guard let img = aiResultImage, let data = img.jpegData(compressionQuality: 0.95) else { status = "没有可保存的 AI 结果"; return }
         isSaving = true
-        let fn = "ai_\(aiMode == .edit ? "edited" : "generated").jpg"
-        if let saved = model.library.saveEditedImage(data, originalFilename: fn) {
+        let saved: URL?
+        if aiMode == .edit, let selectedItem {
+            saved = model.library.replaceEditedImage(
+                data,
+                at: selectedItem.url,
+                originalFilename: selectedItem.filename
+            )
+        } else {
+            saved = model.library.saveEditedImage(data, originalFilename: "ai_generated.jpg")
+        }
+        if let saved {
             selectedItemID = saved.path; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
         } else { status = model.library.message }
         isSaving = false
@@ -1690,6 +1897,26 @@ private struct ImageEditorPage: View {
         settingsBeforeAI = nil
         aiSummaryKey = "等待分析当前照片"
         aiAnalysis = nil
+    }
+
+    private func sampleCurrentColor() {
+        guard let selectedItem,
+              let image = CIImage(contentsOf: selectedItem.url) else {
+            pickerSample = "无法读取照片"
+            return
+        }
+        let extent = image.extent
+        let point = CGPoint(x: extent.midX, y: extent.midY)
+        guard let average = CIFilter(name: "CIAreaAverage") else { return }
+        average.setValue(image, forKey: kCIInputImageKey)
+        average.setValue(CIVector(cgRect: CGRect(x: point.x, y: point.y, width: 1, height: 1)), forKey: "inputExtent")
+        guard let output = average.outputImage,
+              let cg = context.createCGImage(output, from: output.extent.integral),
+              let data = cg.dataProvider?.data,
+              let bytes = CFDataGetBytePtr(data) else { return }
+        let r = Int(bytes[0]), g = Int(bytes[1]), b = Int(bytes[2])
+        pickerSample = String(format: "RGB %02X %02X %02X", r, g, b)
+        pickerColor = Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 
     private func analyzeAI() {
@@ -1847,6 +2074,36 @@ private struct EditorSectionButtonStyle: ButtonStyle {
                 )
             }
             .opacity(configuration.isPressed ? 0.72 : 1)
+    }
+}
+
+private struct EditorColorWheel: View {
+    let title: String
+    @Binding var value: Double
+    let tint: Color
+
+    var body: some View {
+        VStack(spacing: 5) {
+            ZStack {
+                Circle()
+                    .stroke(
+                        AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center),
+                        lineWidth: 10
+                    )
+                Circle()
+                    .fill(IPalette.graphite)
+                    .padding(8)
+                Circle()
+                    .fill(tint)
+                    .frame(width: 8, height: 8)
+                    .offset(x: CGFloat(value / 100) * 22, y: -CGFloat(value / 100) * 12)
+            }
+            .frame(width: 78, height: 78)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(IPalette.muted)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -4545,7 +4802,7 @@ private struct AppSettingsSheet: View {
                                 Text("AI 功能激活").font(.system(size: 15, weight: .bold))
                                 Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: 12)).foregroundStyle(IPalette.muted)
                                 if ActivationManager.isActivated {
-                                    Text("状态：已激活").font(.caption.weight(.semibold)).foregroundStyle(Color.green)
+                                    Text("状态：已激活 · 剩余 \(ActivationManager.remainingUsage) 次").font(.caption.weight(.semibold)).foregroundStyle(Color.green)
                                 }
                             }
                             Spacer()
@@ -4933,7 +5190,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                    Text("• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                     .font(.subheadline)
                     .lineSpacing(5)
 

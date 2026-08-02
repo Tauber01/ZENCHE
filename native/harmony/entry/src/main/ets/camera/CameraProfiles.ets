@@ -51,7 +51,7 @@ export const SUPPORTED_CAMERAS: Array<CameraProfile> = [
   new CameraProfile('Nikon Z50II', 'Nikon', 0x04b0, 0x0455, 100, 51200),
   new CameraProfile('Nikon Z5II', 'Nikon', 0x04b0, 0x0456, 100, 64000),
   new CameraProfile('Nikon ZR', 'Nikon', 0x04b0, 0x0457, 100, 51200),
-  // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+  // ── Sony α ── (Product ID 0 means vendor wildcard)
   // Full-frame E-mount
   new CameraProfile('Sony A1', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony A1 II', 'Sony', 0x054c, 0x0000, 100, 32000),
@@ -80,9 +80,24 @@ export const SUPPORTED_CAMERAS: Array<CameraProfile> = [
 ];
 
 export function profileForProduct(vendorId: number, productId: number): CameraProfile | undefined {
-  return SUPPORTED_CAMERAS.find((profile: CameraProfile) =>
-    profile.vendorId === vendorId && profile.productId === productId
+  const exact: CameraProfile | undefined = SUPPORTED_CAMERAS.find(
+    (profile: CameraProfile) =>
+      profile.vendorId === vendorId &&
+      profile.productId !== 0 &&
+      profile.productId === productId
   );
+  if (exact !== undefined) {
+    return exact;
+  }
+  // Keep the fallback generic when the USB descriptor does not expose a
+  // model, rather than guessing a specific camera.
+  if (vendorId === 0x054c) {
+    return new CameraProfile('Sony ' + 'α USB/PTP', 'Sony', vendorId, 0, 100, 102400);
+  }
+  if (vendorId === 0x04a9) {
+    return new CameraProfile('Canon ' + 'EOS USB/PTP', 'Canon', vendorId, 0, 100, 102400);
+  }
+  return undefined;
 }
 
 export function supportedCameraSummary(): string {

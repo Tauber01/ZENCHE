@@ -3,6 +3,26 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.4.0] - 2026-08-02
+
+### Fixed
+
+- Fixed AI reference-image forwarding: the complete selected image data URL is
+  sent through the proxy in the upstream `images` array, so edits are based on
+  the original photo instead of becoming unrelated generations.
+- Added server-authoritative AI quota deduction with remaining-count response
+  headers and automatic rollback when an upstream request fails.
+- AI retouching now atomically overwrites the current original; AI generation
+  continues to save a separate new file.
+
+### Changed
+
+- Synchronized the five native targets and their launch announcements around
+  the AI workflow, quota behavior, and original-versus-generated file semantics.
+- Improved Nikon, Sony, and Canon camera/PTP and professional-editor stability.
+- Raised native release metadata to version `1.4.0` / build `23` and aligned
+  package scripts, README downloads, and validation assets.
+
 ## [1.3.1] - 2026-08-02
 
 ### Added

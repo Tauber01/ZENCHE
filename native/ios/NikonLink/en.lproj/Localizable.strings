@@ -376,7 +376,7 @@
 "将照片移到废纸篓？" = "Move the photo to Trash?";
 "更新公告" = "What's New";
 "本次更新" = "In This Update";
-"• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。" = "• Unified the AI photo editing and generation workspace: editing now opens Professional Develop by default, with an explicit AI Tools switch; quick presets, ratios, resolutions, and library export remain.\n• Restored the device-code system: each activation key is bound to the current device and AI cloud usage is counted server-side; ZENCHE itself remains free and open source.\n• Added the official redemption path: copy the device ID and visit https://zenche.top to redeem a key bound to this device.\n• Added an Afdian redemption-code purchase prompt, QR code, and purchase entry. Only the official website and in-app Afdian entry are trusted.\n• Removed the editable AI Server window from Settings while retaining legacy configuration reads; Sony / Canon / Nikon camera compatibility remains.\n• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.";
+"• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。" = "• Fixed the AI photo-editing reference-image path: the selected photo is sent as a complete data URL, the proxy forwards it in the upstream images array, and waits for the task result so edits are based on the original.\n• Successful AI retouching overwrites the current original while preserving library records; AI generation still saves a new file.\n• AI usage is deducted by the server and the remaining count is returned; failed requests roll back, preventing missing quota deductions.\n• Kept device-bound activation, official redemption, Afdian purchase guidance, and scam warnings.\n• Improved Nikon / Sony / Canon camera detection, PTP capture, and professional editor stability.\n• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.";
 "谨防诈骗" = "Scam Warning";
 "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”或要求付费购买软件的人都是骗子，请勿转账。" = "ZENCHE is free and open source. Anyone claiming you must join a group to receive the software or pay to buy it is a scammer. Do not send money.";
 "自愿赞助" = "Optional Support";
@@ -539,7 +539,7 @@
 "请输入激活码" = "Please enter an activation code";
 "AI 功能已解锁" = "AI features unlocked";
 "AI 创作" = "AI Create";
-"联网生成与修图 · 结果保存为新文件" = "Online generation and editing · Results are saved as new files";
+"修图覆盖原图 · 生图保存新文件" = "AI editing overwrites the original · generation saves a new file";
 "需要激活" = "Activation required";
 "已解锁" = "Unlocked";
 "输出参数" = "Output parameters";

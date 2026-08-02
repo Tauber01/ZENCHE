@@ -132,6 +132,40 @@ final class CaptureWorkflow: ObservableObject {
     }
 
     @discardableResult
+    func replace(
+        data: Data,
+        at destination: URL,
+        originalFilename: String,
+        cameraName: String
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let temporary = destination
+            .deletingLastPathComponent()
+            .appendingPathComponent(".replace-\(UUID().uuidString).tmp")
+        try data.write(to: temporary, options: .atomic)
+        do {
+            if fileManager.fileExists(atPath: destination.path) {
+                _ = try fileManager.replaceItem(
+                    at: destination,
+                    withItemAt: temporary,
+                    backupItemName: nil,
+                    options: .usingNewMetadataOnly,
+                    resultingItemURL: nil
+                )
+            } else {
+                try fileManager.moveItem(at: temporary, to: destination)
+            }
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw error
+        }
+        try finalize(destination)
+        replaceChecksumEntry(for: destination)
+        status = "已替换原图 · \(destination.lastPathComponent)"
+        return destination
+    }
+
+    @discardableResult
     func importFile(
         from source: URL,
         cameraName: String,
@@ -192,6 +226,24 @@ final class CaptureWorkflow: ObservableObject {
                 }
             }
         }
+    }
+
+    private func replaceChecksumEntry(for primary: URL) {
+        guard let sessionRoot else { return }
+        let manifest = sessionRoot.appendingPathComponent("checksums.sha256")
+        guard let data = try? Data(contentsOf: primary) else { return }
+        let digest = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let relative = "Primary/\(primary.lastPathComponent)"
+        let lines = (try? String(contentsOf: manifest, encoding: .utf8))?
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+            .filter { !$0.hasSuffix("  \(relative)") } ?? []
+        try? (lines + ["\(digest)  \(relative)"])
+            .joined(separator: "\n")
+            .appending("\n")
+            .write(to: manifest, atomically: true, encoding: .utf8)
     }
 
     private func xmpSidecar(for filename: String) -> String {
