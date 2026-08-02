@@ -13,7 +13,6 @@ struct NikonLinkApp: App {
             RootView()
                 .environmentObject(model)
                 .environment(\.locale, model.language.locale)
-                .preferredColorScheme(.dark)
         }
     }
 }

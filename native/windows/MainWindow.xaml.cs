@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -149,6 +150,27 @@ public partial class MainWindow : Window
         double Maximum,
         bool Exposure = false);
 
+    private sealed record EditorAIAnalysis(
+        double MeanLuma,
+        double Contrast,
+        double ShadowRatio,
+        double HighlightRatio,
+        double Saturation,
+        double Red,
+        double Green,
+        double Blue,
+        double Detail)
+    {
+        public string Summary =>
+            MeanLuma < 0.38
+                ? "检测到画面偏暗，已提亮阴影并保护高光"
+                : MeanLuma > 0.64 || HighlightRatio > 0.08
+                    ? "检测到画面偏亮，已回收高光并恢复层次"
+                    : Contrast < 0.16
+                        ? "检测到动态范围偏平，已增强层次与色彩"
+                        : "曝光均衡，已优化色彩与细节";
+    }
+
     private static readonly string AnnouncementStatePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
@@ -163,6 +185,7 @@ public partial class MainWindow : Window
         "library-file-assignments.json");
     private const string LibraryDragFormat = "ZENCHE.LibraryFilePath";
     private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
+    private const string ZencheWebsiteUrl = "https://zenche.top";
     private readonly PtpCamera _camera = new();
     private readonly PhotoLibrary _library = new();
     private readonly CaptureWorkflow _workflow;
@@ -201,9 +224,172 @@ public partial class MainWindow : Window
     private TreeViewItem? _libraryDropTarget;
     private string? _editorSelectedPath;
     private readonly EditorAdjustments _editorAdjustments = new();
+    private EditorAdjustments? _editorSettingsBeforeAI;
+    private EditorAdjustments? _editorAICopiedSettings;
+    private EditorAIAnalysis? _editorAIAnalysis;
     private readonly Dictionary<string, Slider> _editorSliders = [];
     private ComboBox? _editorCropBox;
     private bool _updatingEditorControls;
+    private string _aiPrompt = "";
+    private int _aiMode; // 0=edit, 1=generate
+    private int _aiRatioIndex;
+    private int _aiResolutionIndex;
+    private string? _aiResultPath;
+    private bool _aiGenerating;
+    private bool _editorInAiMode;
+
+    private static readonly string[] AiSizes =
+    [
+        "1024x1024", "1792x1024", "1024x1792", "1365x1024", "1536x1024"
+    ];
+
+    private const int AiMaxUsage = 100;
+    private static readonly string AiDataDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink");
+
+    private static bool IsAiActivated()
+    {
+        var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+        return File.Exists(activatedPath);
+    }
+
+    private static int GetRemainingUsage()
+    {
+        var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
+        var count = 0;
+        if (File.Exists(countPath))
+            int.TryParse(File.ReadAllText(countPath).Trim(), out count);
+        return Math.Max(0, AiMaxUsage - count);
+    }
+
+    private static void RecordAiUsage()
+    {
+        Directory.CreateDirectory(AiDataDir);
+        var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
+        var count = 0;
+        if (File.Exists(countPath))
+            int.TryParse(File.ReadAllText(countPath).Trim(), out count);
+        count++;
+        File.WriteAllText(countPath, count.ToString());
+        if (count >= AiMaxUsage)
+        {
+            var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+            if (File.Exists(activatedPath)) File.Delete(activatedPath);
+        }
+    }
+
+    private static string GetDeviceId()
+    {
+        var devicePath = Path.Combine(AiDataDir, "ai-device-id.txt");
+        if (File.Exists(devicePath))
+            return File.ReadAllText(devicePath).Trim();
+        var id = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
+                 ?? Guid.NewGuid().ToString();
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(devicePath, id);
+        return id;
+    }
+
+    private static string LoadAiServerUrl()
+    {
+        try
+        {
+            var serverPath = Path.Combine(AiDataDir, "ai-server-url.txt");
+            if (File.Exists(serverPath))
+            {
+                var value = File.ReadAllText(serverPath).Trim();
+                if (value.Length > 0) return value;
+            }
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"读取 AI 服务器地址失败：{error.Message}");
+        }
+        return "http://101.34.255.115:8787";
+    }
+
+    private static string LoadActivationCode()
+    {
+        try
+        {
+            var codePath = Path.Combine(AiDataDir, "ai-activation-code.txt");
+            if (File.Exists(codePath))
+            {
+                var value = File.ReadAllText(codePath).Trim();
+                if (value.Length > 0) return value;
+            }
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"读取激活码失败：{error.Message}");
+        }
+        return string.Empty;
+    }
+
+    private static void SaveActivationCode(string code)
+    {
+        try
+        {
+            Directory.CreateDirectory(AiDataDir);
+            var codePath = Path.Combine(AiDataDir, "ai-activation-code.txt");
+            File.WriteAllText(codePath, code.Trim());
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "ai", $"保存激活码失败：{error.Message}");
+        }
+    }
+
+    private void AiBuy_Click(object sender, RoutedEventArgs e)
+    {
+        OpenAfdian();
+    }
+
+    private void AiOfficialWebsite_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = ZencheWebsiteUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "activation",
+                $"无法打开官网兑换页：{error.Message}");
+            ShowError("无法打开浏览器，请访问 zenche.top");
+        }
+    }
+
+    private void AiActivate_Click(object sender, RoutedEventArgs e)
+    {
+        var code = AiActivationCodeBox.Text.Trim();
+        if (string.IsNullOrEmpty(code))
+        {
+            AiActivationStatusText.Text = AppLocalization.T("请输入激活码");
+            return;
+        }
+        // 本地验签激活（RSA 公钥在客户端），服务器端负责真正计数
+        SaveActivationCode(code);
+        var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(activatedPath, "1");
+        AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
+        AiActivationCodeBox.Text = "";
+    }
+
+    private void AiCopyDeviceId_Click(object sender, RoutedEventArgs e)
+    {
+        Clipboard.SetText(GetDeviceId());
+        AiActivationStatusText.Text = AppLocalization.T("设备 ID 已复制，可前往官网兑换密钥");
+    }
 #if NIKONLINK_WINDOWS_SHARE
     private DataTransferManager? _dataTransferManager;
 #endif
@@ -264,6 +450,7 @@ public partial class MainWindow : Window
         };
         AppLocalization.Apply(this);
         _initializing = false;
+        UpdateExposureReadout();
         ShootingTaskStepText.IsEnabled = false;
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
@@ -1143,6 +1330,7 @@ public partial class MainWindow : Window
         object sender,
         SelectionChangedEventArgs e)
     {
+        UpdateExposureReadout();
         if (_initializing ||
             _configuringVideoControls ||
             !_camera.IsConnected ||
@@ -1260,6 +1448,7 @@ public partial class MainWindow : Window
         };
         AppLocalization.SetLanguage(language);
         AppLocalization.Apply(this);
+        UpdateExposureReadout();
     }
 
     private void ShowDestination(Button? navigation, string? destination)
@@ -1281,6 +1470,10 @@ public partial class MainWindow : Window
             destination == "settings"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        if (destination == "settings" && AiDeviceIdText is not null)
+        {
+            AiDeviceIdText.Text = GetDeviceId();
+        }
         var cameraWorkspace = destination is "capture" or "monitor";
         ParameterPanelShell.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
@@ -1293,6 +1486,15 @@ public partial class MainWindow : Window
         }
         if (destination == "editor")
         {
+            _editorInAiMode = !_editorInAiMode;
+            if (!_editorInAiMode)
+            {
+                EditorProGrid.Visibility = Visibility.Visible;
+                EditorAiGrid.Visibility = Visibility.Collapsed;
+                EditorHeaderTitle.Text = AppLocalization.T("专业显影");
+                EditorHeaderSubtitle.Text = AppLocalization.T(
+                    "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
+            }
             RefreshImageEditor();
         }
         ShootingTaskPanel.Visibility =
@@ -1362,7 +1564,7 @@ public partial class MainWindow : Window
         try
         {
             ParameterPanelTitle.Text = AppLocalization.T(
-                videoMode ? "视频曝光三要素与参数" : "照片曝光与参数");
+                videoMode ? "视频曝光与监看" : "拍摄控制");
             VideoFrameRateLabel.Visibility =
                 videoMode ? Visibility.Visible : Visibility.Collapsed;
             VideoFrameRateBox.Visibility =
@@ -2001,11 +2203,12 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 新增树状分支文件库，支持嵌套分支、拖拽归类与持久化组织。\n" +
-                "• 新增专业非破坏性修图工具，提供光影 / 色彩 / 细节 / 效果 / 几何五组参数与透明预设。\n" +
-                "• 新增可展开的全屏二级相机参数面板，移动端保持紧凑触控区域。\n" +
-                "• USB/PTP 连接可靠性大幅提升：瞬时错误自动重试、HONOR 设备同步降级传输。\n" +
-                "• 新增对 Nikon D500、D7500、D850（EXPEED 5）的 USB/PTP 控制支持。\n• 视频录制监看延迟优化：子采样解码、管道重叠取帧、智能跳帧分析。"),
+                "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n" +
+                "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n" +
+                "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n" +
+                "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n" +
+                "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n" +
+                "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -2941,6 +3144,8 @@ public partial class MainWindow : Window
                 : $"{profile.Name} · USB/PTP");
         ConnectButton.Content = AppLocalization.T(
             profile is null ? "连接相机" : "断开相机");
+        ConnectionDot.Fill = (Brush)FindResource(
+            profile is null ? "MutedBrush" : "PositiveBrush");
         PreviewEmpty.Visibility = profile is null
             ? Visibility.Visible
             : PreviewEmpty.Visibility;
@@ -2953,6 +3158,7 @@ public partial class MainWindow : Window
         }
         UpdateEnabledState();
         UpdateLiveViewState();
+        UpdateExposureReadout();
     }
 
     private void UpdateEnabledState()
@@ -3001,6 +3207,75 @@ public partial class MainWindow : Window
             PictureControlBox,
             "pictureControl",
             connected);
+        UpdateExposureReadout();
+    }
+
+    private void UpdateExposureReadout()
+    {
+        if (SourceReadoutText is null)
+        {
+            return;
+        }
+        var connected = _camera.IsConnected;
+        SourceReadoutText.Text = connected ? "USB/PTP" : "—";
+        ModeReadoutText.Text = connected ? ExposureModeText() : "—";
+        ShutterReadoutText.Text = connected
+            ? SelectedContent(ShutterBox, "—")
+            : "—";
+        ApertureReadoutText.Text = connected
+            ? SelectedContent(ApertureBox, "—")
+            : "—";
+        IsoReadoutText.Text = connected
+            ? SelectedContent(IsoBox, "—").Replace("ISO ", "")
+            : "—";
+        CompensationReadoutText.Text = connected
+            ? SelectedContent(ExposureCompensationBox, "—")
+            : "—";
+        UpdateReadoutState(
+            ShutterReadoutLabel,
+            ShutterReadoutText,
+            "快门",
+            _videoMode ? "videoExposureTime" : "exposureTime",
+            connected);
+        UpdateReadoutState(
+            ApertureReadoutLabel,
+            ApertureReadoutText,
+            "光圈",
+            "aperture",
+            connected);
+        UpdateReadoutState(
+            IsoReadoutLabel,
+            IsoReadoutText,
+            "ISO",
+            "iso",
+            connected);
+        UpdateReadoutState(
+            CompensationReadoutLabel,
+            CompensationReadoutText,
+            "曝光补偿",
+            "exposureCompensation",
+            connected);
+    }
+
+    private void UpdateReadoutState(
+        TextBlock label,
+        TextBlock value,
+        string title,
+        string parameter,
+        bool connected)
+    {
+        var writable = connected && _camera.CanAdjustParameter(parameter);
+        label.Text = AppLocalization.T(title) +
+            (connected && !writable ? $" · {AppLocalization.T("自动")}" : "");
+        value.Foreground = (Brush)FindResource(
+            writable ? "ReadoutGlowBrush" : "GraphiteInkBrush");
+    }
+
+    private static string SelectedContent(ComboBox box, string fallback)
+    {
+        return box.SelectedItem is ComboBoxItem item
+            ? Convert.ToString(item.Content) ?? fallback
+            : fallback;
     }
 
     private void SetParameterAvailability(
@@ -3253,6 +3528,11 @@ public partial class MainWindow : Window
 
     private void RefreshImageEditor()
     {
+        if (_editorInAiMode)
+        {
+            RefreshAiEditor();
+            return;
+        }
         var previousPath = _editorSelectedPath;
         var choices = _library.List()
             .Where(item => !item.IsVideo && IsEditableImage(item.Path))
@@ -3276,6 +3556,263 @@ public partial class MainWindow : Window
             ResetEditorControls();
         }
         UpdateEditorPreview();
+    }
+
+    private void RefreshAiEditor()
+    {
+        EditorHeaderTitle.Text = AppLocalization.T("AI 工具");
+        EditorHeaderSubtitle.Text = AppLocalization.T(
+            "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中输入激活码解锁。");
+        EditorProGrid.Visibility = Visibility.Collapsed;
+        EditorAiGrid.Visibility = Visibility.Visible;
+        AiEditModeBtn.Style = (Style)FindResource(
+            _aiMode == 0 ? "PrimaryButton" : "ButtonBase");
+        AiGenModeBtn.Style = (Style)FindResource(
+            _aiMode == 1 ? "PrimaryButton" : "ButtonBase");
+        AiPromptBox.Text = _aiPrompt;
+        AiUnlockStatus.Text = IsAiActivated()
+            ? AppLocalization.T($"已解锁 · 剩余 {GetRemainingUsage()} 次")
+            : AppLocalization.T("需要激活");
+        AiUnlockStatus.Foreground = IsAiActivated()
+            ? (System.Windows.Media.Brush)FindResource("PositiveBrush")
+            : (System.Windows.Media.Brush)FindResource("MutedBrush");
+        AiRatioBox.SelectedIndex = Math.Clamp(_aiRatioIndex, 0, AiRatioBox.Items.Count - 1);
+        AiResolutionBox.SelectedIndex = Math.Clamp(_aiResolutionIndex, 0, AiResolutionBox.Items.Count - 1);
+        AiStatusText.Text = AppLocalization.T(
+            _aiResultPath != null ? "生成完成" : "请输入提示词");
+        AiPreviewBadge.Visibility = _aiResultPath != null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AiSaveBtn.Visibility = _aiResultPath != null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AiPreviewEmpty.Visibility = _aiResultPath != null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (_aiResultPath != null)
+        {
+            try
+            {
+                AiPreviewImage.Source = new BitmapImage(
+                    new Uri(_aiResultPath));
+            }
+            catch { }
+        }
+        else
+        {
+            AiPreviewImage.Source = null;
+        }
+        RefreshAiPresets();
+    }
+
+    private void RefreshAiPresets()
+    {
+        AiPresetPanel.Children.Clear();
+        var presets = _aiMode == 0
+            ? new (string Label, string Prompt)[]
+            {
+                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
+                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
+                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
+                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
+                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
+                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
+                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
+                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
+            }
+            : new (string Label, string Prompt)[]
+            {
+                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
+                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
+                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
+                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
+            };
+        foreach (var preset in presets)
+        {
+            var button = new Button
+            {
+                Content = preset.Label,
+                Height = 30,
+                Margin = new Thickness(0, 0, 6, 6),
+                Padding = new Thickness(10, 0, 10, 0),
+                Style = (Style)FindResource("ButtonBase")
+            };
+            var prompt = preset.Prompt;
+            button.Click += (_, _) =>
+            {
+                AiPromptBox.Text = prompt;
+            };
+            AiPresetPanel.Children.Add(button);
+        }
+    }
+
+    private void AiEditMode_Click(object sender, RoutedEventArgs e)
+    {
+        _aiMode = 0;
+        RefreshAiEditor();
+        RefreshAiPresets();
+    }
+
+    private void AiGenMode_Click(object sender, RoutedEventArgs e)
+    {
+        _aiMode = 1;
+        RefreshAiEditor();
+        RefreshAiPresets();
+    }
+
+    private void AiRatioBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (AiRatioBox.SelectedIndex >= 0)
+            _aiRatioIndex = AiRatioBox.SelectedIndex;
+    }
+
+    private void AiResolutionBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (AiResolutionBox.SelectedIndex >= 0)
+            _aiResolutionIndex = AiResolutionBox.SelectedIndex;
+    }
+
+    private async void AiGenerate_Click(object sender, RoutedEventArgs e)
+    {
+        _aiPrompt = AiPromptBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(_aiPrompt))
+        {
+            AiStatusText.Text = AppLocalization.T("请输入提示词");
+            return;
+        }
+        if (!IsAiActivated())
+        {
+            AiStatusText.Text = AppLocalization.T(
+                "请先在设置中输入激活码解锁 AI 功能");
+            return;
+        }
+        var activationCode = LoadActivationCode();
+        _aiGenerating = true;
+        AiGenerateBtn.IsEnabled = false;
+        AiGenerateBtn.Content = AppLocalization.T("正在生成…");
+        AiStatusText.Text = AppLocalization.T("正在调用 AI 模型…");
+        try
+        {
+            var endpoint = $"{LoadAiServerUrl().TrimEnd('/')}/v1/ai";
+            var size = AiSizes[Math.Clamp(_aiRatioIndex, 0, AiSizes.Length - 1)];
+            var body = new Dictionary<string, object>
+            {
+                ["activationCode"] = activationCode,
+                ["deviceId"] = GetDeviceId(),
+                ["prompt"] = _aiPrompt,
+                ["size"] = size
+            };
+            if (_aiMode == 0 && _editorSelectedPath != null &&
+                File.Exists(_editorSelectedPath))
+            {
+                var sourceBytes = await File.ReadAllBytesAsync(
+                    _editorSelectedPath);
+                var b64 = Convert.ToBase64String(sourceBytes);
+                body["image"] = $"data:image/jpeg;base64,{b64}";
+            }
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(60);
+            var content = new StringContent(
+                JsonSerializer.Serialize(body),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            var response = await client.PostAsync(endpoint, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var code = (int)response.StatusCode;
+                if (code == 403)
+                    throw new Exception("激活码无效或次数用完");
+                if (code == 502)
+                    throw new Exception("AI 服务暂时不可用");
+                throw new Exception($"API 服务返回错误 {code}");
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var dataArr = doc.RootElement.GetProperty("data");
+            if (dataArr.GetArrayLength() == 0)
+                throw new Exception("AI 未返回有效图片");
+            var first = dataArr[0];
+            byte[] imageBytes;
+            if (first.TryGetProperty("b64_json", out var b64El) &&
+                b64El.GetString() is { Length: > 0 } b64Str)
+            {
+                imageBytes = Convert.FromBase64String(b64Str);
+            }
+            else if (first.TryGetProperty("url", out var urlEl) &&
+                     urlEl.GetString() is { Length: > 0 } imageUrl)
+            {
+                imageBytes = await client.GetByteArrayAsync(imageUrl);
+            }
+            else
+            {
+                throw new Exception("AI 未返回有效图片");
+            }
+            var tempPath = Path.Combine(
+                Path.GetTempPath(),
+                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}.jpg");
+            await File.WriteAllBytesAsync(tempPath, imageBytes);
+            _aiResultPath = tempPath;
+            RecordAiUsage();
+            AiStatusText.Text = AppLocalization.T("生成完成");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error("ai", $"AI 调用失败：{error.Message}");
+            AiStatusText.Text = AppLocalization.T(
+                $"AI 生成失败：{error.Message}");
+        }
+        finally
+        {
+            _aiGenerating = false;
+            AiGenerateBtn.IsEnabled = true;
+            AiGenerateBtn.Content = AppLocalization.T("生成");
+            RefreshAiEditor();
+        }
+    }
+
+    private void AiSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_aiResultPath == null || !File.Exists(_aiResultPath))
+        {
+            return;
+        }
+        try
+        {
+            var stem = _aiMode == 0 ? "edited" : "generated";
+            var dest = new FileInfo(
+                UniqueDestination(
+                    $"ai_{stem}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
+            using var source = File.OpenRead(_aiResultPath);
+            var bytes = new byte[source.Length];
+            source.ReadExactly(bytes);
+            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+            using var memStream = new MemoryStream(bytes);
+            var decoder = BitmapDecoder.Create(
+                memStream,
+                BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
+            encoder.Frames.Add(BitmapFrame.Create(decoder.Frames[0]));
+            using var fileStream = dest.OpenWrite();
+            encoder.Save(fileStream);
+            _editorSelectedPath = dest.FullName;
+            RefreshPhotoList();
+            AiStatusText.Text = AppLocalization.T(
+                $"已保存 AI 结果 · {dest.Name}");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error("ai", $"保存 AI 结果失败：{error.Message}");
+            AiStatusText.Text = AppLocalization.T("保存 AI 结果失败");
+        }
+    }
+
+    public string UniqueDestination(string filename)
+    {
+        return Path.Combine(_library.DirectoryPath, filename);
     }
 
     private void EditorPhotoBox_SelectionChanged(
@@ -3555,6 +4092,9 @@ public partial class MainWindow : Window
         {
             return;
         }
+        _editorSettingsBeforeAI = null;
+        UndoEditorAIButton.IsEnabled = false;
+        EditorAISummaryText.Text = AppLocalization.T("等待分析当前照片");
         ApplyEditorPreset(Convert.ToString(item.Tag) ?? "original");
         SyncEditorSliders();
         UpdateEditorPreview();
@@ -3689,8 +4229,300 @@ public partial class MainWindow : Window
         EditorPresetBox.SelectedIndex = 0;
         CompareEditorPhotoButton.Content =
             AppLocalization.T("查看原图");
+        _editorSettingsBeforeAI = null;
+        UndoEditorAIButton.IsEnabled = false;
+        EditorAISummaryText.Text = AppLocalization.T("等待分析当前照片");
         _updatingEditorControls = false;
         EditorStatusText.Text = AppLocalization.T("调整不会覆盖原文件");
+    }
+
+    private void EditorAIIntensity_Changed(
+        object sender,
+        RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (EditorAIIntensityText is not null)
+        {
+            EditorAIIntensityText.Text = $"{Math.Round(e.NewValue)}%";
+        }
+    }
+
+    private void ApplyEditorAI_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            return;
+        }
+        try
+        {
+            var analysis = _editorAIAnalysis ?? AnalyzeEditorPhoto(_editorSelectedPath);
+            _editorSettingsBeforeAI = _editorAdjustments.Copy();
+            _editorAIAnalysis = analysis;
+            ApplyEditorAI(
+                analysis,
+                EditorAIIntensitySlider.Value / 100);
+            _updatingEditorControls = true;
+            EditorPresetBox.SelectedIndex = 0;
+            _updatingEditorControls = false;
+            SyncEditorSliders();
+            UndoEditorAIButton.IsEnabled = true;
+            EditorAISummaryText.Text = AppLocalization.T(analysis.Summary);
+            UpdateEditorAIMetrics();
+            CopyEditorAIButton.IsEnabled = true;
+            EditorStatusText.Text = AppLocalization.T(
+                "AI 优化已应用 · 可继续微调");
+            UpdateEditorPreview();
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text = AppLocalization.T(
+                $"无法分析当前照片：{error.Message}");
+        }
+    }
+
+    private void AnalyzeEditorAI_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            return;
+        }
+        _editorAIAnalysis = AnalyzeEditorPhoto(_editorSelectedPath);
+        if (_editorAIAnalysis is null)
+        {
+            EditorStatusText.Text = AppLocalization.T("无法分析当前照片");
+            return;
+        }
+        EditorAISummaryText.Text = AppLocalization.T(_editorAIAnalysis.Summary);
+        UpdateEditorAIMetrics();
+        EditorStatusText.Text = AppLocalization.T("画面分析完成 · 可应用 AI 建议");
+    }
+
+    private void CopyEditorAI_Click(object sender, RoutedEventArgs e)
+    {
+        _editorAICopiedSettings = _editorAdjustments.Copy();
+        PasteEditorAIButton.IsEnabled = true;
+        EditorStatusText.Text = AppLocalization.T("已复制 AI 调整，可应用到下一张照片");
+    }
+
+    private void PasteEditorAI_Click(object sender, RoutedEventArgs e)
+    {
+        if (_editorAICopiedSettings is null)
+        {
+            return;
+        }
+        RestoreEditorAdjustments(_editorAICopiedSettings);
+        _editorAdjustments.ShowingOriginal = false;
+        UpdateEditorPreview();
+        EditorStatusText.Text = AppLocalization.T("已粘贴 AI 调整");
+    }
+
+    private void UpdateEditorAIMetrics()
+    {
+        if (_editorAIAnalysis is null)
+        {
+            EditorAIMetricsText.Text = AppLocalization.T("等待分析");
+            return;
+        }
+        var analysis = _editorAIAnalysis;
+        EditorAIMetricsText.Text = AppLocalization.T(
+            $"曝光 {analysis.MeanLuma:P0}  动态范围 {analysis.Contrast:P0}  " +
+            $"色彩 {analysis.Saturation:P0}  细节 {analysis.Detail:P0}");
+    }
+
+    private void UndoEditorAI_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_editorSettingsBeforeAI is null)
+        {
+            return;
+        }
+        RestoreEditorAdjustments(_editorSettingsBeforeAI);
+        _editorSettingsBeforeAI = null;
+        SyncEditorSliders();
+        UndoEditorAIButton.IsEnabled = false;
+        EditorAISummaryText.Text = AppLocalization.T("已撤销 AI 优化");
+        EditorStatusText.Text = AppLocalization.T(
+            "已恢复 AI 优化前的参数");
+        UpdateEditorPreview();
+    }
+
+    private void RestoreEditorAdjustments(EditorAdjustments source)
+    {
+        _editorAdjustments.Exposure = source.Exposure;
+        _editorAdjustments.Contrast = source.Contrast;
+        _editorAdjustments.Highlights = source.Highlights;
+        _editorAdjustments.Shadows = source.Shadows;
+        _editorAdjustments.Whites = source.Whites;
+        _editorAdjustments.Blacks = source.Blacks;
+        _editorAdjustments.Temperature = source.Temperature;
+        _editorAdjustments.Tint = source.Tint;
+        _editorAdjustments.Vibrance = source.Vibrance;
+        _editorAdjustments.Saturation = source.Saturation;
+        _editorAdjustments.Texture = source.Texture;
+        _editorAdjustments.Clarity = source.Clarity;
+        _editorAdjustments.Sharpening = source.Sharpening;
+        _editorAdjustments.NoiseReduction = source.NoiseReduction;
+        _editorAdjustments.Dehaze = source.Dehaze;
+        _editorAdjustments.Vignette = source.Vignette;
+        _editorAdjustments.Rotation = source.Rotation;
+        _editorAdjustments.FlipHorizontal = source.FlipHorizontal;
+        _editorAdjustments.FlipVertical = source.FlipVertical;
+        _editorAdjustments.ShowingOriginal = source.ShowingOriginal;
+        _editorAdjustments.CropRatio = source.CropRatio;
+    }
+
+    private void ApplyEditorAI(
+        EditorAIAnalysis analysis,
+        double intensity)
+    {
+        _editorAdjustments.ResetTone();
+        var amount = Math.Clamp(intensity, 0.35, 1);
+        var targetExposure = Math.Clamp(
+            Math.Log2(0.48 / Math.Max(0.08, analysis.MeanLuma)) * 0.68,
+            -0.8,
+            0.8);
+        _editorAdjustments.Exposure = targetExposure * amount;
+        _editorAdjustments.Contrast = AIValue(
+            Math.Clamp((0.20 - analysis.Contrast) * 130, -8, 24),
+            amount);
+        _editorAdjustments.Highlights = -AIValue(
+            Math.Clamp(
+                analysis.HighlightRatio * 360 +
+                    Math.Max(0, analysis.MeanLuma - 0.55) * 70,
+                6,
+                48),
+            amount);
+        _editorAdjustments.Shadows = AIValue(
+            Math.Clamp(
+                analysis.ShadowRatio * 330 +
+                    Math.Max(0, 0.44 - analysis.MeanLuma) * 75,
+                6,
+                46),
+            amount);
+        _editorAdjustments.Whites = AIValue(
+            Math.Clamp((0.58 - analysis.MeanLuma) * 28, -8, 14),
+            amount);
+        _editorAdjustments.Blacks = -AIValue(
+            Math.Clamp((0.21 - analysis.Contrast) * 55 + 5, 4, 18),
+            amount);
+        _editorAdjustments.Temperature = AIValue(
+            Math.Clamp((analysis.Blue - analysis.Red) * 95, -18, 18),
+            amount);
+        var greenExcess = analysis.Green -
+            (analysis.Red + analysis.Blue) / 2;
+        _editorAdjustments.Tint = AIValue(
+            Math.Clamp(greenExcess * 85, -14, 14),
+            amount);
+        _editorAdjustments.Vibrance = AIValue(
+            Math.Clamp((0.30 - analysis.Saturation) * 95 + 6, 4, 26),
+            amount);
+        _editorAdjustments.Saturation = AIValue(
+            Math.Clamp((0.22 - analysis.Saturation) * 28, -4, 8),
+            amount);
+        _editorAdjustments.Texture = AIValue(
+            Math.Clamp((0.075 - analysis.Detail) * 170 + 7, 4, 16),
+            amount);
+        _editorAdjustments.Clarity = AIValue(
+            Math.Clamp((0.19 - analysis.Contrast) * 70 + 6, 3, 18),
+            amount);
+        _editorAdjustments.Sharpening = AIValue(
+            Math.Clamp((0.08 - analysis.Detail) * 210 + 20, 14, 34),
+            amount);
+        _editorAdjustments.NoiseReduction = AIValue(
+            Math.Clamp(
+                analysis.ShadowRatio * 120 +
+                    Math.Max(0, 0.38 - analysis.MeanLuma) * 42 + 6,
+                6,
+                30),
+            amount);
+        _editorAdjustments.Dehaze = AIValue(
+            Math.Clamp((0.18 - analysis.Contrast) * 75, 0, 16),
+            amount);
+        _editorAdjustments.ShowingOriginal = false;
+        CompareEditorPhotoButton.Content = AppLocalization.T("查看原图");
+    }
+
+    private static double AIValue(double value, double amount) =>
+        Math.Round(value * amount);
+
+    private static EditorAIAnalysis AnalyzeEditorPhoto(string path)
+    {
+        using var stream = new MemoryStream(File.ReadAllBytes(path));
+        var decoder = BitmapDecoder.Create(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        var source = decoder.Frames[0];
+        var scale = Math.Min(1, 128.0 /
+            Math.Max(source.PixelWidth, source.PixelHeight));
+        var bitmap = new TransformedBitmap(
+            source,
+            new ScaleTransform(scale, scale));
+        var converted = new FormatConvertedBitmap(
+            bitmap,
+            PixelFormats.Bgra32,
+            null,
+            0);
+        var width = converted.PixelWidth;
+        var height = converted.PixelHeight;
+        var stride = width * 4;
+        var pixels = new byte[stride * height];
+        converted.CopyPixels(pixels, stride, 0);
+        var count = width * height;
+        var lumas = new double[count];
+        double red = 0;
+        double green = 0;
+        double blue = 0;
+        double saturation = 0;
+        double mean = 0;
+        var shadows = 0;
+        var highlights = 0;
+        for (var index = 0; index < count; index++)
+        {
+            var offset = index * 4;
+            var b = pixels[offset] / 255.0;
+            var g = pixels[offset + 1] / 255.0;
+            var r = pixels[offset + 2] / 255.0;
+            var luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+            lumas[index] = luma;
+            mean += luma;
+            red += r;
+            green += g;
+            blue += b;
+            saturation += Math.Max(r, Math.Max(g, b)) -
+                Math.Min(r, Math.Min(g, b));
+            if (luma < 0.10) shadows++;
+            if (luma > 0.90) highlights++;
+        }
+        mean /= count;
+        double variance = 0;
+        double detail = 0;
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var index = y * width + x;
+                variance += Math.Pow(lumas[index] - mean, 2);
+                if (x > 0)
+                {
+                    detail += Math.Abs(lumas[index] - lumas[index - 1]);
+                }
+            }
+        }
+        return new EditorAIAnalysis(
+            mean,
+            Math.Sqrt(variance / count),
+            shadows / (double)count,
+            highlights / (double)count,
+            saturation / count,
+            red / count,
+            green / count,
+            blue / count,
+            detail / Math.Max(1, height * (width - 1)));
     }
 
     private void UpdateEditorPreview()

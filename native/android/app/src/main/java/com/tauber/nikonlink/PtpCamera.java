@@ -21,31 +21,64 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 final class PtpCamera {
-    static final int NIKON_VENDOR_ID = 0x04b0;
+    static final Set<Integer> SUPPORTED_VENDOR_IDS = new HashSet<>(Arrays.asList(
+            0x04b0, 0x054c, 0x04a9
+    ));
     static final String SUPPORTED_CAMERA_SUMMARY =
-            "D500、Z7、Z6、Z50、D7500、D780、D6、Z5、D850、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
-                    + "Z f、Z6III、Z50II、Z5II、ZR";
+            "Nikon D500、Z7、Z6、Z50、D7500、D780、D6、Z5、D850、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
+                    + "Z f、Z6III、Z50II、Z5II、ZR"
+                    + "、Sony A1、A7R V、A7 IV、A7S III、A7C II"
+                    + "、Canon EOS R5、R6 Mark II、R3、R7、R8";
     private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
-            new CameraProfile("Nikon D500", 0x043a, 100, 51200),
-            new CameraProfile("Nikon Z7", 0x0442, 64, 25600),
-            new CameraProfile("Nikon Z6", 0x0443, 100, 51200),
-            new CameraProfile("Nikon Z50", 0x0444, 100, 51200),
-            new CameraProfile("Nikon D7500", 0x0445, 100, 51200),
-            new CameraProfile("Nikon D780", 0x0446, 100, 51200),
-            new CameraProfile("Nikon D6", 0x0447, 100, 102400),
-            new CameraProfile("Nikon Z5", 0x0448, 100, 51200),
-            new CameraProfile("Nikon D850", 0x044a, 64, 25600),
-            new CameraProfile("Nikon Z7II", 0x044b, 64, 25600),
-            new CameraProfile("Nikon Z6II", 0x044c, 100, 51200),
-            new CameraProfile("Nikon Z fc", 0x044f, 100, 51200),
-            new CameraProfile("Nikon Z9", 0x0450, 64, 25600),
-            new CameraProfile("Nikon Z8", 0x0451, 64, 25600),
-            new CameraProfile("Nikon Z30", 0x0452, 100, 51200),
-            new CameraProfile("Nikon Z f", 0x0453, 100, 64000),
-            new CameraProfile("Nikon Z6III", 0x0454, 100, 64000),
-            new CameraProfile("Nikon Z50II", 0x0455, 100, 51200),
-            new CameraProfile("Nikon Z5II", 0x0456, 100, 64000),
-            new CameraProfile("Nikon ZR", 0x0457, 100, 51200)
+            // ── Nikon EXPEED 5 ──
+            new CameraProfile("Nikon D500", "Nikon", 0x04b0, 0x043a, 100, 51200),
+            new CameraProfile("Nikon D7500", "Nikon", 0x04b0, 0x0445, 100, 51200),
+            new CameraProfile("Nikon D850", "Nikon", 0x04b0, 0x044a, 64, 25600),
+            // ── Nikon EXPEED 6 ──
+            new CameraProfile("Nikon Z7", "Nikon", 0x04b0, 0x0442, 64, 25600),
+            new CameraProfile("Nikon Z6", "Nikon", 0x04b0, 0x0443, 100, 51200),
+            new CameraProfile("Nikon Z50", "Nikon", 0x04b0, 0x0444, 100, 51200),
+            new CameraProfile("Nikon D780", "Nikon", 0x04b0, 0x0446, 100, 51200),
+            new CameraProfile("Nikon D6", "Nikon", 0x04b0, 0x0447, 100, 102400),
+            new CameraProfile("Nikon Z5", "Nikon", 0x04b0, 0x0448, 100, 51200),
+            new CameraProfile("Nikon Z7II", "Nikon", 0x04b0, 0x044b, 64, 25600),
+            new CameraProfile("Nikon Z6II", "Nikon", 0x04b0, 0x044c, 100, 51200),
+            new CameraProfile("Nikon Z fc", "Nikon", 0x04b0, 0x044f, 100, 51200),
+            new CameraProfile("Nikon Z30", "Nikon", 0x04b0, 0x0452, 100, 51200),
+            // ── Nikon EXPEED 7 ──
+            new CameraProfile("Nikon Z9", "Nikon", 0x04b0, 0x0450, 64, 25600),
+            new CameraProfile("Nikon Z8", "Nikon", 0x04b0, 0x0451, 64, 25600),
+            new CameraProfile("Nikon Z f", "Nikon", 0x04b0, 0x0453, 100, 64000),
+            new CameraProfile("Nikon Z6III", "Nikon", 0x04b0, 0x0454, 100, 64000),
+            new CameraProfile("Nikon Z50II", "Nikon", 0x04b0, 0x0455, 100, 51200),
+            new CameraProfile("Nikon Z5II", "Nikon", 0x04b0, 0x0456, 100, 64000),
+            new CameraProfile("Nikon ZR", "Nikon", 0x04b0, 0x0457, 100, 51200),
+            // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+            // Full-frame E-mount
+            new CameraProfile("Sony A1", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony A1 II", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony A9 III", "Sony", 0x054c, 0x0000, 100, 51200),
+            new CameraProfile("Sony A7R V", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony A7 IV", "Sony", 0x054c, 0x0000, 100, 51200),
+            new CameraProfile("Sony A7S III", "Sony", 0x054c, 0x0000, 80, 102400),
+            new CameraProfile("Sony A7C II", "Sony", 0x054c, 0x0000, 100, 51200),
+            new CameraProfile("Sony A7C R", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony ZV-E1", "Sony", 0x054c, 0x0000, 80, 102400),
+            // APS-C E-mount
+            new CameraProfile("Sony A6700", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony FX30", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony ZV-E10 II", "Sony", 0x054c, 0x0000, 100, 32000),
+            // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+            new CameraProfile("Canon EOS R1", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R3", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R5", "Canon", 0x04a9, 0x0000, 100, 51200),
+            new CameraProfile("Canon EOS R5 Mark II", "Canon", 0x04a9, 0x0000, 100, 51200),
+            new CameraProfile("Canon EOS R6 Mark II", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R7", "Canon", 0x04a9, 0x0000, 100, 12800),
+            new CameraProfile("Canon EOS R8", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R10", "Canon", 0x04a9, 0x0000, 100, 12800),
+            new CameraProfile("Canon EOS R50", "Canon", 0x04a9, 0x0000, 100, 12800),
+            new CameraProfile("Canon EOS R100", "Canon", 0x04a9, 0x0000, 100, 12800),
     };
 
     private static final int TYPE_COMMAND = 1;
@@ -110,26 +143,30 @@ final class PtpCamera {
         disconnect();
         UsbManager manager = (UsbManager) activity.getSystemService(MainActivity.USB_SERVICE);
         UsbDevice device = null;
-        UsbDevice unsupportedNikon = null;
+        UsbDevice unsupportedDevice = null;
         for (UsbDevice candidate : manager.getDeviceList().values()) {
-            if (candidate.getVendorId() != NIKON_VENDOR_ID) continue;
+            if (!SUPPORTED_VENDOR_IDS.contains(candidate.getVendorId())) continue;
             CameraProfile candidateProfile = profileFor(candidate);
             if (candidateProfile != null) {
                 device = candidate;
                 profile = candidateProfile;
                 break;
             }
-            unsupportedNikon = candidate;
+            if (unsupportedDevice == null) {
+                unsupportedDevice = candidate;
+            }
         }
         if (device == null) {
-            if (unsupportedNikon != null) {
+            if (unsupportedDevice != null) {
+                String vendorHex = String.format("%04x", unsupportedDevice.getVendorId());
+                String productHex = String.format("%04x", unsupportedDevice.getProductId());
                 throw new Exception(String.format(
-                        "检测到未支持的 Nikon USB 设备 04b0:%04x。当前支持 %s。",
-                        unsupportedNikon.getProductId(),
+                        "检测到未支持的 USB 相机设备 %s:%s。当前支持 %s。",
+                        vendorHex, productHex,
                         SUPPORTED_CAMERA_SUMMARY));
             }
             throw new Exception(
-                    "没有检测到支持的 Nikon 相机。请连接 "
+                    "没有检测到支持的相机。请连接 "
                             + SUPPORTED_CAMERA_SUMMARY
                             + "。");
         }
@@ -924,7 +961,7 @@ final class PtpCamera {
         long deadline = System.currentTimeMillis() + timeoutMillis;
         do {
             for (UsbDevice candidate : usbManager.getDeviceList().values()) {
-                if (candidate.getVendorId() == NIKON_VENDOR_ID
+                if (SUPPORTED_VENDOR_IDS.contains(candidate.getVendorId())
                         && candidate.getProductId() == connectedProductId) {
                     return candidate;
                 }
@@ -1400,12 +1437,12 @@ final class PtpCamera {
     }
 
     private void ensureConnected() throws Exception {
-        if (connection == null) throw new Exception("请先连接支持的 Nikon 相机。");
+        if (connection == null) throw new Exception("请先连接支持的相机。");
     }
 
     private void ensureConnectedForOperation(int operation) throws Exception {
         if (operation != OPEN_SESSION) ensureConnected();
-        else if (connection == null) throw new Exception("无法打开 Nikon USB 连接。");
+        else if (connection == null) throw new Exception("无法打开 USB 相机连接。");
     }
 
     synchronized String getConnectedCameraName() {
@@ -1421,18 +1458,18 @@ final class PtpCamera {
     }
 
     private String cameraName() {
-        return profile == null ? "Nikon 相机" : profile.name;
+        return profile == null ? "相机" : profile.name;
     }
 
-    private static CameraProfile profileFor(int productId) {
+    private static CameraProfile profileFor(int vendorId, int productId) {
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-            if (candidate.productId == productId) return candidate;
+            if (candidate.vendorId == vendorId && candidate.productId == productId) return candidate;
         }
         return null;
     }
 
     private static CameraProfile profileFor(UsbDevice device) {
-        CameraProfile byProductId = profileFor(device.getProductId());
+        CameraProfile byProductId = profileFor(device.getVendorId(), device.getProductId());
         if (byProductId != null) return byProductId;
         String descriptor = device.getProductName();
         if (descriptor == null) return null;
@@ -1449,7 +1486,7 @@ final class PtpCamera {
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
             String candidateName = candidate.name
                     .toLowerCase(Locale.ROOT)
-                    .replace("nikon", "")
+                    .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
                     .replace(" ", "");
             String candidateAlias = candidateName
                     .replace("iii", "3")
@@ -1466,12 +1503,16 @@ final class PtpCamera {
 
     private static final class CameraProfile {
         final String name;
+        final String vendorName;
+        final int vendorId;
         final int productId;
         final int minIso;
         final int maxIso;
 
-        CameraProfile(String name, int productId, int minIso, int maxIso) {
+        CameraProfile(String name, String vendorName, int vendorId, int productId, int minIso, int maxIso) {
             this.name = name;
+            this.vendorName = vendorName;
+            this.vendorId = vendorId;
             this.productId = productId;
             this.minIso = minIso;
             this.maxIso = maxIso;

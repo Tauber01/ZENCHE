@@ -35,8 +35,13 @@
         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
           <Border Width="44"
                   Height="44"
-                  Background="{StaticResource GraphiteBrush}"
                   CornerRadius="13">
+            <Border.Background>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="{StaticResource ColorAccent}" />
+                <GradientStop Offset="1" Color="#2E86E0" />
+              </LinearGradientBrush>
+            </Border.Background>
             <Border.Effect>
               <DropShadowEffect BlurRadius="10"
                                 Color="{StaticResource ColorAccent}"
@@ -70,12 +75,20 @@
                 BorderBrush="{StaticResource RuleBrush}"
                 BorderThickness="1"
                 CornerRadius="18">
-          <TextBlock x:Name="CameraStatusText"
-                     Style="{StaticResource MetaText}"
-                     MaxWidth="260"
-                     Text="未连接 · WINDOWS USB/PTP"
-                     TextTrimming="CharacterEllipsis"
-                     TextWrapping="NoWrap" />
+          <StackPanel Orientation="Horizontal">
+            <Ellipse x:Name="ConnectionDot"
+                     Width="8"
+                     Height="8"
+                     Margin="0,0,8,0"
+                     VerticalAlignment="Center"
+                     Fill="{StaticResource MutedBrush}" />
+            <TextBlock x:Name="CameraStatusText"
+                       Style="{StaticResource MetaText}"
+                       MaxWidth="260"
+                       Text="未连接 · WINDOWS USB/PTP"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap" />
+          </StackPanel>
         </Border>
         <Button x:Name="ConnectButton"
                 Grid.Column="2"
@@ -109,7 +122,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.2.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.3.1" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -146,11 +159,84 @@
       <Grid Grid.Column="1" Margin="24">
         <Grid x:Name="CapturePanel">
           <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Border Background="{StaticResource GraphiteBrush}"
+          <Expander Grid.Row="0"
+                    Margin="0,0,0,14"
+                    Header="拍前会话与交付"
+                    IsExpanded="False">
+            <Border Padding="14" Style="{StaticResource PanelCard}">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="110" />
+                  <ColumnDefinition Width="140" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,10,0">
+                  <TextBlock Text="项目名称" />
+                  <TextBox x:Name="SessionNameText" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                  <TextBlock Text="命名模板" />
+                  <TextBox x:Name="SessionNamingTemplateText" FontFamily="{StaticResource MonoFont}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Margin="0,0,10,0">
+                  <TextBlock Text="默认评级" />
+                  <ComboBox x:Name="SessionRatingBox" SelectedIndex="0">
+                    <ComboBoxItem Content="0 星" Tag="0" />
+                    <ComboBoxItem Content="1 星" Tag="1" />
+                    <ComboBoxItem Content="2 星" Tag="2" />
+                    <ComboBoxItem Content="3 星" Tag="3" />
+                    <ComboBoxItem Content="4 星" Tag="4" />
+                    <ComboBoxItem Content="5 星" Tag="5" />
+                  </ComboBox>
+                </StackPanel>
+                <CheckBox x:Name="SessionDualBackupCheck"
+                          Grid.Column="3"
+                          Margin="0,20,0,0"
+                          VerticalAlignment="Center"
+                          Content="双目标备份"
+                          IsChecked="True" />
+                <StackPanel Grid.Row="1" Margin="0,10,10,0">
+                  <TextBlock Text="创作者" />
+                  <TextBox x:Name="SessionCreatorText" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,10,10,0">
+                  <TextBlock Text="版权" />
+                  <TextBox x:Name="SessionRightsText" />
+                </StackPanel>
+                <TextBlock x:Name="SessionStatusText"
+                           Grid.Row="2"
+                           Grid.ColumnSpan="3"
+                           Margin="0,12,12,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="尚未开始拍摄会话" />
+                <Button x:Name="SessionActionButton"
+                        Grid.Row="2"
+                        Grid.Column="3"
+                        Height="42"
+                        Margin="0,10,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="开始会话"
+                        Click="SessionActionButton_Click" />
+              </Grid>
+            </Border>
+          </Expander>
+          <Border Grid.Row="1"
+                  Background="{StaticResource GraphiteBrush}"
                   BorderBrush="{StaticResource GraphiteRuleBrush}"
                   BorderThickness="1"
                   CornerRadius="18"
@@ -193,7 +279,49 @@
                       Click="FullscreenPreviewButton_Click" />
             </Grid>
           </Border>
-          <Grid Grid.Row="1" Margin="0,16,0,0">
+          <Border Grid.Row="2"
+                  Height="82"
+                  Margin="0,14,0,0"
+                  Background="{StaticResource GraphiteBrush}"
+                  BorderBrush="{StaticResource GraphiteRuleBrush}"
+                  BorderThickness="1"
+                  CornerRadius="14">
+            <ScrollViewer HorizontalScrollBarVisibility="Hidden"
+                          VerticalScrollBarVisibility="Disabled">
+              <StackPanel Orientation="Horizontal" Margin="8,0">
+                <StackPanel Width="104" Margin="12,13">
+                  <TextBlock Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="来源" />
+                  <TextBlock x:Name="SourceReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
+                <StackPanel Width="82" Margin="12,13">
+                  <TextBlock Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="模式" />
+                  <TextBlock x:Name="ModeReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
+                <StackPanel Width="116" Margin="12,13">
+                  <TextBlock x:Name="ShutterReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="快门" />
+                  <TextBlock x:Name="ShutterReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
+                <StackPanel Width="104" Margin="12,13">
+                  <TextBlock x:Name="ApertureReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="光圈" />
+                  <TextBlock x:Name="ApertureReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
+                <StackPanel Width="96" Margin="12,13">
+                  <TextBlock x:Name="IsoReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="ISO" />
+                  <TextBlock x:Name="IsoReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
+                <StackPanel Width="132" Margin="12,13">
+                  <TextBlock x:Name="CompensationReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="曝光补偿" />
+                  <TextBlock x:Name="CompensationReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+          <Grid Grid.Row="3" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
@@ -220,9 +348,9 @@
                     Click="ShutterButton_Click" />
           </Grid>
           <Expander x:Name="ShootingTaskPanel"
-                    Grid.Row="2"
+                    Grid.Row="4"
                     Margin="0,14,0,0"
-                    Header="拍摄任务"
+                    Header="拍摄自动化"
                     IsExpanded="False">
             <Border Padding="14" Style="{StaticResource PanelCard}">
               <Grid>
@@ -319,77 +447,6 @@
               </StackPanel>
             </Grid>
           </Border>
-          <Expander Grid.Row="1"
-                    Margin="0,18,0,0"
-                    Header="拍摄会话"
-                    IsExpanded="False">
-            <Border Padding="16" Style="{StaticResource PanelCard}">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="120" />
-                  <ColumnDefinition Width="150" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Margin="0,0,10,0">
-                  <TextBlock Text="项目名称" />
-                  <TextBox x:Name="SessionNameText" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                  <TextBlock Text="命名模板" />
-                  <TextBox x:Name="SessionNamingTemplateText"
-                           FontFamily="{StaticResource MonoFont}" />
-                </StackPanel>
-                <StackPanel Grid.Column="2" Margin="0,0,10,0">
-                  <TextBlock Text="默认评级" />
-                  <ComboBox x:Name="SessionRatingBox" SelectedIndex="0">
-                    <ComboBoxItem Content="0 星" Tag="0" />
-                    <ComboBoxItem Content="1 星" Tag="1" />
-                    <ComboBoxItem Content="2 星" Tag="2" />
-                    <ComboBoxItem Content="3 星" Tag="3" />
-                    <ComboBoxItem Content="4 星" Tag="4" />
-                    <ComboBoxItem Content="5 星" Tag="5" />
-                  </ComboBox>
-                </StackPanel>
-                <CheckBox x:Name="SessionDualBackupCheck"
-                          Grid.Column="3"
-                          Margin="0,20,0,0"
-                          VerticalAlignment="Center"
-                          Content="双目标备份"
-                          IsChecked="True" />
-                <StackPanel Grid.Row="1" Margin="0,10,10,0">
-                  <TextBlock Text="创作者" />
-                  <TextBox x:Name="SessionCreatorText" />
-                </StackPanel>
-                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,10,10,0">
-                  <TextBlock Text="版权" />
-                  <TextBox x:Name="SessionRightsText" />
-                </StackPanel>
-                <TextBlock x:Name="SessionStatusText"
-                           Grid.Row="2"
-                           Grid.ColumnSpan="3"
-                           Margin="0,12,12,0"
-                           VerticalAlignment="Center"
-                           FontFamily="{StaticResource MonoFont}"
-                           FontSize="11"
-                           Foreground="{StaticResource MutedBrush}"
-                           Text="尚未开始拍摄会话" />
-                <Button x:Name="SessionActionButton"
-                        Grid.Row="2"
-                        Grid.Column="3"
-                        Height="42"
-                        Margin="0,10,0,0"
-                        Style="{StaticResource PrimaryButton}"
-                        Content="开始会话"
-                        Click="SessionActionButton_Click" />
-              </Grid>
-            </Border>
-          </Expander>
           <Expander Grid.Row="2"
                     Margin="0,18,0,0"
                     Header="无线传输 · FTP / HTTP / WebDAV"
@@ -527,23 +584,25 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
-          <Border Padding="18"
+          <Border x:Name="EditorHeader" Padding="18"
                   Background="{StaticResource AccentSoftBrush}"
                   BorderBrush="{StaticResource AccentBrush}"
                   BorderThickness="1"
                   CornerRadius="14">
             <StackPanel>
-              <TextBlock Foreground="{StaticResource AccentBrush}"
+              <TextBlock x:Name="EditorHeaderTitle"
+                         Foreground="{StaticResource AccentBrush}"
                          FontFamily="{StaticResource DisplayFont}"
                          FontSize="24"
                          FontWeight="Bold"
                          Text="专业显影" />
-              <TextBlock Margin="0,4,0,0"
+              <TextBlock x:Name="EditorHeaderSubtitle"
+                         Margin="0,4,0,0"
                          Foreground="{StaticResource MutedBrush}"
                          Text="分组调整光线、色彩、细节、效果与几何；始终保留原文件。" />
             </StackPanel>
           </Border>
-          <Grid Grid.Row="1" Margin="0,18,0,0">
+          <Grid x:Name="EditorProGrid" Grid.Row="1" Margin="0,18,0,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="320" />
@@ -574,6 +633,7 @@
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
                   <RowDefinition Height="*" />
                   <RowDefinition Height="Auto" />
                   <RowDefinition Height="Auto" />
@@ -599,19 +659,96 @@
                     <ComboBoxItem Tag="monochrome" Content="高反差黑白" />
                   </ComboBox>
                 </DockPanel>
-                <ScrollViewer Grid.Row="3"
+                <Border Grid.Row="3"
+                        Margin="0,0,0,12"
+                        Padding="12"
+                        Background="{StaticResource AccentSoftBrush}"
+                        BorderBrush="{StaticResource AccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock FontWeight="SemiBold" Text="AI 智能修图 · 工作台" />
+                      <TextBlock DockPanel.Dock="Right"
+                                 Foreground="{StaticResource AccentBrush}"
+                                 FontSize="11"
+                                 FontWeight="SemiBold"
+                                 Text="设备端" />
+                    </DockPanel>
+                    <TextBlock x:Name="EditorAIMetricsText"
+                               Margin="0,0,0,8"
+                               Foreground="{StaticResource InkBrush}"
+                               FontFamily="{StaticResource MonoFont}"
+                               FontSize="10"
+                               Text="等待分析 · 曝光 --  动态范围 --  色彩 --  细节 --" />
+                    <TextBlock x:Name="EditorAISummaryText"
+                               Margin="0,6,0,8"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="12"
+                               Text="等待分析当前照片"
+                               TextWrapping="Wrap" />
+                    <TextBlock Margin="0,0,0,8"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Text="设备端处理 · 照片不会上传" />
+                    <DockPanel>
+                      <TextBlock Text="AI 强度" />
+                      <TextBlock x:Name="EditorAIIntensityText"
+                                 DockPanel.Dock="Right"
+                                 Foreground="{StaticResource MutedBrush}"
+                                 FontFamily="{StaticResource MonoFont}"
+                                 Text="72%" />
+                    </DockPanel>
+                    <Slider x:Name="EditorAIIntensitySlider"
+                            Minimum="35"
+                            Maximum="100"
+                            Value="72"
+                            TickFrequency="5"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="EditorAIIntensity_Changed" />
+                    <UniformGrid Margin="0,8,0,0" Columns="3">
+                      <Button Style="{StaticResource ButtonBase}"
+                              Content="分析画面"
+                              Click="AnalyzeEditorAI_Click" />
+                      <Button Style="{StaticResource PrimaryButton}"
+                              Content="智能优化"
+                              Click="ApplyEditorAI_Click" />
+                      <Button x:Name="UndoEditorAIButton"
+                              Margin="8,0,0,0"
+                              Style="{StaticResource ButtonBase}"
+                              Content="撤销 AI"
+                              IsEnabled="False"
+                              Click="UndoEditorAI_Click" />
+                    </UniformGrid>
+                    <UniformGrid Margin="0,8,0,0" Columns="2">
+                      <Button x:Name="CopyEditorAIButton"
+                              Style="{StaticResource ButtonBase}"
+                              Content="复制 AI"
+                              IsEnabled="False"
+                              Click="CopyEditorAI_Click" />
+                      <Button x:Name="PasteEditorAIButton"
+                              Margin="8,0,0,0"
+                              Style="{StaticResource ButtonBase}"
+                              Content="粘贴 AI"
+                              IsEnabled="False"
+                              Click="PasteEditorAI_Click" />
+                    </UniformGrid>
+                  </StackPanel>
+                </Border>
+                <ScrollViewer Grid.Row="4"
                               VerticalScrollBarVisibility="Auto">
                   <StackPanel x:Name="EditorAdjustmentHost" />
                 </ScrollViewer>
                 <TextBlock x:Name="EditorStatusText"
-                           Grid.Row="4"
+                           Grid.Row="5"
                            Margin="0,12,0,10"
                            FontFamily="{StaticResource MonoFont}"
                            FontSize="11"
                            Foreground="{StaticResource MutedBrush}"
                            Text="调整不会覆盖原文件"
                            TextWrapping="Wrap" />
-                <StackPanel Grid.Row="5"
+                <StackPanel Grid.Row="6"
                             Margin="0,0,0,8"
                             Orientation="Horizontal">
                   <Button x:Name="CompareEditorPhotoButton"
@@ -626,13 +763,138 @@
                           Click="ResetEditor_Click" />
                 </StackPanel>
                 <Button x:Name="SaveEditedPhotoButton"
-                        Grid.Row="6"
+                        Grid.Row="7"
                         Height="46"
                         Style="{StaticResource PrimaryButton}"
                         Content="保存高质量副本"
                         IsEnabled="False"
                         Click="SaveEditedPhoto_Click" />
               </Grid>
+            </Border>
+          </Grid>
+
+          <Grid x:Name="EditorAiGrid" Grid.Row="1" Margin="0,18,0,0" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+            <Border Margin="0,0,18,0"
+                    Padding="14"
+                    Background="{StaticResource GraphiteBrush}"
+                    BorderBrush="{StaticResource GraphiteRuleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+              <Grid>
+                <Image x:Name="AiPreviewImage"
+                       Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <TextBlock x:Name="AiPreviewEmpty"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource GraphiteMutedBrush}"
+                           FontSize="14"
+                           Text="AI 生成结果将在这里显示" />
+                <StackPanel HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                  <Border Background="#99000000"
+                          CornerRadius="16"
+                          Padding="10,6">
+                    <TextBlock x:Name="AiPreviewBadge"
+                               Foreground="White"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Text="AI 生成"
+                               Visibility="Collapsed" />
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Border Grid.Column="1" Padding="16" Style="{StaticResource PanelCard}">
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="AI 创作" />
+                    <TextBlock Margin="0,3,0,0"
+                               Foreground="{StaticResource MutedBrush}"
+                               FontSize="11"
+                               Text="联网生成与修图 · 结果保存为新文件" />
+                  </StackPanel>
+                  <TextBlock x:Name="AiUnlockStatus"
+                             DockPanel.Dock="Right"
+                             Margin="10,0,0,0"
+                             VerticalAlignment="Center"
+                             Foreground="{StaticResource PositiveBrush}"
+                             FontSize="11"
+                             FontWeight="SemiBold"
+                             Text="需要激活" />
+                </DockPanel>
+                <TextBlock FontWeight="SemiBold" Text="AI 模式" Margin="0,14,0,0" />
+                <WrapPanel Margin="0,8,0,10">
+                  <Button x:Name="AiEditModeBtn"
+                          Width="140"
+                          Height="40"
+                          Content="AI 修图"
+                          Click="AiEditMode_Click" />
+                  <Button x:Name="AiGenModeBtn"
+                          Width="140"
+                          Height="40"
+                          Margin="8,0,0,0"
+                          Content="AI 生图"
+                          Click="AiGenMode_Click" />
+                </WrapPanel>
+                <TextBlock FontWeight="SemiBold" Text="快捷预设" Margin="0,10,0,0" />
+                <WrapPanel x:Name="AiPresetPanel" Margin="0,6,0,10" />
+                <TextBlock FontWeight="SemiBold" Text="提示词" />
+                <TextBox x:Name="AiPromptBox"
+                         Margin="0,8,0,0"
+                         Height="80"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto" />
+                <TextBlock FontWeight="SemiBold" Text="输出参数" Margin="0,12,0,0" />
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <ComboBox x:Name="AiRatioBox"
+                            Grid.Column="0"
+                            SelectionChanged="AiRatioBox_SelectionChanged">
+                    <ComboBoxItem Content="1:1" />
+                    <ComboBoxItem Content="16:9" />
+                    <ComboBoxItem Content="9:16" />
+                    <ComboBoxItem Content="4:3" />
+                    <ComboBoxItem Content="3:2" />
+                  </ComboBox>
+                  <ComboBox x:Name="AiResolutionBox"
+                            Grid.Column="2"
+                            SelectionChanged="AiResolutionBox_SelectionChanged">
+                    <ComboBoxItem Content="1K" />
+                    <ComboBoxItem Content="2K" />
+                    <ComboBoxItem Content="4K" />
+                  </ComboBox>
+                </Grid>
+                <Button x:Name="AiGenerateBtn"
+                        Margin="0,14,0,8"
+                        Height="44"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="生成"
+                        Click="AiGenerate_Click" />
+                <TextBlock x:Name="AiStatusText"
+                           FontFamily="{StaticResource MonoFont}"
+                           FontSize="11"
+                           Foreground="{StaticResource MutedBrush}"
+                           Text="请输入提示词"
+                           TextWrapping="Wrap" />
+                <Button x:Name="AiSaveBtn"
+                        Margin="0,14,0,0"
+                        Height="44"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="保存到文件库"
+                        Visibility="Collapsed"
+                        Click="AiSave_Click" />
+              </StackPanel>
             </Border>
           </Grid>
         </Grid>
@@ -738,6 +1000,87 @@
               </Border>
               <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
                 <StackPanel>
+                  <TextBlock Style="{StaticResource SectionTitle}" Text="AI 功能激活" />
+                  <TextBlock Margin="0,4,0,12"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。" />
+                  <Button Height="42"
+                          Style="{StaticResource PrimaryButton}"
+                          Content="前往官网兑换密钥"
+                          Click="AiOfficialWebsite_Click" />
+                  <TextBlock Margin="0,8,0,12"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。" />
+                  <TextBlock Margin="0,0,0,8"
+                             FontWeight="SemiBold"
+                             Text="没有兑换码？在爱发电购买兑换码" />
+                  <Button Width="300"
+                          Height="416"
+                          Margin="0,0,0,8"
+                          HorizontalAlignment="Center"
+                          Padding="4"
+                          Style="{StaticResource ButtonBase}"
+                          ToolTip="在爱发电购买兑换码"
+                          Click="AiBuy_Click">
+                    <Image Source="pack://application:,,,/Assets/wechat-donation.png"
+                           Stretch="Uniform" />
+                  </Button>
+                  <Button Height="38"
+                          Margin="0,0,0,6"
+                          Style="{StaticResource ButtonBase}"
+                          Content="在爱发电购买兑换码"
+                          Click="AiBuy_Click" />
+                  <TextBlock Margin="0,0,0,12"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。" />
+                  <DockPanel Margin="0,0,0,6">
+                    <Button DockPanel.Dock="Right"
+                            Style="{StaticResource ButtonBase}"
+                            Content="复制"
+                            Click="AiCopyDeviceId_Click" />
+                    <TextBlock VerticalAlignment="Center"
+                               FontWeight="SemiBold"
+                               Text="我的设备 ID" />
+                  </DockPanel>
+                  <TextBlock x:Name="AiDeviceIdText"
+                             Margin="0,0,0,8"
+                             FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap" />
+                  <TextBlock Margin="0,0,0,12"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。" />
+                  <TextBox x:Name="AiActivationCodeBox"
+                           Height="38"
+                           Padding="10,7"
+                           ToolTip="激活码" />
+                  <WrapPanel Margin="0,10,0,0">
+                    <Button Width="132"
+                            Margin="0,0,8,0"
+                            Style="{StaticResource ButtonBase}"
+                            Content="购买激活码"
+                            Click="AiBuy_Click" />
+                    <Button Width="120"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="激活"
+                            Click="AiActivate_Click" />
+                  </WrapPanel>
+                  <TextBlock x:Name="AiActivationStatusText"
+                             Margin="0,8,0,0"
+                             FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">
+                <StackPanel>
                   <TextBlock Style="{StaticResource SectionTitle}" Text="诊断日志" />
                   <TextBlock x:Name="DiagnosticLogPathText"
                              Margin="0,0,0,16"
@@ -826,7 +1169,11 @@
           <StackPanel Margin="20">
             <TextBlock x:Name="ParameterPanelTitle"
                        Style="{StaticResource SectionTitle}"
-                       Text="照片曝光与参数" />
+                       Text="拍摄控制" />
+            <TextBlock Margin="0,8,0,4"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource MutedBrush}"
+                       Text="曝光" />
             <TextBlock Text="拍摄模式" />
             <ComboBox x:Name="ExposureModeBox"
                       SelectionChanged="ExposureModeBox_SelectionChanged">
@@ -902,6 +1249,11 @@
               <ComboBoxItem Tag="2" Content="+2 EV" />
             </ComboBox>
 
+            <Separator Margin="0,12,0,8" />
+            <TextBlock Margin="0,0,0,4"
+                       FontWeight="Bold"
+                       Foreground="{StaticResource MutedBrush}"
+                       Text="对焦与色彩" />
             <TextBlock Text="对焦模式" />
             <ComboBox x:Name="FocusModeBox"
                       SelectionChanged="ParameterBox_SelectionChanged">

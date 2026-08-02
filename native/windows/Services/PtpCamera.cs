@@ -29,8 +29,6 @@ public sealed class PtpCamera : IDisposable
     private const ushort TerminateCapture = 0x920c;
     private const ushort ObjectAddedInSdram = 0xc101;
     private const ushort ExposureTime = 0x500d;
-    private const ushort NikonExposureTime = 0xd100;
-    private const ushort NikonMovieExposureTime = 0xd1a8;
     private const int StillImageClass = 6;
     private const int MaximumContainerSize = 256 * 1024 * 1024;
 
@@ -48,6 +46,7 @@ public sealed class PtpCamera : IDisposable
     private int _bulbDurationSeconds = 5;
     private readonly Dictionary<ushort, bool> _writableProperties = [];
     private readonly HashSet<string> _deniedParameters = [];
+    private IPtpVendorOps _vendorOps = new NikonVendorOps();
 
     public CameraProfile? Profile { get; private set; }
     public bool IsConnected => _deviceHandle != nint.Zero;
@@ -63,6 +62,7 @@ public sealed class PtpCamera : IDisposable
             DisconnectCore();
             InitializeLibUsb();
             var profile = OpenSupportedDevice();
+            _vendorOps = PtpVendorOps.ForVendor(profile.VendorId);
             await TransactAsync(
                 OpenSession,
                 [1],
@@ -632,7 +632,8 @@ public sealed class PtpCamera : IDisposable
             throw new InvalidOperationException("无法枚举 Windows USB 设备。");
         }
 
-        ushort? unsupportedNikon = null;
+        ushort? unsupportedVendor = null;
+        ushort? unsupportedProduct = null;
         try
         {
             for (nint index = 0; index < count; index++)
@@ -642,15 +643,16 @@ public sealed class PtpCamera : IDisposable
                     LibUsbNative.libusb_get_device_descriptor(
                         device,
                         out var descriptor) != LibUsbNative.Success ||
-                    descriptor.VendorId != CameraProfile.NikonVendorId)
+                    !CameraProfile.SupportedVendorIds.Contains(descriptor.VendorId))
                 {
                     continue;
                 }
 
-                var profile = CameraProfile.Find(descriptor.ProductId);
+                var profile = CameraProfile.Find(descriptor.VendorId, descriptor.ProductId);
                 if (profile is null)
                 {
-                    unsupportedNikon = descriptor.ProductId;
+                    unsupportedVendor = descriptor.VendorId;
+                    unsupportedProduct = descriptor.ProductId;
                     continue;
                 }
                 OpenDevice(device, profile);
@@ -662,14 +664,14 @@ public sealed class PtpCamera : IDisposable
             LibUsbNative.libusb_free_device_list(list, 1);
         }
 
-        if (unsupportedNikon.HasValue)
+        if (unsupportedVendor.HasValue)
         {
             throw new InvalidOperationException(
-                $"检测到未支持的 Nikon USB 设备 04b0:{unsupportedNikon.Value:x4}。" +
+                $"检测到未支持的 USB 相机设备 {unsupportedVendor.Value:x4}:{unsupportedProduct.Value:x4}。" +
                 $"当前支持 {CameraProfile.Summary}。");
         }
         throw new InvalidOperationException(
-            $"没有检测到支持的 Nikon 相机。请连接 {CameraProfile.Summary}。");
+            $"没有检测到支持的相机。请连接 {CameraProfile.Summary}。");
     }
 
     private void OpenDevice(nint device, CameraProfile profile)
@@ -1003,7 +1005,7 @@ public sealed class PtpCamera : IDisposable
         {
             var encoded = property == ExposureTime
                 ? LittleEndian32((uint)Math.Round(seconds * 10_000))
-                : NikonShutterValue(seconds);
+                : EncodeShutterValue(seconds);
             try
             {
                 await SetPropertyCoreAsync(
@@ -1051,9 +1053,12 @@ public sealed class PtpCamera : IDisposable
             finalError);
     }
 
-    private static ushort[] ShutterProperties(bool video) => video
-        ? [NikonMovieExposureTime, ExposureTime, NikonExposureTime]
-        : [NikonExposureTime, ExposureTime];
+    private ushort[] ShutterProperties(bool video) => video
+        ? _vendorOps.VideoShutterProperties
+        : _vendorOps.ShutterProperties;
+
+    private byte[] EncodeShutterValue(double seconds) =>
+        _vendorOps.EncodeShutterValue(seconds);
 
     private bool HasWritableShutterProperty(bool video)
     {
@@ -1231,11 +1236,18 @@ public sealed class PtpCamera : IDisposable
     {
         _writableProperties.Clear();
         _deniedParameters.Clear();
+        var vendorProperties = new List<ushort> { ExposureTime };
+        foreach (var p in _vendorOps.ShutterProperties)
+            if (!vendorProperties.Contains(p)) vendorProperties.Add(p);
+        foreach (var p in _vendorOps.VideoShutterProperties)
+            if (!vendorProperties.Contains(p)) vendorProperties.Add(p);
+        if (_vendorOps.PictureControlProperty is { } pc && !vendorProperties.Contains(pc))
+            vendorProperties.Add(pc);
         ushort[] properties =
         [
-            0x5005, 0x5007, 0x500a, ExposureTime,
+            0x5005, 0x5007, 0x500a,
             0x500e, 0x500f, 0x5010,
-            NikonExposureTime, NikonMovieExposureTime, 0xd200
+            .. vendorProperties,
         ];
         foreach (var property in properties)
         {
@@ -1259,17 +1271,17 @@ public sealed class PtpCamera : IDisposable
         }
     }
 
-    private static ushort PropertyCode(string name) => name switch
+    private ushort PropertyCode(string name) => name switch
     {
         "whiteBalanceMode" => 0x5005,
         "aperture" => 0x5007,
         "focusMode" => 0x500a,
         "exposureTime" => ExposureTime,
-        "videoExposureTime" => NikonMovieExposureTime,
+        "videoExposureTime" => _vendorOps.VideoShutterProperties[0],
         "exposureMode" => 0x500e,
         "iso" => 0x500f,
         "exposureCompensation" => 0x5010,
-        "pictureControl" => 0xd200,
+        "pictureControl" => _vendorOps.PictureControlProperty ?? 0,
         _ => 0
     };
 
@@ -1338,7 +1350,7 @@ public sealed class PtpCamera : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!IsConnected)
         {
-            throw new InvalidOperationException("请先连接支持的 Nikon 相机。");
+            throw new InvalidOperationException("请先连接支持的相机。");
         }
     }
 
@@ -1348,14 +1360,14 @@ public sealed class PtpCamera : IDisposable
         {
             if (_deviceHandle == nint.Zero)
             {
-                throw new InvalidOperationException("无法打开 Nikon USB 连接。");
+                throw new InvalidOperationException("无法打开 USB 相机连接。");
             }
             return;
         }
         EnsureConnected();
     }
 
-    private string CameraName => Profile?.Name ?? "Nikon 相机";
+    private string CameraName => Profile?.Name ?? "相机";
 
     private void DisconnectCore()
     {

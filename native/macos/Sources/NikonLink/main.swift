@@ -9,21 +9,49 @@ import UniformTypeIdentifiers
 
 private struct SupportedCamera: Equatable {
     let name: String
+    let vendorName: String
+    let vendorID: Int
     let productID: Int
     let detectionTokens: [String]
     let minimumISO: Int
     let maximumISO: Int
 
+    static let supportedVendorIDs: Set<Int> = [0x04b0, 0x054c, 0x04a9]
+
     static let all = [
+        // ── Nikon EXPEED 5 ──
         SupportedCamera(
             name: "Nikon D500",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x043a,
             detectionTokens: ["nikon d500", "nikon d 500"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
+            name: "Nikon D7500",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x0445,
+            detectionTokens: ["nikon d7500", "nikon d 7500"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Nikon D850",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x044a,
+            detectionTokens: ["nikon d850", "nikon d 850"],
+            minimumISO: 64,
+            maximumISO: 25600
+        ),
+        // ── Nikon EXPEED 6 ──
+        SupportedCamera(
             name: "Nikon Z7",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0442,
             detectionTokens: ["nikon z7", "nikon z 7"],
             minimumISO: 64,
@@ -31,6 +59,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0443,
             detectionTokens: ["nikon z6", "nikon z 6"],
             minimumISO: 100,
@@ -38,20 +68,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z50",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0444,
             detectionTokens: ["nikon z50", "nikon z 50"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
-            name: "Nikon D7500",
-            productID: 0x0445,
-            detectionTokens: ["nikon d7500", "nikon d 7500"],
-            minimumISO: 100,
-            maximumISO: 51200
-        ),
-        SupportedCamera(
             name: "Nikon D780",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0446,
             detectionTokens: ["nikon d780", "nikon d 780"],
             minimumISO: 100,
@@ -59,6 +86,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon D6",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0447,
             detectionTokens: ["nikon d6", "nikon d 6"],
             minimumISO: 100,
@@ -66,20 +95,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z5",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0448,
             detectionTokens: ["nikon z5", "nikon z 5"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
-            name: "Nikon D850",
-            productID: 0x044a,
-            detectionTokens: ["nikon d850", "nikon d 850"],
-            minimumISO: 64,
-            maximumISO: 25600
-        ),
-        SupportedCamera(
             name: "Nikon Z7II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044b,
             detectionTokens: [
                 "nikon z7 2", "nikon z7 ii", "nikon z7ii", "nikon z 7ii"
@@ -89,6 +115,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044c,
             detectionTokens: [
                 "nikon z6 2", "nikon z6 ii", "nikon z6ii", "nikon z 6ii"
@@ -98,13 +126,27 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z fc",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x044f,
             detectionTokens: ["nikon zfc", "nikon z fc"],
             minimumISO: 100,
             maximumISO: 51200
         ),
         SupportedCamera(
+            name: "Nikon Z30",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
+            productID: 0x0452,
+            detectionTokens: ["nikon z30", "nikon z 30"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        // ── Nikon EXPEED 7 ──
+        SupportedCamera(
             name: "Nikon Z9",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0450,
             detectionTokens: ["nikon z9", "nikon z 9"],
             minimumISO: 64,
@@ -112,20 +154,17 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z8",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0451,
             detectionTokens: ["nikon z8", "nikon z 8"],
             minimumISO: 64,
             maximumISO: 25600
         ),
         SupportedCamera(
-            name: "Nikon Z30",
-            productID: 0x0452,
-            detectionTokens: ["nikon z30", "nikon z 30"],
-            minimumISO: 100,
-            maximumISO: 51200
-        ),
-        SupportedCamera(
             name: "Nikon Z f",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0453,
             detectionTokens: ["nikon zf", "nikon z f"],
             minimumISO: 100,
@@ -133,6 +172,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z6III",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0454,
             detectionTokens: ["nikon z6 iii", "nikon z6iii", "nikon z6 3"],
             minimumISO: 100,
@@ -140,6 +181,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z50II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0455,
             detectionTokens: [
                 "nikon z50 2", "nikon z50 ii", "nikon z50ii", "nikon z50_2"
@@ -149,6 +192,8 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon Z5II",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0456,
             detectionTokens: ["nikon z5 2", "nikon z5 ii", "nikon z5ii"],
             minimumISO: 100,
@@ -156,15 +201,219 @@ private struct SupportedCamera: Equatable {
         ),
         SupportedCamera(
             name: "Nikon ZR",
+            vendorName: "Nikon",
+            vendorID: 0x04b0,
             productID: 0x0457,
             detectionTokens: ["nikon zr", "nikon z r"],
             minimumISO: 100,
             maximumISO: 51200
-        )
+        ),
+        // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        // Full-frame E-mount
+        SupportedCamera(
+            name: "Sony A1",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a1", "sony ilce-1", "sony a 1"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A1 II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a1 ii", "sony a1 2", "sony a1ii", "sony a1 mk2", "sony ilce-1m2"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A9 III",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a9 iii", "sony a9 3", "sony a9iii", "sony ilce-9m3"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Sony A7R V",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7r v", "sony a7r 5", "sony ilce-7rm5", "sony a7rv"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A7 IV",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7 iv", "sony a7 4", "sony ilce-7m4", "sony a7m4"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Sony A7S III",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7s iii", "sony a7s 3", "sony ilce-7sm3", "sony a7s3"],
+            minimumISO: 80,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Sony A7C II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7c ii", "sony a7c 2", "sony ilce-7cm2", "sony a7c2"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Sony A7C R",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a7c r", "sony a7cr", "sony ilce-7cr"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony ZV-E1",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony zv-e1", "sony zve1", "sony zv e1"],
+            minimumISO: 80,
+            maximumISO: 102400
+        ),
+        // APS-C E-mount
+        SupportedCamera(
+            name: "Sony A6700",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a6700", "sony a 6700", "sony ilce-6700"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony FX30",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony fx30", "sony fx 30", "sony ilme-fx30"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony ZV-E10 II",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony zv-e10 ii", "sony zv e10 ii", "sony zv-e10 2", "sony zve10 ii", "sony zve10 2", "sony zve10m2"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        SupportedCamera(
+            name: "Canon EOS R1",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r1", "canon r1", "eos r1"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R3",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r3", "canon r3", "eos r3"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R5",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r5", "canon r5", "eos r5"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Canon EOS R5 Mark II",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r5 mark ii", "canon eos r5 mk ii", "canon eos r5 mk2", "canon eos r5 2", "canon r5 mark ii", "canon r5 mk2", "eos r5 mark ii"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Canon EOS R6 Mark II",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r6 mark ii", "canon eos r6 mk ii", "canon r6 mark ii", "canon r6 mk2", "canon r6 2", "eos r6 mark ii"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R7",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r7", "canon r7", "eos r7"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R8",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r8", "canon r8", "eos r8"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R10",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r10", "canon r10", "eos r10"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R50",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r50", "canon r50", "eos r50"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
+        SupportedCamera(
+            name: "Canon EOS R100",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r100", "canon r100", "eos r100"],
+            minimumISO: 100,
+            maximumISO: 12800
+        ),
     ]
 
     static var summary: String {
-        all.map { $0.name.replacingOccurrences(of: "Nikon ", with: "") }
+        all.map { $0.name }
             .joined(separator: " · ")
     }
 
@@ -188,8 +437,8 @@ private struct SupportedCamera: Equatable {
         .camera
     }
 
-    static func matching(productID: Int) -> SupportedCamera? {
-        all.first { $0.productID == productID }
+    static func matching(productID: Int, vendorID: Int) -> SupportedCamera? {
+        all.first { $0.productID == productID && $0.vendorID == vendorID }
     }
 
     static func isoOptions(for cameraName: String?) -> [Int] {
@@ -224,9 +473,9 @@ private enum CameraError: LocalizedError {
         case .liveViewBusy(let value):
             return "\(value) 正在处理拍摄操作，已暂停实时取景。请等待存储卡写入、间隔拍摄或长曝光结束后再开启。"
         case .noCamera:
-            return "没有检测到支持的 Nikon 相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
+            return "没有检测到支持的相机（\(SupportedCamera.summary)）。请使用 USB 数据线直连，并关闭 NX Tether 等占用相机的软件。"
         case .wrongCamera(let value):
-            return "检测到 \(value)，当前版本支持 \(SupportedCamera.summary)。"
+            return "检测到 \(value)，但当前版本尚未适配。请在兼容性文档中确认机型。"
         case .noImage:
             return "相机没有返回可用的 JPEG 图像。"
         }
@@ -262,7 +511,7 @@ private final class GPhotoCamera {
     var isLiveViewActive: Bool { liveView }
 
     private var cameraName: String {
-        profile?.name ?? "Nikon 相机"
+        profile?.name ?? "相机"
     }
 
     private var executable: URL {
@@ -549,9 +798,13 @@ private final class GPhotoCamera {
         if let dictionary = value as? [String: Any] {
             let vendor = hexValue(dictionary["vendor_id"])
             let product = hexValue(dictionary["product_id"])
-            if vendor == 0x04b0 {
+            if let vendor,
+               SupportedCamera.supportedVendorIDs.contains(vendor) {
                 if let product,
-                   let match = SupportedCamera.matching(productID: product) {
+                   let match = SupportedCamera.matching(
+                    productID: product,
+                    vendorID: vendor
+                   ) {
                     return match
                 }
                 let descriptor = dictionary.values
@@ -590,12 +843,12 @@ private final class GPhotoCamera {
             SupportedCamera.matching(detection: detected)
             ?? detectedUSBProfile()
         guard let matchedProfile else {
-            if !detected.localizedCaseInsensitiveContains("nikon"),
-               !detected.localizedCaseInsensitiveContains("ptp class camera") {
+            let detectedLower = detected.lowercased()
+            if !detectedLower.contains("ptp class camera") {
                 logger.error("camera", "连接失败：未检测到支持的相机")
                 throw CameraError.noCamera
             }
-            let name = detected.split(separator: "\n").last.map(String.init) ?? "其他 Nikon 相机"
+            let name = detected.split(separator: "\n").last.map(String.init) ?? "其他相机"
             logger.error("camera", "连接失败：检测到不支持的相机 \(name)")
             throw CameraError.wrongCamera(name)
         }
@@ -1385,7 +1638,7 @@ private final class CameraModel: ObservableObject {
     @Published var frame: NSImage?
     @Published var photoFrame: NSImage?
     @Published var status = "未连接"
-    @Published var detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
+    @Published var detail = "USB/PTP · 等待连接"
     @Published var cameraName: String?
     @Published var section: AppSection = .capture
     @Published var photos: [PhotoRecord] = []
@@ -1453,7 +1706,7 @@ private final class CameraModel: ObservableObject {
     }
 
     var activeCameraName: String {
-        cameraName ?? "Nikon 相机"
+        cameraName ?? "相机"
     }
 
     init() {
@@ -1503,7 +1756,7 @@ private final class CameraModel: ObservableObject {
         logger.info("workflow", "用户请求连接相机")
         connecting = true
         status = "正在连接"
-        detail = "正在检测 \(SupportedCamera.summary)…"
+        detail = "正在检测 USB/PTP 相机…"
         cameraQueue.async { [weak self] in
             guard let self else { return }
             do {
@@ -1553,12 +1806,12 @@ private final class CameraModel: ObservableObject {
         cameraName = nil
         parameterWritable = [:]
         status = "未连接"
-        detail = "USB/PTP · 支持 \(SupportedCamera.summary)"
+        detail = "USB/PTP · 等待连接"
     }
 
     func toggleLiveView() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         if liveViewEnabled {
@@ -1698,7 +1951,7 @@ private final class CameraModel: ObservableObject {
 
     func capture() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !capturing else { return }
@@ -1712,7 +1965,7 @@ private final class CameraModel: ObservableObject {
                 let data = try self.camera.capture(bulbSeconds: duration)
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
-                let filename = "NIKON_\(formatter.string(from: Date())).JPG"
+                let filename = "ZENCHE_\(formatter.string(from: Date())).JPG"
                 let url = try self.captureWorkflow.store(
                     data: data,
                     originalFilename: filename,
@@ -1757,7 +2010,7 @@ private final class CameraModel: ObservableObject {
 
     func startShootingTask() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !shootingTaskRunning else { return }
@@ -1869,7 +2122,7 @@ private final class CameraModel: ObservableObject {
 
     func toggleMovieRecording() {
         guard connected else {
-            errorMessage = "请先连接支持的 Nikon 相机。"
+            errorMessage = "请先连接支持的相机。"
             return
         }
         guard !capturing else { return }
@@ -2195,7 +2448,7 @@ private final class CameraModel: ObservableObject {
 
     func applyParameter(_ name: String, value: Any, label: String) {
         guard connected else {
-            errorMessage = "连接支持的 Nikon 相机后才能调整参数。"
+            errorMessage = "连接支持的相机后才能调整参数。"
             return
         }
         guard canAdjustExposureParameter(name) else {
@@ -2344,19 +2597,74 @@ private final class CameraModel: ObservableObject {
     }
 }
 
+/// 亮/暗双主题的中性校准工作台色板。每个 token 都是随有效外观解析的动态色，
+/// 因此切换 `NSApp.appearance` 或系统外观时全局自动更新，调用点无需改动。
+/// 实时画面井（graphite）在两种模式下都保持石墨黑，以保证色彩关键判断不受环境干扰。
 private enum Palette {
-    static let paper = Color(red: 0.965, green: 0.973, blue: 0.988)
-    static let paperSecondary = Color(red: 0.937, green: 0.953, blue: 0.976)
-    static let surface = Color(red: 0.992, green: 0.996, blue: 1.0)
-    static let ink = Color(red: 0.075, green: 0.09, blue: 0.12)
-    static let muted = Color(red: 0.36, green: 0.40, blue: 0.47)
-    static let cobalt = Color(red: 0.02, green: 0.35, blue: 0.82)
-    static let cobaltSoft = Color(red: 0.88, green: 0.93, blue: 1.0)
-    static let video = Color(red: 0.82, green: 0.12, blue: 0.16)
-    static let videoSoft = Color(red: 1.0, green: 0.90, blue: 0.91)
-    static let graphite = Color(red: 0.045, green: 0.055, blue: 0.075)
-    static let rule = Color.black.opacity(0.10)
-    static let shadow = Color(red: 0.05, green: 0.09, blue: 0.16).opacity(0.10)
+    private static func dynamic(
+        light: (Double, Double, Double),
+        dark: (Double, Double, Double)
+    ) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let rgb = isDark ? dark : light
+            return NSColor(srgbRed: rgb.0, green: rgb.1, blue: rgb.2, alpha: 1)
+        })
+    }
+
+    private static func dynamicWhite(
+        light: (Double, Double),
+        dark: (Double, Double)
+    ) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let value = isDark ? dark : light
+            return NSColor(white: value.0, alpha: value.1)
+        })
+    }
+
+    // 中性层：应用底 / 面板与卡片 / 凹陷面
+    static let paper = dynamic(
+        light: (0.914, 0.929, 0.949), dark: (0.075, 0.082, 0.098))
+    static let paperSecondary = dynamic(
+        light: (0.894, 0.914, 0.937), dark: (0.137, 0.153, 0.180))
+    static let surface = dynamic(
+        light: (0.973, 0.980, 0.988), dark: (0.106, 0.118, 0.141))
+    // 文字层
+    static let ink = dynamic(
+        light: (0.090, 0.110, 0.149), dark: (0.925, 0.933, 0.949))
+    static let muted = dynamic(
+        light: (0.353, 0.380, 0.424), dark: (0.604, 0.631, 0.678))
+    // 语义强调：照片=校准蓝、视频=REC 红（填充值兼顾白字对比）
+    static let cobalt = dynamic(
+        light: (0.086, 0.451, 0.902), dark: (0.180, 0.525, 0.878))
+    static let cobaltSoft = dynamic(
+        light: (0.863, 0.918, 0.992), dark: (0.078, 0.161, 0.243))
+    static let video = dynamic(
+        light: (0.847, 0.196, 0.227), dark: (1.0, 0.322, 0.341))
+    static let videoSoft = dynamic(
+        light: (0.984, 0.886, 0.890), dark: (0.227, 0.106, 0.118))
+    // 校准的“正常/已连接”绿，替代系统默认 Color.green
+    static let positive = dynamic(
+        light: (0.121, 0.663, 0.408), dark: (0.208, 0.788, 0.482))
+    // 曝光读数轨在石墨井上的发光蓝数字（两模式一致，石墨背景恒定）
+    static let readoutGlow = Color(
+        red: 107.0 / 255.0,
+        green: 174.0 / 255.0,
+        blue: 1.0
+    )
+    // 实时画面井：两模式恒石墨黑
+    static let graphite = dynamic(
+        light: (0.039, 0.043, 0.051), dark: (0.039, 0.043, 0.051))
+    // 分隔线与投影：随主题切换明度
+    static let rule = Color(nsColor: NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return isDark
+            ? NSColor(white: 1, alpha: 0.12)
+            : NSColor(srgbRed: 207.0 / 255.0, green: 214.0 / 255.0,
+                      blue: 223.0 / 255.0, alpha: 1)
+    })
+    static let shadow = dynamicWhite(light: (0.05, 0.12), dark: (0.0, 0.46))
 }
 
 private struct NativeButtonStyle: ButtonStyle {
@@ -2427,7 +2735,7 @@ private struct PreviewStage: View {
                     RuntimeLocalizedText(
                         model.connected
                             ? "等待实时取景画面"
-                            : "连接支持的 Nikon 相机后开启实时取景"
+                            : "连接支持的相机后开启实时取景"
                     )
                         .font(.system(size: 15, weight: .medium))
                 }
@@ -2442,7 +2750,7 @@ private struct PreviewStage: View {
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(model.liveViewEnabled ? Color.red : Color.white.opacity(0.5))
                     Spacer()
-                    Text("\(model.cameraName ?? SupportedCamera.summary) · USB/PTP")
+                    Text("\(model.cameraName ?? "未连接") · USB/PTP")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Color.white.opacity(0.64))
                 }
@@ -2574,7 +2882,7 @@ private struct ImmersiveMacCameraView: View {
                     .frame(height: 44)
                     .background(.black.opacity(0.58), in: Capsule())
                     Spacer()
-                    Text("\(model.cameraName ?? SupportedCamera.summary) · USB/PTP")
+                    Text("\(model.cameraName ?? "未连接") · USB/PTP")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 14)
                         .frame(height: 44)
@@ -3130,13 +3438,19 @@ private struct TopBar: View {
         HStack(spacing: 16) {
             HStack(spacing: 10) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 13).fill(Palette.graphite)
+                    RoundedRectangle(cornerRadius: 13).fill(
+                        LinearGradient(
+                            colors: [Palette.cobalt, Palette.cobalt.opacity(0.82)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     Text("Z")
                         .font(.system(size: 20, weight: .heavy))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 44, height: 44)
-                .shadow(color: Palette.cobalt.opacity(0.18), radius: 8, y: 4)
+                .shadow(color: Palette.cobalt.opacity(0.35), radius: 8, y: 4)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("帧澈 ZENCHE")
                         .font(.system(size: 18, weight: .bold))
@@ -3150,8 +3464,16 @@ private struct TopBar: View {
                 else { showConnection = true }
             } label: {
                 HStack(spacing: 10) {
+                    Circle()
+                        .fill(model.connected ? Palette.positive : Palette.muted)
+                        .frame(width: 8, height: 8)
+                        .shadow(
+                            color: model.connected
+                                ? Palette.positive.opacity(0.85) : .clear,
+                            radius: 4
+                        )
                     Image(systemName: model.connected ? "camera.fill" : "camera")
-                        .foregroundStyle(model.connected ? Color.green : Palette.cobalt)
+                        .foregroundStyle(model.connected ? Palette.positive : Palette.cobalt)
                     VStack(alignment: .leading, spacing: 1) {
                         RuntimeLocalizedText(model.status)
                             .font(.system(size: 14, weight: .bold))
@@ -3289,11 +3611,13 @@ private struct CaptureView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     WorkspaceHeading(
                         title: "照片拍摄",
-                        subtitle: "快门、曝光、对焦、白平衡与拍摄模式集中在当前页面。"
+                        subtitle: "会话、曝光、对焦与交付按拍摄流程组织。"
                     )
+                    CaptureSessionPanel(workflow: model.captureWorkflow)
                     PreviewStage(model: model) {
                         showMacImmersiveWindow(model: model, monitoring: false)
                     }
+                    ExposureReadoutRail(model: model)
                     HStack {
                         Button {
                             model.toggleLiveView()
@@ -3332,13 +3656,193 @@ private struct CaptureView: View {
     }
 }
 
+/// 签名元素：曝光读数轨。像相机顶盖 LCD 的等宽表格数字，
+/// 恒在石墨井上呈现快门/光圈/ISO/EV；由用户主导的参数发蓝光，
+/// 相机自动接管的参数变暗并标记 AUTO，直接把 P/S/A/M/B 门可视化。
+private struct ExposureReadoutRail: View {
+    @ObservedObject var model: CameraModel
+
+    private var shutterText: String {
+        guard model.connected else { return "—" }
+        let v = model.shutter
+        guard v > 0 else { return "—" }
+        if v < 1 { return "1/\(Int((1.0 / v).rounded()))" }
+        return String(format: "%g\"", v)
+    }
+    private var apertureText: String {
+        model.connected ? String(format: "f/%.1f", model.aperture) : "—"
+    }
+    private var isoText: String { model.connected ? "\(model.iso)" : "—" }
+    private var evText: String {
+        model.connected ? String(format: "%+.1f", model.compensation) : "—"
+    }
+    private var modeText: String {
+        guard model.connected else { return "—" }
+        switch model.exposureMode {
+        case "shutterPriority": return "S"
+        case "aperturePriority": return "A"
+        case "manual": return "M"
+        case "bulb": return "B"
+        default: return "P"
+        }
+    }
+    private var shutterDriven: Bool {
+        model.connected && model.canAdjustExposureParameter("exposureTime")
+    }
+    private var apertureDriven: Bool {
+        model.connected && model.canAdjustExposureParameter("aperture")
+    }
+    private var isoDriven: Bool {
+        model.connected && model.canAdjustExposureParameter("iso")
+    }
+    private var compensationDriven: Bool {
+        model.connected && model.canAdjustExposureParameter("exposureCompensation")
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            modeBadge
+            divider
+            readout("快门", shutterText, driven: shutterDriven)
+            divider
+            readout("光圈", apertureText, driven: apertureDriven)
+            divider
+            readout("ISO", isoText, driven: isoDriven)
+            divider
+            evMeter
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 6)
+        .background(Palette.graphite)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+        }
+        .shadow(color: Palette.shadow, radius: 14, y: 8)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var modeBadge: some View {
+        VStack(spacing: 5) {
+            Text(LocalizedStringKey("模式"))
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .tracking(1.5)
+                .foregroundStyle(Color.white.opacity(0.4))
+            Text(modeText)
+                .font(.system(size: 26, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 60)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.08))
+            .frame(width: 1, height: 42)
+    }
+
+    private func readout(_ key: String, _ value: String, driven: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(LocalizedStringKey(key))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(Color.white.opacity(0.45))
+                if model.connected && !driven {
+                    Text(LocalizedStringKey("自动"))
+                        .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                        .tracking(0.8)
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                }
+            }
+            Text(value)
+                .font(.system(size: 25, weight: .semibold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(
+                    driven ? Palette.readoutGlow : Color.white.opacity(0.85)
+                )
+                .shadow(
+                    color: driven ? Palette.readoutGlow.opacity(0.55) : .clear,
+                    radius: driven ? 8 : 0
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+    }
+
+    private var evMeter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(LocalizedStringKey("曝光"))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .tracking(1.5)
+                    .foregroundStyle(Color.white.opacity(0.45))
+                Spacer()
+                Text("\(evText) EV")
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        compensationDriven
+                            ? Palette.readoutGlow : Color.white.opacity(0.9)
+                    )
+            }
+            GeometryReader { geo in
+                let w = geo.size.width
+                let range = 5.0
+                let clamped = min(max(model.compensation, -range), range)
+                let frac = CGFloat((clamped + range) / (range * 2))
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(height: 2)
+                    HStack(spacing: 0) {
+                        ForEach(0..<11) { i in
+                            Rectangle()
+                                .fill(Color.white.opacity(i == 5 ? 0.5 : 0.18))
+                                .frame(width: 1, height: i == 5 ? 13 : 7)
+                            if i < 10 { Spacer() }
+                        }
+                    }
+                    if model.connected {
+                        Circle()
+                            .fill(
+                                compensationDriven
+                                    ? Palette.readoutGlow : Color.white.opacity(0.82)
+                            )
+                            .frame(width: 9, height: 9)
+                            .shadow(
+                                color: compensationDriven
+                                    ? Palette.readoutGlow.opacity(0.8) : .clear,
+                                radius: 6
+                            )
+                            .offset(x: frac * (w - 9))
+                    }
+                }
+            }
+            .frame(height: 14)
+        }
+        .frame(minWidth: 150)
+        .padding(.horizontal, 16)
+    }
+}
+
 private struct ShootingTaskPanel: View {
     @ObservedObject var model: CameraModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("拍摄任务")
+            Text("拍摄自动化")
                 .font(.system(size: 19, weight: .bold))
+            Text("间隔、包围与 B 门任务集中管理")
+                .font(.system(size: 12))
+                .foregroundStyle(Palette.muted)
             Picker("任务类型", selection: $model.shootingTaskKind) {
                 ForEach(ShootingTaskKind.allCases) { kind in
                     Text(kind.rawValue).tag(kind)
@@ -3415,9 +3919,36 @@ private struct ParameterInspector: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("照片设置")
+                Text("拍摄控制")
                     .font(.system(size: 21, weight: .bold))
 
+                    Text("曝光")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Palette.muted)
+
+                    nativeControl("拍摄模式") {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.exposureMode },
+                                set: { value in
+                                    model.applyParameter(
+                                        "exposureMode",
+                                        value: value,
+                                        label: "拍摄模式"
+                                    )
+                                }
+                            )
+                        ) {
+                            Text("P").tag("program")
+                            Text("S").tag("shutterPriority")
+                            Text("A").tag("aperturePriority")
+                            Text("M").tag("manual")
+                            Text("M · B门").tag("bulb")
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(!model.connected)
+                    }
                     nativeControl(
                         "快门速度",
                         lockedReason: model.exposureLockReason("exposureTime")
@@ -3519,6 +4050,24 @@ private struct ParameterInspector: View {
                                 || !model.canAdjustExposureParameter("exposureCompensation")
                         )
                     }
+                    if model.exposureMode == "bulb" {
+                        nativeControl("B门曝光时长（由应用控制）") {
+                            Picker("B门曝光时长", selection: $model.bulbSeconds) {
+                                Text("1 秒").tag(1)
+                                Text("2 秒").tag(2)
+                                Text("5 秒").tag(5)
+                                Text("10 秒").tag(10)
+                                Text("30 秒").tag(30)
+                                Text("60 秒").tag(60)
+                            }
+                            .labelsHidden()
+                            .disabled(!model.connected)
+                        }
+                    }
+                    Divider()
+                    Text("对焦与色彩")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Palette.muted)
                     nativeControl("对焦模式") {
                         Picker(
                             "",
@@ -3537,42 +4086,26 @@ private struct ParameterInspector: View {
                         .pickerStyle(.menu)
                         .disabled(!model.connected)
                     }
-                    nativeControl("拍摄模式") {
+                    nativeControl("白平衡") {
                         Picker(
                             "",
                             selection: Binding(
-                                get: { model.exposureMode },
+                                get: { model.whiteBalance },
                                 set: { value in
+                                    model.whiteBalance = value
                                     model.applyParameter(
-                                        "exposureMode",
+                                        "whiteBalanceMode",
                                         value: value,
-                                        label: "拍摄模式"
+                                        label: "白平衡"
                                     )
                                 }
                             )
                         ) {
-                            Text("P").tag("program")
-                            Text("S").tag("shutterPriority")
-                            Text("A").tag("aperturePriority")
-                            Text("M").tag("manual")
-                            Text("M · B门").tag("bulb")
+                            Text("自动").tag("continuous")
+                            Text("预设手动").tag("manual")
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.menu)
                         .disabled(!model.connected)
-                    }
-                    if model.exposureMode == "bulb" {
-                        nativeControl("B门曝光时长（由应用控制）") {
-                            Picker("B门曝光时长", selection: $model.bulbSeconds) {
-                                Text("1 秒").tag(1)
-                                Text("2 秒").tag(2)
-                                Text("5 秒").tag(5)
-                                Text("10 秒").tag(10)
-                                Text("30 秒").tag(30)
-                                Text("60 秒").tag(60)
-                            }
-                            .labelsHidden()
-                            .disabled(!model.connected)
-                        }
                     }
                     nativeControl("设定优化校准") {
                         Picker(
@@ -3653,7 +4186,7 @@ private struct MonitorView: View {
                 HStack {
                     WorkspaceHeading(
                         title: "视频监看",
-                        subtitle: "\(model.cameraName ?? SupportedCamera.summary) · 视频取景与本地监看处理",
+                        subtitle: "\(model.cameraName ?? "连接相机后显示当前机型") · 视频取景与本地监看处理",
                         accent: Palette.video
                     )
                     Spacer()
@@ -4011,7 +4544,7 @@ private struct MonitorControlDeck: View {
 
 private struct CaptureSessionPanel: View {
     @ObservedObject var workflow: CaptureWorkflow
-    @State private var expanded = true
+    @State private var expanded = false
     @State private var name = "未命名会话"
     @State private var namingTemplate = "{session}_{date}_{counter}"
     @State private var creator = ""
@@ -4020,7 +4553,7 @@ private struct CaptureSessionPanel: View {
     @State private var dualBackupEnabled = true
 
     var body: some View {
-        DisclosureGroup("拍摄会话", isExpanded: $expanded) {
+        DisclosureGroup("拍前会话与交付", isExpanded: $expanded) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     TextField("项目名称", text: $name)
@@ -4491,8 +5024,6 @@ private struct LibraryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     branchWorkspace
-                    CaptureSessionPanel(workflow: model.captureWorkflow)
-
                     DisclosureGroup(
                         "系统相册 · \(systemAlbum.count)",
                         isExpanded: $systemExpanded
@@ -4888,8 +5419,172 @@ private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
     case detail = "细节"
     case effects = "效果"
     case geometry = "几何"
+    case aiTools = "AI 工具"
 
     var id: String { rawValue }
+}
+
+private enum AiImageMode: String, CaseIterable, Identifiable {
+    case edit = "AI 修图"
+    case generate = "AI 生图"
+    var id: String { rawValue }
+}
+
+private enum AiAspectRatio: String, CaseIterable, Identifiable {
+    case square = "1:1"; case landscape = "16:9"; case portrait = "9:16"
+    case fourThree = "4:3"; case threeTwo = "3:2"
+    var id: String { rawValue }
+    var size: String {
+        switch self {
+        case .square: return "1024x1024"
+        case .landscape: return "1792x1024"
+        case .portrait: return "1024x1792"
+        case .fourThree: return "1365x1024"
+        case .threeTwo: return "1536x1024"
+        }
+    }
+}
+
+private enum AiResolution: String, CaseIterable, Identifiable {
+    case k1 = "1K"; case k2 = "2K"; case k4 = "4K"
+    var id: String { rawValue }
+}
+
+final class ActivationManager {
+    private static let activatedKey = "ai_activated"
+    private static let deviceIdKey = "ai_device_id"
+    private static let usageCountKey = "ai_usage_count"
+    private static let maxUsage = 100
+
+    static var isActivated: Bool {
+        guard UserDefaults.standard.bool(forKey: activatedKey) else { return false }
+        return UserDefaults.standard.integer(forKey: usageCountKey) < maxUsage
+    }
+
+    static var remainingUsage: Int {
+        max(0, maxUsage - UserDefaults.standard.integer(forKey: usageCountKey))
+    }
+
+    static func recordUsage() {
+        let c = UserDefaults.standard.integer(forKey: usageCountKey) + 1
+        UserDefaults.standard.set(c, forKey: usageCountKey)
+    }
+
+    static var deviceId: String {
+        if let e = UserDefaults.standard.string(forKey: deviceIdKey), !e.isEmpty { return e }
+        let p = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+        defer { IOObjectRelease(p) }
+        let s = IORegistryEntryCreateCFProperty(p, kIOPlatformSerialNumberKey as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String
+        let id = s ?? UUID().uuidString
+        UserDefaults.standard.set(id, forKey: deviceIdKey)
+        return id
+    }
+
+    static func verifyAndActivate(code: String) -> Bool {
+        let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        let parts = t.components(separatedBy: "-")
+        guard parts.count >= 4, parts[0] == "ZENCHE", parts[1] == "AI" else { return false }
+        let exp = parts.last ?? "19700101"
+        let df = DateFormatter(); df.dateFormat = "yyyyMMdd"
+        if let ed = df.date(from: exp), ed < Date() { return false }
+        let did = deviceId
+        let sigPart = parts[2..<(parts.count - 1)].joined(separator: "-")
+        guard let sig = Data(base64Encoded: sigPart),
+              let pk = publicKey else { return false }
+        let payload = "\(did):\(exp):a1b2c3d4e5f6"
+        guard let pdata = payload.data(using: .utf8) else { return false }
+        var err: Unmanaged<CFError>?
+        let ok = SecKeyVerifySignature(pk, .rsaSignatureMessagePKCS1v15SHA256, pdata as CFData, sig as CFData, &err)
+        if ok {
+            UserDefaults.standard.set(true, forKey: activatedKey)
+            UserDefaults.standard.set(0, forKey: usageCountKey)
+            UserDefaults.standard.set(did, forKey: deviceIdKey)
+            UserDefaults.standard.set(t, forKey: "ai_activation_code")
+        }
+        return ok
+    }
+
+    static var savedCode: String? {
+        UserDefaults.standard.string(forKey: "ai_activation_code")
+    }
+
+    private static var publicKey: SecKey? {
+        let k = [
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB",
+            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt",
+            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ",
+            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8",
+            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN",
+            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ",
+            "MjQzRwIDAQAB"
+        ].joined()
+        guard let d = Data(base64Encoded: k) else { return nil }
+        let a: [String: Any] = [
+            kSecAttrKeyClass as String: kSecAttrKeyClassPublic,
+            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
+            kSecAttrKeySizeInBits as String: 2048
+        ]
+        return SecKeyCreateWithData(d as CFData, a as CFDictionary, nil)
+    }
+}
+
+private final class AiImageService {
+    private static let defaultServer = "http://101.34.255.115:8787"
+
+    static var serverURL: String {
+        UserDefaults.standard.string(forKey: "aiServerURL") ?? defaultServer
+    }
+
+    struct Request: Encodable {
+        let activationCode: String
+        let deviceId: String
+        let prompt: String
+        let size: String
+        var image: String?
+    }
+
+    struct ImageData: Decodable { let b64_json: String?; let url: String? }
+    struct ResponseData: Decodable { let data: [ImageData] }
+
+    func generate(prompt: String, sourceImageData: Data?, size: String, activationCode: String, deviceId: String) async throws -> Data {
+        let base = Self.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: base + "/v1/ai") else { throw AiServiceError.invalidEndpoint }
+        var req = Request(activationCode: activationCode, deviceId: deviceId, prompt: prompt, size: size)
+        if let src = sourceImageData { req.image = src.base64EncodedString() }
+        var r = URLRequest(url: url); r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.timeoutInterval = 60; r.httpBody = try JSONEncoder().encode(req)
+        let (data, resp) = try await URLSession.shared.data(for: r)
+        guard let hr = resp as? HTTPURLResponse else { throw AiServiceError.networkError }
+        guard (200..<300).contains(hr.statusCode) else {
+            if hr.statusCode == 403 { throw AiServiceError.invalidActivation }
+            if hr.statusCode == 502 { throw AiServiceError.aiServiceUnavailable }
+            throw AiServiceError.serverError(hr.statusCode, "")
+        }
+        let result = try JSONDecoder().decode(ResponseData.self, from: data)
+        guard let first = result.data.first else { throw AiServiceError.noImageReturned }
+        if let b64 = first.b64_json, let img = Data(base64Encoded: b64) { return img }
+        if let u = first.url, let url = URL(string: u) {
+            let (d, _) = try await URLSession.shared.data(from: url); return d
+        }
+        throw AiServiceError.noImageReturned
+    }
+}
+
+enum AiServiceError: LocalizedError {
+    case missingActivation, invalidActivation, invalidEndpoint, networkError, serverError(Int, String), aiServiceUnavailable, noImageReturned
+    var errorDescription: String? {
+        switch self {
+        case .missingActivation: return "请先在设置中输入激活码解锁 AI 功能"
+        case .invalidActivation: return "激活码无效/过期/次数用完"
+        case .invalidEndpoint: return "AI 服务器地址无效"
+        case .networkError: return "网络连接失败，请检查网络后重试"
+        case .serverError(let c, _): return "AI 服务返回错误（\(c)），请稍后重试"
+        case .aiServiceUnavailable: return "AI 服务暂时不可用"
+        case .noImageReturned: return "AI 未返回有效图片，请调整提示词后重试"
+        }
+    }
 }
 
 private enum EditorCropRatio: String, CaseIterable, Identifiable {
@@ -4920,6 +5615,31 @@ private enum EditorPreset: String, CaseIterable, Identifiable {
     case monochrome = "高反差黑白"
 
     var id: String { rawValue }
+}
+
+private struct EditorAIAnalysis {
+    let meanLuma: Double
+    let contrast: Double
+    let shadowRatio: Double
+    let highlightRatio: Double
+    let saturation: Double
+    let red: Double
+    let green: Double
+    let blue: Double
+    let detail: Double
+
+    var summaryKey: String {
+        if meanLuma < 0.38 {
+            return "检测到画面偏暗，已提亮阴影并保护高光"
+        }
+        if meanLuma > 0.64 || highlightRatio > 0.08 {
+            return "检测到画面偏亮，已回收高光并恢复层次"
+        }
+        if contrast < 0.16 {
+            return "检测到动态范围偏平，已增强层次与色彩"
+        }
+        return "曝光均衡，已优化色彩与细节"
+    }
 }
 
 private struct ProfessionalEditSettings {
@@ -5012,6 +5732,39 @@ private struct ProfessionalEditSettings {
             vignette = -14
         }
     }
+
+    mutating func applyAI(
+        _ analysis: EditorAIAnalysis,
+        intensity: Double
+    ) {
+        resetTone()
+        let amount = max(0.35, min(1, intensity))
+        exposure = max(
+            -0.8,
+            min(0.8, log2(0.48 / max(0.08, analysis.meanLuma)) * 0.68)
+        ) * amount
+        contrast = max(-8, min(24, (0.20 - analysis.contrast) * 130)) * amount
+        highlights = -max(
+            6,
+            min(48, analysis.highlightRatio * 360 + max(0, analysis.meanLuma - 0.55) * 70)
+        ) * amount
+        shadows = max(
+            6,
+            min(46, analysis.shadowRatio * 330 + max(0, 0.44 - analysis.meanLuma) * 75)
+        ) * amount
+        whites = max(-8, min(14, (0.58 - analysis.meanLuma) * 28)) * amount
+        blacks = -max(4, min(18, (0.21 - analysis.contrast) * 55 + 5)) * amount
+        temperature = max(-18, min(18, (analysis.blue - analysis.red) * 95)) * amount
+        let greenExcess = analysis.green - (analysis.red + analysis.blue) / 2
+        tint = max(-14, min(14, greenExcess * 85)) * amount
+        vibrance = max(4, min(26, (0.30 - analysis.saturation) * 95 + 6)) * amount
+        saturation = max(-4, min(8, (0.22 - analysis.saturation) * 28)) * amount
+        texture = max(4, min(16, (0.075 - analysis.detail) * 170 + 7)) * amount
+        clarity = max(3, min(18, (0.19 - analysis.contrast) * 70 + 6)) * amount
+        sharpening = max(14, min(34, (0.08 - analysis.detail) * 210 + 20)) * amount
+        noiseReduction = max(6, min(30, analysis.shadowRatio * 120 + max(0, 0.38 - analysis.meanLuma) * 42 + 6)) * amount
+        dehaze = max(0, min(16, (0.18 - analysis.contrast) * 75)) * amount
+    }
 }
 
 private struct ImageEditorView: View {
@@ -5023,7 +5776,20 @@ private struct ImageEditorView: View {
     @State private var showingOriginal = false
     @State private var status = "请选择文件库中的照片"
     @State private var isSaving = false
+    @State private var aiIntensity = 0.72
+    @State private var aiSummaryKey = "等待分析当前照片"
+    @State private var settingsBeforeAI: ProfessionalEditSettings?
+    @State private var aiAnalysis: EditorAIAnalysis?
+    @State private var copiedAISettings: ProfessionalEditSettings?
+    @State private var suppressPresetApply = false
     private let context = CIContext()
+    @State private var aiMode = AiImageMode.edit
+    @State private var aiPrompt = ""
+    @State private var aiRatio = AiAspectRatio.square
+    @State private var aiResolution = AiResolution.k1
+    @State private var aiResultImage: NSImage?
+    @State private var aiIsGenerating = false
+    private let aiService = AiImageService()
 
     private var photos: [PhotoRecord] {
         model.photos.filter {
@@ -5042,17 +5808,42 @@ private struct ImageEditorView: View {
         photos.first { $0.url == selectedPhotoURL }
     }
 
+    private var aiPresets: [(String, String)] {
+        switch aiMode {
+        case .edit:
+            return [
+                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
+                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
+                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
+                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
+                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
+                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
+                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
+                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
+            ]
+        case .generate:
+            return [
+                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
+                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
+                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
+                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
+            ]
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             WorkspaceHeading(
-                title: "专业显影",
-                subtitle: "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
+                title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
+                subtitle: selectedSection == .aiTools
+                    ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                    : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
             )
-            editorToolbar
+            if selectedSection == .aiTools { aiToolsToolbar } else { editorToolbar }
 
             HStack(alignment: .top, spacing: 18) {
                 preview
-                adjustmentSidebar
+                if selectedSection == .aiTools { aiToolsPanel } else { adjustmentSidebar }
             }
         }
         .padding(24)
@@ -5066,6 +5857,114 @@ private struct ImageEditorView: View {
                 ? "请选择文件库中的照片"
                 : "调整不会覆盖原文件"
         }
+    }
+
+    private var aiToolsToolbar: some View {
+        HStack(spacing: 10) {
+            Picker("编辑照片", selection: $selectedPhotoURL) {
+                Text("选择照片").tag(nil as URL?)
+                ForEach(photos) { photo in Text(photo.name).tag(photo.url as URL?) }
+            }.frame(maxWidth: 400)
+            Spacer()
+            if aiResultImage != nil {
+                Button { aiResultImage = nil } label: {
+                    Label("清除结果", systemImage: "xmark.circle")
+                }.buttonStyle(NativeButtonStyle())
+            }
+        }
+    }
+
+    private var aiToolsPanel: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionSelector
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("AI 创作", systemImage: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text("联网生成与修图 · 结果保存为新文件")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Text(ActivationManager.isActivated ? "已解锁" : "需要激活")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(ActivationManager.isActivated ? Palette.positive : Palette.muted)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 26)
+                    .background(
+                        ActivationManager.isActivated ? Palette.positive.opacity(0.12) : Palette.paperSecondary,
+                        in: Capsule()
+                    )
+            }
+            HStack(spacing: 8) {
+                ForEach(AiImageMode.allCases) { mode in
+                    Button {
+                        aiMode = mode
+                        aiResultImage = nil
+                    } label: {
+                        Label(mode.rawValue, systemImage: mode == .edit ? "wand.and.stars" : "photo.badge.plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(NativeButtonStyle(primary: aiMode == mode))
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("提示词").font(.system(size: 12, weight: .semibold))
+                TextEditor(text: $aiPrompt).font(.system(size: 13)).frame(height: 80)
+                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(Palette.rule) }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("快捷预设").font(.system(size: 12, weight: .semibold))
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 6)], alignment: .leading, spacing: 6) {
+                    ForEach(aiPresets, id: \.0) { preset in
+                        Button {
+                            aiPrompt = preset.1
+                            status = "已应用预设 · \(preset.0)"
+                        } label: {
+                            Text(preset.0).font(.system(size: 11)).lineLimit(1)
+                                .frame(maxWidth: .infinity).frame(minHeight: 28)
+                        }
+                        .buttonStyle(NativeButtonStyle())
+                    }
+                }
+            }
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("宽高比").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                    Picker("宽高比", selection: $aiRatio) {
+                        ForEach(AiAspectRatio.allCases) { r in Text(r.rawValue).tag(r) }
+                    }.pickerStyle(.menu).frame(width: 110)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("分辨率").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                    Picker("分辨率", selection: $aiResolution) {
+                        ForEach(AiResolution.allCases) { r in Text(r.rawValue).tag(r) }
+                    }.pickerStyle(.menu).frame(width: 90)
+                }
+                Spacer()
+            }
+            Divider()
+            HStack {
+                Button { generateAi() } label: {
+                    Label(aiIsGenerating ? "正在生成…" : "生成", systemImage: "sparkles")
+                        .frame(minWidth: 100)
+                }.buttonStyle(NativeButtonStyle(primary: true))
+                .disabled(aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || aiIsGenerating || (selectedPhoto == nil && aiMode == .edit))
+                Spacer()
+                if aiResultImage != nil {
+                    Button { saveAiResult() } label: {
+                        Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
+                    }.buttonStyle(NativeButtonStyle(primary: true)).disabled(isSaving)
+                }
+            }
+            Text(aiIsGenerating ? "正在调用 AI 模型…" : status)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+                .lineLimit(2)
+        }
+        .padding(18).frame(width: 390).frame(maxHeight: .infinity)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).stroke(Palette.rule) }
     }
 
     private var editorToolbar: some View {
@@ -5085,7 +5984,10 @@ private struct ImageEditorView: View {
             }
             .frame(width: 170)
             .onChange(of: selectedPreset) {
+                guard !suppressPresetApply else { return }
                 settings.apply(selectedPreset)
+                settingsBeforeAI = nil
+                aiSummaryKey = "等待分析当前照片"
                 showingOriginal = false
                 status = "已应用预设 · \(selectedPreset.rawValue)"
             }
@@ -5107,7 +6009,12 @@ private struct ImageEditorView: View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Palette.graphite)
-            if let image = renderedImage {
+            if selectedSection == .aiTools, let aiImage = aiResultImage {
+                Image(nsImage: aiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(14)
+            } else if let image = renderedImage {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
@@ -5122,20 +6029,32 @@ private struct ImageEditorView: View {
                 )
                 .foregroundStyle(.white, Palette.muted)
             }
-            Text(showingOriginal ? "原图" : "调整后")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .frame(minHeight: 28)
-                .background(Color.black.opacity(0.58))
-                .clipShape(Capsule())
-                .padding(12)
+            if selectedSection != .aiTools {
+                Text(showingOriginal ? "原图" : "调整后")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 28)
+                    .background(Color.black.opacity(0.58))
+                    .clipShape(Capsule())
+                    .padding(12)
+            } else if aiResultImage != nil {
+                Text("AI 生成")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 28)
+                    .background(Color.black.opacity(0.58))
+                    .clipShape(Capsule())
+                    .padding(12)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var adjustmentSidebar: some View {
         VStack(alignment: .leading, spacing: 12) {
+            aiWorkbench
             sectionSelector
             ScrollView {
                 adjustmentPanel
@@ -5175,6 +6094,105 @@ private struct ImageEditorView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Palette.rule)
         }
+    }
+
+    private var aiWorkbench: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("AI 智能修图 · 工作台", systemImage: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("设备端 · 照片不会上传")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Palette.cobalt)
+                    .padding(.horizontal, 7)
+                    .frame(minHeight: 22)
+                    .background(Palette.cobaltSoft, in: Capsule())
+                Spacer()
+                Text("\(Int(aiIntensity * 100))%")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(Palette.muted)
+            }
+            Text(LocalizedStringKey(aiSummaryKey))
+                .font(.system(size: 11))
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if let aiAnalysis {
+                HStack(spacing: 6) {
+                    aiMetric("曝光", value: aiAnalysis.meanLuma)
+                    aiMetric("动态范围", value: aiAnalysis.contrast)
+                    aiMetric("色彩", value: aiAnalysis.saturation)
+                    aiMetric("细节", value: aiAnalysis.detail)
+                }
+            }
+            Slider(value: $aiIntensity, in: 0.35...1, step: 0.05)
+                .accessibilityLabel("AI 强度")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button {
+                        analyzeAI()
+                    } label: {
+                        Label("分析画面", systemImage: "waveform.path.ecg")
+                    }
+                    .buttonStyle(NativeButtonStyle())
+                    .disabled(selectedPhoto == nil)
+                Button {
+                    applyAIEnhancement()
+                } label: {
+                    Label("智能优化", systemImage: "wand.and.stars")
+                }
+                .buttonStyle(NativeButtonStyle(primary: true))
+                .disabled(selectedPhoto == nil)
+                Button {
+                    undoAIEnhancement()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .buttonStyle(NativeButtonStyle())
+                .help("撤销 AI")
+                .disabled(settingsBeforeAI == nil)
+                    Button {
+                        copiedAISettings = settings
+                        status = "已复制 AI 调整，可应用到下一张照片"
+                    } label: {
+                        Label("复制 AI", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(NativeButtonStyle())
+                    .disabled(settingsBeforeAI == nil)
+                    Button {
+                        guard let copiedAISettings else { return }
+                        settings = copiedAISettings
+                        selectedPreset = .original
+                        showingOriginal = false
+                        status = "已粘贴 AI 调整"
+                    } label: {
+                        Label("粘贴 AI", systemImage: "doc.on.clipboard")
+                    }
+                    .buttonStyle(NativeButtonStyle())
+                    .disabled(copiedAISettings == nil || selectedPhoto == nil)
+                }
+            }
+        }
+        .padding(12)
+        .background(Palette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Palette.cobalt.opacity(0.3))
+        }
+    }
+
+    private func aiMetric(_ title: String, value: Double) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(LocalizedStringKey(title))
+                .font(.system(size: 9))
+                .foregroundStyle(Palette.muted)
+            Text("\(Int(max(0, min(1, value)) * 100))%")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Palette.ink)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 7)
+        .frame(minHeight: 36)
+        .background(Palette.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private var sectionSelector: some View {
@@ -5236,6 +6254,8 @@ private struct ImageEditorView: View {
                 standardSlider("暗角", value: $settings.vignette)
             case .geometry:
                 geometryControls
+            case .aiTools:
+                EmptyView()
             }
         }
     }
@@ -5537,6 +6557,121 @@ private struct ImageEditorView: View {
         settings = ProfessionalEditSettings()
         selectedPreset = .original
         showingOriginal = false
+        settingsBeforeAI = nil
+        aiSummaryKey = "等待分析当前照片"
+        aiAnalysis = nil
+    }
+
+    private func analyzeAI() {
+        guard let selectedPhoto,
+              let source = CIImage(contentsOf: selectedPhoto.url),
+              let analysis = analyzeForAI(source)
+        else {
+            status = "无法分析当前照片"
+            return
+        }
+        aiAnalysis = analysis
+        aiSummaryKey = analysis.summaryKey
+        status = "画面分析完成 · 可应用 AI 建议"
+    }
+
+    private func applyAIEnhancement() {
+        guard let selectedPhoto,
+              let source = CIImage(contentsOf: selectedPhoto.url),
+              let analysis = aiAnalysis ?? analyzeForAI(source)
+        else {
+            status = "无法分析当前照片"
+            return
+        }
+        settingsBeforeAI = settings
+        suppressPresetApply = true
+        selectedPreset = .original
+        settings.applyAI(analysis, intensity: aiIntensity)
+        showingOriginal = false
+        aiSummaryKey = analysis.summaryKey
+        aiAnalysis = analysis
+        status = "AI 优化已应用 · 可继续微调"
+        DispatchQueue.main.async {
+            suppressPresetApply = false
+        }
+    }
+
+    private func undoAIEnhancement() {
+        guard let previous = settingsBeforeAI else { return }
+        settings = previous
+        settingsBeforeAI = nil
+        aiSummaryKey = "已撤销 AI 优化"
+        status = "已恢复 AI 优化前的参数"
+    }
+
+    private func analyzeForAI(_ source: CIImage) -> EditorAIAnalysis? {
+        let size = 96
+        let normalizedSource = normalized(source)
+        guard normalizedSource.extent.width > 0,
+              normalizedSource.extent.height > 0
+        else { return nil }
+        let sample = normalizedSource.transformed(
+            by: CGAffineTransform(
+                scaleX: CGFloat(size) / normalizedSource.extent.width,
+                y: CGFloat(size) / normalizedSource.extent.height
+            )
+        )
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        pixels.withUnsafeMutableBytes { buffer in
+            guard let address = buffer.baseAddress else { return }
+            context.render(
+                sample,
+                toBitmap: address,
+                rowBytes: size * 4,
+                bounds: CGRect(x: 0, y: 0, width: size, height: size),
+                format: .RGBA8,
+                colorSpace: CGColorSpaceCreateDeviceRGB()
+            )
+        }
+        var lumas = [Double](repeating: 0, count: size * size)
+        var red = 0.0
+        var green = 0.0
+        var blue = 0.0
+        var saturation = 0.0
+        var shadows = 0.0
+        var highlights = 0.0
+        for index in 0..<(size * size) {
+            let offset = index * 4
+            let r = Double(pixels[offset]) / 255
+            let g = Double(pixels[offset + 1]) / 255
+            let b = Double(pixels[offset + 2]) / 255
+            let luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+            lumas[index] = luma
+            red += r
+            green += g
+            blue += b
+            saturation += max(r, g, b) - min(r, g, b)
+            if luma < 0.10 { shadows += 1 }
+            if luma > 0.90 { highlights += 1 }
+        }
+        let count = Double(size * size)
+        let mean = lumas.reduce(0, +) / count
+        let variance = lumas.reduce(0) { partial, value in
+            partial + pow(value - mean, 2)
+        } / count
+        var detail = 0.0
+        for y in 0..<size {
+            for x in 1..<size {
+                let index = y * size + x
+                detail += abs(lumas[index] - lumas[index - 1])
+            }
+        }
+        return EditorAIAnalysis(
+            meanLuma: mean,
+            contrast: sqrt(variance),
+            shadowRatio: shadows / count,
+            highlightRatio: highlights / count,
+            saturation: saturation / count,
+            red: red / count,
+            green: green / count,
+            blue: blue / count,
+            detail: detail / Double(size * (size - 1))
+        )
     }
 
     private func saveCopy() {
@@ -5575,6 +6710,40 @@ private struct ImageEditorView: View {
             status = model.errorMessage ?? "保存编辑副本失败"
             showingOriginal = wasShowingOriginal
         }
+        isSaving = false
+    }
+
+    private func generateAi() {
+        guard !aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "请输入提示词"; return }
+        guard let code = ActivationManager.savedCode else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
+        let src: Data? = aiMode == .edit ? selectedPhoto.flatMap { try? Data(contentsOf: $0.url) } : nil
+        if aiMode == .edit && src == nil { status = "请先选择一张照片用于 AI 修图"; return }
+        aiIsGenerating = true; status = "正在调用 AI 模型…"
+        let sz = aiRatio.size
+        let did = ActivationManager.deviceId
+        Task {
+            do {
+                let d = try await aiService.generate(prompt: aiPrompt, sourceImageData: src, size: sz, activationCode: code, deviceId: did)
+                let img = NSImage(data: d)
+                await MainActor.run {
+                    aiResultImage = img; aiIsGenerating = false
+                    status = img != nil ? "生成完成" : "无法解码 AI 返回的图片"
+                }
+            } catch {
+                await MainActor.run { aiIsGenerating = false; status = error.localizedDescription }
+            }
+        }
+    }
+
+    private func saveAiResult() {
+        guard let img = aiResultImage, let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { status = "没有可保存的 AI 结果"; return }
+        let rep = NSBitmapImageRep(cgImage: cg)
+        guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.95]) else { status = "无法编码 AI 结果"; return }
+        isSaving = true
+        let fn = "ai_\(aiMode == .edit ? "edited" : "generated").jpg"
+        if let saved = model.saveEditedPhoto(data, originalFilename: fn) {
+            selectedPhotoURL = saved; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
+        } else { status = model.errorMessage ?? "保存 AI 结果失败" }
         isSaving = false
     }
 }
@@ -6081,9 +7250,9 @@ private struct ConnectionSheet: View {
                     .background(Palette.cobaltSoft)
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Nikon Z 系列原生 USB")
+                    Text("原生 USB/PTP 相机")
                         .font(.system(size: 17, weight: .bold))
-                    Text(SupportedCamera.summary)
+                    Text("连接后自动识别当前机型与可用参数")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Palette.cobalt)
                     Text("联机拍摄、参数控制、实时监看和文件传输")
@@ -6110,7 +7279,7 @@ private struct ConnectionSheet: View {
                     RuntimeLocalizedText(
                         model.connecting
                             ? "正在连接…"
-                            : "连接 Nikon 相机"
+                            : "连接相机"
                     )
                 }
                 .buttonStyle(NativeButtonStyle(primary: true))
@@ -6127,8 +7296,19 @@ private struct RootView: View {
     @ObservedObject var model: CameraModel
     @StateObject private var updater = UpdateController()
     @AppStorage("appLanguage") private var languageRaw = "zh-Hans"
+    @AppStorage("appThemeMode") private var themeRaw = ThemeMode.system.rawValue
     @AppStorage("dismissedLaunchAnnouncementVersion")
     private var dismissedAnnouncementVersion = ""
+
+    private var themeMode: ThemeMode {
+        ThemeMode(rawValue: themeRaw) ?? .system
+    }
+
+    /// 将主题设置应用到 AppKit 全局外观，使所有动态色（Palette / SettingsPalette）
+    /// 与非 SwiftUI 面板（NSSavePanel、菜单等）同步解析明/暗。
+    private func applyAppearance() {
+        NSApp.appearance = themeMode.appKitAppearance
+    }
     @State private var showConnection = false
     @State private var showSettings = false
     @State private var showLaunchAnnouncement = false
@@ -6138,7 +7318,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.2.0"
+        ) as? String ?? "1.3.1"
     }
 
     var body: some View {
@@ -6206,7 +7386,8 @@ private struct RootView: View {
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
                 updater: updater,
-                languageRaw: $languageRaw
+                languageRaw: $languageRaw,
+                themeRaw: $themeRaw
             )
         }
         .sheet(isPresented: $showLaunchAnnouncement) {
@@ -6221,7 +7402,9 @@ private struct RootView: View {
             }
             .interactiveDismissDisabled()
         }
+        .preferredColorScheme(themeMode.colorScheme)
         .onAppear {
+            applyAppearance()
             updateWindowTitle()
             updater.checkAutomaticallyIfNeeded()
             showLaunchAnnouncement =
@@ -6229,6 +7412,9 @@ private struct RootView: View {
         }
         .onChange(of: languageRaw) { _, _ in
             updateWindowTitle()
+        }
+        .onChange(of: themeRaw) { _, _ in
+            applyAppearance()
         }
         .alert(
             "帧澈 ZENCHE",

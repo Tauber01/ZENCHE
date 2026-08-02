@@ -97,6 +97,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var supportsFocusPoint = false
     @Published private(set) var supportsExposureBias = false
     @Published private(set) var supportsCustomExposure = false
+    @Published private(set) var exposureModeIsCustom = false
     @Published private(set) var minExposureBias: Float = -2
     @Published private(set) var maxExposureBias: Float = 2
     @Published private(set) var minISO: Float = 100
@@ -138,6 +139,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var captureDelegates: [Int64: PhotoCaptureDelegate] = [:]
     private var shouldResumeSession = false
     private var lastMonitorFrameTime = CFAbsoluteTimeGetCurrent()
+    private var lastExposureReadoutTime = CFAbsoluteTimeGetCurrent()
 
     override init() {
         super.init()
@@ -220,6 +222,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.supportsFocusPoint = false
                 self.supportsExposureBias = false
                 self.supportsCustomExposure = false
+                self.exposureModeIsCustom = false
                 self.supportsMovieRecording = false
                 self.isRecording = false
                 self.state = .disconnected
@@ -455,6 +458,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.activeFrameRate = frameRate
                     self.shutterAngle = appliedAngle
                     self.exposureISO = clampedISO
+                    self.exposureModeIsCustom = true
                     self.onMessage?(
                         String(
                             format: "视频曝光已应用 · %.1f° · ISO %.0f",
@@ -686,6 +690,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.supportsExposureBias =
                         device.minExposureTargetBias < device.maxExposureTargetBias
                     self.supportsCustomExposure = device.isExposureModeSupported(.custom)
+                    self.exposureModeIsCustom = device.exposureMode == .custom
                     self.supportsMovieRecording = canRecordMovie
                     self.minExposureBias = device.minExposureTargetBias
                     self.maxExposureBias = device.maxExposureTargetBias
@@ -693,7 +698,10 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                     self.maxISO = device.activeFormat.maxISO
                     self.exposureISO = device.iso
                     self.lensAperture = device.lensAperture
-                    self.activeFrameRate = Self.activeFrameRate(for: device)
+                    let frameRate = Self.activeFrameRate(for: device)
+                    self.activeFrameRate = frameRate
+                    self.shutterAngle = CMTimeGetSeconds(device.exposureDuration)
+                        * frameRate * 360
                     self.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 8)
                     self.exposureBias = device.exposureTargetBias
                     self.zoomFactor = device.videoZoomFactor
@@ -727,6 +735,23 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
             return
         }
         lastMonitorFrameTime = now
+        if now - lastExposureReadoutTime >= 0.5, let device = currentDevice {
+            lastExposureReadoutTime = now
+            let frameRate = Self.activeFrameRate(for: device)
+            let angle = CMTimeGetSeconds(device.exposureDuration) * frameRate * 360
+            let iso = device.iso
+            let aperture = device.lensAperture
+            let bias = device.exposureTargetBias
+            let customExposure = device.exposureMode == .custom
+            DispatchQueue.main.async { [weak self] in
+                self?.activeFrameRate = frameRate
+                self?.shutterAngle = angle
+                self?.exposureISO = iso
+                self?.lensAperture = aperture
+                self?.exposureBias = bias
+                self?.exposureModeIsCustom = customExposure
+            }
+        }
         let result = ProfessionalMonitor.process(
             pixelBuffer,
             focusPeaking: focusPeakingEnabled,

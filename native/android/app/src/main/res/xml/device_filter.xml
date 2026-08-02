@@ -1,17 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Nikon D500 -->
+    <usb-device vendor-id="1200" product-id="1082" />
     <!-- Nikon Z7 -->
     <usb-device vendor-id="1200" product-id="1090" />
     <!-- Nikon Z6 -->
     <usb-device vendor-id="1200" product-id="1091" />
     <!-- Nikon Z50 -->
     <usb-device vendor-id="1200" product-id="1092" />
+    <!-- Nikon D7500 -->
+    <usb-device vendor-id="1200" product-id="1093" />
     <!-- Nikon D780 -->
     <usb-device vendor-id="1200" product-id="1094" />
     <!-- Nikon D6 -->
     <usb-device vendor-id="1200" product-id="1095" />
     <!-- Nikon Z5 -->
     <usb-device vendor-id="1200" product-id="1096" />
+    <!-- Nikon D850 -->
+    <usb-device vendor-id="1200" product-id="1098" />
     <!-- Nikon Z7II -->
     <usb-device vendor-id="1200" product-id="1099" />
     <!-- Nikon Z6II -->
@@ -36,4 +42,8 @@
     <usb-device vendor-id="1200" product-id="1111" />
     <!-- Name-based fallback for newly reported Nikon still-image interfaces. -->
     <usb-device vendor-id="1200" class="6" subclass="1" protocol="1" />
+    <!-- Sony still-image class fallback. -->
+    <usb-device vendor-id="1356" class="6" subclass="1" protocol="1" />
+    <!-- Canon still-image class fallback. -->
+    <usb-device vendor-id="1193" class="6" subclass="1" protocol="1" />
 </resources>

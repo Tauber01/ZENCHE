@@ -1,7 +1,7 @@
 import { BusinessError, usbManager } from '@kit.BasicServicesKit';
 import {
   CameraProfile,
-  NIKON_VENDOR_ID,
+  SUPPORTED_VENDOR_IDS,
   profileForProduct,
   supportedCameraSummary
 } from './CameraProfiles';
@@ -91,32 +91,34 @@ export class PtpCamera {
       usbManager.getDevices();
     let selectedDevice: Readonly<usbManager.USBDevice> | undefined;
     let selectedProfile: CameraProfile | undefined;
-    let unsupportedNikon: number = 0;
+    let unsupportedVendor: number = 0;
+    let unsupportedProduct: number = 0;
 
     for (const device of devices) {
-      if (device.vendorId !== NIKON_VENDOR_ID) {
+      if (!SUPPORTED_VENDOR_IDS.has(device.vendorId)) {
         continue;
       }
       const candidate: CameraProfile | undefined =
-        profileForProduct(device.productId);
+        profileForProduct(device.vendorId, device.productId);
       if (candidate !== undefined) {
         selectedDevice = device;
         selectedProfile = candidate;
         break;
       }
-      unsupportedNikon = device.productId;
+      unsupportedVendor = device.vendorId;
+      unsupportedProduct = device.productId;
     }
 
     if (selectedDevice === undefined || selectedProfile === undefined) {
-      if (unsupportedNikon !== 0) {
+      if (unsupportedVendor !== 0) {
+        const vendorHex: string = unsupportedVendor.toString(16).padStart(4, '0');
+        const productHex: string = unsupportedProduct.toString(16).padStart(4, '0');
         throw new Error(
-          `检测到未支持的 Nikon USB 设备 04b0:${unsupportedNikon
-            .toString(16)
-            .padStart(4, '0')}。当前支持 ${supportedCameraSummary()}。`
+          `检测到未支持的 USB 相机设备 ${vendorHex}:${productHex}。当前支持 ${supportedCameraSummary()}。`
         );
       }
       throw new Error(
-        `没有检测到支持的 Nikon 相机。请连接 ${supportedCameraSummary()}。`
+        `没有检测到支持的相机。请连接 ${supportedCameraSummary()}。`
       );
     }
 
@@ -649,7 +651,7 @@ export class PtpCamera {
     timeout: number
   ): Promise<void> {
     if (this.pipe === undefined || this.bulkOut === undefined) {
-      throw new Error('Nikon USB 输出 endpoint 不可用。');
+      throw new Error('USB 输出 endpoint 不可用。');
     }
     const packet: Uint8Array = new Uint8Array(12 + payload.length);
     const view: DataView = new DataView(packet.buffer);
@@ -678,7 +680,7 @@ export class PtpCamera {
 
   private async receiveContainer(timeout: number): Promise<PtpContainer> {
     if (this.pipe === undefined || this.bulkIn === undefined) {
-      throw new Error('Nikon USB 输入 endpoint 不可用。');
+      throw new Error('USB 输入 endpoint 不可用。');
     }
     const first: Uint8Array = new Uint8Array(USB_CHUNK_SIZE);
     const received: number = await usbManager.bulkTransfer(
@@ -1002,14 +1004,14 @@ export class PtpCamera {
 
   private ensureConnected(): void {
     if (!this.isConnected) {
-      throw new Error('请先连接支持的 Nikon 相机。');
+      throw new Error('请先连接支持的相机。');
     }
   }
 
   private ensureConnectedForOperation(operation: number): void {
     if (operation === OPEN_SESSION) {
       if (this.pipe === undefined) {
-        throw new Error('无法打开 Nikon USB 连接。');
+        throw new Error('无法打开 USB 相机连接。');
       }
       return;
     }
@@ -1017,7 +1019,7 @@ export class PtpCamera {
   }
 
   private cameraName(): string {
-    return this.activeProfile?.name ?? 'Nikon 相机';
+    return this.activeProfile?.name ?? '相机';
   }
 
   private sleep(milliseconds: number): Promise<void> {
