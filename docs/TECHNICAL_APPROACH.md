@@ -10,6 +10,8 @@
 - 服务器在成功任务完成后扣减 AI 次数并通过 `X-ZENCHE-Remaining` 返回剩余次数；失败请求回滚预扣次数。
 - 修图结果使用临时文件和原子替换覆盖当前原图；生图结果使用新的 `ai_generated_*.jpg` 文件保存。
 
+v1.4.0 已于 2026-08-02 以提交 `8a13c0b`、标签 `v1.4.0` 发布到 [GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。Release 包含 Android、HarmonyOS、iOS unsigned、macOS、Windows Setup 和 Windows ZIP 六个包及六份 `.sha256` 校验文件；签名状态和 SHA-256 以 `docs/releases/v1.4.0.md` 为准。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

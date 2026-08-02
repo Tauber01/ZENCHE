@@ -243,7 +243,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 验证完成：`npm test` 59/59 通过，`git diff --check` 通过；五端包和六份 SHA-256 均已生成并本地回验。
 - 本地附件 SHA-256：Android `f89f873db175e393b47e5195fbfce396a63c536782048b424ba7e060ff61f444`；HarmonyOS `ce81c588af1de6da7ecc7c1898dcf7094cda3810fb2c6465f67b2325a72cba9b`；iOS unsigned `8e70058c3e0a6004de6e81098cb7b69c28ac77fbf9f5c6c1320fd32c8be66dfb`；macOS `531a206288bf1f669d6e96566527da14970857da33deae7d077e40ca809aacea`；Windows Setup `486052d2cd398bbb62eedd983f7bb544e431fd35d7225ba75789ee1caa010499`；Windows ZIP `d33cc4696eec6a36f0b7866d9155b82bcc2b1993f8cc8ea4071752b9b74a4c22`。
 - 签名状态：macOS ad-hoc 未公证，Android debug，HarmonyOS/iOS unsigned，Windows 无商业代码签名；仍需各平台正式签名和真机验收。
-- 待完成：创建提交 `release: 帧澈 ZENCHE v1.4.0`、标签 `v1.4.0`、推送 `main` 与标签，并创建详细中文 GitHub Release。
+- 已完成提交 `8a13c0b`（`release: 帧澈 ZENCHE v1.4.0`）、标签 `v1.4.0` 和详细中文 GitHub Release：<https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0>。
+- Release 已上传 12 个附件（六个交付包及六个 `.sha256`），本地 SHA-256 已回验：Android `f89f873db175e393b47e5195fbfce396a63c536782048b424ba7e060ff61f444`；HarmonyOS `ce81c588af1de6da7ecc7c1898dcf7094cda3810fb2c6465f67b2325a72cba9b`；iOS unsigned `8e70058c3e0a6004de6e81098cb7b69c28ac77fbf9f5c6c1320fd32c8be66dfb`；macOS `531a206288bf1f669d6e96566527da14970857da33deae7d077e40ca809aacea`；Windows Setup `486052d2cd398bbb62eedd983f7bb544e431fd35d7225ba75789ee1caa010499`；Windows ZIP `d33cc4696eec6a36f0b7866d9155b82bcc2b1993f8cc8ea4071752b9b74a4c22`。
+- 远端 `main` 在此前 v1.3.1 发布分支上存在删除 `AGENTS.md`/`PV` 的历史，无法快进接受本地 `1.4.0` 提交；为避免覆盖远端历史，本次仅推送了独立 `v1.4.0` 标签和 Release，未强推 `main`。
 
 ## 8. 已知文档债务
 
