@@ -98,6 +98,7 @@ private enum IPalette {
     static let videoSoft = dynamic(light: 0xFBE2E3, dark: 0x3A1B1E)
     static let positive = dynamic(light: 0x1FA869, dark: 0x35C97B)
     static let graphite = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
+    static let monitorBackground = Color(red: 4 / 255, green: 12 / 255, blue: 22 / 255)
     static let readoutGlow = Color(red: 107 / 255, green: 174 / 255, blue: 255 / 255)
     static let shadow = Color.black.opacity(0.18)
 }
@@ -173,18 +174,25 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.4.0"
+        ) as? String ?? "1.4.1"
     }
 
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                IPalette.paper
+                (model.section == .monitor && proxy.size.width < 820
+                    ? IPalette.monitorBackground
+                    : IPalette.paper)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    AppHeader()
-                    Divider().overlay(IPalette.rule)
+                    // The compact monitor is a dedicated camera surface. Keep the
+                    // existing header for the other pages, while letting monitor
+                    // use the full portrait canvas shown in the native reference.
+                    if !(model.section == .monitor && proxy.size.width < 820) {
+                        AppHeader()
+                        Divider().overlay(IPalette.rule)
+                    }
 
                     if proxy.size.width >= 820 {
                         HStack(spacing: 0) {
@@ -201,6 +209,9 @@ struct RootView: View {
                     }
 
                 }
+                .preferredColorScheme(
+                    model.section == .monitor && proxy.size.width < 820 ? .dark : nil
+                )
             }
         }
         .overlay {
@@ -451,7 +462,9 @@ private struct BottomNavigation: View {
     var body: some View {
         HStack {
             ForEach(AppSection.allCases) { section in
-                let accent = section == .monitor ? IPalette.video : IPalette.cobalt
+                let accent = section == .monitor
+                    ? (model.section == .monitor ? IPalette.cobalt : IPalette.video)
+                    : IPalette.cobalt
                 Button {
                     model.section = section
                 } label: {
@@ -483,7 +496,7 @@ private struct BottomNavigation: View {
         .offset(y: min(bottomInset * 0.38, 14))
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
-        .background(IPalette.surface)
+        .background(model.section == .monitor ? Color.black : IPalette.surface)
         .overlay(alignment: .top) {
             Rectangle().fill(IPalette.rule).frame(height: 0.5)
         }
@@ -813,8 +826,15 @@ private struct ProfessionalEditSettings {
     var wheelLift = 0.0
     var wheelGamma = 0.0
     var wheelGain = 0.0
+    var wheelLiftX = 0.0
+    var wheelLiftY = 0.0
+    var wheelGammaX = 0.0
+    var wheelGammaY = 0.0
+    var wheelGainX = 0.0
+    var wheelGainY = 0.0
     var curveContrast = 0.0
     var curvePivot = 50.0
+    var curvePoints: [EditorCurvePoint] = EditorCurvePoint.defaults
     var maskEnabled = false
     var maskFeather = 55.0
     var rotation = 0
@@ -943,6 +963,7 @@ private struct ImageEditorPage: View {
     @State private var settingsBeforeAI: ProfessionalEditSettings?
     @State private var aiAnalysis: EditorAIAnalysis?
     @State private var copiedAISettings: ProfessionalEditSettings?
+    @State private var activeCurvePoint: Int?
     private let context = CIContext()
     @State private var aiMode = AiImageMode.edit
     @State private var aiPrompt = ""
@@ -1413,13 +1434,13 @@ private struct ImageEditorPage: View {
             Text("三向色轮 · Lift / Gamma / Gain")
                 .font(.subheadline.weight(.semibold))
             HStack(spacing: 12) {
-                EditorColorWheel(title: "Lift", value: $settings.wheelLift, tint: .blue)
-                EditorColorWheel(title: "Gamma", value: $settings.wheelGamma, tint: .green)
-                EditorColorWheel(title: "Gain", value: $settings.wheelGain, tint: .orange)
+                EditorColorWheel(title: "暗部 · Lift", x: $settings.wheelLiftX, y: $settings.wheelLiftY, tint: .blue)
+                EditorColorWheel(title: "中间调 · Gamma", x: $settings.wheelGammaX, y: $settings.wheelGammaY, tint: .green)
+                EditorColorWheel(title: "高光 · Gain", x: $settings.wheelGainX, y: $settings.wheelGainY, tint: .orange)
             }
-            standardSlider("Lift", value: $settings.wheelLift)
-            standardSlider("Gamma", value: $settings.wheelGamma)
-            standardSlider("Gain", value: $settings.wheelGain)
+            Text("在圆盘内拖动色点调整对应范围")
+                .font(.caption)
+                .foregroundStyle(IPalette.muted)
         }
     }
 
@@ -1435,28 +1456,61 @@ private struct ImageEditorPage: View {
                     }
                     .stroke(IPalette.rule, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     Path { path in
-                        let amount = settings.curveContrast / 100
-                        path.move(to: CGPoint(x: 0, y: proxy.size.height))
-                        path.addCurve(
-                            to: CGPoint(x: proxy.size.width, y: 0),
-                            control1: CGPoint(x: proxy.size.width * 0.28, y: proxy.size.height * (0.82 - amount * 0.3)),
-                            control2: CGPoint(x: proxy.size.width * 0.72, y: proxy.size.height * (0.18 + amount * 0.3))
-                        )
+                        let samples = stride(from: 0.0, through: 1.0, by: 1.0 / 48.0).map { x in
+                            CGPoint(x: x * proxy.size.width, y: (1 - curveValue(x)) * proxy.size.height)
+                        }
+                        guard let first = samples.first else { return }
+                        path.move(to: first)
+                        for point in samples.dropFirst() { path.addLine(to: point) }
                     }
                     .stroke(IPalette.cobalt, lineWidth: 3)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(IPalette.cobalt)
-                        .frame(width: 8, height: 8)
-                        .position(x: proxy.size.width * settings.curvePivot / 100,
-                                  y: proxy.size.height * (1 - settings.curvePivot / 100))
+                    ForEach(Array(settings.curvePoints.enumerated()), id: \.offset) { index, point in
+                        Circle()
+                            .fill(index == activeCurvePoint ? IPalette.ink : IPalette.cobalt)
+                            .frame(width: 9, height: 9)
+                            .position(x: point.x * proxy.size.width, y: (1 - point.y) * proxy.size.height)
+                    }
                 }
                 .background(IPalette.graphite)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay { RoundedRectangle(cornerRadius: 8).stroke(IPalette.rule) }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let width = max(proxy.size.width, 1)
+                            let height = max(proxy.size.height, 1)
+                            let x = min(max(gesture.location.x / width, 0), 1)
+                            let y = min(max(1 - gesture.location.y / height, 0), 1)
+                            if activeCurvePoint == nil {
+                                let hit = settings.curvePoints.enumerated().min {
+                                    let dx = $0.element.x - x
+                                    let dy = $0.element.y - y
+                                    let dx2 = $1.element.x - x
+                                    let dy2 = $1.element.y - y
+                                    return dx * dx + dy * dy < dx2 * dx2 + dy2 * dy2
+                                }
+                                if let hit, pow(hit.element.x - x, 2) + pow(hit.element.y - y, 2) < 0.035 * 0.035 {
+                                    activeCurvePoint = hit.offset
+                                } else {
+                                    settings.curvePoints.append(EditorCurvePoint(x: x, y: y))
+                                    activeCurvePoint = settings.curvePoints.count - 1
+                                }
+                            }
+                            if let index = activeCurvePoint, settings.curvePoints.indices.contains(index) {
+                                settings.curvePoints[index].x = x
+                                settings.curvePoints[index].y = y
+                            }
+                        }
+                        .onEnded { _ in
+                            activeCurvePoint = nil
+                        }
+                )
             }
             .frame(height: 190)
-            standardSlider("曲线对比度", value: $settings.curveContrast)
-            editorSlider(title: "中点", value: $settings.curvePivot, range: 0...100, step: 1, formatter: { "\(Int($0))" })
+            Text("点击任意位置新增控制点，拖动控制点调整曲线")
+                .font(.caption)
+                .foregroundStyle(IPalette.muted)
         }
     }
 
@@ -1636,7 +1690,7 @@ private struct ImageEditorPage: View {
         )
 
         let gain = max(0.4, 1 + settings.whites / 260)
-        let lift = settings.blacks / 850
+        let blackLift = settings.blacks / 850
         let tintShift = settings.tint / 1800
         output = filtered(
             "CIColorMatrix",
@@ -1646,34 +1700,36 @@ private struct ImageEditorPage: View {
                 "inputGVector": CIVector(x: 0, y: gain, z: 0, w: 0),
                 "inputBVector": CIVector(x: 0, y: 0, z: gain, w: 0),
                 "inputBiasVector": CIVector(
-                    x: lift + tintShift,
-                    y: lift - tintShift,
-                    z: lift + tintShift,
+                    x: blackLift + tintShift,
+                    y: blackLift - tintShift,
+                    z: blackLift + tintShift,
                     w: 0
                 )
             ]
         )
 
-        // Apply compact Lift/Gamma/Gain controls as channel offsets and gain.
-        let lift = settings.wheelLift / 260
-        let gamma = settings.wheelGamma / 180
-        let wheelGainValue = max(0.35, 1 + settings.wheelGain / 140)
-        output = filtered(
-            "CIColorMatrix",
-            image: output,
-            values: [
-                "inputRVector": CIVector(x: wheelGainValue, y: 0, z: 0, w: 0),
-                "inputGVector": CIVector(x: 0, y: wheelGainValue, z: 0, w: 0),
-                "inputBVector": CIVector(x: 0, y: 0, z: wheelGainValue, w: 0),
-                "inputBiasVector": CIVector(x: lift + gamma, y: lift, z: lift - gamma, w: 0)
-            ]
-        )
-        if settings.curveContrast != 0 {
-            output = filtered(
-                "CIColorControls",
-                image: output,
-                values: [kCIInputContrastKey: max(0.1, 1 + settings.curveContrast / 120)]
-            )
+        output = applyingGradingCube(to: output)
+        if settings.curvePoints.count > 2 {
+            let dimension = 16
+            var cube = [Float]()
+            cube.reserveCapacity(dimension * dimension * dimension * 4)
+            for blue in 0..<dimension {
+                for green in 0..<dimension {
+                    for red in 0..<dimension {
+                        let r = Double(red) / Double(dimension - 1)
+                        let g = Double(green) / Double(dimension - 1)
+                        let b = Double(blue) / Double(dimension - 1)
+                        let luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+                        let delta = curveValue(luma) - luma
+                        cube += [Float(max(0, min(1, r + delta))), Float(max(0, min(1, g + delta))), Float(max(0, min(1, b + delta))), 1]
+                    }
+                }
+            }
+            let cubeData = cube.withUnsafeBufferPointer { Data(buffer: $0) }
+            output = filtered("CIColorCube", image: output, values: [
+                "inputCubeDimension": dimension,
+                "inputCubeData": cubeData
+            ])
         }
 
         if settings.texture > 0 {
@@ -1738,6 +1794,18 @@ private struct ImageEditorPage: View {
                 ]
             )
         }
+        if settings.maskEnabled {
+            // A soft vignette provides a stable radial mask preview on-device.
+            output = filtered(
+                "CIVignette",
+                image: output,
+                values: [
+                    kCIInputIntensityKey: settings.maskFeather / 180,
+                    kCIInputRadiusKey: min(output.extent.width, output.extent.height)
+                        * (0.35 + settings.maskFeather / 180)
+                ]
+            )
+        }
         return output
     }
 
@@ -1750,6 +1818,53 @@ private struct ImageEditorPage: View {
         filter.setValue(image, forKey: kCIInputImageKey)
         values.forEach { filter.setValue($0.value, forKey: $0.key) }
         return filter.outputImage ?? image
+    }
+
+    private func curveValue(_ input: Double) -> Double {
+        let x = min(max(input, 0), 1)
+        let points = settings.curvePoints.sorted { $0.x < $1.x }
+        guard points.count > 1 else { return x }
+        if x <= points[0].x { return points[0].y }
+        if x >= points[points.count - 1].x { return points[points.count - 1].y }
+        let index = max(1, points.firstIndex { $0.x >= x } ?? 1)
+        let p0 = points[max(0, index - 2)]
+        let p1 = points[index - 1]
+        let p2 = points[index]
+        let p3 = points[min(points.count - 1, index + 1)]
+        let t = (x - p1.x) / max(0.0001, p2.x - p1.x)
+        let t2 = t * t
+        let t3 = t2 * t
+        let y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+        return min(max(y, 0), 1)
+    }
+
+    private func applyingGradingCube(to image: CIImage) -> CIImage {
+        let dimension = 16
+        var cube = [Float]()
+        cube.reserveCapacity(dimension * dimension * dimension * 4)
+        for blue in 0..<dimension {
+            for green in 0..<dimension {
+                for red in 0..<dimension {
+                    var r = Double(red) / Double(dimension - 1)
+                    var g = Double(green) / Double(dimension - 1)
+                    var b = Double(blue) / Double(dimension - 1)
+                    let luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+                    let shadows = pow(1 - luma, 2)
+                    let midtones = 1 - abs(luma * 2 - 1)
+                    let highlights = pow(luma, 2)
+                    let x = settings.wheelLiftX / 800 * shadows + settings.wheelGammaX / 800 * midtones + settings.wheelGainX / 800 * highlights
+                    let y = settings.wheelLiftY / 800 * shadows + settings.wheelGammaY / 800 * midtones + settings.wheelGainY / 800 * highlights
+                    r += x - y * 0.5
+                    g += y - x * 0.5
+                    b -= (x + y) * 0.5
+                    cube += [Float(max(0, min(1, r))), Float(max(0, min(1, g))), Float(max(0, min(1, b))), 1]
+                }
+            }
+        }
+        return filtered("CIColorCube", image: image, values: [
+            "inputCubeDimension": dimension,
+            "inputCubeData": cube.withUnsafeBufferPointer { Data(buffer: $0) }
+        ])
     }
 
     private func applyGeometry(to source: CIImage) -> CIImage {
@@ -1907,16 +2022,17 @@ private struct ImageEditorPage: View {
         }
         let extent = image.extent
         let point = CGPoint(x: extent.midX, y: extent.midY)
-        guard let average = CIFilter(name: "CIAreaAverage") else { return }
-        average.setValue(image, forKey: kCIInputImageKey)
-        average.setValue(CIVector(cgRect: CGRect(x: point.x, y: point.y, width: 1, height: 1)), forKey: "inputExtent")
-        guard let output = average.outputImage,
-              let cg = context.createCGImage(output, from: output.extent.integral),
-              let data = cg.dataProvider?.data,
-              let bytes = CFDataGetBytePtr(data) else { return }
-        let r = Int(bytes[0]), g = Int(bytes[1]), b = Int(bytes[2])
+        let sampleRect = CGRect(x: point.x, y: point.y, width: 1, height: 1)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        pixel.withUnsafeMutableBytes { buffer in
+            context.render(image, toBitmap: buffer.baseAddress!, rowBytes: 4, bounds: sampleRect, format: .RGBA8, colorSpace: CGColorSpaceCreateDeviceRGB())
+        }
+        let r = Int(pixel[0]), g = Int(pixel[1]), b = Int(pixel[2])
         pickerSample = String(format: "RGB %02X %02X %02X", r, g, b)
         pickerColor = Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
+        settings.temperature = min(max(Double(b - r) / 2.55, -100), 100)
+        settings.tint = min(max((Double(g) - Double(r + b) / 2) / 2.55, -100), 100)
+        status = "已取样 #\(String(format: "%02X%02X%02X", r, g, b)) · 已微调色温/色调"
     }
 
     private func analyzeAI() {
@@ -2077,9 +2193,23 @@ private struct EditorSectionButtonStyle: ButtonStyle {
     }
 }
 
+private struct EditorCurvePoint: Equatable {
+    var x: Double
+    var y: Double
+
+    static let defaults: [EditorCurvePoint] = [
+        EditorCurvePoint(x: 0, y: 0),
+        EditorCurvePoint(x: 0.25, y: 0.25),
+        EditorCurvePoint(x: 0.5, y: 0.5),
+        EditorCurvePoint(x: 0.75, y: 0.75),
+        EditorCurvePoint(x: 1, y: 1)
+    ]
+}
+
 private struct EditorColorWheel: View {
     let title: String
-    @Binding var value: Double
+    @Binding var x: Double
+    @Binding var y: Double
     let tint: Color
 
     var body: some View {
@@ -2096,11 +2226,25 @@ private struct EditorColorWheel: View {
                 Circle()
                     .fill(tint)
                     .frame(width: 8, height: 8)
-                    .offset(x: CGFloat(value / 100) * 22, y: -CGFloat(value / 100) * 12)
+                    .offset(x: CGFloat(x / 100) * 28, y: -CGFloat(y / 100) * 28)
             }
             .frame(width: 78, height: 78)
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let center = CGPoint(x: 39, y: 39)
+                        let dx = min(max((gesture.location.x - center.x) / 28, -1), 1)
+                        let dy = min(max((center.y - gesture.location.y) / 28, -1), 1)
+                        x = min(max(dx * 100, -100), 100)
+                        y = min(max(dy * 100, -100), 100)
+                    }
+            )
             Text(title)
                 .font(.caption.weight(.semibold))
+                .foregroundStyle(IPalette.muted)
+            Text(String(format: "%+.0f, %+.0f", x, y))
+                .font(.caption.monospaced())
                 .foregroundStyle(IPalette.muted)
         }
         .frame(maxWidth: .infinity)
@@ -3173,34 +3317,589 @@ private struct CapabilityChip: View {
 
 private struct MonitorPage: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showingFullscreen = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageTitle(
-                    title: "视频监看",
-                    subtitle: "系统视频设备预览、监看参数与输出规格。",
-                    accent: IPalette.video
-                )
-                CameraStage {
-                    showingFullscreen = true
-                }
-                MonitorRecordingBar()
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 280), spacing: 14)],
-                    alignment: .leading,
-                    spacing: 14
-                ) {
-                    MonitorParameterDeck()
-                    MonitorOutputDeck()
+        Group {
+            if horizontalSizeClass == .compact {
+                MonitorConsolePage()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        PageTitle(
+                            title: "视频监看",
+                            subtitle: "系统视频设备预览、监看参数与输出规格。",
+                            accent: IPalette.video
+                        )
+                        CameraStage {
+                            showingFullscreen = true
+                        }
+                        MonitorRecordingBar()
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 280), spacing: 14)],
+                            alignment: .leading,
+                            spacing: 14
+                        ) {
+                            MonitorParameterDeck()
+                            MonitorOutputDeck()
+                        }
+                    }
+                    .padding(20)
                 }
             }
-            .padding(20)
         }
         .fullScreenCover(isPresented: $showingFullscreen) {
             ImmersiveCameraView(mode: .video)
         }
+    }
+}
+
+/// Compact, camera-first monitor surface matching the native reference layout.
+/// It intentionally keeps all controls wired to CameraService so the visual
+/// treatment does not create a second camera state machine.
+private struct MonitorConsolePage: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var elapsedSeconds = 0
+    @State private var showingFullscreen = false
+    @State private var selectedFocusPoint: CGPoint?
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    private var connected: Bool { model.camera.state == .ready }
+
+    var body: some View {
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                timecode
+                    .frame(height: 102)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(red: 5 / 255, green: 14 / 255, blue: 24 / 255))
+
+                preview(width: proxy.size.width)
+
+                VStack(spacing: 0) {
+                    scopeStrip
+                        .padding(.top, 14)
+                    readoutStrip
+                        .padding(.top, 13)
+                    parameterStrip
+                        .padding(.top, 8)
+                    toolStrip
+                        .padding(.top, 12)
+                    Spacer(minLength: 10)
+                    storageReadout
+                        .padding(.bottom, 18)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(IPalette.monitorBackground)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .background(IPalette.monitorBackground)
+            .preferredColorScheme(.dark)
+            .onReceive(timer) { _ in
+                if model.camera.isRecording {
+                    elapsedSeconds += 1
+                } else {
+                    elapsedSeconds = 0
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showingFullscreen) {
+            ImmersiveCameraView(mode: .video)
+        }
+    }
+
+    private var timecode: some View {
+        VStack(spacing: 6) {
+            Text(timecodeText)
+                .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white)
+                .monospacedDigit()
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(model.camera.isRecording ? IPalette.video : Color.white.opacity(0.35))
+                    .frame(width: 7, height: 7)
+                Text(model.camera.isRecording ? "REC" : (connected ? "LIVE VIEW" : "未连接相机"))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+        }
+    }
+
+    private var timecodeText: String {
+        let hours = elapsedSeconds / 3600
+        let minutes = (elapsedSeconds % 3600) / 60
+        let seconds = elapsedSeconds % 60
+        return String(format: "%02d:%02d:%02d:00", hours, minutes, seconds)
+    }
+
+    private func preview(width: CGFloat) -> some View {
+        ZStack {
+            Color.black
+            if connected {
+                CameraPreview(
+                    session: model.camera.session,
+                    focusHandler: { point in
+                        selectedFocusPoint = point
+                        model.camera.focus(at: point)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            if selectedFocusPoint == point { selectedFocusPoint = nil }
+                        }
+                    }
+                )
+                .overlay {
+                    if let overlay = model.camera.monitorOverlay {
+                        Image(decorative: overlay, scale: 1)
+                            .resizable()
+                            .scaledToFill()
+                            .allowsHitTesting(false)
+                    }
+                }
+                if model.showGrid {
+                    GridOverlay()
+                        .stroke(Color.white.opacity(0.35), lineWidth: 0.7)
+                        .allowsHitTesting(false)
+                }
+                if model.showSafeGuide {
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.yellow.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [7]))
+                        .padding(width * 0.075)
+                        .allowsHitTesting(false)
+                }
+                if let selectedFocusPoint {
+                    FocusPointReticle()
+                        .stroke(Color.yellow, lineWidth: 2)
+                        .frame(width: 48, height: 48)
+                        .position(
+                            x: selectedFocusPoint.x * width,
+                            y: selectedFocusPoint.y * width * 9 / 16
+                        )
+                        .allowsHitTesting(false)
+                }
+            } else {
+                VStack(spacing: 9) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 34, weight: .light))
+                    Text("等待相机画面")
+                        .font(.subheadline.weight(.semibold))
+                    Button("选择相机") { model.showingConnection = true }
+                        .buttonStyle(.borderedProminent)
+                        .tint(IPalette.cobalt)
+                }
+                .foregroundStyle(.white.opacity(0.72))
+            }
+        }
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .topLeading) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(connected ? IPalette.positive : IPalette.video)
+                    .frame(width: 6, height: 6)
+                Text(model.camera.deviceName)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.white.opacity(0.82))
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(.black.opacity(0.48), in: Capsule())
+            .padding(10)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button { showingFullscreen = true } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(width: 28, height: 28)
+                    .foregroundStyle(.white.opacity(0.84))
+                    .background(.black.opacity(0.48), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(10)
+            .accessibilityLabel("打开全屏取景")
+        }
+    }
+
+    private var scopeStrip: some View {
+        HStack(spacing: 10) {
+            RGBWaveformCard()
+            Button {
+                model.camera.toggleVideoRecording()
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(.white.opacity(0.95), lineWidth: 2)
+                        .frame(width: 86, height: 86)
+                    Circle()
+                        .fill(model.camera.isRecording ? IPalette.video : Color(red: 0.55, green: 0.03, blue: 0.03))
+                        .frame(width: 51, height: 51)
+                        .overlay {
+                            if model.camera.isRecording {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(.white)
+                                    .frame(width: 15, height: 15)
+                            }
+                        }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .disabled(!connected || !model.camera.supportsMovieRecording)
+            AudioWaveformCard()
+        }
+        .padding(.horizontal, 18)
+        .frame(height: 92)
+    }
+
+    private var readoutStrip: some View {
+        HStack(spacing: 0) {
+            ConsoleReadout(label: "帧率", value: String(format: "%.0f", model.camera.activeFrameRate))
+            ConsoleReadout(label: "快门", value: shutterSpeed)
+            ConsoleReadout(label: "光圈", value: model.camera.lensAperture > 0 ? String(format: "f/%.1f", model.camera.lensAperture) : "—", dimmed: model.camera.lensAperture <= 0)
+            ConsoleReadout(label: "ISO", value: connected ? "\(Int(model.camera.exposureISO.rounded()))" : "—")
+            ConsoleReadout(label: "白平衡", value: "自动")
+            ConsoleReadout(label: "色调", value: String(format: "%+.0f", model.camera.exposureBias * 50))
+        }
+        .padding(.horizontal, 17)
+    }
+
+    private var parameterStrip: some View {
+        HStack(spacing: 8) {
+            MonitorConsoleStepper(
+                title: "帧率",
+                value: "\(Int(model.camera.activeFrameRate))p",
+                enabled: connected,
+                decrease: { adjustVideoSpec(-1) },
+                increase: { adjustVideoSpec(1) }
+            )
+            MonitorConsoleStepper(
+                title: "快门",
+                value: String(format: "%.1f°", model.camera.shutterAngle),
+                enabled: connected && model.camera.supportsCustomExposure,
+                decrease: { adjustVideoShutterAngle(-1) },
+                increase: { adjustVideoShutterAngle(1) }
+            )
+            MonitorConsoleStepper(
+                title: "ISO",
+                value: "\(Int(model.camera.exposureISO.rounded()))",
+                enabled: connected && model.camera.supportsCustomExposure,
+                decrease: { adjustVideoISO(-1) },
+                increase: { adjustVideoISO(1) }
+            )
+        }
+        .padding(.horizontal, 18)
+    }
+
+    private var shutterSpeed: String {
+        guard connected, model.camera.shutterAngle > 0, model.camera.activeFrameRate > 0 else { return "—" }
+        let denominator = Int((360 * model.camera.activeFrameRate / model.camera.shutterAngle).rounded())
+        return denominator > 0 ? "1/\(denominator)" : "—"
+    }
+
+    private func adjustVideoShutterAngle(_ direction: Int) {
+        let values = [45.0, 60.0, 72.0, 90.0, 108.0, 120.0, 144.0, 150.0,
+                      172.8, 180.0, 216.0, 240.0, 270.0, 300.0, 324.0, 360.0]
+        let current = values.enumerated().min {
+            abs($0.element - model.camera.shutterAngle) < abs($1.element - model.camera.shutterAngle)
+        }?.offset ?? 9
+        let next = min(max(current + direction, 0), values.count - 1)
+        model.camera.setVideoShutterAngle(values[next])
+    }
+
+    private func adjustVideoISO(_ direction: Int) {
+        let values = [64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640,
+                      800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000,
+                      6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000,
+                      40000, 51200, 64000, 80000, 102400]
+            .filter { Float($0) >= model.camera.minISO && Float($0) <= model.camera.maxISO }
+        guard !values.isEmpty else { return }
+        let current = values.enumerated().min {
+            abs(Float($0.element) - model.camera.exposureISO) < abs(Float($1.element) - model.camera.exposureISO)
+        }?.offset ?? 0
+        let next = min(max(current + direction, 0), values.count - 1)
+        model.camera.setVideoISO(Float(values[next]))
+    }
+
+    private func adjustVideoSpec(_ direction: Int) {
+        let values = MonitorVideoSpec.allCases
+        guard let current = values.firstIndex(of: model.monitorVideoSpec) else { return }
+        let next = min(max(current + direction, 0), values.count - 1)
+        model.setMonitorVideoSpec(values[next])
+    }
+
+    private var toolStrip: some View {
+        HStack(spacing: 0) {
+            ConsoleToolButton(title: "对焦", icon: "camera.viewfinder", active: model.camera.supportsFocusPoint) {
+                model.camera.focus(at: CGPoint(x: 0.5, y: 0.5))
+            }
+            ConsoleToolButton(title: "LUT", icon: "rectangle.on.rectangle", active: model.camera.falseColorEnabled) {
+                model.camera.setFalseColorEnabled(!model.camera.falseColorEnabled)
+            }
+            ConsoleToolButton(title: "峰值", icon: "circle.dotted", active: model.camera.focusPeakingEnabled) {
+                model.camera.setFocusPeakingEnabled(!model.camera.focusPeakingEnabled)
+            }
+            ConsoleToolButton(title: "假色", icon: "plusminus.circle", active: model.camera.falseColorEnabled) {
+                model.camera.setFalseColorEnabled(!model.camera.falseColorEnabled)
+            }
+            ConsoleToolButton(title: "网格", icon: "viewfinder", active: model.showGrid) {
+                model.showGrid.toggle()
+            }
+            ConsoleToolButton(title: "全屏", icon: "arrow.up.left.and.arrow.down.right", active: false) {
+                showingFullscreen = true
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var storageReadout: some View {
+        let info = MonitorStorageInfo.current
+        return HStack(spacing: 13) {
+            Image(systemName: "iphone")
+                .font(.system(size: 33, weight: .light))
+                .frame(width: 60)
+                .foregroundStyle(.white.opacity(0.9))
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(info.minutesRemaining)")
+                        .font(.system(size: 25, weight: .bold, design: .monospaced))
+                    Text("剩余录制")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                    Spacer(minLength: 10)
+                    Text(info.freeDescription)
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                ProgressView(value: info.progress)
+                    .tint(IPalette.cobalt)
+                    .scaleEffect(x: 1, y: 1.5, anchor: .center)
+                HStack {
+                    Text("\(info.percentUsed)% 已用")
+                    Spacer()
+                    Text(model.camera.isRecording ? "录制中" : "待机")
+                }
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white.opacity(0.65))
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(width: 286, height: 91)
+        .background(Color(red: 27 / 255, green: 36 / 255, blue: 51 / 255), in: RoundedRectangle(cornerRadius: 9))
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .fill(Color.white.opacity(0.04))
+                .frame(width: 62)
+                .clipShape(RoundedRectangle(cornerRadius: 9))
+        }
+        .foregroundStyle(.white)
+    }
+}
+
+private struct ScopeCard: View {
+    let title: String
+    let value: String
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.85))
+            MonitorSparkline(value: value)
+                .stroke(accent, lineWidth: 1.4)
+                .frame(height: 44)
+                .background(Color.black.opacity(0.24))
+                .overlay(Rectangle().stroke(Color.white.opacity(0.35), lineWidth: 0.5))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(red: 27 / 255, green: 36 / 255, blue: 51 / 255), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct RGBWaveformCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("RGB 波形")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.85))
+            waveformRow(model.camera.redHistogram, .red)
+            waveformRow(model.camera.greenHistogram, .green)
+            waveformRow(model.camera.blueHistogram, .blue)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(red: 27 / 255, green: 36 / 255, blue: 51 / 255), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func waveformRow(_ value: String, _ color: Color) -> some View {
+        MonitorSparkline(value: value)
+            .stroke(color, lineWidth: 1.7)
+            .frame(height: 17)
+            .background(Color.black.opacity(0.24))
+    }
+}
+
+private struct AudioWaveformCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("音频波形")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white.opacity(0.85))
+            AudioWaveformShape()
+                .stroke(Color(red: 0.31, green: 0.76, blue: 0.92), lineWidth: 1.5)
+                .frame(height: 53)
+                .background(Color.black.opacity(0.24))
+            Text("无音频源 · 静音基线")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.56))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(red: 27 / 255, green: 36 / 255, blue: 51 / 255), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct AudioWaveformShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let mid = rect.midY
+        path.move(to: CGPoint(x: rect.minX, y: mid))
+        path.addLine(to: CGPoint(x: rect.maxX, y: mid))
+        return path
+    }
+}
+
+private struct MonitorConsoleStepper: View {
+    let title: String
+    let value: String
+    let enabled: Bool
+    let decrease: () -> Void
+    let increase: () -> Void
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Button(action: decrease) {
+                Image(systemName: "minus").frame(width: 30, height: 32)
+            }
+            VStack(spacing: 1) {
+                Text(title).font(.system(size: 9, weight: .semibold))
+                Text(value).font(.system(size: 11, weight: .bold, design: .monospaced)).monospacedDigit()
+            }
+            .frame(minWidth: 54)
+            Button(action: increase) {
+                Image(systemName: "plus").frame(width: 30, height: 32)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(enabled ? .white : .white.opacity(0.45))
+        .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 8))
+        .disabled(!enabled)
+    }
+}
+
+private struct FocusPointReticle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let arm = min(rect.width, rect.height) * 0.28
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + arm)); path.addLine(to: CGPoint(x: rect.minX, y: rect.minY)); path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.minY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.minY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + arm))
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY - arm)); path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.minX + arm, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.maxX - arm, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY)); path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - arm))
+        return path
+    }
+}
+
+private struct ConsoleReadout: View {
+    let label: String
+    let value: String
+    var dimmed = false
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(dimmed ? .white.opacity(0.48) : .white)
+                .minimumScaleFactor(0.68)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct ConsoleToolButton: View {
+    let title: String
+    let icon: String
+    let active: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .light))
+                    .frame(width: 44, height: 38)
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(active ? IPalette.cobalt : .white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .foregroundStyle(active ? IPalette.cobalt : .white.opacity(0.9))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MonitorSparkline: Shape {
+    private let bars = Array("▁▂▃▄▅▆▇█")
+    let value: String
+
+    func path(in rect: CGRect) -> Path {
+        let values = Array(value).map { character -> CGFloat in
+            guard let index = bars.firstIndex(of: character) else { return 0.12 }
+            return CGFloat(index) / CGFloat(max(1, bars.count - 1))
+        }
+        guard values.count > 1 else { return Path() }
+        var path = Path()
+        for (index, level) in values.enumerated() {
+            let x = rect.minX + rect.width * CGFloat(index) / CGFloat(values.count - 1)
+            let y = rect.maxY - rect.height * max(0.04, level)
+            if index == 0 { path.move(to: CGPoint(x: x, y: y)) }
+            else { path.addLine(to: CGPoint(x: x, y: y)) }
+        }
+        return path
+    }
+}
+
+private struct MonitorStorageInfo {
+    let progress: Double
+    let percentUsed: Int
+    let freeDescription: String
+    let minutesRemaining: String
+
+    static var current: MonitorStorageInfo {
+        let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
+        let total = (attributes?[.systemSize] as? NSNumber)?.doubleValue ?? 1
+        let free = (attributes?[.systemFreeSize] as? NSNumber)?.doubleValue ?? total * 0.8
+        let used = max(0, total - free)
+        let progress = min(1, max(0, used / max(total, 1)))
+        let freeGB = max(0, free / 1_073_741_824)
+        let minutes = Int(max(1, min(999, freeGB * 2.1)))
+        return MonitorStorageInfo(
+            progress: progress,
+            percentUsed: Int((progress * 100).rounded()),
+            freeDescription: String(format: "%.0fGB", freeGB),
+            minutesRemaining: String(format: "%02d:%02d", minutes / 60, minutes % 60)
+        )
     }
 }
 
@@ -5190,7 +5889,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                    Text("• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                     .font(.subheadline)
                     .lineSpacing(5)
 

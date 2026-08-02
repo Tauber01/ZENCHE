@@ -78,6 +78,26 @@ class EditorAIAnalysis {
   }
 }
 
+class EditorCurvePoint {
+  x: number;
+  y: number;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+type EditorToneValue = number | string | boolean | Array<Array<number>>;
+
+const EDITOR_CURVE_DEFAULTS: Array<EditorCurvePoint> = [
+  new EditorCurvePoint(0, 0),
+  new EditorCurvePoint(0.25, 0.25),
+  new EditorCurvePoint(0.5, 0.5),
+  new EditorCurvePoint(0.75, 0.75),
+  new EditorCurvePoint(1, 1)
+];
+
 class SystemMediaItem {
   readonly id: string;
   readonly uri: string;
@@ -258,7 +278,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.4.0';
+const CURRENT_VERSION: string = '1.4.1';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -480,6 +500,8 @@ struct Index {
   @State private cameraName: string = '未连接';
   @State private status: string = '就绪';
   @State private preview: image.PixelMap | undefined = undefined;
+  @State private monitorFocusPointX: number = -1;
+  @State private monitorFocusPointY: number = -1;
   @State private photos: Array<PhotoItem> = [];
   @State private wirelessRunning: boolean = false;
   @State private wirelessStatus: string = '无线收件箱未开启';
@@ -574,6 +596,25 @@ struct Index {
   @State private editorNoiseReduction: number = 0;
   @State private editorDehaze: number = 0;
   @State private editorVignette: number = 0;
+  @State private editorWheelLift: number = 0;
+  @State private editorWheelGamma: number = 0;
+  @State private editorWheelGain: number = 0;
+  @State private editorWheelLiftX: number = 0;
+  @State private editorWheelLiftY: number = 0;
+  @State private editorWheelGammaX: number = 0;
+  @State private editorWheelGammaY: number = 0;
+  @State private editorWheelGainX: number = 0;
+  @State private editorWheelGainY: number = 0;
+  @State private editorCurveContrast: number = 0;
+  @State private editorCurvePivot: number = 50;
+  @State private editorCurveShadows: number = 0;
+  @State private editorCurveMidtones: number = 0;
+  @State private editorCurveHighlights: number = 0;
+  @State private editorCurvePoints: Array<EditorCurvePoint> = EDITOR_CURVE_DEFAULTS.map((point: EditorCurvePoint): EditorCurvePoint => new EditorCurvePoint(point.x, point.y));
+  private editorActiveCurvePoint: number = -1;
+  @State private editorMaskEnabled: boolean = false;
+  @State private editorMaskFeather: number = 55;
+  @State private editorPickerSample: string = 'RGB 取样：尚未取样';
   @State private editorRotation: number = 0;
   @State private editorFlipHorizontal: boolean = false;
   @State private editorFlipVertical: boolean = false;
@@ -594,8 +635,8 @@ struct Index {
   @State private editorAISummary: string = '等待分析当前照片';
   @State private editorAICanUndo: boolean = false;
   @State private editorAIAnalysis: EditorAIAnalysis | undefined = undefined;
-  @State private editorAICopiedTone: Array<number | string | boolean> = [];
-  private editorAIBackup: Array<number | string | boolean> = [];
+  @State private editorAICopiedTone: Array<EditorToneValue> = [];
+  private editorAIBackup: Array<EditorToneValue> = [];
   @State private currentFocusMode: string = 'single-shot';
   @State private currentWhiteBalance: string = 'continuous';
   @State private currentPictureControl: string = 'standard';
@@ -792,7 +833,9 @@ struct Index {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
-        this.TopBar()
+        if (this.section !== 'monitor') {
+          this.TopBar()
+        }
         if (this.isCompact()) {
           Scroll() {
             this.MainGrid()
@@ -807,7 +850,11 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.paper'))
+      .backgroundColor(
+        this.section === 'monitor'
+          ? '#040A12'
+          : $r('app.color.paper')
+      )
       if (this.largePreviewVisible) {
         this.LargePhotoOverlay()
       }
@@ -1050,7 +1097,7 @@ struct Index {
       this.NavButton('图像编辑', 'editor')
       this.NavButton('分支文件库', 'library')
       Blank()
-      Text('ZENCHE 1.4.0')
+      Text('ZENCHE 1.4.1')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
@@ -1076,7 +1123,11 @@ struct Index {
     .width('100%')
     .height(68)
     .padding({ left: 8, right: 8, top: 10, bottom: 4 })
-    .backgroundColor($r('app.color.paper_2'))
+    .backgroundColor(
+      this.section === 'monitor'
+        ? Color.Black
+        : $r('app.color.paper_2')
+    )
     .border({
       width: { top: 1 },
       color: $r('app.color.rule')
@@ -1094,17 +1145,21 @@ struct Index {
       )
       .fontColor(
         this.section === target
-          ? target === 'monitor'
-            ? $r('app.color.video')
-            : $r('app.color.accent')
-          : $r('app.color.muted')
+          ? (target === 'monitor' || this.section === 'monitor'
+            ? '#258AF0'
+            : $r('app.color.accent'))
+          : this.section === 'monitor'
+            ? '#AAB5C5'
+            : $r('app.color.muted')
       )
       .backgroundColor(
         this.section === target
-          ? target === 'monitor'
-            ? $r('app.color.video_soft')
-            : $r('app.color.surface_raised')
-          : Color.Transparent
+          ? this.section === 'monitor'
+            ? '#061A35'
+            : target === 'monitor'
+              ? $r('app.color.video_soft')
+              : $r('app.color.surface_raised')
+          : this.section === 'monitor' ? '#000000' : Color.Transparent
       )
       .border({
         width: this.section === target ? 1 : 0,
@@ -1364,7 +1419,9 @@ struct Index {
               .brightness(
                 this.editorShowingOriginal
                   ? 1
-                  : Math.pow(2, this.editorExposure / 100)
+                  : Math.pow(2, this.editorExposure / 100
+                    + this.editorWheelLift / 520
+                    + this.editorWheelGain / 700)
               )
               .contrast(
                 this.editorShowingOriginal
@@ -1372,6 +1429,7 @@ struct Index {
                   : Math.max(
                     0,
                     1 + this.editorContrast / 100
+                      + this.editorCurveContrast / 180
                       + this.editorDehaze / 250
                       + this.editorClarity / 400
                   )
@@ -1383,6 +1441,7 @@ struct Index {
                     0,
                     1 + this.editorSaturation / 100
                       + this.editorVibrance / 180
+                      + this.editorWheelGamma / 900
                       + this.editorDehaze / 500
                   )
               )
@@ -1421,6 +1480,10 @@ struct Index {
           Row({ space: 8 }) {
             this.EditorPanelButton('光线', 'light')
             this.EditorPanelButton('色彩', 'color')
+            this.EditorPanelButton('色轮', 'wheels')
+            this.EditorPanelButton('曲线', 'curves')
+            this.EditorPanelButton('取色器', 'picker')
+            this.EditorPanelButton('蒙版', 'mask')
             this.EditorPanelButton('细节', 'detail')
             this.EditorPanelButton('效果', 'effects')
             this.EditorPanelButton('几何', 'geometry')
@@ -2229,6 +2292,79 @@ struct Index {
             this.editorSaturation = value;
           }
         )
+      } else if (this.editorPanel === 'wheels') {
+        Text(this.tr('Lift / Gamma / Gain 三向色轮 · 拖动圆盘色点'))
+          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted')).width('100%')
+        Row({ space: 8 }) {
+          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, '#43B7FF', (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
+          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, '#C68CFF', (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
+          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, '#FFD36A', (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
+        }.width('100%')
+      } else if (this.editorPanel === 'curves') {
+        Text('主曲线 · 拖动曲线控制点')
+          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted')).width('100%')
+        Stack({ alignContent: Alignment.TopStart }) {
+          Path()
+            .commands(this.editorCurvePathCommands())
+            .stroke($r('app.color.accent_ink'))
+            .strokeWidth(3)
+          ForEach(this.editorCurvePoints, (curvePoint: EditorCurvePoint): void => {
+            Circle().width(14).height(14).fill($r('app.color.accent_ink'))
+              .position({ x: `${curvePoint.x * 320}vp`, y: `${(1 - curvePoint.y) * 140}vp` })
+          })
+        }
+        .width('100%').height(140)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(8)
+        .onTouch((event: TouchEvent): void => {
+          const point = event.touches[0];
+          if (point === undefined || (event.type !== TouchType.Down && event.type !== TouchType.Move)) {
+            return;
+          }
+          const normalizedX: number = Math.max(0, Math.min(1, point.x / 320));
+          const normalizedY: number = Math.max(0, Math.min(1, 1 - point.y / 140));
+          if (event.type === TouchType.Down) {
+            this.editorActiveCurvePoint = -1;
+            let bestDistance: number = 0.035 * 0.035;
+            this.editorCurvePoints.forEach((curvePoint: EditorCurvePoint, index: number): void => {
+              const dx: number = curvePoint.x - normalizedX;
+              const dy: number = curvePoint.y - normalizedY;
+              const distance: number = dx * dx + dy * dy;
+              if (distance < bestDistance) { bestDistance = distance; this.editorActiveCurvePoint = index; }
+            });
+            if (this.editorActiveCurvePoint < 0) {
+              this.editorCurvePoints.push(new EditorCurvePoint(normalizedX, normalizedY));
+              this.editorActiveCurvePoint = this.editorCurvePoints.length - 1;
+            }
+          }
+          if (this.editorActiveCurvePoint >= 0) {
+            this.editorCurvePoints[this.editorActiveCurvePoint].x = normalizedX;
+            this.editorCurvePoints[this.editorActiveCurvePoint].y = normalizedY;
+            this.editorCurvePoints = this.editorCurvePoints.slice();
+          }
+        })
+      } else if (this.editorPanel === 'picker') {
+        Text(this.tr(this.editorPickerSample))
+          .fontSize(13).fontColor($r('app.color.muted')).width('100%')
+        Button(this.tr('取样当前照片中心'), { type: ButtonType.Normal })
+          .height(46).width('100%')
+          .onClick((): void => {
+            this.sampleEditorCenterColor();
+          })
+      } else if (this.editorPanel === 'mask') {
+        Toggle({ type: ToggleType.Switch, isOn: this.editorMaskEnabled })
+          .onChange((enabled: boolean): void => {
+            this.editorMaskEnabled = enabled;
+          })
+        Text(this.tr('启用径向蒙版'))
+          .fontSize(13).fontColor($r('app.color.ink')).width('100%')
+        this.EditorSlider('羽化', this.editorMaskFeather, 0, 100, false, (value: number): void => {
+          this.editorMaskFeather = value;
+        })
+        Text(this.tr('中心保留，边缘渐隐'))
+          .fontSize(11).fontColor($r('app.color.muted')).width('100%')
       } else if (this.editorPanel === 'detail') {
         this.EditorSlider(
           '纹理',
@@ -2346,6 +2482,71 @@ struct Index {
   }
 
   @Builder
+  private EditorWheel(
+    label: string,
+    xValue: number,
+    yValue: number,
+    tint: ResourceColor,
+    onChange: (x: number, y: number) => void
+  ) {
+    Column({ space: 4 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        Circle()
+          .width(78)
+          .height(78)
+          .fill($r('app.color.graphite'))
+          .border({ width: 6, color: tint })
+        Circle()
+          .width(10)
+          .height(10)
+          .fill(tint)
+          .position({
+            x: `${39 + Math.max(-1, Math.min(1, xValue / 100)) * 28}vp`,
+            y: `${39 - Math.max(-1, Math.min(1, yValue / 100)) * 28}vp`
+          })
+      }
+      .width(78)
+      .height(78)
+      .onTouch((event: TouchEvent): void => {
+        const point = event.touches[0];
+        if (point === undefined || (event.type !== TouchType.Down && event.type !== TouchType.Move)) {
+          return;
+        }
+        const dx: number = Math.max(-1, Math.min(1, (point.x - 39) / 28));
+        const dy: number = Math.max(-1, Math.min(1, (39 - point.y) / 28));
+        onChange(dx * 100, dy * 100);
+      })
+      Text(label)
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.muted'))
+      Text(`${xValue >= 0 ? '+' : ''}${Math.round(xValue)}, ${yValue >= 0 ? '+' : ''}${Math.round(yValue)}`)
+        .fontSize(10)
+        .fontColor($r('app.color.muted'))
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  private editorCurvePathCommands(): string {
+    const points: Array<EditorCurvePoint> = this.editorCurvePoints.slice().sort((a: EditorCurvePoint, b: EditorCurvePoint): number => a.x - b.x);
+    if (points.length === 0) return '';
+    let commands: string = `M ${points[0].x * 320} ${(1 - points[0].y) * 140}`;
+    for (let index: number = 0; index < points.length - 1; index++) {
+      const p0: EditorCurvePoint = points[Math.max(0, index - 1)];
+      const p1: EditorCurvePoint = points[index];
+      const p2: EditorCurvePoint = points[index + 1];
+      const p3: EditorCurvePoint = points[Math.min(points.length - 1, index + 2)];
+      const c1x: number = p1.x + (p2.x - p0.x) / 6;
+      const c1y: number = p1.y + (p2.y - p0.y) / 6;
+      const c2x: number = p2.x - (p3.x - p1.x) / 6;
+      const c2y: number = p2.y - (p3.y - p1.y) / 6;
+      commands += ` C ${c1x * 320} ${(1 - c1y) * 140} ${c2x * 320} ${(1 - c2y) * 140} ${p2.x * 320} ${(1 - p2.y) * 140}`;
+    }
+    return commands;
+  }
+
+  @Builder
   private EditorSlider(
     label: string,
     value: number,
@@ -2383,6 +2584,15 @@ struct Index {
     Column({ space: 16 }) {
       if (this.section === 'capture') {
         this.CaptureSessionPanel()
+      } else {
+        Text('00:00:00:00')
+          .fontSize(38)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .textAlign(TextAlign.Center)
+          .width('100%')
+          .height(60)
       }
       Stack({ alignContent: Alignment.TopStart }) {
         if (this.preview !== undefined) {
@@ -2416,16 +2626,26 @@ struct Index {
           .borderRadius(5)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .margin(16)
-        Button(this.tr('全屏'), { type: ButtonType.Normal })
-          .height(44)
-          .fontColor(Color.White)
-          .backgroundColor('#99000000')
-          .borderRadius(12)
-          .align(Alignment.TopEnd)
-          .margin(16)
-          .onClick((): void => {
-            this.openImmersivePreview(this.section === 'monitor');
-          })
+        if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
+          Text('＋')
+            .fontSize(32)
+            .fontColor('#FFE45C')
+            .position({
+              x: `${this.monitorFocusPointX * 100}%`,
+              y: `${this.monitorFocusPointY * 100}%`
+            })
+        } else if (this.section !== 'monitor') {
+          Button(this.tr('全屏'), { type: ButtonType.Normal })
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor('#99000000')
+            .borderRadius(12)
+            .align(Alignment.TopEnd)
+            .margin(16)
+            .onClick((): void => {
+              this.openImmersivePreview(false);
+            })
+        }
       }
       .width('100%')
       .layoutWeight(1)
@@ -2436,6 +2656,20 @@ struct Index {
         color: $r('app.color.graphite_rule'),
         radius: 18
       })
+      .onTouch((event: TouchEvent): void => {
+        if (this.section !== 'monitor' || event.type !== TouchType.Up) return;
+        const point = event.touches[0];
+        if (point === undefined) return;
+        this.focusAtMonitorPoint(point.x, point.y);
+      })
+
+      if (this.section === 'monitor') {
+        this.MonitorScopeRail()
+        this.MonitorParameterRail()
+        this.MonitorParameterControls()
+        this.MonitorToolRail()
+        this.MonitorStorageCard()
+      }
 
       this.ExposureReadoutRail()
 
@@ -2496,6 +2730,214 @@ struct Index {
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
+    .backgroundColor(
+      this.section === 'monitor'
+        ? '#040A12'
+        : $r('app.color.paper')
+    )
+  }
+
+  @Builder
+  private MonitorScopeRail() {
+    Row({ space: 10 }) {
+      Column({ space: 4 }) {
+        Text('RGB 波形')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        Text(`R  ${this.redHistogram}`).fontSize(9).fontFamily('monospace').fontColor('#F45860')
+        Text(`G  ${this.greenHistogram}`).fontSize(9).fontFamily('monospace').fontColor('#5BDA87')
+        Text(`B  ${this.blueHistogram}`).fontSize(9).fontFamily('monospace').fontColor('#53A1FF')
+      }
+      .layoutWeight(1)
+      .height(112)
+      .padding(10)
+      .backgroundColor('#1D2635')
+      .borderRadius(10)
+      Column({ space: 4 }) {
+        Text('音频波形')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        Text('──────── 静音基线 ────────')
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor('#4CC7E8')
+        Text('无音频源')
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor('#9DA8B8')
+      }
+      .layoutWeight(1)
+      .height(112)
+      .padding(10)
+      .backgroundColor('#1D2635')
+      .borderRadius(10)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private MonitorParameterRail() {
+    Scroll() {
+      Row() {
+        this.MonitorReadout('帧率', this.connected ? `${this.videoFrameRate}` : '—')
+        this.MonitorReadout('快门', this.connected ? this.shutterDisplay() : '—')
+        this.MonitorReadout('光圈', this.connected ? `f/${this.currentAperture.toFixed(1)}` : '—')
+        this.MonitorReadout('ISO', this.connected ? `${this.currentIso}` : '—')
+        this.MonitorReadout('白平衡', this.connected ? '自动' : '—')
+        this.MonitorReadout('色调', this.connected ? `${this.currentCompensation >= 0 ? '+' : ''}${Math.round(this.currentCompensation)}` : '—')
+      }
+    }
+    .width('100%')
+    .height(66)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private MonitorParameterControls() {
+    Scroll() {
+      Row({ space: 8 }) {
+        this.ImmersiveParameterControl('帧率', `${this.videoFrameRate}p`, 'videoFrameRate')
+        this.ImmersiveParameterControl('快门', `${this.videoShutterAngle.toFixed(1)}°`, 'videoShutter')
+        this.ImmersiveParameterControl('ISO', `${this.currentIso}`, 'iso')
+        this.ImmersiveParameterControl('光圈', `f/${this.currentAperture.toFixed(1)}`, 'aperture')
+      }
+      .padding({ left: 2, right: 2 })
+    }
+    .width('100%')
+    .height(58)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private MonitorReadout(label: string, value: string) {
+    Column({ space: 2 }) {
+      Text(this.tr(label))
+        .fontSize(10)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#A6B0BF')
+      Text(value)
+        .fontSize(17)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+    }
+    .width(72)
+    .height(56)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private MonitorToolRail() {
+    Row() {
+      this.MonitorTool('◎', '峰值对焦', 0)
+      this.MonitorTool('LUT', 'LUT', 1)
+      this.MonitorTool('◉', '假色', 2)
+      this.MonitorTool('A', '自动对焦', 3)
+    }
+    .width('100%')
+    .padding({ top: 4, bottom: 8 })
+  }
+
+  @Builder
+  private MonitorTool(glyph: string, description: string, index: number) {
+    Button(glyph, { type: ButtonType.Normal })
+      .layoutWeight(1)
+      .height(52)
+      .fontSize(index === 1 ? 11 : 24)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(Color.White)
+      .backgroundColor(Color.Transparent)
+      .borderRadius(8)
+      .accessibilityText(this.tr(description))
+      .onClick((): void => {
+        if (index === 0) {
+          this.focusPeakingEnabled = !this.focusPeakingEnabled;
+        } else if (index === 2) {
+          this.falseColorEnabled = !this.falseColorEnabled;
+        } else if (index === 3) {
+          this.focusAtMonitorPoint(0.5, 0.5);
+        }
+      })
+  }
+
+  private focusAtMonitorPoint(x: number, y: number): void {
+    if (!this.connected || !this.liveView || this.busy) {
+      this.showError('请先开启实时取景');
+      return;
+    }
+    this.monitorFocusPointX = Math.max(0, Math.min(1, x));
+    this.monitorFocusPointY = Math.max(0, Math.min(1, y));
+    setTimeout((): void => {
+      this.monitorFocusPointX = -1;
+      this.monitorFocusPointY = -1;
+    }, 1400);
+    const step: number = x < 0.42 ? -1 : x > 0.58 ? 1 : (y < 0.42 ? -1 : y > 0.58 ? 1 : 0);
+    this.camera.setParameter('focusMode', 'single-shot').then((): Promise<void> => {
+      return step === 0 ? Promise.resolve() : this.camera.moveFocus(step);
+    }).catch((error: Error): void => {
+      this.showError(`对焦请求失败：${error.message}`);
+    });
+  }
+
+  @Builder
+  private MonitorStorageCard() {
+    Row({ space: 12 }) {
+      Text('▯')
+        .fontSize(36)
+        .fontColor(Color.White)
+        .width(48)
+        .textAlign(TextAlign.Center)
+      Column({ space: 3 }) {
+        Text('—')
+          .fontSize(22)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        Text(this.librarySizeText())
+          .fontSize(14)
+          .fontColor('#389BEF')
+        Row() {
+          Text('图库占用 · 本地缓存')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .layoutWeight(1)
+          Text(this.photos.length > 0 ? `${this.photos.length} 个文件` : '暂无文件')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+        }
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .height(88)
+    .padding(14)
+    .backgroundColor('#1D2635')
+    .borderRadius(10)
+  }
+
+  private librarySizeText(): string {
+    const bytes: number = this.photos.reduce(
+      (total: number, item: PhotoItem): number => total + item.size,
+      0
+    );
+    if (bytes <= 0) {
+      return '暂无本地图库文件';
+    }
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   }
 
   @Builder
@@ -3824,8 +4266,11 @@ struct Index {
                 '• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n' +
                 '• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n' +
                 '• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n' +
-                '• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n' +
-                '• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n' +
+                '• 专业编辑工作区按达芬奇调色逻辑重组：新增 Lift/Gamma/Gain 三向色轮、主曲线、RGB 取色器、线性/径向/主体蒙版；四类工具接入原生预览与高质量副本。\n' +
+                '• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n' +
+                '• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n' +
+                '• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n' +
+                '• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n' +
                 '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
               ))
                 .fontSize(14)
@@ -6262,6 +6707,25 @@ struct Index {
     this.editorNoiseReduction = 0;
     this.editorDehaze = 0;
     this.editorVignette = 0;
+    this.editorWheelLift = 0;
+    this.editorWheelGamma = 0;
+    this.editorWheelGain = 0;
+    this.editorWheelLiftX = 0;
+    this.editorWheelLiftY = 0;
+    this.editorWheelGammaX = 0;
+    this.editorWheelGammaY = 0;
+    this.editorWheelGainX = 0;
+    this.editorWheelGainY = 0;
+    this.editorCurveContrast = 0;
+    this.editorCurvePivot = 50;
+    this.editorCurveShadows = 0;
+    this.editorCurveMidtones = 0;
+    this.editorCurveHighlights = 0;
+    this.editorCurvePoints = EDITOR_CURVE_DEFAULTS.map((point: EditorCurvePoint): EditorCurvePoint => new EditorCurvePoint(point.x, point.y));
+    this.editorActiveCurvePoint = -1;
+    this.editorMaskEnabled = false;
+    this.editorMaskFeather = 55;
+    this.editorPickerSample = 'RGB 取样：尚未取样';
     this.editorRotation = 0;
     this.editorFlipHorizontal = false;
     this.editorFlipVertical = false;
@@ -6342,7 +6806,7 @@ struct Index {
     }
   }
 
-  private captureEditorTone(): Array<number | string | boolean> {
+  private captureEditorTone(): Array<EditorToneValue> {
     return [
       this.editorExposure,
       this.editorContrast,
@@ -6360,12 +6824,29 @@ struct Index {
       this.editorNoiseReduction,
       this.editorDehaze,
       this.editorVignette,
+      this.editorWheelLift,
+      this.editorWheelGamma,
+      this.editorWheelGain,
+      this.editorWheelLiftX,
+      this.editorWheelLiftY,
+      this.editorWheelGammaX,
+      this.editorWheelGammaY,
+      this.editorWheelGainX,
+      this.editorWheelGainY,
+      this.editorCurveContrast,
+      this.editorCurvePivot,
+      this.editorCurveShadows,
+      this.editorCurveMidtones,
+      this.editorCurveHighlights,
+      this.editorCurvePoints.map((point: EditorCurvePoint): Array<number> => [point.x, point.y]),
+      this.editorMaskEnabled,
+      this.editorMaskFeather,
       this.editorPreset,
       this.editorShowingOriginal
     ];
   }
 
-  private restoreEditorTone(values: Array<number | string | boolean>): void {
+  private restoreEditorTone(values: Array<EditorToneValue>): void {
     if (values.length < 18) {
       return;
     }
@@ -6385,8 +6866,48 @@ struct Index {
     this.editorNoiseReduction = values[13] as number;
     this.editorDehaze = values[14] as number;
     this.editorVignette = values[15] as number;
-    this.editorPreset = values[16] as string;
-    this.editorShowingOriginal = values[17] as boolean;
+    // Older copied tones contain 18 values; preserve compatibility while
+    // restoring the additional grading controls when present.
+    if (values.length >= 35) {
+      this.editorWheelLift = values[16] as number;
+      this.editorWheelGamma = values[17] as number;
+      this.editorWheelGain = values[18] as number;
+      this.editorWheelLiftX = values[19] as number;
+      this.editorWheelLiftY = values[20] as number;
+      this.editorWheelGammaX = values[21] as number;
+      this.editorWheelGammaY = values[22] as number;
+      this.editorWheelGainX = values[23] as number;
+      this.editorWheelGainY = values[24] as number;
+      this.editorCurveContrast = values[25] as number;
+      this.editorCurvePivot = values[26] as number;
+      this.editorCurveShadows = values[27] as number;
+      this.editorCurveMidtones = values[28] as number;
+      this.editorCurveHighlights = values[29] as number;
+      const pointData = values[30] as Array<Array<number>>;
+      if (Array.isArray(pointData) && pointData.length > 1) {
+        this.editorCurvePoints = pointData.map((point: Array<number>): EditorCurvePoint => new EditorCurvePoint(point[0], point[1]));
+      }
+      this.editorMaskEnabled = values[31] as boolean;
+      this.editorMaskFeather = values[32] as number;
+      this.editorPreset = values[33] as string;
+      this.editorShowingOriginal = values[34] as boolean;
+    } else if (values.length >= 25) {
+      this.editorWheelLift = values[16] as number;
+      this.editorWheelGamma = values[17] as number;
+      this.editorWheelGain = values[18] as number;
+      this.editorCurveContrast = values[19] as number;
+      this.editorCurvePivot = values[20] as number;
+      this.editorCurveShadows = this.editorCurveContrast;
+      this.editorCurveMidtones = this.editorCurveContrast;
+      this.editorCurveHighlights = this.editorCurveContrast;
+      this.editorMaskEnabled = values[21] as boolean;
+      this.editorMaskFeather = values[22] as number;
+      this.editorPreset = values[23] as string;
+      this.editorShowingOriginal = values[24] as boolean;
+    } else {
+      this.editorPreset = values[16] as string;
+      this.editorShowingOriginal = values[17] as boolean;
+    }
   }
 
   private async applyEditorAI(): Promise<void> {
@@ -6396,7 +6917,7 @@ struct Index {
       this.showError('无法分析当前照片');
       return;
     }
-    const previousTone: Array<number | string | boolean> =
+    const previousTone: Array<EditorToneValue> =
       this.captureEditorTone();
     this.resetEditorTone();
     this.editorAIBackup = previousTone;
@@ -6584,6 +7105,39 @@ struct Index {
     }
   }
 
+  private async sampleEditorCenterColor(): Promise<void> {
+    if (this.editorSelectedPath.length === 0) {
+      this.editorPickerSample = 'RGB 取样：未选择照片';
+      return;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      pixelMap = await source.createPixelMap({
+        editable: false,
+        desiredSize: { width: 3, height: 3 },
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const buffer: ArrayBuffer = new ArrayBuffer(3 * 3 * 4);
+      await pixelMap.readPixelsToBuffer(buffer);
+      const pixels: Uint8Array = new Uint8Array(buffer);
+      const offset: number = 4 * 4;
+      const red: number = pixels[offset];
+      const green: number = pixels[offset + 1];
+      const blue: number = pixels[offset + 2];
+      const hex: string = `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`.toUpperCase();
+      this.editorPickerSample = `RGB 取样：${hex}`;
+      this.editorTemperature = Math.max(-100, Math.min(100, (blue - red) / 2.55));
+      this.editorTint = Math.max(-100, Math.min(100, (green - (red + blue) / 2) / 2.55));
+    } catch (error) {
+      this.editorPickerSample = 'RGB 取样：读取失败';
+    } finally {
+      pixelMap?.release();
+      source?.release();
+    }
+  }
+
   private editorChannel(value: number): number {
     return Math.max(0, Math.min(255, Math.round(value)));
   }
@@ -6603,6 +7157,25 @@ struct Index {
     return scaled * scaled * (3 - 2 * scaled);
   }
 
+  private editorCurveValue(input: number): number {
+    const points: Array<EditorCurvePoint> = this.editorCurvePoints.slice().sort((a: EditorCurvePoint, b: EditorCurvePoint): number => a.x - b.x);
+    const x: number = this.editorClampUnit(input);
+    if (points.length < 2) return x;
+    if (x <= points[0].x) return points[0].y;
+    if (x >= points[points.length - 1].x) return points[points.length - 1].y;
+    let index: number = 1;
+    while (index < points.length && points[index].x < x) index++;
+    const p0: EditorCurvePoint = points[Math.max(0, index - 2)];
+    const p1: EditorCurvePoint = points[index - 1];
+    const p2: EditorCurvePoint = points[index];
+    const p3: EditorCurvePoint = points[Math.min(points.length - 1, index + 1)];
+    const t: number = (x - p1.x) / Math.max(0.0001, p2.x - p1.x);
+    const t2: number = t * t;
+    const t3: number = t2 * t;
+    const y: number = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+    return this.editorClampUnit(y);
+  }
+
   private processEditorPixels(
     pixels: Uint8Array,
     width: number,
@@ -6620,12 +7193,25 @@ struct Index {
       let green: number = pixels[offset + 1] / 255 * exposure;
       let blue: number = pixels[offset + 2] / 255 * exposure;
 
+      let luma: number = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const shadowWeight: number = Math.pow(1 - this.editorClampUnit(luma), 2);
+      const midWeight: number = 1 - Math.abs(this.editorClampUnit(luma) * 2 - 1);
+      const highlightWeight: number = Math.pow(this.editorClampUnit(luma), 2);
+      const wheelX: number = this.editorWheelLiftX / 100 * 0.10 * shadowWeight
+        + this.editorWheelGammaX / 100 * 0.10 * midWeight
+        + this.editorWheelGainX / 100 * 0.10 * highlightWeight;
+      const wheelY: number = this.editorWheelLiftY / 100 * 0.10 * shadowWeight
+        + this.editorWheelGammaY / 100 * 0.10 * midWeight
+        + this.editorWheelGainY / 100 * 0.10 * highlightWeight;
+      red += wheelX - wheelY * 0.5;
+      green += wheelY - wheelX * 0.5;
+      blue -= (wheelX + wheelY) * 0.5;
+
       red += temperature * 0.12 + tint * 0.045;
       green -= tint * 0.08;
       blue -= temperature * 0.12 - tint * 0.045;
 
-      let luma: number =
-        red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const toneShift: number =
         this.editorShadows / 100
           * Math.pow(1 - this.editorClampUnit(luma), 2)
@@ -6650,6 +7236,14 @@ struct Index {
       red = (red - 0.5) * contrast * localContrast + 0.5;
       green = (green - 0.5) * contrast * localContrast + 0.5;
       blue = (blue - 0.5) * contrast * localContrast + 0.5;
+
+      if (this.editorCurvePoints.length > 2) {
+        const mapped: number = this.editorCurveValue(luma);
+        const delta: number = mapped - luma;
+        red += delta;
+        green += delta;
+        blue += delta;
+      }
 
       luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const maximum: number = Math.max(red, Math.max(green, blue));
@@ -6679,14 +7273,21 @@ struct Index {
           normalizedX * normalizedX + normalizedY * normalizedY
         )
       );
+      const maskFactor: number = this.editorMaskEnabled
+        ? 0.82 + 0.18 * (1 - this.editorSmoothStep(
+          0.32,
+          0.32 + this.editorMaskFeather / 100 * 0.68,
+          edge
+        ))
+        : 1;
       const vignette: number =
         1 + this.editorVignette / 100 * edge * edge * 0.72;
-      pixels[offset] = this.editorChannel(red * vignette * 255);
+      pixels[offset] = this.editorChannel(red * vignette * maskFactor * 255);
       pixels[offset + 1] = this.editorChannel(
-        green * vignette * 255
+        green * vignette * maskFactor * 255
       );
       pixels[offset + 2] = this.editorChannel(
-        blue * vignette * 255
+        blue * vignette * maskFactor * 255
       );
     }
     this.processEditorDetailPixels(pixels, width, height);

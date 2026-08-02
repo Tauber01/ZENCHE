@@ -12,6 +12,14 @@
 
 v1.4.0 已于 2026-08-02 以提交 `8a13c0b`、标签 `v1.4.0` 发布到 [GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。Release 包含 Android、HarmonyOS、iOS unsigned、macOS、Windows Setup 和 Windows ZIP 六个包及六份 `.sha256` 校验文件；签名状态和 SHA-256 以 `docs/releases/v1.4.0.md` 为准。
 
+v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releases/v1.4.1.md` 和 [GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.1) 为准。
+
+## 0.1. 1.4.1 原生监看约定
+
+- 五端监看卡统一显示 RGB 三色波形和音频波形；音频传输管线尚未接入时只显示静音基线，不生成伪造电平。
+- 监看预览点按显示焦点标记并调用现有原生对焦/焦点步进能力；PTP 平台按点击区域映射步进，设备能力不足时如实提示。
+- Android 录制键位于两张波形卡之间，监看页移除镜头读数、曝光工具和右上角全屏入口；帧率、快门角度、ISO 等参数在监看页可调。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

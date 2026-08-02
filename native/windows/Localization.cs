@@ -112,24 +112,21 @@ internal static class AppLocalization
                 new("What's New", "アップデートのお知らせ"),
             ["本次更新"] =
                 new("In This Update", "今回の更新"),
-            ["• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n" +
-             "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n" +
-             "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n" +
-             "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n" +
-             "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n" +
+            ["• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n" +
+             "• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n" +
+             "• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n" +
+             "• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n" +
              "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"] =
                 new(
-                    "• Fixed the AI photo-editing reference-image path: the selected photo is sent as a complete data URL, the proxy forwards it in the upstream images array, and waits for the task result so edits are based on the original.\n" +
-                    "• Successful AI retouching overwrites the current original while preserving library records; AI generation still saves a new file.\n" +
-                    "• AI usage is deducted by the server and the remaining count is returned; failed requests roll back, preventing missing quota deductions.\n" +
-                    "• Kept device-bound activation, official redemption, Afdian purchase guidance, and scam warnings.\n" +
-                    "• Improved Nikon / Sony / Canon camera detection, PTP capture, and professional editor stability.\n" +
+                    "• The monitor now shows separate RGB waveforms on the left and an audio waveform card on the right; without an audio source it displays a silent baseline.\n" +
+                    "• Android moves the recording control between the two waveform cards and removes the monitor preview fullscreen button.\n" +
+                    "• Removed the monitor lens readout and the “曝光” tool entry; frame rate, shutter angle, ISO, and related parameters can be adjusted directly.\n" +
+                    "• Tapping the monitor preview switches focus, shows a focus marker, and requests native focus; PTP devices map the tap region to focus steps.\n" +
                     "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
-                    "• AI 写真編集の参照画像経路を修正。選択した写真を完全な data URL として送り、プロキシが上流の images 配列へ転送してタスク完了まで待機するため、編集結果が元画像に基づくようになりました。\n" +
-                    "• AI レタッチ成功時は現在の元画像を上書きし、ライブラリ記録を保持します。AI 生成は新規ファイルとして保存します。\n" +
-                    "• AI 利用回数はサーバーで減算し、残り回数を返します。失敗したリクエストはロールバックされ、回数が減らない問題を防ぎます。\n" +
-                    "• デバイス紐付け認証、公式交換、Afdian 購入案内、詐欺注意を継続します。\n" +
-                    "• Nikon / Sony / Canon のカメラ検出、PTP 撮影、プロ現像の安定性を改善しました。\n" +
+                    "• モニター左側に RGB 3 チャンネル波形、右側に音声波形カードを追加。音声ソースがない場合は無音の基準線を表示します。\n" +
+                    "• Android では録画ボタンを 2 つの波形カードの中央へ移動し、モニタープレビュー右上の全画面ボタンを削除しました。\n" +
+                    "• モニターのレンズ表示と「曝光」ツール入口を削除し、フレームレート、シャッター角度、ISO などを直接調整できます。\n" +
+                    "• モニタープレビューをタップするとフォーカス位置を切り替え、フォーカスマーカーを表示してネイティブフォーカスを要求します。PTP 機器ではタップ領域をフォーカスステップへ変換します。\n" +
                     "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。"),
             ["谨防诈骗"] =
                 new("Scam Warning", "詐欺にご注意ください"),
@@ -269,6 +266,27 @@ internal static class AppLocalization
                 new("Unable to analyze this photo", "この写真を解析できません"),
             ["光线"] = new("Light", "ライト"),
             ["色彩"] = new("Color", "カラー"),
+            ["色轮"] = new("Color Wheels", "カラーホイール"),
+            ["曲线"] = new("Curves", "カーブ"),
+            ["蒙版"] = new("Masks", "マスク"),
+            ["阴影曲线"] = new("Shadow Curve", "シャドウカーブ"),
+            ["中间调曲线"] = new("Midtone Curve", "中間調カーブ"),
+            ["高光曲线"] = new("Highlight Curve", "ハイライトカーブ"),
+            ["中间调"] = new("Midtones", "中間調"),
+            ["Lift / Gamma / Gain · 三向色轮"] = new("Lift / Gamma / Gain · Three-way wheels", "Lift / Gamma / Gain · 3ウェイホイール"),
+            ["蒙版类型"] = new("Mask type", "マスクタイプ"),
+            ["线性渐变"] = new("Linear gradient", "線形グラデーション"),
+            ["径向渐变"] = new("Radial gradient", "放射グラデーション"),
+            ["主体"] = new("Subject", "被写体"),
+            ["强度"] = new("Amount", "強度"),
+            ["羽化"] = new("Feather", "ぼかし"),
+            ["反相蒙版"] = new("Invert mask", "マスクを反転"),
+            ["取色器已启用，请点击预览画面"] = new("Picker armed. Click the preview.", "スポイトを有効化しました。プレビューをクリックしてください。"),
+            ["取色器已关闭"] = new("Picker disabled", "スポイトを無効化しました"),
+            ["点击预览取色 · 再次关闭"] = new("Click preview to sample · click again to disable", "プレビューをクリックしてサンプル · 再度クリックで無効化"),
+            ["未取样"] = new("No sample", "未サンプル"),
+            ["在预览画面点击取样色彩，自动微调色温与色调"] = new("Click the preview to sample color and fine-tune temperature and tint", "プレビューをクリックして色をサンプルし、色温と色かぶりを微調整"),
+            ["调色台 · 色轮 · 曲线 · 取色器 · 蒙版 · 始终保留原文件。"] = new("Colorist desk · wheels · curves · picker · masks · originals stay untouched.", "カラーグレーディング · ホイール · カーブ · スポイト · マスク · 元ファイルは保持"),
             ["细节"] = new("Detail", "ディテール"),
             ["效果"] = new("Effects", "効果"),
             ["几何"] = new("Geometry", "ジオメトリ"),

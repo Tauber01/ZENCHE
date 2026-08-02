@@ -54,6 +54,14 @@ public partial class MainWindow : Window
         public override string ToString() => Item.Name;
     }
 
+    private sealed class EditorCurvePoint
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public EditorCurvePoint(double x, double y) { X = x; Y = y; }
+        public EditorCurvePoint Copy() => new(X, Y);
+    }
+
     private sealed class EditorAdjustments
     {
         public double Exposure { get; set; }
@@ -78,9 +86,19 @@ public partial class MainWindow : Window
         public double Lift { get; set; }
         public double Gamma { get; set; }
         public double Gain { get; set; }
+        public double LiftX { get; set; }
+        public double LiftY { get; set; }
+        public double GammaX { get; set; }
+        public double GammaY { get; set; }
+        public double GainX { get; set; }
+        public double GainY { get; set; }
         public double CurveShadows { get; set; }
         public double CurveMidtones { get; set; }
         public double CurveHighlights { get; set; }
+        public List<EditorCurvePoint> CurvePoints { get; set; } = DefaultCurvePoints();
+
+        private static List<EditorCurvePoint> DefaultCurvePoints() =>
+            [new(0, 0), new(.25, .25), new(.5, .5), new(.75, .75), new(1, 1)];
         public string MaskType { get; set; } = "无";
         public double MaskAmount { get; set; }
         public double MaskFeather { get; set; } = 50;
@@ -114,9 +132,16 @@ public partial class MainWindow : Window
             Lift = 0;
             Gamma = 0;
             Gain = 0;
+            LiftX = 0;
+            LiftY = 0;
+            GammaX = 0;
+            GammaY = 0;
+            GainX = 0;
+            GainY = 0;
             CurveShadows = 0;
             CurveMidtones = 0;
             CurveHighlights = 0;
+            CurvePoints = DefaultCurvePoints();
             MaskType = "无";
             MaskAmount = 0;
             MaskFeather = 50;
@@ -165,9 +190,16 @@ public partial class MainWindow : Window
             Lift = Lift,
             Gamma = Gamma,
             Gain = Gain,
+            LiftX = LiftX,
+            LiftY = LiftY,
+            GammaX = GammaX,
+            GammaY = GammaY,
+            GainX = GainX,
+            GainY = GainY,
             CurveShadows = CurveShadows,
             CurveMidtones = CurveMidtones,
             CurveHighlights = CurveHighlights,
+            CurvePoints = CurvePoints.Select(point => point.Copy()).ToList(),
             MaskType = MaskType,
             MaskAmount = MaskAmount,
             MaskFeather = MaskFeather,
@@ -180,6 +212,170 @@ public partial class MainWindow : Window
             ShowingOriginal = ShowingOriginal,
             CropRatio = CropRatio
         };
+    }
+
+    private sealed class EditorWheelControl : FrameworkElement
+    {
+        private readonly Pen _ringPen = new(Brushes.White, 1);
+        private bool _dragging;
+        public Brush Accent { get; set; } = Brushes.DeepSkyBlue;
+        public double XValue { get; set; }
+        public double YValue { get; set; }
+        public event Action<double, double>? ValueChanged;
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            var radius = Math.Max(8, Math.Min(ActualWidth, ActualHeight) * 0.38);
+            var colors = new[] { Colors.Red, Colors.Yellow, Colors.LimeGreen, Colors.Cyan, Colors.Blue, Colors.Magenta };
+            for (var i = 0; i < colors.Length; i++) DrawWheelSegment(dc, center, radius, i * 60 - 90, (i + 1) * 60 - 90, new SolidColorBrush(colors[i]));
+            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(35, 42, 52)), _ringPen, center, radius - 6, radius - 6);
+            var knobX = center.X + Math.Clamp(XValue / 100, -1, 1) * radius * .72;
+            var knobY = center.Y - Math.Clamp(YValue / 100, -1, 1) * radius * .72;
+            dc.DrawEllipse(Accent, null, new Point(knobX, knobY), 6, 6);
+            dc.DrawEllipse(null, new Pen(Accent, 1), center, radius - 1, radius - 1);
+        }
+
+        private static void DrawWheelSegment(DrawingContext dc, Point center, double radius, double start, double end, Brush brush)
+        {
+            static Point Polar(Point c, double r, double degrees)
+            {
+                var radians = degrees * Math.PI / 180;
+                return new Point(c.X + Math.Cos(radians) * r, c.Y + Math.Sin(radians) * r);
+            }
+            var geometry = new StreamGeometry();
+            using (var ctx = geometry.Open())
+            {
+                ctx.BeginFigure(center, true, true);
+                ctx.LineTo(Polar(center, radius, start), true, false);
+                ctx.ArcTo(Polar(center, radius, end), new Size(radius, radius), 60, false, SweepDirection.Clockwise, true, false);
+            }
+            geometry.Freeze();
+            dc.DrawGeometry(brush, null, geometry);
+        }
+
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            CaptureMouse();
+            UpdateValue(e.GetPosition(this));
+            e.Handled = true;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (_dragging) UpdateValue(e.GetPosition(this));
+        }
+
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            _dragging = false;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        private void UpdateValue(Point point)
+        {
+            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            var radius = Math.Max(8, Math.Min(ActualWidth, ActualHeight) * 0.38);
+            var dx = Math.Clamp((point.X - center.X) / (radius * .72), -1, 1);
+            var dy = Math.Clamp((center.Y - point.Y) / (radius * .72), -1, 1);
+            XValue = Math.Clamp(dx * 100, -100, 100);
+            YValue = Math.Clamp(dy * 100, -100, 100);
+            InvalidateVisual();
+            ValueChanged?.Invoke(XValue, YValue);
+        }
+    }
+
+    private sealed class EditorCurveControl : FrameworkElement
+    {
+        private readonly EditorAdjustments _settings;
+        private bool _dragging;
+        private int _activePoint = -1;
+        public event Action<string, double>? ValueChanged;
+
+        public EditorCurveControl(EditorAdjustments settings) => _settings = settings;
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            var w = Math.Max(1, ActualWidth);
+            var h = Math.Max(1, ActualHeight);
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(35, 42, 52)), new Pen(new SolidColorBrush(Color.FromRgb(80, 90, 104)), 1), new Rect(0, 0, w, h), 8, 8);
+            var guide = new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1) { DashStyle = new DashStyle(new[] { 4d, 4d }, 0) };
+            dc.DrawLine(guide, new Point(0, h), new Point(w, 0));
+            var accent = (Brush)Application.Current.FindResource("AccentBrush");
+            var curvePen = new Pen(accent, 2);
+            var geometry = new StreamGeometry();
+            using (var ctx = geometry.Open())
+            {
+                var points = _settings.CurvePoints.OrderBy(point => point.X).ToList();
+                if (points.Count == 0) points = [new EditorCurvePoint(0, 0), new EditorCurvePoint(1, 1)];
+                ctx.BeginFigure(new Point(points[0].X * w, (1 - points[0].Y) * h), false, false);
+                for (var index = 0; index < points.Count - 1; index++)
+                {
+                    var p0 = points[Math.Max(0, index - 1)];
+                    var p1 = points[index];
+                    var p2 = points[index + 1];
+                    var p3 = points[Math.Min(points.Count - 1, index + 2)];
+                    var c1 = new Point((p1.X + (p2.X - p0.X) / 6) * w, (1 - (p1.Y + (p2.Y - p0.Y) / 6)) * h);
+                    var c2 = new Point((p2.X - (p3.X - p1.X) / 6) * w, (1 - (p2.Y - (p3.Y - p1.Y) / 6)) * h);
+                    ctx.BezierTo(c1, c2, new Point(p2.X * w, (1 - p2.Y) * h), true, false);
+                }
+            }
+            geometry.Freeze();
+            dc.DrawGeometry(null, curvePen, geometry);
+            foreach (var point in _settings.CurvePoints) DrawPoint(dc, point.X * w, (1 - point.Y) * h, accent);
+        }
+
+        private static void DrawPoint(DrawingContext dc, double x, double y, Brush brush) => dc.DrawEllipse(brush, null, new Point(x, y), 6, 6);
+
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            CaptureMouse();
+            _activePoint = FindOrCreatePoint(e.GetPosition(this));
+            UpdateValue(e.GetPosition(this));
+            e.Handled = true;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (_dragging) UpdateValue(e.GetPosition(this));
+        }
+
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            _dragging = false;
+            _activePoint = -1;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        private void UpdateValue(Point point)
+        {
+            var x = Math.Clamp(point.X / Math.Max(1, ActualWidth), 0, 1);
+            var y = Math.Clamp(1 - point.Y / Math.Max(1, ActualHeight), 0, 1);
+            if (_activePoint < 0) _activePoint = FindOrCreatePoint(point);
+            _settings.CurvePoints[_activePoint].X = x;
+            _settings.CurvePoints[_activePoint].Y = y;
+            InvalidateVisual();
+            ValueChanged?.Invoke("curve", y);
+        }
+
+        private int FindOrCreatePoint(Point point)
+        {
+            var x = Math.Clamp(point.X / Math.Max(1, ActualWidth), 0, 1);
+            var y = Math.Clamp(1 - point.Y / Math.Max(1, ActualHeight), 0, 1);
+            var nearest = _settings.CurvePoints
+                .Select((candidate, index) => (candidate, index, distance: Math.Pow(candidate.X - x, 2) + Math.Pow(candidate.Y - y, 2)))
+                .OrderBy(item => item.distance)
+                .FirstOrDefault();
+            if (nearest.candidate is not null && nearest.distance <= .035 * .035) return nearest.index;
+            _settings.CurvePoints.Add(new EditorCurvePoint(x, y));
+            return _settings.CurvePoints.Count - 1;
+        }
     }
 
     private sealed record EditorSliderSpec(
@@ -242,6 +438,9 @@ public partial class MainWindow : Window
     private bool _configuringVideoControls;
     private bool _videoMode;
     private bool _videoRecording;
+    private DateTime? _recordingStartedAt;
+    private readonly System.Windows.Threading.DispatcherTimer _monitorTimecodeTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(100) };
     private int _previewAnalysisSequence;
     private double _videoFrameRate = 30;
     private double _videoShutterAngle = 180;
@@ -252,6 +451,8 @@ public partial class MainWindow : Window
     private int _shootingTaskStep = 1;
     private bool _focusPeakingEnabled;
     private bool _falseColorEnabled;
+    private bool _monitorLutEnabled;
+    private bool _monitorZebraEnabled;
     private string? _availableUpdateUrl;
     private bool _checkingForUpdates;
     private bool _announcementShownThisLaunch;
@@ -268,6 +469,8 @@ public partial class MainWindow : Window
     private EditorAIAnalysis? _editorAIAnalysis;
     private readonly Dictionary<string, Slider> _editorSliders = [];
     private readonly Dictionary<string, Slider> _editorGradeSliders = [];
+    private readonly Dictionary<string, EditorWheelControl> _editorWheelControls = [];
+    private EditorCurveControl? _editorCurveControl;
     private ComboBox? _editorCropBox;
     private ComboBox? _editorMaskBox;
     private Slider? _editorMaskAmountSlider;
@@ -565,6 +768,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _monitorTimecodeTimer.Tick += (_, _) => UpdateMonitorTimecode();
+        _monitorTimecodeTimer.Start();
         BuildEditorAdjustmentControls();
         EditorPresetBox.SelectedIndex = 0;
         _libraryBranches = LoadLibraryBranches();
@@ -1366,6 +1571,74 @@ public partial class MainWindow : Window
         _falseColorEnabled = FalseColorCheck.IsChecked == true;
     }
 
+    private void MonitorFocusButton_Click(object sender, RoutedEventArgs e)
+    {
+        _focusPeakingEnabled = !_focusPeakingEnabled;
+        FocusPeakingCheck.IsChecked = _focusPeakingEnabled;
+        RefreshMonitorPreview();
+    }
+
+    private void MonitorLutButton_Click(object sender, RoutedEventArgs e)
+    {
+        _monitorLutEnabled = !_monitorLutEnabled;
+        EditorStatusText.Text = AppLocalization.T(_monitorLutEnabled ? "监看 LUT 已启用" : "监看 LUT 已关闭");
+    }
+
+    private void MonitorFalseColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        _falseColorEnabled = !_falseColorEnabled;
+        FalseColorCheck.IsChecked = _falseColorEnabled;
+        RefreshMonitorPreview();
+    }
+
+    private void MonitorZebraButton_Click(object sender, RoutedEventArgs e)
+    {
+        _monitorZebraEnabled = !_monitorZebraEnabled;
+        EditorStatusText.Text = AppLocalization.T(_monitorZebraEnabled ? "斑马线提示已启用" : "斑马线提示已关闭");
+    }
+
+    private void MonitorAutoFocusButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FocusModeBox.Items.Count > 1) FocusModeBox.SelectedIndex = 1;
+        EditorStatusText.Text = AppLocalization.T("已切换连续自动对焦");
+    }
+
+    private async void MonitorPreviewImage_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_camera.IsLiveView || MonitorPreviewImage.ActualWidth <= 0 || MonitorPreviewImage.ActualHeight <= 0)
+        {
+            EditorStatusText.Text = AppLocalization.T("请先开启实时取景");
+            return;
+        }
+        var point = e.GetPosition(MonitorPreviewImage);
+        MonitorFocusReticle.Margin = new Thickness(Math.Max(0, point.X - 22), Math.Max(0, point.Y - 22), 0, 0);
+        MonitorFocusReticle.Visibility = Visibility.Visible;
+        try
+        {
+            await _camera.SetParameterAsync("focusMode", "single-shot", CancellationToken.None);
+            var horizontalStep = point.X < MonitorPreviewImage.ActualWidth * 0.42 ? -1 : point.X > MonitorPreviewImage.ActualWidth * 0.58 ? 1 : 0;
+            var verticalStep = point.Y < MonitorPreviewImage.ActualHeight * 0.42 ? -1 : point.Y > MonitorPreviewImage.ActualHeight * 0.58 ? 1 : 0;
+            var step = horizontalStep != 0 ? horizontalStep : verticalStep;
+            if (step != 0) await _camera.MoveFocusAsync(step, CancellationToken.None);
+            EditorStatusText.Text = AppLocalization.T("监看焦点已切换");
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text = AppLocalization.T($"对焦请求失败：{error.Message}");
+        }
+        await Task.Delay(1200);
+        MonitorFocusReticle.Visibility = Visibility.Collapsed;
+    }
+
+    private void RefreshMonitorPreview()
+    {
+        if (MonitorPreviewImage.Source is BitmapSource bitmap)
+        {
+            var monitor = ProfessionalMonitor.Process(bitmap, _focusPeakingEnabled, _falseColorEnabled);
+            DisplayPreparedPreview(new PreparedPreview(monitor.Image, monitor));
+        }
+    }
+
     private void LoadCaptureSessionControls()
     {
         var configuration = _workflow.Configuration;
@@ -1471,6 +1744,7 @@ public partial class MainWindow : Window
                     await _camera.StartMovieRecordingAsync(token);
                 }
                 _videoRecording = _camera.IsMovieRecording;
+                _recordingStartedAt = _videoRecording ? DateTime.Now : null;
                 OperationStatusText.Text = AppLocalization.T(
                     _videoRecording
                         ? "● REC · 视频正在录制到相机存储卡"
@@ -1481,6 +1755,7 @@ public partial class MainWindow : Window
 
     private void UpdateRecordingState()
     {
+        UpdateMonitorTimecode();
         if (_videoMode)
         {
             ShutterButton.Content = AppLocalization.T(
@@ -1491,6 +1766,28 @@ public partial class MainWindow : Window
             _immersiveRecordButton.Content = AppLocalization.T(
                 _videoRecording ? "■\n停止" : "●\n录制");
         }
+    }
+
+    private void UpdateMonitorTimecode()
+    {
+        if (MonitorTimecodeText is null)
+        {
+            return;
+        }
+        if (!_videoRecording || !_recordingStartedAt.HasValue)
+        {
+            MonitorTimecodeText.Text = "00:00:00:00";
+            return;
+        }
+        var elapsed = DateTime.Now - _recordingStartedAt.Value;
+        var centiseconds = Math.Max(0, (int)(elapsed.TotalMilliseconds / 10));
+        MonitorTimecodeText.Text = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0:00}:{1:00}:{2:00}:{3:00}",
+            centiseconds / 360000,
+            (centiseconds / 6000) % 60,
+            (centiseconds / 100) % 60,
+            centiseconds % 100);
     }
 
     private async void ParameterBox_SelectionChanged(
@@ -1622,7 +1919,11 @@ public partial class MainWindow : Window
     {
         SetCurrentNavigation(navigation);
         CapturePanel.Visibility =
-            destination is "capture" or "monitor"
+            destination == "capture"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        MonitorDashboard.Visibility =
+            destination == "monitor"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         LibraryPanel.Visibility =
@@ -1641,7 +1942,7 @@ public partial class MainWindow : Window
         {
             AiDeviceIdText.Text = GetDeviceId();
         }
-        var cameraWorkspace = destination is "capture" or "monitor";
+        var cameraWorkspace = destination == "capture";
         ParameterPanelShell.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
         ParameterColumn.Width =
@@ -2373,8 +2674,11 @@ public partial class MainWindow : Window
                 "• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n" +
                 "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n" +
                 "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n" +
-                "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n" +
-                "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n" +
+                "• 专业编辑工作区按达芬奇调色逻辑重组：新增 Lift/Gamma/Gain 三向色轮、主曲线、RGB 取色器、线性/径向/主体蒙版；四类工具接入原生预览与高质量副本。\n" +
+                "• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n" +
+                "• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n" +
+                "• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n" +
+                "• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
@@ -3319,6 +3623,7 @@ public partial class MainWindow : Window
         if (profile is null)
         {
             _videoRecording = false;
+            _recordingStartedAt = null;
             PreviewImage.Source = null;
             PreviewEmpty.Visibility = Visibility.Visible;
             UpdateRecordingState();
@@ -3326,6 +3631,45 @@ public partial class MainWindow : Window
         UpdateEnabledState();
         UpdateLiveViewState();
         UpdateExposureReadout();
+    }
+
+    private void UpdateMonitorStorage()
+    {
+        if (MonitorStorageFreeText is null || MonitorStorageDetailText is null)
+        {
+            return;
+        }
+        try
+        {
+            var root = Path.GetPathRoot(_library.DirectoryPath);
+            if (string.IsNullOrWhiteSpace(root)) throw new IOException("storage root unavailable");
+            var drive = new DriveInfo(root);
+            var free = drive.AvailableFreeSpace;
+            MonitorStorageFreeText.Text = FormatStorageBytes(free);
+            var usedPercent = drive.TotalSize > 0
+                ? Math.Clamp((int)Math.Round((1 - free / (double)drive.TotalSize) * 100), 0, 100)
+                : 0;
+            MonitorStorageDetailText.Text = $"{usedPercent}% 已用 · 本地缓存";
+        }
+        catch
+        {
+            MonitorStorageFreeText.Text = "—";
+            MonitorStorageDetailText.Text = "本地缓存 · 存储状态暂不可用";
+        }
+    }
+
+    private static string FormatStorageBytes(long bytes)
+    {
+        if (bytes < 0) return "—";
+        var value = (double)bytes;
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        var index = 0;
+        while (value >= 1024 && index < units.Length - 1)
+        {
+            value /= 1024;
+            index++;
+        }
+        return index == 0 ? $"{value:0} {units[index]}" : $"{value:0.0} {units[index]}";
     }
 
     private void UpdateEnabledState()
@@ -3398,6 +3742,17 @@ public partial class MainWindow : Window
         CompensationReadoutText.Text = connected
             ? SelectedContent(ExposureCompensationBox, "—")
             : "—";
+        if (MonitorFrameRateText is not null)
+        {
+            MonitorFrameRateText.Text = connected ? $"{_videoFrameRate:0}" : "—";
+            MonitorShutterText.Text = connected ? (_videoMode ? $"{_videoShutterAngle:0}°" : SelectedContent(ShutterBox, "—")) : "—";
+            MonitorApertureText.Text = connected ? SelectedContent(ApertureBox, "—").Replace("f/", "f") : "—";
+            MonitorIsoText.Text = connected ? SelectedContent(IsoBox, "—").Replace("ISO ", "") : "—";
+            MonitorWhiteBalanceText.Text = connected ? SelectedContent(WhiteBalanceBox, "—") : "—";
+            MonitorToneText.Text = connected ? SelectedContent(ExposureCompensationBox, "—").Replace(" EV", "") : "—";
+            MonitorCameraOverlay.Text = connected ? $"{_camera.Profile?.Name ?? "相机"} · USB/PTP" : "未连接 · USB/PTP";
+            UpdateMonitorStorage();
+        }
         UpdateReadoutState(
             ShutterReadoutLabel,
             ShutterReadoutText,
@@ -3471,6 +3826,16 @@ public partial class MainWindow : Window
         LiveBadge.Foreground = live
             ? (Brush)FindResource("AccentInkBrush")
             : (Brush)FindResource("GraphiteMutedBrush");
+        if (MonitorLiveStatusText is not null)
+        {
+            MonitorLiveStatusText.Text = live ? "LIVE" : "NO SOURCE";
+            MonitorLiveStatusText.Foreground = live
+                ? (Brush)FindResource("PositiveBrush")
+                : (Brush)FindResource("GraphiteMutedBrush");
+            MonitorPreviewEmpty.Visibility = live || MonitorPreviewImage.Source is not null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
     }
 
     private void DisplayJpeg(byte[] jpeg)
@@ -3512,6 +3877,11 @@ public partial class MainWindow : Window
     private void DisplayPreparedPreview(PreparedPreview prepared)
     {
         PreviewImage.Source = prepared.Display;
+        MonitorPreviewImage.Source = prepared.Display;
+        MonitorPreviewEmpty.Visibility = Visibility.Collapsed;
+        MonitorCameraOverlay.Text = $"{(_camera.Profile?.Name ?? "未连接")} · USB/PTP";
+        MonitorHistogramText.Text = $"R {prepared.Monitor.RedHistogram}\nG {prepared.Monitor.GreenHistogram}\nB {prepared.Monitor.BlueHistogram}";
+        MonitorWaveformText.Text = "──────── 静音基线 ────────\n无音频源";
         if (_immersivePreviewImage is not null)
         {
             _immersivePreviewImage.Source = prepared.Display;
@@ -4164,73 +4534,62 @@ public partial class MainWindow : Window
     {
         var amount = new TextBlock
         {
-            Text = "0",
+            Text = $"{EditorWheelXForKey(key):+0;-0;0}, {EditorWheelYForKey(key):+0;-0;0}",
             Foreground = (Brush)FindResource("MutedBrush"),
             FontFamily = (FontFamily)FindResource("MonoFont"),
             HorizontalAlignment = HorizontalAlignment.Center
         };
-        var slider = new Slider
+        var direct = new EditorWheelControl
         {
-            Tag = $"grade:{key}",
-            Minimum = -100,
-            Maximum = 100,
-            TickFrequency = 1,
-            IsSnapToTickEnabled = true,
+            Accent = (Brush)new BrushConverter().ConvertFromString(color)!,
+            XValue = EditorWheelXForKey(key),
+            YValue = EditorWheelYForKey(key),
             Width = 76,
+            Height = 76,
             HorizontalAlignment = HorizontalAlignment.Center
         };
-        _editorGradeSliders[key] = slider;
-        slider.ValueChanged += (_, _) =>
+        direct.ValueChanged += (x, y) =>
         {
-            amount.Text = $"{slider.Value:+0;-0;0}";
-            SetEditorAdjustment(key, slider.Value);
+            amount.Text = $"{x:+0;-0;0}, {y:+0;-0;0}";
+            SetEditorWheelAdjustment(key, x, y);
             if (!_initializing && !_updatingEditorControls) UpdateEditorPreview();
         };
+        _editorWheelControls[key] = direct;
         var panel = new StackPanel { Margin = new Thickness(3, 0, 3, 0) };
-        panel.Children.Add(new Border
-        {
-            Width = 66,
-            Height = 66,
-            CornerRadius = new CornerRadius(33),
-            BorderThickness = new Thickness(2),
-            BorderBrush = (Brush)new BrushConverter().ConvertFromString(color)!,
-            Background = (Brush)FindResource("GraphiteBrush"),
-            Child = new TextBlock
-            {
-                Text = "●",
-                FontSize = 24,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = (Brush)new BrushConverter().ConvertFromString(color)!
-            }
-        });
+        panel.Children.Add(direct);
         panel.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 0) });
         panel.Children.Add(amount);
-        panel.Children.Add(slider);
         return panel;
     }
 
     private Expander CreateEditorCurvesGroup()
     {
         var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
-        content.Children.Add(new Border
+        content.Children.Add(new TextBlock
         {
-            Height = 132,
-            Background = (Brush)FindResource("GraphiteBrush"),
-            BorderBrush = (Brush)FindResource("GraphiteRuleBrush"),
-            BorderThickness = new Thickness(1),
-            Child = new Canvas
-            {
-                Children =
-                {
-                    new Polyline { Points = new PointCollection { new Point(0, 124), new Point(34, 107), new Point(70, 85), new Point(108, 48), new Point(145, 8), new Point(180, 0) }, Stroke = (Brush)FindResource("AccentBrush"), StrokeThickness = 2 },
-                    new Line { X1 = 0, Y1 = 124, X2 = 180, Y2 = 0, Stroke = (Brush)FindResource("GraphiteMutedBrush"), StrokeThickness = 1, Opacity = 0.4 }
-                }
-            }
+            Text = AppLocalization.T("主曲线 · 拖动曲线控制点"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 8)
         });
-        content.Children.Add(CreateEditorGradeSlider("curveShadows", "阴影曲线", -100, 100));
-        content.Children.Add(CreateEditorGradeSlider("curveMidtones", "中间调曲线", -100, 100));
-        content.Children.Add(CreateEditorGradeSlider("curveHighlights", "高光曲线", -100, 100));
+        var curve = new EditorCurveControl(_editorAdjustments)
+        {
+            Height = 150,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        curve.ValueChanged += (_, _) =>
+        {
+            if (!_initializing && !_updatingEditorControls) UpdateEditorPreview();
+        };
+        _editorCurveControl = curve;
+        content.Children.Add(curve);
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("点击任意位置新增控制点，拖动控制点调整曲线"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 6, 0, 0)
+        });
         return new Expander { Header = AppLocalization.T("曲线"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
     }
 
@@ -4254,7 +4613,9 @@ public partial class MainWindow : Window
         content.Children.Add(new TextBlock { Text = AppLocalization.T("在预览画面点击取样色彩，自动微调色温与色调"), Foreground = (Brush)FindResource("MutedBrush"), FontSize = 11, Margin = new Thickness(0, 0, 0, 6) });
         var arm = new Button { Content = AppLocalization.T("取色器"), Style = (Style)FindResource("ButtonBase") };
         arm.Click += (_, _) => { _editorPickerArmed = !_editorPickerArmed; _editorAdjustments.PickerEnabled = _editorPickerArmed; arm.Content = AppLocalization.T(_editorPickerArmed ? "点击预览取色 · 再次关闭" : "取色器"); EditorStatusText.Text = AppLocalization.T(_editorPickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭"); };
-        content.Children.Add(arm); content.Children.Add(_editorPickedColorText);
+        var center = new Button { Content = AppLocalization.T("取样画面中心"), Style = (Style)FindResource("ButtonBase"), Margin = new Thickness(0, 6, 0, 0) };
+        center.Click += (_, _) => SampleEditorPixelAtCenter();
+        content.Children.Add(arm); content.Children.Add(center); content.Children.Add(_editorPickedColorText);
         return new Expander { Header = AppLocalization.T("取色器"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
     }
 
@@ -4266,11 +4627,13 @@ public partial class MainWindow : Window
         content.Children.Add(new TextBlock { Text = AppLocalization.T("蒙版类型"), FontWeight = FontWeights.SemiBold });
         content.Children.Add(_editorMaskBox);
         content.Children.Add(new TextBlock { Text = AppLocalization.T("强度"), FontWeight = FontWeights.SemiBold });
-        _editorMaskAmountSlider = CreateEditorMaskSlider("maskAmount", "强度");
-        content.Children.Add(_editorMaskAmountSlider.Parent as FrameworkElement ?? _editorMaskAmountSlider);
+        var amountRow = CreateEditorMaskSlider("maskAmount", "强度", out var amountSlider);
+        _editorMaskAmountSlider = amountSlider;
+        content.Children.Add(amountRow);
         content.Children.Add(new TextBlock { Text = AppLocalization.T("羽化"), FontWeight = FontWeights.SemiBold });
-        _editorMaskFeatherSlider = CreateEditorMaskSlider("maskFeather", "羽化");
-        content.Children.Add(_editorMaskFeatherSlider.Parent as FrameworkElement ?? _editorMaskFeatherSlider);
+        var featherRow = CreateEditorMaskSlider("maskFeather", "羽化", out var featherSlider);
+        _editorMaskFeatherSlider = featherSlider;
+        content.Children.Add(featherRow);
         var invert = new CheckBox { Content = AppLocalization.T("反相蒙版") };
         invert.Checked += (_, _) => { _editorAdjustments.MaskInvert = true; UpdateEditorPreview(); };
         invert.Unchecked += (_, _) => { _editorAdjustments.MaskInvert = false; UpdateEditorPreview(); };
@@ -4278,17 +4641,18 @@ public partial class MainWindow : Window
         return new Expander { Header = AppLocalization.T("蒙版"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
     }
 
-    private Slider CreateEditorMaskSlider(string key, string label)
+    private FrameworkElement CreateEditorMaskSlider(string key, string label, out Slider slider)
     {
         var valueText = new TextBlock { Text = "0", Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), HorizontalAlignment = HorizontalAlignment.Right };
         var heading = new DockPanel();
         heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
         DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
-        var slider = new Slider { Tag = $"grade:{key}", Minimum = 0, Maximum = 100, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
-        slider.ValueChanged += (_, _) => { valueText.Text = $"{slider.Value:0}"; SetEditorAdjustment(key, slider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
+        var createdSlider = new Slider { Tag = $"grade:{key}", Minimum = 0, Maximum = 100, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
+        slider = createdSlider;
+        createdSlider.ValueChanged += (_, _) => { valueText.Text = $"{createdSlider.Value:0}"; SetEditorAdjustment(key, createdSlider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
         var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
-        row.Children.Add(heading); row.Children.Add(slider); row.Tag = slider;
-        return slider;
+        row.Children.Add(heading); row.Children.Add(createdSlider);
+        return row;
     }
 
     private Expander CreateEditorGroup(
@@ -4506,6 +4870,40 @@ public partial class MainWindow : Window
             case "vignette":
                 _editorAdjustments.Vignette = value;
                 break;
+            case "lift": _editorAdjustments.Lift = value; break;
+            case "gamma": _editorAdjustments.Gamma = value; break;
+            case "gain": _editorAdjustments.Gain = value; break;
+            case "curveShadows": _editorAdjustments.CurveShadows = value; break;
+            case "curveMidtones": _editorAdjustments.CurveMidtones = value; break;
+            case "curveHighlights": _editorAdjustments.CurveHighlights = value; break;
+            case "maskAmount": _editorAdjustments.MaskAmount = value; break;
+            case "maskFeather": _editorAdjustments.MaskFeather = value; break;
+        }
+    }
+
+    private double EditorWheelXForKey(string key) => key switch
+    {
+        "lift" => _editorAdjustments.LiftX,
+        "gamma" => _editorAdjustments.GammaX,
+        "gain" => _editorAdjustments.GainX,
+        _ => 0
+    };
+
+    private double EditorWheelYForKey(string key) => key switch
+    {
+        "lift" => _editorAdjustments.LiftY,
+        "gamma" => _editorAdjustments.GammaY,
+        "gain" => _editorAdjustments.GainY,
+        _ => 0
+    };
+
+    private void SetEditorWheelAdjustment(string key, double x, double y)
+    {
+        switch (key)
+        {
+            case "lift": _editorAdjustments.LiftX = x; _editorAdjustments.LiftY = y; break;
+            case "gamma": _editorAdjustments.GammaX = x; _editorAdjustments.GammaY = y; break;
+            case "gain": _editorAdjustments.GainX = x; _editorAdjustments.GainY = y; break;
         }
     }
 
@@ -4596,6 +4994,22 @@ public partial class MainWindow : Window
         {
             entry.Value.Value = EditorAdjustmentForKey(entry.Key);
         }
+        foreach (var entry in _editorGradeSliders)
+        {
+            entry.Value.Value = EditorAdjustmentForKey(entry.Key);
+        }
+        foreach (var entry in _editorWheelControls)
+        {
+            entry.Value.XValue = EditorWheelXForKey(entry.Key);
+            entry.Value.YValue = EditorWheelYForKey(entry.Key);
+            entry.Value.InvalidateVisual();
+        }
+        _editorCurveControl?.InvalidateVisual();
+        if (_editorMaskBox is not null)
+            _editorMaskBox.SelectedIndex = _editorAdjustments.MaskType switch { "线性渐变" => 1, "径向渐变" => 2, "主体" => 3, _ => 0 };
+        if (_editorMaskAmountSlider is not null) _editorMaskAmountSlider.Value = _editorAdjustments.MaskAmount;
+        if (_editorMaskFeatherSlider is not null) _editorMaskFeatherSlider.Value = _editorAdjustments.MaskFeather;
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = AppLocalization.T(_editorAdjustments.PickedColorHex);
         _updatingEditorControls = false;
     }
 
@@ -4617,6 +5031,14 @@ public partial class MainWindow : Window
         "noiseReduction" => _editorAdjustments.NoiseReduction,
         "dehaze" => _editorAdjustments.Dehaze,
         "vignette" => _editorAdjustments.Vignette,
+        "lift" => _editorAdjustments.Lift,
+        "gamma" => _editorAdjustments.Gamma,
+        "gain" => _editorAdjustments.Gain,
+        "curveShadows" => _editorAdjustments.CurveShadows,
+        "curveMidtones" => _editorAdjustments.CurveMidtones,
+        "curveHighlights" => _editorAdjustments.CurveHighlights,
+        "maskAmount" => _editorAdjustments.MaskAmount,
+        "maskFeather" => _editorAdjustments.MaskFeather,
         _ => 0
     };
 
@@ -4649,10 +5071,24 @@ public partial class MainWindow : Window
         {
             slider.Value = 0;
         }
+        foreach (var slider in _editorGradeSliders.Values)
+        {
+            slider.Value = slider.Tag?.ToString() == "grade:maskFeather" ? 50 : 0;
+        }
+        foreach (var wheel in _editorWheelControls)
+        {
+            wheel.Value.XValue = 0;
+            wheel.Value.YValue = 0;
+            wheel.Value.InvalidateVisual();
+        }
+        _editorCurveControl?.InvalidateVisual();
         if (_editorCropBox is not null)
         {
             _editorCropBox.SelectedIndex = 0;
         }
+        if (_editorMaskBox is not null) _editorMaskBox.SelectedIndex = 0;
+        _editorPickerArmed = false;
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = AppLocalization.T("未取样");
         EditorPresetBox.SelectedIndex = 0;
         CompareEditorPhotoButton.Content =
             AppLocalization.T("查看原图");
@@ -4795,6 +5231,19 @@ public partial class MainWindow : Window
         _editorAdjustments.NoiseReduction = source.NoiseReduction;
         _editorAdjustments.Dehaze = source.Dehaze;
         _editorAdjustments.Vignette = source.Vignette;
+        _editorAdjustments.Lift = source.Lift;
+        _editorAdjustments.Gamma = source.Gamma;
+        _editorAdjustments.Gain = source.Gain;
+        _editorAdjustments.LiftX = source.LiftX;
+        _editorAdjustments.LiftY = source.LiftY;
+        _editorAdjustments.GammaX = source.GammaX;
+        _editorAdjustments.GammaY = source.GammaY;
+        _editorAdjustments.GainX = source.GainX;
+        _editorAdjustments.GainY = source.GainY;
+        _editorAdjustments.CurveShadows = source.CurveShadows;
+        _editorAdjustments.CurveMidtones = source.CurveMidtones;
+        _editorAdjustments.CurveHighlights = source.CurveHighlights;
+        _editorAdjustments.CurvePoints = source.CurvePoints.Select(point => point.Copy()).ToList();
         _editorAdjustments.Rotation = source.Rotation;
         _editorAdjustments.FlipHorizontal = source.FlipHorizontal;
         _editorAdjustments.FlipVertical = source.FlipVertical;
@@ -4981,6 +5430,40 @@ public partial class MainWindow : Window
         }
     }
 
+    private void EditorPreviewImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_editorPickerArmed || string.IsNullOrWhiteSpace(_editorSelectedPath)) return;
+        var point = e.GetPosition(EditorPreviewImage);
+        var bitmap = EditorPreviewImage.Source as BitmapSource;
+        if (bitmap is null || EditorPreviewImage.ActualWidth <= 0 || EditorPreviewImage.ActualHeight <= 0) return;
+        var x = (int)Math.Clamp(point.X / EditorPreviewImage.ActualWidth * bitmap.PixelWidth, 0, bitmap.PixelWidth - 1);
+        var y = (int)Math.Clamp(point.Y / EditorPreviewImage.ActualHeight * bitmap.PixelHeight, 0, bitmap.PixelHeight - 1);
+        ApplyEditorPickerSample(bitmap, x, y);
+        e.Handled = true;
+    }
+
+    private void SampleEditorPixelAtCenter()
+    {
+        if (EditorPreviewImage.Source is not BitmapSource bitmap) return;
+        ApplyEditorPickerSample(bitmap, bitmap.PixelWidth / 2, bitmap.PixelHeight / 2);
+    }
+
+    private void ApplyEditorPickerSample(BitmapSource bitmap, int x, int y)
+    {
+        var sampled = new byte[4];
+        bitmap.CopyPixels(new Int32Rect(Math.Clamp(x, 0, bitmap.PixelWidth - 1), Math.Clamp(y, 0, bitmap.PixelHeight - 1), 1, 1), sampled, 4, 0);
+        var hex = $"#{sampled[2]:X2}{sampled[1]:X2}{sampled[0]:X2}";
+        _editorAdjustments.PickedColorHex = hex;
+        _editorAdjustments.PickerEnabled = false;
+        _editorPickerArmed = false;
+        _editorAdjustments.Temperature = Math.Clamp((sampled[0] - sampled[2]) / 2.55, -100, 100);
+        _editorAdjustments.Tint = Math.Clamp((sampled[1] - (sampled[0] + sampled[2]) / 2) / 2.55, -100, 100);
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = hex;
+        EditorStatusText.Text = AppLocalization.T($"已取样 {hex} · 已微调色温/色调");
+        SyncEditorSliders();
+        UpdateEditorPreview();
+    }
+
     private void SaveEditedPhoto_Click(
         object sender,
         RoutedEventArgs e)
@@ -5139,6 +5622,41 @@ public partial class MainWindow : Window
                     normalizedY * normalizedY));
             var vignette =
                 1 + settings.Vignette / 100 * edge * edge * 0.72;
+            // Apply independent X/Y wheel axes and the editable curve.
+            var shadowWeight = Math.Pow(1 - ClampUnit(luminance), 2);
+            var midWeight = 1 - Math.Abs(ClampUnit(luminance) * 2 - 1);
+            var highlightWeight = Math.Pow(ClampUnit(luminance), 2);
+            var wheelX = settings.LiftX / 100 * shadowWeight * 0.12
+                + settings.GammaX / 100 * midWeight * 0.12
+                + settings.GainX / 100 * highlightWeight * 0.12;
+            var wheelY = settings.LiftY / 100 * shadowWeight * 0.12
+                + settings.GammaY / 100 * midWeight * 0.12
+                + settings.GainY / 100 * highlightWeight * 0.12;
+            red += wheelX - wheelY * .5;
+            green += wheelY - wheelX * .5;
+            blue -= (wheelX + wheelY) * .5;
+            if (settings.CurvePoints.Count > 2)
+            {
+                var mapped = CurveValue(settings.CurvePoints, luminance);
+                var delta = mapped - luminance;
+                red += delta;
+                green += delta;
+                blue += delta;
+            }
+            if (settings.MaskType != "无")
+            {
+                var mask = settings.MaskType == "线性渐变"
+                    ? ClampUnit((double)y / Math.Max(1, converted.PixelHeight - 1))
+                    : settings.MaskType == "径向渐变"
+                        ? ClampUnit(1 - edge)
+                        : ClampUnit(1 - Math.Abs(normalizedX) * 0.65 - Math.Abs(normalizedY) * 0.65);
+                if (settings.MaskInvert) mask = 1 - mask;
+                mask = Math.Pow(mask, Math.Max(0.2, settings.MaskFeather / 50));
+                var maskMix = mask * settings.MaskAmount / 100;
+                red = red * (1 - maskMix) + (red + settings.Temperature / 600) * maskMix;
+                green = green * (1 - maskMix) + (green - settings.Tint / 800) * maskMix;
+                blue = blue * (1 - maskMix) + (blue - settings.Temperature / 600) * maskMix;
+            }
             pixels[index] = ClampChannel(blue * vignette * 255);
             pixels[index + 1] = ClampChannel(green * vignette * 255);
             pixels[index + 2] = ClampChannel(red * vignette * 255);
@@ -5257,6 +5775,28 @@ public partial class MainWindow : Window
     {
         var scaled = ClampUnit((value - edge0) / (edge1 - edge0));
         return scaled * scaled * (3 - 2 * scaled);
+    }
+
+    private static double CurveValue(List<EditorCurvePoint> source, double input)
+    {
+        var points = source.OrderBy(point => point.X).ToList();
+        var x = ClampUnit(input);
+        if (points.Count < 2) return x;
+        if (x <= points[0].X) return points[0].Y;
+        if (x >= points[^1].X) return points[^1].Y;
+        var index = 1;
+        while (index < points.Count && points[index].X < x) index++;
+        var p0 = points[Math.Max(0, index - 2)];
+        var p1 = points[index - 1];
+        var p2 = points[index];
+        var p3 = points[Math.Min(points.Count - 1, index + 1)];
+        var t = (x - p1.X) / Math.Max(.0001, p2.X - p1.X);
+        var t2 = t * t;
+        var t3 = t2 * t;
+        var y = .5 * (2 * p1.Y + (-p0.Y + p2.Y) * t
+            + (2 * p0.Y - 5 * p1.Y + 4 * p2.Y - p3.Y) * t2
+            + (-p0.Y + 3 * p1.Y - 3 * p2.Y + p3.Y) * t3);
+        return ClampUnit(y);
     }
 
     private static double ClampUnit(double value) =>
@@ -5569,6 +6109,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         _shutdownStarted = true;
         Closing -= Window_Closing;
+        _monitorTimecodeTimer.Stop();
         if (_immersivePreviewWindow is { } immersive)
         {
             CloseImmersivePreview(immersive);

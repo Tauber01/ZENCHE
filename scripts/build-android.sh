@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=1.4.0
+VERSION=1.4.1
 ANDROID_ROOT="$PROJECT_ROOT/native/android"
 ASSET_ROOT="$ANDROID_ROOT/app/src/main/assets/web"
 DIST_ROOT="$PROJECT_ROOT/dist"

@@ -848,7 +848,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                        Text("• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

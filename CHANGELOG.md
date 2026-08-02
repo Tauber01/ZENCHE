@@ -3,6 +3,27 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.4.1] - 2026-08-02
+
+### Added
+
+- Added native RGB three-channel waveform and audio waveform monitor cards across
+  iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.
+- Added monitor-preview tap-to-focus feedback and native focus requests across
+  all five targets.
+
+### Changed
+
+- Moved the Android recording control between the RGB and audio waveform cards.
+- Removed the monitor lens readout, the monitor “曝光” tool entry, and the
+  Android monitor preview fullscreen control.
+- Exposed adjustable frame rate, shutter angle, ISO, and related monitor
+  parameters directly in the monitor surfaces.
+- The audio card reports a silent baseline because no camera audio transport is
+  currently available; it does not fabricate live audio levels.
+- Raised native release metadata to version `1.4.1` / build `24` and aligned
+  package scripts, README downloads, announcements, and validation assets.
+
 ## [1.4.0] - 2026-08-02
 
 ### Fixed
@@ -19,6 +40,11 @@ the project uses semantic versioning.
 
 - Synchronized the five native targets and their launch announcements around
   the AI workflow, quota behavior, and original-versus-generated file semantics.
+- Reorganized the native professional editor around a DaVinci-style grading
+  workflow with Lift / Gamma / Gain color wheels, a master curve, RGB picker,
+  and linear, radial, and subject mask controls. These controls are connected
+  to native previews and high-quality non-destructive copies on all five
+  targets.
 - Improved Nikon, Sony, and Canon camera/PTP and professional-editor stability.
 - Raised native release metadata to version `1.4.0` / build `23` and aligned
   package scripts, README downloads, and validation assets.

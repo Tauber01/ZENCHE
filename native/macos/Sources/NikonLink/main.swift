@@ -1760,6 +1760,7 @@ private final class CameraModel: ObservableObject {
     @Published var liveViewEnabled = false
     @Published var capturing = false
     @Published var videoRecording = false
+    @Published var videoRecordingStartedAt: Date?
     private var previewAnalysisSequence = 0
     @Published var frame: NSImage?
     @Published var photoFrame: NSImage?
@@ -1923,6 +1924,7 @@ private final class CameraModel: ObservableObject {
         clearPendingPreviewProcessing()
         liveViewEnabled = false
         videoRecording = false
+        videoRecordingStartedAt = nil
         cameraQueue.async { [weak self] in
             self?.camera.disconnect()
         }
@@ -2266,6 +2268,7 @@ private final class CameraModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.capturing = false
                     self.videoRecording = !shouldStop
+                    self.videoRecordingStartedAt = self.videoRecording ? Date() : nil
                     self.detail = shouldStop
                         ? "视频已停止并保存到相机存储卡"
                         : "● REC · 正在录制到相机存储卡"
@@ -2541,6 +2544,42 @@ private final class CameraModel: ObservableObject {
             value: shutter,
             label: "快门角度 \(angle.formatted())°"
         )
+    }
+
+    func stepVideoFrameRate(_ direction: Int) {
+        let values = [24.0, 25.0, 30.0, 50.0, 60.0]
+        let index = values.enumerated().min { abs($0.element - videoFrameRate) < abs($1.element - videoFrameRate) }?.offset ?? 2
+        setVideoFrameRate(values[max(0, min(values.count - 1, index + direction))])
+    }
+
+    func stepVideoShutter(_ direction: Int) {
+        let values = [45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0]
+        let index = values.enumerated().min { abs($0.element - videoShutterAngle) < abs($1.element - videoShutterAngle) }?.offset ?? 4
+        setVideoShutterAngle(values[max(0, min(values.count - 1, index + direction))])
+    }
+
+    func stepISO(_ direction: Int) {
+        let values = SupportedCamera.isoOptions(for: cameraName)
+        guard !values.isEmpty else { return }
+        let index = values.enumerated().min { abs($0.element - iso) < abs($1.element - iso) }?.offset ?? 0
+        let next = values[max(0, min(values.count - 1, index + direction))]
+        iso = next
+        applyParameter("iso", value: next, label: "ISO感光度")
+    }
+
+    func focus(at point: CGPoint) {
+        guard connected, liveViewEnabled else { return }
+        let direction = point.x < 0.42 ? -1 : point.x > 0.58 ? 1 : (point.y < 0.42 ? -1 : point.y > 0.58 ? 1 : 0)
+        cameraQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                try self.camera.setParameter(name: "focusMode", value: "single-shot")
+                if direction != 0 { try self.camera.moveFocus(direction) }
+                DispatchQueue.main.async { self.detail = "监看焦点已切换" }
+            } catch {
+                DispatchQueue.main.async { self.errorMessage = "对焦请求失败：\(error.localizedDescription)" }
+            }
+        }
     }
 
     func importLUT(from url: URL) {
@@ -4334,75 +4373,260 @@ private struct ParameterInspector: View {
     }
 }
 
+private struct MacMonitorStorageInfo {
+    let percentUsed: Int
+    let freeDescription: String
+
+    static var current: MacMonitorStorageInfo {
+        let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
+        let total = (attributes?[.systemSize] as? NSNumber)?.doubleValue ?? 0
+        let free = (attributes?[.systemFreeSize] as? NSNumber)?.doubleValue ?? 0
+        let usedRatio = total > 0 ? min(1, max(0, (total - free) / total)) : 0
+        return MacMonitorStorageInfo(
+            percentUsed: Int((usedRatio * 100).rounded()),
+            freeDescription: free > 0
+                ? String(format: "%.1f GB", free / 1_073_741_824)
+                : "—"
+        )
+    }
+}
+
 private struct MonitorView: View {
     @ObservedObject var model: CameraModel
+    @State private var now = Date()
+    @State private var focusPoint: CGPoint?
+    private let timecodeTimer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack {
-                    WorkspaceHeading(
-                        title: "视频监看",
-                        subtitle: "\(model.cameraName ?? "连接相机后显示当前机型") · 视频取景与本地监看处理",
-                        accent: Palette.video
-                    )
-                    Spacer()
-                    Button {
-                        model.toggleMovieRecording()
-                    } label: {
-                        RuntimeLocalizedText(
-                            model.videoRecording ? "停止录制" : "开始录制"
-                        )
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    HStack {
+                        Text(timecodeText)
+                            .font(.system(size: proxy.size.width > 900 ? 42 : 30,
+                                          weight: .semibold, design: .monospaced))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.white)
+                        Spacer()
+                        Label(model.liveViewEnabled ? "LIVE" : "NO SOURCE", systemImage: "circle.fill")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundStyle(model.liveViewEnabled ? Palette.positive : Color.white.opacity(0.55))
                     }
-                    .buttonStyle(
-                        NativeButtonStyle(
-                            primary: true,
-                            accent: Palette.video
-                        )
-                    )
-                    .disabled(!model.connected || model.capturing)
-                    Button {
-                        model.toggleLiveView()
-                    } label: {
-                        RuntimeLocalizedText(
-                            model.liveViewEnabled
-                                ? "停止实时取景"
-                                : "开启实时取景"
-                        )
-                    }
-                    .buttonStyle(
-                        NativeButtonStyle(
-                            primary: !model.liveViewEnabled,
-                            accent: Palette.video
-                        )
-                    )
-                }
+                    .padding(.horizontal, 26)
+                    .padding(.vertical, 18)
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 20) {
-                        PreviewStage(
-                            model: model,
-                            showsMonitorEffects: true
-                        ) {
-                            showMacImmersiveWindow(model: model, monitoring: true)
+                    ZStack(alignment: .topLeading) {
+                        if let frame = model.frame {
+                            Image(nsImage: frame)
+                                .resizable()
+                                .interpolation(.medium)
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                            if model.zebraEnabled, let zebra = model.zebraMask {
+                                Image(nsImage: zebra)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .allowsHitTesting(false)
+                            }
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "camera.viewfinder")
+                                    .font(.system(size: 46, weight: .light))
+                                Text(model.connected ? "等待实时取景画面" : "连接相机后开启实时取景")
+                                    .font(.system(size: 15, weight: .medium))
+                            }
+                            .foregroundStyle(Color.white.opacity(0.55))
+                            .frame(maxWidth: .infinity, minHeight: 270)
                         }
-                            .frame(minWidth: 520)
-                        MonitorControlDeck(model: model)
-                            .frame(width: 320)
-                    }
-                    VStack(alignment: .leading, spacing: 20) {
-                        PreviewStage(
-                            model: model,
-                            showsMonitorEffects: true
-                        ) {
-                            showMacImmersiveWindow(model: model, monitoring: true)
+                        Text("\(model.cameraName ?? "未连接") · USB/PTP")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(Color.white.opacity(0.72))
+                            .padding(12)
+                        if let focusPoint {
+                            ImmersiveMacFocusReticle()
+                                .stroke(Color.yellow, lineWidth: 2)
+                                .frame(width: 56, height: 56)
+                                .position(focusPoint)
+                                .allowsHitTesting(false)
                         }
-                        MonitorControlDeck(model: model)
                     }
+                    .frame(maxWidth: .infinity)
+                    .background(Palette.graphite)
+                    .contentShape(Rectangle())
+                    .gesture(SpatialTapGesture().onEnded { value in
+                        let location = value.location
+                        focusPoint = location
+                        model.focus(at: location)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            if focusPoint == location { focusPoint = nil }
+                        }
+                    })
+
+                    HStack(spacing: 14) {
+                        monitorRGBWaveformCard(model)
+                        Button {
+                            model.toggleMovieRecording()
+                        } label: {
+                            ZStack {
+                                Circle().fill(model.videoRecording ? Palette.video : Color(red: 0.45, green: 0.02, blue: 0.04))
+                                Circle().stroke(Color.white, lineWidth: 2)
+                                Circle().fill(Palette.video).frame(width: 56, height: 56)
+                            }
+                            .frame(width: 108, height: 108)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!model.connected || model.capturing)
+                        monitorAudioWaveformCard()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+
+                    HStack(spacing: 0) {
+                        monitorReadout("帧率", "\(Int(model.videoFrameRate))")
+                        monitorReadout("快门", model.connected ? "1/\(max(1, Int((1 / max(model.shutter, 0.0001)).rounded())))" : "—")
+                        monitorReadout("光圈", model.connected ? String(format: "f/%.1f", model.aperture) : "—")
+                        monitorReadout("ISO", model.connected ? "\(model.iso)" : "—")
+                        monitorReadout("白平衡", model.connected ? (model.whiteBalance == "continuous" ? "自动" : "预设") : "—")
+                        monitorReadout("色调", model.connected ? String(format: "%+.0f", model.compensation * 10) : "—")
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 14)
+
+                    HStack(spacing: 28) {
+                        monitorIconToggle("camera.aperture", title: "峰值", isOn: model.focusPeakingEnabled) { model.setFocusPeakingEnabled(!model.focusPeakingEnabled) }
+                        monitorIconToggle("rectangle.on.rectangle", title: "LUT", isOn: model.lutEnabled) { model.setLUTEnabled(!model.lutEnabled) }
+                        monitorIconToggle("circle.lefthalf.filled", title: "假色", isOn: model.falseColorEnabled) { model.setFalseColorEnabled(!model.falseColorEnabled) }
+                        monitorIconToggle("circle.dashed", title: "斑马", isOn: model.zebraEnabled) { model.setZebraEnabled(!model.zebraEnabled) }
+                        monitorIconToggle("viewfinder", title: "自动对焦", isOn: model.focusMode != "manual") {
+                            let value = model.focusMode == "manual" ? "single-shot" : "manual"
+                            model.focusMode = value
+                            model.applyParameter("focusMode", value: value, label: "对焦模式")
+                        }
+                        Button { model.toggleLiveView() } label: { Image(systemName: "rectangle.inset.filled") }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 27, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.9))
+                            .help(model.liveViewEnabled ? "停止取景" : "开启取景")
+                    }
+                    .padding(.vertical, 18)
+
+                    HStack(spacing: 8) {
+                        MonitorMacStepper(title: "帧率", value: "\(Int(model.videoFrameRate))p", decrease: { model.stepVideoFrameRate(-1) }, increase: { model.stepVideoFrameRate(1) })
+                        MonitorMacStepper(title: "快门", value: "\(model.videoShutterAngle.formatted())°", decrease: { model.stepVideoShutter(-1) }, increase: { model.stepVideoShutter(1) })
+                        MonitorMacStepper(title: "ISO", value: "\(model.iso)", decrease: { model.stepISO(-1) }, increase: { model.stepISO(1) })
+                    }
+                    .padding(.horizontal, 20)
+
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 5) {
+                            Image(systemName: "iphone")
+                                .font(.system(size: 28))
+                            Text(MacMonitorStorageInfo.current.freeDescription)
+                                .font(.system(size: 25, weight: .bold, design: .monospaced))
+                            Text("\(MacMonitorStorageInfo.current.percentUsed)% 已用 · 本地缓存")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        .foregroundStyle(Color.white.opacity(0.9))
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 14)
+                        .background(Palette.graphite)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        Spacer()
+                    }
+                    .padding(.vertical, 36)
+                    .background(Color.black.opacity(0.2))
+
+                    MonitorControlDeck(model: model)
+                        .padding(20)
                 }
+                .background(Color(red: 0.02, green: 0.04, blue: 0.07))
             }
-            .padding(28)
+            .onReceive(timecodeTimer) { now = $0 }
         }
+        .preferredColorScheme(.dark)
+    }
+
+    private var timecodeText: String {
+        guard model.videoRecording, let started = model.videoRecordingStartedAt else {
+            return "00:00:00:00"
+        }
+        let centiseconds = max(0, Int(now.timeIntervalSince(started) * 100))
+        return String(format: "%02d:%02d:%02d:%02d",
+                      centiseconds / 360000,
+                      (centiseconds / 6000) % 60,
+                      (centiseconds / 100) % 60,
+                      centiseconds % 100)
+    }
+
+    private func monitorReadout(_ title: String, _ value: String) -> some View {
+        VStack(spacing: 6) {
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.white.opacity(0.58))
+            Text(value).font(.system(size: 22, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func monitorScopeCard(_ title: String, _ value: String, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+            Text(value).font(.system(size: 10, design: .monospaced)).foregroundStyle(tint).lineLimit(3).minimumScaleFactor(0.5)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .background(Color(red: 0.10, green: 0.13, blue: 0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func monitorRGBWaveformCard(_ model: CameraModel) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("RGB 波形").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+            Text("R  \(model.redHistogram)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.red)
+            Text("G  \(model.greenHistogram)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.green)
+            Text("B  \(model.blueHistogram)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.blue)
+        }
+        .padding(12).frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .background(Color(red: 0.10, green: 0.13, blue: 0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func monitorAudioWaveformCard() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("音频波形").font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+            Text("──────── 静音基线 ────────").font(.system(size: 10, design: .monospaced)).foregroundStyle(Color.cyan)
+            Text("无音频源").font(.system(size: 9, design: .monospaced)).foregroundStyle(.white.opacity(0.55))
+        }
+        .padding(12).frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+        .background(Color(red: 0.10, green: 0.13, blue: 0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func monitorIconToggle(_ icon: String, title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 25, weight: .medium))
+                Text(title).font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(isOn ? Palette.video : Color.white.opacity(0.9))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MonitorMacStepper: View {
+    let title: String
+    let value: String
+    let decrease: () -> Void
+    let increase: () -> Void
+    var body: some View {
+        HStack(spacing: 4) {
+            Button("−", action: decrease).buttonStyle(.plain)
+            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.58)); Text(value).font(.system(size: 12, design: .monospaced)).foregroundStyle(.white) }
+            Button("+", action: increase).buttonStyle(.plain)
+        }
+        .padding(.horizontal, 7).frame(height: 40)
+        .background(Palette.graphite).clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -5573,6 +5797,10 @@ private struct LibraryView: View {
 private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
     case light = "光线"
     case color = "色彩"
+    case wheels = "色轮"
+    case curves = "曲线"
+    case picker = "取色器"
+    case masks = "蒙版"
     case detail = "细节"
     case effects = "效果"
     case geometry = "几何"
@@ -5902,6 +6130,19 @@ private struct EditorAIAnalysis {
     }
 }
 
+private struct EditorCurvePoint: Equatable {
+    var x: Double
+    var y: Double
+
+    static let defaults: [EditorCurvePoint] = [
+        EditorCurvePoint(x: 0, y: 0),
+        EditorCurvePoint(x: 0.25, y: 0.25),
+        EditorCurvePoint(x: 0.5, y: 0.5),
+        EditorCurvePoint(x: 0.75, y: 0.75),
+        EditorCurvePoint(x: 1, y: 1)
+    ]
+}
+
 private struct ProfessionalEditSettings {
     var exposure = 0.0
     var contrast = 0.0
@@ -5919,6 +6160,24 @@ private struct ProfessionalEditSettings {
     var noiseReduction = 0.0
     var dehaze = 0.0
     var vignette = 0.0
+    var lift = 0.0
+    var gamma = 0.0
+    var gain = 0.0
+    var liftX = 0.0
+    var liftY = 0.0
+    var gammaX = 0.0
+    var gammaY = 0.0
+    var gainX = 0.0
+    var gainY = 0.0
+    var curveShadows = 0.0
+    var curveMidtones = 0.0
+    var curveHighlights = 0.0
+    var curvePoints: [EditorCurvePoint] = EditorCurvePoint.defaults
+    var maskType = "无"
+    var maskAmount = 0.0
+    var maskFeather = 50.0
+    var maskInvert = false
+    var pickedColorHex = "未取样"
     var rotation = 0
     var flipHorizontal = false
     var flipVertical = false
@@ -6041,7 +6300,9 @@ private struct ImageEditorView: View {
     @State private var settingsBeforeAI: ProfessionalEditSettings?
     @State private var aiAnalysis: EditorAIAnalysis?
     @State private var copiedAISettings: ProfessionalEditSettings?
+    @State private var activeCurvePoint: Int?
     @State private var suppressPresetApply = false
+    @State private var pickerArmed = false
     private let context = CIContext()
     @State private var aiMode = AiImageMode.edit
     @State private var aiPrompt = ""
@@ -6310,6 +6571,30 @@ private struct ImageEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if pickerArmed { sampleColorAtCenter() }
+        }
+    }
+
+    private func sampleColorAtCenter() {
+        guard let selectedPhoto,
+              let source = CIImage(contentsOf: selectedPhoto.url),
+              let cg = context.createCGImage(source, from: source.extent.integral)
+        else { return }
+        let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        guard let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()) else { return }
+        let x = max(0, rep.pixelsWide / 2)
+        let y = max(0, rep.pixelsHigh / 2)
+        guard let sampled = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return }
+        let r = Int((sampled.redComponent * 255).rounded())
+        let g = Int((sampled.greenComponent * 255).rounded())
+        let b = Int((sampled.blueComponent * 255).rounded())
+        settings.pickedColorHex = String(format: "#%02X%02X%02X", r, g, b)
+        settings.temperature = Double(b - r) / 2.55
+        settings.tint = max(-100, min(100, (Double(g) - Double(r + b) / 2) / 2.55))
+        pickerArmed = false
+        status = "已取样 \(settings.pickedColorHex) · 已微调色温/色调"
     }
 
     private var adjustmentSidebar: some View {
@@ -6456,16 +6741,18 @@ private struct ImageEditorView: View {
     }
 
     private var sectionSelector: some View {
-        HStack(spacing: 5) {
-            ForEach(EditorAdjustmentSection.allCases) { section in
-                Button(section.rawValue) {
-                    selectedSection = section
-                }
-                .buttonStyle(
-                    EditorSectionButtonStyle(
-                        selected: selectedSection == section
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(EditorAdjustmentSection.allCases) { section in
+                    Button(section.rawValue) {
+                        selectedSection = section
+                    }
+                    .buttonStyle(
+                        EditorSectionButtonStyle(
+                            selected: selectedSection == section
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -6492,6 +6779,14 @@ private struct ImageEditorView: View {
                 standardSlider("色调", value: $settings.tint)
                 standardSlider("自然饱和度", value: $settings.vibrance)
                 standardSlider("饱和度", value: $settings.saturation)
+            case .wheels:
+                colorWheelsControls
+            case .curves:
+                curvesControls
+            case .picker:
+                pickerControls
+            case .masks:
+                maskControls
             case .detail:
                 standardSlider("纹理", value: $settings.texture)
                 standardSlider("清晰度", value: $settings.clarity)
@@ -6517,6 +6812,122 @@ private struct ImageEditorView: View {
             case .aiTools:
                 EmptyView()
             }
+        }
+    }
+
+private var colorWheelsControls: some View {
+        VStack(spacing: 12) {
+            Text("Lift / Gamma / Gain · 三向色轮").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            HStack(spacing: 8) {
+                colorWheel("阴影", color: .cyan, x: $settings.liftX, y: $settings.liftY)
+                colorWheel("中间调", color: .purple, x: $settings.gammaX, y: $settings.gammaY)
+                colorWheel("高光", color: .yellow, x: $settings.gainX, y: $settings.gainY)
+            }
+            Text("在圆盘内拖动色点调整对应范围").font(.system(size: 11)).foregroundStyle(Palette.muted)
+        }
+    }
+
+    private func colorWheel(_ title: String, color: Color, x: Binding<Double>, y: Binding<Double>) -> some View {
+        VStack(spacing: 5) {
+            GeometryReader { proxy in
+                let size = min(proxy.size.width, proxy.size.height)
+                let center = CGPoint(x: size / 2, y: size / 2)
+                ZStack {
+                    Circle().fill(Palette.graphite)
+                    Circle().stroke(AngularGradient(colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red], center: .center), lineWidth: 5)
+                    Circle().stroke(color, lineWidth: 1).padding(7)
+                    Circle().fill(color).frame(width: 12, height: 12)
+                        .position(
+                            x: center.x + CGFloat(x.wrappedValue / 100) * size * 0.38,
+                            y: center.y - CGFloat(y.wrappedValue / 100) * size * 0.38
+                        )
+                }
+                .contentShape(Circle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let dx = min(max((gesture.location.x - center.x) / (size * 0.38), -1), 1)
+                            let dy = min(max((center.y - gesture.location.y) / (size * 0.38), -1), 1)
+                            x.wrappedValue = min(max(dx * 100, -100), 100)
+                            y.wrappedValue = min(max(dy * 100, -100), 100)
+                        }
+                )
+            }
+                .frame(width: 62, height: 62)
+            Text(title).font(.system(size: 10, weight: .semibold))
+            Text(String(format: "%+.0f, %+.0f", x.wrappedValue, y.wrappedValue)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted)
+        }.frame(maxWidth: .infinity)
+    }
+
+private var curvesControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            GeometryReader { proxy in
+                ZStack {
+                    Rectangle().fill(Palette.graphite)
+                    Path { path in
+                        let samples = stride(from: 0.0, through: 1.0, by: 1.0 / 48.0).map { x in
+                            CGPoint(x: x * proxy.size.width, y: (1 - curveValue(x)) * proxy.size.height)
+                        }
+                        guard let first = samples.first else { return }
+                        path.move(to: first)
+                        for point in samples.dropFirst() { path.addLine(to: point) }
+                    }.stroke(Palette.cobalt, lineWidth: 2)
+                    Path { path in path.move(to: CGPoint(x: 0, y: proxy.size.height)); path.addLine(to: CGPoint(x: proxy.size.width, y: 0)) }.stroke(.white.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                    ForEach(settings.curvePoints.indices, id: \.self) { index in
+                        let point = settings.curvePoints[index]
+                        Circle().fill(Palette.cobalt).frame(width: 10, height: 10)
+                            .position(x: point.x * proxy.size.width, y: (1 - point.y) * proxy.size.height)
+                    }
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let width = max(proxy.size.width, 1)
+                            let height = max(proxy.size.height, 1)
+                            let x = min(max(gesture.location.x / width, 0), 1)
+                            let normalizedY = min(max(1 - gesture.location.y / height, 0), 1)
+                            if activeCurvePoint == nil {
+                                if let hit = settings.curvePoints.indices.min(by: { a, b in
+                                    pow(settings.curvePoints[a].x - x, 2) + pow(settings.curvePoints[a].y - normalizedY, 2)
+                                        < pow(settings.curvePoints[b].x - x, 2) + pow(settings.curvePoints[b].y - normalizedY, 2)
+                                }), pow(settings.curvePoints[hit].x - x, 2) + pow(settings.curvePoints[hit].y - normalizedY, 2) < 0.035 * 0.035 {
+                                    activeCurvePoint = hit
+                                } else {
+                                    settings.curvePoints.append(EditorCurvePoint(x: x, y: normalizedY))
+                                    activeCurvePoint = settings.curvePoints.count - 1
+                                }
+                            }
+                            if let activeCurvePoint, settings.curvePoints.indices.contains(activeCurvePoint) {
+                                settings.curvePoints[activeCurvePoint] = EditorCurvePoint(x: x, y: normalizedY)
+                            }
+                        }
+                        .onEnded { _ in activeCurvePoint = nil }
+                )
+            }
+            .frame(height: 150)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            Text("点击任意位置新增控制点，拖动控制点调整曲线")
+                .font(.system(size: 11)).foregroundStyle(Palette.muted)
+        }
+    }
+
+    private var pickerControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("在预览画面点击取样色彩，自动微调色温与色调").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Button { pickerArmed.toggle(); status = pickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭" } label: {
+                Label(pickerArmed ? "点击预览取色 · 再次关闭" : "取色器", systemImage: "eyedropper")
+            }.buttonStyle(NativeButtonStyle(primary: pickerArmed))
+            Text(settings.pickedColorHex).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.muted)
+        }
+    }
+
+    private var maskControls: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Picker("蒙版类型", selection: $settings.maskType) { Text("无").tag("无"); Text("线性渐变").tag("线性渐变"); Text("径向渐变").tag("径向渐变"); Text("主体").tag("主体") }.pickerStyle(.menu)
+            standardSlider("强度", value: $settings.maskAmount)
+            editorSlider(title: "羽化", value: $settings.maskFeather, range: 0...100, step: 1, formatter: { "\(Int($0))" })
+            Toggle("反相蒙版", isOn: $settings.maskInvert)
         }
     }
 
@@ -6635,6 +7046,42 @@ private struct ImageEditorView: View {
                 kCIInputSaturationKey: max(0, 1 + combinedSaturation)
             ]
         )
+        output = applyingGradingCube(to: output)
+        if settings.curvePoints.count > 2 {
+            let dimension = 16
+            var cube = [Float]()
+            cube.reserveCapacity(dimension * dimension * dimension * 4)
+            for blue in 0..<dimension {
+                for green in 0..<dimension {
+                    for red in 0..<dimension {
+                        let r = Double(red) / Double(dimension - 1)
+                        let g = Double(green) / Double(dimension - 1)
+                        let b = Double(blue) / Double(dimension - 1)
+                        let luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+                        let delta = curveValue(luma) - luma
+                        cube += [Float(max(0, min(1, r + delta))), Float(max(0, min(1, g + delta))), Float(max(0, min(1, b + delta))), 1]
+                    }
+                }
+            }
+            let cubeData = cube.withUnsafeBufferPointer { Data(buffer: $0) }
+            output = filtered("CIColorCube", image: output, values: [
+                "inputCubeDimension": dimension,
+                "inputCubeData": cubeData
+            ])
+        }
+        if settings.maskType != "无" && settings.maskAmount > 0 {
+            let maskBias = settings.maskAmount / 1000 * (settings.maskInvert ? -1 : 1)
+            output = filtered(
+                "CIColorMatrix",
+                image: output,
+                values: [
+                    "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: 0, y: 1, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
+                    "inputBiasVector": CIVector(x: maskBias, y: maskBias, z: maskBias, w: 0)
+                ]
+            )
+        }
         let gain = max(0.4, 1 + settings.whites / 260)
         let lift = settings.blacks / 850
         let tintShift = settings.tint / 1800
@@ -6727,6 +7174,53 @@ private struct ImageEditorView: View {
         filter.setValue(image, forKey: kCIInputImageKey)
         values.forEach { filter.setValue($0.value, forKey: $0.key) }
         return filter.outputImage ?? image
+    }
+
+    private func curveValue(_ input: Double) -> Double {
+        let x = min(max(input, 0), 1)
+        let points = settings.curvePoints.sorted { $0.x < $1.x }
+        guard points.count > 1 else { return x }
+        if x <= points[0].x { return points[0].y }
+        if x >= points[points.count - 1].x { return points[points.count - 1].y }
+        let index = max(1, points.firstIndex { $0.x >= x } ?? 1)
+        let p0 = points[max(0, index - 2)]
+        let p1 = points[index - 1]
+        let p2 = points[index]
+        let p3 = points[min(points.count - 1, index + 1)]
+        let t = (x - p1.x) / max(0.0001, p2.x - p1.x)
+        let t2 = t * t
+        let t3 = t2 * t
+        let y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+        return min(max(y, 0), 1)
+    }
+
+    private func applyingGradingCube(to image: CIImage) -> CIImage {
+        let dimension = 16
+        var cube = [Float]()
+        cube.reserveCapacity(dimension * dimension * dimension * 4)
+        for blue in 0..<dimension {
+            for green in 0..<dimension {
+                for red in 0..<dimension {
+                    var r = Double(red) / Double(dimension - 1)
+                    var g = Double(green) / Double(dimension - 1)
+                    var b = Double(blue) / Double(dimension - 1)
+                    let luma = r * 0.2126 + g * 0.7152 + b * 0.0722
+                    let shadows = pow(1 - luma, 2)
+                    let midtones = 1 - abs(luma * 2 - 1)
+                    let highlights = pow(luma, 2)
+                    let x = settings.liftX / 800 * shadows + settings.gammaX / 800 * midtones + settings.gainX / 800 * highlights
+                    let y = settings.liftY / 800 * shadows + settings.gammaY / 800 * midtones + settings.gainY / 800 * highlights
+                    r += x - y * 0.5
+                    g += y - x * 0.5
+                    b -= (x + y) * 0.5
+                    cube += [Float(max(0, min(1, r))), Float(max(0, min(1, g))), Float(max(0, min(1, b))), 1]
+                }
+            }
+        }
+        return filtered("CIColorCube", image: image, values: [
+            "inputCubeDimension": dimension,
+            "inputCubeData": cube.withUnsafeBufferPointer { Data(buffer: $0) }
+        ])
     }
 
     private func applyGeometry(to source: CIImage) -> CIImage {
@@ -7603,7 +8097,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.4.0"
+        ) as? String ?? "1.4.1"
     }
 
     var body: some View {

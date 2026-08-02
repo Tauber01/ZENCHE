@@ -37,6 +37,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.StatFs;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.content.ContentUris;
@@ -108,6 +109,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
+import java.util.function.BiConsumer;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -156,6 +158,18 @@ public final class MainActivity extends Activity {
     private static final String LIBRARY_FILE_ASSIGNMENTS_KEY =
             "libraryFileBranchAssignments";
 
+    private static final class EditorCurvePoint {
+        float x;
+        float y;
+
+        EditorCurvePoint(float x, float y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        EditorCurvePoint copy() { return new EditorCurvePoint(x, y); }
+    }
+
     private static final class EditorAdjustments {
         int exposure;
         int contrast;
@@ -176,8 +190,15 @@ public final class MainActivity extends Activity {
         int wheelLift;
         int wheelGamma;
         int wheelGain;
+        int wheelLiftX;
+        int wheelLiftY;
+        int wheelGammaX;
+        int wheelGammaY;
+        int wheelGainX;
+        int wheelGainY;
         int curveContrast;
         int curvePivot = 50;
+        final ArrayList<EditorCurvePoint> curvePoints = new ArrayList<>();
         boolean maskEnabled;
         int maskFeather = 55;
         int rotation;
@@ -185,6 +206,8 @@ public final class MainActivity extends Activity {
         boolean flipVertical;
         boolean showingOriginal;
         String cropRatio = "original";
+
+        EditorAdjustments() { reset(); }
 
         void reset() {
             exposure = 0;
@@ -206,8 +229,20 @@ public final class MainActivity extends Activity {
             wheelLift = 0;
             wheelGamma = 0;
             wheelGain = 0;
+            wheelLiftX = 0;
+            wheelLiftY = 0;
+            wheelGammaX = 0;
+            wheelGammaY = 0;
+            wheelGainX = 0;
+            wheelGainY = 0;
             curveContrast = 0;
             curvePivot = 50;
+            curvePoints.clear();
+            curvePoints.add(new EditorCurvePoint(0f, 0f));
+            curvePoints.add(new EditorCurvePoint(.25f, .25f));
+            curvePoints.add(new EditorCurvePoint(.5f, .5f));
+            curvePoints.add(new EditorCurvePoint(.75f, .75f));
+            curvePoints.add(new EditorCurvePoint(1f, 1f));
             maskEnabled = false;
             maskFeather = 55;
             rotation = 0;
@@ -250,8 +285,15 @@ public final class MainActivity extends Activity {
             copy.wheelLift = wheelLift;
             copy.wheelGamma = wheelGamma;
             copy.wheelGain = wheelGain;
+            copy.wheelLiftX = wheelLiftX;
+            copy.wheelLiftY = wheelLiftY;
+            copy.wheelGammaX = wheelGammaX;
+            copy.wheelGammaY = wheelGammaY;
+            copy.wheelGainX = wheelGainX;
+            copy.wheelGainY = wheelGainY;
             copy.curveContrast = curveContrast;
             copy.curvePivot = curvePivot;
+            for (EditorCurvePoint point : curvePoints) copy.curvePoints.add(point.copy());
             copy.maskEnabled = maskEnabled;
             copy.maskFeather = maskFeather;
             copy.rotation = rotation;
@@ -282,8 +324,16 @@ public final class MainActivity extends Activity {
             wheelLift = source.wheelLift;
             wheelGamma = source.wheelGamma;
             wheelGain = source.wheelGain;
+            wheelLiftX = source.wheelLiftX;
+            wheelLiftY = source.wheelLiftY;
+            wheelGammaX = source.wheelGammaX;
+            wheelGammaY = source.wheelGammaY;
+            wheelGainX = source.wheelGainX;
+            wheelGainY = source.wheelGainY;
             curveContrast = source.curveContrast;
             curvePivot = source.curvePivot;
+            curvePoints.clear();
+            for (EditorCurvePoint point : source.curvePoints) curvePoints.add(point.copy());
             maskEnabled = source.maskEnabled;
             maskFeather = source.maskFeather;
             rotation = source.rotation;
@@ -337,10 +387,15 @@ public final class MainActivity extends Activity {
     private PtpCamera camera;
     private DiagnosticLogger diagnostics;
     private FrameLayout contentHost;
+    private LinearLayout applicationRoot;
+    private View applicationTopBar;
+    private View applicationBottomNavigation;
+    private View applicationStatusBar;
     private TextView statusText;
     private TextView countText;
     private Button connectButton;
     private ImageView previewImage;
+    private TextView monitorFocusReticle;
     private ImageView zebraImage;
     private TextView previewPlaceholder;
     private Button shutterButton;
@@ -380,6 +435,7 @@ public final class MainActivity extends Activity {
     private TextView isoReadoutValue;
     private TextView compensationReadoutLabel;
     private TextView compensationReadoutValue;
+    private TextView monitorTimerText;
     private SensorManager immersiveSensorManager;
     private Sensor immersiveRotationSensor;
     private boolean immersiveLandscape;
@@ -395,6 +451,23 @@ public final class MainActivity extends Activity {
     private volatile boolean liveViewEnabled;
     private volatile boolean capturing;
     private volatile boolean videoRecording;
+    private volatile long recordingStartedAt;
+    private final Runnable monitorTimerTicker = new Runnable() {
+        @Override public void run() {
+            if (monitorTimerText == null || !"monitor".equals(currentSection)) return;
+            long elapsed = videoRecording && recordingStartedAt > 0
+                    ? Math.max(0, System.currentTimeMillis() - recordingStartedAt)
+                    : 0;
+            long centis = (elapsed / 10) % 100;
+            long seconds = (elapsed / 1000) % 60;
+            long minutes = (elapsed / 60000) % 60;
+            long hours = elapsed / 3600000;
+            monitorTimerText.setText(String.format(
+                    Locale.CHINA, "%02d:%02d:%02d:%02d",
+                    hours, minutes, seconds, centis));
+            mainHandler.postDelayed(this, 100);
+        }
+    };
     private volatile boolean wirelessRequested;
     private volatile String wirelessStatus = "无线收件箱未开启";
     private volatile int previewGeneration;
@@ -1434,10 +1507,12 @@ public final class MainActivity extends Activity {
 
     private View buildApplication() {
         LinearLayout root = new LinearLayout(this);
+        applicationRoot = root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(PAPER);
 
         View topBar = buildTopBar();
+        applicationTopBar = topBar;
         root.addView(topBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(72)));
@@ -1448,10 +1523,13 @@ public final class MainActivity extends Activity {
                 0,
                 1f));
 
-        root.addView(buildBottomNavigation(), new LinearLayout.LayoutParams(
+        View bottomNavigation = buildBottomNavigation();
+        applicationBottomNavigation = bottomNavigation;
+        root.addView(bottomNavigation, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(70)));
         View statusBar = buildStatusBar();
+        applicationStatusBar = statusBar;
         root.addView(statusBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(30)));
@@ -1667,6 +1745,30 @@ public final class MainActivity extends Activity {
         contentHost.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        boolean darkMonitor = "monitor".equals(section);
+        if (applicationRoot != null) applicationRoot.setBackgroundColor(
+                darkMonitor ? Color.rgb(4, 10, 18) : PAPER);
+        if (applicationTopBar != null) {
+            applicationTopBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
+            applicationTopBar.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
+            applicationTopBar.setElevation(darkMonitor ? 0 : dp(6));
+        }
+        if (applicationBottomNavigation != null) {
+            applicationBottomNavigation.setBackgroundColor(darkMonitor ? Color.BLACK : PAPER_2);
+        }
+        if (applicationStatusBar != null) {
+            applicationStatusBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
+        }
+        getWindow().setStatusBarColor(darkMonitor ? Color.BLACK : PAPER);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | (darkMonitor ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+        if (darkMonitor) {
+            mainHandler.removeCallbacks(monitorTimerTicker);
+            mainHandler.post(monitorTimerTicker);
+        }
         for (Button button : navigationButtons) {
             boolean active = section.equals(button.getTag());
             boolean videoSection = "monitor".equals(section);
@@ -1919,47 +2021,228 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorView() {
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(4, 10, 18));
+        scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content = verticalContainer();
-        content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(sectionHeader(
-                "视频监看",
-                connected
-                        ? connectedCameraName + " · 视频取景与本地监看处理"
-                        : "连接相机后显示当前机型与实时画面",
-                VIDEO));
+        content.setPadding(dp(16), dp(10), dp(16), dp(24));
+        content.setBackgroundColor(Color.rgb(4, 10, 18));
+
+        monitorTimerText = text("00:00:00:00", 38, Typeface.BOLD, Color.WHITE);
+        monitorTimerText.setGravity(Gravity.CENTER);
+        monitorTimerText.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        content.addView(monitorTimerText, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(74)));
+        mainHandler.removeCallbacks(monitorTimerTicker);
+        mainHandler.post(monitorTimerTicker);
+
         content.addView(buildPreviewStage(true), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(300)));
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        liveViewButton = nativeButton(
-                liveViewEnabled ? "停止实时取景" : "开启实时取景",
-                false);
+
+        liveViewButton = monitorActionButton(
+                liveViewEnabled ? "停止取景" : "开启取景", false);
         liveViewButton.setOnClickListener(view -> toggleLiveView());
-        shutterButton = nativeButton(
-                videoRecording ? "停止录制" : "开始录制",
-                true);
-        shutterButton.setBackground(rounded(VIDEO, 9, 0));
+        shutterButton = monitorActionButton(
+                videoRecording ? "停止录制" : "开始录制", true);
         shutterButton.setOnClickListener(view -> toggleVideoRecording());
         cameraControls.add(liveViewButton);
         cameraControls.add(shutterButton);
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                0,
-                dp(50),
-                1f);
-        buttonParams.setMargins(0, dp(16), 0, 0);
-        actions.addView(liveViewButton, buttonParams);
-        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(
-                0,
-                dp(50),
-                1f);
-        recordParams.setMargins(dp(10), dp(16), 0, 0);
-        actions.addView(shutterButton, recordParams);
+
+        LinearLayout scopeRow = new LinearLayout(this);
+        scopeRow.setOrientation(LinearLayout.HORIZONTAL);
+        scopeRow.setGravity(Gravity.CENTER_VERTICAL);
+        scopeRow.setPadding(0, dp(12), 0, dp(4));
+        scopeRow.addView(buildMonitorScopeCard("RGB 波形", true), new LinearLayout.LayoutParams(0, dp(118), 1f));
+        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(dp(92), dp(92));
+        recordParams.setMargins(dp(10), 0, dp(10), 0);
+        scopeRow.addView(shutterButton, recordParams);
+        scopeRow.addView(buildMonitorScopeCard("音频波形", false), new LinearLayout.LayoutParams(0, dp(118), 1f));
+        content.addView(scopeRow);
+
+        content.addView(buildMonitorParameterRail());
+        content.addView(buildMonitorToolRail());
+        content.addView(buildMonitorStorageCard());
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        actions.setPadding(0, dp(6), 0, dp(10));
+        actions.addView(liveViewButton, new LinearLayout.LayoutParams(0, dp(44), 1f));
         content.addView(actions);
+        // Keep the established camera parameter/output controls available below the new monitor surface.
         content.addView(buildMonitorParameterControls());
         content.addView(buildMonitorOutputControls());
         scroll.addView(content);
         return scroll;
+    }
+
+    private View buildMonitorScopeCard(String title, boolean histogram) {
+        LinearLayout card = verticalContainer();
+        card.setPadding(dp(12), dp(9), dp(12), dp(8));
+        card.setBackground(rounded(Color.rgb(29, 38, 53), 10, Color.rgb(35, 47, 65)));
+        card.addView(text(title, 12, Typeface.BOLD, Color.WHITE));
+        if (histogram) {
+            card.addView(monitorWaveformLine("R  " + redHistogram, Color.rgb(244, 88, 96)));
+            card.addView(monitorWaveformLine("G  " + greenHistogram, Color.rgb(91, 218, 135)));
+            card.addView(monitorWaveformLine("B  " + blueHistogram, Color.rgb(83, 161, 255)));
+        } else {
+            TextView scope = monitorWaveformLine("──────── 静音基线 ────────", Color.rgb(76, 199, 232));
+            scope.setTextSize(10);
+            card.addView(scope);
+            TextView note = text("无音频源", 9, Typeface.NORMAL, Color.rgb(157, 168, 184));
+            note.setTypeface(Typeface.MONOSPACE);
+            note.setGravity(Gravity.CENTER);
+            card.addView(note, new LinearLayout.LayoutParams(-1, dp(22)));
+        }
+        return card;
+    }
+
+    private TextView monitorWaveformLine(String value, int color) {
+        TextView line = text(value, 9, Typeface.NORMAL, color);
+        line.setTypeface(Typeface.MONOSPACE);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setSingleLine(true);
+        line.setPadding(dp(4), 0, dp(4), 0);
+        line.setBackgroundColor(Color.argb(45, 0, 0, 0));
+        return line;
+    }
+
+    private View buildMonitorParameterRail() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setGravity(Gravity.CENTER);
+        rail.setPadding(0, dp(12), 0, dp(3));
+        addMonitorReadout(rail, "帧率", connected ? String.valueOf(monitorFrameRate) : "—");
+        addMonitorReadout(rail, "快门", connected ? shutterDisplayValue() : "—");
+        addMonitorReadout(rail, "光圈", connected ? String.format(Locale.CHINA, "f/%.1f", currentAperture) : "—");
+        addMonitorReadout(rail, "ISO", connected ? String.valueOf(currentIso) : "—");
+        addMonitorReadout(rail, "白平衡", connected
+                ? ("continuous".equals(currentWhiteBalance) ? "自动" : "预设")
+                : "—");
+        addMonitorReadout(rail, "色调", connected ? String.format(Locale.CHINA, "%+d", (int) currentCompensation) : "—");
+        scroll.addView(rail);
+        return scroll;
+    }
+
+    private void addMonitorReadout(LinearLayout rail, String label, String value) {
+        LinearLayout cell = verticalContainer();
+        cell.setGravity(Gravity.CENTER);
+        cell.setPadding(dp(7), 0, dp(7), 0);
+        TextView title = text(label, 10, Typeface.BOLD, Color.rgb(166, 176, 191));
+        title.setGravity(Gravity.CENTER);
+        TextView reading = text(value, 17, Typeface.BOLD, Color.WHITE);
+        reading.setGravity(Gravity.CENTER);
+        reading.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        cell.addView(title, new LinearLayout.LayoutParams(dp(64), dp(20)));
+        cell.addView(reading, new LinearLayout.LayoutParams(dp(64), dp(28)));
+        rail.addView(cell);
+    }
+
+    private View buildMonitorToolRail() {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER);
+        row.setPadding(0, dp(8), 0, dp(10));
+        String[] glyphs = {"◎", "LUT", "◉", "A"};
+        String[] descriptions = {"峰值对焦", "LUT", "假色", "自动对焦"};
+        for (int i = 0; i < glyphs.length; i++) {
+            final int index = i;
+            Button tool = new Button(this);
+            tool.setText(glyphs[i]);
+            tool.setTextColor(Color.WHITE);
+            tool.setTextSize(i == 1 ? 11 : 24);
+            tool.setTypeface(Typeface.create("sans", Typeface.BOLD));
+            tool.setAllCaps(false);
+            tool.setGravity(Gravity.CENTER);
+            tool.setPadding(0, 0, 0, 0);
+            tool.setBackgroundColor(Color.TRANSPARENT);
+            tool.setContentDescription(descriptions[i]);
+            tool.setOnClickListener(view -> {
+                if (index == 0) {
+                    focusPeakingEnabled = !focusPeakingEnabled;
+                    refreshPreviewProcessing();
+                    showToast(focusPeakingEnabled ? "已开启峰值对焦" : "已关闭峰值对焦");
+                } else if (index == 1) {
+                    showSection("monitor");
+                    showToast("LUT 设置位于监看输出");
+                } else if (index == 2) {
+                    falseColorEnabled = !falseColorEnabled;
+                    refreshPreviewProcessing();
+                    showToast(falseColorEnabled ? "已开启假色" : "已关闭假色");
+                } else if (index == 3) {
+                    showToast("自动对焦已请求");
+                    requestMonitorFocusAt(0.5f, 0.5f, null);
+                }
+            });
+            row.addView(tool, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        }
+        return row;
+    }
+
+    private View buildMonitorStorageCard() {
+        String freeSpace = "—";
+        String usage = "存储状态暂不可用";
+        if (photoDirectory != null) {
+            try {
+                StatFs stats = new StatFs(photoDirectory.getAbsolutePath());
+                long total = stats.getTotalBytes();
+                long available = stats.getAvailableBytes();
+                freeSpace = formatStorageBytes(available);
+                if (total > 0) {
+                    usage = String.format(
+                            Locale.CHINA,
+                            "%d%% 已用 · 本地缓存",
+                            Math.max(0, Math.min(100, Math.round(
+                                    (1 - available / (double) total) * 100))));
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(12), dp(16), dp(12));
+        card.setBackground(rounded(Color.rgb(29, 38, 53), 10, 0));
+        TextView icon = text("▯", 38, Typeface.NORMAL, Color.WHITE);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(70)));
+        LinearLayout copy = verticalContainer();
+        TextView capacity = text("—", 22, Typeface.BOLD, Color.WHITE);
+        capacity.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        copy.addView(capacity);
+        TextView barLabel = text(freeSpace, 15, Typeface.BOLD, Color.rgb(56, 155, 239));
+        copy.addView(barLabel, new LinearLayout.LayoutParams(-1, dp(22)));
+        LinearLayout detail = new LinearLayout(this);
+        detail.setGravity(Gravity.CENTER_VERTICAL);
+        detail.addView(text(usage, 11, Typeface.BOLD, Color.WHITE), new LinearLayout.LayoutParams(0, dp(18), 1f));
+        TextView space = text("可用空间", 11, Typeface.BOLD, Color.WHITE);
+        space.setGravity(Gravity.RIGHT);
+        detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
+        copy.addView(detail);
+        card.addView(copy, new LinearLayout.LayoutParams(0, dp(72), 1f));
+        return card;
+    }
+
+    private static String formatStorageBytes(long bytes) {
+        if (bytes < 0) return "—";
+        double value = bytes;
+        String[] units = {"B", "KB", "MB", "GB", "TB"};
+        int index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+            value /= 1024;
+            index++;
+        }
+        return index == 0
+                ? String.format(Locale.CHINA, "%.0f %s", value, units[index])
+                : String.format(Locale.CHINA, "%.1f %s", value, units[index]);
+    }
+
+    private Button monitorActionButton(String label, boolean primary) {
+        Button button = nativeButton(label, primary);
+        button.setTextSize(12);
+        button.setTextColor(Color.WHITE);
+        button.setBackground(rounded(primary ? Color.rgb(163, 28, 35) : Color.rgb(30, 40, 55), 8, primary ? 0 : Color.rgb(67, 80, 101)));
+        return button;
     }
 
     private View buildPreviewStage(boolean monitoring) {
@@ -1974,6 +2257,21 @@ public final class MainActivity extends Activity {
         stage.addView(previewImage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        if (monitoring) {
+            monitorFocusReticle = text("＋", 34, Typeface.NORMAL, Color.YELLOW);
+            monitorFocusReticle.setGravity(Gravity.CENTER);
+            monitorFocusReticle.setVisibility(View.GONE);
+            FrameLayout.LayoutParams reticleParams = new FrameLayout.LayoutParams(
+                    dp(58), dp(58));
+            stage.addView(monitorFocusReticle, reticleParams);
+            previewImage.setOnTouchListener((view, event) -> {
+                if (event.getAction() != MotionEvent.ACTION_UP) return true;
+                float x = Math.max(0f, Math.min(1f, event.getX() / Math.max(1f, view.getWidth())));
+                float y = Math.max(0f, Math.min(1f, event.getY() / Math.max(1f, view.getHeight())));
+                requestMonitorFocusAt(x, y, stage);
+                return true;
+            });
+        }
 
         zebraImage = new ImageView(this);
         zebraImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -2008,16 +2306,15 @@ public final class MainActivity extends Activity {
         badgeParams.setMargins(dp(14), dp(10), 0, 0);
         stage.addView(badge, badgeParams);
 
-        Button fullscreen = nativeButton("全屏", false);
-        fullscreen.setContentDescription(
-                monitoring ? "打开视频全屏取景" : "打开照片全屏取景");
-        fullscreen.setOnClickListener(view -> showImmersivePreview(monitoring));
-        FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(
-                dp(82),
-                dp(44),
-                Gravity.TOP | Gravity.END);
-        fullscreenParams.setMargins(0, dp(10), dp(14), 0);
-        stage.addView(fullscreen, fullscreenParams);
+        if (!monitoring) {
+            Button fullscreen = nativeButton("全屏", false);
+            fullscreen.setContentDescription("打开照片全屏取景");
+            fullscreen.setOnClickListener(view -> showImmersivePreview(false));
+            FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(
+                    dp(82), dp(44), Gravity.TOP | Gravity.END);
+            fullscreenParams.setMargins(0, dp(10), dp(14), 0);
+            stage.addView(fullscreen, fullscreenParams);
+        }
 
         TextView outputBadge = text(
                 monitoring
@@ -2043,6 +2340,35 @@ public final class MainActivity extends Activity {
                     dp(380)));
         }
         return stage;
+    }
+
+    private void requestMonitorFocusAt(float normalizedX, float normalizedY, ViewGroup stage) {
+        if (monitorFocusReticle != null && stage != null) {
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) monitorFocusReticle.getLayoutParams();
+            params.leftMargin = Math.max(0, Math.round(normalizedX * stage.getWidth() - dp(29)));
+            params.topMargin = Math.max(0, Math.round(normalizedY * stage.getHeight() - dp(29)));
+            monitorFocusReticle.setLayoutParams(params);
+            monitorFocusReticle.setVisibility(View.VISIBLE);
+            mainHandler.postDelayed(() -> {
+                if (monitorFocusReticle != null) monitorFocusReticle.setVisibility(View.GONE);
+            }, 1400);
+        }
+        if (!connected || camera == null || !liveViewEnabled) {
+            showToast("请先开启实时取景");
+            return;
+        }
+        int step = normalizedX < 0.42f ? -1 : normalizedX > 0.58f ? 1 : 0;
+        if (step == 0) step = normalizedY < 0.42f ? -1 : normalizedY > 0.58f ? 1 : 0;
+        final int focusStep = step;
+        cameraExecutor.submit(() -> {
+            try {
+                camera.setParameter("focusMode", "single-shot");
+                if (focusStep != 0) camera.moveFocus(focusStep);
+                mainHandler.post(() -> showToast("焦点位置已切换"));
+            } catch (Exception error) {
+                mainHandler.post(() -> showToast("对焦请求失败：" + error.getMessage()));
+            }
+        });
     }
 
     private void showImmersivePreview(boolean monitoring) {
@@ -4323,39 +4649,47 @@ public final class MainActivity extends Activity {
 
         // Secondary grading tools mirror the iOS and Harmony editor tabs.
         LinearLayout wheels = editorAdjustmentGroup();
-        wheels.addView(text("Lift / Gamma / Gain", 12, Typeface.BOLD, MUTED));
-        addEditorAdjustment(wheels, "Lift", editorAdjustments.wheelLift, -100, 100, false,
-                value -> editorAdjustments.wheelLift = value, refreshPreview);
-        addEditorAdjustment(wheels, "Gamma", editorAdjustments.wheelGamma, -100, 100, false,
-                value -> editorAdjustments.wheelGamma = value, refreshPreview);
-        addEditorAdjustment(wheels, "Gain", editorAdjustments.wheelGain, -100, 100, false,
-                value -> editorAdjustments.wheelGain = value, refreshPreview);
+        wheels.addView(text("Lift / Gamma / Gain · 在圆盘内拖动色点", 12, Typeface.BOLD, MUTED));
+        LinearLayout wheelRow = new LinearLayout(this);
+        wheelRow.setOrientation(LinearLayout.HORIZONTAL);
+        wheelRow.setGravity(Gravity.CENTER);
+        wheelRow.addView(createEditorWheel("Lift", COBALT, editorAdjustments.wheelLiftX, editorAdjustments.wheelLiftY,
+                (x, y) -> { editorAdjustments.wheelLiftX = x; editorAdjustments.wheelLiftY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheelRow.addView(createEditorWheel("Gamma", Color.rgb(198, 140, 255), editorAdjustments.wheelGammaX, editorAdjustments.wheelGammaY,
+                (x, y) -> { editorAdjustments.wheelGammaX = x; editorAdjustments.wheelGammaY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheelRow.addView(createEditorWheel("Gain", Color.rgb(255, 211, 106), editorAdjustments.wheelGainX, editorAdjustments.wheelGainY,
+                (x, y) -> { editorAdjustments.wheelGainX = x; editorAdjustments.wheelGainY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheels.addView(wheelRow);
         content.addView(collapsibleGroup("editor-wheels", "色轮", "三向色轮", wheels, false));
 
         LinearLayout curves = editorAdjustmentGroup();
-        TextView curvePreview = text("╲\n  ╲\n    ╲", 26, Typeface.BOLD, COBALT);
-        curvePreview.setGravity(Gravity.CENTER);
-        curvePreview.setBackground(rounded(GRAPHITE, 8, RULE));
-        curves.addView(curvePreview, marginParams(-1, dp(108), 0, 0, 0, 8));
-        addEditorAdjustment(curves, "对比度", editorAdjustments.curveContrast, -100, 100, false,
-                value -> editorAdjustments.curveContrast = value, refreshPreview);
-        addEditorAdjustment(curves, "中点", editorAdjustments.curvePivot, 0, 100, false,
-                value -> editorAdjustments.curvePivot = value, refreshPreview);
+        curves.addView(text("主曲线 · 拖动曲线控制点", 12, Typeface.BOLD, MUTED));
+        curves.addView(createEditorCurvePad(refreshPreview), marginParams(-1, dp(156), 0, 0, 0, 6));
+        curves.addView(text("点击任意位置新增控制点，拖动控制点调整曲线", 11, Typeface.NORMAL, MUTED));
         content.addView(collapsibleGroup("editor-curves", "曲线", "主曲线", curves, false));
 
-        LinearLayout picker = editorAdjustmentGroup();
+        LinearLayout pickerPanel = editorAdjustmentGroup();
         TextView pickerValue = text("RGB 取样：点击取样器读取中心像素", 12, Typeface.NORMAL, MUTED);
-        picker.addView(pickerValue, marginParams(-1, -2, 0, 0, 0, 6));
+        pickerPanel.addView(pickerValue, marginParams(-1, -2, 0, 0, 0, 6));
         Button sample = nativeButton("取样当前照片", false);
         sample.setOnClickListener(view -> {
             Bitmap bitmap = renderEditorAnalysisBitmap(new File(editorSelectedPath), 256);
             if (bitmap == null) { pickerValue.setText("无法读取当前照片"); return; }
             int colorValue = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
             pickerValue.setText(String.format(Locale.ROOT, "RGB 取样：#%06X", 0xFFFFFF & colorValue));
+            int red = Color.red(colorValue);
+            int green = Color.green(colorValue);
+            int blue = Color.blue(colorValue);
+            editorAdjustments.temperature = Math.max(-100, Math.min(100, Math.round((blue - red) / 2.55f)));
+            editorAdjustments.tint = Math.max(-100, Math.min(100, Math.round((green - (red + blue) / 2f) / 2.55f)));
             bitmap.recycle();
+            refreshPreview.run();
         });
-        picker.addView(sample, new LinearLayout.LayoutParams(-1, dp(44)));
-        content.addView(collapsibleGroup("editor-picker", "取色器", "中心像素", picker, false));
+        pickerPanel.addView(sample, new LinearLayout.LayoutParams(-1, dp(44)));
+        content.addView(collapsibleGroup("editor-picker", "取色器", "中心像素", pickerPanel, false));
 
         LinearLayout mask = editorAdjustmentGroup();
         Switch maskSwitch = new Switch(this);
@@ -5023,6 +5357,176 @@ public final class MainActivity extends Activity {
         return group;
     }
 
+    private View createEditorWheel(
+            String title,
+            int tint,
+            int initialX,
+            int initialY,
+            BiConsumer<Integer, Integer> setter,
+            Runnable refreshPreview) {
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setGravity(Gravity.CENTER_HORIZONTAL);
+        EditorWheelView wheel = new EditorWheelView(this, tint, initialX, initialY, (x, y) -> {
+            setter.accept(x, y);
+            refreshPreview.run();
+        });
+        column.addView(wheel, new LinearLayout.LayoutParams(dp(82), dp(82)));
+        TextView label = text(title, 11, Typeface.BOLD, INK);
+        label.setGravity(Gravity.CENTER);
+        column.addView(label, new LinearLayout.LayoutParams(-1, dp(20)));
+        TextView value = text(String.format(Locale.ROOT, "%+d, %+d", initialX, initialY), 10, Typeface.NORMAL, MUTED);
+        value.setGravity(Gravity.CENTER);
+        wheel.setValueLabel(value);
+        column.addView(value, new LinearLayout.LayoutParams(-1, dp(18)));
+        return column;
+    }
+
+    private View createEditorCurvePad(Runnable refreshPreview) {
+        return new EditorCurveView(this, editorAdjustments, refreshPreview);
+    }
+
+    private final class EditorWheelView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int tint;
+        private int xValue;
+        private int yValue;
+        private final BiConsumer<Integer, Integer> onValue;
+        private TextView valueLabel;
+
+        EditorWheelView(Context context, int tint, int initialX, int initialY, BiConsumer<Integer, Integer> onValue) {
+            super(context);
+            this.tint = tint;
+            this.xValue = initialX;
+            this.yValue = initialY;
+            this.onValue = onValue;
+            setContentDescription("直接拖动色轮调节");
+        }
+
+        void setValueLabel(TextView label) { valueLabel = label; }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float radius = Math.min(getWidth(), getHeight()) * 0.39f;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(5));
+            paint.setShader(new android.graphics.SweepGradient(cx, cy,
+                    new int[]{Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA, Color.RED}, null));
+            canvas.drawCircle(cx, cy, radius, paint);
+            paint.setShader(null);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(GRAPHITE);
+            canvas.drawCircle(cx, cy, radius - dp(6), paint);
+            paint.setColor(tint);
+            float knobX = cx + (xValue / 100f) * radius * 0.72f;
+            float knobY = cy - (yValue / 100f) * radius * 0.72f;
+            canvas.drawCircle(knobX, knobY, dp(6), paint);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                float cx = getWidth() / 2f;
+                float cy = getHeight() / 2f;
+                float radius = Math.min(getWidth(), getHeight()) * 0.39f;
+                float dx = Math.max(-1f, Math.min(1f, (event.getX() - cx) / (radius * 0.72f)));
+                float dy = Math.max(-1f, Math.min(1f, (cy - event.getY()) / (radius * 0.72f)));
+                xValue = Math.round(dx * 100);
+                yValue = Math.round(dy * 100);
+                if (valueLabel != null) valueLabel.setText(String.format(Locale.ROOT, "%+d, %+d", xValue, yValue));
+                onValue.accept(xValue, yValue);
+                invalidate();
+                return true;
+            }
+            return event.getAction() == MotionEvent.ACTION_UP;
+        }
+    }
+
+    private final class EditorCurveView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final EditorAdjustments settings;
+        private final Runnable refreshPreview;
+        private int activePoint = -1;
+
+        EditorCurveView(Context context, EditorAdjustments settings, Runnable refreshPreview) {
+            super(context);
+            this.settings = settings;
+            this.refreshPreview = refreshPreview;
+            setContentDescription("直接拖动曲线控制点调节");
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(GRAPHITE);
+            canvas.drawRoundRect(0, 0, w, h, dp(8), dp(8), paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(1));
+            paint.setColor(Color.argb(80, 255, 255, 255));
+            canvas.drawLine(0, h, w, 0, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(2));
+            paint.setColor(COBALT);
+            android.graphics.Path path = new android.graphics.Path();
+            ArrayList<EditorCurvePoint> points = new ArrayList<>(settings.curvePoints);
+            Collections.sort(points, (a, b) -> Float.compare(a.x, b.x));
+            if (points.isEmpty()) points.add(new EditorCurvePoint(0, 0));
+            path.moveTo(points.get(0).x * w, (1 - points.get(0).y) * h);
+            for (int i = 0; i < points.size() - 1; i++) {
+                EditorCurvePoint p0 = points.get(Math.max(0, i - 1));
+                EditorCurvePoint p1 = points.get(i);
+                EditorCurvePoint p2 = points.get(i + 1);
+                EditorCurvePoint p3 = points.get(Math.min(points.size() - 1, i + 2));
+                float c1x = p1.x + (p2.x - p0.x) / 6f;
+                float c1y = p1.y + (p2.y - p0.y) / 6f;
+                float c2x = p2.x - (p3.x - p1.x) / 6f;
+                float c2y = p2.y - (p3.y - p1.y) / 6f;
+                path.cubicTo(c1x * w, (1 - c1y) * h, c2x * w, (1 - c2y) * h, p2.x * w, (1 - p2.y) * h);
+            }
+            canvas.drawPath(path, paint);
+            paint.setStyle(Paint.Style.FILL);
+            for (EditorCurvePoint point : settings.curvePoints) {
+                paint.setColor(COBALT);
+                canvas.drawCircle(point.x * w, (1 - point.y) * h, dp(5), paint);
+            }
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                float x = Math.max(0, Math.min(getWidth(), event.getX())) / Math.max(1, getWidth());
+                float y = Math.max(0, Math.min(getHeight(), event.getY())) / Math.max(1, getHeight());
+                float normalizedY = 1 - y;
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    activePoint = -1;
+                    float best = .06f * .06f;
+                    for (int i = 0; i < settings.curvePoints.size(); i++) {
+                        EditorCurvePoint point = settings.curvePoints.get(i);
+                        float dx = point.x - x;
+                        float dy = point.y - normalizedY;
+                        float distance = dx * dx + dy * dy;
+                        if (distance < best) { best = distance; activePoint = i; }
+                    }
+                    if (activePoint < 0) {
+                        settings.curvePoints.add(new EditorCurvePoint(x, normalizedY));
+                        activePoint = settings.curvePoints.size() - 1;
+                    }
+                }
+                if (activePoint >= 0 && activePoint < settings.curvePoints.size()) {
+                    EditorCurvePoint point = settings.curvePoints.get(activePoint);
+                    point.x = x;
+                    point.y = normalizedY;
+                }
+                refreshPreview.run();
+                invalidate();
+                return true;
+            }
+            return event.getAction() == MotionEvent.ACTION_UP;
+        }
+    }
+
     private void addEditorAIMetric(
             LinearLayout parent,
             String title,
@@ -5206,7 +5710,7 @@ public final class MainActivity extends Activity {
         if (bitmap == null) return null;
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
-        int[] pixels = new int[width * height];
+            int[] pixels = new int[width * height];
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
         bitmap.recycle();
         EditorAIAnalysis analysis = new EditorAIAnalysis();
@@ -5423,6 +5927,28 @@ public final class MainActivity extends Activity {
                 || lower.endsWith(".tiff");
     }
 
+    private static double curveValue(ArrayList<EditorCurvePoint> source, double input) {
+        ArrayList<EditorCurvePoint> points = new ArrayList<>(source);
+        Collections.sort(points, (a, b) -> Float.compare(a.x, b.x));
+        double x = Math.max(0, Math.min(1, input));
+        if (points.size() < 2) return x;
+        if (x <= points.get(0).x) return points.get(0).y;
+        if (x >= points.get(points.size() - 1).x) return points.get(points.size() - 1).y;
+        int index = 1;
+        while (index < points.size() && points.get(index).x < x) index++;
+        EditorCurvePoint p0 = points.get(Math.max(0, index - 2));
+        EditorCurvePoint p1 = points.get(index - 1);
+        EditorCurvePoint p2 = points.get(index);
+        EditorCurvePoint p3 = points.get(Math.min(points.size() - 1, index + 1));
+        double t = (x - p1.x) / Math.max(.0001, p2.x - p1.x);
+        double t2 = t * t;
+        double t3 = t2 * t;
+        double y = .5 * (2 * p1.y + (-p0.y + p2.y) * t
+                + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+        return Math.max(0, Math.min(1, y));
+    }
+
     private Bitmap renderEditedBitmap(
             File file,
             EditorAdjustments settings,
@@ -5475,15 +6001,21 @@ public final class MainActivity extends Activity {
             blue -= temperature * 0.12 - tint * 0.045;
 
             // Compact Lift/Gamma/Gain and curve controls.
-            double lift = settings.wheelLift / 100.0 * 0.12;
-            double gamma = settings.wheelGamma / 100.0 * 0.10;
-            double gain = 1 + settings.wheelGain / 100.0 * 0.18;
-            red = (red + lift + gamma) * gain;
-            green = (green + lift) * gain;
-            blue = (blue + lift - gamma) * gain;
-
             double luma =
                     red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            double shadowWeight = Math.pow(1 - clampUnit(luma), 2);
+            double highlightWeight = Math.pow(clampUnit(luma), 2);
+            double midWeight = 1 - Math.abs(clampUnit(luma) * 2 - 1);
+            double wheelX = settings.wheelLiftX / 100.0 * 0.10 * shadowWeight
+                    + settings.wheelGammaX / 100.0 * 0.10 * midWeight
+                    + settings.wheelGainX / 100.0 * 0.10 * highlightWeight;
+            double wheelY = settings.wheelLiftY / 100.0 * 0.10 * shadowWeight
+                    + settings.wheelGammaY / 100.0 * 0.10 * midWeight
+                    + settings.wheelGainY / 100.0 * 0.10 * highlightWeight;
+            red += wheelX - wheelY * .5;
+            green += wheelY - wheelX * .5;
+            blue -= (wheelX + wheelY) * .5;
+            luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
             double toneShift =
                     settings.shadows / 100.0
                             * Math.pow(1 - clampUnit(luma), 2)
@@ -5510,11 +6042,12 @@ public final class MainActivity extends Activity {
             green = (green - 0.5) * contrast * localContrast + 0.5;
             blue = (blue - 0.5) * contrast * localContrast + 0.5;
 
-            if (settings.curveContrast != 0) {
-                double curve = settings.curveContrast / 100.0 * 0.45;
-                red = (red - 0.5) * (1 + curve) + 0.5;
-                green = (green - 0.5) * (1 + curve) + 0.5;
-                blue = (blue - 0.5) * (1 + curve) + 0.5;
+            if (settings.curvePoints.size() > 2) {
+                double curveValue = curveValue(settings.curvePoints, luma);
+                double delta = curveValue - luma;
+                red += delta;
+                green += delta;
+                blue += delta;
             }
 
             luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
@@ -7332,6 +7865,9 @@ public final class MainActivity extends Activity {
                                 : "机身视频录制已停止");
                 mainHandler.post(() -> {
                     videoRecording = nowRecording;
+                    recordingStartedAt = nowRecording
+                            ? System.currentTimeMillis()
+                            : 0;
                     capturing = false;
                     updateRecordingButtons();
                 });
@@ -7341,6 +7877,9 @@ public final class MainActivity extends Activity {
                         "切换视频录制失败：" + error.getMessage());
                 mainHandler.post(() -> {
                     videoRecording = camera.isMovieRecording();
+                    recordingStartedAt = videoRecording
+                            ? System.currentTimeMillis()
+                            : 0;
                     capturing = false;
                     updateRecordingButtons();
                     showError("视频录制失败：" + error.getMessage());
@@ -8268,9 +8807,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.4.0" : version;
+            return version == null || version.isEmpty() ? "1.4.1" : version;
         } catch (Exception error) {
-            return "1.4.0";
+            return "1.4.1";
         }
     }
 
@@ -8421,8 +8960,11 @@ public final class MainActivity extends Activity {
                         "• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n"
                                 + "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n"
                                 + "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n"
-                                + "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n"
-                                + "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n"
+                                + "• 专业编辑工作区按达芬奇调色逻辑重组：新增 Lift/Gamma/Gain 三向色轮、主曲线、RGB 取色器、线性/径向/主体蒙版；四类工具接入原生预览与高质量副本。\n"
+                                + "• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n"
+                                + "• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n"
+                                + "• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n"
+                                + "• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n"
                                 + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
                         14,
                         Typeface.NORMAL,

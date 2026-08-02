@@ -2,7 +2,7 @@
 
 > 快照时间：2026-08-02（Asia/Shanghai）
 > 基线分支：`main`
-> 当前版本：1.4.0 / build 23
+> 当前版本：1.4.1 / build 24
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -213,6 +213,35 @@ pwsh -NoLogo -NoProfile -File scripts/build-windows.ps1 -LibUsbDll "$PWD/.toolch
 
 当前构建机使用 `curl` 探测 `https://zenche.top` 时遇到 `LibreSSL SSL_ERROR_SYSCALL`，因此只验证了五端跳转实现和固定 HTTPS 地址，尚未在各端真实浏览器中闭环验证官网 TLS 可用性；需由官网侧检查证书、TLS 配置和公网可达性。
 
+### 5.9 本轮专业监看与直接调色工作区验证记录
+
+2026-08-02 将专业监看控制台与直接调色工作区同步到 iOS / iPadOS、Android、HarmonyOS、macOS 和 Windows：监看页统一提供示波器、拍摄读数、辅助工具、存储状态和录制控制；编辑页统一提供 Lift / Gamma / Gain 色轮、主曲线、取色器、线性/径向/主体蒙版及其强度、羽化和反相控制。五端启动公告已同步说明本轮功能。
+
+本轮同时清理无法由设备或系统状态支撑的演示读数：不再固定显示 `27mm`、`6000K`、`28:59`、`18GB` 或 `4%`。不支持的镜头数据使用 `—`；Android、macOS、Windows 在可用时显示真实本地存储值，HarmonyOS 显示本地图库实际容量与文件数，macOS 与 Windows 时码跟随真实录制状态。
+
+在仓库根目录实际运行：
+
+```sh
+git diff --check
+npm test
+cd native/android && ./gradlew --no-daemon :app:compileDebugJavaWithJavac
+xcodebuild -project native/ios/NikonLink.xcodeproj -scheme NikonLink -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
+cd native/harmony && hvigorw assembleHap
+swiftc -typecheck native/macos/Sources/NikonLink/*.swift
+dotnet build native/windows/NikonLink.Windows.csproj
+scripts/build-android.sh
+scripts/build-ios.sh --unsigned
+scripts/build-harmony.sh
+scripts/build-macos.sh
+pwsh -NoLogo -NoProfile -File scripts/build-windows.ps1 -LibUsbDll "$PWD/.toolchains/libusb-1.0.29/VS2022/MS64/dll/libusb-1.0.dll"
+```
+
+结果：`npm test` 59/59 通过，`git diff --check` 通过；Android Java、iOS Simulator、HarmonyOS ArkTS/HAP、macOS Swift typecheck 和 Windows .NET 编译均成功。Android SDK 源列表联网出现 TLS 握手警告，但使用本地缓存完成；Windows 保留 3 个非阻塞编译警告。macOS 首次并行打包因构建期间源文件被改动而中止，源文件稳定后单独重跑成功。
+
+本轮最终本地 1.4.0 交付包及 SHA-256：Android APK `2c19efbfcd4e6d4af735c9d6e17de8ef47b5d0958767bdaba38680e0cf124774`；HarmonyOS HAP `73726464bf0c9eea00a1d097d5bd69b7eb53f21bc10f6474fdc3b6210a1d5859`；iOS unsigned IPA `e0ee69c44d0b8717199480c8deb402cfbcf652771a4c9f9ce3df5e121de5d0cc`；macOS arm64 DMG `0d858ce72a7736bdeb935b38c0e829c85c7bce1744619b02ab77e9a572fcbeeb`；Windows x64 Setup `45089aa7ddb6cf239a1049caa034e656c5fc646c256cb56f26d41f01e2fbf3c4`；Windows x64 ZIP `98fae82171d3f7968d568ebd4cba09bc5679b2b7fb947e591c50259d9ba49508`。六份 `.sha256` 文件均已使用 `shasum -a 256 -c` 回验通过。
+
+签名与验收状态：Android 使用 debug 证书；HarmonyOS 和 iOS 未签名；macOS 为 ad-hoc 签名且未公证；Windows 在 macOS 交叉构建、未使用受信任代码签名证书，尚未完成真实 Windows 安装、升级、驱动和 SmartScreen 验收。本轮未提交、未打标签、未上传 GitHub；上述哈希只对应当前 `dist/` 本地产物，不代表既有 v1.4.0 GitHub Release 附件已被替换。
+
 ## 6. 签名与发布状态
 
 | 平台 | 打包能力 | 正式分发缺口 |
@@ -247,13 +276,22 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - Release 已上传 12 个附件（六个交付包及六个 `.sha256`），本地 SHA-256 已回验：Android `f89f873db175e393b47e5195fbfce396a63c536782048b424ba7e060ff61f444`；HarmonyOS `ce81c588af1de6da7ecc7c1898dcf7094cda3810fb2c6465f67b2325a72cba9b`；iOS unsigned `8e70058c3e0a6004de6e81098cb7b69c28ac77fbf9f5c6c1320fd32c8be66dfb`；macOS `531a206288bf1f669d6e96566527da14970857da33deae7d077e40ca809aacea`；Windows Setup `486052d2cd398bbb62eedd983f7bb544e431fd35d7225ba75789ee1caa010499`；Windows ZIP `d33cc4696eec6a36f0b7866d9155b82bcc2b1993f8cc8ea4071752b9b74a4c22`。
 - 远端 `main` 在此前 v1.3.1 发布分支上存在删除 `AGENTS.md`/`PV` 的历史，无法快进接受本地 `1.4.0` 提交；为避免覆盖远端历史，本次仅推送了独立 `v1.4.0` 标签和 Release，未强推 `main`。
 
-## 8. 已知文档债务
+## 9. 原生监看波形与点按对焦（2026-08-02）
+
+- 五端原生监看页同步调整：录制键位于 RGB 三色波形与音频波形之间；移除监看镜头读数；移除监看工具中的“曝光”入口；保留并显式开放帧率、快门角度、ISO，以及光圈/白平衡等可调参数。
+- iOS、Android、HarmonyOS、macOS、Windows 的监看预览均接入点按焦点反馈：显示短时黄色焦点标记并调用现有原生对焦/焦点步进接口。PTP 平台按点位象限映射焦点步进；相机未开启实时取景或机身不支持时显示失败/提示，不伪造音频数据。
+- 音频采集管线当前尚未接入五端相机传输层，因此音频波形显示“无音频源 · 静音基线”。
+- 验证命令：`npm test`（62/62）；`git diff --check`；iOS Simulator `xcodebuild ... build`；macOS `swiftc -typecheck`；Android `./gradlew :app:compileDebugJavaWithJavac` 与 `scripts/build-android.sh`；`scripts/build-harmony.sh`；`scripts/build-macos.sh`；`scripts/build-windows.ps1`。
+- 已生成并校验 SHA-256：Android `38569ac9ed70a07aca726177fb0b31730e45264eda0026178b43d3f8e817b51c`；HarmonyOS `eb5ef0a7fcf6ce7677bed82faa89226a2f0971955db12ff31137c39c2b8e913c`；iOS unsigned `7afb044dbfcc17c1229c8e81e05a32a112a7ccbcf01f8e3fe2ef7d0988bd437b`；macOS `1d3ab22739dc3bf4d106bef19583ce080ce27647f80efccfa9355a2255753759`；Windows Setup `8f5c9b74dc5d9b6f9a95d48194c1e05e3800528b8bb48bdd6f2310ee5f0408bd`；Windows ZIP `a87d140139cc94370041694d8c8faf251e901a768a6e4f588122578a6d319b2b`。
+- 签名状态：Android debug；HarmonyOS/iOS unsigned；macOS ad-hoc 未公证；Windows 无商业代码签名。尚未进行相机真机点按对焦验收。
+
+## 10. 已知文档债务
 
 - `docs/CAMERA_TEST_CHECKLIST.md` 的机型清单和“Current build status”仍停留在 17 款 EXPEED 6/7、1.0.0，应更新到当前 20 款、1.3.0，并填入真实验收结果。
 - `docs/DEEPSEEK_V4_PRO_HANDOFF.md` 是 2026-07-30 的历史交接快照，包含 1.0.0、17 款机型等过时信息；可用于追溯，不应作为当前状态来源。
 - 三份基线文档（`PROJECT_OUTLINE.md` / `TECHNICAL_APPROACH.md` / `TASK_PROGRESS.md`）与 `AGENT_START_PROMPT.md` 位于主仓库但尚未纳入版本控制，后续应评估是否纳入 git 以便随源码演进。
 
-## 9. 下一步优先级
+## 11. 下一步优先级
 
 ### P0：收敛 1.3.1 发布
 
@@ -280,7 +318,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 为 AI 服务器补充监控、日志轮转与失败告警。
 - 评估 AI 修图参考图上传尺寸限制、超时与重试策略。
 
-## 10. 每次更新本文件时记录什么
+## 12. 每次更新本文件时记录什么
 
 每次工作结束至少更新以下信息：
 

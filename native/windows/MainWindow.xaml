@@ -122,7 +122,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.4.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.4.1" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -157,6 +157,79 @@
       </Border>
 
       <Grid Grid.Column="1" Margin="24">
+        <Grid x:Name="MonitorDashboard" Visibility="Collapsed">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+          <Border Grid.Row="0" Background="#060B14" Padding="20,16" BorderBrush="#152131" BorderThickness="1,1,1,0">
+            <Grid>
+              <TextBlock x:Name="MonitorTimecodeText" Text="00:00:00:00" FontFamily="{StaticResource MonoFont}" FontSize="38" FontWeight="SemiBold" Foreground="White" />
+              <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" Fill="#26D07C" />
+                <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="Bold" Foreground="#B9C2CE" />
+              </StackPanel>
+            </Grid>
+          </Border>
+          <Border Grid.Row="1" Background="#060B14" BorderBrush="#152131" BorderThickness="1,0,1,0" ClipToBounds="True">
+            <Grid>
+              <Image x:Name="MonitorPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonUp="MonitorPreviewImage_MouseLeftButtonUp" />
+              <TextBlock x:Name="MonitorFocusReticle" Text="＋" Visibility="Collapsed" Foreground="#FFE45C" FontSize="38" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
+              <StackPanel x:Name="MonitorPreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="Bold" Foreground="#F0F3F8" />
+                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="连接相机后开启实时取景" Foreground="#ADB5C1" />
+              </StackPanel>
+              <TextBlock x:Name="MonitorCameraOverlay" Margin="16" VerticalAlignment="Top" Text="未连接 · USB/PTP" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#D7DEE8" />
+            </Grid>
+          </Border>
+          <Grid Grid.Row="2" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Margin="0,0,12,0" Padding="12" Background="#1A212D" CornerRadius="10">
+              <StackPanel>
+                <TextBlock Text="RGB 波形" FontWeight="Bold" Foreground="White" />
+                <TextBlock x:Name="MonitorHistogramText" Margin="0,6,0,0" Text="R —\nG —\nB —" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="#D9E0E8" />
+              </StackPanel>
+            </Border>
+            <Button x:Name="MonitorRecordButton" Grid.Column="1" Width="108" Height="108" Style="{StaticResource ButtonBase}" Click="ShutterButton_Click" ToolTip="开始或停止录制">
+              <Grid>
+                <Ellipse Width="96" Height="96" Stroke="White" StrokeThickness="2" />
+                <Ellipse Width="58" Height="58" Fill="{StaticResource VideoBrush}" />
+              </Grid>
+            </Button>
+            <Border Grid.Column="2" Margin="12,0,0,0" Padding="12" Background="#1A212D" CornerRadius="10">
+              <StackPanel>
+                <TextBlock Text="音频波形" FontWeight="Bold" Foreground="White" />
+                <TextBlock x:Name="MonitorWaveformText" Margin="0,6,0,0" Text="Y —\nH —" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="#D9E0E8" />
+              </StackPanel>
+            </Border>
+          </Grid>
+          <UniformGrid Grid.Row="3" Columns="6" Margin="0,18,0,0">
+            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+          </UniformGrid>
+          <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,4">
+            <Button x:Name="MonitorFocusButton" Style="{StaticResource MonitorIconButton}" Tag="focus" Content="◎\n峰值" Click="MonitorFocusButton_Click" />
+            <Button x:Name="MonitorLutButton" Style="{StaticResource MonitorIconButton}" Tag="lut" Content="LUT\nLUT" Click="MonitorLutButton_Click" />
+            <Button x:Name="MonitorFalseColorButton" Style="{StaticResource MonitorIconButton}" Tag="false" Content="◉\n假色" Click="MonitorFalseColorButton_Click" />
+            <Button x:Name="MonitorZebraButton" Style="{StaticResource MonitorIconButton}" Tag="zebra" Content="±\n斑马" Click="MonitorZebraButton_Click" />
+            <Button x:Name="MonitorAutoFocusButton" Style="{StaticResource MonitorIconButton}" Tag="af" Content="◎A\n自动对焦" Click="MonitorAutoFocusButton_Click" />
+            <Button x:Name="MonitorLiveViewButton" Style="{StaticResource MonitorIconButton}" Content="▣\n取景" Click="LiveViewButton_Click" />
+          </StackPanel>
+          <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="#1A212D" CornerRadius="10">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="▯" FontSize="28" Foreground="White" VerticalAlignment="Center" />
+              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#ADB5C1" /></StackPanel>
+            </StackPanel>
+          </Border>
+        </Grid>
         <Grid x:Name="CapturePanel">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -599,7 +672,7 @@
               <TextBlock x:Name="EditorHeaderSubtitle"
                          Margin="0,4,0,0"
                          Foreground="{StaticResource MutedBrush}"
-                         Text="分组调整光线、色彩、细节、效果与几何；始终保留原文件。" />
+                         Text="调色台 · 色轮 · 曲线 · 取色器 · 蒙版 · 始终保留原文件。" />
             </StackPanel>
           </Border>
           <Grid x:Name="EditorProGrid" Grid.Row="1" Margin="0,18,0,0">
@@ -616,7 +689,8 @@
               <Grid>
                 <Image x:Name="EditorPreviewImage"
                        Stretch="Uniform"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       MouseLeftButtonDown="EditorPreviewImage_MouseLeftButtonDown" />
                 <TextBlock x:Name="EditorPreviewEmpty"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"

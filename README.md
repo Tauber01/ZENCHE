@@ -27,7 +27,7 @@
 Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、
 管理、导入与分享。
 
-- 当前源码版本：**1.4.0**
+- 当前源码版本：**1.4.1**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
@@ -58,10 +58,10 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 | --- | --- |
 | Capture · 拍摄 | USB 识别、实时取景、SDRAM 拍摄、JPEG 下载；支持间隔拍摄、曝光包围、焦点包围与 B 门计时 |
 | Control · 控制 | 快门、光圈、ISO、曝光补偿、对焦模式、白平衡与 Picture Control |
-| Monitor · 监看 | 快门角度换算、RGB 直方图、波形、矢量示波器、峰值对焦、假色、条纹图案与自定义 3D `.cube` LUT |
+| Monitor · 监看 | 可调帧率、快门角度、ISO 等参数；左侧 RGB 三色波形、右侧音频波形（无音频源时显示静音基线）；点击预览画面切换焦点；另含 RGB 直方图、矢量示波器、峰值对焦、假色、条纹图案与自定义 3D `.cube` LUT |
 | Connect · 传输 | 内置 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
 | Flow · 管理 | 显眼的树状分支工作区、任意层级新建与删除、拖拽归类、移动端折叠抽屉，以及项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份和 SHA-256 |
-| Develop · 修图 | AI 修图工作台提供设备端画面分析、曝光/动态范围/色彩/细节指标、可调强度、智能优化、AI 调整复制/粘贴与一键撤销；五组专业显影参数、透明预设、原图对比、旋转翻转、比例裁切及非破坏性高质量 JPEG 副本 |
+| Develop · 修图 | AI 修图工作台提供设备端画面分析、曝光/动态范围/色彩/细节指标、可调强度、智能优化、AI 调整复制/粘贴与一键撤销；五组专业显影参数、DaVinci 风格 Lift/Gamma/Gain 三向色轮、主曲线、RGB 取色器、线性/径向/主体蒙版、透明预设、原图对比、旋转翻转、比例裁切及非破坏性高质量 JPEG 副本 |
 | Diagnose · 诊断 | 隐私脱敏的滚动日志、版本检查与预填 GitHub Issue |
 
 ## AI 修图与生图
@@ -79,7 +79,8 @@ AI 功能采用**设备绑定激活码制**：每个激活密钥绑定当前设�
 使用应用内“在爱发电购买兑换码”入口或二维码，也可以直接打开 [爱发电主页](https://www.ifdian.net/a/Tauber)。设置页不再提供可编辑 AI 服务器窗口，
 但会兼容读取旧版本配置。只认官方官网和应用内爱发电入口，谨防诈骗。
 
-LUT、直方图、波形、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
+监看页支持直接调节帧率、快门角度、ISO 等参数；点击预览画面可切换焦点。RGB 波形、
+音频波形（无音频源时为静音基线）、LUT、直方图、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
 不修改原片，也不写入相机的视频设置。
 具体能力取决于平台、相机固件、镜头和当前拍摄模式。
 
@@ -136,16 +137,16 @@ USB 主机组合均已完成实机验证。请使用
 ## 下载与安装
 
 前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
-版本及同名 `.sha256` 校验文件。1.4.0 的交付文件命名如下：
+版本及同名 `.sha256` 校验文件。1.4.1 的交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.4.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.4.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.4.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.4.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.4.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.4.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.4.1-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.4.1-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.4.1-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.4.1-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.4.1-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.4.1-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -156,13 +157,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.4.0-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.4.1-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.4.0-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.4.1-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -321,7 +322,7 @@ implementations where the operating system permits it, provides live view and
 capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Source version: **1.4.0**
+- Source version: **1.4.1**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
@@ -342,10 +343,10 @@ in a local library for review and export.
 | --- | --- |
 | Capture | USB detection, live view, SDRAM capture, JPEG download, interval capture, exposure bracketing, focus bracketing, and timed Bulb |
 | Control | Shutter speed, aperture, ISO, exposure compensation, focus mode, white balance, and Picture Control |
-| Monitor | Shutter-angle conversion, RGB histograms, waveform, vectorscope, focus peaking, false color, zebra, and custom 3D `.cube` LUTs |
+| Monitor | Adjustable frame rate, shutter angle, ISO and related parameters; separate RGB waveform and audio waveform cards (silent baseline when no audio source is available); tap-to-focus preview; plus RGB histograms, vectorscope, focus peaking, false color, zebra, and custom 3D `.cube` LUTs |
 | Connect | Built-in FTP/PASV, HTTP PUT/POST, and WebDAV inboxes |
 | Flow | A prominent branch-tree workspace with arbitrary nesting, creation, deletion, drag organization, a collapsible mobile drawer, project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, and SHA-256 |
-| Develop | The AI Retouch Workbench provides on-device image analysis, exposure/dynamic-range/color/detail metrics, adjustable strength, smart enhancement, AI adjustment copy/paste, and one-step undo; five professional adjustment groups, transparent presets, before/after comparison, rotation, flipping, aspect-ratio cropping, and non-destructive high-quality JPEG copies |
+| Develop | The AI Retouch Workbench provides on-device image analysis, exposure/dynamic-range/color/detail metrics, adjustable strength, smart enhancement, AI adjustment copy/paste, and one-step undo; five professional adjustment groups, DaVinci-style Lift/Gamma/Gain three-way color wheels, a master curve, RGB picker, linear/radial/subject masks, transparent presets, before/after comparison, rotation, flipping, aspect-ratio cropping, and non-destructive high-quality JPEG copies |
 | Diagnose | Privacy-redacted rolling logs, update checks, and prefilled GitHub Issues |
 
 ## AI Photo Editing & Generation
@@ -365,7 +366,7 @@ use the in-app Afdian purchase entry or QR code, or open the [Afdian page](https
 AI Server window, but legacy configuration reads remain compatible. Use only the official
 website and the in-app Afdian entry.
 
-LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
+The monitor exposes frame rate, shutter angle, ISO and related parameters directly, and tapping the preview changes focus when the native camera supports it. RGB and audio waveforms (silent baseline without an audio source), LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
 monitoring image. They do not modify the original file or write video settings
 to the camera.
 Capabilities vary with the platform, camera firmware, lens, and shooting mode.
@@ -421,17 +422,17 @@ completed hardware validation.
 ### Download and install
 
 Download published packages and their matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.4.0
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.4.1
 uses the following delivery names:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.4.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.4.0-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.4.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.4.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.4.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.4.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.4.1-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.4.1-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.4.1-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.4.1-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.4.1-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.4.1-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -550,7 +551,7 @@ OS が許可する環境では Nikon カメラを USB/PTP で接続・制御し�
 WebDAV で画像を受信して、同じアプリ内でプレビュー、管理、読み込み、共有まで
 行えます。
 
-- 現在のソースバージョン：**1.4.0**
+- 現在のソースバージョン：**1.4.1**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
@@ -571,10 +572,10 @@ WebDAV で画像を受信して、同じアプリ内でプレビュー、管理�
 | --- | --- |
 | Capture · 撮影 | USB 検出、ライブビュー、SDRAM 撮影、JPEG ダウンロード、インターバル撮影、露出ブラケット、フォーカスブラケット、時間指定バルブ |
 | Control · 制御 | シャッター速度、絞り、ISO、露出補正、フォーカスモード、ホワイトバランス、Picture Control |
-| Monitor · モニター | シャッター角度換算、RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT |
+| Monitor · モニター | フレームレート、シャッター角度、ISO などを調整可能。左側に RGB 3 チャンネル波形、右側に音声波形（音声ソースがない場合は無音の基準線）を表示し、プレビューをタップしてフォーカスを切替。RGB ヒストグラム、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT も搭載 |
 | Connect · 転送 | 内蔵 FTP/PASV、HTTP PUT/POST、WebDAV 受信ボックス |
 | Flow · 管理 | 目立つ分岐ツリー、任意階層の作成と削除、ドラッグ分類、モバイル折りたたみドロワー、プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256 |
-| Develop · 現像 | AI レタッチワークベンチでデバイス内解析、露出/ダイナミックレンジ/カラー/ディテール指標、強度調整、スマート補正、AI 調整のコピー/貼り付け、ワンステップ取り消しを提供。5 グループのプロ調整、透明なプリセット、補正前後比較、回転・反転、縦横比クロップ、非破壊の高品質 JPEG コピーにも対応 |
+| Develop · 現像 | AI レタッチワークベンチでデバイス内解析、露出/ダイナミックレンジ/カラー/ディテール指標、強度調整、スマート補正、AI 調整のコピー/貼り付け、ワンステップ取り消しを提供。5 グループのプロ調整、DaVinci 風 Lift/Gamma/Gain 3 ウェイカラーホイール、マスターカーブ、RGB スポイト、線形/放射状/被写体マスク、透明なプリセット、補正前後比較、回転・反転、縦横比クロップ、非破壊の高品質 JPEG コピーにも対応 |
 | Diagnose · 診断 | プライバシー情報を除去したローテーションログ、更新確認、入力済み GitHub Issue |
 
 ## AI 編集・生成
@@ -594,7 +595,7 @@ ZENCHE 本体は無料・オープンソースのままです。AI ツールの�
 編集可能な AI サーバー欄を設けず、旧設定の読み込み互換性だけを維持します。公式サイトと
 アプリ内 Afdian 導線だけを利用してください。
 
-LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
+モニター画面ではフレームレート、シャッター角度、ISO などを直接調整でき、プレビューをタップすると対応するカメラのフォーカスを切り替えます。RGB 波形と音声波形（音声ソースがない場合は無音の基準線）、LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
 適用されます。原本を変更したり、カメラ本体の動画設定へ書き込んだりしません。利用できる機能は、
 プラットフォーム、ファームウェア、レンズ、撮影モードによって異なります。
 
@@ -648,17 +649,17 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 ### ダウンロードとインストール
 
 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から公開済み
-パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.4.0 の
+パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.4.1 の
 配布ファイル名は次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.4.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.4.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.4.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.4.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.4.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.4.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.4.1-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.4.1-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.4.1-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.4.1-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.4.1-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.4.1-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
