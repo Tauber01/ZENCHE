@@ -210,8 +210,14 @@ final class PtpCamera {
         ensureConnected();
         boolean resumeLiveView = liveView;
         boolean releaseRemoteMode = false;
-        if (resumeLiveView) stopLiveView();
+        if (resumeLiveView) {
+            stopLiveView();
+            // 退出实时取景后等待相机真正就绪，避免立刻拍摄被判定为忙
+            waitUntilDeviceReady(6_000);
+        }
         try {
+            // 拍摄前先确认相机就绪，Z50 等机身需要稳定状态
+            waitUntilDeviceReady(6_000);
             if ("bulb".equals(exposureMode)) {
                 transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
                 releaseRemoteMode = true;
@@ -227,7 +233,7 @@ final class PtpCamera {
             } else {
                 transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
             }
-            long handle = 0xffff0001L;
+            long handle = 0;
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
                 try {
@@ -242,8 +248,42 @@ final class PtpCamera {
                 }
                 Thread.sleep(180);
             }
-            byte[] jpeg = extractJpeg(
-                    transact(GET_OBJECT, new long[]{handle}, null, 60_000));
+            if (handle == 0) {
+                // 未通过事件找到对象：等相机就绪后再用默认 SDRAM 句柄重试一次
+                waitUntilDeviceReady(8_000);
+                handle = 0xffff0001L;
+            }
+            // GET_OBJECT 可能遇到 0x2009 DeviceBusy（相机仍在写卡），重试等待
+            byte[] objectData = null;
+            Exception objectError = null;
+            for (int attempt = 0; attempt < 4; attempt++) {
+                try {
+                    objectData = transact(
+                            GET_OBJECT,
+                            new long[]{handle},
+                            null,
+                            60_000);
+                    break;
+                } catch (Exception error) {
+                    objectError = error;
+                    String message = error.getMessage();
+                    if (message == null || !message.contains("0x2009")) {
+                        throw error;
+                    }
+                    diagnostics.warning(
+                            "capture",
+                            cameraName()
+                                    + " 读取照片时相机忙，第 "
+                                    + (attempt + 1)
+                                    + " 次重试："
+                                    + message);
+                    waitUntilDeviceReady(3_000);
+                }
+            }
+            if (objectData == null && objectError != null) {
+                throw objectError;
+            }
+            byte[] jpeg = extractJpeg(objectData);
             waitUntilDeviceReady(8_000);
             return jpeg;
         } finally {

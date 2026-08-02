@@ -6270,9 +6270,8 @@ public final class MainActivity extends Activity {
                     return;
                 }
                 BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
-                if (packet.monitoring) {
-                    decodeOpts.inSampleSize = 2;
-                }
+                // 以全分辨率解码实时取景帧；目标显示尺寸由 resampleMonitorPreview
+                // 按 monitorVideoProfile 统一缩放，避免监看画质被提前减半
                 Bitmap source = BitmapFactory.decodeByteArray(
                         packet.jpeg,
                         0,

@@ -229,6 +229,8 @@ public sealed class PtpCamera : IDisposable
             }
             try
             {
+                // 等待相机退出实时取景后真正就绪，再开始拍摄。
+                await WaitUntilDeviceReadyAsync(8_000, cancellationToken);
                 if (_exposureMode == "bulb")
                 {
                     await TransactAsync(

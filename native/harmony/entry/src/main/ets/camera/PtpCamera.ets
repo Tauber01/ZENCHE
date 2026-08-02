@@ -1,4 +1,5 @@
 import { BusinessError, usbManager } from '@kit.BasicServicesKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   CameraProfile,
   NIKON_VENDOR_ID,
@@ -256,8 +257,12 @@ export class PtpCamera {
     let releaseRemoteMode: boolean = false;
     if (resumeLiveView) {
       await this.stopLiveView();
+      // 退出实时取景后等待相机真正就绪，避免立刻拍摄被判定为忙
+      await this.waitUntilDeviceReady(6000);
     }
     try {
+      // 拍摄前先确认相机就绪，Z50 等机身需要稳定状态
+      await this.waitUntilDeviceReady(6000);
       if (this.exposureMode === 'bulb') {
         await this.transact(CHANGE_CAMERA_MODE, [1], undefined, 10000);
         releaseRemoteMode = true;
@@ -309,14 +314,39 @@ export class PtpCamera {
         await this.sleep(180);
       }
 
-      const source: Uint8Array = await this.transact(
-        GET_OBJECT,
-        [handle],
-        undefined,
-        60000
-      );
+      // GET_OBJECT 可能遇到 0x2009 DeviceBusy（相机仍在写卡），重试等待
+      let source: Uint8Array | undefined = undefined;
+      let objectError: Error | undefined;
+      for (let attempt: number = 0; attempt < 4; attempt++) {
+        try {
+          source = await this.transact(
+            GET_OBJECT,
+            [handle],
+            undefined,
+            60000
+          );
+          break;
+        } catch (error) {
+          const candidate: Error = error as Error;
+          objectError = candidate;
+          if (!candidate.message.includes('0x2009') &&
+              !candidate.message.includes('busy') &&
+              !candidate.message.includes('Busy')) {
+            throw candidate;
+          }
+          hilog.warn(
+            0x0000,
+            'NikonLink',
+            `[camera] ${this.cameraName()} 读取照片时相机忙，第 ${attempt + 1} 次重试：${candidate.message}`
+          );
+          await this.waitUntilDeviceReady(3000);
+        }
+      }
+      if (source === undefined && objectError !== undefined) {
+        throw objectError;
+      }
       await this.waitUntilDeviceReady(8000);
-      return this.extractJpeg(source);
+      return this.extractJpeg(source as Uint8Array);
     } finally {
       if (releaseRemoteMode && this.isConnected) {
         try {

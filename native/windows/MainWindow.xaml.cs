@@ -319,6 +319,59 @@ public partial class MainWindow : Window
         }
     }
 
+    private const string AiActivationPublicKey =
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
+        "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL" +
+        "32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj" +
+        "c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW" +
+        "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap" +
+        "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI" +
+        "3wIDAQAB";
+
+    private static bool VerifyActivationCode(string code, string deviceId)
+    {
+        var trimmed = code.Trim();
+        if (string.IsNullOrEmpty(trimmed) || string.IsNullOrEmpty(deviceId))
+        {
+            return false;
+        }
+        var parts = trimmed.Split('-');
+        if (parts.Length < 4 || parts[0] != "ZENCHE" || parts[1] != "AI")
+        {
+            return false;
+        }
+        var expiry = parts[parts.Length - 1];
+        if (!DateTime.TryParseExact(
+                expiry,
+                "yyyyMMdd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var expiryDate) ||
+            expiryDate < DateTime.Now)
+        {
+            return false;
+        }
+        var signatureText = string.Join("-", parts, 2, parts.Length - 3);
+        try
+        {
+            var signature = Convert.FromBase64String(signatureText);
+            var payload = $"{deviceId}:{expiry}:a1b2c3d4e5f6";
+            using var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportSubjectPublicKeyInfo(
+                Convert.FromBase64String(AiActivationPublicKey),
+                out _);
+            return rsa.VerifyData(
+                System.Text.Encoding.UTF8.GetBytes(payload),
+                signature,
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static void SaveAiServerUrl(string url)
     {
         try
@@ -353,7 +406,12 @@ public partial class MainWindow : Window
         {
             SaveAiServerUrl(serverUrl);
         }
-        // 本地验签激活（RSA 公钥在客户端），服务器端负责真正计数
+        // 本地 RSA 验签激活（公钥在客户端），服务器端负责真正计数
+        if (!VerifyActivationCode(code, GetDeviceId()))
+        {
+            AiActivationStatusText.Text = AppLocalization.T("激活码无效或已过期");
+            return;
+        }
         SaveActivationCode(code);
         var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
         Directory.CreateDirectory(AiDataDir);
