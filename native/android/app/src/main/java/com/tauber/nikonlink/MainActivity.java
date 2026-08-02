@@ -459,7 +459,7 @@ public final class MainActivity extends Activity {
                 android.provider.Settings.Secure.ANDROID_ID);
         if (id == null) id = java.util.UUID.randomUUID().toString();
         getSharedPreferences("nikon-link", MODE_PRIVATE)
-                .edit().putString("ai_device_id", id).apply();
+                .edit().putString("ai_device_id", id).commit();
         return id;
     }
 
@@ -475,12 +475,12 @@ public final class MainActivity extends Activity {
 
     private static final String AI_PUBLIC_KEY =
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
-            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt" +
-            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ" +
-            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8" +
-            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN" +
-            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ" +
-            "MjQzRwIDAQAB";
+            "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL" +
+            "32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj" +
+            "c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW" +
+            "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap" +
+            "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI" +
+            "3wIDAQAB";
 
     private boolean verifyActivationCode(String code) {
         if (code == null) return false;
@@ -495,8 +495,10 @@ public final class MainActivity extends Activity {
             String expiryPart = parts[parts.length - 1];
             java.text.SimpleDateFormat sdf =
                     new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US);
+            sdf.setLenient(false);
             java.util.Date expiry = sdf.parse(expiryPart);
-            if (expiry != null && expiry.before(new java.util.Date())) {
+            if (expiry == null || !expiryPart.equals(sdf.format(expiry))
+                    || expiryPart.compareTo(sdf.format(new java.util.Date())) < 0) {
                 return false;
             }
             StringBuilder sigBuilder = new StringBuilder();

@@ -6,12 +6,12 @@ import {
 import { dataSharePredicates, preferences } from '@kit.ArkData';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
 import {
   BusinessError,
-  deviceInfo,
   pasteboard
 } from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
@@ -269,6 +269,14 @@ const RELEASES_URL: string =
 const AFDIAN_URL: string =
   'https://www.ifdian.net/a/Tauber';
 const ZENCHE_WEBSITE_URL: string = 'https://zenche.top';
+const AI_ACTIVATION_PUBLIC_KEY: string =
+  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB' +
+  'FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL' +
+  '32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj' +
+  'c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW' +
+  'XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap' +
+  'bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI' +
+  '3wIDAQAB';
 const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
   'dismissedLaunchAnnouncementVersion';
 const AUTOMATIC_UPDATE_KEY: string = 'automaticallyCheckForUpdates';
@@ -1927,12 +1935,9 @@ struct Index {
       if (id.length > 0) {
         return id;
       }
-      id = deviceInfo.udid || deviceInfo.serial || '';
-      if (id.length === 0) {
-        id = util.generateRandomUUID();
-      }
+      id = util.generateRandomUUID();
       prefs.putSync('ai_device_id', id);
-      prefs.flushSync();
+      prefs.flush();
       return id;
     } catch (_) {
       return '';
@@ -1988,20 +1993,52 @@ struct Index {
       return false;
     }
     const expiryPart: string = parts[parts.length - 1];
+    if (!/^\d{8}$/.test(expiryPart)) {
+      return false;
+    }
     const expiryYear: number = parseInt(expiryPart.substring(0, 4));
     const expiryMonth: number = parseInt(expiryPart.substring(4, 6));
     const expiryDay: number = parseInt(expiryPart.substring(6, 8));
     const now: Date = new Date();
-    const expiryDate: Date = new Date(expiryYear, expiryMonth - 1, expiryDay);
-    if (expiryDate < now) {
+    const expiryDate: Date = new Date(
+      expiryYear,
+      expiryMonth - 1,
+      expiryDay,
+      23,
+      59,
+      59,
+      999
+    );
+    if (expiryDate.getFullYear() !== expiryYear ||
+      expiryDate.getMonth() !== expiryMonth - 1 ||
+      expiryDate.getDate() !== expiryDay ||
+      expiryDate < now) {
       return false;
     }
     const deviceId: string = this.getDeviceId();
     const payload: string = `${deviceId}:${expiryPart}:a1b2c3d4e5f6`;
-    // HarmonyOS doesn't export the full SubtleCrypto API, so signature
-    // verification is deferred to the server or skipped for now.
-    // In production, send (code, deviceId) to a simple HTTP endpoint
-    // that verifies the signature on your side.
+    const signaturePart: string = parts.slice(2, parts.length - 1).join('-');
+    try {
+      const base64Helper = new util.Base64Helper();
+      const publicKeyBlob: cryptoFramework.DataBlob = {
+        data: base64Helper.decodeSync(AI_ACTIVATION_PUBLIC_KEY)
+      };
+      const signatureBlob: cryptoFramework.DataBlob = {
+        data: base64Helper.decodeSync(signaturePart)
+      };
+      const payloadBlob: cryptoFramework.DataBlob = {
+        data: new util.TextEncoder().encode(payload)
+      };
+      const generator = cryptoFramework.createAsyKeyGenerator('RSA2048');
+      const keyPair = generator.convertKeySync(publicKeyBlob, null);
+      const verifier = cryptoFramework.createVerify('RSA2048|PKCS1|SHA256');
+      verifier.initSync(keyPair.pubKey);
+      if (!verifier.verifySync(payloadBlob, signatureBlob)) {
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
     const prefs = preferences.getPreferencesSync(
       getContext(this) as common.UIAbilityContext,
       { name: 'zenche_ai_settings' }

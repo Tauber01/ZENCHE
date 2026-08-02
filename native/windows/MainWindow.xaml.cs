@@ -283,7 +283,10 @@ public partial class MainWindow : Window
     {
         var devicePath = Path.Combine(AiDataDir, "ai-device-id.txt");
         if (File.Exists(devicePath))
-            return File.ReadAllText(devicePath).Trim();
+        {
+            var existing = File.ReadAllText(devicePath).Trim();
+            if (existing.Length > 0) return existing;
+        }
         var id = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
                  ?? Guid.NewGuid().ToString();
         Directory.CreateDirectory(AiDataDir);
@@ -372,7 +375,7 @@ public partial class MainWindow : Window
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
                 out var expiryDate) ||
-            expiryDate < DateTime.Now)
+            expiryDate < DateTime.Today)
         {
             return false;
         }

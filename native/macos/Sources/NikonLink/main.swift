@@ -4,6 +4,7 @@ import CoreImage
 import Darwin
 import Foundation
 import Photos
+import Security
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -5544,8 +5545,36 @@ private enum AiResolution: String, CaseIterable, Identifiable {
 final class ActivationManager {
     private static let activatedKey = "ai_activated"
     private static let deviceIdKey = "ai_device_id"
+    private static let deviceIdKeychainService = "com.tauber.nikonlink.ai-device-id"
+    private static let deviceIdKeychainAccount = "ai_device_id"
     private static let usageCountKey = "ai_usage_count"
     private static let maxUsage = 100
+    private static let stableDeviceId: String = {
+        if let existing = UserDefaults.standard.string(forKey: deviceIdKey),
+           !existing.isEmpty {
+            saveDeviceIdToKeychain(existing)
+            return existing
+        }
+        if let existing = loadDeviceIdFromKeychain(), !existing.isEmpty {
+            UserDefaults.standard.set(existing, forKey: deviceIdKey)
+            return existing
+        }
+        let platform = IOServiceGetMatchingService(
+            kIOMainPortDefault,
+            IOServiceMatching("IOPlatformExpertDevice")
+        )
+        defer { IOObjectRelease(platform) }
+        let serial = IORegistryEntryCreateCFProperty(
+            platform,
+            kIOPlatformSerialNumberKey as CFString,
+            kCFAllocatorDefault,
+            0
+        )?.takeRetainedValue() as? String
+        let id = serial ?? UUID().uuidString
+        UserDefaults.standard.set(id, forKey: deviceIdKey)
+        saveDeviceIdToKeychain(id)
+        return id
+    }()
 
     static var isActivated: Bool {
         guard UserDefaults.standard.bool(forKey: activatedKey) else { return false }
@@ -5562,13 +5591,7 @@ final class ActivationManager {
     }
 
     static var deviceId: String {
-        if let e = UserDefaults.standard.string(forKey: deviceIdKey), !e.isEmpty { return e }
-        let p = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
-        defer { IOObjectRelease(p) }
-        let s = IORegistryEntryCreateCFProperty(p, kIOPlatformSerialNumberKey as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue() as? String
-        let id = s ?? UUID().uuidString
-        UserDefaults.standard.set(id, forKey: deviceIdKey)
-        return id
+        stableDeviceId
     }
 
     static func verifyAndActivate(code: String) -> Bool {
@@ -5577,8 +5600,15 @@ final class ActivationManager {
         let parts = t.components(separatedBy: "-")
         guard parts.count >= 4, parts[0] == "ZENCHE", parts[1] == "AI" else { return false }
         let exp = parts.last ?? "19700101"
-        let df = DateFormatter(); df.dateFormat = "yyyyMMdd"
-        if let ed = df.date(from: exp), ed < Date() { return false }
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyyMMdd"
+        df.isLenient = false
+        guard exp.count == 8,
+              let ed = df.date(from: exp),
+              df.string(from: ed) == exp,
+              Calendar.current.startOfDay(for: ed) >= Calendar.current.startOfDay(for: Date())
+        else { return false }
         let did = deviceId
         let sigPart = parts[2..<(parts.count - 1)].joined(separator: "-")
         guard let sig = Data(base64Encoded: sigPart),
@@ -5600,15 +5630,49 @@ final class ActivationManager {
         UserDefaults.standard.string(forKey: "ai_activation_code")
     }
 
+    private static func loadDeviceIdFromKeychain() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: deviceIdKeychainService,
+            kSecAttrAccount as String: deviceIdKeychainAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data
+        else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func saveDeviceIdToKeychain(_ id: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: deviceIdKeychainService,
+            kSecAttrAccount as String: deviceIdKeychainAccount
+        ]
+        let data = Data(id.utf8)
+        if SecItemUpdate(
+            query as CFDictionary,
+            [kSecValueData as String: data] as CFDictionary
+        ) == errSecItemNotFound {
+            var item = query
+            item[kSecValueData as String] = data
+            item[kSecAttrAccessible as String] =
+                kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            SecItemAdd(item as CFDictionary, nil)
+        }
+    }
+
     private static var publicKey: SecKey? {
         let k = [
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB",
-            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt",
-            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ",
-            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8",
-            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN",
-            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ",
-            "MjQzRwIDAQAB"
+            "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL",
+            "32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj",
+            "c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW",
+            "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap",
+            "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI",
+            "3wIDAQAB"
         ].joined()
         guard let d = Data(base64Encoded: k) else { return nil }
         let a: [String: Any] = [
