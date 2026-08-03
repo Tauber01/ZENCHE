@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "permission_camera",
+      "value": "Used to open the device camera, capture photos, and save them to the ZENCHE library."
+    },
+    {
       "name": "module_desc",
       "value": "Cross-platform camera control and image transfer · Capture · Connect · Flow"
     },
@@ -23,6 +27,14 @@
     {
       "name": "permission_album",
       "value": "Used to show photos and videos from the system library on the Files page"
+    },
+    {
+      "name": "permission_bluetooth",
+      "value": "Used to connect a Bluetooth shutter remote and receive capture commands"
+    },
+    {
+      "name": "permission_location",
+      "value": "Used to write the current location to XMP GPS metadata when a photo is captured"
     }
   ]
 }

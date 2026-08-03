@@ -11,7 +11,7 @@
     <AssemblyName>ZENCHE</AssemblyName>
     <RootNamespace>NikonLink.Windows</RootNamespace>
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
-    <Version>1.3.1</Version>
+    <Version>1.5.0</Version>
     <Company>ZENCHE contributors</Company>
     <Product>帧澈 ZENCHE</Product>
     <Description>跨平台相机控制与影像传输工具 · Capture · Connect · Flow</Description>
@@ -36,6 +36,20 @@
     <Resource Include="..\macos\Resources\wechat-donation.png">
       <Link>Assets\wechat-donation.png</Link>
     </Resource>
+    <Resource Include="..\macos\Resources\camera-nikon.jpg">
+      <Link>Assets\camera-nikon.jpg</Link>
+    </Resource>
+    <Resource Include="..\macos\Resources\camera-sony.jpg">
+      <Link>Assets\camera-sony.jpg</Link>
+    </Resource>
+    <Resource Include="..\macos\Resources\camera-canon.jpg">
+      <Link>Assets\camera-canon.jpg</Link>
+    </Resource>
+    <Content Include="..\macos\Resources\nikon-cloud-presets.json">
+      <Link>Assets\nikon-cloud-presets.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="native\libusb-1.0.dll" Condition="Exists('native\libusb-1.0.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

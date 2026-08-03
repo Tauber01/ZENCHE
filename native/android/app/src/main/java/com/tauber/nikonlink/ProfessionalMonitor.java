@@ -31,12 +31,15 @@ final class ProfessionalMonitor {
         }
     }
 
-    private static final char[] BARS = "▁▂▃▄▅▆▇█".toCharArray();
+    private static final int SCOPE_COLUMNS = 64;
+    private static final int SCOPE_ROWS = 48;
+    private static final char[] HEX = "0123456789ABCDEF".toCharArray();
 
     static Result process(
             Bitmap source,
             boolean focusPeaking,
-            boolean falseColor) {
+            boolean falseColor,
+            NikonCloudPreview.Preset nikonCloudPreset) {
         int sourceWidth = source.getWidth();
         int sourceHeight = source.getHeight();
         double scale = Math.min(1.0, 640.0 / Math.max(sourceWidth, sourceHeight));
@@ -47,13 +50,16 @@ final class ProfessionalMonitor {
                 : source;
         int[] pixels = new int[width * height];
         int[] luma = focusPeaking ? new int[width * height] : null;
-        int[] red = new int[16];
-        int[] green = new int[16];
-        int[] blue = new int[16];
-        int[] waveformSum = new int[24];
-        int[] waveformCount = new int[24];
-        int[] hueSum = new int[24];
-        int[] hueCount = new int[24];
+        int[] red = scopeBuffer();
+        int[] green = scopeBuffer();
+        int[] blue = scopeBuffer();
+        int[] lumaScope = scopeBuffer();
+        int[] cbScope = scopeBuffer();
+        int[] crScope = scopeBuffer();
+        double[] cloudChannels = nikonCloudPreset == null
+                ? null : new double[3];
+        double[] cloudHsl = nikonCloudPreset == null
+                ? null : new double[3];
         working.getPixels(pixels, 0, width, 0, 0, width, height);
 
         for (int y = 0; y < height; y++) {
@@ -63,22 +69,29 @@ final class ProfessionalMonitor {
                 int r = Color.red(color);
                 int g = Color.green(color);
                 int b = Color.blue(color);
+                if (nikonCloudPreset != null) {
+                    cloudChannels[0] = r / 255.0;
+                    cloudChannels[1] = g / 255.0;
+                    cloudChannels[2] = b / 255.0;
+                    nikonCloudPreset.applyPreviewEffect(
+                            cloudChannels,
+                            cloudHsl);
+                    r = clamp8((int) Math.round(cloudChannels[0] * 255));
+                    g = clamp8((int) Math.round(cloudChannels[1] * 255));
+                    b = clamp8((int) Math.round(cloudChannels[2] * 255));
+                    pixels[index] = Color.rgb(r, g, b);
+                }
                 int value = (54 * r + 183 * g + 19 * b) >> 8;
                 if (luma != null) luma[index] = value;
-                red[Math.min(15, r >> 4)]++;
-                green[Math.min(15, g >> 4)]++;
-                blue[Math.min(15, b >> 4)]++;
-                int column = Math.min(23, x * 24 / Math.max(1, width));
-                waveformSum[column] += value;
-                waveformCount[column]++;
-                int maximum = Math.max(r, Math.max(g, b));
-                int minimum = Math.min(r, Math.min(g, b));
-                int saturation = maximum - minimum;
-                if (saturation > 8) {
-                    int hue = hueIndex(r, g, b, maximum, saturation);
-                    hueSum[hue] += saturation;
-                    hueCount[hue]++;
-                }
+                int column = Math.min(SCOPE_COLUMNS - 1, x * SCOPE_COLUMNS / Math.max(1, width));
+                accumulate(red, column, r);
+                accumulate(green, column, g);
+                accumulate(blue, column, b);
+                accumulate(lumaScope, column, value);
+                int cb = clamp8(128 + ((-29 * r - 99 * g + 128 * b) >> 8));
+                int cr = clamp8(128 + ((128 * r - 116 * g - 12 * b) >> 8));
+                accumulate(cbScope, column, cb);
+                accumulate(crScope, column, cr);
                 if (falseColor) {
                     pixels[index] = falseColor(value);
                 }
@@ -101,7 +114,7 @@ final class ProfessionalMonitor {
             }
         }
         Bitmap output;
-        if (focusPeaking || falseColor) {
+        if (focusPeaking || falseColor || nikonCloudPreset != null) {
             output = Bitmap.createBitmap(
                     pixels,
                     width,
@@ -111,36 +124,28 @@ final class ProfessionalMonitor {
         } else {
             output = working;
         }
-        int[] waveform = averages(waveformSum, waveformCount);
-        int[] vectorscope = averages(hueSum, hueCount);
         return new Result(
                 output,
-                sparkline(red),
-                sparkline(green),
-                sparkline(blue),
-                sparkline(waveform),
-                sparkline(vectorscope),
+                densityMap(red),
+                densityMap(green),
+                densityMap(blue),
+                densityMap(lumaScope),
+                densityMap(cbScope) + "|" + densityMap(crScope),
                 (int) Math.round(
                         peakingPixels * 100.0 / Math.max(1, width * height)));
     }
 
-    private static int hueIndex(
-            int red,
-            int green,
-            int blue,
-            int maximum,
-            int delta) {
-        double hue;
-        if (maximum == red) {
-            hue = (green - blue) / (double) delta;
-        } else if (maximum == green) {
-            hue = 2 + (blue - red) / (double) delta;
-        } else {
-            hue = 4 + (red - green) / (double) delta;
-        }
-        double degrees = (hue * 60) % 360;
-        if (degrees < 0) degrees += 360;
-        return Math.min(23, (int) (degrees / 15));
+    private static int[] scopeBuffer() {
+        return new int[SCOPE_COLUMNS * SCOPE_ROWS];
+    }
+
+    private static void accumulate(int[] buffer, int column, int value) {
+        int row = SCOPE_ROWS - 1 - clamp8(value) * (SCOPE_ROWS - 1) / 255;
+        buffer[row * SCOPE_COLUMNS + column]++;
+    }
+
+    private static int clamp8(int value) {
+        return Math.min(255, Math.max(0, value));
     }
 
     private static int falseColor(int luma) {
@@ -153,23 +158,15 @@ final class ProfessionalMonitor {
         return Color.rgb(255, 32, 56);
     }
 
-    private static int[] averages(int[] sums, int[] counts) {
-        int[] values = new int[sums.length];
-        for (int index = 0; index < sums.length; index++) {
-            values[index] = counts[index] == 0 ? 0 : sums[index] / counts[index];
-        }
-        return values;
-    }
-
-    private static String sparkline(int[] values) {
+    private static String densityMap(int[] values) {
         int maximum = 1;
         for (int value : values) maximum = Math.max(maximum, value);
-        StringBuilder result = new StringBuilder(values.length);
+        double divisor = Math.log1p(maximum);
+        StringBuilder result = new StringBuilder(8 + values.length);
+        result.append('S').append(SCOPE_COLUMNS).append('x').append(SCOPE_ROWS).append(':');
         for (int value : values) {
-            int index = Math.min(
-                    BARS.length - 1,
-                    value * (BARS.length - 1) / maximum);
-            result.append(BARS[index]);
+            int level = (int) Math.round(Math.log1p(value) / divisor * 15);
+            result.append(HEX[Math.min(15, Math.max(0, level))]);
         }
         return result.toString();
     }

@@ -52,6 +52,38 @@
         }
       },
       {
+        name: "ohos.permission.CAMERA",
+        reason: "$string:permission_camera",
+        usedScene: {
+          abilities: ["EntryAbility"],
+          when: "inuse"
+        }
+      },
+      {
+        name: "ohos.permission.ACCESS_BLUETOOTH",
+        reason: "$string:permission_bluetooth",
+        usedScene: {
+          abilities: ["EntryAbility"],
+          when: "inuse"
+        }
+      },
+      {
+        name: "ohos.permission.LOCATION",
+        reason: "$string:permission_location",
+        usedScene: {
+          abilities: ["EntryAbility"],
+          when: "inuse"
+        }
+      },
+      {
+        name: "ohos.permission.APPROXIMATELY_LOCATION",
+        reason: "$string:permission_location",
+        usedScene: {
+          abilities: ["EntryAbility"],
+          when: "inuse"
+        }
+      },
+      {
         name: "ohos.permission.READ_IMAGEVIDEO",
         reason: "$string:permission_album",
         usedScene: {

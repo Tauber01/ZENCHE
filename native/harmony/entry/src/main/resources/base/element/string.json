@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "permission_camera",
+      "value": "用于调用本机摄像头取景、拍照并保存到帧澈文件库。"
+    },
+    {
       "name": "module_desc",
       "value": "跨平台相机控制与影像传输工具 · Capture · Connect · Flow"
     },
@@ -23,6 +27,14 @@
     {
       "name": "permission_album",
       "value": "用于在文件页面直接显示系统相册中的照片和视频"
+    },
+    {
+      "name": "permission_bluetooth",
+      "value": "用于连接蓝牙快门遥控器并接收拍摄指令"
+    },
+    {
+      "name": "permission_location",
+      "value": "用于在拍摄时将当前位置写入照片的 XMP GPS 元数据"
     }
   ]
 }

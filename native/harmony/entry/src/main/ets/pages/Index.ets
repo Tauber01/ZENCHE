@@ -6,12 +6,12 @@ import {
 import { dataSharePredicates, preferences } from '@kit.ArkData';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { promptAction } from '@kit.ArkUI';
 import {
   BusinessError,
-  deviceInfo,
   pasteboard
 } from '@kit.BasicServicesKit';
 import { http } from '@kit.NetworkKit';
@@ -19,7 +19,22 @@ import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
 import { CameraProfile } from '../camera/CameraProfiles';
 import { PtpCamera } from '../camera/PtpCamera';
+import { PtpIpCamera } from '../camera/PtpIpCamera';
+import { LocalCameraController } from '../camera/LocalCameraController';
+import { BluetoothRemoteController } from '../camera/BluetoothRemoteController';
+import {
+  CaptureLocation,
+  LocationTaggingController
+} from '../camera/LocationTaggingController';
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
+import {
+  CameraStorageItem,
+  CameraStorageSnapshot
+} from '../storage/CameraStorage';
+import {
+  ExternalRecordingResult,
+  ExternalVideoRecorder
+} from '../storage/ExternalVideoRecorder';
 import {
   FTP_PORT,
   HTTP_PORT,
@@ -35,6 +50,11 @@ import {
   ProfessionalMonitorResult
 } from '../monitor/ProfessionalMonitor';
 import {
+  NIKON_CLOUD_PRESETS,
+  NikonCloudColorMix,
+  NikonCloudPreset
+} from '../presets/NikonCloudPreview';
+import {
   LANGUAGE_ENGLISH,
   LANGUAGE_JAPANESE,
   LANGUAGE_PREFERENCE_KEY,
@@ -43,6 +63,11 @@ import {
   translate
 } from '../localization/Localization';
 
+function filenameFromPath(path: string): string {
+  const index: number = path.lastIndexOf('/');
+  return index >= 0 ? path.substring(index + 1) : path;
+}
+
 class SelectEntry {
   readonly label: string;
   readonly value: string;
@@ -50,6 +75,40 @@ class SelectEntry {
   constructor(label: string, value: string) {
     this.label = label;
     this.value = value;
+  }
+}
+
+class ScopeDensity {
+  readonly columns: number;
+  readonly rows: number;
+  readonly values: Array<number>;
+
+  constructor(columns: number, rows: number, values: Array<number>) {
+    this.columns = columns;
+    this.rows = rows;
+    this.values = values;
+  }
+}
+
+class RememberedCameraDevice {
+  readonly id: string;
+  readonly name: string;
+  readonly vendor: string;
+  readonly transport: string;
+  readonly lastConnectedAt: number;
+
+  constructor(
+    id: string,
+    name: string,
+    vendor: string,
+    transport: string,
+    lastConnectedAt: number
+  ) {
+    this.id = id;
+    this.name = name;
+    this.vendor = vendor;
+    this.transport = transport;
+    this.lastConnectedAt = lastConnectedAt;
   }
 }
 
@@ -77,6 +136,125 @@ class EditorAIAnalysis {
     return '曝光均衡，已优化色彩与细节';
   }
 }
+
+class EditorCurvePoint {
+  x: number;
+  y: number;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+class EditorMaskPoint {
+  x: number;
+  y: number;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
+class EditorMaskStroke {
+  readonly id: string;
+  readonly subtract: boolean;
+  readonly size: number;
+  points: Array<EditorMaskPoint>;
+
+  constructor(
+    id: string,
+    subtract: boolean,
+    size: number,
+    points: Array<EditorMaskPoint> = []
+  ) {
+    this.id = id;
+    this.subtract = subtract;
+    this.size = size;
+    this.points = points;
+  }
+}
+
+class EditorMaskLayer {
+  id: string;
+  name: string;
+  visible: boolean = true;
+  type: string = '画笔';
+  amount: number = 100;
+  feather: number = 55;
+  invert: boolean = false;
+  subtract: boolean = false;
+  brushSize: number = 18;
+  strokes: Array<EditorMaskStroke> = [];
+  exposure: number = 0;
+  contrast: number = 0;
+  highlights: number = 0;
+  shadows: number = 0;
+  temperature: number = 0;
+  tint: number = 0;
+  saturation: number = 0;
+  clarity: number = 0;
+
+  constructor(id: string, name: string) {
+    this.id = id;
+    this.name = name;
+  }
+
+  copy(): EditorMaskLayer {
+    const layer = new EditorMaskLayer(this.id, this.name);
+    layer.visible = this.visible;
+    layer.type = this.type;
+    layer.amount = this.amount;
+    layer.feather = this.feather;
+    layer.invert = this.invert;
+    layer.subtract = this.subtract;
+    layer.brushSize = this.brushSize;
+    layer.strokes = this.strokes.map((stroke: EditorMaskStroke): EditorMaskStroke => {
+      return new EditorMaskStroke(
+        stroke.id,
+        stroke.subtract,
+        stroke.size,
+        stroke.points.map((point: EditorMaskPoint): EditorMaskPoint => {
+          return new EditorMaskPoint(point.x, point.y);
+        })
+      );
+    });
+    layer.exposure = this.exposure;
+    layer.contrast = this.contrast;
+    layer.highlights = this.highlights;
+    layer.shadows = this.shadows;
+    layer.temperature = this.temperature;
+    layer.tint = this.tint;
+    layer.saturation = this.saturation;
+    layer.clarity = this.clarity;
+    return layer;
+  }
+}
+
+class EditorPreviewRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+
+  constructor(left: number, top: number, width: number, height: number) {
+    this.left = left;
+    this.top = top;
+    this.width = width;
+    this.height = height;
+  }
+}
+
+type EditorToneValue = number | string | boolean | Array<Array<number>>;
+
+const EDITOR_CURVE_DEFAULTS: Array<EditorCurvePoint> = [
+  new EditorCurvePoint(0, 0),
+  new EditorCurvePoint(0.25, 0.25),
+  new EditorCurvePoint(0.5, 0.5),
+  new EditorCurvePoint(0.75, 0.75),
+  new EditorCurvePoint(1, 1)
+];
 
 class SystemMediaItem {
   readonly id: string;
@@ -222,6 +400,22 @@ interface MirrorChyanResponse {
   data?: MirrorChyanVersion;
 }
 
+interface SelfHostedAnnouncement {
+  title?: string;
+  body?: string;
+}
+
+interface SelfHostedUpdate {
+  schema_version: number;
+  product: string;
+  version: string;
+  url?: string;
+  sha256?: string;
+  release_url?: string;
+  update_type?: string;
+  announcement?: SelfHostedAnnouncement;
+}
+
 class UpdateCandidate {
   readonly version: string;
   readonly url: string;
@@ -258,10 +452,12 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.3.1';
+const CURRENT_VERSION: string = '1.5.0';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
+const SELF_HOSTED_UPDATE_ENDPOINT: string =
+  'https://zenche.top/api/update';
 const LATEST_RELEASE_API: string =
   'https://api.github.com/repos/Tauber01/ZENCHE/releases/latest';
 const RELEASES_URL: string =
@@ -269,6 +465,14 @@ const RELEASES_URL: string =
 const AFDIAN_URL: string =
   'https://www.ifdian.net/a/Tauber';
 const ZENCHE_WEBSITE_URL: string = 'https://zenche.top';
+const AI_ACTIVATION_PUBLIC_KEY: string =
+  'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB' +
+  'FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL' +
+  '32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj' +
+  'c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW' +
+  'XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap' +
+  'bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI' +
+  '3wIDAQAB';
 const DISMISSED_ANNOUNCEMENT_VERSION_KEY: string =
   'dismissedLaunchAnnouncementVersion';
 const AUTOMATIC_UPDATE_KEY: string = 'automaticallyCheckForUpdates';
@@ -335,6 +539,45 @@ const VIDEO_FRAME_RATES: Array<SelectEntry> = [
   new SelectEntry('30p', '30'),
   new SelectEntry('50p', '50'),
   new SelectEntry('60p', '60')
+];
+const VIDEO_CODECS: Array<SelectEntry> = [
+  new SelectEntry('H.264 / AVC · 8-bit', 'h264'),
+  new SelectEntry('H.265 / HEVC · 10-bit', 'h265'),
+  new SelectEntry('Apple ProRes 422 HQ · 10-bit', 'prores422hq'),
+  new SelectEntry('Apple ProRes RAW HQ · 12-bit', 'proresRaw'),
+  new SelectEntry('N-RAW · 12-bit NEV', 'nraw')
+];
+const SONY_VIDEO_CODECS: Array<SelectEntry> = [
+  new SelectEntry('XAVC HS 8K · HEVC Long GOP', 'sonyXavcHs8k'),
+  new SelectEntry('XAVC HS 4K · HEVC Long GOP', 'sonyXavcHs4k'),
+  new SelectEntry('XAVC S 4K · AVC Long GOP', 'sonyXavcS4k'),
+  new SelectEntry('XAVC S HD · AVC Long GOP', 'sonyXavcSHd'),
+  new SelectEntry('XAVC S-I 4K · AVC Intra', 'sonyXavcSi4k'),
+  new SelectEntry('XAVC S-I HD · AVC Intra', 'sonyXavcSiHd')
+];
+const CANON_VIDEO_CODECS: Array<SelectEntry> = [
+  new SelectEntry('RAW · 12-bit', 'canonRaw'),
+  new SelectEntry('XF-HEVC S · 4:2:2 10-bit', 'canonXfHevc422'),
+  new SelectEntry('XF-HEVC S · 4:2:0 10-bit', 'canonXfHevc420'),
+  new SelectEntry('XF-AVC S · 4:2:2 10-bit', 'canonXfAvc422'),
+  new SelectEntry('XF-AVC S · 4:2:0 8-bit', 'canonXfAvc420')
+];
+const NIKON_VIDEO_LOGS: Array<SelectEntry> = [
+  new SelectEntry('关闭 · SDR', 'off'),
+  new SelectEntry('N-Log', 'nlog')
+];
+const SONY_VIDEO_LOGS: Array<SelectEntry> = [
+  new SelectEntry('关闭 · SDR', 'off'),
+  new SelectEntry('PP7 · S-Log2', 'sonySLog2'),
+  new SelectEntry('PP8 · S-Log3 / S-Gamut3.Cine', 'sonySLog3Cine'),
+  new SelectEntry('PP9 · S-Log3 / S-Gamut3', 'sonySLog3'),
+  new SelectEntry('PP10 · HLG', 'sonyHlg')
+];
+const CANON_VIDEO_LOGS: Array<SelectEntry> = [
+  new SelectEntry('关闭 · SDR', 'off'),
+  new SelectEntry('Canon Log', 'canonLog'),
+  new SelectEntry('Canon Log 2', 'canonLog2'),
+  new SelectEntry('Canon Log 3', 'canonLog3')
 ];
 const SHUTTER_ANGLES: Array<SelectEntry> = [
   new SelectEntry('45°', '45'),
@@ -456,6 +699,10 @@ const PICTURE_CONTROLS: Array<SelectEntry> = [
 @Component
 struct Index {
   private camera: PtpCamera = new PtpCamera();
+  private wifiCamera: PtpIpCamera = new PtpIpCamera();
+  private localCamera: LocalCameraController = new LocalCameraController();
+  private bluetoothRemote?: BluetoothRemoteController;
+  private locationTagging?: LocationTaggingController;
   private library?: PhotoLibrary;
   private captureWorkflow?: CaptureWorkflow;
   private wireless?: WirelessTransferServer;
@@ -463,15 +710,38 @@ struct Index {
   private settingsPreferences?: preferences.Preferences;
   private previewGeneration: number = 0;
   private previewAnalysisSequence: number = 0;
+  private externalVideoRecorder: ExternalVideoRecorder =
+    new ExternalVideoRecorder();
 
   @State private section: string = 'capture';
   @State private language: string = LANGUAGE_SIMPLIFIED_CHINESE;
   @State private connected: boolean = false;
+  @State private localCameraSelected: boolean = false;
+  @State private wifiConnected: boolean = false;
+  @State private wifiConnecting: boolean = false;
+  @State private wifiConnectionMode: string = 'ap';
+  @State private wifiHost: string = '192.168.1.1';
+  @State private wifiPort: string = '15740';
+  @State private wifiCameraName: string = 'PTP/IP Camera';
+  @State private wifiStatus: string = 'Wi‑Fi 相机未连接';
+  @State private bluetoothRemoteEnabled: boolean = false;
+  @State private bluetoothRemoteConnected: boolean = false;
+  @State private bluetoothRemoteStatus: string = '蓝牙遥控未开启';
+  @State private locationTaggingEnabled: boolean = false;
+  @State private locationTaggingStatus: string = '定位未开启';
+  @State private connectionPanelVisible: boolean = false;
   @State private liveView: boolean = false;
   @State private busy: boolean = false;
   @State private cameraName: string = '未连接';
+  @State private rememberedDevices: Array<RememberedCameraDevice> = [];
+  @State private cameraVendor: string = 'Nikon';
   @State private status: string = '就绪';
   @State private preview: image.PixelMap | undefined = undefined;
+  @State private monitorNikonCloudPresetId: string = '';
+  @State private monitorFocusPointX: number = -1;
+  @State private monitorFocusPointY: number = -1;
+  @State private monitorStageWidth: number = 1;
+  @State private monitorStageHeight: number = 1;
   @State private photos: Array<PhotoItem> = [];
   @State private wirelessRunning: boolean = false;
   @State private wirelessStatus: string = '无线收件箱未开启';
@@ -479,6 +749,10 @@ struct Index {
   @State private exposureMode: string = 'manual';
   @State private videoFrameRate: number = 30;
   @State private videoShutterAngle: number = 180;
+  @State private videoShutterMode: string = 'angle';
+  @State private videoCodec: string = 'h265';
+  @State private nLogEnabled: boolean = false;
+  @State private videoLogProfile: string = 'off';
   @State private currentShutterSpeed: number = 0.008;
   @State private currentAperture: number = 4;
   @State private currentIso: number = 400;
@@ -497,6 +771,14 @@ struct Index {
   @State private waveform: string = '—';
   @State private vectorscope: string = '—';
   @State private peakingCoverage: number = 0;
+  private readonly scopeRenderingSettings: RenderingContextSettings =
+    new RenderingContextSettings(true);
+  private readonly monitorRgbScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly monitorAudioScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly professionalScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
   @State private sessionName: string = '未命名会话';
   @State private sessionNamingTemplate: string =
     '{session}_{date}_{counter}';
@@ -506,6 +788,7 @@ struct Index {
   @State private sessionDualBackup: boolean = true;
   @State private captureSessionExpanded: boolean = false;
   @State private videoRecording: boolean = false;
+  @State private externalRecordToDevice: boolean = true;
   @State private recentLogs: string = '点击“查询最近日志”后显示。';
   @State private updateStatus: string = '尚未检查更新';
   @State private updateChecking: boolean = false;
@@ -528,9 +811,15 @@ struct Index {
   @State private immersiveMoreParametersExpanded: boolean = false;
   @State private immersiveLandscape: boolean = false;
   @State private systemExpanded: boolean = true;
+  @State private cameraStorageExpanded: boolean = true;
+  @State private cameraStorageBusy: boolean = false;
+  @State private cameraStorageStatus: string = '连接相机后可浏览存储卡';
+  @State private cameraStorageSnapshot: CameraStorageSnapshot =
+    new CameraStorageSnapshot([], []);
+  @State private selectedCameraStorageHandles: Array<number> = [];
   @State private systemPhotosExpanded: boolean = true;
   @State private systemVideosExpanded: boolean = true;
-  @State private wirelessExpanded: boolean = false;
+  @State private wirelessExpanded: boolean = true;
   @State private localPhotosExpanded: boolean = true;
   @State private localVideosExpanded: boolean = true;
   @State private localUnclassifiedExpanded: boolean = true;
@@ -548,8 +837,10 @@ struct Index {
   @State private branchDeleteName: string = '';
   @State private mobileBranchDrawerExpanded: boolean = false;
   @State private editorSelectedPath: string = '';
+  @State private editorPickerVisible: boolean = false;
   @State private editorPanel: string = 'light';
   @State private editorPreset: string = 'original';
+  @State private editorNikonCloudPresetId: string = '';
   @State private editorExposure: number = 0;
   @State private editorContrast: number = 0;
   @State private editorHighlights: number = 0;
@@ -566,6 +857,49 @@ struct Index {
   @State private editorNoiseReduction: number = 0;
   @State private editorDehaze: number = 0;
   @State private editorVignette: number = 0;
+  @State private editorWheelLift: number = 0;
+  @State private editorWheelGamma: number = 0;
+  @State private editorWheelGain: number = 0;
+  @State private editorWheelLiftX: number = 0;
+  @State private editorWheelLiftY: number = 0;
+  @State private editorWheelGammaX: number = 0;
+  @State private editorWheelGammaY: number = 0;
+  @State private editorWheelGainX: number = 0;
+  @State private editorWheelGainY: number = 0;
+  @State private editorCurveContrast: number = 0;
+  @State private editorCurvePivot: number = 50;
+  @State private editorCurveShadows: number = 0;
+  @State private editorCurveMidtones: number = 0;
+  @State private editorCurveHighlights: number = 0;
+  @State private editorCurvePoints: Array<EditorCurvePoint> = EDITOR_CURVE_DEFAULTS.map((point: EditorCurvePoint): EditorCurvePoint => new EditorCurvePoint(point.x, point.y));
+  private editorActiveCurvePoint: number = -1;
+  @State private editorMaskEnabled: boolean = false;
+  @State private editorMaskType: string = '画笔';
+  @State private editorMaskAmount: number = 100;
+  @State private editorMaskFeather: number = 55;
+  @State private editorMaskInvert: boolean = false;
+  @State private editorMaskSubtract: boolean = false;
+  @State private editorMaskBrushSize: number = 18;
+  @State private editorMaskStrokes: Array<EditorMaskStroke> = [];
+  @State private editorMaskExposure: number = 0;
+  @State private editorMaskContrast: number = 0;
+  @State private editorMaskHighlights: number = 0;
+  @State private editorMaskShadows: number = 0;
+  @State private editorMaskTemperature: number = 0;
+  @State private editorMaskTint: number = 0;
+  @State private editorMaskSaturation: number = 0;
+  @State private editorMaskClarity: number = 0;
+  @State private editorMaskLayers: Array<EditorMaskLayer> = [];
+  @State private editorActiveMaskLayerId: string = '';
+  @State private editorNextMaskNumber: number = 1;
+  private editorActiveMaskStroke: number = -1;
+  @State private editorPreviewWidth: number = 1;
+  @State private editorPreviewHeight: number = 1;
+  @State private editorImageWidth: number = 1;
+  @State private editorImageHeight: number = 1;
+  @State private editorRenderedPreview: image.PixelMap | undefined = undefined;
+  private editorRenderGeneration: number = 0;
+  @State private editorPickerSample: string = 'RGB 取样：尚未取样';
   @State private editorRotation: number = 0;
   @State private editorFlipHorizontal: boolean = false;
   @State private editorFlipVertical: boolean = false;
@@ -573,6 +907,8 @@ struct Index {
   @State private editorShowingOriginal: boolean = false;
   @State private editorSaving: boolean = false;
   @State private aiPrompt: string = '';
+  @State private aiManualPrompt: string = '';
+  @State private aiSelectedPresets: Array<string> = [];
   @State private aiMode: number = 0; // 0=edit, 1=generate
   @State private aiRatioIndex: number = 0;
   @State private aiResolutionIndex: number = 0;
@@ -586,8 +922,8 @@ struct Index {
   @State private editorAISummary: string = '等待分析当前照片';
   @State private editorAICanUndo: boolean = false;
   @State private editorAIAnalysis: EditorAIAnalysis | undefined = undefined;
-  @State private editorAICopiedTone: Array<number | string | boolean> = [];
-  private editorAIBackup: Array<number | string | boolean> = [];
+  @State private editorAICopiedTone: Array<EditorToneValue> = [];
+  private editorAIBackup: Array<EditorToneValue> = [];
   @State private currentFocusMode: string = 'single-shot';
   @State private currentWhiteBalance: string = 'continuous';
   @State private currentPictureControl: string = 'standard';
@@ -619,6 +955,22 @@ struct Index {
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
     this.captureWorkflow = new CaptureWorkflow(this.library.directoryPath);
+    this.bluetoothRemote = new BluetoothRemoteController(
+      (status: string, connected: boolean): void => {
+        this.bluetoothRemoteStatus = status;
+        this.bluetoothRemoteConnected = connected;
+      },
+      (): void => {
+        if (!this.busy && (this.connected || this.wifiConnected)) {
+          this.capturePhoto();
+        }
+      }
+    );
+    this.locationTagging = new LocationTaggingController(
+      (status: string): void => {
+        this.locationTaggingStatus = status;
+      }
+    );
     const session: CaptureSessionConfiguration =
       this.captureWorkflow.configuration;
     this.sessionName = session.name;
@@ -671,6 +1023,30 @@ struct Index {
           true
         );
       this.automaticUpdates = automaticUpdates as boolean;
+      const externalRecording: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'externalRecordToDevice',
+          true
+        );
+      this.externalRecordToDevice = externalRecording as boolean;
+      const wifiConnectionMode: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'wifiCameraConnectionMode',
+          'ap'
+        );
+      this.wifiConnectionMode = wifiConnectionMode === 'sta' ? 'sta' : 'ap';
+      const wifiHost: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'wifiCameraHost',
+          '192.168.1.1'
+        );
+      this.wifiHost = wifiHost as string;
+      const wifiPort: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'wifiCameraPort',
+          '15740'
+        );
+      this.wifiPort = wifiPort as string;
       const mirrorChyanCdk: preferences.ValueType =
         await this.settingsPreferences.get(
           MIRROR_CHYAN_CDK_KEY,
@@ -699,6 +1075,27 @@ struct Index {
       this.libraryFileAssignments = JSON.parse(
         savedAssignments as string
       ) as Array<LibraryFileAssignmentData>;
+      const savedDevices: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'rememberedCameraDevices.v1',
+          '[]'
+        );
+      const deviceData: Array<RememberedCameraDevice> = JSON.parse(
+        savedDevices as string
+      ) as Array<RememberedCameraDevice>;
+      this.rememberedDevices = deviceData
+        .map((device: RememberedCameraDevice): RememberedCameraDevice =>
+          new RememberedCameraDevice(
+            device.id,
+            device.name,
+            device.vendor,
+            device.transport,
+            device.lastConnectedAt
+          ))
+        .sort(
+          (left: RememberedCameraDevice, right: RememberedCameraDevice): number =>
+            right.lastConnectedAt - left.lastConnectedAt
+        );
       if (this.automaticUpdates) {
         setTimeout((): void => {
           this.checkForUpdates(true);
@@ -767,7 +1164,11 @@ struct Index {
     this.stopImmersiveOrientationTracking();
     this.diagnostics?.endSession();
     this.previewGeneration++;
+    this.finishExternalRecordingForDisconnect();
     this.camera.disconnect();
+    this.wifiCamera.disconnect();
+    this.bluetoothRemote?.stop();
+    this.locationTagging?.setEnabled(false);
     if (this.wireless !== undefined) {
       this.wireless.stop();
     }
@@ -784,7 +1185,9 @@ struct Index {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
-        this.TopBar()
+        if (this.section !== 'monitor') {
+          this.TopBar()
+        }
         if (this.isCompact()) {
           Scroll() {
             this.MainGrid()
@@ -799,7 +1202,11 @@ struct Index {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor($r('app.color.paper'))
+      .backgroundColor(
+        this.section === 'monitor'
+          ? '#040A12'
+          : $r('app.color.paper')
+      )
       if (this.largePreviewVisible) {
         this.LargePhotoOverlay()
       }
@@ -820,6 +1227,9 @@ struct Index {
       }
       if (this.launchAnnouncementVisible) {
         this.LaunchAnnouncementOverlay()
+      }
+      if (this.connectionPanelVisible) {
+        this.ConnectionPanelOverlay()
       }
       if (this.showSplash) {
         this.SplashOverlay()
@@ -897,6 +1307,8 @@ struct Index {
       }) {
         if (this.section === 'library') {
           this.LibraryWorkspace()
+        } else if (this.section === 'devices') {
+          this.MyDevicesWorkspace()
         } else if (this.section === 'editor') {
           this.ImageEditorWorkspace()
         } else if (this.section === 'settings') {
@@ -930,8 +1342,8 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
         }
-        .width(44)
-        .height(44)
+        .width(this.isCompact() ? 38 : 44)
+        .height(this.isCompact() ? 38 : 44)
         .justifyContent(FlexAlign.Center)
         .linearGradient({
           angle: 135,
@@ -946,23 +1358,29 @@ struct Index {
         })
         Column({ space: 3 }) {
           Text('帧澈 ZENCHE')
-            .fontSize(20)
+            .fontSize(this.isCompact() ? 15 : 20)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text('Capture · Connect · Flow')
-            .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor($r('app.color.muted'))
-          Text(
-            this.connected
-              ? `${this.cameraName} · USB/PTP`
-              : `${this.tr('未连接')} · HARMONYOS USB/PTP`
-          )
-            .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor($r('app.color.muted'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          if (!this.isCompact()) {
+            Text('Capture · Connect · Flow')
+              .fontSize(10)
+              .fontFamily('monospace')
+              .fontColor($r('app.color.muted'))
+            Text(
+              this.connected
+                ? `${this.cameraName} · USB/PTP`
+                : (this.localCameraSelected
+                  ? `${this.tr('本机摄像头')} · HARMONYOS`
+                : (this.wifiConnected
+                  ? `${this.wifiCameraName} · WI‑FI/PTP‑IP`
+                  : `${this.tr('未连接')} · HARMONYOS USB/PTP`))
+            )
+              .fontSize(10)
+              .fontFamily('monospace')
+              .fontColor($r('app.color.muted'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
@@ -972,15 +1390,15 @@ struct Index {
       Text('●')
         .fontSize(13)
         .fontColor(
-          this.connected
+          this.connected || this.wifiConnected || this.localCameraSelected
             ? $r('app.color.positive')
             : $r('app.color.muted')
         )
         .margin({ right: 8 })
       Button(
         this.isCompact()
-          ? this.tr(this.connected ? '断开' : '连接')
-          : this.tr(this.connected ? '断开相机' : '连接相机'),
+          ? this.tr('连接')
+          : this.tr('连接管理'),
         {
         type: ButtonType.Normal
         }
@@ -995,7 +1413,7 @@ struct Index {
         .borderRadius(12)
         .enabled(!this.busy)
         .onClick((): void => {
-          this.toggleCameraConnection();
+          this.connectionPanelVisible = true;
         })
       Button('⚙', { type: ButtonType.Normal })
         .fontSize(22)
@@ -1013,8 +1431,11 @@ struct Index {
         })
     }
     .width('100%')
-    .height(76)
-    .padding({ left: 20, right: 20 })
+    .height(this.isCompact() ? 64 : 76)
+    .padding({
+      left: this.isCompact() ? 12 : 20,
+      right: this.isCompact() ? 12 : 20
+    })
     .backgroundColor($r('app.color.surface_raised'))
     .border({
       width: { bottom: 1 },
@@ -1040,9 +1461,10 @@ struct Index {
       this.NavButton('照片拍摄', 'capture')
       this.NavButton('视频监看', 'monitor')
       this.NavButton('图像编辑', 'editor')
+      this.NavButton('我的设备', 'devices')
       this.NavButton('分支文件库', 'library')
       Blank()
-      Text('ZENCHE 1.3.1')
+      Text('ZENCHE 1.5.0')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
@@ -1063,12 +1485,17 @@ struct Index {
       this.NavButton('照片', 'capture')
       this.NavButton('视频', 'monitor')
       this.NavButton('编辑', 'editor')
+      this.NavButton('设备', 'devices')
       this.NavButton('分支', 'library')
     }
     .width('100%')
-    .height(68)
-    .padding({ left: 8, right: 8, top: 10, bottom: 4 })
-    .backgroundColor($r('app.color.paper_2'))
+    .height(64)
+    .padding({ left: 6, right: 6, top: 6, bottom: 4 })
+    .backgroundColor(
+      this.section === 'monitor'
+        ? Color.Black
+        : $r('app.color.paper_2')
+    )
     .border({
       width: { top: 1 },
       color: $r('app.color.rule')
@@ -1078,28 +1505,32 @@ struct Index {
   @Builder
   private NavButton(label: string, target: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
-      .width(this.isCompact() ? '25%' : '100%')
-      .height(44)
-      .fontSize(14)
+      .width(this.isCompact() ? '20%' : '100%')
+      .height(this.isCompact() ? 52 : 44)
+      .fontSize(this.isCompact() ? 11 : 14)
       .fontWeight(
         this.section === target ? FontWeight.Bold : FontWeight.Normal
       )
       .fontColor(
         this.section === target
-          ? target === 'monitor'
-            ? $r('app.color.video')
-            : $r('app.color.accent')
-          : $r('app.color.muted')
+          ? (target === 'monitor' || this.section === 'monitor'
+            ? '#258AF0'
+            : $r('app.color.accent'))
+          : this.section === 'monitor'
+            ? '#AAB5C5'
+            : $r('app.color.muted')
       )
       .backgroundColor(
         this.section === target
-          ? target === 'monitor'
-            ? $r('app.color.video_soft')
-            : $r('app.color.surface_raised')
-          : Color.Transparent
+          ? this.section === 'monitor'
+            ? '#061A35'
+            : target === 'monitor'
+              ? $r('app.color.video_soft')
+              : $r('app.color.surface_raised')
+          : this.section === 'monitor' ? '#000000' : Color.Transparent
       )
       .border({
-        width: this.section === target ? 1 : 0,
+        width: this.section === target && !this.isCompact() ? 1 : 0,
         color: target === 'monitor'
           ? $r('app.color.video')
           : $r('app.color.accent'),
@@ -1122,6 +1553,156 @@ struct Index {
           this.ensureEditorSelection();
         }
       })
+  }
+
+  @Builder
+  private MyDevicesWorkspace() {
+    Scroll() {
+      Column({ space: 16 }) {
+        Column({ space: 6 }) {
+          Text(this.tr('我的设备'))
+            .fontSize(30)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('管理连接过的相机，轻触即可快速重连'))
+            .fontSize(14)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+        .alignItems(HorizontalAlign.Start)
+
+        if (this.rememberedDevices.length === 0) {
+          Column({ space: 12 }) {
+            Text('◉')
+              .fontSize(48)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.accent'))
+            Text(this.tr('尚未连接过设备'))
+              .fontSize(21)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+            Text(this.tr('成功连接相机后会自动保存在这里。'))
+              .fontSize(14)
+              .fontColor($r('app.color.muted'))
+              .textAlign(TextAlign.Center)
+          }
+          .width('100%')
+          .height(360)
+          .justifyContent(FlexAlign.Center)
+          .backgroundColor($r('app.color.surface_raised'))
+          .border({
+            width: 1,
+            color: $r('app.color.rule'),
+            radius: 20
+          })
+        } else {
+          ForEach(
+            this.rememberedDevices,
+            (device: RememberedCameraDevice): void => {
+              this.RememberedDeviceCard(device)
+            },
+            (device: RememberedCameraDevice): string => device.id
+          )
+        }
+      }
+      .width('100%')
+      .padding(22)
+    }
+    .width('100%')
+    .height('100%')
+    .scrollBar(BarState.Auto)
+  }
+
+  @Builder
+  private RememberedDeviceCard(device: RememberedCameraDevice) {
+    Column() {
+      if (device.vendor.toLowerCase().includes('sony')) {
+        Image($r('app.media.camera_sony'))
+          .width('100%')
+          .height(this.isCompact() ? 180 : 230)
+          .objectFit(ImageFit.Cover)
+      } else if (device.vendor.toLowerCase().includes('canon')) {
+        Image($r('app.media.camera_canon'))
+          .width('100%')
+          .height(this.isCompact() ? 180 : 230)
+          .objectFit(ImageFit.Cover)
+      } else {
+        Image($r('app.media.camera_nikon'))
+          .width('100%')
+          .height(this.isCompact() ? 180 : 230)
+          .objectFit(ImageFit.Cover)
+      }
+      Column({ space: 11 }) {
+        Row() {
+          Text(device.name)
+            .fontSize(19)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .layoutWeight(1)
+          if (this.connected && this.cameraName === device.name) {
+            Text(this.tr('当前已连接'))
+              .fontSize(11)
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.positive'))
+              .padding({ left: 9, right: 9, top: 5, bottom: 5 })
+              .backgroundColor('#E4F7EE')
+              .borderRadius(14)
+          }
+        }
+        .width('100%')
+        Text(`${device.vendor} · ${device.transport}`)
+          .fontSize(13)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Text(`${this.tr('最近连接')} · ${this.formatDeviceTimestamp(device.lastConnectedAt)}`)
+          .fontSize(12)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Row({ space: 10 }) {
+          Button(this.tr('快速连接'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .enabled(
+              !this.busy &&
+              !(this.connected && this.cameraName === device.name)
+            )
+            .onClick((): void => {
+              this.reconnectRememberedDevice();
+            })
+          Button(this.tr('忘记设备'), { type: ButtonType.Normal })
+            .height(44)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.surface'))
+            .border({
+              width: 1,
+              color: $r('app.color.rule_strong'),
+              radius: 10
+            })
+            .onClick((): void => {
+              this.forgetRememberedDevice(device.id);
+            })
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .padding(16)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .backgroundColor($r('app.color.surface_raised'))
+    .border({
+      width: 1,
+      color: this.connected && this.cameraName === device.name
+        ? $r('app.color.positive')
+        : $r('app.color.rule'),
+      radius: 20
+    })
+    .borderRadius(20)
   }
 
   @Builder
@@ -1197,17 +1778,7 @@ struct Index {
           radius: 12
         })
       } else {
-        Select(
-          this.editablePhotos().map((item: PhotoItem): SelectEntry => {
-            return new SelectEntry(item.name, item.name);
-          })
-        )
-          .selected(this.editorSelectedIndex())
-          .width('100%')
-          .onSelect((index: number): void => {
-            this.editorSelectedPath = this.editablePhotos()[index].path;
-            this.resetImageEditor();
-          })
+        this.EditorPhotoPicker()
         Column({ space: 10 }) {
           Scroll() {
             Row({ space: 8 }) {
@@ -1310,6 +1881,7 @@ struct Index {
               .backgroundColor($r('app.color.paper_2'))
               .onClick((): void => {
                 this.restoreEditorTone(this.editorAICopiedTone);
+                this.editorNikonCloudPresetId = '';
                 this.editorAISummary = '已粘贴 AI 调整';
                 this.status = '已粘贴 AI 调整';
               })
@@ -1347,16 +1919,49 @@ struct Index {
             ];
             this.applyEditorPreset(presets[index]);
           })
+        Text(`${this.tr('尼康云创预览')} · ${NIKON_CLOUD_PRESETS.length} NP3`)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+        Select(this.nikonCloudSelectEntries())
+          .selected(this.nikonCloudPresetIndex())
+          .width('100%')
+          .onSelect((index: number): void => {
+            if (index === 0) {
+              this.applyEditorPreset('original');
+              this.status = '尼康云创预览已关闭';
+              return;
+            }
+            this.applyNikonCloudPreset(NIKON_CLOUD_PRESETS[index - 1]);
+          })
+        Text(this.tr('设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同'))
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
         Stack({ alignContent: Alignment.Center }) {
-          if (this.editorSelectedPath.length > 0) {
+          if (
+            (this.editorMaskEnabled ||
+              this.editorNikonCloudPresetId.length > 0) &&
+            this.editorRenderedPreview !== undefined
+          ) {
+            Image(this.editorRenderedPreview)
+              .width('100%')
+              .height('100%')
+              .padding(12)
+              .objectFit(ImageFit.Contain)
+          } else if (this.editorSelectedPath.length > 0) {
             Image(`file://${this.editorSelectedPath}`)
               .width('100%')
               .height('100%')
+              .padding(12)
               .objectFit(ImageFit.Contain)
               .brightness(
                 this.editorShowingOriginal
                   ? 1
-                  : Math.pow(2, this.editorExposure / 100)
+                  : Math.pow(2, this.editorExposure / 100
+                    + this.editorWheelLift / 520
+                    + this.editorWheelGain / 700)
               )
               .contrast(
                 this.editorShowingOriginal
@@ -1364,6 +1969,7 @@ struct Index {
                   : Math.max(
                     0,
                     1 + this.editorContrast / 100
+                      + this.editorCurveContrast / 180
                       + this.editorDehaze / 250
                       + this.editorClarity / 400
                   )
@@ -1375,6 +1981,7 @@ struct Index {
                     0,
                     1 + this.editorSaturation / 100
                       + this.editorVibrance / 180
+                      + this.editorWheelGamma / 900
                       + this.editorDehaze / 500
                   )
               )
@@ -1392,6 +1999,47 @@ struct Index {
                   : (this.editorFlipVertical ? -1 : 1)
               })
           }
+          if (
+            this.editorPanel === 'mask' &&
+            this.editorMaskEnabled &&
+            this.activeEditorMaskLayerVisible() &&
+            !this.editorShowingOriginal
+          ) {
+            ForEach(
+              this.editorMaskStrokes,
+              (stroke: EditorMaskStroke): void => {
+                ForEach(
+                  stroke.points,
+                  (point: EditorMaskPoint): void => {
+                    Circle()
+                      .width(Math.max(
+                        4,
+                        stroke.size / 100 * Math.min(
+                          this.editorImageRect().width,
+                          this.editorImageRect().height
+                        )
+                      ))
+                      .height(Math.max(
+                        4,
+                        stroke.size / 100 * Math.min(
+                          this.editorImageRect().width,
+                          this.editorImageRect().height
+                        )
+                      ))
+                      .fill(stroke.subtract ? '#D9FFFFFF' : '#961673E6')
+                      .position({
+                        x: this.editorImageRect().left
+                          + point.x * this.editorImageRect().width,
+                        y: this.editorImageRect().top
+                          + point.y * this.editorImageRect().height
+                      })
+                  },
+                  (point: EditorMaskPoint): string => `${point.x}-${point.y}`
+                )
+              },
+              (stroke: EditorMaskStroke): string => stroke.id
+            )
+          }
           Text(this.tr(
             this.editorShowingOriginal ? '原图' : '调整后'
           ))
@@ -1405,14 +2053,25 @@ struct Index {
         }
         .width('100%')
         .height(this.isCompact() ? 320 : 460)
-        .padding(12)
         .backgroundColor($r('app.color.graphite'))
         .borderRadius(14)
+        .onAreaChange((_oldArea: Area, newArea: Area): void => {
+          this.editorPreviewWidth = Math.max(1, Number(newArea.width));
+          this.editorPreviewHeight = Math.max(1, Number(newArea.height));
+          this.refreshEditorImageMetrics();
+        })
+        .onTouch((event: TouchEvent): void => {
+          this.handleEditorMaskTouch(event);
+        })
 
         Scroll() {
           Row({ space: 8 }) {
             this.EditorPanelButton('光线', 'light')
             this.EditorPanelButton('色彩', 'color')
+            this.EditorPanelButton('色轮', 'wheels')
+            this.EditorPanelButton('曲线', 'curves')
+            this.EditorPanelButton('取色器', 'picker')
+            this.EditorPanelButton('蒙版', 'mask')
             this.EditorPanelButton('细节', 'detail')
             this.EditorPanelButton('效果', 'effects')
             this.EditorPanelButton('几何', 'geometry')
@@ -1467,6 +2126,121 @@ struct Index {
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
     .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
+  private EditorPhotoPicker() {
+    Column({ space: 6 }) {
+      Button(this.editorSelectedLabel(), { type: ButtonType.Normal })
+        .height(50)
+        .width('100%')
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.surface'))
+        .border({ width: 1, color: $r('app.color.rule'), radius: 8 })
+        .onClick((): void => {
+          this.editorPickerVisible = !this.editorPickerVisible;
+        })
+      if (this.editorPickerVisible) {
+        Column({ space: 4 }) {
+          this.EditorPhotoGroup('未分类', this.unclassifiedEditablePhotos(), 0)
+          ForEach(
+            this.userLibraryBranches,
+            (branch: LibraryBranch) => {
+              this.EditorPhotoBranch(branch, 0)
+            },
+            (branch: LibraryBranch): string => branch.id
+          )
+        }
+        .width('100%')
+        .padding(8)
+        .backgroundColor($r('app.color.surface'))
+        .border({ width: 1, color: $r('app.color.rule'), radius: 8 })
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private EditorPhotoBranch(branch: LibraryBranch, depth: number) {
+    Column({ space: 3 }) {
+      Button(
+        `${this.isLibraryBranchExpanded(branch.id) ? '⌄' : '›'}  分支 · ${branch.name} · ${this.editablePhotosForBranch(branch.id).length}`,
+        { type: ButtonType.Normal }
+      )
+        .height(42)
+        .width('100%')
+        .padding({ left: 8 + depth * 14, right: 6 })
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => this.toggleLibraryBranch(branch.id))
+      if (this.isLibraryBranchExpanded(branch.id)) {
+        this.EditorPhotoGroup('', this.editablePhotosForBranch(branch.id), depth + 1)
+        ForEach(
+          branch.children,
+          (child: LibraryBranch) => this.EditorPhotoBranch(child, depth + 1),
+          (child: LibraryBranch): string => child.id
+        )
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private EditorPhotoGroup(title: string, items: Array<PhotoItem>, depth: number) {
+    Column({ space: 3 }) {
+      if (title.length > 0) {
+        Text(`${title} · ${items.length}`)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted'))
+          .padding({ left: 8 + depth * 14, top: 4, bottom: 2 })
+      }
+      ForEach(
+        items,
+        (item: PhotoItem) => {
+          Row({ space: 8 }) {
+            Image(`file://${item.path}`)
+              .width(64)
+              .height(46)
+              .objectFit(ImageFit.Cover)
+              .borderRadius(6)
+            Text(item.name)
+              .fontSize(12)
+              .fontColor($r('app.color.ink'))
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+            if (item.path === this.editorSelectedPath) {
+              Text('✓')
+                .fontSize(16)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.accent'))
+            }
+          }
+          .width('100%')
+          .height(58)
+          .padding({ left: 8 + depth * 14, right: 8 })
+          .backgroundColor(item.path === this.editorSelectedPath
+            ? $r('app.color.accent_soft') : $r('app.color.surface'))
+          .border({ width: 1, color: item.path === this.editorSelectedPath
+            ? $r('app.color.accent') : $r('app.color.rule'), radius: 6 })
+          .onClick((): void => {
+            this.editorSelectedPath = item.path;
+            this.editorPickerVisible = false;
+            this.resetImageEditor();
+            this.refreshEditorImageMetrics();
+          })
+        },
+        (item: PhotoItem): string => item.path
+      )
+      if (items.length === 0) {
+        Text(this.tr('此分支暂无可编辑照片'))
+          .fontSize(11)
+          .fontColor($r('app.color.muted'))
+          .padding({ left: 22 + depth * 14, top: 5, bottom: 5 })
+      }
+    }
+    .width('100%')
   }
 
   @Builder
@@ -1536,7 +2310,7 @@ struct Index {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text(this.tr('联网生成与修图 · 结果保存为新文件'))
+          Text(this.tr('修图覆盖原图 · 生图保存新文件'))
             .fontSize(11)
             .fontColor($r('app.color.muted'))
         }
@@ -1561,6 +2335,10 @@ struct Index {
       .backgroundColor($r('app.color.surface'))
       .border({ width: 1, color: $r('app.color.rule'), radius: 12 })
 
+      if (this.aiMode === 0 && this.editablePhotos().length > 0) {
+        this.EditorPhotoPicker()
+      }
+
       Row({ space: 8 }) {
         Button(this.aiMode === 0 ? '● AI 修图' : '○ AI 修图', { type: ButtonType.Normal })
           .height(44)
@@ -1583,36 +2361,12 @@ struct Index {
       }
       .width('100%')
 
-      Text('快捷预设')
-        .fontSize(12)
-        .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.muted'))
-        .width('100%')
-      Scroll() {
-        Row({ space: 6 }) {
-          ForEach(this.getAiPresets(), (preset: Array<string>) => {
-            Button(preset[0], { type: ButtonType.Normal })
-              .height(32)
-              .fontSize(11)
-              .fontColor($r('app.color.ink'))
-              .backgroundColor($r('app.color.surface'))
-              .borderRadius(16)
-              .padding({ left: 12, right: 12 })
-              .onClick((): void => {
-                this.aiPrompt = preset[1];
-              })
-          }, (preset: Array<string>) => preset[0])
-        }
-      }
-      .scrollable(ScrollDirection.Horizontal)
-      .scrollBar(BarState.Off)
-      .width('100%')
-
-      TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…' : '输入生图描述…' })
+      TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…（可补充）' : '输入生图描述…（可补充）', text: this.aiManualPrompt })
         .height(80)
         .fontSize(14)
         .onChange((value: string): void => {
-          this.aiPrompt = value;
+          this.aiManualPrompt = value;
+          this.composeAiPrompt();
         })
 
       Text(this.tr('输出参数'))
@@ -1652,7 +2406,7 @@ struct Index {
       }
       .width('100%')
 
-      Button(this.aiGenerating ? '正在生成…' : '生成', { type: ButtonType.Normal })
+      Button(this.aiGenerating ? '正在生成…' : '生成图像', { type: ButtonType.Normal })
         .height(48)
         .width('100%')
         .enabled(
@@ -1665,6 +2419,53 @@ struct Index {
         .onClick((): void => {
           this.doAiGenerate();
         })
+
+      Row() {
+        Text('可组合预设')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted'))
+          .layoutWeight(1)
+        Button('清空', { type: ButtonType.Normal })
+          .height(44)
+          .fontSize(11)
+          .backgroundColor($r('app.color.surface'))
+          .onClick((): void => {
+            this.aiSelectedPresets = [];
+            this.aiManualPrompt = '';
+            this.composeAiPrompt();
+          })
+      }
+      .width('100%')
+      ForEach(this.getAiModules(), (module: Array<string>) => {
+        Text(module[0])
+          .fontSize(10)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Scroll() {
+          Row({ space: 6 }) {
+            ForEach(module.slice(1), (value: string) => {
+              Button(value, { type: ButtonType.Normal })
+                .height(44)
+                .fontSize(11)
+                .fontColor($r('app.color.ink'))
+                .backgroundColor(this.isAiPresetSelected(module[0], value)
+                  ? $r('app.color.accent_soft') : $r('app.color.surface'))
+                .border({ width: 1, color: this.isAiPresetSelected(module[0], value)
+                  ? $r('app.color.accent') : $r('app.color.rule'), radius: 8 })
+                .padding({ left: 12, right: 12 })
+                .onClick((): void => {
+                  this.toggleAiPreset(module[0], value);
+                  this.composeAiPrompt();
+                })
+            }, (value: string) => `${module[0]}-${value}`)
+          }
+        }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .width('100%')
+      }, (module: Array<string>) => module[0])
 
       if (this.aiResultPath.length > 0) {
         Image(`file://${this.aiResultPath}`)
@@ -1721,6 +2522,40 @@ struct Index {
     ];
   }
 
+  private getAiModules(): Array<Array<string>> {
+    return [
+      ['主体', '人像主体', '产品主体', '建筑主体', '风光主体', '食物主体'],
+      ['光线', '柔和自然光', '电影感侧光', '金色时刻', '低调棚拍光', '夜景霓虹光'],
+      ['色彩', '自然通透', '胶片暖调', '日系清新', '高反差黑白', '冷色城市'],
+      ['质感', '保留真实皮肤纹理', '细节清晰', '轻微胶片颗粒', '柔和高光', '高动态范围'],
+      ['构图', '浅景深', '干净背景', '对称构图', '环境叙事', '视觉焦点明确'],
+      ['约束', '保持人物身份和五官', '不改变产品形状', '不添加多余物体', '不过度磨皮', '保留自然阴影']
+    ];
+  }
+
+  private isAiPresetSelected(category: string, value: string): boolean {
+    return this.aiSelectedPresets.indexOf(`${category}:${value}`) >= 0;
+  }
+
+  private toggleAiPreset(category: string, value: string): void {
+    const key = `${category}:${value}`;
+    const selected = this.isAiPresetSelected(category, value);
+    this.aiSelectedPresets = this.aiSelectedPresets.filter((entry: string): boolean => !entry.startsWith(`${category}:`));
+    if (!selected) this.aiSelectedPresets.push(key);
+  }
+
+  private composeAiPrompt(): void {
+    const groups: Array<string> = [];
+    if (this.aiManualPrompt.trim().length > 0) groups.push(this.aiManualPrompt.trim());
+    this.getAiModules().forEach((module: Array<string>): void => {
+      const values = this.aiSelectedPresets
+        .filter((entry: string): boolean => entry.startsWith(`${module[0]}:`))
+        .map((entry: string): string => entry.substring(module[0].length + 1));
+      if (values.length > 0) groups.push(`${module[0]}：${values.join('、')}`);
+    });
+    this.aiPrompt = groups.join('。');
+  }
+
   private async doAiGenerate(): Promise<void> {
     if (this.aiPrompt.trim().length === 0) {
       this.aiStatus = '请输入提示词';
@@ -1763,8 +2598,12 @@ struct Index {
           if (srcBytes && srcBytes.byteLength > 0) {
             const base64Helper = new util.Base64Helper();
             const b64: string = base64Helper.encodeToStringSync(new Uint8Array(srcBytes));
-            body['image'] = `data:image/jpeg;base64,${b64}`;
+            body['image'] = `data:${this.imageMimeType(this.editorSelectedPath)};base64,${b64}`;
+          } else {
+            throw new Error('无法读取原图，未发送 AI 修图请求');
           }
+        } else if (this.aiMode === 0) {
+          throw new Error('无法读取原图，未发送 AI 修图请求');
         }
       }
       const response = await httpRequest.request(
@@ -1774,7 +2613,9 @@ struct Index {
           header: {
             'Content-Type': 'application/json',
           },
-          extraData: body,
+          // Send explicit JSON so the reference image is not dropped by the
+          // HTTP client while coercing a Record into request data.
+          extraData: JSON.stringify(body),
           connectTimeout: 15000,
           readTimeout: 60000,
         }
@@ -1823,6 +2664,15 @@ struct Index {
       if (!imageBytes || imageBytes.byteLength === 0) {
         throw new Error('AI 未返回有效图片');
       }
+      const remaining: number | undefined = this.parseAiRemaining(
+        response.header as Record<string, string>
+      );
+      if (remaining !== undefined) {
+        this.setAiRemainingUsage(remaining);
+      } else {
+        // Keep compatibility with older proxies that did not expose a count.
+        this.recordAiUsage();
+      }
       const context: common.UIAbilityContext =
         getContext(this) as common.UIAbilityContext;
       const tempDir: string = context.tempDir;
@@ -1863,10 +2713,11 @@ struct Index {
         this.aiStatus = '保存 AI 结果失败';
         return;
       }
-      const destination: string = library.saveEditedCopy(
-        `ai_${stem}`,
-        new Uint8Array(data)
-      );
+      const destination: string = this.aiMode === 0 && this.editorSelectedPath.length > 0
+        ? library.replaceFile(this.editorSelectedPath, new Uint8Array(data))
+        : library.saveEditedCopy(`ai_${stem}`, new Uint8Array(data));
+      this.refreshPhotos();
+      this.editorSelectedPath = destination;
       this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
       this.editorSaving = false;
     } catch (err) {
@@ -1882,7 +2733,8 @@ struct Index {
         { name: 'zenche_ai_settings' }
       );
       const activated: boolean = (prefs.getSync('ai_activated', false) as boolean) || false;
-      return activated;
+      const count: number = (prefs.getSync('ai_usage_count', 0) as number) || 0;
+      return activated && count < 100;
     } catch (_) {
       return false;
     }
@@ -1902,6 +2754,48 @@ struct Index {
         prefs.flushSync();
       }
     } catch (_) {}
+  }
+
+  private parseAiRemaining(
+    headers: Record<string, string>
+  ): number | undefined {
+    const raw: string = headers['X-ZENCHE-Remaining']
+      || headers['x-zenche-remaining']
+      || '';
+    if (raw.length === 0) {
+      return undefined;
+    }
+    const value: number = Number(raw);
+    if (!Number.isFinite(value)) {
+      return undefined;
+    }
+    return Math.max(0, Math.min(100, Math.floor(value)));
+  }
+
+  private imageMimeType(path: string): string {
+    const lower: string = path.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
+    if (lower.endsWith('.tif') || lower.endsWith('.tiff')) return 'image/tiff';
+    if (lower.endsWith('.bmp')) return 'image/bmp';
+    return 'image/jpeg';
+  }
+
+  private setAiRemainingUsage(remaining: number): void {
+    try {
+      const prefs = preferences.getPreferencesSync(
+        getContext(this) as common.UIAbilityContext,
+        { name: 'zenche_ai_settings' }
+      );
+      const bounded: number = Math.max(0, Math.min(100, remaining));
+      prefs.putSync('ai_usage_count', 100 - bounded);
+      prefs.putSync('ai_activated', bounded > 0);
+      prefs.flushSync();
+      if (bounded === 0) {
+        this.aiStatus = 'AI 次数已用完';
+      }
+    } catch (_) {
+    }
   }
 
   private getRemainingUsage(): number {
@@ -1927,12 +2821,9 @@ struct Index {
       if (id.length > 0) {
         return id;
       }
-      id = deviceInfo.udid || deviceInfo.serial || '';
-      if (id.length === 0) {
-        id = util.generateRandomUUID();
-      }
+      id = util.generateRandomUUID();
       prefs.putSync('ai_device_id', id);
-      prefs.flushSync();
+      prefs.flush();
       return id;
     } catch (_) {
       return '';
@@ -1988,20 +2879,52 @@ struct Index {
       return false;
     }
     const expiryPart: string = parts[parts.length - 1];
+    if (!/^\d{8}$/.test(expiryPart)) {
+      return false;
+    }
     const expiryYear: number = parseInt(expiryPart.substring(0, 4));
     const expiryMonth: number = parseInt(expiryPart.substring(4, 6));
     const expiryDay: number = parseInt(expiryPart.substring(6, 8));
     const now: Date = new Date();
-    const expiryDate: Date = new Date(expiryYear, expiryMonth - 1, expiryDay);
-    if (expiryDate < now) {
+    const expiryDate: Date = new Date(
+      expiryYear,
+      expiryMonth - 1,
+      expiryDay,
+      23,
+      59,
+      59,
+      999
+    );
+    if (expiryDate.getFullYear() !== expiryYear ||
+      expiryDate.getMonth() !== expiryMonth - 1 ||
+      expiryDate.getDate() !== expiryDay ||
+      expiryDate < now) {
       return false;
     }
     const deviceId: string = this.getDeviceId();
     const payload: string = `${deviceId}:${expiryPart}:a1b2c3d4e5f6`;
-    // HarmonyOS doesn't export the full SubtleCrypto API, so signature
-    // verification is deferred to the server or skipped for now.
-    // In production, send (code, deviceId) to a simple HTTP endpoint
-    // that verifies the signature on your side.
+    const signaturePart: string = parts.slice(2, parts.length - 1).join('-');
+    try {
+      const base64Helper = new util.Base64Helper();
+      const publicKeyBlob: cryptoFramework.DataBlob = {
+        data: base64Helper.decodeSync(AI_ACTIVATION_PUBLIC_KEY)
+      };
+      const signatureBlob: cryptoFramework.DataBlob = {
+        data: base64Helper.decodeSync(signaturePart)
+      };
+      const payloadBlob: cryptoFramework.DataBlob = {
+        data: new util.TextEncoder().encode(payload)
+      };
+      const generator = cryptoFramework.createAsyKeyGenerator('RSA2048');
+      const keyPair = generator.convertKeySync(publicKeyBlob, null);
+      const verifier = cryptoFramework.createVerify('RSA2048|PKCS1|SHA256');
+      verifier.initSync(keyPair.pubKey);
+      if (!verifier.verifySync(payloadBlob, signatureBlob)) {
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
     const prefs = preferences.getPreferencesSync(
       getContext(this) as common.UIAbilityContext,
       { name: 'zenche_ai_settings' }
@@ -2133,6 +3056,281 @@ struct Index {
             this.editorSaturation = value;
           }
         )
+      } else if (this.editorPanel === 'wheels') {
+        Text(this.tr('Lift / Gamma / Gain 三向色轮 · 拖动圆盘色点'))
+          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted')).width('100%')
+        Row({ space: 8 }) {
+          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, '#43B7FF', (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
+          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, '#C68CFF', (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
+          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, '#FFD36A', (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
+        }.width('100%')
+      } else if (this.editorPanel === 'curves') {
+        Text('主曲线 · 拖动曲线控制点')
+          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted')).width('100%')
+        Stack({ alignContent: Alignment.TopStart }) {
+          Path()
+            .commands(this.editorCurvePathCommands())
+            .stroke($r('app.color.accent_ink'))
+            .strokeWidth(3)
+          ForEach(this.editorCurvePoints, (curvePoint: EditorCurvePoint): void => {
+            Circle().width(14).height(14).fill($r('app.color.accent_ink'))
+              .position({ x: `${curvePoint.x * 320}vp`, y: `${(1 - curvePoint.y) * 140}vp` })
+          })
+        }
+        .width('100%').height(140)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(8)
+        .onTouch((event: TouchEvent): void => {
+          const point = event.touches[0];
+          if (point === undefined || (event.type !== TouchType.Down && event.type !== TouchType.Move)) {
+            return;
+          }
+          const normalizedX: number = Math.max(0, Math.min(1, point.x / 320));
+          const normalizedY: number = Math.max(0, Math.min(1, 1 - point.y / 140));
+          if (event.type === TouchType.Down) {
+            this.editorActiveCurvePoint = -1;
+            let bestDistance: number = 0.035 * 0.035;
+            this.editorCurvePoints.forEach((curvePoint: EditorCurvePoint, index: number): void => {
+              const dx: number = curvePoint.x - normalizedX;
+              const dy: number = curvePoint.y - normalizedY;
+              const distance: number = dx * dx + dy * dy;
+              if (distance < bestDistance) { bestDistance = distance; this.editorActiveCurvePoint = index; }
+            });
+            if (this.editorActiveCurvePoint < 0) {
+              this.editorCurvePoints.push(new EditorCurvePoint(normalizedX, normalizedY));
+              this.editorActiveCurvePoint = this.editorCurvePoints.length - 1;
+            }
+          }
+          if (this.editorActiveCurvePoint >= 0) {
+            this.editorCurvePoints[this.editorActiveCurvePoint].x = normalizedX;
+            this.editorCurvePoints[this.editorActiveCurvePoint].y = normalizedY;
+            this.editorCurvePoints = this.editorCurvePoints.slice();
+          }
+        })
+      } else if (this.editorPanel === 'picker') {
+        Text(this.tr(this.editorPickerSample))
+          .fontSize(13).fontColor($r('app.color.muted')).width('100%')
+        Button(this.tr('取样当前照片中心'), { type: ButtonType.Normal })
+          .height(46).width('100%')
+          .onClick((): void => {
+            this.sampleEditorCenterColor();
+          })
+      } else if (this.editorPanel === 'mask') {
+        Text(this.tr('蒙版列表'))
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+        if (this.editorMaskLayers.length === 0) {
+          Text(this.tr('暂无蒙版'))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+            .height(44)
+            .width('100%')
+        } else {
+          Column({ space: 6 }) {
+            ForEach(
+              this.editorMaskLayers,
+              (layer: EditorMaskLayer): void => {
+                Row({ space: 6 }) {
+                  Button(
+                    `${layer.id === this.editorActiveMaskLayerId ? '●' : '○'}  ${this.tr(layer.name)} · ${this.tr(this.displayedEditorMaskLayer(layer).type)}`,
+                    { type: ButtonType.Normal }
+                  )
+                    .height(46)
+                    .layoutWeight(1)
+                    .fontSize(12)
+                    .fontColor($r('app.color.ink'))
+                    .backgroundColor(Color.Transparent)
+                    .onClick((): void => {
+                      this.selectEditorMaskLayer(layer.id);
+                      this.status = '已切换蒙版';
+                      this.refreshEditorRenderedPreview();
+                    })
+                  Toggle({
+                    type: ToggleType.Switch,
+                    isOn: layer.visible
+                  })
+                    .width(56)
+                    .height(46)
+                    .onChange((visible: boolean): void => {
+                      this.setEditorMaskLayerVisible(layer.id, visible);
+                      this.status = visible ? '蒙版已显示' : '蒙版已隐藏';
+                      this.refreshEditorRenderedPreview();
+                    })
+                }
+                .width('100%')
+                .padding({ left: 6, right: 4 })
+                .backgroundColor(
+                  layer.id === this.editorActiveMaskLayerId
+                    ? $r('app.color.paper_2')
+                    : $r('app.color.surface')
+                )
+                .borderRadius(9)
+                .border({
+                  width: 1,
+                  color: layer.id === this.editorActiveMaskLayerId
+                    ? $r('app.color.accent')
+                    : $r('app.color.rule')
+                })
+              },
+              (layer: EditorMaskLayer): string => layer.id
+            )
+          }
+          .width('100%')
+        }
+        Row({ space: 8 }) {
+          Button(this.tr('创建蒙版'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .onClick((): void => {
+              this.createEditorMaskLayer();
+              this.status = '蒙版已创建 · 在预览画面涂抹';
+              this.refreshEditorRenderedPreview();
+            })
+          Button(this.tr('删除蒙版'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .enabled(this.editorMaskEnabled)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .onClick((): void => {
+              this.deleteActiveEditorMaskLayer();
+              this.status = '蒙版已删除';
+              this.refreshEditorRenderedPreview();
+            })
+        }
+        .width('100%')
+        Row({ space: 8 }) {
+          Button(this.tr('添加蒙版（画笔）'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .fontSize(11)
+            .fontColor(!this.editorMaskSubtract && this.editorMaskEnabled
+              ? $r('app.color.accent_ink') : $r('app.color.ink'))
+            .backgroundColor(!this.editorMaskSubtract && this.editorMaskEnabled
+              ? $r('app.color.accent') : $r('app.color.paper_2'))
+            .onClick((): void => {
+              this.ensureEditorMaskLayer();
+              if (this.editorMaskType.length === 0) {
+                this.editorMaskType = '画笔';
+              }
+              this.editorMaskSubtract = false;
+              this.status = '添加蒙版画笔已启用';
+            })
+          Button(this.tr('减去蒙版（画笔）'), { type: ButtonType.Normal })
+            .height(48)
+            .layoutWeight(1)
+            .fontSize(11)
+            .fontColor(this.editorMaskSubtract && this.editorMaskEnabled
+              ? $r('app.color.accent_ink') : $r('app.color.ink'))
+            .backgroundColor(this.editorMaskSubtract && this.editorMaskEnabled
+              ? $r('app.color.accent') : $r('app.color.paper_2'))
+            .onClick((): void => {
+              this.ensureEditorMaskLayer();
+              if (this.editorMaskType.length === 0) {
+                this.editorMaskType = '画笔';
+              }
+              this.editorMaskSubtract = true;
+              this.status = '减去蒙版画笔已启用';
+            })
+        }
+        .width('100%')
+        Text(this.tr('智能识别'))
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Scroll() {
+          Row({ space: 8 }) {
+            ForEach(
+              ['智能主体', '智能天空', '智能背景', '智能人物', '智能亮部', '智能暗部'],
+              (type: string): void => {
+                Button(this.tr(type), { type: ButtonType.Normal })
+                  .height(44)
+                  .fontSize(11)
+                  .fontColor(this.editorMaskType === type
+                    ? $r('app.color.accent_ink') : $r('app.color.ink'))
+                  .backgroundColor(this.editorMaskType === type
+                    ? $r('app.color.accent') : $r('app.color.paper_2'))
+                  .onClick((): void => {
+                    this.ensureEditorMaskLayer();
+                    this.editorMaskType = type;
+                    this.editorMaskAmount = 100;
+                    this.editorMaskInvert = false;
+                    this.editorMaskSubtract = false;
+                    this.editorMaskStrokes = [];
+                    this.status = this.tr('智能蒙版已创建 · 可继续添加或减去画笔');
+                    this.refreshEditorRenderedPreview();
+                  })
+              },
+              (type: string): string => type
+            )
+          }
+        }
+        .width('100%')
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        this.EditorSlider('强度', this.editorMaskAmount, 0, 100, false, (value: number): void => {
+          this.editorMaskAmount = value;
+        })
+        this.EditorSlider('羽化', this.editorMaskFeather, 0, 100, false, (value: number): void => {
+          this.editorMaskFeather = value;
+        })
+        this.EditorSlider('画笔大小', this.editorMaskBrushSize, 4, 64, false, (value: number): void => {
+          this.editorMaskBrushSize = value;
+        })
+        Button(this.tr('反向蒙版'), { type: ButtonType.Normal })
+          .height(46)
+          .width('100%')
+          .fontColor(this.editorMaskInvert
+            ? $r('app.color.accent_ink') : $r('app.color.ink'))
+          .backgroundColor(this.editorMaskInvert
+            ? $r('app.color.accent') : $r('app.color.paper_2'))
+          .onClick((): void => {
+            this.editorMaskInvert = !this.editorMaskInvert;
+            this.status = this.editorMaskInvert
+              ? '蒙版已反向'
+              : '蒙版已恢复正向';
+            this.refreshEditorRenderedPreview();
+          })
+        Text(this.tr('蒙版内调整'))
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+        this.EditorSlider('曝光', this.editorMaskExposure, -200, 200, true, (value: number): void => {
+          this.editorMaskExposure = value;
+        })
+        this.EditorSlider('对比度', this.editorMaskContrast, -100, 100, false, (value: number): void => {
+          this.editorMaskContrast = value;
+        })
+        this.EditorSlider('高光', this.editorMaskHighlights, -100, 100, false, (value: number): void => {
+          this.editorMaskHighlights = value;
+        })
+        this.EditorSlider('阴影', this.editorMaskShadows, -100, 100, false, (value: number): void => {
+          this.editorMaskShadows = value;
+        })
+        this.EditorSlider('色温', this.editorMaskTemperature, -100, 100, false, (value: number): void => {
+          this.editorMaskTemperature = value;
+        })
+        this.EditorSlider('色调', this.editorMaskTint, -100, 100, false, (value: number): void => {
+          this.editorMaskTint = value;
+        })
+        this.EditorSlider('饱和度', this.editorMaskSaturation, -100, 100, false, (value: number): void => {
+          this.editorMaskSaturation = value;
+        })
+        this.EditorSlider('清晰度', this.editorMaskClarity, -100, 100, false, (value: number): void => {
+          this.editorMaskClarity = value;
+        })
+        Text(this.tr(this.editorMaskEnabled
+          ? '在预览画面拖动画笔；蓝色为添加，白色为减去。'
+          : '先创建蒙版，再选择添加或减去画笔。'))
+          .fontSize(11).fontColor($r('app.color.muted')).width('100%')
       } else if (this.editorPanel === 'detail') {
         this.EditorSlider(
           '纹理',
@@ -2214,6 +3412,9 @@ struct Index {
               'original', '1:1', '4:3', '3:2', '16:9'
             ];
             this.editorCropRatio = ratios[index];
+            if (this.editorMaskEnabled) {
+              this.refreshEditorRenderedPreview();
+            }
           })
         Row({ space: 8 }) {
           Button(this.tr('旋转 90°'), { type: ButtonType.Normal })
@@ -2221,6 +3422,9 @@ struct Index {
             .layoutWeight(1)
             .onClick((): void => {
               this.editorRotation = (this.editorRotation + 90) % 360;
+              if (this.editorMaskEnabled) {
+                this.refreshEditorRenderedPreview();
+              }
             })
           Button(this.tr('水平翻转'), { type: ButtonType.Normal })
             .height(48)
@@ -2228,12 +3432,18 @@ struct Index {
             .onClick((): void => {
               this.editorFlipHorizontal =
                 !this.editorFlipHorizontal;
+              if (this.editorMaskEnabled) {
+                this.refreshEditorRenderedPreview();
+              }
             })
           Button(this.tr('垂直翻转'), { type: ButtonType.Normal })
             .height(48)
             .layoutWeight(1)
             .onClick((): void => {
               this.editorFlipVertical = !this.editorFlipVertical;
+              if (this.editorMaskEnabled) {
+                this.refreshEditorRenderedPreview();
+              }
             })
         }
         .width('100%')
@@ -2247,6 +3457,71 @@ struct Index {
       color: $r('app.color.rule'),
       radius: 10
     })
+  }
+
+  @Builder
+  private EditorWheel(
+    label: string,
+    xValue: number,
+    yValue: number,
+    tint: ResourceColor,
+    onChange: (x: number, y: number) => void
+  ) {
+    Column({ space: 4 }) {
+      Stack({ alignContent: Alignment.Center }) {
+        Circle()
+          .width(78)
+          .height(78)
+          .fill($r('app.color.graphite'))
+          .border({ width: 6, color: tint })
+        Circle()
+          .width(10)
+          .height(10)
+          .fill(tint)
+          .position({
+            x: `${39 + Math.max(-1, Math.min(1, xValue / 100)) * 28}vp`,
+            y: `${39 - Math.max(-1, Math.min(1, yValue / 100)) * 28}vp`
+          })
+      }
+      .width(78)
+      .height(78)
+      .onTouch((event: TouchEvent): void => {
+        const point = event.touches[0];
+        if (point === undefined || (event.type !== TouchType.Down && event.type !== TouchType.Move)) {
+          return;
+        }
+        const dx: number = Math.max(-1, Math.min(1, (point.x - 39) / 28));
+        const dy: number = Math.max(-1, Math.min(1, (39 - point.y) / 28));
+        onChange(dx * 100, dy * 100);
+      })
+      Text(label)
+        .fontSize(11)
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.muted'))
+      Text(`${xValue >= 0 ? '+' : ''}${Math.round(xValue)}, ${yValue >= 0 ? '+' : ''}${Math.round(yValue)}`)
+        .fontSize(10)
+        .fontColor($r('app.color.muted'))
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  private editorCurvePathCommands(): string {
+    const points: Array<EditorCurvePoint> = this.editorCurvePoints.slice().sort((a: EditorCurvePoint, b: EditorCurvePoint): number => a.x - b.x);
+    if (points.length === 0) return '';
+    let commands: string = `M ${points[0].x * 320} ${(1 - points[0].y) * 140}`;
+    for (let index: number = 0; index < points.length - 1; index++) {
+      const p0: EditorCurvePoint = points[Math.max(0, index - 1)];
+      const p1: EditorCurvePoint = points[index];
+      const p2: EditorCurvePoint = points[index + 1];
+      const p3: EditorCurvePoint = points[Math.min(points.length - 1, index + 2)];
+      const c1x: number = p1.x + (p2.x - p0.x) / 6;
+      const c1y: number = p1.y + (p2.y - p0.y) / 6;
+      const c2x: number = p2.x - (p3.x - p1.x) / 6;
+      const c2y: number = p2.y - (p3.y - p1.y) / 6;
+      commands += ` C ${c1x * 320} ${(1 - c1y) * 140} ${c2x * 320} ${(1 - c2y) * 140} ${p2.x * 320} ${(1 - p2.y) * 140}`;
+    }
+    return commands;
   }
 
   @Builder
@@ -2276,6 +3551,9 @@ struct Index {
       })
         .onChange((next: number): void => {
           onChange(Math.round(next));
+          if (this.editorMaskEnabled) {
+            this.refreshEditorRenderedPreview();
+          }
         })
     }
     .width('100%')
@@ -2285,8 +3563,17 @@ struct Index {
   @Builder
   private CameraWorkspace() {
     Column({ space: 16 }) {
-      if (this.section === 'capture') {
+      if (this.section === 'capture' && !this.isCompact()) {
         this.CaptureSessionPanel()
+      } else {
+        Text('00:00:00:00')
+          .fontSize(38)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .textAlign(TextAlign.Center)
+          .width('100%')
+          .height(60)
       }
       Stack({ alignContent: Alignment.TopStart }) {
         if (this.preview !== undefined) {
@@ -2320,16 +3607,26 @@ struct Index {
           .borderRadius(5)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .margin(16)
-        Button(this.tr('全屏'), { type: ButtonType.Normal })
-          .height(44)
-          .fontColor(Color.White)
-          .backgroundColor('#99000000')
-          .borderRadius(12)
-          .align(Alignment.TopEnd)
-          .margin(16)
-          .onClick((): void => {
-            this.openImmersivePreview(this.section === 'monitor');
-          })
+        if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
+          Text('＋')
+            .fontSize(32)
+            .fontColor('#FFE45C')
+            .position({
+              x: `${this.monitorFocusPointX * 100}%`,
+              y: `${this.monitorFocusPointY * 100}%`
+            })
+        } else if (this.section !== 'monitor') {
+          Button(this.tr('全屏'), { type: ButtonType.Normal })
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor('#99000000')
+            .borderRadius(12)
+            .align(Alignment.TopEnd)
+            .margin(16)
+            .onClick((): void => {
+              this.openImmersivePreview(false);
+            })
+        }
       }
       .width('100%')
       .layoutWeight(1)
@@ -2340,6 +3637,27 @@ struct Index {
         color: $r('app.color.graphite_rule'),
         radius: 18
       })
+      .onTouch((event: TouchEvent): void => {
+        if (this.section !== 'monitor' || event.type !== TouchType.Up) return;
+        const point = event.touches[0];
+        if (point === undefined) return;
+        const normalized = this.normalizeMonitorPoint(point.x, point.y);
+        if (normalized !== undefined) this.focusAtMonitorPoint(normalized[0], normalized[1]);
+      })
+      .onAreaChange((_oldArea: Area, newArea: Area): void => {
+        this.monitorStageWidth = Math.max(1, Number(newArea.width));
+        this.monitorStageHeight = Math.max(1, Number(newArea.height));
+      })
+
+      this.NikonCloudMonitorPicker()
+
+      if (this.section === 'monitor') {
+        this.MonitorScopeRail()
+        this.MonitorParameterRail()
+        this.MonitorParameterControls()
+        this.MonitorToolRail()
+        this.MonitorStorageCard()
+      }
 
       this.ExposureReadoutRail()
 
@@ -2383,7 +3701,11 @@ struct Index {
               : $r('app.color.accent')
           )
           .borderRadius(12)
-          .enabled(this.connected && !this.busy)
+          .enabled(
+            (this.section === 'monitor'
+              ? this.connected
+              : (this.connected || this.wifiConnected || this.localCameraSelected)) && !this.busy
+          )
           .onClick((): void => {
             if (this.section === 'monitor') {
               this.toggleVideoRecording();
@@ -2391,22 +3713,360 @@ struct Index {
               this.capturePhoto();
             }
           })
+        if (this.section === 'capture' || this.section === 'monitor') {
+          Button('AF-ON', { type: ButtonType.Normal })
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor('#334A5F')
+            .borderRadius(12)
+            .enabled(this.connected && this.liveView && !this.busy)
+            .onClick((): void => {
+              this.triggerAutoFocusOn();
+            })
+        }
       }
       .width('100%')
       if (this.section === 'capture') {
+        if (this.isCompact()) {
+          this.CaptureSessionPanel()
+        }
         this.ShootingTaskPanel()
       }
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
+    .backgroundColor(
+      this.section === 'monitor'
+        ? '#040A12'
+        : $r('app.color.paper')
+    )
+  }
+
+  @Builder
+  private NikonCloudMonitorPicker() {
+    Column({ space: 8 }) {
+      Row({ space: 12 }) {
+        Text('NP3')
+          .width(40)
+          .height(40)
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#FFFFFF')
+          .textAlign(TextAlign.Center)
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(12)
+        Column({ space: 2 }) {
+          Text(this.tr('尼康云创监看'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(
+              this.section === 'monitor'
+                ? '#FFFFFF'
+                : $r('app.color.ink')
+            )
+          Text(
+            this.selectedMonitorNikonCloudPreset()?.name ??
+            this.tr('已关闭')
+          )
+            .fontSize(11)
+            .fontColor(
+              this.section === 'monitor'
+                ? '#CAD3E0'
+                : $r('app.color.muted')
+            )
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Select(this.nikonCloudSelectEntries())
+          .selected(this.monitorNikonCloudPresetIndex())
+          .value(this.tr('选择预设'))
+          .width(142)
+          .height(44)
+          .onSelect((index: number): void => {
+            this.monitorNikonCloudPresetId = index === 0
+              ? '' : NIKON_CLOUD_PRESETS[index - 1].id;
+            const selected: NikonCloudPreset | undefined =
+              this.selectedMonitorNikonCloudPreset();
+            this.status = selected === undefined
+              ? '尼康云创监看已关闭'
+              : `尼康云创监看 · ${selected.name} · 照片/视频 · SDR 近似`;
+          })
+      }
+      .width('100%')
+      Text(this.tr('照片与视频实时生效 · SDR 近似 · 不写入原片'))
+        .fontSize(11)
+        .fontColor(
+          this.section === 'monitor'
+            ? '#CAD3E0'
+            : $r('app.color.muted')
+        )
+        .maxLines(2)
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(
+      this.section === 'monitor'
+        ? '#182434'
+        : $r('app.color.accent_soft')
+    )
+    .border({
+      width: 1,
+      color: this.section === 'monitor'
+        ? '#304E70'
+        : $r('app.color.accent'),
+      radius: 14
+    })
+  }
+
+  @Builder
+  private MonitorScopeRail() {
+    Row({ space: 10 }) {
+      Canvas(this.monitorRgbScopeContext)
+        .width('100%')
+        .height(100)
+        .onReady((): void => {
+          this.drawMonitorRgbScope();
+        })
+      .layoutWeight(1)
+      .height(112)
+      .padding(3)
+      .backgroundColor('#000000')
+      Canvas(this.monitorAudioScopeContext)
+        .width('100%')
+        .height(100)
+        .onReady((): void => {
+          this.drawAudioScope();
+        })
+      .layoutWeight(1)
+      .height(112)
+      .padding(3)
+      .backgroundColor('#000000')
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private MonitorParameterRail() {
+    Scroll() {
+      Row() {
+        this.MonitorReadout('帧率', this.connected ? `${this.videoFrameRate}` : '—')
+        this.MonitorReadout('快门', this.connected ? this.shutterDisplay() : '—')
+        this.MonitorReadout('光圈', this.connected ? `f/${this.currentAperture.toFixed(1)}` : '—')
+        this.MonitorReadout('ISO', this.connected ? `${this.currentIso}` : '—')
+        this.MonitorReadout('白平衡', this.connected ? '自动' : '—')
+        this.MonitorReadout('色调', this.connected ? `${this.currentCompensation >= 0 ? '+' : ''}${Math.round(this.currentCompensation)}` : '—')
+      }
+    }
+    .width('100%')
+    .height(66)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private MonitorParameterControls() {
+    Scroll() {
+      Row({ space: 8 }) {
+        this.ImmersiveParameterControl('帧率', `${this.videoFrameRate}p`, 'videoFrameRate')
+        this.ImmersiveParameterControl(
+          this.videoShutterMode === 'angle' ? '快门角度' : '快门速度',
+          this.videoShutterMode === 'angle'
+            ? `${this.videoShutterAngle.toFixed(1)}°`
+            : this.shutterDisplay(),
+          'videoShutter'
+        )
+        this.ImmersiveParameterControl('ISO', `${this.currentIso}`, 'iso')
+        this.ImmersiveParameterControl('光圈', `f/${this.currentAperture.toFixed(1)}`, 'aperture')
+      }
+      .padding({ left: 2, right: 2 })
+    }
+    .width('100%')
+    .height(58)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+  }
+
+  @Builder
+  private MonitorReadout(label: string, value: string) {
+    Column({ space: 2 }) {
+      Text(this.tr(label))
+        .fontSize(10)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#A6B0BF')
+      Text(value)
+        .fontSize(17)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+    }
+    .width(72)
+    .height(56)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private MonitorToolRail() {
+    Row() {
+      this.MonitorTool('◎', '峰值对焦', 0)
+      this.MonitorTool('LUT', 'LUT', 1)
+      this.MonitorTool('◉', '假色', 2)
+      this.MonitorTool('AF-ON', 'AF-ON', 3)
+    }
+    .width('100%')
+    .padding({ top: 4, bottom: 8 })
+  }
+
+  @Builder
+  private MonitorTool(glyph: string, description: string, index: number) {
+    Button(glyph, { type: ButtonType.Normal })
+      .layoutWeight(1)
+      .height(52)
+      .fontSize(index === 1 ? 11 : 24)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(Color.White)
+      .backgroundColor(Color.Transparent)
+      .borderRadius(8)
+      .accessibilityText(this.tr(description))
+      .onClick((): void => {
+        if (index === 0) {
+          this.focusPeakingEnabled = !this.focusPeakingEnabled;
+        } else if (index === 2) {
+          this.falseColorEnabled = !this.falseColorEnabled;
+        } else if (index === 3) {
+          this.triggerAutoFocusOn();
+        }
+      })
+  }
+
+  private triggerAutoFocusOn(): void {
+    if (!this.connected || !this.liveView || this.busy) {
+      this.showError('请先开启实时取景');
+      return;
+    }
+    this.camera.triggerAutoFocus().then((): void => {
+      this.status = 'AF-ON 已触发';
+    }).catch((error: Error): void => {
+      this.showError(`AF-ON 失败：${error.message}`);
+    });
+  }
+
+  private focusAtMonitorPoint(x: number, y: number): void {
+    if (!this.connected || !this.liveView || this.busy) {
+      this.showError('请先开启实时取景');
+      return;
+    }
+    this.monitorFocusPointX = Math.max(0, Math.min(1, x));
+    this.monitorFocusPointY = Math.max(0, Math.min(1, y));
+    setTimeout((): void => {
+      this.monitorFocusPointX = -1;
+      this.monitorFocusPointY = -1;
+    }, 1400);
+    const dx: number = x - 0.5;
+    const dy: number = y - 0.5;
+    const step: number = Math.abs(dx) >= Math.abs(dy)
+      ? Math.round(Math.max(-3, Math.min(3, dx * 8)))
+      : Math.round(Math.max(-3, Math.min(3, dy * 8)));
+    this.camera.setParameter('focusMode', 'single-shot').then((): Promise<void> => {
+      return step === 0 ? Promise.resolve() : this.camera.moveFocus(step);
+    }).catch((error: Error): void => {
+      this.showError(`对焦请求失败：${error.message}`);
+    });
+    if (step === 0) this.status = '已触发单次自动对焦';
+    else this.status = '焦点步进已完成（当前相机不支持二维对焦点）';
+  }
+
+  private normalizeMonitorPoint(x: number, y: number): Array<number> | undefined {
+    // ImageFit.Contain centers the source and leaves letterbox margins; ignore taps in those margins.
+    // PixelMap dimensions are not exposed synchronously here, so use the monitor's 16:9 transport aspect as fallback.
+    const containerWidth = Math.max(1, this.monitorStageWidth);
+    const containerHeight = Math.max(1, this.monitorStageHeight);
+    const sourceAspect = 16 / 9;
+    const containerAspect = containerWidth / containerHeight;
+    let left = 0;
+    let top = 0;
+    let width = 1;
+    let height = 1;
+    if (containerAspect > sourceAspect) {
+      width = containerWidth * (sourceAspect / containerAspect);
+      left = (containerWidth - width) / 2;
+    } else {
+      height = containerHeight * (containerAspect / sourceAspect);
+      top = (containerHeight - height) / 2;
+    }
+    if (x < left || x > left + width || y < top || y > top + height) return undefined;
+    return [Math.max(0, Math.min(1, (x - left) / width)), Math.max(0, Math.min(1, (y - top) / height))];
+  }
+
+  @Builder
+  private MonitorStorageCard() {
+    Row({ space: 12 }) {
+      Text('▯')
+        .fontSize(36)
+        .fontColor(Color.White)
+        .width(48)
+        .textAlign(TextAlign.Center)
+      Column({ space: 3 }) {
+        Text('—')
+          .fontSize(22)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        Text(this.librarySizeText())
+          .fontSize(14)
+          .fontColor('#389BEF')
+        Row() {
+          Text('图库占用 · 本地缓存')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .layoutWeight(1)
+          Text(this.photos.length > 0 ? `${this.photos.length} 个文件` : '暂无文件')
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+        }
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+    }
+    .width('100%')
+    .height(88)
+    .padding(14)
+    .backgroundColor('#1D2635')
+    .borderRadius(10)
+  }
+
+  private librarySizeText(): string {
+    const bytes: number = this.photos.reduce(
+      (total: number, item: PhotoItem): number => total + item.size,
+      0
+    );
+    if (bytes <= 0) {
+      return '暂无本地图库文件';
+    }
+    if (bytes >= 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    }
+    if (bytes >= 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   }
 
   @Builder
   private ExposureReadoutRail() {
     Scroll() {
       Row() {
-        this.ReadoutCell('来源', this.connected ? 'USB/PTP' : '—', false, false)
+        this.ReadoutCell(
+          '来源',
+          this.connected ? 'USB/PTP' : (this.localCameraSelected ? '本机' : '—'),
+          false,
+          false
+        )
         this.ReadoutDivider()
         this.ReadoutCell(
           '模式',
@@ -2637,6 +4297,25 @@ struct Index {
         .fontColor($r('app.color.muted'))
         .width('100%')
       this.BranchWorkspace()
+      Button(
+        this.tr(
+          `${this.wirelessExpanded ? '⌄' : '›'} 无线传输 · ` +
+          `${this.wifiConnected ? 'Wi‑Fi 已连接' : 'Wi‑Fi 未连接'} · ` +
+          `${this.wirelessRunning ? '收件箱运行中' : '收件箱已停止'}`
+        ),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.wirelessExpanded = !this.wirelessExpanded;
+        })
+      if (this.wirelessExpanded) {
+        this.WirelessTransferCard()
+      }
+      this.CameraStorageWorkspace()
       Row({ space: 8 }) {
         Button(this.tr('刷新系统相册'), { type: ButtonType.Normal })
           .height(44)
@@ -2788,24 +4467,206 @@ struct Index {
           .fontColor($r('app.color.muted'))
           .width('100%')
       }
-      Button(
-        this.tr(`${this.wirelessExpanded ? '⌄' : '›'} 无线传输`),
-        { type: ButtonType.Normal }
-      )
-        .width('100%')
-        .height(44)
-        .fontColor($r('app.color.ink'))
-        .backgroundColor($r('app.color.paper_2'))
-        .onClick((): void => {
-          this.wirelessExpanded = !this.wirelessExpanded;
-        })
-      if (this.wirelessExpanded) {
-        this.WirelessTransferCard()
-      }
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
+  }
+
+  @Builder
+  private CameraStorageWorkspace() {
+    Column({ space: 10 }) {
+      Button(
+        this.tr(
+          `${this.cameraStorageExpanded ? '⌄' : '›'} 相机机内存储 · ` +
+          `${this.cameraStorageSnapshot.items.length}`
+        ),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(48)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.cameraStorageExpanded = !this.cameraStorageExpanded;
+        })
+      if (this.cameraStorageExpanded) {
+        Text(
+          this.cameraStorageSnapshot.capacityBytes > 0
+            ? `${this.formatStorageSize(
+              this.cameraStorageSnapshot.capacityBytes -
+                this.cameraStorageSnapshot.freeBytes
+            )} 已用 / ${this.formatStorageSize(
+              this.cameraStorageSnapshot.capacityBytes
+            )}`
+            : this.tr(this.cameraStorageStatus)
+        )
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Row({ space: 8 }) {
+          Button(
+            this.cameraStorageBusy ? this.tr('正在读取…') : this.tr('刷新机内文件'),
+            { type: ButtonType.Normal }
+          )
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .enabled(
+              !this.cameraStorageBusy && (this.connected || this.wifiConnected)
+            )
+            .onClick((): void => {
+              this.refreshCameraStorage();
+            })
+          Button(
+            this.selectedCameraStorageHandles.length > 0 &&
+              this.selectedCameraStorageHandles.length ===
+                this.cameraStorageSnapshot.items.filter(
+                  (item: CameraStorageItem): boolean => !item.protectedObject
+                ).length
+              ? this.tr('取消全选')
+              : this.tr('全选'),
+            { type: ButtonType.Normal }
+          )
+            .height(44)
+            .layoutWeight(1)
+            .enabled(!this.cameraStorageBusy && this.cameraStorageSnapshot.items.length > 0)
+            .onClick((): void => {
+              const selectable: Array<number> = this.cameraStorageSnapshot.items
+                .filter((item: CameraStorageItem): boolean => !item.protectedObject)
+                .map((item: CameraStorageItem): number => item.handle);
+              this.selectedCameraStorageHandles =
+                this.selectedCameraStorageHandles.length === selectable.length
+                  ? []
+                  : selectable;
+            })
+        }
+        .width('100%')
+        Row({ space: 8 }) {
+          Button(this.tr('下载所选'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .enabled(!this.cameraStorageBusy && this.selectedCameraStorageHandles.length > 0)
+            .onClick((): void => {
+              this.downloadSelectedCameraStorage();
+            })
+          Button(this.tr('从相机删除'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor(Color.White)
+            .backgroundColor($r('app.color.video'))
+            .enabled(!this.cameraStorageBusy && this.selectedCameraStorageHandles.length > 0)
+            .onClick((): void => {
+              this.confirmDeleteSelectedCameraStorage();
+            })
+        }
+        .width('100%')
+        if (!this.connected && !this.wifiConnected) {
+          Text(this.tr('请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机。系统摄像头不开放机内存储。'))
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .padding(22)
+        } else if (this.cameraStorageSnapshot.items.length === 0) {
+          Text(this.tr(
+            this.cameraStorageBusy
+              ? '正在读取存储卷与文件信息…'
+              : '暂无机内文件。点击“刷新机内文件”读取相机存储卡。'
+          ))
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .padding(22)
+        } else {
+          List({ space: 6 }) {
+            ForEach(
+              this.cameraStorageSnapshot.items,
+              (item: CameraStorageItem) => {
+                ListItem() {
+                  Row({ space: 10 }) {
+                    Checkbox({
+                      name: `camera-storage-${item.handle}`,
+                      group: 'camera-storage-selection'
+                    })
+                      .select(this.selectedCameraStorageHandles.indexOf(item.handle) >= 0)
+                      .enabled(!item.protectedObject && !this.cameraStorageBusy)
+                      .onChange((selected: boolean): void => {
+                        this.toggleCameraStorageSelection(item.handle, selected);
+                      })
+                    Stack({ alignContent: Alignment.Center }) {
+                      Text(item.isVideo ? '▶' : '▣')
+                        .fontSize(18)
+                        .fontColor(Color.White)
+                    }
+                      .width(60)
+                      .height(44)
+                      .backgroundColor($r('app.color.graphite'))
+                      .borderRadius(6)
+                    Column({ space: 3 }) {
+                      Text(item.filename)
+                        .fontSize(14)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor($r('app.color.ink'))
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .width('100%')
+                      Text(
+                        `${this.formatStorageSize(item.sizeBytes)}` +
+                        `${item.width > 0 && item.height > 0
+                          ? ` · ${item.width} × ${item.height}` : ''}` +
+                        ` · ${item.capturedAt}` +
+                        `${item.protectedObject ? ' · 已保护' : ''}`
+                      )
+                        .fontSize(11)
+                        .fontFamily('monospace')
+                        .fontColor($r('app.color.muted'))
+                        .maxLines(1)
+                        .width('100%')
+                    }
+                      .layoutWeight(1)
+                      .alignItems(HorizontalAlign.Start)
+                  }
+                  .width('100%')
+                  .height(60)
+                  .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+                  .backgroundColor($r('app.color.surface'))
+                  .border({
+                    width: 1,
+                    color: $r('app.color.rule'),
+                    radius: 8
+                  })
+                }
+              },
+              (item: CameraStorageItem): string => `${item.handle}`
+            )
+          }
+            .width('100%')
+            .height(Math.min(420, Math.max(72, this.cameraStorageSnapshot.items.length * 68)))
+            .scrollBar(BarState.Auto)
+        }
+        Text(this.tr(this.cameraStorageStatus))
+          .fontSize(11)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(12)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 12
+    })
   }
 
   @Builder
@@ -3354,8 +5215,98 @@ struct Index {
   }
 
   @Builder
+  private WifiCameraTransferSection() {
+    Column({ space: 10 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('Wi‑Fi 相机 · PTP/IP'))
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('相机控制'))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+          Text(this.tr(this.wifiStatus))
+            .fontSize(11)
+            .fontColor(this.wifiConnected
+              ? $r('app.color.positive')
+              : $r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Button(this.tr(this.wifiConnected ? '断开' : '连接'), {
+          type: ButtonType.Normal
+        })
+          .height(44)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(8)
+          .enabled(!this.wifiConnecting && !this.busy)
+          .onClick((): void => {
+            if (this.wifiConnected) {
+              this.disconnectWifiCamera();
+            } else {
+              this.connectWifiCamera();
+            }
+          })
+      }
+      .width('100%')
+      Text(this.tr('连接模式'))
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .width('100%')
+      Select([
+        { value: this.tr('AP 直连') },
+        { value: this.tr('STA 局域网') }
+      ])
+        .selected(this.wifiConnectionMode === 'sta' ? 1 : 0)
+        .width('100%')
+        .enabled(!this.wifiConnected && !this.wifiConnecting)
+        .onSelect((index: number): void => {
+          this.wifiConnectionMode = index === 1 ? 'sta' : 'ap';
+          this.persistWifiConnectionSettings();
+        })
+      Text(this.tr(
+        this.wifiConnectionMode === 'sta'
+          ? 'STA 模式：让相机与设备加入同一局域网，并输入路由器分配给相机的 IP 地址。'
+          : 'AP 模式：让设备加入相机热点；相机地址通常为 192.168.1.1。'
+      ))
+        .fontSize(11)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Row({ space: 10 }) {
+        TextInput({ placeholder: '192.168.1.1', text: this.wifiHost })
+          .height(42)
+          .layoutWeight(1)
+          .onChange((value: string): void => {
+            this.wifiHost = value;
+          })
+        TextInput({ placeholder: '15740', text: this.wifiPort })
+          .height(42)
+          .width(108)
+          .type(InputType.Number)
+          .onChange((value: string): void => {
+            this.wifiPort = value;
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder
   private WirelessTransferCard() {
     Column({ space: 12 }) {
+          this.WifiCameraTransferSection()
+          Divider()
+            .color($r('app.color.rule'))
+          Text(this.tr('文件接收'))
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
         Text(this.tr('多协议无线图片收件箱'))
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
@@ -3402,6 +5353,116 @@ struct Index {
       color: $r('app.color.rule'),
       radius: 8
     })
+  }
+
+  @Builder
+  private ConnectionPanelOverlay() {
+    Column({ space: 14 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('相机连接'))
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('本机摄像头、USB/PTP 与官方 SDK'))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Button(this.tr('关闭'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(8)
+          .onClick((): void => {
+            this.connectionPanelVisible = false;
+          })
+      }
+      .width('100%')
+
+      Row({ space: 12 }) {
+        Column({ space: 4 }) {
+          Text(this.tr('本机摄像头'))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr(
+            this.localCameraSelected
+              ? '已选择 · 拍摄时由 HarmonyOS 系统相机接管取景'
+              : '调用设备内置镜头拍照，并自动保存到帧澈文件库'
+          ))
+            .fontSize(11)
+            .fontColor(this.localCameraSelected
+              ? $r('app.color.positive')
+              : $r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Button(this.tr(this.localCameraSelected ? '取消选择' : '使用'), {
+          type: ButtonType.Normal
+        })
+          .height(44)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(8)
+          .enabled(!this.busy)
+          .onClick((): void => {
+            if (this.localCameraSelected) {
+              this.localCameraSelected = false;
+              this.status = '已取消本机摄像头';
+            } else {
+              this.selectLocalCamera();
+            }
+          })
+      }
+      .width('100%')
+      .padding(14)
+      .backgroundColor($r('app.color.accent_soft'))
+      .borderRadius(10)
+
+      Row({ space: 12 }) {
+        Column({ space: 4 }) {
+          Text(this.tr('USB / PTP'))
+            .fontSize(16)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.connected
+            ? `${this.cameraName} · ${this.tr('已连接')}`
+            : this.tr('使用数据线连接受支持的相机'))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Button(this.tr(this.connected ? '断开' : '连接'), {
+          type: ButtonType.Normal
+        })
+          .height(44)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(8)
+          .enabled(!this.busy)
+          .onClick((): void => {
+            this.toggleCameraConnection();
+          })
+      }
+      .width('100%')
+      .padding(14)
+      .backgroundColor($r('app.color.paper_2'))
+      .borderRadius(10)
+
+    }
+    .width('92%')
+    .constraintSize({ maxWidth: 680 })
+    .padding(20)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule_strong'),
+      radius: 16
+    })
+    .shadow({ radius: 24, color: '#44000000', offsetY: 10 })
   }
 
   @Builder
@@ -3725,11 +5786,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n' +
-                '• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n' +
-                '• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n' +
-                '• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n' +
-                '• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n' +
+                '• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n' +
+                '• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n' +
+                '• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n' +
+                '• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n' +
+                '• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n' +
                 '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
               ))
                 .fontSize(14)
@@ -4156,7 +6217,11 @@ struct Index {
           : $r('app.color.accent')
       )
       .borderRadius(48)
-      .enabled(this.connected && !this.busy)
+      .enabled(
+        (this.immersiveMonitoring
+          ? this.connected
+          : (this.connected || this.wifiConnected)) && !this.busy
+      )
       .onClick((): void => {
         if (this.immersiveMonitoring) {
           this.toggleVideoRecording();
@@ -4275,6 +6340,36 @@ struct Index {
                   `${this.videoFrameRate}p`,
                   'videoFrameRate'
                 )
+                Button(
+                  this.videoShutterMode === 'angle' ? '快门角度' : '快门速度',
+                  { type: ButtonType.Normal }
+                )
+                  .height(44)
+                  .fontColor(Color.White)
+                  .backgroundColor('#334A5F')
+                  .borderRadius(10)
+                  .onClick((): void => {
+                    this.videoShutterMode =
+                      this.videoShutterMode === 'angle' ? 'speed' : 'angle';
+                    if (this.videoShutterMode === 'angle') {
+                      this.applyVideoShutterAngle();
+                    }
+                  })
+                this.ImmersiveParameterControl(
+                  '拍摄模式',
+                  this.exposureMode.toUpperCase(),
+                  'exposureMode'
+                )
+                this.ImmersiveParameterControl(
+                  '视频录制规格',
+                  this.videoCodecLabel(),
+                  'videoCodec'
+                )
+                this.ImmersiveParameterControl(
+                  'Log',
+                  this.videoLogLabel(),
+                  'videoLog'
+                )
               } else {
                 this.ImmersiveParameterControl(
                   '拍摄模式',
@@ -4362,6 +6457,78 @@ struct Index {
   }
 
   @Builder
+  private CaptureAssistSettingsCard() {
+    Column({ space: 12 }) {
+      Text(this.tr('拍摄辅助'))
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .width('100%')
+      Text(this.tr('蓝牙遥控与拍摄定位'))
+        .fontSize(12)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('蓝牙遥控拍摄'))
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr(this.bluetoothRemoteStatus))
+            .fontSize(11)
+            .fontColor(this.bluetoothRemoteConnected
+              ? $r('app.color.positive')
+              : $r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Toggle({
+          type: ToggleType.Switch,
+          isOn: this.bluetoothRemoteEnabled
+        })
+          .onChange((enabled: boolean): void => {
+            this.setBluetoothRemoteEnabled(enabled);
+          })
+      }
+      .width('100%')
+      Divider()
+        .color($r('app.color.rule'))
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('拍摄位置'))
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr(this.locationTaggingStatus))
+            .fontSize(11)
+            .fontColor($r('app.color.muted'))
+          Text(this.tr('拍摄时写入同名 XMP GPS，不在后台持续定位。'))
+            .fontSize(10)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Toggle({
+          type: ToggleType.Switch,
+          isOn: this.locationTaggingEnabled
+        })
+          .onChange((enabled: boolean): void => {
+            this.setLocationTaggingEnabled(enabled);
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(20)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 8
+    })
+  }
+
+  @Builder
   private SettingsWorkspace() {
     Scroll() {
       Column({ space: 20 }) {
@@ -4370,7 +6537,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text(this.tr('更新、诊断与支持。'))
+        Text(this.tr('通用、拍摄辅助、更新、诊断与支持。'))
           .fontSize(14)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -4411,6 +6578,57 @@ struct Index {
               ];
               this.changeLanguage(languages[index]);
             })
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        this.CaptureAssistSettingsCard()
+        Column({ space: 8 }) {
+          Text(this.tr('索尼官方 SDK'))
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr(
+            '索尼 Camera Remote SDK 2.02.00 只提供 macOS 与 Windows 运行库；当前平台继续使用原生 Camera Remote Command 连接后端。'
+          ))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+        }
+        .width('100%')
+        .padding(20)
+        .alignItems(HorizontalAlign.Start)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        Column({ space: 8 }) {
+          Text(this.tr('尼康官方 SDK'))
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr(
+            '尼康只为 macOS 与 Windows 提供本次 SDK 运行库；当前平台继续使用原生相机连接后端。'
+          ))
+            .fontSize(12)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
         }
         .width('100%')
         .padding(20)
@@ -4803,8 +7021,24 @@ struct Index {
             .fontColor($r('app.color.muted'))
             .width('100%')
             .margin({ bottom: 4 })
+          this.ParameterSelect(
+            '视频曝光模式',
+            EXPOSURE_MODES.slice(0, 4),
+            3,
+            true,
+            'exposureMode'
+          )
           this.VideoFrameRateSelect()
+          this.VideoShutterModeSelect()
           this.VideoShutterAngleSelect()
+          this.ParameterSelect(
+            '视频录制规格',
+            this.videoCodecEntries(),
+            this.videoCodecIndex(),
+            this.camera.canAdjustParameter('videoCodec'),
+            'videoCodec'
+          )
+          this.VideoLogSelect()
           this.ParameterSelect(
             '光圈',
             APERTURES,
@@ -4915,6 +7149,26 @@ struct Index {
       .width('100%')
       .margin({ top: 8 })
     Row() {
+      Column({ space: 2 }) {
+        Text(this.tr('外录到当前智能设备'))
+          .fontSize(13)
+        Text(this.tr('生成无声 Motion‑JPEG AVI，可与机身录制并行'))
+          .fontSize(10)
+          .fontColor($r('app.color.muted'))
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Toggle({
+        type: ToggleType.Switch,
+        isOn: this.externalRecordToDevice
+      })
+        .enabled(!this.videoRecording)
+        .onChange((enabled: boolean): void => {
+          this.setExternalRecordToDevice(enabled);
+        })
+    }
+    .width('100%')
+    Row() {
       Text(this.tr('峰值对焦'))
         .fontSize(13)
         .layoutWeight(1)
@@ -4941,40 +7195,371 @@ struct Index {
     }
     .width('100%')
     Column({ space: 4 }) {
-      this.ScopeLine('R', this.redHistogram, '#FFD22D34')
-      this.ScopeLine('G', this.greenHistogram, '#FF199152')
-      this.ScopeLine('B', this.blueHistogram, '#FF2468D8')
-      this.ScopeLine('波形', this.waveform, '#FF1C2330')
-      this.ScopeLine('矢量', this.vectorscope, '#FF1C2330')
+      Canvas(this.professionalScopeContext)
+        .width('100%')
+        .height(190)
+        .onReady((): void => {
+          this.drawProfessionalScope();
+        })
       Text(`${this.tr('峰值覆盖')} · ${this.peakingCoverage}%`)
         .fontSize(10)
         .fontFamily('monospace')
-        .fontColor($r('app.color.muted'))
+        .fontColor('#BFFFFFFF')
         .width('100%')
     }
     .width('100%')
-    .padding(10)
-    .backgroundColor($r('app.color.paper_2'))
-    .borderRadius(6)
+    .padding(4)
+    .backgroundColor('#000000')
   }
 
-  @Builder
-  private ScopeLine(label: string, value: string, color: ResourceColor) {
-    Row({ space: 6 }) {
-      Text(this.tr(label))
-        .width(34)
-        .fontSize(10)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(color)
-      Text(value)
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor($r('app.color.ink'))
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .layoutWeight(1)
+  private scopeLevels(value: string): Array<number> {
+    const bars: string = '▁▂▃▄▅▆▇█';
+    const levels: Array<number> = [];
+    for (let index: number = 0; index < value.length; index++) {
+      const level: number = bars.indexOf(value.charAt(index));
+      if (level >= 0) {
+        levels.push(level / 7);
+      }
     }
-    .width('100%')
+    return levels.length > 1 ? levels : [0.08, 0.08];
+  }
+
+  private drawScopeGrid(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    parade: boolean
+  ): void {
+    context.strokeStyle = '#90FFFFFF';
+    context.lineWidth = 0.72;
+    for (let guide: number = 1; guide < 4; guide++) {
+      const lineY: number = y + height * guide / 4;
+      context.beginPath();
+      context.moveTo(x, lineY);
+      context.lineTo(x + width, lineY);
+      context.stroke();
+    }
+    if (parade) {
+      for (let guide: number = 1; guide < 3; guide++) {
+        const lineX: number = x + width * guide / 3;
+        context.beginPath();
+        context.moveTo(lineX, y);
+        context.lineTo(lineX, y + height);
+        context.stroke();
+      }
+    }
+    context.strokeStyle = '#F0FFFFFF';
+    context.lineWidth = 1.1;
+    context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+  }
+
+  private drawScopeTrace(
+    context: CanvasRenderingContext2D,
+    value: string,
+    color: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    segment: number,
+    seed: number
+  ): void {
+    const inset: number = Math.max(2, width * 0.009);
+    const segmentWidth: number = segment >= 0 ? width / 3 : width;
+    const startX: number = segment >= 0
+      ? x + segmentWidth * segment + inset
+      : x + inset;
+    const plotWidth: number = Math.max(1, segmentWidth - inset * 2);
+    const topInset: number = Math.max(3, height * 0.035);
+    const bottom: number = y + height - Math.max(3, height * 0.035);
+    const plotHeight: number = Math.max(1, bottom - y - topInset);
+    const density: ScopeDensity | null = this.parseScopeDensity(value);
+    if (density !== null) {
+      this.drawScopeDensity(
+        context, density, color, startX, y + topInset, plotWidth, plotHeight
+      );
+      return;
+    }
+    const levels: Array<number> = this.scopeLevels(value);
+    const columns: number = Math.min(190, Math.max(48, Math.floor(plotWidth / 1.35)));
+
+    context.fillStyle = color;
+    context.beginPath();
+    for (let column: number = 0; column < columns; column++) {
+      const progress: number = column / Math.max(1, columns - 1);
+      const sample: number = progress * (levels.length - 1);
+      const lower: number = Math.min(levels.length - 1, Math.floor(sample));
+      const upper: number = Math.min(levels.length - 1, lower + 1);
+      const blend: number = sample - lower;
+      const interpolated: number = levels[lower]
+        + (levels[upper] - levels[lower]) * blend;
+      const ripple: number = (this.scopeNoise(column, 0, seed) - 0.5) * 0.075;
+      const level: number = Math.min(1, Math.max(0.04, interpolated + ripple));
+      const pointX: number = startX + plotWidth * progress;
+      const envelopeY: number = y + topInset
+        + plotHeight * (1 - (0.12 + level * 0.82));
+      const particles: number = 18 + Math.round(level * 28);
+      for (let particle: number = 0; particle < particles; particle++) {
+        const distribution: number = this.scopeNoise(column, particle + 1, seed * 7);
+        const depth: number = Math.pow(
+          distribution,
+          particle % 3 === 0 ? 2.25 : 0.72
+        );
+        const jitterX: number =
+          (this.scopeNoise(column, particle + 11, seed * 13) - 0.5) * 2.2;
+        const jitterY: number =
+          (this.scopeNoise(column, particle + 29, seed * 17) - 0.5) * 2.4;
+        const pointY: number = Math.min(
+          bottom,
+          Math.max(y + topInset, envelopeY + (bottom - envelopeY) * depth + jitterY)
+        );
+        const bright: boolean = (column + particle + seed) % 5 === 0;
+        context.globalAlpha = 0.07;
+        context.fillRect(pointX + jitterX - 0.8, pointY - 0.8, 1.6, 1.6);
+        context.globalAlpha = bright ? 0.64 : 0.30;
+        const dot: number = bright ? 1.12 : 0.72;
+        context.fillRect(pointX + jitterX - dot / 2, pointY - dot / 2, dot, dot);
+      }
+    }
+
+    const trace = (): void => {
+      context.beginPath();
+      for (let column: number = 0; column < columns; column++) {
+        const progress: number = column / Math.max(1, columns - 1);
+        const sample: number = progress * (levels.length - 1);
+        const lower: number = Math.min(levels.length - 1, Math.floor(sample));
+        const upper: number = Math.min(levels.length - 1, lower + 1);
+        const blend: number = sample - lower;
+        const level: number = Math.min(
+          1,
+          Math.max(
+            0.04,
+            levels[lower] + (levels[upper] - levels[lower]) * blend
+              + (this.scopeNoise(column, 0, seed) - 0.5) * 0.075
+          )
+        );
+        const pointX: number = startX + plotWidth * progress;
+        const pointY: number = y + topInset
+          + plotHeight * (1 - (0.12 + level * 0.82));
+        if (column === 0) context.moveTo(pointX, pointY);
+        else context.lineTo(pointX, pointY);
+      }
+      context.stroke();
+    };
+
+    context.globalAlpha = 1;
+    context.strokeStyle = color;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.globalAlpha = 0.14;
+    context.lineWidth = 3.2;
+    trace();
+    context.globalAlpha = 0.62;
+    context.lineWidth = 0.72;
+    trace();
+    context.globalAlpha = 1;
+  }
+
+  private drawScopeDensity(
+    context: CanvasRenderingContext2D,
+    density: ScopeDensity,
+    color: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
+    const cellWidth: number = width / density.columns;
+    const cellHeight: number = height / density.rows;
+    const dot: number = Math.max(0.62, Math.min(1.5, cellWidth * 0.72));
+    context.fillStyle = color;
+    context.strokeStyle = color;
+    context.beginPath();
+    let hasEnvelope: boolean = false;
+    for (let column: number = 0; column < density.columns; column++) {
+      let firstRow: number = -1;
+      for (let row: number = 0; row < density.rows; row++) {
+        const level: number = density.values[row * density.columns + column];
+        if (level <= 0) continue;
+        if (firstRow < 0) firstRow = row;
+        const pointX: number = x + (column + 0.5) * cellWidth;
+        const pointY: number = y + (row + 0.5) * cellHeight;
+        const intensity: number = level / 15;
+        context.globalAlpha = 0.10;
+        context.fillRect(pointX - dot, pointY - dot, dot * 2, dot * 2);
+        if (level >= 3) {
+          const core: number = dot * (0.46 + intensity * 0.38);
+          context.globalAlpha = level >= 9 ? 0.78 : 0.35;
+          context.fillRect(pointX - core, pointY - core, core * 2, core * 2);
+        }
+      }
+      if (firstRow >= 0) {
+        const pointX: number = x + (column + 0.5) * cellWidth;
+        const pointY: number = y + (firstRow + 0.5) * cellHeight;
+        if (!hasEnvelope) {
+          context.moveTo(pointX, pointY);
+          hasEnvelope = true;
+        } else {
+          context.lineTo(pointX, pointY);
+        }
+      }
+    }
+    context.globalAlpha = 0.22;
+    context.lineWidth = 2.8;
+    context.stroke();
+    context.globalAlpha = 0.72;
+    context.lineWidth = 0.68;
+    context.stroke();
+    context.globalAlpha = 1;
+  }
+
+  private parseScopeDensity(value: string): ScopeDensity | null {
+    const colon: number = value.indexOf(':');
+    if (!value.startsWith('S') || colon < 2) return null;
+    const dimensions: Array<string> = value.substring(1, colon).split('x');
+    if (dimensions.length !== 2) return null;
+    const columns: number = Number.parseInt(dimensions[0]);
+    const rows: number = Number.parseInt(dimensions[1]);
+    const payload: string = value.substring(colon + 1);
+    if (!Number.isFinite(columns) || !Number.isFinite(rows) ||
+        payload.length !== columns * rows) return null;
+    const values: Array<number> = [];
+    for (let index: number = 0; index < payload.length; index++) {
+      const level: number = Number.parseInt(payload.charAt(index), 16);
+      if (!Number.isFinite(level)) return null;
+      values.push(level);
+    }
+    return new ScopeDensity(columns, rows, values);
+  }
+
+  private chromaPart(value: string, index: number): string {
+    const parts: Array<string> = value.split('|');
+    return parts.length > index ? parts[index] : value;
+  }
+
+  private scopeNoise(column: number, particle: number, seed: number): number {
+    const value: number = Math.sin(
+      ((column + 1) * 17 + (particle + 3) * 31 + seed * 47) * 12.9898
+    ) * 43758.5453;
+    return value - Math.floor(value);
+  }
+
+  private drawScopePanel(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    label: string,
+    values: Array<string>,
+    colors: Array<string>,
+    parade: boolean
+  ): void {
+    const footerHeight: number = Math.min(14, Math.max(10, height * 0.17));
+    const plotHeight: number = Math.max(1, height - footerHeight);
+    context.fillStyle = '#000000';
+    context.fillRect(x, y, width, height);
+    context.fillStyle = '#050A0F';
+    context.fillRect(x, y, width, plotHeight);
+    for (let index: number = 0; index < values.length; index++) {
+      this.drawScopeTrace(
+        context,
+        values[index],
+        colors[index],
+        x,
+        y,
+        width,
+        plotHeight,
+        parade ? index : -1,
+        index + 1
+      );
+    }
+    this.drawScopeGrid(context, x, y, width, plotHeight, parade);
+    context.globalAlpha = 1;
+    context.fillStyle = '#E0FFFFFF';
+    context.font = `${Math.min(9, footerHeight * 0.68)}px monospace`;
+    context.textAlign = 'center';
+    const baseline: number = y + height - Math.max(1.5, footerHeight * 0.12);
+    if (parade) {
+      context.fillText('R', x + width / 6, baseline);
+      context.fillText('G', x + width / 2, baseline);
+      context.fillText('B', x + width * 5 / 6, baseline);
+    } else {
+      context.fillText(label, x + width / 2, baseline);
+    }
+    context.textAlign = 'left';
+  }
+
+  private drawMonitorRgbScope(): void {
+    const context: CanvasRenderingContext2D = this.monitorRgbScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    this.drawScopePanel(
+      context,
+      0,
+      0,
+      context.width,
+      context.height,
+      '',
+      [this.redHistogram, this.greenHistogram, this.blueHistogram],
+      ['#FF302A', '#28FF69', '#2240FF'],
+      true
+    );
+  }
+
+  private drawAudioScope(): void {
+    const context: CanvasRenderingContext2D = this.monitorAudioScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    this.drawScopePanel(
+      context,
+      0,
+      0,
+      context.width,
+      context.height,
+      'AUDIO',
+      [],
+      [],
+      false
+    );
+    const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
+    const plotHeight: number = context.height - footerHeight;
+    context.strokeStyle = '#4CC7E8';
+    context.globalAlpha = 0.22;
+    context.lineWidth = 5;
+    context.beginPath();
+    context.moveTo(4, plotHeight / 2);
+    context.lineTo(context.width - 4, plotHeight / 2);
+    context.stroke();
+    context.globalAlpha = 0.92;
+    context.lineWidth = 1;
+    context.stroke();
+    context.globalAlpha = 1;
+  }
+
+  private drawProfessionalScope(): void {
+    const context: CanvasRenderingContext2D = this.professionalScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    const gap: number = 1;
+    const panelHeight: number = (context.height - gap * 2) / 3;
+    this.drawScopePanel(
+      context, 0, 0, context.width, panelHeight,
+      'Y', [this.waveform], ['#FFFFFF'], false
+    );
+    this.drawScopePanel(
+      context, 0, panelHeight + gap, context.width, panelHeight,
+      'YUV', [this.waveform, this.chromaPart(this.vectorscope, 0),
+        this.chromaPart(this.vectorscope, 1)],
+      ['#14FF5C', '#00D2FF', '#FF26DE'], false
+    );
+    this.drawScopePanel(
+      context, 0, (panelHeight + gap) * 2, context.width, panelHeight,
+      '', [this.redHistogram, this.greenHistogram, this.blueHistogram],
+      ['#FF302A', '#28FF69', '#2240FF'], true
+    );
   }
 
   @Builder
@@ -5055,15 +7640,42 @@ struct Index {
   }
 
   @Builder
+  private VideoShutterModeSelect() {
+    Text(this.tr('视频快门表示'))
+      .fontSize(13)
+      .fontColor($r('app.color.ink_2'))
+      .width('100%')
+    Select([
+      { value: this.tr('快门角度') },
+      { value: this.tr('快门速度') }
+    ])
+      .selected(this.videoShutterMode === 'angle' ? 0 : 1)
+      .width('100%')
+      .height(44)
+      .fontColor($r('app.color.ink'))
+      .backgroundColor($r('app.color.paper'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule_strong'),
+        radius: 6
+      })
+      .margin({ bottom: 8 })
+      .onSelect((index: number): void => {
+        this.videoShutterMode = index === 0 ? 'angle' : 'speed';
+      })
+  }
+
+  @Builder
   private VideoShutterAngleSelect() {
     Text(
-      `${this.tr('快门角度')} · ${this.videoFrameRate}p`
+      `${this.tr(this.videoShutterMode === 'angle' ? '快门角度' : '快门速度')} · ${this.videoFrameRate}p`
     )
       .fontSize(13)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
-      SHUTTER_ANGLES.map((entry: SelectEntry): SelectOption => {
+      (this.videoShutterMode === 'angle' ? SHUTTER_ANGLES : SHUTTER_SPEEDS)
+        .map((entry: SelectEntry): SelectOption => {
         return { value: entry.label };
       })
     )
@@ -5084,9 +7696,25 @@ struct Index {
       )
       .margin({ bottom: 8 })
       .onSelect((index: number): void => {
-        this.videoShutterAngle = Number(SHUTTER_ANGLES[index].value);
-        this.applyVideoShutterAngle();
+        if (this.videoShutterMode === 'angle') {
+          this.videoShutterAngle = Number(SHUTTER_ANGLES[index].value);
+          this.applyVideoShutterAngle();
+        } else {
+          this.currentShutterSpeed = Number(SHUTTER_SPEEDS[index].value);
+          this.setCameraParameter('videoExposureTime', SHUTTER_SPEEDS[index]);
+        }
       })
+  }
+
+  @Builder
+  private VideoLogSelect() {
+    this.ParameterSelect(
+      'Log / Picture Profile',
+      this.videoLogEntries(),
+      this.videoLogIndex(),
+      true,
+      'videoLog'
+    )
   }
 
   private async toggleCameraConnection(): Promise<void> {
@@ -5096,11 +7724,13 @@ struct Index {
     if (this.connected) {
       this.previewGeneration++;
       await this.runBusy('正在断开相机…', async (): Promise<void> => {
+        await this.finishExternalRecordingForDisconnect();
         await this.camera.disconnect();
         this.connected = false;
         this.liveView = false;
         this.videoRecording = false;
         this.cameraName = '未连接';
+        this.cameraVendor = 'Nikon';
         if (this.preview !== undefined) {
           this.preview.release();
           this.preview = undefined;
@@ -5110,12 +7740,218 @@ struct Index {
       return;
     }
 
-    await this.runBusy('正在连接 Nikon 相机…', async (): Promise<void> => {
+    await this.runBusy('正在连接相机…', async (): Promise<void> => {
+      this.localCameraSelected = false;
       const profile: CameraProfile = await this.camera.connect();
       this.connected = true;
       this.cameraName = profile.name;
+      this.cameraVendor = profile.vendorName;
+      this.rememberConnectedDevice(profile);
+      this.videoCodecIndex();
+      this.videoLogIndex();
       this.status = `${profile.name} 已连接`;
     });
+  }
+
+  private async selectLocalCamera(): Promise<void> {
+    if (this.busy) return;
+    const granted: boolean = await this.requestFeaturePermissions([
+      'ohos.permission.CAMERA'
+    ]);
+    if (!granted) {
+      this.localCameraSelected = false;
+      this.status = '未获得相机权限，无法使用本机摄像头';
+      return;
+    }
+    if (this.connected) {
+      this.previewGeneration++;
+      await this.finishExternalRecordingForDisconnect();
+      await this.camera.stopLiveView();
+      await this.camera.disconnect();
+      this.connected = false;
+      this.liveView = false;
+      this.videoRecording = false;
+    }
+    if (this.wifiConnected) {
+      await this.disconnectWifiCamera();
+    }
+    this.localCameraSelected = true;
+    this.cameraName = 'HarmonyOS 本机摄像头';
+    this.cameraVendor = 'System';
+    this.status = '本机摄像头已就绪 · 拍摄时打开系统取景器';
+    this.connectionPanelVisible = false;
+  }
+
+  private async connectWifiCamera(): Promise<void> {
+    if (this.wifiConnecting || this.busy) {
+      return;
+    }
+    const port: number = Number(this.wifiPort);
+    if (this.wifiHost.trim().length === 0 || !Number.isInteger(port) ||
+      port < 1 || port > 65535) {
+      this.wifiStatus = 'Wi‑Fi 相机地址或端口无效';
+      return;
+    }
+    this.wifiConnecting = true;
+    this.localCameraSelected = false;
+    this.wifiStatus = '正在连接 Wi‑Fi 相机…';
+    await this.persistWifiConnectionSettings();
+    try {
+      const name: string = await this.wifiCamera.connect(
+        this.wifiHost.trim(),
+        port
+      );
+      this.wifiCameraName = name;
+      this.wifiConnected = true;
+      this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已通过 PTP/IP 连接`;
+      this.status = this.wifiStatus;
+    } catch (error) {
+      this.wifiConnected = false;
+      this.wifiStatus = `Wi‑Fi 连接失败：${(error as Error).message}`;
+      this.status = this.wifiStatus;
+    } finally {
+      this.wifiConnecting = false;
+    }
+  }
+
+  private async disconnectWifiCamera(): Promise<void> {
+    await this.wifiCamera.disconnect();
+    this.wifiConnected = false;
+    this.wifiCameraName = 'PTP/IP Camera';
+    this.wifiStatus = 'Wi‑Fi 相机未连接';
+    this.status = 'Wi‑Fi 相机已断开';
+  }
+
+  private async persistWifiConnectionSettings(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      await this.settingsPreferences.put(
+        'wifiCameraConnectionMode',
+        this.wifiConnectionMode
+      );
+      await this.settingsPreferences.put('wifiCameraHost', this.wifiHost);
+      await this.settingsPreferences.put('wifiCameraPort', this.wifiPort);
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'wifi-camera',
+        `无法保存 Wi‑Fi 连接设置：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private async setBluetoothRemoteEnabled(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      this.bluetoothRemoteEnabled = false;
+      this.bluetoothRemote?.stop();
+      return;
+    }
+    const granted: boolean = await this.requestFeaturePermissions([
+      'ohos.permission.ACCESS_BLUETOOTH'
+    ]);
+    if (!granted) {
+      this.bluetoothRemoteEnabled = false;
+      this.bluetoothRemoteStatus = '未获得蓝牙访问权限';
+      return;
+    }
+    this.bluetoothRemoteEnabled = true;
+    this.bluetoothRemote?.start();
+  }
+
+  private async setLocationTaggingEnabled(enabled: boolean): Promise<void> {
+    if (!enabled) {
+      this.locationTaggingEnabled = false;
+      this.locationTagging?.setEnabled(false);
+      return;
+    }
+    const granted: boolean = await this.requestFeaturePermissions([
+      'ohos.permission.APPROXIMATELY_LOCATION',
+      'ohos.permission.LOCATION'
+    ]);
+    if (!granted) {
+      this.locationTaggingEnabled = false;
+      this.locationTaggingStatus = '未获得定位权限';
+      return;
+    }
+    this.locationTaggingEnabled = true;
+    this.locationTagging?.setEnabled(true);
+  }
+
+  private async requestFeaturePermissions(
+    permissionsToRequest: Array<Permissions>
+  ): Promise<boolean> {
+    const context: common.UIAbilityContext =
+      getContext(this) as common.UIAbilityContext;
+    try {
+      const result = await abilityAccessCtrl.createAtManager()
+        .requestPermissionsFromUser(context, permissionsToRequest);
+      return result.authResults.length === permissionsToRequest.length &&
+        result.authResults.every((value: number): boolean => value === 0);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  private async reconnectRememberedDevice(): Promise<void> {
+    if (this.busy) return;
+    if (this.connected) {
+      await this.toggleCameraConnection();
+    }
+    if (!this.connected) {
+      await this.toggleCameraConnection();
+    }
+  }
+
+  private rememberConnectedDevice(profile: CameraProfile): void {
+    const id: string = `${profile.vendorId.toString(16).padStart(4, '0')}:` +
+      `${profile.productId.toString(16).padStart(4, '0')}:${profile.name}`;
+    const record: RememberedCameraDevice = new RememberedCameraDevice(
+      id,
+      profile.name,
+      profile.vendorName,
+      'USB/PTP',
+      Date.now()
+    );
+    this.rememberedDevices = [record]
+      .concat(this.rememberedDevices.filter(
+        (item: RememberedCameraDevice): boolean => item.id !== id
+      ))
+      .slice(0, 12);
+    this.persistRememberedDevices();
+  }
+
+  private forgetRememberedDevice(id: string): void {
+    this.rememberedDevices = this.rememberedDevices.filter(
+      (item: RememberedCameraDevice): boolean => item.id !== id
+    );
+    this.persistRememberedDevices();
+  }
+
+  private async persistRememberedDevices(): Promise<void> {
+    if (this.settingsPreferences === undefined) return;
+    try {
+      await this.settingsPreferences.put(
+        'rememberedCameraDevices.v1',
+        JSON.stringify(this.rememberedDevices)
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'devices',
+        `无法保存已连接设备：${(error as BusinessError).message}`
+      );
+    }
+  }
+
+  private formatDeviceTimestamp(timestamp: number): string {
+    const value: Date = new Date(timestamp);
+    const pad: (part: number) => string =
+      (part: number): string => part.toString().padStart(2, '0');
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-` +
+      `${pad(value.getDate())} ${pad(value.getHours())}:` +
+      `${pad(value.getMinutes())}`;
   }
 
   private isCompact(): boolean {
@@ -5135,6 +7971,7 @@ struct Index {
     if (this.liveView) {
       this.previewGeneration++;
       await this.runBusy('正在停止实时取景…', async (): Promise<void> => {
+        await this.finishExternalRecordingForDisconnect();
         await this.camera.stopLiveView();
         this.liveView = false;
         this.status = '实时取景已停止';
@@ -5160,6 +7997,15 @@ struct Index {
       try {
         const jpeg: Uint8Array = await this.camera.getLiveViewFrame();
         failures = 0;
+        if (this.externalVideoRecorder.isRecording) {
+          try {
+            this.externalVideoRecorder.appendJpeg(jpeg);
+          } catch (recordingError) {
+            await this.finishExternalRecordingAfterFailure(
+              recordingError as Error
+            );
+          }
+        }
         await this.displayJpeg(jpeg);
       } catch (error) {
         failures++;
@@ -5170,6 +8016,7 @@ struct Index {
         );
         if (failures >= 3) {
           this.previewGeneration++;
+          await this.finishExternalRecordingForDisconnect();
           await this.camera.stopLiveView();
           this.liveView = false;
           this.status = '实时取景已安全停止 · 机身控制已释放';
@@ -5187,6 +8034,40 @@ struct Index {
   private async capturePhoto(): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
     const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    if (this.localCameraSelected && !this.busy && workflow !== undefined) {
+      await this.runBusy('正在打开本机摄像头…', async (): Promise<void> => {
+        const granted: boolean = await this.requestFeaturePermissions([
+          'ohos.permission.CAMERA'
+        ]);
+        if (!granted) {
+          throw new Error('未获得相机权限，无法使用本机摄像头');
+        }
+        const context: common.UIAbilityContext =
+          getContext(this) as common.UIAbilityContext;
+        const jpeg: Uint8Array = await this.localCamera.capture(context);
+        if (this.locationTaggingEnabled) {
+          await this.locationTagging?.refresh();
+        }
+        const path: string = await workflow.store(
+          jpeg,
+          'local-camera.jpg',
+          'HarmonyOS 本机摄像头',
+          undefined,
+          this.locationTagging?.snapshot()
+        );
+        await this.displayJpeg(jpeg);
+        this.refreshPhotos();
+        this.status = `本机拍摄已保存 · ${path.substring(path.lastIndexOf('/') + 1)}`;
+      });
+      return;
+    }
+    if (!this.connected && this.wifiConnected && !this.busy) {
+      await this.runBusy('正在通过 Wi‑Fi 触发相机快门…', async (): Promise<void> => {
+        await this.wifiCamera.capture();
+        this.status = `${this.wifiCameraName} 已收到拍摄指令 · 原片保存在相机存储卡`;
+      });
+      return;
+    }
     if (
       !this.connected ||
       this.busy ||
@@ -5196,11 +8077,18 @@ struct Index {
       return;
     }
     await this.runBusy('正在拍摄并下载 JPEG…', async (): Promise<void> => {
+      if (this.locationTaggingEnabled) {
+        await this.locationTagging?.refresh();
+      }
       const jpeg: Uint8Array = await this.camera.capture();
+      const location: CaptureLocation | undefined =
+        this.locationTagging?.snapshot();
       const path: string = await workflow.store(
         jpeg,
         'capture.jpg',
-        this.cameraName
+        this.cameraName,
+        undefined,
+        location
       );
       this.diagnostics?.info(
         'capture',
@@ -5295,10 +8183,15 @@ struct Index {
           await this.camera.moveFocus(step);
         }
         const jpeg: Uint8Array = await this.camera.capture();
+        if (this.locationTaggingEnabled) {
+          await this.locationTagging?.refresh();
+        }
         const path: string = await workflow.store(
           jpeg,
           'capture.jpg',
-          this.cameraName
+          this.cameraName,
+          undefined,
+          this.locationTagging?.snapshot()
         );
         await this.displayJpeg(jpeg);
         this.refreshPhotos();
@@ -5375,16 +8268,123 @@ struct Index {
       this.videoRecording ? '正在停止视频录制…' : '正在开始视频录制…',
       async (): Promise<void> => {
         if (this.videoRecording) {
-          await this.camera.stopMovieRecording();
+          let bodyError: Error | undefined = undefined;
+          if (this.camera.isMovieRecording) {
+            try {
+              await this.camera.stopMovieRecording();
+            } catch (error) {
+              bodyError = error as Error;
+            }
+          }
+          const result: ExternalRecordingResult | undefined =
+            this.externalVideoRecorder.stopIfRecording();
+          if (result !== undefined) {
+            await this.captureWorkflow?.completeExternalRecording(
+              result.path
+            );
+            this.diagnostics?.info(
+              'external-recording',
+              `外录完成；文件=${filenameFromPath(result.path)}` +
+              `；帧数=${result.frames}；大小=${result.bytes}`
+            );
+            this.refreshPhotos();
+          }
+          if (bodyError !== undefined && result === undefined) {
+            throw bodyError;
+          }
         } else {
-          await this.camera.startMovieRecording();
+          if (this.externalRecordToDevice && !this.liveView) {
+            await this.camera.startLiveView();
+            this.liveView = true;
+            this.startPreviewLoop();
+          }
+          if (this.externalRecordToDevice) {
+            const target: string | undefined =
+              this.captureWorkflow?.reserveExternalRecording(
+                this.cameraName,
+                'avi'
+              );
+            if (target === undefined) {
+              throw new Error('无法创建外录文件。');
+            }
+            this.externalVideoRecorder.start(target, this.videoFrameRate);
+          }
+          let bodyError: Error | undefined = undefined;
+          try {
+            await this.camera.startMovieRecording();
+          } catch (error) {
+            bodyError = error as Error;
+          }
+          if (
+            bodyError !== undefined &&
+            !this.externalVideoRecorder.isRecording
+          ) {
+            throw bodyError;
+          }
         }
-        this.videoRecording = this.camera.isMovieRecording;
+        this.videoRecording = this.camera.isMovieRecording ||
+          this.externalVideoRecorder.isRecording;
         this.status = this.videoRecording
-          ? '● REC · 视频正在录制到相机存储卡'
-          : '录制已停止 · 视频保存在相机存储卡';
+          ? this.externalVideoRecorder.isRecording
+            ? '● EXT REC · 正在外录到当前智能设备'
+            : '● REC · 视频正在录制到相机存储卡'
+          : '录制已停止 · 外录文件已保存到 ZENCHE 文件库';
       }
     );
+  }
+
+  private async setExternalRecordToDevice(enabled: boolean): Promise<void> {
+    if (this.videoRecording) return;
+    this.externalRecordToDevice = enabled;
+    this.status = enabled
+      ? '外录已开启 · 视频将写入 ZENCHE 文件库'
+      : '外录已关闭 · PTP 相机仅记录到机身存储卡';
+    if (this.settingsPreferences !== undefined) {
+      await this.settingsPreferences.put(
+        'externalRecordToDevice',
+        enabled
+      );
+      await this.settingsPreferences.flush();
+    }
+  }
+
+  private async finishExternalRecordingAfterFailure(
+    cause: Error
+  ): Promise<void> {
+    try {
+      const result: ExternalRecordingResult | undefined =
+        this.externalVideoRecorder.stopIfRecording();
+      if (result !== undefined) {
+        await this.captureWorkflow?.completeExternalRecording(result.path);
+      }
+    } catch (error) {
+      this.externalVideoRecorder.abort();
+    }
+    this.videoRecording = this.camera.isMovieRecording;
+    this.refreshPhotos();
+    this.showError(`外录已停止：${cause.message}`);
+  }
+
+  private async finishExternalRecordingForDisconnect(): Promise<void> {
+    try {
+      const result: ExternalRecordingResult | undefined =
+        this.externalVideoRecorder.stopIfRecording();
+      if (result !== undefined) {
+        await this.captureWorkflow?.completeExternalRecording(result.path);
+        this.diagnostics?.info(
+          'external-recording',
+          `连接结束，已安全保存外录：${filenameFromPath(result.path)}`
+        );
+        this.refreshPhotos();
+      }
+    } catch (error) {
+      this.externalVideoRecorder.abort();
+      this.diagnostics?.error(
+        'external-recording',
+        `连接结束时无法完成外录：${(error as Error).message}`
+      );
+    }
+    this.videoRecording = false;
   }
 
   private openImmersivePreview(monitoring: boolean): void {
@@ -5441,6 +8441,53 @@ struct Index {
     return `${this.currentShutterSpeed.toFixed(1)}s`;
   }
 
+  private videoCodecLabel(): string {
+    const selected: SelectEntry | undefined = this.videoCodecEntries().find(
+      (entry: SelectEntry): boolean => entry.value === this.videoCodec
+    );
+    return selected === undefined ? this.videoCodec : selected.label;
+  }
+
+  private videoCodecEntries(): Array<SelectEntry> {
+    if (this.cameraVendor === 'Sony') return SONY_VIDEO_CODECS;
+    if (this.cameraVendor === 'Canon') return CANON_VIDEO_CODECS;
+    return VIDEO_CODECS;
+  }
+
+  private videoLogEntries(): Array<SelectEntry> {
+    if (this.cameraVendor === 'Sony') return SONY_VIDEO_LOGS;
+    if (this.cameraVendor === 'Canon') return CANON_VIDEO_LOGS;
+    return NIKON_VIDEO_LOGS;
+  }
+
+  private videoCodecIndex(): number {
+    const entries: Array<SelectEntry> = this.videoCodecEntries();
+    const index: number = entries.findIndex(
+      (entry: SelectEntry): boolean => entry.value === this.videoCodec
+    );
+    if (index >= 0) return index;
+    this.videoCodec = entries[0].value;
+    return 0;
+  }
+
+  private videoLogIndex(): number {
+    const entries: Array<SelectEntry> = this.videoLogEntries();
+    const index: number = entries.findIndex(
+      (entry: SelectEntry): boolean => entry.value === this.videoLogProfile
+    );
+    if (index >= 0) return index;
+    this.videoLogProfile = 'off';
+    this.nLogEnabled = false;
+    return 0;
+  }
+
+  private videoLogLabel(): string {
+    const selected: SelectEntry | undefined = this.videoLogEntries().find(
+      (entry: SelectEntry): boolean => entry.value === this.videoLogProfile
+    );
+    return selected === undefined ? this.videoLogProfile : selected.label;
+  }
+
   private exposureModeCode(): string {
     switch (this.exposureMode) {
       case 'program': return 'P';
@@ -5460,6 +8507,8 @@ struct Index {
     }
     if ([
       'videoFrameRate',
+      'videoCodec',
+      'videoLog',
       'exposureMode',
       'focusMode',
       'whiteBalanceMode',
@@ -5527,6 +8576,12 @@ struct Index {
     if (parameter === 'videoFrameRate') {
       entries = VIDEO_FRAME_RATES;
       current = this.videoFrameRate.toString();
+    } else if (parameter === 'videoCodec') {
+      entries = this.videoCodecEntries();
+      current = this.videoCodec;
+    } else if (parameter === 'videoLog') {
+      entries = this.videoLogEntries();
+      current = this.videoLogProfile;
     } else if (parameter === 'exposureMode') {
       entries = EXPOSURE_MODES;
       current = this.exposureMode;
@@ -5558,6 +8613,11 @@ struct Index {
     }
     if (parameter === 'exposureMode') {
       this.exposureMode = entry.value;
+    } else if (parameter === 'videoCodec') {
+      this.videoCodec = entry.value;
+    } else if (parameter === 'videoLog') {
+      this.videoLogProfile = entry.value;
+      this.nLogEnabled = entry.value !== 'off';
     } else if (parameter === 'focusMode') {
       this.currentFocusMode = entry.value;
     } else if (parameter === 'whiteBalanceMode') {
@@ -5603,6 +8663,11 @@ struct Index {
       );
       if (parameter === 'exposureMode') {
         this.exposureMode = entry.value;
+      } else if (parameter === 'videoCodec') {
+        this.videoCodec = entry.value;
+      } else if (parameter === 'videoLog') {
+        this.videoLogProfile = entry.value;
+        this.nLogEnabled = entry.value !== 'off';
       }
       this.status = `已设置 ${entry.label}`;
     });
@@ -5902,6 +8967,158 @@ struct Index {
     }
   }
 
+  private toggleCameraStorageSelection(handle: number, selected: boolean): void {
+    const remaining: Array<number> = this.selectedCameraStorageHandles.filter(
+      (value: number): boolean => value !== handle
+    );
+    this.selectedCameraStorageHandles = selected
+      ? remaining.concat([handle])
+      : remaining;
+  }
+
+  private async refreshCameraStorage(): Promise<void> {
+    if (this.cameraStorageBusy) {
+      return;
+    }
+    if (!this.connected && !this.wifiConnected) {
+      this.cameraStorageStatus = '请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机';
+      promptAction.showToast({ message: this.tr(this.cameraStorageStatus) });
+      return;
+    }
+    this.cameraStorageBusy = true;
+    this.cameraStorageStatus = '正在读取存储卡…';
+    try {
+      const snapshot: CameraStorageSnapshot = this.connected
+        ? await this.camera.listStorage()
+        : await this.wifiCamera.listStorage();
+      this.cameraStorageSnapshot = snapshot;
+      const valid: Array<number> = snapshot.items.map(
+        (item: CameraStorageItem): number => item.handle
+      );
+      this.selectedCameraStorageHandles =
+        this.selectedCameraStorageHandles.filter(
+          (handle: number): boolean => valid.indexOf(handle) >= 0
+        );
+      this.cameraStorageStatus = '读取完成';
+      this.diagnostics?.info(
+        'camera-storage',
+        `读取机内存储完成；文件=${snapshot.items.length}`
+      );
+    } catch (error) {
+      const message: string = (error as Error).message;
+      this.cameraStorageStatus = `读取失败 · ${message}`;
+      this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
+      this.showError(message);
+    } finally {
+      this.cameraStorageBusy = false;
+    }
+  }
+
+  private selectedCameraStorageItems(): Array<CameraStorageItem> {
+    return this.cameraStorageSnapshot.items.filter(
+      (item: CameraStorageItem): boolean =>
+        this.selectedCameraStorageHandles.indexOf(item.handle) >= 0
+    );
+  }
+
+  private async activeStorageObject(handle: number): Promise<Uint8Array> {
+    return this.connected
+      ? await this.camera.downloadStorageObject(handle)
+      : await this.wifiCamera.downloadStorageObject(handle);
+  }
+
+  private async deleteActiveStorageObject(handle: number): Promise<void> {
+    if (this.connected) {
+      await this.camera.deleteStorageObject(handle);
+    } else {
+      await this.wifiCamera.deleteStorageObject(handle);
+    }
+  }
+
+  private async downloadSelectedCameraStorage(): Promise<void> {
+    const selected: Array<CameraStorageItem> = this.selectedCameraStorageItems();
+    const library: PhotoLibrary | undefined = this.library;
+    if (selected.length === 0 || library === undefined) {
+      promptAction.showToast({ message: this.tr('请先选择要下载的机内文件。') });
+      return;
+    }
+    this.cameraStorageBusy = true;
+    try {
+      for (let index: number = 0; index < selected.length; index++) {
+        const item: CameraStorageItem = selected[index];
+        this.cameraStorageStatus = `正在下载 ${index + 1} / ${selected.length}`;
+        const bytes: Uint8Array = await this.activeStorageObject(item.handle);
+        library.saveReceived(item.filename, bytes);
+      }
+      this.selectedCameraStorageHandles = [];
+      this.cameraStorageStatus = `已下载 ${selected.length} 个文件到 ZENCHE 文件库`;
+      this.refreshPhotos();
+      promptAction.showToast({ message: this.tr(this.cameraStorageStatus) });
+    } catch (error) {
+      const message: string = (error as Error).message;
+      this.cameraStorageStatus = `下载失败 · ${message}`;
+      this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
+      this.showError(message);
+    } finally {
+      this.cameraStorageBusy = false;
+    }
+  }
+
+  private async confirmDeleteSelectedCameraStorage(): Promise<void> {
+    const selected: Array<CameraStorageItem> = this.selectedCameraStorageItems();
+    if (selected.length === 0) {
+      promptAction.showToast({ message: this.tr('请先选择要从相机删除的文件。') });
+      return;
+    }
+    try {
+      const result = await promptAction.showDialog({
+        title: this.tr('从相机永久删除？'),
+        message: this.tr(
+          `将从相机存储卡永久删除所选 ${selected.length} 个文件；` +
+          '此操作无法撤销。已保护文件不会被选择。'
+        ),
+        buttons: [
+          { text: this.tr('取消'), color: '#5A616C' },
+          { text: this.tr('永久删除'), color: '#D8323A' }
+        ]
+      });
+      if (result.index !== 1) {
+        return;
+      }
+      this.cameraStorageBusy = true;
+      this.cameraStorageStatus = '正在从相机删除…';
+      for (const item of selected) {
+        await this.deleteActiveStorageObject(item.handle);
+      }
+      this.selectedCameraStorageHandles = [];
+      this.cameraStorageBusy = false;
+      this.cameraStorageStatus = `已从相机删除 ${selected.length} 个文件`;
+      await this.refreshCameraStorage();
+    } catch (error) {
+      this.cameraStorageBusy = false;
+      const message: string = (error as Error).message;
+      this.cameraStorageStatus = `删除失败 · ${message}`;
+      this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
+      this.showError(message);
+    }
+  }
+
+  private formatStorageSize(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes < 0) {
+      return '—';
+    }
+    const units: Array<string> = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value: number = bytes;
+    let index: number = 0;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index++;
+    }
+    return index === 0
+      ? `${Math.round(value)} ${units[index]}`
+      : `${value.toFixed(1)} ${units[index]}`;
+  }
+
   private async loadSystemAlbum(): Promise<void> {
     const context: common.UIAbilityContext =
       getContext(this) as common.UIAbilityContext;
@@ -6107,6 +9324,27 @@ struct Index {
     });
   }
 
+  private unclassifiedEditablePhotos(): Array<PhotoItem> {
+    return this.editablePhotos().filter(
+      (item: PhotoItem): boolean => this.branchIdForPhoto(item.path).length === 0
+    );
+  }
+
+  private editablePhotosForBranch(branchId: string): Array<PhotoItem> {
+    return this.photosForBranch(branchId).filter(
+      (item: PhotoItem): boolean => this.editablePhotos().some(
+        (photo: PhotoItem): boolean => photo.path === item.path
+      )
+    );
+  }
+
+  private editorSelectedLabel(): string {
+    const selected: PhotoItem | undefined = this.editablePhotos().find(
+      (item: PhotoItem): boolean => item.path === this.editorSelectedPath
+    );
+    return selected === undefined ? this.tr('选择照片') : `▧  ${selected.name}`;
+  }
+
   private ensureEditorSelection(): void {
     const photos: Array<PhotoItem> = this.editablePhotos();
     if (
@@ -6139,6 +9377,50 @@ struct Index {
     return index < 0 ? 0 : index;
   }
 
+  private nikonCloudSelectEntries(): Array<SelectEntry> {
+    const entries: Array<SelectEntry> = [
+      new SelectEntry('关闭云创预览', '')
+    ];
+    NIKON_CLOUD_PRESETS.forEach((preset: NikonCloudPreset): void => {
+      entries.push(new SelectEntry(preset.name, preset.id));
+    });
+    return entries;
+  }
+
+  private nikonCloudPresetIndex(): number {
+    const index: number = NIKON_CLOUD_PRESETS.findIndex(
+      (preset: NikonCloudPreset): boolean => {
+        return preset.id === this.editorNikonCloudPresetId;
+      }
+    );
+    return index < 0 ? 0 : index + 1;
+  }
+
+  private monitorNikonCloudPresetIndex(): number {
+    const index: number = NIKON_CLOUD_PRESETS.findIndex(
+      (preset: NikonCloudPreset): boolean => {
+        return preset.id === this.monitorNikonCloudPresetId;
+      }
+    );
+    return index < 0 ? 0 : index + 1;
+  }
+
+  private selectedMonitorNikonCloudPreset(): NikonCloudPreset | undefined {
+    return NIKON_CLOUD_PRESETS.find(
+      (preset: NikonCloudPreset): boolean => {
+        return preset.id === this.monitorNikonCloudPresetId;
+      }
+    );
+  }
+
+  private selectedNikonCloudPreset(): NikonCloudPreset | undefined {
+    return NIKON_CLOUD_PRESETS.find(
+      (preset: NikonCloudPreset): boolean => {
+        return preset.id === this.editorNikonCloudPresetId;
+      }
+    );
+  }
+
   private editorCropRatioIndex(): number {
     const values: Array<string> = [
       'original', '1:1', '4:3', '3:2', '16:9'
@@ -6150,6 +9432,7 @@ struct Index {
   private resetImageEditor(): void {
     this.editorPanel = 'light';
     this.editorPreset = 'original';
+    this.editorNikonCloudPresetId = '';
     this.editorExposure = 0;
     this.editorContrast = 0;
     this.editorHighlights = 0;
@@ -6166,6 +9449,44 @@ struct Index {
     this.editorNoiseReduction = 0;
     this.editorDehaze = 0;
     this.editorVignette = 0;
+    this.editorWheelLift = 0;
+    this.editorWheelGamma = 0;
+    this.editorWheelGain = 0;
+    this.editorWheelLiftX = 0;
+    this.editorWheelLiftY = 0;
+    this.editorWheelGammaX = 0;
+    this.editorWheelGammaY = 0;
+    this.editorWheelGainX = 0;
+    this.editorWheelGainY = 0;
+    this.editorCurveContrast = 0;
+    this.editorCurvePivot = 50;
+    this.editorCurveShadows = 0;
+    this.editorCurveMidtones = 0;
+    this.editorCurveHighlights = 0;
+    this.editorCurvePoints = EDITOR_CURVE_DEFAULTS.map((point: EditorCurvePoint): EditorCurvePoint => new EditorCurvePoint(point.x, point.y));
+    this.editorActiveCurvePoint = -1;
+    this.editorMaskEnabled = false;
+    this.editorMaskType = '画笔';
+    this.editorMaskAmount = 100;
+    this.editorMaskFeather = 55;
+    this.editorMaskInvert = false;
+    this.editorMaskSubtract = false;
+    this.editorMaskBrushSize = 18;
+    this.editorMaskStrokes = [];
+    this.editorMaskExposure = 0;
+    this.editorMaskContrast = 0;
+    this.editorMaskHighlights = 0;
+    this.editorMaskShadows = 0;
+    this.editorMaskTemperature = 0;
+    this.editorMaskTint = 0;
+    this.editorMaskSaturation = 0;
+    this.editorMaskClarity = 0;
+    this.editorMaskLayers = [];
+    this.editorActiveMaskLayerId = '';
+    this.editorNextMaskNumber = 1;
+    this.editorActiveMaskStroke = -1;
+    this.clearEditorRenderedPreview();
+    this.editorPickerSample = 'RGB 取样：尚未取样';
     this.editorRotation = 0;
     this.editorFlipHorizontal = false;
     this.editorFlipVertical = false;
@@ -6246,7 +9567,46 @@ struct Index {
     }
   }
 
-  private captureEditorTone(): Array<number | string | boolean> {
+  private applyNikonCloudPreset(preset: NikonCloudPreset): void {
+    this.resetEditorTone();
+    this.editorPreset = 'original';
+    this.editorContrast = preset.tone.contrast;
+    this.editorHighlights = preset.tone.highlights;
+    this.editorShadows = preset.tone.shadows;
+    this.editorWhites = preset.tone.whites;
+    this.editorBlacks = preset.tone.blacks;
+    this.editorSaturation = preset.tone.saturation;
+    this.editorTexture = preset.tone.texture;
+    this.editorClarity = preset.tone.clarity;
+    this.editorSharpening = preset.tone.sharpening;
+    this.editorWheelLiftX = preset.grading.liftX;
+    this.editorWheelLiftY = preset.grading.liftY;
+    this.editorWheelGammaX = preset.grading.gammaX;
+    this.editorWheelGammaY = preset.grading.gammaY;
+    this.editorWheelGainX = preset.grading.gainX;
+    this.editorWheelGainY = preset.grading.gainY;
+    if (preset.toneCurve.length > 1) {
+      const denominator: number = preset.toneCurve.length - 1;
+      this.editorCurvePoints = preset.toneCurve.map(
+        (value: number, index: number): EditorCurvePoint => {
+          return new EditorCurvePoint(
+            index / denominator,
+            this.editorClampUnit(value)
+          );
+        }
+      );
+    }
+    this.editorNikonCloudPresetId = preset.id;
+    this.editorAIBackup = [];
+    this.editorAICanUndo = false;
+    this.editorAIAnalysis = undefined;
+    this.editorAISummary = '等待分析当前照片';
+    this.editorShowingOriginal = false;
+    this.status = `尼康云创预览 · ${preset.name} · SDR 近似`;
+    this.refreshEditorRenderedPreview();
+  }
+
+  private captureEditorTone(): Array<EditorToneValue> {
     return [
       this.editorExposure,
       this.editorContrast,
@@ -6264,12 +9624,29 @@ struct Index {
       this.editorNoiseReduction,
       this.editorDehaze,
       this.editorVignette,
+      this.editorWheelLift,
+      this.editorWheelGamma,
+      this.editorWheelGain,
+      this.editorWheelLiftX,
+      this.editorWheelLiftY,
+      this.editorWheelGammaX,
+      this.editorWheelGammaY,
+      this.editorWheelGainX,
+      this.editorWheelGainY,
+      this.editorCurveContrast,
+      this.editorCurvePivot,
+      this.editorCurveShadows,
+      this.editorCurveMidtones,
+      this.editorCurveHighlights,
+      this.editorCurvePoints.map((point: EditorCurvePoint): Array<number> => [point.x, point.y]),
+      this.editorMaskEnabled,
+      this.editorMaskFeather,
       this.editorPreset,
       this.editorShowingOriginal
     ];
   }
 
-  private restoreEditorTone(values: Array<number | string | boolean>): void {
+  private restoreEditorTone(values: Array<EditorToneValue>): void {
     if (values.length < 18) {
       return;
     }
@@ -6289,8 +9666,48 @@ struct Index {
     this.editorNoiseReduction = values[13] as number;
     this.editorDehaze = values[14] as number;
     this.editorVignette = values[15] as number;
-    this.editorPreset = values[16] as string;
-    this.editorShowingOriginal = values[17] as boolean;
+    // Older copied tones contain 18 values; preserve compatibility while
+    // restoring the additional grading controls when present.
+    if (values.length >= 35) {
+      this.editorWheelLift = values[16] as number;
+      this.editorWheelGamma = values[17] as number;
+      this.editorWheelGain = values[18] as number;
+      this.editorWheelLiftX = values[19] as number;
+      this.editorWheelLiftY = values[20] as number;
+      this.editorWheelGammaX = values[21] as number;
+      this.editorWheelGammaY = values[22] as number;
+      this.editorWheelGainX = values[23] as number;
+      this.editorWheelGainY = values[24] as number;
+      this.editorCurveContrast = values[25] as number;
+      this.editorCurvePivot = values[26] as number;
+      this.editorCurveShadows = values[27] as number;
+      this.editorCurveMidtones = values[28] as number;
+      this.editorCurveHighlights = values[29] as number;
+      const pointData = values[30] as Array<Array<number>>;
+      if (Array.isArray(pointData) && pointData.length > 1) {
+        this.editorCurvePoints = pointData.map((point: Array<number>): EditorCurvePoint => new EditorCurvePoint(point[0], point[1]));
+      }
+      this.editorMaskEnabled = values[31] as boolean;
+      this.editorMaskFeather = values[32] as number;
+      this.editorPreset = values[33] as string;
+      this.editorShowingOriginal = values[34] as boolean;
+    } else if (values.length >= 25) {
+      this.editorWheelLift = values[16] as number;
+      this.editorWheelGamma = values[17] as number;
+      this.editorWheelGain = values[18] as number;
+      this.editorCurveContrast = values[19] as number;
+      this.editorCurvePivot = values[20] as number;
+      this.editorCurveShadows = this.editorCurveContrast;
+      this.editorCurveMidtones = this.editorCurveContrast;
+      this.editorCurveHighlights = this.editorCurveContrast;
+      this.editorMaskEnabled = values[21] as boolean;
+      this.editorMaskFeather = values[22] as number;
+      this.editorPreset = values[23] as string;
+      this.editorShowingOriginal = values[24] as boolean;
+    } else {
+      this.editorPreset = values[16] as string;
+      this.editorShowingOriginal = values[17] as boolean;
+    }
   }
 
   private async applyEditorAI(): Promise<void> {
@@ -6300,7 +9717,7 @@ struct Index {
       this.showError('无法分析当前照片');
       return;
     }
-    const previousTone: Array<number | string | boolean> =
+    const previousTone: Array<EditorToneValue> =
       this.captureEditorTone();
     this.resetEditorTone();
     this.editorAIBackup = previousTone;
@@ -6488,6 +9905,39 @@ struct Index {
     }
   }
 
+  private async sampleEditorCenterColor(): Promise<void> {
+    if (this.editorSelectedPath.length === 0) {
+      this.editorPickerSample = 'RGB 取样：未选择照片';
+      return;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      pixelMap = await source.createPixelMap({
+        editable: false,
+        desiredSize: { width: 3, height: 3 },
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const buffer: ArrayBuffer = new ArrayBuffer(3 * 3 * 4);
+      await pixelMap.readPixelsToBuffer(buffer);
+      const pixels: Uint8Array = new Uint8Array(buffer);
+      const offset: number = 4 * 4;
+      const red: number = pixels[offset];
+      const green: number = pixels[offset + 1];
+      const blue: number = pixels[offset + 2];
+      const hex: string = `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`.toUpperCase();
+      this.editorPickerSample = `RGB 取样：${hex}`;
+      this.editorTemperature = Math.max(-100, Math.min(100, (blue - red) / 2.55));
+      this.editorTint = Math.max(-100, Math.min(100, (green - (red + blue) / 2) / 2.55));
+    } catch (error) {
+      this.editorPickerSample = 'RGB 取样：读取失败';
+    } finally {
+      pixelMap?.release();
+      source?.release();
+    }
+  }
+
   private editorChannel(value: number): number {
     return Math.max(0, Math.min(255, Math.round(value)));
   }
@@ -6507,6 +9957,356 @@ struct Index {
     return scaled * scaled * (3 - 2 * scaled);
   }
 
+  private activeEditorMaskLayer(): EditorMaskLayer | undefined {
+    return this.editorMaskLayers.find((layer: EditorMaskLayer): boolean => {
+      return layer.id === this.editorActiveMaskLayerId;
+    });
+  }
+
+  private activeEditorMaskLayerVisible(): boolean {
+    const layer: EditorMaskLayer | undefined = this.activeEditorMaskLayer();
+    return layer !== undefined && layer.visible;
+  }
+
+  private createEditorMaskLayer(): void {
+    this.persistActiveEditorMaskLayer();
+    const layer = new EditorMaskLayer(
+      `${Date.now()}-${this.editorNextMaskNumber}`,
+      `${this.tr('蒙版')} ${this.editorNextMaskNumber}`
+    );
+    this.editorNextMaskNumber += 1;
+    this.editorMaskLayers.push(layer);
+    this.editorMaskLayers = this.editorMaskLayers.slice();
+    this.loadEditorMaskLayer(layer);
+  }
+
+  private ensureEditorMaskLayer(): void {
+    if (!this.editorMaskEnabled || this.activeEditorMaskLayer() === undefined) {
+      this.createEditorMaskLayer();
+    }
+  }
+
+  private selectEditorMaskLayer(id: string): void {
+    if (id === this.editorActiveMaskLayerId) return;
+    this.persistActiveEditorMaskLayer();
+    const layer: EditorMaskLayer | undefined = this.editorMaskLayers.find(
+      (candidate: EditorMaskLayer): boolean => candidate.id === id
+    );
+    if (layer !== undefined) this.loadEditorMaskLayer(layer);
+  }
+
+  private deleteActiveEditorMaskLayer(): void {
+    const index: number = this.editorMaskLayers.findIndex(
+      (layer: EditorMaskLayer): boolean => {
+        return layer.id === this.editorActiveMaskLayerId;
+      }
+    );
+    if (index < 0) return;
+    this.persistActiveEditorMaskLayer();
+    this.editorMaskLayers.splice(index, 1);
+    this.editorMaskLayers = this.editorMaskLayers.slice();
+    if (this.editorMaskLayers.length === 0) {
+      this.editorMaskEnabled = false;
+      this.editorActiveMaskLayerId = '';
+      this.editorMaskStrokes = [];
+    } else {
+      this.loadEditorMaskLayer(
+        this.editorMaskLayers[Math.min(index, this.editorMaskLayers.length - 1)]
+      );
+    }
+  }
+
+  private setEditorMaskLayerVisible(id: string, visible: boolean): void {
+    this.persistActiveEditorMaskLayer();
+    const index: number = this.editorMaskLayers.findIndex(
+      (layer: EditorMaskLayer): boolean => layer.id === id
+    );
+    if (index < 0) return;
+    this.editorMaskLayers[index].visible = visible;
+    this.editorMaskLayers = this.editorMaskLayers.slice();
+  }
+
+  private displayedEditorMaskLayer(layer: EditorMaskLayer): EditorMaskLayer {
+    return layer.id === this.editorActiveMaskLayerId
+      ? this.snapshotEditorMaskLayer(layer)
+      : layer.copy();
+  }
+
+  private effectiveEditorMaskLayers(): Array<EditorMaskLayer> {
+    return this.editorMaskLayers.map(
+      (layer: EditorMaskLayer): EditorMaskLayer => {
+        return this.displayedEditorMaskLayer(layer);
+      }
+    );
+  }
+
+  private persistActiveEditorMaskLayer(): void {
+    const index: number = this.editorMaskLayers.findIndex(
+      (layer: EditorMaskLayer): boolean => {
+        return layer.id === this.editorActiveMaskLayerId;
+      }
+    );
+    if (index < 0) return;
+    this.editorMaskLayers[index] = this.snapshotEditorMaskLayer(
+      this.editorMaskLayers[index]
+    );
+    this.editorMaskLayers = this.editorMaskLayers.slice();
+  }
+
+  private snapshotEditorMaskLayer(identity: EditorMaskLayer): EditorMaskLayer {
+    const layer = new EditorMaskLayer(identity.id, identity.name);
+    layer.visible = identity.visible;
+    layer.type = this.editorMaskType;
+    layer.amount = this.editorMaskAmount;
+    layer.feather = this.editorMaskFeather;
+    layer.invert = this.editorMaskInvert;
+    layer.subtract = this.editorMaskSubtract;
+    layer.brushSize = this.editorMaskBrushSize;
+    layer.strokes = this.editorMaskStrokes.map(
+      (stroke: EditorMaskStroke): EditorMaskStroke => {
+        return new EditorMaskStroke(
+          stroke.id,
+          stroke.subtract,
+          stroke.size,
+          stroke.points.map((point: EditorMaskPoint): EditorMaskPoint => {
+            return new EditorMaskPoint(point.x, point.y);
+          })
+        );
+      }
+    );
+    layer.exposure = this.editorMaskExposure;
+    layer.contrast = this.editorMaskContrast;
+    layer.highlights = this.editorMaskHighlights;
+    layer.shadows = this.editorMaskShadows;
+    layer.temperature = this.editorMaskTemperature;
+    layer.tint = this.editorMaskTint;
+    layer.saturation = this.editorMaskSaturation;
+    layer.clarity = this.editorMaskClarity;
+    return layer;
+  }
+
+  private loadEditorMaskLayer(layer: EditorMaskLayer): void {
+    const value: EditorMaskLayer = layer.copy();
+    this.editorMaskEnabled = true;
+    this.editorActiveMaskLayerId = value.id;
+    this.editorMaskType = value.type;
+    this.editorMaskAmount = value.amount;
+    this.editorMaskFeather = value.feather;
+    this.editorMaskInvert = value.invert;
+    this.editorMaskSubtract = value.subtract;
+    this.editorMaskBrushSize = value.brushSize;
+    this.editorMaskStrokes = value.strokes;
+    this.editorMaskExposure = value.exposure;
+    this.editorMaskContrast = value.contrast;
+    this.editorMaskHighlights = value.highlights;
+    this.editorMaskShadows = value.shadows;
+    this.editorMaskTemperature = value.temperature;
+    this.editorMaskTint = value.tint;
+    this.editorMaskSaturation = value.saturation;
+    this.editorMaskClarity = value.clarity;
+    this.editorActiveMaskStroke = -1;
+  }
+
+  private editorImageRect(): EditorPreviewRect {
+    const inset: number = 12;
+    const availableWidth: number = Math.max(
+      1,
+      this.editorPreviewWidth - inset * 2
+    );
+    const availableHeight: number = Math.max(
+      1,
+      this.editorPreviewHeight - inset * 2
+    );
+    const imageWidth: number = Math.max(1, this.editorImageWidth);
+    const imageHeight: number = Math.max(1, this.editorImageHeight);
+    const scale: number = Math.min(
+      availableWidth / imageWidth,
+      availableHeight / imageHeight
+    );
+    const width: number = imageWidth * scale;
+    const height: number = imageHeight * scale;
+    return new EditorPreviewRect(
+      inset + (availableWidth - width) / 2,
+      inset + (availableHeight - height) / 2,
+      width,
+      height
+    );
+  }
+
+  private async refreshEditorImageMetrics(): Promise<void> {
+    if (this.editorSelectedPath.length === 0) return;
+    let source: image.ImageSource | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      const info: image.ImageInfo = await source.getImageInfo();
+      this.editorImageWidth = Math.max(1, info.size.width);
+      this.editorImageHeight = Math.max(1, info.size.height);
+      if (this.editorMaskEnabled) {
+        this.refreshEditorRenderedPreview();
+      }
+    } catch (_) {
+    } finally {
+      source?.release();
+    }
+  }
+
+  private handleEditorMaskTouch(event: TouchEvent): void {
+    if (
+      this.editorPanel !== 'mask' ||
+      !this.editorMaskEnabled ||
+      !this.activeEditorMaskLayerVisible() ||
+      this.editorSelectedPath.length === 0
+    ) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (touch === undefined) {
+      if (event.type === TouchType.Up) this.editorActiveMaskStroke = -1;
+      return;
+    }
+    const rect: EditorPreviewRect = this.editorImageRect();
+    if (
+      event.type === TouchType.Down &&
+      (
+        touch.x < rect.left || touch.x > rect.left + rect.width ||
+        touch.y < rect.top || touch.y > rect.top + rect.height
+      )
+    ) {
+      return;
+    }
+    const point = new EditorMaskPoint(
+      Math.max(0, Math.min(1, (touch.x - rect.left) / rect.width)),
+      Math.max(0, Math.min(1, (touch.y - rect.top) / rect.height))
+    );
+    if (event.type === TouchType.Down) {
+      const stroke = new EditorMaskStroke(
+        `${Date.now()}-${this.editorMaskStrokes.length}`,
+        this.editorMaskSubtract,
+        this.editorMaskBrushSize,
+        [point]
+      );
+      this.editorMaskStrokes.push(stroke);
+      this.editorActiveMaskStroke = this.editorMaskStrokes.length - 1;
+      this.editorMaskStrokes = this.editorMaskStrokes.slice();
+    } else if (
+      event.type === TouchType.Move &&
+      this.editorActiveMaskStroke >= 0
+    ) {
+      this.editorMaskStrokes[this.editorActiveMaskStroke].points.push(point);
+      this.editorMaskStrokes = this.editorMaskStrokes.slice();
+    } else if (event.type === TouchType.Up) {
+      this.editorActiveMaskStroke = -1;
+      this.status = this.editorMaskSubtract
+        ? '已减去蒙版区域'
+        : '已添加蒙版区域';
+      this.refreshEditorRenderedPreview();
+    }
+  }
+
+  private editorCurveValue(input: number): number {
+    const points: Array<EditorCurvePoint> = this.editorCurvePoints.slice().sort((a: EditorCurvePoint, b: EditorCurvePoint): number => a.x - b.x);
+    const x: number = this.editorClampUnit(input);
+    if (points.length < 2) return x;
+    if (x <= points[0].x) return points[0].y;
+    if (x >= points[points.length - 1].x) return points[points.length - 1].y;
+    let index: number = 1;
+    while (index < points.length && points[index].x < x) index++;
+    const p0: EditorCurvePoint = points[Math.max(0, index - 2)];
+    const p1: EditorCurvePoint = points[index - 1];
+    const p2: EditorCurvePoint = points[index];
+    const p3: EditorCurvePoint = points[Math.min(points.length - 1, index + 1)];
+    const t: number = (x - p1.x) / Math.max(0.0001, p2.x - p1.x);
+    const t2: number = t * t;
+    const t3: number = t2 * t;
+    const y: number = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+    return this.editorClampUnit(y);
+  }
+
+  private applyNikonCloudColorMixer(
+    channels: Array<number>,
+    hsl: Array<number>,
+    preset: NikonCloudPreset
+  ): void {
+    if (preset.mixer.length !== 8) return;
+    const red: number = this.editorClampUnit(channels[0]);
+    const green: number = this.editorClampUnit(channels[1]);
+    const blue: number = this.editorClampUnit(channels[2]);
+    const maximum: number = Math.max(red, Math.max(green, blue));
+    const minimum: number = Math.min(red, Math.min(green, blue));
+    const delta: number = maximum - minimum;
+    const lightness: number = (maximum + minimum) / 2;
+    let hue: number = 0;
+    let saturation: number = 0;
+    if (delta > 0.000001) {
+      saturation = delta / Math.max(
+        0.000001,
+        1 - Math.abs(2 * lightness - 1)
+      );
+      if (maximum === red) {
+        hue = 60 * (((green - blue) / delta) % 6);
+      } else if (maximum === green) {
+        hue = 60 * ((blue - red) / delta + 2);
+      } else {
+        hue = 60 * ((red - green) / delta + 4);
+      }
+      if (hue < 0) hue += 360;
+    }
+    const anchors: Array<number> = [0, 30, 60, 120, 180, 240, 280, 330];
+    let totalWeight: number = 0;
+    let hueShift: number = 0;
+    let chromaShift: number = 0;
+    let brightnessShift: number = 0;
+    for (let index: number = 0; index < anchors.length; index++) {
+      const direct: number = Math.abs(hue - anchors[index]);
+      const distance: number = Math.min(direct, 360 - direct);
+      const weight: number = Math.max(0, 1 - distance / 60);
+      const item: NikonCloudColorMix = preset.mixer[index];
+      totalWeight += weight;
+      hueShift += item.hue * weight;
+      chromaShift += item.chroma * weight;
+      brightnessShift += item.brightness * weight;
+    }
+    let mixedHue: number = hue;
+    let mixedSaturation: number = saturation;
+    let mixedLightness: number = lightness;
+    if (totalWeight > 0) {
+      mixedHue = (hue + hueShift / totalWeight * 0.5) % 360;
+      if (mixedHue < 0) mixedHue += 360;
+      mixedSaturation = this.editorClampUnit(
+        saturation * (1 + chromaShift / totalWeight / 64)
+      );
+      mixedLightness = this.editorClampUnit(
+        lightness + brightnessShift / totalWeight / 255
+      );
+    }
+    hsl[0] = mixedHue;
+    hsl[1] = mixedSaturation;
+    hsl[2] = mixedLightness;
+    const chroma: number = (1 - Math.abs(2 * hsl[2] - 1)) * hsl[1];
+    const sector: number = hsl[0] / 60;
+    const secondary: number = chroma * (1 - Math.abs(sector % 2 - 1));
+    let mixedRed: number = 0;
+    let mixedGreen: number = 0;
+    let mixedBlue: number = 0;
+    if (sector < 1) {
+      mixedRed = chroma; mixedGreen = secondary;
+    } else if (sector < 2) {
+      mixedRed = secondary; mixedGreen = chroma;
+    } else if (sector < 3) {
+      mixedGreen = chroma; mixedBlue = secondary;
+    } else if (sector < 4) {
+      mixedGreen = secondary; mixedBlue = chroma;
+    } else if (sector < 5) {
+      mixedRed = secondary; mixedBlue = chroma;
+    } else {
+      mixedRed = chroma; mixedBlue = secondary;
+    }
+    const match: number = hsl[2] - chroma / 2;
+    channels[0] = this.editorClampUnit(mixedRed + match);
+    channels[1] = this.editorClampUnit(mixedGreen + match);
+    channels[2] = this.editorClampUnit(mixedBlue + match);
+  }
+
   private processEditorPixels(
     pixels: Uint8Array,
     width: number,
@@ -6519,17 +10319,34 @@ struct Index {
       1 + this.editorSaturation / 100 + this.editorDehaze / 520;
     const temperature: number = this.editorTemperature / 100;
     const tint: number = this.editorTint / 100;
+    const cloudPreset: NikonCloudPreset | undefined =
+      this.selectedNikonCloudPreset();
+    const cloudChannels: Array<number> = [0, 0, 0];
+    const cloudHsl: Array<number> = [0, 0, 0];
     for (let offset: number = 0; offset < pixels.length; offset += 4) {
       let red: number = pixels[offset] / 255 * exposure;
       let green: number = pixels[offset + 1] / 255 * exposure;
       let blue: number = pixels[offset + 2] / 255 * exposure;
 
+      let luma: number = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const shadowWeight: number = Math.pow(1 - this.editorClampUnit(luma), 2);
+      const midWeight: number = 1 - Math.abs(this.editorClampUnit(luma) * 2 - 1);
+      const highlightWeight: number = Math.pow(this.editorClampUnit(luma), 2);
+      const wheelX: number = this.editorWheelLiftX / 100 * 0.10 * shadowWeight
+        + this.editorWheelGammaX / 100 * 0.10 * midWeight
+        + this.editorWheelGainX / 100 * 0.10 * highlightWeight;
+      const wheelY: number = this.editorWheelLiftY / 100 * 0.10 * shadowWeight
+        + this.editorWheelGammaY / 100 * 0.10 * midWeight
+        + this.editorWheelGainY / 100 * 0.10 * highlightWeight;
+      red += wheelX - wheelY * 0.5;
+      green += wheelY - wheelX * 0.5;
+      blue -= (wheelX + wheelY) * 0.5;
+
       red += temperature * 0.12 + tint * 0.045;
       green -= tint * 0.08;
       blue -= temperature * 0.12 - tint * 0.045;
 
-      let luma: number =
-        red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const toneShift: number =
         this.editorShadows / 100
           * Math.pow(1 - this.editorClampUnit(luma), 2)
@@ -6555,6 +10372,14 @@ struct Index {
       green = (green - 0.5) * contrast * localContrast + 0.5;
       blue = (blue - 0.5) * contrast * localContrast + 0.5;
 
+      if (this.editorCurvePoints.length > 2) {
+        const mapped: number = this.editorCurveValue(luma);
+        const delta: number = mapped - luma;
+        red += delta;
+        green += delta;
+        blue += delta;
+      }
+
       luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
       const maximum: number = Math.max(red, Math.max(green, blue));
       const minimum: number = Math.min(red, Math.min(green, blue));
@@ -6569,6 +10394,20 @@ struct Index {
       red = luma + (red - luma) * saturation;
       green = luma + (green - luma) * saturation;
       blue = luma + (blue - luma) * saturation;
+
+      if (cloudPreset !== undefined) {
+        cloudChannels[0] = red;
+        cloudChannels[1] = green;
+        cloudChannels[2] = blue;
+        this.applyNikonCloudColorMixer(
+          cloudChannels,
+          cloudHsl,
+          cloudPreset
+        );
+        red = cloudChannels[0];
+        green = cloudChannels[1];
+        blue = cloudChannels[2];
+      }
 
       const index: number = offset / 4;
       const x: number = index % width;
@@ -6594,6 +10433,306 @@ struct Index {
       );
     }
     this.processEditorDetailPixels(pixels, width, height);
+  }
+
+  private processEditorMaskPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number
+  ): void {
+    if (!this.editorMaskEnabled) return;
+    this.effectiveEditorMaskLayers().forEach(
+      (layer: EditorMaskLayer): void => {
+        if (layer.visible && layer.type.length > 0) {
+          this.processEditorMaskLayerPixels(pixels, width, height, layer);
+        }
+      }
+    );
+  }
+
+  private processEditorMaskLayerPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    layer: EditorMaskLayer
+  ): void {
+    const original: Uint8Array = new Uint8Array(pixels);
+    const local: Uint8Array = new Uint8Array(pixels);
+    const exposure: number = Math.pow(2, layer.exposure / 100);
+    const contrast: number = 1 + layer.contrast / 100;
+    const saturation: number = Math.max(
+      0,
+      1 + layer.saturation / 100
+    );
+    const temperature: number = layer.temperature / 100;
+    const tint: number = layer.tint / 100;
+    for (let offset: number = 0; offset < local.length; offset += 4) {
+      let red: number = original[offset] / 255 * exposure;
+      let green: number = original[offset + 1] / 255 * exposure;
+      let blue: number = original[offset + 2] / 255 * exposure;
+      red += temperature * 0.12 + tint * 0.045;
+      green -= tint * 0.08;
+      blue -= temperature * 0.12 - tint * 0.045;
+      let luma: number = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      const tone: number = layer.shadows / 100
+        * Math.pow(1 - this.editorClampUnit(luma), 2) * 0.38
+        + layer.highlights / 100
+        * Math.pow(this.editorClampUnit(luma), 2) * 0.30;
+      red += tone;
+      green += tone;
+      blue += tone;
+      const clarityWeight: number =
+        1 - Math.abs(this.editorClampUnit(luma) * 2 - 1);
+      const localContrast: number = contrast
+        * (1 + layer.clarity / 100 * clarityWeight * 0.38);
+      red = (red - 0.5) * localContrast + 0.5;
+      green = (green - 0.5) * localContrast + 0.5;
+      blue = (blue - 0.5) * localContrast + 0.5;
+      luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      local[offset] = this.editorChannel(
+        (luma + (red - luma) * saturation) * 255
+      );
+      local[offset + 1] = this.editorChannel(
+        (luma + (green - luma) * saturation) * 255
+      );
+      local[offset + 2] = this.editorChannel(
+        (luma + (blue - luma) * saturation) * 255
+      );
+    }
+    const mask: Uint8Array = this.buildEditorMask(
+      width,
+      height,
+      original,
+      layer
+    );
+    const intensity: number = Math.max(
+      0,
+      Math.min(1, layer.amount / 100)
+    );
+    for (let offset: number = 0; offset < pixels.length; offset += 4) {
+      const coverage: number = mask[offset / 4] / 255;
+      const amount: number = (
+        layer.invert ? 1 - coverage : coverage
+      ) * intensity;
+      for (let channel: number = 0; channel < 3; channel++) {
+        pixels[offset + channel] = this.editorChannel(
+          original[offset + channel]
+            + (local[offset + channel] - original[offset + channel])
+            * amount
+        );
+      }
+    }
+  }
+
+  private buildEditorMask(
+    width: number,
+    height: number,
+    sourcePixels: Uint8Array,
+    layer: EditorMaskLayer
+  ): Uint8Array {
+    const mask = new Uint8Array(Math.max(1, width * height));
+    if (layer.type !== '画笔') {
+      for (let index: number = 0; index < mask.length; index++) {
+        const offset: number = index * 4;
+        const coverage: number = this.smartEditorMaskCoverage(
+          layer.type,
+          sourcePixels[offset] / 255,
+          sourcePixels[offset + 1] / 255,
+          sourcePixels[offset + 2] / 255,
+          index % width,
+          Math.floor(index / width),
+          width,
+          height
+        );
+        mask[index] = Math.max(
+          0,
+          Math.min(255, Math.round(coverage * 255))
+        );
+      }
+    }
+    layer.strokes.forEach((stroke: EditorMaskStroke): void => {
+      if (stroke.points.length === 0) return;
+      let previous: EditorMaskPoint = stroke.points[0];
+      this.stampEditorMask(mask, width, height, previous, stroke, layer.feather);
+      stroke.points.slice(1).forEach((current: EditorMaskPoint): void => {
+        const deltaX: number = (current.x - previous.x) * width;
+        const deltaY: number = (current.y - previous.y) * height;
+        const radius: number = Math.max(
+          1,
+          stroke.size / 200 * Math.min(width, height)
+        );
+        const steps: number = Math.max(
+          1,
+          Math.ceil(
+            Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+              / Math.max(1, radius * 0.45)
+          )
+        );
+        for (let step: number = 1; step <= steps; step++) {
+          const progress: number = step / steps;
+          this.stampEditorMask(
+            mask,
+            width,
+            height,
+            new EditorMaskPoint(
+              previous.x + (current.x - previous.x) * progress,
+              previous.y + (current.y - previous.y) * progress
+            ),
+            stroke,
+            layer.feather
+          );
+        }
+        previous = current;
+      });
+    });
+    const blurRadius: number = Math.min(
+      24,
+      Math.max(
+        0,
+        Math.round(
+          layer.feather / 100 * Math.min(width, height) * 0.015
+        )
+      )
+    );
+    if (blurRadius > 0) {
+      this.blurEditorMask(mask, width, height, blurRadius);
+    }
+    return mask;
+  }
+
+  private smartEditorMaskCoverage(
+    type: string,
+    red: number,
+    green: number,
+    blue: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): number {
+    const luma: number = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+    const chroma: number = Math.max(red, green, blue)
+      - Math.min(red, green, blue);
+    const unitX: number = x / Math.max(1, width - 1);
+    const unitY: number = y / Math.max(1, height - 1);
+    const center: number = 1 - Math.min(
+      1,
+      Math.sqrt(
+        Math.pow((unitX - 0.5) / 0.72, 2)
+          + Math.pow((unitY - 0.52) / 0.82, 2)
+      )
+    );
+    const subject: number = this.editorClampUnit(
+      center * 0.72 + chroma * 0.72 + Math.abs(luma - 0.5) * 0.18
+    );
+    if (type === '智能背景') return 1 - subject;
+    if (type === '智能天空') {
+      const top: number = this.editorClampUnit((0.76 - unitY) / 0.62);
+      const skyColor: number = this.editorClampUnit(
+        (blue - red * 0.88) * 2.5
+          + (blue - green * 0.78) * 1.6 + 0.18
+      );
+      return top * skyColor * this.editorSmoothStep(0.18, 0.82, luma);
+    }
+    if (type === '智能人物') {
+      const skin: number = this.editorSmoothStep(0.02, 0.20, red - blue)
+        * this.editorSmoothStep(-0.05, 0.16, red - green)
+        * this.editorSmoothStep(0.16, 0.78, luma);
+      return this.editorClampUnit(skin * 0.78 + subject * center * 0.42);
+    }
+    if (type === '智能亮部') {
+      return this.editorSmoothStep(0.55, 0.88, luma);
+    }
+    if (type === '智能暗部') {
+      return 1 - this.editorSmoothStep(0.12, 0.48, luma);
+    }
+    return subject;
+  }
+
+  private blurEditorMask(
+    mask: Uint8Array,
+    width: number,
+    height: number,
+    radius: number
+  ): void {
+    const horizontal: Uint8Array = new Uint8Array(mask.length);
+    const divisor: number = radius * 2 + 1;
+    for (let y: number = 0; y < height; y++) {
+      let sum: number = 0;
+      for (let x: number = -radius; x <= radius; x++) {
+        sum += mask[y * width + Math.max(0, Math.min(width - 1, x))];
+      }
+      for (let x: number = 0; x < width; x++) {
+        horizontal[y * width + x] = Math.round(sum / divisor);
+        const removeX: number = Math.max(0, x - radius);
+        const addX: number = Math.min(width - 1, x + radius + 1);
+        sum += mask[y * width + addX] - mask[y * width + removeX];
+      }
+    }
+    for (let x: number = 0; x < width; x++) {
+      let sum: number = 0;
+      for (let y: number = -radius; y <= radius; y++) {
+        sum += horizontal[
+          Math.max(0, Math.min(height - 1, y)) * width + x
+        ];
+      }
+      for (let y: number = 0; y < height; y++) {
+        mask[y * width + x] = Math.round(sum / divisor);
+        const removeY: number = Math.max(0, y - radius);
+        const addY: number = Math.min(height - 1, y + radius + 1);
+        sum += horizontal[addY * width + x]
+          - horizontal[removeY * width + x];
+      }
+    }
+  }
+
+  private stampEditorMask(
+    mask: Uint8Array,
+    width: number,
+    height: number,
+    point: EditorMaskPoint,
+    stroke: EditorMaskStroke,
+    feather: number
+  ): void {
+    const radius: number = Math.max(
+      1,
+      stroke.size / 200 * Math.min(width, height)
+    );
+    const softEdge: number = radius
+      * Math.max(0, Math.min(100, feather)) / 100;
+    const outerRadius: number = radius + softEdge;
+    const centerX: number = Math.round(point.x * (width - 1));
+    const centerY: number = Math.round(point.y * (height - 1));
+    const extent: number = Math.max(1, Math.ceil(outerRadius));
+    for (
+      let y: number = Math.max(0, centerY - extent);
+      y <= Math.min(height - 1, centerY + extent);
+      y++
+    ) {
+      for (
+        let x: number = Math.max(0, centerX - extent);
+        x <= Math.min(width - 1, centerX + extent);
+        x++
+      ) {
+        const deltaX: number = x - centerX;
+        const deltaY: number = y - centerY;
+        const distance: number = Math.sqrt(
+          deltaX * deltaX + deltaY * deltaY
+        );
+        if (distance > outerRadius) continue;
+        const coverage: number = distance <= radius || softEdge <= 0
+          ? 1
+          : 1 - (distance - radius) / softEdge;
+        const offset: number = y * width + x;
+        const value: number = Math.max(
+          0,
+          Math.min(255, Math.round(coverage * 255))
+        );
+        mask[offset] = stroke.subtract
+          ? Math.max(0, mask[offset] - value)
+          : Math.max(mask[offset], value);
+      }
+    }
   }
 
   private processEditorDetailPixels(
@@ -6653,6 +10792,121 @@ struct Index {
       return 16 / 9;
     }
     return 0;
+  }
+
+  private clearEditorRenderedPreview(): void {
+    this.editorRenderGeneration++;
+    const previous: image.PixelMap | undefined = this.editorRenderedPreview;
+    this.editorRenderedPreview = undefined;
+    if (previous !== undefined) {
+      setTimeout((): void => {
+        previous.release();
+      }, 300);
+    }
+  }
+
+  private async refreshEditorRenderedPreview(): Promise<void> {
+    if ((
+      !this.editorMaskEnabled &&
+      this.editorNikonCloudPresetId.length === 0
+    ) || this.editorSelectedPath.length === 0) {
+      this.clearEditorRenderedPreview();
+      return;
+    }
+    const generation: number = ++this.editorRenderGeneration;
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      const sourceInfo: image.ImageInfo = await source.getImageInfo();
+      const scale: number = Math.min(
+        1,
+        1200 / Math.max(sourceInfo.size.width, sourceInfo.size.height)
+      );
+      pixelMap = await source.createPixelMap({
+        editable: true,
+        desiredSize: {
+          width: Math.max(1, Math.round(sourceInfo.size.width * scale)),
+          height: Math.max(1, Math.round(sourceInfo.size.height * scale))
+        },
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const baseInfo: image.ImageInfo = await pixelMap.getImageInfo();
+      const baseBuffer: ArrayBuffer = new ArrayBuffer(
+        baseInfo.size.width * baseInfo.size.height * 4
+      );
+      await pixelMap.readPixelsToBuffer(baseBuffer);
+      if (!this.editorShowingOriginal) {
+        this.processEditorPixels(
+          new Uint8Array(baseBuffer),
+          baseInfo.size.width,
+          baseInfo.size.height
+        );
+        await pixelMap.writeBufferToPixels(baseBuffer);
+      }
+      if (this.editorRotation !== 0) {
+        await pixelMap.rotate(this.editorRotation);
+      }
+      if (this.editorFlipHorizontal || this.editorFlipVertical) {
+        await pixelMap.flip(
+          this.editorFlipHorizontal,
+          this.editorFlipVertical
+        );
+      }
+      const cropRatio: number = this.editorCropRatioValue();
+      if (cropRatio > 0) {
+        const geometryInfo: image.ImageInfo = await pixelMap.getImageInfo();
+        let cropWidth: number = geometryInfo.size.width;
+        let cropHeight: number = Math.round(cropWidth / cropRatio);
+        if (cropHeight > geometryInfo.size.height) {
+          cropHeight = geometryInfo.size.height;
+          cropWidth = Math.round(cropHeight * cropRatio);
+        }
+        await pixelMap.crop({
+          x: Math.max(0, Math.floor((geometryInfo.size.width - cropWidth) / 2)),
+          y: Math.max(0, Math.floor((geometryInfo.size.height - cropHeight) / 2)),
+          size: {
+            width: Math.max(1, cropWidth),
+            height: Math.max(1, cropHeight)
+          }
+        });
+      }
+      const finalInfo: image.ImageInfo = await pixelMap.getImageInfo();
+      const finalBuffer: ArrayBuffer = new ArrayBuffer(
+        finalInfo.size.width * finalInfo.size.height * 4
+      );
+      await pixelMap.readPixelsToBuffer(finalBuffer);
+      if (!this.editorShowingOriginal) {
+        this.processEditorMaskPixels(
+          new Uint8Array(finalBuffer),
+          finalInfo.size.width,
+          finalInfo.size.height
+        );
+        await pixelMap.writeBufferToPixels(finalBuffer);
+      }
+      if (generation !== this.editorRenderGeneration) {
+        pixelMap.release();
+        pixelMap = undefined;
+        return;
+      }
+      const previous: image.PixelMap | undefined = this.editorRenderedPreview;
+      this.editorRenderedPreview = pixelMap;
+      this.editorImageWidth = finalInfo.size.width;
+      this.editorImageHeight = finalInfo.size.height;
+      pixelMap = undefined;
+      if (previous !== undefined) {
+        setTimeout((): void => {
+          previous.release();
+        }, 300);
+      }
+    } catch (_) {
+      if (generation === this.editorRenderGeneration) {
+        this.status = '蒙版预览生成失败，请重试';
+      }
+    } finally {
+      pixelMap?.release();
+      source?.release();
+    }
   }
 
   private async saveEditedPhoto(): Promise<void> {
@@ -6721,6 +10975,19 @@ struct Index {
         };
         await pixelMap.crop(region);
       }
+      if (this.editorMaskEnabled) {
+        const maskInfo: image.ImageInfo = await pixelMap.getImageInfo();
+        const maskBuffer: ArrayBuffer = new ArrayBuffer(
+          maskInfo.size.width * maskInfo.size.height * 4
+        );
+        await pixelMap.readPixelsToBuffer(maskBuffer);
+        this.processEditorMaskPixels(
+          new Uint8Array(maskBuffer),
+          maskInfo.size.width,
+          maskInfo.size.height
+        );
+        await pixelMap.writeBufferToPixels(maskBuffer);
+      }
       packer = image.createImagePacker();
       const packed: ArrayBuffer = await packer.packing(pixelMap, {
         format: 'image/jpeg',
@@ -6733,6 +11000,7 @@ struct Index {
       this.refreshPhotos();
       this.editorSelectedPath = destination;
       this.resetImageEditor();
+      this.refreshEditorImageMetrics();
       this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
     } catch (error) {
       this.showError(
@@ -6862,16 +11130,20 @@ struct Index {
     let pixelMap: image.PixelMap = sourceMap;
     const monitoring: boolean =
       this.section === 'monitor' || this.immersiveMonitoring;
+    const nikonCloudPreset: NikonCloudPreset | undefined =
+      this.selectedMonitorNikonCloudPreset();
     const visualProcessing: boolean =
-      this.focusPeakingEnabled || this.falseColorEnabled;
+      this.focusPeakingEnabled || this.falseColorEnabled ||
+      nikonCloudPreset !== undefined;
     const analyzeFrame: boolean =
       visualProcessing || this.previewAnalysisSequence++ % (this.videoRecording ? 6 : 3) === 0;
-    if (monitoring && analyzeFrame) {
+    if ((monitoring || nikonCloudPreset !== undefined) && analyzeFrame) {
       const result: ProfessionalMonitorResult =
         await processProfessionalMonitor(
           sourceMap,
           this.focusPeakingEnabled,
-          this.falseColorEnabled
+          this.falseColorEnabled,
+          nikonCloudPreset
         );
       pixelMap = result.pixelMap;
       this.redHistogram = result.redHistogram;
@@ -6880,6 +11152,8 @@ struct Index {
       this.waveform = result.waveform;
       this.vectorscope = result.vectorscope;
       this.peakingCoverage = result.peakingCoverage;
+      this.drawMonitorRgbScope();
+      this.drawProfessionalScope();
       if (pixelMap !== sourceMap) {
         sourceMap.release();
       }
@@ -6995,7 +11269,7 @@ struct Index {
     try {
       let candidate: UpdateCandidate;
       try {
-        candidate = await this.checkMirrorChyan();
+        candidate = await this.checkSelfHostedUpdate();
         if (
           this.isNewerVersion(candidate.version, CURRENT_VERSION) &&
           candidate.url.length === 0
@@ -7007,19 +11281,34 @@ struct Index {
             candidate.notice
           );
         }
-      } catch (error) {
-        const mirrorError: MirrorChyanRequestError =
-          error as MirrorChyanRequestError;
-        this.diagnostics?.warning(
-          'update',
-          `Mirror酱检查失败，准备回退 GitHub；code=${mirrorError.code}`
-        );
-        const github: UpdateCandidate = await this.checkGitHub();
-        candidate = new UpdateCandidate(
-          github.version,
-          github.url,
-          this.mirrorFallbackStatus(mirrorError.code)
-        );
+      } catch (selfHostedError) {
+        try {
+          candidate = await this.checkMirrorChyan();
+          if (
+            this.isNewerVersion(candidate.version, CURRENT_VERSION) &&
+            candidate.url.length === 0
+          ) {
+            const github: UpdateCandidate = await this.checkGitHub();
+            candidate = new UpdateCandidate(
+              candidate.version,
+              github.url,
+              candidate.notice
+            );
+          }
+        } catch (error) {
+          const mirrorError: MirrorChyanRequestError =
+            error as MirrorChyanRequestError;
+          this.diagnostics?.warning(
+            'update',
+            `Mirror酱检查失败，准备回退 GitHub；code=${mirrorError.code}`
+          );
+          const github: UpdateCandidate = await this.checkGitHub();
+          candidate = new UpdateCandidate(
+            github.version,
+            github.url,
+            this.mirrorFallbackStatus(mirrorError.code)
+          );
+        }
       }
       if (!this.isNewerVersion(candidate.version, CURRENT_VERSION)) {
         this.availableVersion = '';
@@ -7088,6 +11377,57 @@ struct Index {
       }
       return new UpdateCandidate(
         this.normalizeVersion(root.data.version_name),
+        url,
+        notice
+      );
+    } finally {
+      request.destroy();
+    }
+  }
+
+  private async checkSelfHostedUpdate(): Promise<UpdateCandidate> {
+    const request: http.HttpRequest = http.createHttp();
+    try {
+      const endpoint: string =
+        `${SELF_HOSTED_UPDATE_ENDPOINT}?platform=harmony&arch=arm64`
+        + `&current_version=${encodeURIComponent(CURRENT_VERSION)}`
+        + '&channel=stable';
+      const response: http.HttpResponse = await request.request(
+        endpoint,
+        {
+          method: http.RequestMethod.GET,
+          header: {
+            'Accept': 'application/json',
+            'User-Agent': `ZENCHE-HarmonyOS/${CURRENT_VERSION}`
+          },
+          connectTimeout: 20000,
+          readTimeout: 20000,
+          expectDataType: http.HttpDataType.STRING
+        }
+      );
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        throw new Error(`Self-hosted update HTTP ${response.responseCode}`);
+      }
+      const root: SelfHostedUpdate =
+        JSON.parse(response.result as string) as SelfHostedUpdate;
+      if (root.schema_version !== 1 ||
+          root.product.toUpperCase() !== 'ZENCHE' ||
+          root.version.length === 0) {
+        throw new Error('Invalid self-hosted update feed');
+      }
+      let url: string = root.url ?? root.release_url ?? '';
+      if ((root.update_type ?? '').toLowerCase() === 'incremental') {
+        url = '';
+      }
+      let notice: string = '';
+      if (root.announcement !== undefined) {
+        const title: string = (root.announcement.title ?? '').trim();
+        const body: string = (root.announcement.body ?? '').trim();
+        notice = title.length === 0 ? body
+          : (body.length === 0 ? title : `${title}：${body}`);
+      }
+      return new UpdateCandidate(
+        this.normalizeVersion(root.version),
         url,
         notice
       );

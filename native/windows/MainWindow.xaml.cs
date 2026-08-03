@@ -2,6 +2,7 @@ using NikonLink.Windows.Models;
 using NikonLink.Windows.Services;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -24,8 +25,18 @@ namespace NikonLink.Windows;
 public partial class MainWindow : Window
 {
     private sealed record PreparedPreview(
+        BitmapSource Source,
         BitmapSource Display,
         ProfessionalMonitorResult Monitor);
+
+    private sealed class RememberedCameraDevice
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Vendor { get; set; } = "Camera";
+        public string Transport { get; set; } = "USB/PTP";
+        public DateTime LastConnectedAt { get; set; } = DateTime.Now;
+    }
 
     private sealed class LibraryBranch
     {
@@ -47,11 +58,115 @@ public partial class MainWindow : Window
         public ObservableCollection<LibraryTreeNode> Children { get; } = [];
     }
 
+    private sealed class CameraStorageListItem : INotifyPropertyChanged
+    {
+        private BitmapSource? _thumbnail;
+
+        public required CameraStorageItem Item { get; init; }
+        public string Name => Item.Filename;
+        public string Icon => Item.IsVideo ? "▶" : "▣";
+        public string Detail =>
+            $"{FormatStorageBytes(Item.SizeBytes)}" +
+            (Item.Width > 0 && Item.Height > 0
+                ? $" · {Item.Width} × {Item.Height}"
+                : "") +
+            $" · {Item.CapturedAt}" +
+            (Item.IsProtected ? " · 已保护" : "");
+
+        public BitmapSource? Thumbnail
+        {
+            get => _thumbnail;
+            set
+            {
+                if (ReferenceEquals(_thumbnail, value)) return;
+                _thumbnail = value;
+                PropertyChanged?.Invoke(
+                    this,
+                    new PropertyChangedEventArgs(nameof(Thumbnail)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
     private sealed class EditorPhotoChoice
     {
         public required PhotoItem Item { get; init; }
 
         public override string ToString() => Item.Name;
+    }
+
+    private sealed class EditorCurvePoint
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public EditorCurvePoint(double x, double y) { X = x; Y = y; }
+        public EditorCurvePoint Copy() => new(X, Y);
+    }
+
+    private sealed class EditorMaskPoint
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public EditorMaskPoint(double x, double y) { X = x; Y = y; }
+        public EditorMaskPoint Copy() => new(X, Y);
+    }
+
+    private sealed class EditorMaskStroke
+    {
+        public bool Subtract { get; set; }
+        public double Size { get; set; } = 18;
+        public List<EditorMaskPoint> Points { get; set; } = [];
+        public EditorMaskStroke Copy() => new()
+        {
+            Subtract = Subtract,
+            Size = Size,
+            Points = Points.Select(point => point.Copy()).ToList()
+        };
+    }
+
+    private sealed class EditorMaskLayer
+    {
+        public Guid Id { get; init; } = Guid.NewGuid();
+        public string Name { get; set; } = "";
+        public bool IsVisible { get; set; } = true;
+        public string Type { get; set; } = "画笔";
+        public double Amount { get; set; } = 100;
+        public double Feather { get; set; } = 50;
+        public bool Invert { get; set; }
+        public bool Subtract { get; set; }
+        public double BrushSize { get; set; } = 18;
+        public List<EditorMaskStroke> Strokes { get; set; } = [];
+        public double Exposure { get; set; }
+        public double Contrast { get; set; }
+        public double Highlights { get; set; }
+        public double Shadows { get; set; }
+        public double Temperature { get; set; }
+        public double Tint { get; set; }
+        public double Saturation { get; set; }
+        public double Clarity { get; set; }
+
+        public EditorMaskLayer Copy() => new()
+        {
+            Id = Id,
+            Name = Name,
+            IsVisible = IsVisible,
+            Type = Type,
+            Amount = Amount,
+            Feather = Feather,
+            Invert = Invert,
+            Subtract = Subtract,
+            BrushSize = BrushSize,
+            Strokes = Strokes.Select(stroke => stroke.Copy()).ToList(),
+            Exposure = Exposure,
+            Contrast = Contrast,
+            Highlights = Highlights,
+            Shadows = Shadows,
+            Temperature = Temperature,
+            Tint = Tint,
+            Saturation = Saturation,
+            Clarity = Clarity
+        };
     }
 
     private sealed class EditorAdjustments
@@ -72,6 +187,45 @@ public partial class MainWindow : Window
         public double NoiseReduction { get; set; }
         public double Dehaze { get; set; }
         public double Vignette { get; set; }
+        // DaVinci-style grading controls. Values are intentionally normalized
+        // to the existing -100...100 editor range so presets and reset remain
+        // backwards compatible.
+        public double Lift { get; set; }
+        public double Gamma { get; set; }
+        public double Gain { get; set; }
+        public double LiftX { get; set; }
+        public double LiftY { get; set; }
+        public double GammaX { get; set; }
+        public double GammaY { get; set; }
+        public double GainX { get; set; }
+        public double GainY { get; set; }
+        public double CurveShadows { get; set; }
+        public double CurveMidtones { get; set; }
+        public double CurveHighlights { get; set; }
+        public List<EditorCurvePoint> CurvePoints { get; set; } = DefaultCurvePoints();
+
+        private static List<EditorCurvePoint> DefaultCurvePoints() =>
+            [new(0, 0), new(.25, .25), new(.5, .5), new(.75, .75), new(1, 1)];
+        public string MaskType { get; set; } = "无";
+        public double MaskAmount { get; set; }
+        public double MaskFeather { get; set; } = 50;
+        public bool MaskInvert { get; set; }
+        public bool MaskSubtract { get; set; }
+        public double MaskBrushSize { get; set; } = 18;
+        public List<EditorMaskStroke> MaskStrokes { get; set; } = [];
+        public double MaskExposure { get; set; }
+        public double MaskContrast { get; set; }
+        public double MaskHighlights { get; set; }
+        public double MaskShadows { get; set; }
+        public double MaskTemperature { get; set; }
+        public double MaskTint { get; set; }
+        public double MaskSaturation { get; set; }
+        public double MaskClarity { get; set; }
+        public List<EditorMaskLayer> MaskLayers { get; set; } = [];
+        public Guid? ActiveMaskLayerId { get; set; }
+        public int NextMaskNumber { get; set; } = 1;
+        public bool PickerEnabled { get; set; }
+        public string PickedColorHex { get; set; } = "未取样";
         public int Rotation { get; set; }
         public bool FlipHorizontal { get; set; }
         public bool FlipVertical { get; set; }
@@ -96,6 +250,39 @@ public partial class MainWindow : Window
             NoiseReduction = 0;
             Dehaze = 0;
             Vignette = 0;
+            Lift = 0;
+            Gamma = 0;
+            Gain = 0;
+            LiftX = 0;
+            LiftY = 0;
+            GammaX = 0;
+            GammaY = 0;
+            GainX = 0;
+            GainY = 0;
+            CurveShadows = 0;
+            CurveMidtones = 0;
+            CurveHighlights = 0;
+            CurvePoints = DefaultCurvePoints();
+            MaskType = "无";
+            MaskAmount = 0;
+            MaskFeather = 50;
+            MaskInvert = false;
+            MaskSubtract = false;
+            MaskBrushSize = 18;
+            MaskStrokes = [];
+            MaskExposure = 0;
+            MaskContrast = 0;
+            MaskHighlights = 0;
+            MaskShadows = 0;
+            MaskTemperature = 0;
+            MaskTint = 0;
+            MaskSaturation = 0;
+            MaskClarity = 0;
+            MaskLayers = [];
+            ActiveMaskLayerId = null;
+            NextMaskNumber = 1;
+            PickerEnabled = false;
+            PickedColorHex = "未取样";
             Rotation = 0;
             FlipHorizontal = false;
             FlipVertical = false;
@@ -135,12 +322,322 @@ public partial class MainWindow : Window
             NoiseReduction = NoiseReduction,
             Dehaze = Dehaze,
             Vignette = Vignette,
+            Lift = Lift,
+            Gamma = Gamma,
+            Gain = Gain,
+            LiftX = LiftX,
+            LiftY = LiftY,
+            GammaX = GammaX,
+            GammaY = GammaY,
+            GainX = GainX,
+            GainY = GainY,
+            CurveShadows = CurveShadows,
+            CurveMidtones = CurveMidtones,
+            CurveHighlights = CurveHighlights,
+            CurvePoints = CurvePoints.Select(point => point.Copy()).ToList(),
+            MaskType = MaskType,
+            MaskAmount = MaskAmount,
+            MaskFeather = MaskFeather,
+            MaskInvert = MaskInvert,
+            MaskSubtract = MaskSubtract,
+            MaskBrushSize = MaskBrushSize,
+            MaskStrokes = MaskStrokes.Select(stroke => stroke.Copy()).ToList(),
+            MaskExposure = MaskExposure,
+            MaskContrast = MaskContrast,
+            MaskHighlights = MaskHighlights,
+            MaskShadows = MaskShadows,
+            MaskTemperature = MaskTemperature,
+            MaskTint = MaskTint,
+            MaskSaturation = MaskSaturation,
+            MaskClarity = MaskClarity,
+            MaskLayers = MaskLayers.Select(layer => layer.Copy()).ToList(),
+            ActiveMaskLayerId = ActiveMaskLayerId,
+            NextMaskNumber = NextMaskNumber,
+            PickerEnabled = PickerEnabled,
+            PickedColorHex = PickedColorHex,
             Rotation = Rotation,
             FlipHorizontal = FlipHorizontal,
             FlipVertical = FlipVertical,
             ShowingOriginal = ShowingOriginal,
             CropRatio = CropRatio
         };
+
+        public EditorMaskLayer? ActiveMaskLayer() => ActiveMaskLayerId is { } id
+            ? MaskLayers.FirstOrDefault(layer => layer.Id == id)
+            : null;
+
+        public bool ActiveMaskLayerIsVisible() =>
+            ActiveMaskLayer()?.IsVisible == true;
+
+        public void CreateMaskLayer()
+        {
+            PersistActiveMaskLayer();
+            var layer = new EditorMaskLayer
+            {
+                Name = $"{AppLocalization.T("蒙版")} {NextMaskNumber++}"
+            };
+            MaskLayers.Add(layer);
+            LoadMaskLayer(layer);
+        }
+
+        public void EnsureMaskLayer()
+        {
+            if (ActiveMaskLayer() is null || MaskType == "无")
+                CreateMaskLayer();
+        }
+
+        public void SelectMaskLayer(Guid id)
+        {
+            if (ActiveMaskLayerId == id) return;
+            PersistActiveMaskLayer();
+            var layer = MaskLayers.FirstOrDefault(candidate => candidate.Id == id);
+            if (layer is not null) LoadMaskLayer(layer);
+        }
+
+        public void DeleteActiveMaskLayer()
+        {
+            var active = ActiveMaskLayer();
+            if (active is null) return;
+            var index = MaskLayers.IndexOf(active);
+            PersistActiveMaskLayer();
+            MaskLayers.RemoveAt(index);
+            if (MaskLayers.Count == 0)
+            {
+                ActiveMaskLayerId = null;
+                MaskType = "无";
+                MaskStrokes = [];
+            }
+            else
+            {
+                LoadMaskLayer(MaskLayers[Math.Min(index, MaskLayers.Count - 1)]);
+            }
+        }
+
+        public void SetMaskLayerVisible(Guid id, bool visible)
+        {
+            PersistActiveMaskLayer();
+            var layer = MaskLayers.FirstOrDefault(candidate => candidate.Id == id);
+            if (layer is not null) layer.IsVisible = visible;
+        }
+
+        public EditorMaskLayer DisplayedMaskLayer(EditorMaskLayer layer) =>
+            layer.Id == ActiveMaskLayerId ? SnapshotMaskLayer(layer) : layer.Copy();
+
+        public List<EditorMaskLayer> EffectiveMaskLayers() =>
+            MaskLayers.Select(DisplayedMaskLayer).ToList();
+
+        private void PersistActiveMaskLayer()
+        {
+            var active = ActiveMaskLayer();
+            if (active is null) return;
+            MaskLayers[MaskLayers.IndexOf(active)] = SnapshotMaskLayer(active);
+        }
+
+        private EditorMaskLayer SnapshotMaskLayer(EditorMaskLayer identity) => new()
+        {
+            Id = identity.Id,
+            Name = identity.Name,
+            IsVisible = identity.IsVisible,
+            Type = MaskType,
+            Amount = MaskAmount,
+            Feather = MaskFeather,
+            Invert = MaskInvert,
+            Subtract = MaskSubtract,
+            BrushSize = MaskBrushSize,
+            Strokes = MaskStrokes.Select(stroke => stroke.Copy()).ToList(),
+            Exposure = MaskExposure,
+            Contrast = MaskContrast,
+            Highlights = MaskHighlights,
+            Shadows = MaskShadows,
+            Temperature = MaskTemperature,
+            Tint = MaskTint,
+            Saturation = MaskSaturation,
+            Clarity = MaskClarity
+        };
+
+        private void LoadMaskLayer(EditorMaskLayer layer)
+        {
+            ActiveMaskLayerId = layer.Id;
+            MaskType = layer.Type;
+            MaskAmount = layer.Amount;
+            MaskFeather = layer.Feather;
+            MaskInvert = layer.Invert;
+            MaskSubtract = layer.Subtract;
+            MaskBrushSize = layer.BrushSize;
+            MaskStrokes = layer.Strokes.Select(stroke => stroke.Copy()).ToList();
+            MaskExposure = layer.Exposure;
+            MaskContrast = layer.Contrast;
+            MaskHighlights = layer.Highlights;
+            MaskShadows = layer.Shadows;
+            MaskTemperature = layer.Temperature;
+            MaskTint = layer.Tint;
+            MaskSaturation = layer.Saturation;
+            MaskClarity = layer.Clarity;
+        }
+    }
+
+    private sealed class EditorWheelControl : FrameworkElement
+    {
+        private readonly Pen _ringPen = new(Brushes.White, 1);
+        private bool _dragging;
+        public Brush Accent { get; set; } = Brushes.DeepSkyBlue;
+        public double XValue { get; set; }
+        public double YValue { get; set; }
+        public event Action<double, double>? ValueChanged;
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            var radius = Math.Max(8, Math.Min(ActualWidth, ActualHeight) * 0.38);
+            var colors = new[] { Colors.Red, Colors.Yellow, Colors.LimeGreen, Colors.Cyan, Colors.Blue, Colors.Magenta };
+            for (var i = 0; i < colors.Length; i++) DrawWheelSegment(dc, center, radius, i * 60 - 90, (i + 1) * 60 - 90, new SolidColorBrush(colors[i]));
+            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(35, 42, 52)), _ringPen, center, radius - 6, radius - 6);
+            var knobX = center.X + Math.Clamp(XValue / 100, -1, 1) * radius * .72;
+            var knobY = center.Y - Math.Clamp(YValue / 100, -1, 1) * radius * .72;
+            dc.DrawEllipse(Accent, null, new Point(knobX, knobY), 6, 6);
+            dc.DrawEllipse(null, new Pen(Accent, 1), center, radius - 1, radius - 1);
+        }
+
+        private static void DrawWheelSegment(DrawingContext dc, Point center, double radius, double start, double end, Brush brush)
+        {
+            static Point Polar(Point c, double r, double degrees)
+            {
+                var radians = degrees * Math.PI / 180;
+                return new Point(c.X + Math.Cos(radians) * r, c.Y + Math.Sin(radians) * r);
+            }
+            var geometry = new StreamGeometry();
+            using (var ctx = geometry.Open())
+            {
+                ctx.BeginFigure(center, true, true);
+                ctx.LineTo(Polar(center, radius, start), true, false);
+                ctx.ArcTo(Polar(center, radius, end), new Size(radius, radius), 60, false, SweepDirection.Clockwise, true, false);
+            }
+            geometry.Freeze();
+            dc.DrawGeometry(brush, null, geometry);
+        }
+
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            CaptureMouse();
+            UpdateValue(e.GetPosition(this));
+            e.Handled = true;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (_dragging) UpdateValue(e.GetPosition(this));
+        }
+
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            _dragging = false;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        private void UpdateValue(Point point)
+        {
+            var center = new Point(ActualWidth / 2, ActualHeight / 2);
+            var radius = Math.Max(8, Math.Min(ActualWidth, ActualHeight) * 0.38);
+            var dx = Math.Clamp((point.X - center.X) / (radius * .72), -1, 1);
+            var dy = Math.Clamp((center.Y - point.Y) / (radius * .72), -1, 1);
+            XValue = Math.Clamp(dx * 100, -100, 100);
+            YValue = Math.Clamp(dy * 100, -100, 100);
+            InvalidateVisual();
+            ValueChanged?.Invoke(XValue, YValue);
+        }
+    }
+
+    private sealed class EditorCurveControl : FrameworkElement
+    {
+        private readonly EditorAdjustments _settings;
+        private bool _dragging;
+        private int _activePoint = -1;
+        public event Action<string, double>? ValueChanged;
+
+        public EditorCurveControl(EditorAdjustments settings) => _settings = settings;
+
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            var w = Math.Max(1, ActualWidth);
+            var h = Math.Max(1, ActualHeight);
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(35, 42, 52)), new Pen(new SolidColorBrush(Color.FromRgb(80, 90, 104)), 1), new Rect(0, 0, w, h), 8, 8);
+            var guide = new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1) { DashStyle = new DashStyle(new[] { 4d, 4d }, 0) };
+            dc.DrawLine(guide, new Point(0, h), new Point(w, 0));
+            var accent = (Brush)Application.Current.FindResource("AccentBrush");
+            var curvePen = new Pen(accent, 2);
+            var geometry = new StreamGeometry();
+            using (var ctx = geometry.Open())
+            {
+                var points = _settings.CurvePoints.OrderBy(point => point.X).ToList();
+                if (points.Count == 0) points = [new EditorCurvePoint(0, 0), new EditorCurvePoint(1, 1)];
+                ctx.BeginFigure(new Point(points[0].X * w, (1 - points[0].Y) * h), false, false);
+                for (var index = 0; index < points.Count - 1; index++)
+                {
+                    var p0 = points[Math.Max(0, index - 1)];
+                    var p1 = points[index];
+                    var p2 = points[index + 1];
+                    var p3 = points[Math.Min(points.Count - 1, index + 2)];
+                    var c1 = new Point((p1.X + (p2.X - p0.X) / 6) * w, (1 - (p1.Y + (p2.Y - p0.Y) / 6)) * h);
+                    var c2 = new Point((p2.X - (p3.X - p1.X) / 6) * w, (1 - (p2.Y - (p3.Y - p1.Y) / 6)) * h);
+                    ctx.BezierTo(c1, c2, new Point(p2.X * w, (1 - p2.Y) * h), true, false);
+                }
+            }
+            geometry.Freeze();
+            dc.DrawGeometry(null, curvePen, geometry);
+            foreach (var point in _settings.CurvePoints) DrawPoint(dc, point.X * w, (1 - point.Y) * h, accent);
+        }
+
+        private static void DrawPoint(DrawingContext dc, double x, double y, Brush brush) => dc.DrawEllipse(brush, null, new Point(x, y), 6, 6);
+
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            _dragging = true;
+            CaptureMouse();
+            _activePoint = FindOrCreatePoint(e.GetPosition(this));
+            UpdateValue(e.GetPosition(this));
+            e.Handled = true;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            if (_dragging) UpdateValue(e.GetPosition(this));
+        }
+
+        protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+        {
+            _dragging = false;
+            _activePoint = -1;
+            ReleaseMouseCapture();
+            e.Handled = true;
+        }
+
+        private void UpdateValue(Point point)
+        {
+            var x = Math.Clamp(point.X / Math.Max(1, ActualWidth), 0, 1);
+            var y = Math.Clamp(1 - point.Y / Math.Max(1, ActualHeight), 0, 1);
+            if (_activePoint < 0) _activePoint = FindOrCreatePoint(point);
+            _settings.CurvePoints[_activePoint].X = x;
+            _settings.CurvePoints[_activePoint].Y = y;
+            InvalidateVisual();
+            ValueChanged?.Invoke("curve", y);
+        }
+
+        private int FindOrCreatePoint(Point point)
+        {
+            var x = Math.Clamp(point.X / Math.Max(1, ActualWidth), 0, 1);
+            var y = Math.Clamp(1 - point.Y / Math.Max(1, ActualHeight), 0, 1);
+            var nearest = _settings.CurvePoints
+                .Select((candidate, index) => (candidate, index, distance: Math.Pow(candidate.X - x, 2) + Math.Pow(candidate.Y - y, 2)))
+                .OrderBy(item => item.distance)
+                .FirstOrDefault();
+            if (nearest.candidate is not null && nearest.distance <= .035 * .035) return nearest.index;
+            _settings.CurvePoints.Add(new EditorCurvePoint(x, y));
+            return _settings.CurvePoints.Count - 1;
+        }
     }
 
     private sealed record EditorSliderSpec(
@@ -183,10 +680,30 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "library-file-assignments.json");
+    private static readonly string RememberedDevicesStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "remembered-camera-devices.json");
+    private static readonly string ExternalRecordingStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "external-recording-enabled.txt");
+    private static readonly string WifiConnectionModeStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "wifi-camera-connection-mode.txt");
     private const string LibraryDragFormat = "ZENCHE.LibraryFilePath";
     private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
     private const string ZencheWebsiteUrl = "https://zenche.top";
     private readonly PtpCamera _camera = new();
+    private readonly PtpIpCamera _wifiCamera = new();
+    private readonly LocalCameraService _localCamera = new();
+    private readonly ExternalVideoRecorder _externalVideoRecorder = new();
+    private readonly BluetoothRemoteController _bluetoothRemote = new();
+    private readonly LocationTaggingService _locationTagging = new();
+    private readonly NikonOfficialSdkService _nikonOfficialSdk = new();
+    private readonly SonyOfficialSdkCamera _sonyOfficialSdk =
+        SonyOfficialSdkCamera.Shared;
     private readonly PhotoLibrary _library = new();
     private readonly CaptureWorkflow _workflow;
     private readonly WirelessTransferServer _wirelessServer;
@@ -194,6 +711,12 @@ public partial class MainWindow : Window
     private readonly UpdateService _updateService = new();
     private readonly List<LibraryBranch> _libraryBranches;
     private readonly Dictionary<string, string> _libraryFileAssignments;
+    private readonly List<RememberedCameraDevice> _rememberedDevices;
+    private readonly ObservableCollection<CameraStorageListItem>
+        _cameraStorageRows = [];
+    private CameraStorageSnapshot _cameraStorageSnapshot =
+        CameraStorageSnapshot.Empty;
+    private bool _cameraStorageBusy;
     private CancellationTokenSource? _previewCancellation;
     private Task? _previewTask;
     private CancellationTokenSource? _shootingTaskCancellation;
@@ -203,16 +726,26 @@ public partial class MainWindow : Window
     private bool _configuringVideoControls;
     private bool _videoMode;
     private bool _videoRecording;
+    private bool _externalRecordToDevice = true;
+    private string _wifiConnectionMode = "ap";
+    private DateTime? _recordingStartedAt;
+    private readonly System.Windows.Threading.DispatcherTimer _monitorTimecodeTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(100) };
     private int _previewAnalysisSequence;
     private double _videoFrameRate = 30;
     private double _videoShutterAngle = 180;
+    private string _videoShutterMode = "angle";
     private double _photoShutterSeconds = 0.008;
+    private string _videoCodec = "h265";
+    private string _videoLogProfile = "off";
     private string _shootingTaskKind = "interval";
     private int _shootingTaskCount = 5;
     private int _shootingTaskInterval = 3;
     private int _shootingTaskStep = 1;
     private bool _focusPeakingEnabled;
     private bool _falseColorEnabled;
+    private bool _monitorLutEnabled;
+    private bool _monitorZebraEnabled;
     private string? _availableUpdateUrl;
     private bool _checkingForUpdates;
     private bool _announcementShownThisLaunch;
@@ -224,17 +757,39 @@ public partial class MainWindow : Window
     private TreeViewItem? _libraryDropTarget;
     private string? _editorSelectedPath;
     private readonly EditorAdjustments _editorAdjustments = new();
+    private readonly NikonCloudCatalog _nikonCloudCatalog =
+        NikonCloudCatalog.Load();
+    private NikonCloudPreset? _selectedNikonCloudPreset;
+    private NikonCloudPreset? _monitorNikonCloudPreset;
+    private bool _updatingMonitorCloudControls;
+    private BitmapSource? _lastPreviewSource;
+    private NikonCloudPreset? _editorCloudPresetBeforeAI;
     private EditorAdjustments? _editorSettingsBeforeAI;
     private EditorAdjustments? _editorAICopiedSettings;
     private EditorAIAnalysis? _editorAIAnalysis;
     private readonly Dictionary<string, Slider> _editorSliders = [];
+    private readonly Dictionary<string, Slider> _editorGradeSliders = [];
+    private readonly Dictionary<string, EditorWheelControl> _editorWheelControls = [];
+    private EditorCurveControl? _editorCurveControl;
     private ComboBox? _editorCropBox;
+    private ComboBox? _editorMaskBox;
+    private Slider? _editorMaskAmountSlider;
+    private Slider? _editorMaskFeatherSlider;
+    private Slider? _editorMaskBrushSizeSlider;
+    private CheckBox? _editorMaskInvertCheckBox;
+    private StackPanel? _editorMaskListPanel;
+    private TextBlock? _editorPickedColorText;
+    private bool _editorPickerArmed;
+    private EditorMaskStroke? _activeEditorMaskStroke;
     private bool _updatingEditorControls;
     private string _aiPrompt = "";
+    private string _aiManualPrompt = "";
+    private readonly HashSet<string> _aiSelectedPresets = [];
     private int _aiMode; // 0=edit, 1=generate
     private int _aiRatioIndex;
     private int _aiResolutionIndex;
     private string? _aiResultPath;
+    private int? _aiServerRemainingUsage;
     private bool _aiGenerating;
     private bool _editorInAiMode;
 
@@ -251,16 +806,65 @@ public partial class MainWindow : Window
     private static bool IsAiActivated()
     {
         var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
-        return File.Exists(activatedPath);
+        return File.Exists(activatedPath) && GetRemainingUsage() > 0;
     }
 
     private static int GetRemainingUsage()
+    {
+        var serverRemainingPath = Path.Combine(
+            AiDataDir,
+            "ai-server-remaining.txt");
+        if (File.Exists(serverRemainingPath) &&
+            int.TryParse(
+                File.ReadAllText(serverRemainingPath).Trim(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var serverRemaining))
+        {
+            return Math.Clamp(serverRemaining, 0, AiMaxUsage);
+        }
+        return GetLocalRemainingUsage();
+    }
+
+    private static int GetLocalRemainingUsage()
     {
         var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
         var count = 0;
         if (File.Exists(countPath))
             int.TryParse(File.ReadAllText(countPath).Trim(), out count);
         return Math.Max(0, AiMaxUsage - count);
+    }
+
+    private static void SaveServerRemainingUsage(int remaining)
+    {
+        Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(
+            Path.Combine(AiDataDir, "ai-server-remaining.txt"),
+            Math.Clamp(remaining, 0, AiMaxUsage).ToString(
+                CultureInfo.InvariantCulture));
+    }
+
+    private int CurrentRemainingUsage() =>
+        _aiServerRemainingUsage ?? GetRemainingUsage();
+
+    private bool HasAiUsageAvailable() => CurrentRemainingUsage() > 0;
+
+    private static int? ReadServerRemainingUsage(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues(
+                "X-ZENCHE-Remaining",
+                out var values))
+        {
+            return null;
+        }
+        var value = values.FirstOrDefault();
+        return int.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var remaining)
+            ? Math.Clamp(remaining, 0, AiMaxUsage)
+            : null;
     }
 
     private static void RecordAiUsage()
@@ -283,7 +887,10 @@ public partial class MainWindow : Window
     {
         var devicePath = Path.Combine(AiDataDir, "ai-device-id.txt");
         if (File.Exists(devicePath))
-            return File.ReadAllText(devicePath).Trim();
+        {
+            var existing = File.ReadAllText(devicePath).Trim();
+            if (existing.Length > 0) return existing;
+        }
         var id = System.Security.Principal.WindowsIdentity.GetCurrent().User?.Value
                  ?? Guid.NewGuid().ToString();
         Directory.CreateDirectory(AiDataDir);
@@ -344,6 +951,59 @@ public partial class MainWindow : Window
         }
     }
 
+    private const string AiActivationPublicKey =
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
+        "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL" +
+        "32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj" +
+        "c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW" +
+        "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap" +
+        "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI" +
+        "3wIDAQAB";
+
+    private static bool VerifyActivationCode(string code, string deviceId)
+    {
+        var trimmed = code.Trim();
+        if (string.IsNullOrEmpty(trimmed) || string.IsNullOrEmpty(deviceId))
+        {
+            return false;
+        }
+        var parts = trimmed.Split('-');
+        if (parts.Length < 4 || parts[0] != "ZENCHE" || parts[1] != "AI")
+        {
+            return false;
+        }
+        var expiry = parts[parts.Length - 1];
+        if (!DateTime.TryParseExact(
+                expiry,
+                "yyyyMMdd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var expiryDate) ||
+            expiryDate < DateTime.Today)
+        {
+            return false;
+        }
+        var signatureText = string.Join("-", parts, 2, parts.Length - 3);
+        try
+        {
+            var signature = Convert.FromBase64String(signatureText);
+            var payload = $"{deviceId}:{expiry}:a1b2c3d4e5f6";
+            using var rsa = System.Security.Cryptography.RSA.Create();
+            rsa.ImportSubjectPublicKeyInfo(
+                Convert.FromBase64String(AiActivationPublicKey),
+                out _);
+            return rsa.VerifyData(
+                System.Text.Encoding.UTF8.GetBytes(payload),
+                signature,
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void AiBuy_Click(object sender, RoutedEventArgs e)
     {
         OpenAfdian();
@@ -376,12 +1036,28 @@ public partial class MainWindow : Window
             AiActivationStatusText.Text = AppLocalization.T("请输入激活码");
             return;
         }
-        // 本地验签激活（RSA 公钥在客户端），服务器端负责真正计数
+        // 本地 RSA 验签激活（公钥在客户端），服务器端负责真正计数
+        if (!VerifyActivationCode(code, GetDeviceId()))
+        {
+            AiActivationStatusText.Text = AppLocalization.T("激活码无效或已过期");
+            return;
+        }
         SaveActivationCode(code);
         var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
         Directory.CreateDirectory(AiDataDir);
+        File.WriteAllText(
+            Path.Combine(AiDataDir, "ai-usage-count.txt"),
+            "0");
         File.WriteAllText(activatedPath, "1");
+        var serverRemainingPath = Path.Combine(
+            AiDataDir,
+            "ai-server-remaining.txt");
+        if (File.Exists(serverRemainingPath))
+        {
+            File.Delete(serverRemainingPath);
+        }
         AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
+        _aiServerRemainingUsage = null;
         AiActivationCodeBox.Text = "";
     }
 
@@ -398,10 +1074,30 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        CameraStorageList.ItemsSource = _cameraStorageRows;
+        _monitorTimecodeTimer.Tick += (_, _) => UpdateMonitorTimecode();
+        _monitorTimecodeTimer.Start();
         BuildEditorAdjustmentControls();
         EditorPresetBox.SelectedIndex = 0;
+        NikonCloudPresetBox.Items.Add(new ComboBoxItem
+        {
+            Content = AppLocalization.T("关闭云创预览"),
+            Tag = null
+        });
+        foreach (var preset in _nikonCloudCatalog.Presets)
+        {
+            NikonCloudPresetBox.Items.Add(new ComboBoxItem
+            {
+                Content = preset.Name +
+                    (preset.HasCustomToneCurve ? " · Curve" : ""),
+                Tag = preset
+            });
+        }
+        NikonCloudPresetBox.SelectedIndex = 0;
+        PopulateMonitorNikonCloudPresetBoxes();
         _libraryBranches = LoadLibraryBranches();
         _libraryFileAssignments = LoadLibraryFileAssignments();
+        _rememberedDevices = LoadRememberedDevices();
         _workflow = new CaptureWorkflow(_library.DirectoryPath);
         LoadCaptureSessionControls();
         _wirelessServer = new WirelessTransferServer(_library);
@@ -432,15 +1128,34 @@ public partial class MainWindow : Window
                     AppLocalization.T("开启无线接收");
                 ShowError(error.Message);
             });
+        _bluetoothRemote.StatusChanged += (_, status) =>
+            Dispatcher.Invoke(() =>
+            {
+                OperationStatusText.Text = AppLocalization.T(status);
+                UpdateConnectionSummary();
+            });
+        _bluetoothRemote.ShutterPressed += (_, _) =>
+            Dispatcher.Invoke(() =>
+                ShutterButton_Click(this, new RoutedEventArgs()));
+        _locationTagging.StatusChanged += (_, status) =>
+            Dispatcher.Invoke(() =>
+                OperationStatusText.Text = AppLocalization.T(status));
         DiagnosticLogPathText.Text = AppLocalization.T(
             "按日写入、5 MB 滚动、保留 14 天\n") +
             _diagnostics.DirectoryPath;
         CurrentVersionText.Text = AppLocalization.T(
             $"当前版本 {_updateService.CurrentVersion} · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases");
         MirrorChyanCdkBox.Password = _updateService.LoadMirrorChyanCdk();
+        _externalRecordToDevice = LoadExternalRecordingPreference();
+        _wifiConnectionMode = LoadWifiConnectionModePreference();
+        WifiCameraTransferHost.Content = BuildWifiCameraTransferPanel();
+        CaptureAssistSettingsHost.Content = BuildCaptureAssistSettingsPanel();
+        ExternalRecordingCheck.IsChecked = _externalRecordToDevice;
+        ConfigureVideoRecordingOptions(null);
         ConfigureFineExposureControls();
         ConfigureShutterControl(false);
         RefreshPhotoList();
+        RefreshRememberedDevices();
         SetCurrentNavigation(CaptureNav);
         LanguageBox.SelectedIndex = AppLocalization.Current switch
         {
@@ -454,6 +1169,7 @@ public partial class MainWindow : Window
         ShootingTaskStepText.IsEnabled = false;
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
+        PreviewKeyUp += MainWindow_PreviewKeyUp;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -474,10 +1190,295 @@ public partial class MainWindow : Window
         }
 #endif
         ShowLaunchAnnouncementIfNeeded();
+        await RefreshNikonOfficialSdkAsync(allowRemoteProbe: !_camera.IsConnected);
+        await RefreshSonyOfficialSdkAsync(allowEnumeration: !_camera.IsConnected);
         await CheckForUpdatesAsync(silent: true);
     }
 
-    private async void ConnectButton_Click(object sender, RoutedEventArgs e)
+    private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (!_bluetoothRemote.Enabled) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.VolumeUp or Key.VolumeDown or Key.MediaPlayPause)
+        {
+            e.Handled = true;
+            ShutterButton_Click(this, new RoutedEventArgs());
+        }
+    }
+
+    private void ConnectButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShowConnectionDialog();
+    }
+
+    private FrameworkElement BuildWifiCameraTransferPanel()
+    {
+        var hostBox = new TextBox
+        {
+            Text = "192.168.1.1",
+            MinWidth = 280,
+            Height = 36,
+            Padding = new Thickness(8, 5, 8, 5)
+        };
+        var portBox = new TextBox
+        {
+            Text = "15740",
+            Width = 86,
+            Height = 36,
+            Margin = new Thickness(10, 0, 0, 0),
+            Padding = new Thickness(8, 5, 8, 5)
+        };
+        var status = new TextBlock
+        {
+            Text = AppLocalization.T(_wifiCamera.Status),
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        var button = new Button
+        {
+            Content = AppLocalization.T(_wifiCamera.IsConnected ? "断开" : "连接"),
+            Width = 92,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        var content = new StackPanel();
+        content.Children.Add(status);
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("连接模式"),
+            Margin = new Thickness(0, 10, 0, 4),
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        var mode = new ComboBox
+        {
+            MinWidth = 280,
+            Height = 36,
+            IsEnabled = !_wifiCamera.IsConnected
+        };
+        mode.Items.Add(new ComboBoxItem
+        {
+            Content = AppLocalization.T("AP 直连"),
+            Tag = "ap"
+        });
+        mode.Items.Add(new ComboBoxItem
+        {
+            Content = AppLocalization.T("STA 局域网"),
+            Tag = "sta"
+        });
+        var modeHelp = new TextBlock
+        {
+            Text = AppLocalization.T(
+                "AP 模式：让电脑加入相机热点；相机地址通常为 192.168.1.1。"),
+            Margin = new Thickness(0, 6, 0, 0),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        mode.SelectionChanged += (_, _) =>
+        {
+            if (mode.SelectedItem is not ComboBoxItem selected) return;
+            _wifiConnectionMode = selected.Tag as string == "sta" ? "sta" : "ap";
+            SaveWifiConnectionModePreference(_wifiConnectionMode);
+            modeHelp.Text = AppLocalization.T(
+                _wifiConnectionMode == "sta"
+                    ? "STA 模式：让相机与电脑加入同一局域网，并输入路由器分配给相机的 IP 地址。"
+                    : "AP 模式：让电脑加入相机热点；相机地址通常为 192.168.1.1。");
+        };
+        mode.SelectedIndex = _wifiConnectionMode == "sta" ? 1 : 0;
+        content.Children.Add(mode);
+        content.Children.Add(modeHelp);
+
+        var endpoint = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+        endpoint.Children.Add(hostBox);
+        endpoint.Children.Add(portBox);
+        content.Children.Add(endpoint);
+
+        button.Click += async (_, _) =>
+        {
+            button.IsEnabled = false;
+            mode.IsEnabled = false;
+            try
+            {
+                if (_wifiCamera.IsConnected)
+                {
+                    await _wifiCamera.DisconnectAsync();
+                }
+                else
+                {
+                    if (!int.TryParse(portBox.Text, out var port))
+                    {
+                        throw new ArgumentException("Wi‑Fi 相机端口无效");
+                    }
+                    using var timeout = new CancellationTokenSource(
+                        TimeSpan.FromSeconds(12));
+                    await _wifiCamera.ConnectAsync(hostBox.Text, port, timeout.Token);
+                    _diagnostics.Info(
+                        "wifi-camera",
+                        $"PTP/IP 已连接；模式={_wifiConnectionMode.ToUpperInvariant()}；相机={_wifiCamera.CameraName}");
+                }
+            }
+            catch (Exception error)
+            {
+                ShowError(error.Message);
+            }
+            status.Text = _wifiCamera.IsConnected
+                ? $"{_wifiConnectionMode.ToUpperInvariant()} · {AppLocalization.T(_wifiCamera.Status)}"
+                : AppLocalization.T(_wifiCamera.Status);
+            button.Content = AppLocalization.T(
+                _wifiCamera.IsConnected ? "断开" : "连接");
+            button.IsEnabled = true;
+            mode.IsEnabled = !_wifiCamera.IsConnected;
+            UpdateConnectionSummary();
+            UpdateEnabledState();
+            UpdateExposureReadout();
+        };
+
+        return ConnectionCard("Wi‑Fi 相机 · PTP/IP", content, button);
+    }
+
+    private FrameworkElement BuildCaptureAssistSettingsPanel()
+    {
+        var root = new StackPanel();
+        root.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("拍摄辅助"),
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("InkBrush")
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("蓝牙遥控与拍摄定位"),
+            Margin = new Thickness(0, 4, 0, 14),
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+
+        var bluetoothStatus = new TextBlock
+        {
+            Text = AppLocalization.T(_bluetoothRemote.Status),
+            FontSize = 12,
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        var bluetoothBody = new StackPanel();
+        bluetoothBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("蓝牙遥控拍摄"),
+            FontWeight = FontWeights.SemiBold
+        });
+        bluetoothBody.Children.Add(bluetoothStatus);
+        bluetoothBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。"),
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        var bluetoothToggle = new CheckBox
+        {
+            Content = AppLocalization.T("启用"),
+            IsChecked = _bluetoothRemote.Enabled,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        bluetoothToggle.Checked += (_, _) =>
+        {
+            try { _bluetoothRemote.Start(); }
+            catch (Exception error) { ShowError(error.Message); }
+            bluetoothStatus.Text = AppLocalization.T(_bluetoothRemote.Status);
+        };
+        bluetoothToggle.Unchecked += (_, _) =>
+        {
+            _bluetoothRemote.Stop();
+            bluetoothStatus.Text = AppLocalization.T(_bluetoothRemote.Status);
+        };
+        var bluetoothRow = new Grid();
+        bluetoothRow.ColumnDefinitions.Add(new ColumnDefinition());
+        bluetoothRow.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+        bluetoothRow.Children.Add(bluetoothBody);
+        Grid.SetColumn(bluetoothToggle, 1);
+        bluetoothToggle.Margin = new Thickness(16, 0, 0, 0);
+        bluetoothRow.Children.Add(bluetoothToggle);
+        root.Children.Add(bluetoothRow);
+
+        root.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 14, 0, 14),
+            Background = (Brush)FindResource("RuleBrush")
+        });
+
+        var locationStatus = new TextBlock
+        {
+            Text = AppLocalization.T(_locationTagging.Status),
+            FontSize = 12,
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        var locationBody = new StackPanel();
+        locationBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("拍摄位置"),
+            FontWeight = FontWeights.SemiBold
+        });
+        locationBody.Children.Add(locationStatus);
+        locationBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。"),
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        var locationToggle = new CheckBox
+        {
+            Content = AppLocalization.T("启用"),
+            IsChecked = _locationTagging.Enabled,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        locationToggle.Checked += async (_, _) =>
+        {
+            await _locationTagging.SetEnabledAsync(true);
+            locationStatus.Text = AppLocalization.T(_locationTagging.Status);
+            locationToggle.IsChecked = _locationTagging.Enabled;
+        };
+        locationToggle.Unchecked += async (_, _) =>
+        {
+            await _locationTagging.SetEnabledAsync(false);
+            locationStatus.Text = AppLocalization.T(_locationTagging.Status);
+        };
+        var locationRow = new Grid();
+        locationRow.ColumnDefinitions.Add(new ColumnDefinition());
+        locationRow.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+        locationRow.Children.Add(locationBody);
+        Grid.SetColumn(locationToggle, 1);
+        locationToggle.Margin = new Thickness(16, 0, 0, 0);
+        locationRow.Children.Add(locationToggle);
+        root.Children.Add(locationRow);
+
+        return new Border
+        {
+            Padding = new Thickness(18),
+            Background = (Brush)FindResource("SurfaceBrush"),
+            BorderBrush = (Brush)FindResource("RuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = root
+        };
+    }
+
+    private async Task ToggleUsbConnectionAsync()
     {
         if (_operationInProgress)
         {
@@ -487,6 +1488,7 @@ public partial class MainWindow : Window
         {
             await RunOperationAsync("正在断开相机…", async token =>
             {
+                await FinishExternalRecordingForDisconnectAsync();
                 await StopPreviewLoopAsync();
                 await _camera.DisconnectAsync(token);
                 SetConnectionState(null);
@@ -496,19 +1498,410 @@ public partial class MainWindow : Window
             return;
         }
 
-        await RunOperationAsync("正在连接 Nikon 相机…", async token =>
+        await RunOperationAsync("正在连接相机…", async token =>
         {
             var profile = await _camera.ConnectAsync(token);
             SetConnectionState(profile);
+            RememberConnectedDevice(profile);
             OperationStatusText.Text =
                 AppLocalization.T($"{profile.Name} 已连接");
         });
     }
 
+    private async Task ToggleLocalCameraConnectionAsync()
+    {
+        if (_operationInProgress) return;
+        if (_localCamera.IsConnected)
+        {
+            await RunOperationAsync("正在断开本机摄像头…", async _ =>
+            {
+                await FinishExternalRecordingForDisconnectAsync();
+                await StopPreviewLoopAsync();
+                await _localCamera.DisconnectAsync();
+                PreviewImage.Source = null;
+                PreviewEmpty.Visibility = Visibility.Visible;
+                OperationStatusText.Text = AppLocalization.T("本机摄像头已断开");
+            });
+        }
+        else
+        {
+            await RunOperationAsync("正在连接本机摄像头…", async token =>
+            {
+                if (_camera.IsConnected)
+                {
+                    await FinishExternalRecordingForDisconnectAsync();
+                    await StopPreviewLoopAsync();
+                    await _camera.DisconnectAsync(token);
+                    SetConnectionState(null);
+                }
+                if (_wifiCamera.IsConnected)
+                {
+                    await _wifiCamera.DisconnectAsync();
+                }
+                await _localCamera.ConnectAsync(token);
+                RememberLocalCamera(_localCamera.DeviceName);
+                OperationStatusText.Text = AppLocalization.T(
+                    $"{_localCamera.DeviceName} 已连接");
+            });
+        }
+        UpdateConnectionSummary();
+        UpdateEnabledState();
+        UpdateLiveViewState();
+        UpdateExposureReadout();
+        RefreshRememberedDevices();
+    }
+
+    private void ShowConnectionDialog()
+    {
+        var panel = new StackPanel { Margin = new Thickness(24) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("相机连接"),
+            FontSize = 24,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("InkBrush")
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("本机摄像头、USB/PTP 与官方 SDK"),
+            Margin = new Thickness(0, 4, 0, 18),
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+
+        var sdkSummary = new TextBlock
+        {
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sdkRemote = new TextBlock
+        {
+            Margin = new Thickness(0, 7, 0, 0),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sdkImage = new TextBlock
+        {
+            Margin = new Thickness(0, 4, 0, 0),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sdkDevices = new TextBlock
+        {
+            Margin = new Thickness(0, 5, 0, 0),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sdkContent = new StackPanel();
+        sdkContent.Children.Add(sdkSummary);
+        sdkContent.Children.Add(sdkRemote);
+        sdkContent.Children.Add(sdkImage);
+        sdkContent.Children.Add(sdkDevices);
+        var sdkRefresh = new Button
+        {
+            Content = AppLocalization.T("重新检测"),
+            Width = 92,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        void UpdateSdkCard()
+        {
+            var status = _nikonOfficialSdk.Status;
+            sdkSummary.Text = AppLocalization.T(status.Summary);
+            sdkRemote.Text = $"Remote SDK 2.0.0 · {AppLocalization.T(status.RemoteDetail)}";
+            sdkImage.Text = $"Image SDK 1.46.0 · {AppLocalization.T(status.ImageDetail)}";
+            sdkDevices.Text = status.Devices.Count == 0
+                ? ""
+                : string.Join(
+                    "\n",
+                    status.Devices.Select(device =>
+                        $"▣ {device.Name} · " +
+                        AppLocalization.T(device.Available ? "可连接" : "正被占用")));
+            sdkRefresh.ToolTip = _camera.IsConnected
+                ? AppLocalization.T("断开当前 USB 会话后可重新检测")
+                : null;
+        }
+        UpdateSdkCard();
+        sdkRefresh.Click += async (_, _) =>
+        {
+            sdkRefresh.IsEnabled = false;
+            await RefreshNikonOfficialSdkAsync(
+                allowRemoteProbe: !_camera.IsConnected);
+            UpdateSdkCard();
+            sdkRefresh.IsEnabled = true;
+        };
+        panel.Children.Add(ConnectionCard(
+            "尼康官方 SDK",
+            sdkContent,
+            sdkRefresh));
+
+        var sonySummary = new TextBlock
+        {
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sonyDetail = new TextBlock
+        {
+            Margin = new Thickness(0, 7, 0, 0),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sonyDevices = new TextBlock
+        {
+            Margin = new Thickness(0, 5, 0, 0),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sonyNotice = new TextBlock
+        {
+            Text = AppLocalization.T(
+                "连接即表示同意索尼 SDK 使用限制；帧澈独立提供产品支持。"),
+            Margin = new Thickness(0, 6, 0, 0),
+            FontSize = 10,
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var sonyContent = new StackPanel();
+        sonyContent.Children.Add(sonySummary);
+        sonyContent.Children.Add(sonyDetail);
+        sonyContent.Children.Add(sonyDevices);
+        sonyContent.Children.Add(sonyNotice);
+        var sonyRefresh = new Button
+        {
+            Content = AppLocalization.T("重新检测"),
+            Width = 92,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        void UpdateSonySdkCard()
+        {
+            var status = _sonyOfficialSdk.Status;
+            sonySummary.Text = AppLocalization.T(status.Summary);
+            sonyDetail.Text =
+                $"Camera Remote SDK 2.02.00 · {AppLocalization.T(status.Detail)}";
+            sonyDevices.Text = status.Devices.Count == 0
+                ? ""
+                : string.Join("\n", status.Devices.Select(device => $"▣ {device}"));
+            sonyRefresh.ToolTip = _camera.IsConnected
+                ? AppLocalization.T("断开当前 USB 会话后可重新检测")
+                : null;
+        }
+        UpdateSonySdkCard();
+        sonyRefresh.Click += async (_, _) =>
+        {
+            sonyRefresh.IsEnabled = false;
+            await RefreshSonyOfficialSdkAsync(
+                allowEnumeration: !_camera.IsConnected);
+            UpdateSonySdkCard();
+            sonyRefresh.IsEnabled = true;
+        };
+        panel.Children.Add(ConnectionCard(
+            "索尼官方 SDK",
+            sonyContent,
+            sonyRefresh));
+
+        var localStatus = new TextBlock
+        {
+            Text = AppLocalization.T(
+                _localCamera.IsConnected
+                    ? $"{_localCamera.DeviceName} · 已连接"
+                    : "使用电脑内置或外接摄像头取景、拍照并保存到文件库"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var localButton = new Button
+        {
+            Content = AppLocalization.T(_localCamera.IsConnected ? "断开" : "连接"),
+            Width = 92,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        localButton.Click += async (_, _) =>
+        {
+            localButton.IsEnabled = false;
+            await ToggleLocalCameraConnectionAsync();
+            localStatus.Text = AppLocalization.T(
+                _localCamera.IsConnected
+                    ? $"{_localCamera.DeviceName} · 已连接"
+                    : "使用电脑内置或外接摄像头取景、拍照并保存到文件库");
+            localButton.Content = AppLocalization.T(
+                _localCamera.IsConnected ? "断开" : "连接");
+            localButton.IsEnabled = true;
+        };
+        panel.Children.Add(ConnectionCard(
+            "本机摄像头",
+            localStatus,
+            localButton));
+
+        var usbStatus = new TextBlock
+        {
+            Text = _camera.IsConnected
+                ? $"{_camera.Profile?.Name ?? "相机"} · 已连接"
+                : "联机拍摄、参数控制、实时监看和文件传输",
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        var usbButton = new Button
+        {
+            Content = AppLocalization.T(_camera.IsConnected ? "断开" : "连接"),
+            Width = 92,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        var usbCard = ConnectionCard("USB / PTP", usbStatus, usbButton);
+        usbButton.Click += async (_, _) =>
+        {
+            usbButton.IsEnabled = false;
+            await ToggleUsbConnectionAsync();
+            usbStatus.Text = _camera.IsConnected
+                ? $"{_camera.Profile?.Name ?? "相机"} · 已连接"
+                : "联机拍摄、参数控制、实时监看和文件传输";
+            usbButton.Content = AppLocalization.T(
+                _camera.IsConnected ? "断开" : "连接");
+            usbButton.IsEnabled = true;
+        };
+        panel.Children.Add(usbCard);
+
+        var closeButton = new Button
+        {
+            Content = AppLocalization.T("关闭"),
+            Width = 96,
+            Height = 40,
+            Margin = new Thickness(0, 18, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        panel.Children.Add(closeButton);
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = "帧澈 ZENCHE · 连接管理",
+            Width = 660,
+            Height = 680,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = (Brush)FindResource("PaperBrush"),
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = panel
+            }
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+        dialog.ShowDialog();
+    }
+
+    private async Task RefreshNikonOfficialSdkAsync(bool allowRemoteProbe)
+    {
+        try
+        {
+            var status = await Task.Run(() =>
+                _nikonOfficialSdk.Probe(allowRemoteProbe));
+            _diagnostics.Info(
+                "nikon-sdk",
+                $"官方 SDK 探测完成；Remote={status.RemoteReady}；" +
+                $"Image={status.ImageReady}；Devices={status.Devices.Count}");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "nikon-sdk",
+                $"官方 SDK 探测失败：{error.Message}");
+        }
+    }
+
+    private async Task RefreshSonyOfficialSdkAsync(bool allowEnumeration)
+    {
+        try
+        {
+            var status = await Task.Run(() =>
+                _sonyOfficialSdk.Probe(allowEnumeration));
+            _diagnostics.Info(
+                "sony-sdk",
+                $"官方 SDK 探测完成；Ready={status.Ready}；" +
+                $"Devices={status.Devices.Count}");
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "sony-sdk",
+                $"官方 SDK 探测失败：{error.Message}");
+        }
+    }
+
+    private Border ConnectionCard(
+        string title,
+        UIElement content,
+        UIElement action)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(title),
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("InkBrush")
+        });
+        if (content is FrameworkElement element)
+        {
+            element.Margin = new Thickness(0, 4, 0, 0);
+        }
+        body.Children.Add(content);
+        grid.Children.Add(body);
+        Grid.SetColumn(action, 1);
+        if (action is FrameworkElement actionElement)
+        {
+            actionElement.Margin = new Thickness(16, 0, 0, 0);
+        }
+        grid.Children.Add(action);
+        return new Border
+        {
+            Margin = new Thickness(0, 0, 0, 12),
+            Padding = new Thickness(16),
+            Background = (Brush)FindResource("SurfaceBrush"),
+            BorderBrush = (Brush)FindResource("RuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Child = grid
+        };
+    }
+
     private async void LiveViewButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_operationInProgress || !_camera.IsConnected)
+        if (_operationInProgress ||
+            (!_camera.IsConnected && !_localCamera.IsConnected))
         {
+            return;
+        }
+        if (_localCamera.IsConnected)
+        {
+            if (_localCamera.IsLiveView)
+            {
+                await RunOperationAsync("正在停止本机摄像头取景…", async _ =>
+                {
+                    await StopPreviewLoopAsync();
+                    await _localCamera.StopLiveViewAsync();
+                    UpdateLiveViewState();
+                });
+            }
+            else
+            {
+                await RunOperationAsync("正在开启本机摄像头取景…", async token =>
+                {
+                    await _localCamera.StartLiveViewAsync(token);
+                    UpdateLiveViewState();
+                    StartPreviewLoop();
+                });
+            }
             return;
         }
         if (_camera.IsLiveView)
@@ -672,7 +2065,7 @@ public partial class MainWindow : Window
         var exposure = new TextBlock
         {
             Text = _videoMode
-                ? $"{_videoShutterAngle:0.#}°   {_videoFrameRate:0} fps   JPEG"
+                ? $"{_videoShutterAngle:0.#}°   {_videoFrameRate:0} fps   {VideoCodecShortLabel()}   {VideoLogShortLabel()}"
                 : $"{ExposureModeText()}   JPEG   帧澈 ZENCHE",
             Foreground = Brushes.White,
             FontFamily = (FontFamily)FindResource("MonoFont"),
@@ -718,6 +2111,12 @@ public partial class MainWindow : Window
         {
             moreParameterBar.Children.Add(
                 ImmersiveParameterControl("视频帧率", VideoFrameRateBox));
+            moreParameterBar.Children.Add(
+                ImmersiveParameterControl("曝光模式", ExposureModeBox));
+            moreParameterBar.Children.Add(
+                ImmersiveParameterControl("视频录制规格", VideoCodecBox));
+            moreParameterBar.Children.Add(
+                ImmersiveParameterControl("Log", VideoLogBox));
         }
         else
         {
@@ -950,6 +2349,44 @@ public partial class MainWindow : Window
         };
     }
 
+    private Border ImmersiveToggleControl(string label, CheckBox source)
+    {
+        var toggle = new CheckBox
+        {
+            Content = source.IsChecked == true ? "开启" : "关闭",
+            IsChecked = source.IsChecked,
+            IsEnabled = source.IsEnabled,
+            Foreground = Brushes.White,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        toggle.Click += (_, _) =>
+        {
+            source.IsChecked = toggle.IsChecked;
+            source.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            toggle.Content = toggle.IsChecked == true ? "开启" : "关闭";
+        };
+        return new Border
+        {
+            Margin = new Thickness(4),
+            Padding = new Thickness(10),
+            Background = new SolidColorBrush(Color.FromArgb(145, 20, 27, 36)),
+            CornerRadius = new CornerRadius(8),
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = label,
+                        Foreground = new SolidColorBrush(Color.FromRgb(173, 181, 193)),
+                        FontSize = 11
+                    },
+                    toggle
+                }
+            }
+        };
+    }
+
     private string ExposureModeText()
     {
         return ExposureModeBox.SelectedItem is ComboBoxItem item
@@ -966,7 +2403,59 @@ public partial class MainWindow : Window
 
     private async void ShutterButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_operationInProgress || !_camera.IsConnected)
+        if (_operationInProgress)
+        {
+            return;
+        }
+        if (_localCamera.IsConnected)
+        {
+            if (_videoMode)
+            {
+                if (!_externalRecordToDevice)
+                {
+                    ShowError("本机摄像头视频需要开启“外录到当前智能设备”。");
+                    return;
+                }
+                await ToggleMovieRecordingAsync();
+                return;
+            }
+            await RunOperationAsync("正在使用本机摄像头拍摄…", async token =>
+            {
+                if (_locationTagging.Enabled)
+                {
+                    await _locationTagging.RefreshAsync(token);
+                }
+                var jpeg = await _localCamera.CaptureJpegAsync(token);
+                var path = await _workflow.StoreAsync(
+                    jpeg,
+                    "local-camera.jpg",
+                    _localCamera.DeviceName,
+                    cancellationToken: token,
+                    location: _locationTagging.Snapshot());
+                DisplayJpeg(jpeg);
+                RefreshPhotoList();
+                OperationStatusText.Text = AppLocalization.T(
+                    $"本机拍摄已保存 · {Path.GetFileName(path)}");
+            });
+            return;
+        }
+        if (!_camera.IsConnected && _wifiCamera.IsConnected)
+        {
+            if (_videoMode)
+            {
+                ShowError("Wi‑Fi PTP/IP 当前仅支持照片遥控拍摄。");
+                return;
+            }
+            await RunOperationAsync("正在通过 Wi‑Fi 触发相机快门…", async token =>
+            {
+                await _wifiCamera.CaptureAsync(token);
+                OperationStatusText.Text = AppLocalization.T(
+                    "Wi‑Fi 快门已触发 · 原片保存在相机卡内");
+            });
+            UpdateConnectionSummary();
+            return;
+        }
+        if (!_camera.IsConnected)
         {
             return;
         }
@@ -977,17 +2466,35 @@ public partial class MainWindow : Window
         }
         await RunOperationAsync("正在拍摄并下载 JPEG…", async token =>
         {
+            if (_locationTagging.Enabled)
+            {
+                await _locationTagging.RefreshAsync(token);
+            }
             var jpeg = await _camera.CaptureAsync(token);
             var path = await _workflow.StoreAsync(
                 jpeg,
                 "capture.jpg",
                 _camera.Profile?.Name ?? "Nikon 相机",
-                cancellationToken: token);
+                cancellationToken: token,
+                location: _locationTagging.Snapshot());
             DisplayJpeg(jpeg);
             RefreshPhotoList();
             OperationStatusText.Text = AppLocalization.T(
                 $"已保存 {Path.GetFileName(path)}");
         });
+    }
+
+    private async void CaptureAutoFocusButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _camera.TriggerAutoFocusAsync(CancellationToken.None);
+            OperationStatusText.Text = AppLocalization.T("AF-ON 已触发");
+        }
+        catch (Exception error)
+        {
+            OperationStatusText.Text = AppLocalization.T($"AF-ON 失败：{error.Message}");
+        }
     }
 
     private async Task StartShootingTaskAsync()
@@ -1057,11 +2564,16 @@ public partial class MainWindow : Window
                     await _camera.MoveFocusAsync(step, token);
                 }
                 var jpeg = await _camera.CaptureAsync(token);
+                if (_locationTagging.Enabled)
+                {
+                    await _locationTagging.RefreshAsync(token);
+                }
                 var path = await _workflow.StoreAsync(
                     jpeg,
                     "capture.jpg",
                     _camera.Profile?.Name ?? "Nikon 相机",
-                    cancellationToken: token);
+                    cancellationToken: token,
+                    location: _locationTagging.Snapshot());
                 DisplayJpeg(jpeg);
                 RefreshPhotoList();
                 ShootingTaskStatusText.Text = AppLocalization.T(
@@ -1199,6 +2711,168 @@ public partial class MainWindow : Window
         _falseColorEnabled = FalseColorCheck.IsChecked == true;
     }
 
+    private void MonitorFocusButton_Click(object sender, RoutedEventArgs e)
+    {
+        _focusPeakingEnabled = !_focusPeakingEnabled;
+        FocusPeakingCheck.IsChecked = _focusPeakingEnabled;
+        RefreshMonitorPreview();
+    }
+
+    private void PopulateMonitorNikonCloudPresetBoxes()
+    {
+        _updatingMonitorCloudControls = true;
+        foreach (var box in new[]
+                 {
+                     CaptureNikonCloudPresetBox,
+                     MonitorNikonCloudPresetBox
+                 })
+        {
+            box.Items.Add(new ComboBoxItem
+            {
+                Content = AppLocalization.T("关闭云创监看"),
+                Tag = null
+            });
+            foreach (var preset in _nikonCloudCatalog.Presets)
+            {
+                box.Items.Add(new ComboBoxItem
+                {
+                    Content = preset.Name +
+                        (preset.HasCustomToneCurve ? " · Curve" : ""),
+                    Tag = preset
+                });
+            }
+            box.SelectedIndex = 0;
+        }
+        _updatingMonitorCloudControls = false;
+    }
+
+    private void MonitorNikonCloudPresetBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_updatingMonitorCloudControls ||
+            sender is not ComboBox source ||
+            source.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        _monitorNikonCloudPreset = item.Tag as NikonCloudPreset;
+        var selectedIndex = _monitorNikonCloudPreset is null
+            ? 0
+            : _nikonCloudCatalog.Presets.FindIndex(
+                preset => preset.Id == _monitorNikonCloudPreset.Id) + 1;
+        _updatingMonitorCloudControls = true;
+        CaptureNikonCloudPresetBox.SelectedIndex = selectedIndex;
+        MonitorNikonCloudPresetBox.SelectedIndex = selectedIndex;
+        CaptureNikonCloudPresetBox.IsDropDownOpen = false;
+        MonitorNikonCloudPresetBox.IsDropDownOpen = false;
+        _updatingMonitorCloudControls = false;
+        OperationStatusText.Text = AppLocalization.T(
+            _monitorNikonCloudPreset is null
+                ? "尼康云创监看已关闭"
+                : $"尼康云创监看 · {_monitorNikonCloudPreset.Name} · 照片/视频 · SDR 近似");
+        RefreshMonitorPreview();
+    }
+
+    private void MonitorLutButton_Click(object sender, RoutedEventArgs e)
+    {
+        _monitorLutEnabled = !_monitorLutEnabled;
+        EditorStatusText.Text = AppLocalization.T(_monitorLutEnabled ? "监看 LUT 已启用" : "监看 LUT 已关闭");
+    }
+
+    private void MonitorFalseColorButton_Click(object sender, RoutedEventArgs e)
+    {
+        _falseColorEnabled = !_falseColorEnabled;
+        FalseColorCheck.IsChecked = _falseColorEnabled;
+        RefreshMonitorPreview();
+    }
+
+    private void MonitorZebraButton_Click(object sender, RoutedEventArgs e)
+    {
+        _monitorZebraEnabled = !_monitorZebraEnabled;
+        EditorStatusText.Text = AppLocalization.T(_monitorZebraEnabled ? "斑马线提示已启用" : "斑马线提示已关闭");
+    }
+
+    private async void MonitorAutoFocusButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _camera.TriggerAutoFocusAsync(CancellationToken.None);
+            EditorStatusText.Text = AppLocalization.T("AF-ON 已触发");
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text = AppLocalization.T($"AF-ON 失败：{error.Message}");
+        }
+    }
+
+    private async void MonitorPreviewImage_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_camera.IsLiveView || MonitorPreviewImage.ActualWidth <= 0 || MonitorPreviewImage.ActualHeight <= 0)
+        {
+            EditorStatusText.Text = AppLocalization.T("请先开启实时取景");
+            return;
+        }
+        var point = e.GetPosition(MonitorPreviewImage);
+        var rect = GetUniformImageRect(MonitorPreviewImage, MonitorPreviewImage.Source as BitmapSource);
+        if (!rect.Contains(point))
+        {
+            EditorStatusText.Text = AppLocalization.T("请点击画面区域进行对焦");
+            return;
+        }
+        var normalizedX = Math.Clamp((point.X - rect.Left) / rect.Width, 0, 1);
+        var normalizedY = Math.Clamp((point.Y - rect.Top) / rect.Height, 0, 1);
+        MonitorFocusReticle.Margin = new Thickness(
+            rect.Left + normalizedX * rect.Width - 22,
+            rect.Top + normalizedY * rect.Height - 22, 0, 0);
+        MonitorFocusReticle.Visibility = Visibility.Visible;
+        try
+        {
+            await _camera.SetParameterAsync("focusMode", "single-shot", CancellationToken.None);
+            var dx = normalizedX - 0.5;
+            var dy = normalizedY - 0.5;
+            var step = Math.Abs(dx) >= Math.Abs(dy)
+                ? (int)Math.Round(Math.Clamp(dx * 8, -3, 3))
+                : (int)Math.Round(Math.Clamp(dy * 8, -3, 3));
+            if (step != 0) await _camera.MoveFocusAsync(step, CancellationToken.None);
+            EditorStatusText.Text = AppLocalization.T(
+                step == 0 ? "已触发单次自动对焦" : "焦点步进已完成（当前相机不支持二维对焦点）");
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text = AppLocalization.T($"对焦请求失败：{error.Message}");
+        }
+        await Task.Delay(1200);
+        MonitorFocusReticle.Visibility = Visibility.Collapsed;
+    }
+
+    private static Rect GetUniformImageRect(FrameworkElement host, BitmapSource? source)
+    {
+        if (source is null || host.ActualWidth <= 0 || host.ActualHeight <= 0)
+            return new Rect(0, 0, host.ActualWidth, host.ActualHeight);
+        var scale = Math.Min(host.ActualWidth / source.PixelWidth, host.ActualHeight / source.PixelHeight);
+        var width = source.PixelWidth * scale;
+        var height = source.PixelHeight * scale;
+        return new Rect((host.ActualWidth - width) / 2, (host.ActualHeight - height) / 2, width, height);
+    }
+
+    private void RefreshMonitorPreview()
+    {
+        if (_lastPreviewSource is BitmapSource bitmap)
+        {
+            var monitor = ProfessionalMonitor.Process(
+                bitmap,
+                _focusPeakingEnabled,
+                _falseColorEnabled,
+                _monitorNikonCloudPreset);
+            DisplayPreparedPreview(new PreparedPreview(
+                bitmap,
+                _videoMode || _monitorNikonCloudPreset is not null
+                    ? monitor.Image : bitmap,
+                monitor));
+        }
+    }
+
     private void LoadCaptureSessionControls()
     {
         var configuration = _workflow.Configuration;
@@ -1297,23 +2971,96 @@ public partial class MainWindow : Window
             {
                 if (_videoRecording)
                 {
-                    await _camera.StopMovieRecordingAsync(token);
+                    Exception? bodyError = null;
+                    if (_camera.IsConnected && _camera.IsMovieRecording)
+                    {
+                        try
+                        {
+                            await _camera.StopMovieRecordingAsync(token);
+                        }
+                        catch (Exception error)
+                        {
+                            bodyError = error;
+                        }
+                    }
+                    var result = _externalVideoRecorder.StopIfRecording();
+                    if (result is not null)
+                    {
+                        await _workflow.CompleteExternalRecordingAsync(
+                            result.Path,
+                            token);
+                        _diagnostics.Info(
+                            "external-recording",
+                            $"外录完成；文件={Path.GetFileName(result.Path)}；" +
+                            $"帧数={result.Frames}；大小={result.Bytes}");
+                        RefreshPhotoList();
+                    }
+                    if (bodyError is not null) throw bodyError;
                 }
                 else
                 {
-                    await _camera.StartMovieRecordingAsync(token);
+                    if (_externalRecordToDevice &&
+                        !_camera.IsLiveView && !_localCamera.IsLiveView)
+                    {
+                        if (_localCamera.IsConnected)
+                        {
+                            await _localCamera.StartLiveViewAsync(token);
+                        }
+                        else
+                        {
+                            await _camera.StartLiveViewAsync(token);
+                        }
+                        StartPreviewLoop();
+                    }
+                    if (_externalRecordToDevice)
+                    {
+                        var target = _workflow.ReserveExternalRecording(
+                            _localCamera.IsConnected
+                                ? _localCamera.DeviceName
+                                : _camera.Profile?.Name ?? "Camera");
+                        _externalVideoRecorder.Start(
+                            target,
+                            (int)Math.Round(_videoFrameRate));
+                    }
+                    Exception? bodyError = null;
+                    if (_camera.IsConnected)
+                    {
+                        try
+                        {
+                            await _camera.StartMovieRecordingAsync(token);
+                        }
+                        catch (Exception error)
+                        {
+                            bodyError = error;
+                        }
+                    }
+                    if (bodyError is not null &&
+                        !_externalVideoRecorder.IsRecording)
+                    {
+                        throw bodyError;
+                    }
+                    if (bodyError is not null)
+                    {
+                        OperationStatusText.Text = AppLocalization.T(
+                            "机身录制不可用，已继续外录到当前设备");
+                    }
                 }
-                _videoRecording = _camera.IsMovieRecording;
+                _videoRecording = _externalVideoRecorder.IsRecording ||
+                    (_camera.IsConnected && _camera.IsMovieRecording);
+                _recordingStartedAt = _videoRecording ? DateTime.Now : null;
                 OperationStatusText.Text = AppLocalization.T(
                     _videoRecording
-                        ? "● REC · 视频正在录制到相机存储卡"
-                        : "录制已停止 · 视频保存在相机存储卡");
+                        ? _externalVideoRecorder.IsRecording
+                            ? "● EXT REC · 正在外录到当前智能设备"
+                            : "● REC · 视频正在录制到相机存储卡"
+                        : "录制已停止 · 外录文件已保存到 ZENCHE 文件库");
             });
         UpdateRecordingState();
     }
 
     private void UpdateRecordingState()
     {
+        UpdateMonitorTimecode();
         if (_videoMode)
         {
             ShutterButton.Content = AppLocalization.T(
@@ -1324,6 +3071,109 @@ public partial class MainWindow : Window
             _immersiveRecordButton.Content = AppLocalization.T(
                 _videoRecording ? "■\n停止" : "●\n录制");
         }
+    }
+
+    private void ExternalRecordingCheck_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_videoRecording)
+        {
+            ExternalRecordingCheck.IsChecked = _externalRecordToDevice;
+            return;
+        }
+        _externalRecordToDevice = ExternalRecordingCheck.IsChecked == true;
+        SaveExternalRecordingPreference(_externalRecordToDevice);
+        OperationStatusText.Text = AppLocalization.T(
+            _externalRecordToDevice
+                ? "外录已开启 · 视频将写入 ZENCHE 文件库"
+                : "外录已关闭 · PTP 相机仅记录到机身存储卡");
+    }
+
+    private static bool LoadExternalRecordingPreference()
+    {
+        try
+        {
+            return !File.Exists(ExternalRecordingStatePath) ||
+                File.ReadAllText(ExternalRecordingStatePath).Trim() != "0";
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static void SaveExternalRecordingPreference(bool enabled)
+    {
+        try
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(ExternalRecordingStatePath)!);
+            File.WriteAllText(
+                ExternalRecordingStatePath,
+                enabled ? "1" : "0");
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "external-recording",
+                $"保存外录偏好失败：{error.Message}");
+        }
+    }
+
+    private static string LoadWifiConnectionModePreference()
+    {
+        try
+        {
+            return File.Exists(WifiConnectionModeStatePath) &&
+                File.ReadAllText(WifiConnectionModeStatePath).Trim() == "sta"
+                    ? "sta"
+                    : "ap";
+        }
+        catch
+        {
+            return "ap";
+        }
+    }
+
+    private static void SaveWifiConnectionModePreference(string mode)
+    {
+        try
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(WifiConnectionModeStatePath)!);
+            File.WriteAllText(
+                WifiConnectionModeStatePath,
+                mode == "sta" ? "sta" : "ap");
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "wifi-camera",
+                $"保存 Wi-Fi 连接模式失败：{error.Message}");
+        }
+    }
+
+    private void UpdateMonitorTimecode()
+    {
+        if (MonitorTimecodeText is null)
+        {
+            return;
+        }
+        if (!_videoRecording || !_recordingStartedAt.HasValue)
+        {
+            MonitorTimecodeText.Text = "00:00:00:00";
+            return;
+        }
+        var elapsed = DateTime.Now - _recordingStartedAt.Value;
+        var centiseconds = Math.Max(0, (int)(elapsed.TotalMilliseconds / 10));
+        MonitorTimecodeText.Text = string.Format(
+            CultureInfo.InvariantCulture,
+            "{0:00}:{1:00}:{2:00}:{3:00}",
+            centiseconds / 360000,
+            (centiseconds / 6000) % 60,
+            (centiseconds / 100) % 60,
+            centiseconds % 100);
     }
 
     private async void ParameterBox_SelectionChanged(
@@ -1359,7 +3209,7 @@ public partial class MainWindow : Window
         }
         if (combo == ShutterBox)
         {
-            if (_videoMode &&
+            if (_videoMode && _videoShutterMode == "angle" &&
                 double.TryParse(
                     item.Uid,
                     NumberStyles.Float,
@@ -1367,6 +3217,11 @@ public partial class MainWindow : Window
                     out var angle))
             {
                 _videoShutterAngle = angle;
+            }
+            else if (_videoMode && _videoShutterMode == "speed" &&
+                     double.TryParse(Convert.ToString(item.Tag), NumberStyles.Float, CultureInfo.InvariantCulture, out var videoSeconds))
+            {
+                _photoShutterSeconds = videoSeconds;
             }
             else if (!_videoMode &&
                      double.TryParse(
@@ -1416,6 +3271,217 @@ public partial class MainWindow : Window
         });
     }
 
+    private void VideoShutterModeBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (VideoShutterModeBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        _videoShutterMode = Convert.ToString(item.Tag) ?? "angle";
+        if (!_configuringVideoControls)
+        {
+            ConfigureShutterControl(_videoMode);
+            if (_videoMode) _ = ApplyCurrentVideoShutterAsync();
+        }
+    }
+
+    private async void VideoCodecBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (VideoCodecBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        _videoCodec = Convert.ToString(item.Tag) ?? "h265";
+        if (_initializing)
+        {
+            return;
+        }
+        UpdateExposureAvailability();
+        if (_configuringVideoControls ||
+            !_camera.IsConnected || _operationInProgress)
+        {
+            return;
+        }
+        await RunOperationAsync($"正在设置视频录制规格 {item.Content}…", async token =>
+        {
+            await _camera.SetParameterAsync("videoCodec", _videoCodec, token);
+            OperationStatusText.Text = AppLocalization.T(
+                $"视频录制规格：{item.Content}");
+        });
+    }
+
+    private async void VideoLogBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (VideoLogBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        _videoLogProfile = Convert.ToString(item.Tag) ?? "off";
+        UpdateExposureReadout();
+        if (_initializing || _configuringVideoControls ||
+            !_camera.IsConnected || _operationInProgress)
+        {
+            return;
+        }
+        await RunOperationAsync(
+            $"正在设置 {item.Content}…",
+            async token =>
+            {
+                await _camera.SetParameterAsync(
+                    "videoLog",
+                    _videoLogProfile,
+                    token);
+                OperationStatusText.Text = AppLocalization.T(
+                    $"Log / Picture Profile：{item.Content}");
+            });
+    }
+
+    private string VideoCodecShortLabel() => _videoCodec switch
+    {
+        "h264" => "H.264",
+        "proRes422HQ" => "ProRes 422 HQ",
+        "proResRAW" => "ProRes RAW",
+        "nRaw" => "N-RAW",
+        "sonyXavcHs8k" => "XAVC HS 8K",
+        "sonyXavcHs4k" => "XAVC HS 4K",
+        "sonyXavcS4k" => "XAVC S 4K",
+        "sonyXavcSHd" => "XAVC S HD",
+        "sonyXavcSi4k" => "XAVC S-I 4K",
+        "sonyXavcSiHd" => "XAVC S-I HD",
+        "canonRaw" => "RAW",
+        "canonXfHevc422" or "canonXfHevc420" => "XF-HEVC S",
+        "canonXfAvc422" or "canonXfAvc420" => "XF-AVC S",
+        _ => "H.265"
+    };
+
+    private string VideoLogShortLabel() => _videoLogProfile switch
+    {
+        "nlog" => "N-Log",
+        "sonySLog2" => "S-Log2",
+        "sonySLog3Cine" or "sonySLog3" => "S-Log3",
+        "sonyHlg" => "HLG",
+        "canonLog" => "Canon Log",
+        "canonLog2" => "Canon Log 2",
+        "canonLog3" => "Canon Log 3",
+        _ => "SDR"
+    };
+
+    private void ConfigureVideoRecordingOptions(CameraProfile? profile)
+    {
+        var vendorId = profile?.VendorId ?? 0x04b0;
+        (string Value, string Label)[] codecs = vendorId switch
+        {
+            0x054c =>
+            [
+                ("sonyXavcHs8k", "XAVC HS 8K · HEVC Long GOP"),
+                ("sonyXavcHs4k", "XAVC HS 4K · HEVC Long GOP"),
+                ("sonyXavcS4k", "XAVC S 4K · AVC Long GOP"),
+                ("sonyXavcSHd", "XAVC S HD · AVC Long GOP"),
+                ("sonyXavcSi4k", "XAVC S-I 4K · AVC Intra"),
+                ("sonyXavcSiHd", "XAVC S-I HD · AVC Intra")
+            ],
+            0x04a9 =>
+            [
+                ("canonRaw", "RAW · 12-bit"),
+                ("canonXfHevc422", "XF-HEVC S · 4:2:2 10-bit"),
+                ("canonXfHevc420", "XF-HEVC S · 4:2:0 10-bit"),
+                ("canonXfAvc422", "XF-AVC S · 4:2:2 10-bit"),
+                ("canonXfAvc420", "XF-AVC S · 4:2:0 8-bit")
+            ],
+            _ =>
+            [
+                ("h264", "H.264 / AVC · 8-bit"),
+                ("h265", "H.265 / HEVC · 10-bit"),
+                ("proRes422HQ", "Apple ProRes 422 HQ · 10-bit"),
+                ("proResRAW", "Apple ProRes RAW HQ · 12-bit"),
+                ("nRaw", "N-RAW · 12-bit NEV")
+            ]
+        };
+        (string Value, string Label)[] logs = vendorId switch
+        {
+            0x054c =>
+            [
+                ("off", "关闭 · SDR"),
+                ("sonySLog2", "PP7 · S-Log2"),
+                ("sonySLog3Cine", "PP8 · S-Log3 / S-Gamut3.Cine"),
+                ("sonySLog3", "PP9 · S-Log3 / S-Gamut3"),
+                ("sonyHlg", "PP10 · HLG")
+            ],
+            0x04a9 =>
+            [
+                ("off", "关闭 · SDR"),
+                ("canonLog", "Canon Log"),
+                ("canonLog2", "Canon Log 2"),
+                ("canonLog3", "Canon Log 3")
+            ],
+            _ => [("off", "关闭 · SDR"), ("nlog", "N-Log")]
+        };
+
+        var previousConfiguring = _configuringVideoControls;
+        _configuringVideoControls = true;
+        try
+        {
+            VideoCodecBox.Items.Clear();
+            foreach (var option in codecs)
+            {
+                VideoCodecBox.Items.Add(new ComboBoxItem
+                {
+                    Tag = option.Value,
+                    Content = AppLocalization.T(option.Label)
+                });
+            }
+            var codecIndex = Array.FindIndex(
+                codecs,
+                option => option.Value == _videoCodec);
+            VideoCodecBox.SelectedIndex = codecIndex >= 0 ? codecIndex : 0;
+            _videoCodec = codecs[VideoCodecBox.SelectedIndex].Value;
+
+            VideoLogBox.Items.Clear();
+            foreach (var option in logs)
+            {
+                VideoLogBox.Items.Add(new ComboBoxItem
+                {
+                    Tag = option.Value,
+                    Content = AppLocalization.T(option.Label)
+                });
+            }
+            var logIndex = Array.FindIndex(
+                logs,
+                option => option.Value == _videoLogProfile);
+            VideoLogBox.SelectedIndex = logIndex >= 0 ? logIndex : 0;
+            _videoLogProfile = logs[VideoLogBox.SelectedIndex].Value;
+        }
+        finally
+        {
+            _configuringVideoControls = previousConfiguring;
+        }
+    }
+
+    private async Task ApplyCurrentVideoShutterAsync()
+    {
+        if (!_videoMode || !_camera.IsConnected || _operationInProgress)
+        {
+            return;
+        }
+        var seconds = _videoShutterMode == "angle"
+            ? _videoShutterAngle / (360 * _videoFrameRate)
+            : _photoShutterSeconds;
+        await RunOperationAsync("正在应用视频快门…", async token =>
+        {
+            await _camera.SetParameterAsync("videoExposureTime", seconds, token);
+            OperationStatusText.Text = AppLocalization.T(
+                _videoShutterMode == "angle"
+                    ? $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps"
+                    : $"快门速度 {_photoShutterSeconds:g} s · {_videoFrameRate:g} fps");
+        });
+    }
+
     private void Navigate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button)
@@ -1455,11 +3521,19 @@ public partial class MainWindow : Window
     {
         SetCurrentNavigation(navigation);
         CapturePanel.Visibility =
-            destination is "capture" or "monitor"
+            destination == "capture"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        MonitorDashboard.Visibility =
+            destination == "monitor"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         LibraryPanel.Visibility =
             destination == "library"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        DevicesPanel.Visibility =
+            destination == "devices"
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         EditorPanel.Visibility =
@@ -1478,11 +3552,15 @@ public partial class MainWindow : Window
         ParameterPanelShell.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
         ParameterColumn.Width =
-            cameraWorkspace ? new GridLength(300) : new GridLength(0);
+            cameraWorkspace ? new GridLength(320) : new GridLength(0);
         if (destination == "library")
         {
             RefreshPhotoList();
             LoadCaptureSessionControls();
+        }
+        if (destination == "devices")
+        {
+            RefreshRememberedDevices();
         }
         if (destination == "editor")
         {
@@ -1543,9 +3621,13 @@ public partial class MainWindow : Window
                 $"视频曝光参考：{_videoShutterAngle:g}° · {_videoFrameRate:g} fps");
             return;
         }
-        var seconds = _videoShutterAngle / (360 * _videoFrameRate);
+        var seconds = _videoShutterMode == "angle"
+            ? _videoShutterAngle / (360 * _videoFrameRate)
+            : _photoShutterSeconds;
         await RunOperationAsync(
-            $"正在按 {_videoShutterAngle:g}° 换算曝光时间…",
+            _videoShutterMode == "angle"
+                ? $"正在按 {_videoShutterAngle:g}° 换算曝光时间…"
+                : $"正在设置视频快门速度 {_photoShutterSeconds:g} s…",
             async token =>
             {
                 await _camera.SetParameterAsync(
@@ -1553,7 +3635,9 @@ public partial class MainWindow : Window
                     seconds,
                     token);
                 OperationStatusText.Text = AppLocalization.T(
-                    $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps");
+                    _videoShutterMode == "angle"
+                        ? $"快门角度 {_videoShutterAngle:g}° · {_videoFrameRate:g} fps"
+                        : $"快门速度 {_photoShutterSeconds:g} s · {_videoFrameRate:g} fps");
             });
     }
 
@@ -1565,14 +3649,26 @@ public partial class MainWindow : Window
         {
             ParameterPanelTitle.Text = AppLocalization.T(
                 videoMode ? "视频曝光与监看" : "拍摄控制");
+            ExposureModeLabel.Text = AppLocalization.T(
+                videoMode ? "视频曝光模式" : "拍摄模式");
             VideoFrameRateLabel.Visibility =
                 videoMode ? Visibility.Visible : Visibility.Collapsed;
             VideoFrameRateBox.Visibility =
                 videoMode ? Visibility.Visible : Visibility.Collapsed;
             ShutterLabel.Text = AppLocalization.T(
-                videoMode ? "快门角度" : "快门速度");
+                videoMode && _videoShutterMode == "angle" ? "快门角度" : "快门速度");
+            VideoShutterModeLabel.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoShutterModeBox.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoCodecLabel.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoCodecBox.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoLogLabel.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            VideoLogBox.Visibility = videoMode ? Visibility.Visible : Visibility.Collapsed;
+            ExternalRecordingCheck.Visibility =
+                videoMode ? Visibility.Visible : Visibility.Collapsed;
+            ExternalRecordingHint.Visibility =
+                videoMode ? Visibility.Visible : Visibility.Collapsed;
             ShutterBox.Items.Clear();
-            if (videoMode)
+            if (videoMode && _videoShutterMode == "angle")
             {
                 foreach (var angle in new[]
                          {
@@ -2203,11 +4299,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n" +
-                "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n" +
-                "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n" +
-                "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n" +
-                "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n" +
+                "• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n" +
+                "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n" +
+                "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n" +
+                "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n" +
+                "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
@@ -3022,17 +5118,32 @@ public partial class MainWindow : Window
         var failures = 0;
         Task<byte[]>? pendingFetch = null;
         while (!cancellationToken.IsCancellationRequested &&
-               _camera.IsConnected &&
-               _camera.IsLiveView)
+               ((_camera.IsConnected && _camera.IsLiveView) ||
+                (_localCamera.IsConnected && _localCamera.IsLiveView)))
         {
             try
             {
                 // Start next fetch before processing current frame
-                var fetchTask = pendingFetch
-                    ?? _camera.GetLiveViewFrameAsync(cancellationToken);
-                pendingFetch = _camera.GetLiveViewFrameAsync(cancellationToken);
+                Task<byte[]> NextFrame() => _localCamera.IsConnected
+                    ? _localCamera.GetLiveViewFrameAsync(cancellationToken)
+                    : _camera.GetLiveViewFrameAsync(cancellationToken);
+                var fetchTask = pendingFetch ?? NextFrame();
+                pendingFetch = NextFrame();
                 var jpeg = await fetchTask;
                 failures = 0;
+                if (_externalVideoRecorder.IsRecording)
+                {
+                    try
+                    {
+                        _externalVideoRecorder.AppendJpeg(jpeg);
+                    }
+                    catch (Exception recordingError)
+                    {
+                        await FinishExternalRecordingAfterFailureAsync(
+                            recordingError,
+                            cancellationToken);
+                    }
+                }
                 var videoMode = _videoMode;
                 var recording = _videoRecording;
                 var sequence = ++_previewAnalysisSequence;
@@ -3047,7 +5158,8 @@ public partial class MainWindow : Window
                         videoMode,
                         focusPeaking,
                         falseColor,
-                        recording),
+                        recording,
+                        _monitorNikonCloudPreset),
                     cancellationToken);
                 await Dispatcher.InvokeAsync(
                     () => DisplayPreparedPreview(prepared));
@@ -3064,7 +5176,15 @@ public partial class MainWindow : Window
                     $"获取实时取景帧失败（{failures}/3）：{error.Message}");
                 if (failures >= 3)
                 {
-                    await _camera.StopLiveViewAsync(CancellationToken.None);
+                    await FinishExternalRecordingForDisconnectAsync();
+                    if (_localCamera.IsConnected)
+                    {
+                        await _localCamera.StopLiveViewAsync();
+                    }
+                    else
+                    {
+                        await _camera.StopLiveViewAsync(CancellationToken.None);
+                    }
                     await Dispatcher.InvokeAsync(() =>
                     {
                         UpdateLiveViewState();
@@ -3105,6 +5225,59 @@ public partial class MainWindow : Window
         cancellation?.Dispose();
     }
 
+    private async Task FinishExternalRecordingAfterFailureAsync(
+        Exception cause,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = _externalVideoRecorder.StopIfRecording();
+            if (result is not null)
+            {
+                await _workflow.CompleteExternalRecordingAsync(
+                    result.Path,
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+            _externalVideoRecorder.Abort();
+        }
+        _videoRecording = _camera.IsConnected && _camera.IsMovieRecording;
+        if (!_videoRecording) _recordingStartedAt = null;
+        await Dispatcher.InvokeAsync(() =>
+        {
+            UpdateRecordingState();
+            RefreshPhotoList();
+            ShowError($"外录已停止：{cause.Message}");
+        });
+    }
+
+    private async Task FinishExternalRecordingForDisconnectAsync()
+    {
+        try
+        {
+            var result = _externalVideoRecorder.StopIfRecording();
+            if (result is not null)
+            {
+                await _workflow.CompleteExternalRecordingAsync(result.Path);
+                _diagnostics.Info(
+                    "external-recording",
+                    $"连接结束，已安全保存外录：{Path.GetFileName(result.Path)}");
+                RefreshPhotoList();
+            }
+        }
+        catch (Exception error)
+        {
+            _externalVideoRecorder.Abort();
+            _diagnostics.Error(
+                "external-recording",
+                $"连接结束时无法完成外录：{error.Message}");
+        }
+        _videoRecording = false;
+        _recordingStartedAt = null;
+    }
+
     private async Task RunOperationAsync(
         string status,
         Func<CancellationToken, Task> operation)
@@ -3138,46 +5311,126 @@ public partial class MainWindow : Window
 
     private void SetConnectionState(CameraProfile? profile)
     {
-        CameraStatusText.Text = AppLocalization.T(
-            profile is null
-                ? "未连接 · WINDOWS USB/PTP"
-                : $"{profile.Name} · USB/PTP");
-        ConnectButton.Content = AppLocalization.T(
-            profile is null ? "连接相机" : "断开相机");
-        ConnectionDot.Fill = (Brush)FindResource(
-            profile is null ? "MutedBrush" : "PositiveBrush");
+        ConfigureVideoRecordingOptions(profile);
+        UpdateConnectionSummary();
         PreviewEmpty.Visibility = profile is null
             ? Visibility.Visible
             : PreviewEmpty.Visibility;
         if (profile is null)
         {
             _videoRecording = false;
+            _recordingStartedAt = null;
             PreviewImage.Source = null;
+            _lastPreviewSource = null;
             PreviewEmpty.Visibility = Visibility.Visible;
             UpdateRecordingState();
         }
         UpdateEnabledState();
         UpdateLiveViewState();
         UpdateExposureReadout();
+        RefreshRememberedDevices();
+    }
+
+    private void UpdateConnectionSummary()
+    {
+        var anyConnected = _camera.IsConnected ||
+            _localCamera.IsConnected ||
+            _wifiCamera.IsConnected;
+        CameraStatusText.Text = AppLocalization.T(
+            _camera.IsConnected
+                ? $"{_camera.Profile?.Name ?? "相机"} · USB/PTP"
+                : _localCamera.IsConnected
+                    ? $"{_localCamera.DeviceName} · 本机摄像头"
+                : _wifiCamera.IsConnected
+                    ? $"{_wifiCamera.CameraName} · {_wifiConnectionMode.ToUpperInvariant()} · WI‑FI/PTP‑IP"
+                    : "未连接 · WINDOWS USB/PTP");
+        ConnectButton.Content = AppLocalization.T("连接管理");
+        ConnectionDot.Fill = (Brush)FindResource(
+            anyConnected ? "PositiveBrush" : "MutedBrush");
+    }
+
+    private void UpdateMonitorStorage()
+    {
+        if (MonitorStorageFreeText is null || MonitorStorageDetailText is null)
+        {
+            return;
+        }
+        try
+        {
+            var root = Path.GetPathRoot(_library.DirectoryPath);
+            if (string.IsNullOrWhiteSpace(root)) throw new IOException("storage root unavailable");
+            var drive = new DriveInfo(root);
+            var free = drive.AvailableFreeSpace;
+            MonitorStorageFreeText.Text = FormatStorageBytes(free);
+            var usedPercent = drive.TotalSize > 0
+                ? Math.Clamp((int)Math.Round((1 - free / (double)drive.TotalSize) * 100), 0, 100)
+                : 0;
+            MonitorStorageDetailText.Text = $"{usedPercent}% 已用 · 本地缓存";
+        }
+        catch
+        {
+            MonitorStorageFreeText.Text = "—";
+            MonitorStorageDetailText.Text = "本地缓存 · 存储状态暂不可用";
+        }
+    }
+
+    private static string FormatStorageBytes(long bytes)
+    {
+        if (bytes < 0) return "—";
+        var value = (double)bytes;
+        var units = new[] { "B", "KB", "MB", "GB", "TB" };
+        var index = 0;
+        while (value >= 1024 && index < units.Length - 1)
+        {
+            value /= 1024;
+            index++;
+        }
+        return index == 0 ? $"{value:0} {units[index]}" : $"{value:0.0} {units[index]}";
     }
 
     private void UpdateEnabledState()
     {
         var connected = _camera.IsConnected && !_operationInProgress;
+        var liveViewReady = (_camera.IsConnected || _localCamera.IsConnected) &&
+            !_operationInProgress;
+        var photoCaptureReady =
+            (_camera.IsConnected || _localCamera.IsConnected || _wifiCamera.IsConnected) &&
+            !_operationInProgress;
         ConnectButton.IsEnabled = !_operationInProgress;
-        LiveViewButton.IsEnabled = connected;
-        ShutterButton.IsEnabled = connected;
+        LiveViewButton.IsEnabled = liveViewReady;
+        ShutterButton.IsEnabled = _videoMode
+            ? liveViewReady && (_externalRecordToDevice || _camera.IsConnected)
+            : photoCaptureReady;
         if (_immersiveRecordButton is not null)
         {
-            _immersiveRecordButton.IsEnabled = connected;
+            _immersiveRecordButton.IsEnabled = _videoMode
+                ? liveViewReady && (_externalRecordToDevice || _camera.IsConnected)
+                : connected;
         }
         ExposureModeBox.IsEnabled = connected;
+        VideoCodecBox.IsEnabled = connected;
+        VideoLogBox.IsEnabled = connected;
+        ExternalRecordingCheck.IsEnabled = !_videoRecording &&
+            !_operationInProgress;
+        CaptureAutoFocusButton.IsEnabled = connected && _camera.IsLiveView && !_operationInProgress;
         FocusModeBox.IsEnabled = connected;
         WhiteBalanceBox.IsEnabled = connected;
         PictureControlBox.IsEnabled = connected;
         ShootingTaskButton.IsEnabled =
             (_shootingTaskCancellation is not null && _operationInProgress) ||
             connected;
+        if (RefreshCameraStorageButton is not null)
+        {
+            RefreshCameraStorageButton.IsEnabled =
+                !_cameraStorageBusy && !_operationInProgress &&
+                (_camera.IsConnected || _wifiCamera.IsConnected);
+            if (!_camera.IsConnected && !_wifiCamera.IsConnected &&
+                _cameraStorageRows.Count == 0)
+            {
+                CameraStorageStatusText.Text = AppLocalization.T(
+                    "请连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机");
+            }
+        }
         UpdateExposureAvailability();
     }
 
@@ -3207,6 +5460,11 @@ public partial class MainWindow : Window
             PictureControlBox,
             "pictureControl",
             connected);
+        if (_videoMode)
+        {
+            SetParameterAvailability(VideoCodecBox, "videoCodec", connected);
+            SetParameterAvailability(VideoLogBox, "videoLog", connected);
+        }
         UpdateExposureReadout();
     }
 
@@ -3217,7 +5475,13 @@ public partial class MainWindow : Window
             return;
         }
         var connected = _camera.IsConnected;
-        SourceReadoutText.Text = connected ? "USB/PTP" : "—";
+        SourceReadoutText.Text = connected
+            ? "USB/PTP"
+            : _localCamera.IsConnected
+                ? "本机"
+                : _wifiCamera.IsConnected
+                    ? $"{_wifiConnectionMode.ToUpperInvariant()} · WI‑FI/PTP‑IP"
+                    : "—";
         ModeReadoutText.Text = connected ? ExposureModeText() : "—";
         ShutterReadoutText.Text = connected
             ? SelectedContent(ShutterBox, "—")
@@ -3231,6 +5495,22 @@ public partial class MainWindow : Window
         CompensationReadoutText.Text = connected
             ? SelectedContent(ExposureCompensationBox, "—")
             : "—";
+        if (MonitorFrameRateText is not null)
+        {
+            MonitorFrameRateText.Text = connected ? $"{_videoFrameRate:0}" : "—";
+            MonitorShutterText.Text = connected ? (_videoMode ? $"{_videoShutterAngle:0}°" : SelectedContent(ShutterBox, "—")) : "—";
+            MonitorApertureText.Text = connected ? SelectedContent(ApertureBox, "—").Replace("f/", "f") : "—";
+            MonitorIsoText.Text = connected ? SelectedContent(IsoBox, "—").Replace("ISO ", "") : "—";
+            MonitorWhiteBalanceText.Text = connected ? SelectedContent(WhiteBalanceBox, "—") : "—";
+            MonitorCodecText.Text = connected ? VideoCodecShortLabel() : "—";
+            MonitorToneText.Text = connected ? VideoLogShortLabel() : "—";
+            MonitorCameraOverlay.Text = connected
+                ? $"{_camera.Profile?.Name ?? "相机"} · USB/PTP"
+                : _localCamera.IsConnected
+                    ? $"{_localCamera.DeviceName} · 本机摄像头"
+                    : "未连接 · USB/PTP";
+            UpdateMonitorStorage();
+        }
         UpdateReadoutState(
             ShutterReadoutLabel,
             ShutterReadoutText,
@@ -3297,13 +5577,23 @@ public partial class MainWindow : Window
 
     private void UpdateLiveViewState()
     {
-        var live = _camera.IsLiveView;
+        var live = _camera.IsLiveView || _localCamera.IsLiveView;
         LiveViewButton.Content =
             AppLocalization.T(live ? "停止取景" : "开启取景");
         LiveBadge.Text = live ? "LIVE VIEW ON" : "LIVE VIEW OFF";
         LiveBadge.Foreground = live
             ? (Brush)FindResource("AccentInkBrush")
             : (Brush)FindResource("GraphiteMutedBrush");
+        if (MonitorLiveStatusText is not null)
+        {
+            MonitorLiveStatusText.Text = live ? "LIVE" : "NO SOURCE";
+            MonitorLiveStatusText.Foreground = live
+                ? (Brush)FindResource("PositiveBrush")
+                : (Brush)FindResource("GraphiteMutedBrush");
+            MonitorPreviewEmpty.Visibility = live || MonitorPreviewImage.Source is not null
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        }
     }
 
     private void DisplayJpeg(byte[] jpeg)
@@ -3312,7 +5602,9 @@ public partial class MainWindow : Window
             jpeg,
             _videoMode,
             _videoMode && _focusPeakingEnabled,
-            _videoMode && _falseColorEnabled));
+            _videoMode && _falseColorEnabled,
+            false,
+            _monitorNikonCloudPreset));
     }
 
     private static PreparedPreview PrepareJpeg(
@@ -3320,7 +5612,8 @@ public partial class MainWindow : Window
         bool videoMode,
         bool focusPeaking,
         bool falseColor,
-        bool recording = false)
+        bool recording = false,
+        NikonCloudPreset? nikonCloudPreset = null)
     {
         using var stream = new MemoryStream(jpeg, writable: false);
         var bitmap = new BitmapImage();
@@ -3336,27 +5629,298 @@ public partial class MainWindow : Window
         var monitor = ProfessionalMonitor.Process(
             bitmap,
             focusPeaking,
-            falseColor);
+            falseColor,
+            nikonCloudPreset);
         return new PreparedPreview(
-            videoMode ? monitor.Image : bitmap,
+            bitmap,
+            videoMode || nikonCloudPreset is not null
+                ? monitor.Image : bitmap,
             monitor);
     }
 
     private void DisplayPreparedPreview(PreparedPreview prepared)
     {
+        _lastPreviewSource = prepared.Source;
         PreviewImage.Source = prepared.Display;
+        MonitorPreviewImage.Source = prepared.Display;
+        MonitorPreviewEmpty.Visibility = Visibility.Collapsed;
+        MonitorCameraOverlay.Text = $"{(_camera.Profile?.Name ?? "未连接")} · USB/PTP";
+        MonitorRgbScope.SetData(
+            prepared.Monitor.RedHistogram,
+            prepared.Monitor.GreenHistogram,
+            prepared.Monitor.BlueHistogram,
+            prepared.Monitor.Waveform,
+            prepared.Monitor.Vectorscope);
         if (_immersivePreviewImage is not null)
         {
             _immersivePreviewImage.Source = prepared.Display;
         }
-        RedHistogramText.Text = $"R {prepared.Monitor.RedHistogram}";
-        GreenHistogramText.Text = $"G {prepared.Monitor.GreenHistogram}";
-        BlueHistogramText.Text = $"B {prepared.Monitor.BlueHistogram}";
-        WaveformText.Text = $"Y {prepared.Monitor.Waveform}";
-        VectorscopeText.Text = $"H {prepared.Monitor.Vectorscope}";
+        ProfessionalScope.SetData(
+            prepared.Monitor.RedHistogram,
+            prepared.Monitor.GreenHistogram,
+            prepared.Monitor.BlueHistogram,
+            prepared.Monitor.Waveform,
+            prepared.Monitor.Vectorscope);
         PeakingCoverageText.Text = AppLocalization.T(
             $"峰值覆盖 {prepared.Monitor.PeakingCoverage}%");
         PreviewEmpty.Visibility = Visibility.Collapsed;
+    }
+
+    private async void RefreshCameraStorageButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_cameraStorageBusy) return;
+        if (!_camera.IsConnected && !_wifiCamera.IsConnected)
+        {
+            CameraStorageStatusText.Text = AppLocalization.T(
+                "请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机");
+            ShowError("请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机。");
+            return;
+        }
+        SetCameraStorageBusy(true, "正在读取存储卷与文件信息…");
+        try
+        {
+            using var cancellation = new CancellationTokenSource(
+                TimeSpan.FromMinutes(3));
+            _cameraStorageSnapshot = _camera.IsConnected
+                ? await _camera.ListStorageAsync(cancellation.Token)
+                : await _wifiCamera.ListStorageAsync(cancellation.Token);
+            _cameraStorageRows.Clear();
+            foreach (var item in _cameraStorageSnapshot.Items)
+            {
+                _cameraStorageRows.Add(new CameraStorageListItem { Item = item });
+            }
+            var capacity = _cameraStorageSnapshot.CapacityBytes;
+            CameraStorageSummaryText.Text = capacity > 0
+                ? $"{FormatStorageBytes(Math.Max(
+                    0,
+                    capacity - _cameraStorageSnapshot.FreeBytes))} 已用 / " +
+                  FormatStorageBytes(capacity)
+                : $"{_cameraStorageSnapshot.Items.Count} 个机内文件";
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"读取完成 · {_cameraStorageSnapshot.Items.Count} 个文件");
+            _diagnostics.Info(
+                "camera-storage",
+                $"读取机内存储完成；卷={_cameraStorageSnapshot.Volumes.Count}；" +
+                $"文件={_cameraStorageSnapshot.Items.Count}");
+        }
+        catch (Exception error)
+        {
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"读取失败 · {error.Message}");
+            _diagnostics.Error("camera-storage", error.ToString());
+            ShowError(error.Message);
+        }
+        finally
+        {
+            SetCameraStorageBusy(false);
+        }
+    }
+
+    private void SelectAllCameraStorageButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var selectable = _cameraStorageRows
+            .Where(row => !row.Item.IsProtected)
+            .ToList();
+        var selectedCount = CameraStorageList.SelectedItems
+            .OfType<CameraStorageListItem>()
+            .Count(row => !row.Item.IsProtected);
+        CameraStorageList.SelectedItems.Clear();
+        if (selectedCount != selectable.Count)
+        {
+            foreach (var row in selectable) CameraStorageList.SelectedItems.Add(row);
+        }
+        UpdateCameraStorageSelectionState();
+    }
+
+    private void CameraStorageList_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        foreach (var row in CameraStorageList.SelectedItems
+                     .OfType<CameraStorageListItem>()
+                     .Where(row => row.Item.IsProtected)
+                     .ToList())
+        {
+            CameraStorageList.SelectedItems.Remove(row);
+        }
+        UpdateCameraStorageSelectionState();
+        foreach (var row in CameraStorageList.SelectedItems
+                     .OfType<CameraStorageListItem>()
+                     .Where(row => !row.Item.IsVideo && row.Thumbnail is null))
+        {
+            _ = LoadCameraStorageThumbnailAsync(row);
+        }
+    }
+
+    private async Task LoadCameraStorageThumbnailAsync(CameraStorageListItem row)
+    {
+        try
+        {
+            using var cancellation = new CancellationTokenSource(
+                TimeSpan.FromSeconds(30));
+            var bytes = _camera.IsConnected
+                ? await _camera.GetStorageThumbnailAsync(
+                    row.Item.Handle,
+                    cancellation.Token)
+                : await _wifiCamera.GetStorageThumbnailAsync(
+                    row.Item.Handle,
+                    cancellation.Token);
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = 144;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            row.Thumbnail = bitmap;
+        }
+        catch
+        {
+            // Some RAW/video objects do not expose a PTP thumbnail.
+        }
+    }
+
+    private async void DownloadCameraStorageButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var selected = SelectedCameraStorageRows();
+        if (_cameraStorageBusy || selected.Count == 0) return;
+        SetCameraStorageBusy(true, $"正在下载 0 / {selected.Count}");
+        try
+        {
+            using var cancellation = new CancellationTokenSource(
+                TimeSpan.FromMinutes(20));
+            for (var index = 0; index < selected.Count; index++)
+            {
+                var item = selected[index].Item;
+                CameraStorageStatusText.Text = AppLocalization.T(
+                    $"正在下载 {index + 1} / {selected.Count} · {item.Filename}");
+                var bytes = _camera.IsConnected
+                    ? await _camera.DownloadStorageObjectAsync(
+                        item.Handle,
+                        cancellation.Token)
+                    : await _wifiCamera.DownloadStorageObjectAsync(
+                        item.Handle,
+                        cancellation.Token);
+                await _workflow.StoreAsync(
+                    bytes,
+                    item.Filename,
+                    _camera.IsConnected
+                        ? _camera.Profile?.Name ?? "相机"
+                        : _wifiCamera.CameraName,
+                    cancellationToken: cancellation.Token);
+            }
+            CameraStorageList.SelectedItems.Clear();
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"已下载 {selected.Count} 个文件到 ZENCHE 文件库");
+            RefreshPhotoList();
+        }
+        catch (Exception error)
+        {
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"下载失败 · {error.Message}");
+            _diagnostics.Error("camera-storage", error.ToString());
+            ShowError(error.Message);
+        }
+        finally
+        {
+            SetCameraStorageBusy(false);
+        }
+    }
+
+    private async void DeleteCameraStorageButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var selected = SelectedCameraStorageRows();
+        if (_cameraStorageBusy || selected.Count == 0) return;
+        var confirmation = MessageBox.Show(
+            this,
+            AppLocalization.T(
+                $"将从相机存储卡永久删除所选 {selected.Count} 个文件。" +
+                "\n\n此操作无法撤销；已保护文件不会被选择。"),
+            AppLocalization.T("从相机永久删除？"),
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning,
+            MessageBoxResult.Cancel);
+        if (confirmation != MessageBoxResult.OK) return;
+
+        SetCameraStorageBusy(true, "正在从相机删除…");
+        try
+        {
+            using var cancellation = new CancellationTokenSource(
+                TimeSpan.FromMinutes(10));
+            foreach (var row in selected)
+            {
+                if (_camera.IsConnected)
+                {
+                    await _camera.DeleteStorageObjectAsync(
+                        row.Item.Handle,
+                        cancellation.Token);
+                }
+                else
+                {
+                    await _wifiCamera.DeleteStorageObjectAsync(
+                        row.Item.Handle,
+                        cancellation.Token);
+                }
+            }
+            SetCameraStorageBusy(false);
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"已从相机删除 {selected.Count} 个文件");
+            RefreshCameraStorageButton_Click(this, new RoutedEventArgs());
+        }
+        catch (Exception error)
+        {
+            CameraStorageStatusText.Text = AppLocalization.T(
+                $"删除失败 · {error.Message}");
+            _diagnostics.Error("camera-storage", error.ToString());
+            ShowError(error.Message);
+        }
+        finally
+        {
+            SetCameraStorageBusy(false);
+        }
+    }
+
+    private List<CameraStorageListItem> SelectedCameraStorageRows() =>
+        CameraStorageList.SelectedItems
+            .OfType<CameraStorageListItem>()
+            .Where(row => !row.Item.IsProtected)
+            .ToList();
+
+    private void UpdateCameraStorageSelectionState()
+    {
+        var selectedCount = SelectedCameraStorageRows().Count;
+        DownloadCameraStorageButton.IsEnabled =
+            !_cameraStorageBusy && selectedCount > 0;
+        DeleteCameraStorageButton.IsEnabled =
+            !_cameraStorageBusy && selectedCount > 0;
+        SelectAllCameraStorageButton.Content = AppLocalization.T(
+            selectedCount > 0 &&
+            selectedCount == _cameraStorageRows.Count(row => !row.Item.IsProtected)
+                ? "取消全选"
+                : "全选");
+    }
+
+    private void SetCameraStorageBusy(bool busy, string? status = null)
+    {
+        _cameraStorageBusy = busy;
+        RefreshCameraStorageButton.IsEnabled =
+            !busy && (_camera.IsConnected || _wifiCamera.IsConnected);
+        SelectAllCameraStorageButton.IsEnabled =
+            !busy && _cameraStorageRows.Count > 0;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            CameraStorageStatusText.Text = AppLocalization.T(status);
+        }
+        UpdateCameraStorageSelectionState();
     }
 
     private void RefreshPhotoList()
@@ -3540,6 +6104,8 @@ public partial class MainWindow : Window
             .ToList();
         _updatingEditorControls = true;
         EditorPhotoBox.ItemsSource = choices;
+        EditorPhotoTree.ItemsSource = BuildEditorPhotoTree(
+            choices.Select(choice => choice.Item).ToList());
         var selected = choices.FirstOrDefault(choice =>
             string.Equals(
                 choice.Item.Path,
@@ -3547,6 +6113,10 @@ public partial class MainWindow : Window
                 StringComparison.OrdinalIgnoreCase)) ?? choices.FirstOrDefault();
         EditorPhotoBox.SelectedItem = selected;
         _editorSelectedPath = selected?.Item.Path;
+        EditorPhotoPickerButton.Content = selected is null
+            ? "选择照片"
+            : $"▧  {selected.Item.Name}";
+        AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
         _updatingEditorControls = false;
         if (!string.Equals(
                 previousPath,
@@ -3556,6 +6126,41 @@ public partial class MainWindow : Window
             ResetEditorControls();
         }
         UpdateEditorPreview();
+    }
+
+    private ObservableCollection<LibraryTreeNode> BuildEditorPhotoTree(
+        IReadOnlyList<PhotoItem> photos)
+    {
+        var roots = new ObservableCollection<LibraryTreeNode>();
+        var unclassified = photos
+            .Where(item => !_libraryFileAssignments.ContainsKey(item.Path))
+            .OrderByDescending(item => File.GetLastWriteTimeUtc(item.Path))
+            .ToList();
+        var unclassifiedNode = new LibraryTreeNode
+        {
+            Name = $"未分类 · {unclassified.Count}",
+            Detail = "尚未放入用户分支的可编辑照片",
+            Icon = "▱",
+            IsUnclassified = true,
+            IsExpanded = true
+        };
+        foreach (var item in unclassified)
+        {
+            unclassifiedNode.Children.Add(new LibraryTreeNode
+            {
+                Name = item.Name,
+                Detail = item.Detail,
+                Icon = "◫",
+                Thumbnail = CreateLibraryThumbnail(item),
+                Item = item
+            });
+        }
+        roots.Add(unclassifiedNode);
+        foreach (var branch in _libraryBranches)
+        {
+            roots.Add(BuildBranchNode(branch, photos));
+        }
+        return roots;
     }
 
     private void RefreshAiEditor()
@@ -3570,8 +6175,10 @@ public partial class MainWindow : Window
         AiGenModeBtn.Style = (Style)FindResource(
             _aiMode == 1 ? "PrimaryButton" : "ButtonBase");
         AiPromptBox.Text = _aiPrompt;
+        AiPromptBox.TextChanged -= AiPromptBox_TextChanged;
+        AiPromptBox.TextChanged += AiPromptBox_TextChanged;
         AiUnlockStatus.Text = IsAiActivated()
-            ? AppLocalization.T($"已解锁 · 剩余 {GetRemainingUsage()} 次")
+            ? AppLocalization.T($"已解锁 · 剩余 {CurrentRemainingUsage()} 次")
             : AppLocalization.T("需要激活");
         AiUnlockStatus.Foreground = IsAiActivated()
             ? (System.Windows.Media.Brush)FindResource("PositiveBrush")
@@ -3608,42 +6215,53 @@ public partial class MainWindow : Window
     private void RefreshAiPresets()
     {
         AiPresetPanel.Children.Clear();
-        var presets = _aiMode == 0
-            ? new (string Label, string Prompt)[]
-            {
-                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
-                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
-                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
-                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
-                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
-                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
-                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
-                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
-            }
-            : new (string Label, string Prompt)[]
-            {
-                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
-                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
-                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
-                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
-            };
-        foreach (var preset in presets)
+        var clear = new Button { Content = AppLocalization.T("清空"), Height = 44, Margin = new Thickness(0, 0, 6, 6), Style = (Style)FindResource("ButtonBase") };
+        clear.Click += (_, _) => { _aiSelectedPresets.Clear(); _aiManualPrompt = ""; AiPromptBox.Text = ComposeAiPrompt(); };
+        AiPresetPanel.Children.Add(clear);
+        var modules = new (string Category, string[] Values)[]
         {
-            var button = new Button
+            ("主体", ["人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"]),
+            ("光线", ["柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"]),
+            ("色彩", ["自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"]),
+            ("质感", ["保留真实皮肤纹理", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"]),
+            ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"]),
+            ("约束", ["保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"])
+        };
+        foreach (var module in modules)
+        {
+            AiPresetPanel.Children.Add(new TextBlock { Text = module.Category, Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(0, 4, 0, 2) });
+            foreach (var value in module.Values)
             {
-                Content = preset.Label,
-                Height = 30,
-                Margin = new Thickness(0, 0, 6, 6),
-                Padding = new Thickness(10, 0, 10, 0),
-                Style = (Style)FindResource("ButtonBase")
-            };
-            var prompt = preset.Prompt;
-            button.Click += (_, _) =>
-            {
-                AiPromptBox.Text = prompt;
-            };
-            AiPresetPanel.Children.Add(button);
+                var key = $"{module.Category}:{value}";
+                var button = new Button { Content = value, Height = 44, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(10, 0, 10, 0), Style = (Style)FindResource("ButtonBase") };
+                button.IsHitTestVisible = true;
+                button.Click += (_, _) =>
+                {
+                    var selected = _aiSelectedPresets.Contains(key);
+                    _aiSelectedPresets.RemoveWhere(item => item.StartsWith(module.Category + ":", StringComparison.Ordinal));
+                    if (!selected) _aiSelectedPresets.Add(key);
+                    AiPromptBox.Text = ComposeAiPrompt();
+                };
+                AiPresetPanel.Children.Add(button);
+            }
         }
+    }
+
+    private void AiPromptBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (AiPromptBox.IsFocused) _aiManualPrompt = AiPromptBox.Text.Trim();
+    }
+
+    private string ComposeAiPrompt()
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_aiManualPrompt)) parts.Add(_aiManualPrompt.Trim());
+        foreach (var category in new[] { "主体", "光线", "色彩", "质感", "构图", "约束" })
+        {
+            var values = _aiSelectedPresets.Where(item => item.StartsWith(category + ":", StringComparison.Ordinal)).Select(item => item[(category.Length + 1)..]).ToArray();
+            if (values.Length > 0) parts.Add($"{category}：{string.Join("、", values)}");
+        }
+        return string.Join("。", parts);
     }
 
     private void AiEditMode_Click(object sender, RoutedEventArgs e)
@@ -3690,6 +6308,19 @@ public partial class MainWindow : Window
                 "请先在设置中输入激活码解锁 AI 功能");
             return;
         }
+        if (!HasAiUsageAvailable())
+        {
+            AiStatusText.Text = AppLocalization.T("AI 次数已用完，请重新兑换激活码");
+            return;
+        }
+        if (_aiMode == 0 &&
+            (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+             !File.Exists(_editorSelectedPath)))
+        {
+            AiStatusText.Text = AppLocalization.T(
+                "请先选择一张照片用于 AI 修图");
+            return;
+        }
         var activationCode = LoadActivationCode();
         _aiGenerating = true;
         AiGenerateBtn.IsEnabled = false;
@@ -3706,13 +6337,17 @@ public partial class MainWindow : Window
                 ["prompt"] = _aiPrompt,
                 ["size"] = size
             };
-            if (_aiMode == 0 && _editorSelectedPath != null &&
-                File.Exists(_editorSelectedPath))
+            if (_aiMode == 0 && _editorSelectedPath != null)
             {
                 var sourceBytes = await File.ReadAllBytesAsync(
                     _editorSelectedPath);
+                if (sourceBytes.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        "原图为空，未发送 AI 修图请求");
+                }
                 var b64 = Convert.ToBase64String(sourceBytes);
-                body["image"] = $"data:image/jpeg;base64,{b64}";
+                body["image"] = $"data:{ImageMimeType(_editorSelectedPath)};base64,{b64}";
             }
             using var client = new HttpClient();
             client.Timeout = TimeSpan.FromSeconds(60);
@@ -3721,14 +6356,27 @@ public partial class MainWindow : Window
                 System.Text.Encoding.UTF8,
                 "application/json");
             var response = await client.PostAsync(endpoint, content);
+            var serverRemaining = ReadServerRemainingUsage(response);
             if (!response.IsSuccessStatusCode)
             {
                 var code = (int)response.StatusCode;
+                if (code == 403)
+                {
+                    _aiServerRemainingUsage = serverRemaining ?? 0;
+                    SaveServerRemainingUsage(_aiServerRemainingUsage.Value);
+                }
                 if (code == 403)
                     throw new Exception("激活码无效或次数用完");
                 if (code == 502)
                     throw new Exception("AI 服务暂时不可用");
                 throw new Exception($"API 服务返回错误 {code}");
+            }
+            // The proxy is authoritative. Keep the local counter only for old
+            // proxy deployments that do not return the remaining-use header.
+            if (serverRemaining is { } remaining)
+            {
+                _aiServerRemainingUsage = remaining;
+                SaveServerRemainingUsage(remaining);
             }
             var json = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
@@ -3753,10 +6401,15 @@ public partial class MainWindow : Window
             }
             var tempPath = Path.Combine(
                 Path.GetTempPath(),
-                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}.jpg");
+                $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid():N}.jpg");
             await File.WriteAllBytesAsync(tempPath, imageBytes);
             _aiResultPath = tempPath;
-            RecordAiUsage();
+            if (serverRemaining is null)
+            {
+                RecordAiUsage();
+                _aiServerRemainingUsage = GetLocalRemainingUsage();
+                SaveServerRemainingUsage(_aiServerRemainingUsage.Value);
+            }
             AiStatusText.Text = AppLocalization.T("生成完成");
         }
         catch (Exception error)
@@ -3769,7 +6422,7 @@ public partial class MainWindow : Window
         {
             _aiGenerating = false;
             AiGenerateBtn.IsEnabled = true;
-            AiGenerateBtn.Content = AppLocalization.T("生成");
+            AiGenerateBtn.Content = AppLocalization.T("生成图像");
             RefreshAiEditor();
         }
     }
@@ -3782,26 +6435,37 @@ public partial class MainWindow : Window
         }
         try
         {
-            var stem = _aiMode == 0 ? "edited" : "generated";
-            var dest = new FileInfo(
-                UniqueDestination(
-                    $"ai_{stem}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg"));
             using var source = File.OpenRead(_aiResultPath);
             var bytes = new byte[source.Length];
             source.ReadExactly(bytes);
-            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
             using var memStream = new MemoryStream(bytes);
             var decoder = BitmapDecoder.Create(
                 memStream,
                 BitmapCreateOptions.PreservePixelFormat,
                 BitmapCacheOption.OnLoad);
-            encoder.Frames.Add(BitmapFrame.Create(decoder.Frames[0]));
-            using var fileStream = dest.OpenWrite();
-            encoder.Save(fileStream);
-            _editorSelectedPath = dest.FullName;
-            RefreshPhotoList();
-            AiStatusText.Text = AppLocalization.T(
-                $"已保存 AI 结果 · {dest.Name}");
+            var frame = decoder.Frames[0];
+            if (_aiMode == 0 &&
+                !string.IsNullOrWhiteSpace(_editorSelectedPath) &&
+                File.Exists(_editorSelectedPath))
+            {
+                var originalPath = _editorSelectedPath;
+                SaveBitmapAtomically(originalPath, frame);
+                RefreshPhotoList();
+                RefreshImageEditor();
+                AiStatusText.Text = AppLocalization.T(
+                    $"已覆盖原图 · {Path.GetFileName(originalPath)}");
+            }
+            else
+            {
+                var dest = new FileInfo(
+                    UniqueDestination(
+                        $"ai_generated_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.jpg"));
+                SaveBitmapAtomically(dest.FullName, frame);
+                _editorSelectedPath = dest.FullName;
+                RefreshPhotoList();
+                AiStatusText.Text = AppLocalization.T(
+                    $"已保存 AI 结果 · {dest.Name}");
+            }
         }
         catch (Exception error)
         {
@@ -3815,6 +6479,61 @@ public partial class MainWindow : Window
         return Path.Combine(_library.DirectoryPath, filename);
     }
 
+    private static void SaveBitmapAtomically(
+        string destination,
+        BitmapSource bitmap)
+    {
+        var temporary = destination + $".zenche-{Guid.NewGuid():N}.tmp";
+        try
+        {
+            var extension = Path.GetExtension(destination);
+            BitmapEncoder encoder = extension.ToLowerInvariant() switch
+            {
+                ".png" => new PngBitmapEncoder(),
+                ".bmp" => new BmpBitmapEncoder(),
+                ".tif" or ".tiff" => new TiffBitmapEncoder(),
+                _ => new JpegBitmapEncoder { QualityLevel = 95 }
+            };
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var fileStream = new FileStream(
+                       temporary,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            {
+                encoder.Save(fileStream);
+                fileStream.Flush(true);
+            }
+            if (File.Exists(destination))
+            {
+                File.Replace(temporary, destination, null);
+            }
+            else
+            {
+                File.Move(temporary, destination);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+    }
+
+    private static string ImageMimeType(string? path)
+    {
+        return Path.GetExtension(path ?? string.Empty).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".heic" or ".heif" => "image/heic",
+            ".tif" or ".tiff" => "image/tiff",
+            ".bmp" => "image/bmp",
+            _ => "image/jpeg"
+        };
+    }
+
     private void EditorPhotoBox_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
@@ -3825,6 +6544,44 @@ public partial class MainWindow : Window
         }
         _editorSelectedPath =
             (EditorPhotoBox.SelectedItem as EditorPhotoChoice)?.Item.Path;
+        ResetEditorControls();
+        UpdateEditorPreview();
+    }
+
+    private void EditorPhotoPickerButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement target)
+        {
+            EditorPhotoPickerPopup.PlacementTarget = target;
+        }
+        EditorPhotoPickerPopup.IsOpen = true;
+    }
+
+    private void EditorPhotoTree_SelectedItemChanged(
+        object sender,
+        RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (_updatingEditorControls ||
+            e.NewValue is not LibraryTreeNode { Item: { } item })
+        {
+            return;
+        }
+        _editorSelectedPath = item.Path;
+        var choice = EditorPhotoBox.Items
+            .OfType<EditorPhotoChoice>()
+            .FirstOrDefault(candidate =>
+                string.Equals(
+                    candidate.Item.Path,
+                    item.Path,
+                    StringComparison.OrdinalIgnoreCase));
+        _updatingEditorControls = true;
+        EditorPhotoBox.SelectedItem = choice;
+        _updatingEditorControls = false;
+        EditorPhotoPickerButton.Content = $"▧  {item.Name}";
+        AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
+        EditorPhotoPickerPopup.IsOpen = false;
         ResetEditorControls();
         UpdateEditorPreview();
     }
@@ -3861,7 +6618,418 @@ public partial class MainWindow : Window
             false,
             new EditorSliderSpec("dehaze", "去雾", -100, 100),
             new EditorSliderSpec("vignette", "暗角", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorColorWheelsGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorCurvesGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorPickerGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorMaskGroup());
         EditorAdjustmentHost.Children.Add(CreateEditorGeometryGroup());
+    }
+
+    private Expander CreateEditorColorWheelsGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        var intro = new TextBlock
+        {
+            Text = AppLocalization.T("Lift / Gamma / Gain · 三向色轮"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        content.Children.Add(intro);
+        var wheels = new UniformGrid { Columns = 3, Rows = 1 };
+        wheels.Children.Add(CreateColorWheel("lift", "阴影", "#43B7FF"));
+        wheels.Children.Add(CreateColorWheel("gamma", "中间调", "#C68CFF"));
+        wheels.Children.Add(CreateColorWheel("gain", "高光", "#FFD36A"));
+        content.Children.Add(wheels);
+        return new Expander
+        {
+            Header = AppLocalization.T("色轮"),
+            Content = content,
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+    }
+
+    private FrameworkElement CreateColorWheel(string key, string label, string color)
+    {
+        var amount = new TextBlock
+        {
+            Text = $"{EditorWheelXForKey(key):+0;-0;0}, {EditorWheelYForKey(key):+0;-0;0}",
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        var direct = new EditorWheelControl
+        {
+            Accent = (Brush)new BrushConverter().ConvertFromString(color)!,
+            XValue = EditorWheelXForKey(key),
+            YValue = EditorWheelYForKey(key),
+            Width = 76,
+            Height = 76,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+        direct.ValueChanged += (x, y) =>
+        {
+            amount.Text = $"{x:+0;-0;0}, {y:+0;-0;0}";
+            SetEditorWheelAdjustment(key, x, y);
+            if (!_initializing && !_updatingEditorControls) UpdateEditorPreview();
+        };
+        _editorWheelControls[key] = direct;
+        var panel = new StackPanel { Margin = new Thickness(3, 0, 3, 0) };
+        panel.Children.Add(direct);
+        panel.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 5, 0, 0) });
+        panel.Children.Add(amount);
+        return panel;
+    }
+
+    private Expander CreateEditorCurvesGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("主曲线 · 拖动曲线控制点"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+        var curve = new EditorCurveControl(_editorAdjustments)
+        {
+            Height = 150,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        curve.ValueChanged += (_, _) =>
+        {
+            if (!_initializing && !_updatingEditorControls) UpdateEditorPreview();
+        };
+        _editorCurveControl = curve;
+        content.Children.Add(curve);
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("点击任意位置新增控制点，拖动控制点调整曲线"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            Margin = new Thickness(0, 6, 0, 0)
+        });
+        return new Expander { Header = AppLocalization.T("曲线"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private FrameworkElement CreateEditorGradeSlider(string key, string label, double min, double max)
+    {
+        var valueText = new TextBlock { Text = "0", Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), HorizontalAlignment = HorizontalAlignment.Right };
+        var heading = new DockPanel();
+        heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
+        DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
+        var slider = new Slider { Tag = $"grade:{key}", Minimum = min, Maximum = max, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
+        _editorGradeSliders[key] = slider;
+        slider.ValueChanged += (_, _) => { valueText.Text = $"{slider.Value:+0;-0;0}"; SetEditorAdjustment(key, slider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
+        var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
+        row.Children.Add(heading); row.Children.Add(slider); return row;
+    }
+
+    private Expander CreateEditorPickerGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        _editorPickedColorText = new TextBlock { Text = AppLocalization.T("未取样"), Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), Margin = new Thickness(0, 0, 0, 8) };
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("在预览画面点击取样色彩，自动微调色温与色调"), Foreground = (Brush)FindResource("MutedBrush"), FontSize = 11, Margin = new Thickness(0, 0, 0, 6) });
+        var arm = new Button { Content = AppLocalization.T("取色器"), Style = (Style)FindResource("ButtonBase") };
+        arm.Click += (_, _) => { _editorPickerArmed = !_editorPickerArmed; _editorAdjustments.PickerEnabled = _editorPickerArmed; arm.Content = AppLocalization.T(_editorPickerArmed ? "点击预览取色 · 再次关闭" : "取色器"); EditorStatusText.Text = AppLocalization.T(_editorPickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭"); };
+        var center = new Button { Content = AppLocalization.T("取样画面中心"), Style = (Style)FindResource("ButtonBase"), Margin = new Thickness(0, 6, 0, 0) };
+        center.Click += (_, _) => SampleEditorPixelAtCenter();
+        content.Children.Add(arm); content.Children.Add(center); content.Children.Add(_editorPickedColorText);
+        return new Expander { Header = AppLocalization.T("取色器"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private Expander CreateEditorMaskGroup()
+    {
+        var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("蒙版列表"),
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 5)
+        });
+        _editorMaskListPanel = new StackPanel
+        {
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        content.Children.Add(_editorMaskListPanel);
+        RefreshEditorMaskList();
+        var lifecycle = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 8) };
+        var create = new Button
+        {
+            Content = AppLocalization.T("创建蒙版"),
+            Height = 44,
+            Style = (Style)FindResource("PrimaryButton")
+        };
+        create.Click += (_, _) =>
+        {
+            _editorAdjustments.CreateMaskLayer();
+            EditorStatusText.Text = AppLocalization.T("蒙版已创建 · 在预览画面涂抹");
+            RefreshEditorMaskList();
+            SyncEditorSliders();
+            UpdateEditorPreview();
+        };
+        var delete = new Button
+        {
+            Content = AppLocalization.T("删除蒙版"),
+            Height = 44,
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("ButtonBase")
+        };
+        delete.Click += (_, _) =>
+        {
+            _editorAdjustments.DeleteActiveMaskLayer();
+            _activeEditorMaskStroke = null;
+            EditorStatusText.Text = AppLocalization.T("蒙版已删除");
+            RefreshEditorMaskList();
+            SyncEditorSliders();
+            UpdateEditorPreview();
+        };
+        lifecycle.Children.Add(create);
+        lifecycle.Children.Add(delete);
+        content.Children.Add(lifecycle);
+
+        var brushes = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 8) };
+        var addBrush = new Button
+        {
+            Content = AppLocalization.T("添加蒙版（画笔）"),
+            Height = 44,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        addBrush.Click += (_, _) =>
+        {
+            _editorAdjustments.EnsureMaskLayer();
+            _editorAdjustments.MaskAmount = Math.Max(1, _editorAdjustments.MaskAmount);
+            _editorAdjustments.MaskSubtract = false;
+            EditorStatusText.Text = AppLocalization.T("添加蒙版画笔已启用");
+            RedrawEditorMaskOverlay();
+        };
+        var subtractBrush = new Button
+        {
+            Content = AppLocalization.T("减去蒙版（画笔）"),
+            Height = 44,
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("ButtonBase")
+        };
+        subtractBrush.Click += (_, _) =>
+        {
+            _editorAdjustments.EnsureMaskLayer();
+            _editorAdjustments.MaskAmount = Math.Max(1, _editorAdjustments.MaskAmount);
+            _editorAdjustments.MaskSubtract = true;
+            EditorStatusText.Text = AppLocalization.T("减去蒙版画笔已启用");
+            RedrawEditorMaskOverlay();
+        };
+        brushes.Children.Add(addBrush);
+        brushes.Children.Add(subtractBrush);
+        content.Children.Add(brushes);
+
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("智能识别"),
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 2, 0, 5)
+        });
+        var smartMasks = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+        foreach (var type in new[]
+                 {
+                     "智能主体", "智能天空", "智能背景",
+                     "智能人物", "智能亮部", "智能暗部"
+                 })
+        {
+            var smart = new Button
+            {
+                Content = AppLocalization.T(type),
+                MinHeight = 42,
+                Margin = new Thickness(0, 0, 7, 7),
+                Style = (Style)FindResource("ButtonBase")
+            };
+            smart.Click += (_, _) =>
+            {
+                _editorAdjustments.EnsureMaskLayer();
+                _editorAdjustments.MaskType = type;
+                _editorAdjustments.MaskAmount = 100;
+                _editorAdjustments.MaskInvert = false;
+                _editorAdjustments.MaskSubtract = false;
+                _editorAdjustments.MaskStrokes.Clear();
+                EditorStatusText.Text = AppLocalization.T(
+                    "智能蒙版已创建 · 可继续添加或减去画笔");
+                SyncEditorSliders();
+                UpdateEditorPreview();
+            };
+            smartMasks.Children.Add(smart);
+        }
+        content.Children.Add(smartMasks);
+
+        _editorMaskBox = new ComboBox { ItemsSource = new[] { "无", "画笔", "线性渐变", "径向渐变", "智能主体", "智能天空", "智能背景", "智能人物", "智能亮部", "智能暗部" }.Select(AppLocalization.T).ToList(), SelectedIndex = 0 };
+        _editorMaskBox.SelectionChanged += (_, _) => { if (!_updatingEditorControls) { if (_editorMaskBox.SelectedIndex > 0) _editorAdjustments.EnsureMaskLayer(); _editorAdjustments.MaskType = _editorMaskBox.SelectedIndex switch { 1 => "画笔", 2 => "线性渐变", 3 => "径向渐变", 4 => "智能主体", 5 => "智能天空", 6 => "智能背景", 7 => "智能人物", 8 => "智能亮部", 9 => "智能暗部", _ => "无" }; if (_editorAdjustments.MaskType != "无" && _editorAdjustments.MaskAmount == 0) _editorAdjustments.MaskAmount = 100; RefreshEditorMaskList(); UpdateEditorPreview(); } };
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("蒙版类型"), FontWeight = FontWeights.SemiBold });
+        content.Children.Add(_editorMaskBox);
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("强度"), FontWeight = FontWeights.SemiBold });
+        var amountRow = CreateEditorMaskSlider("maskAmount", "强度", out var amountSlider);
+        _editorMaskAmountSlider = amountSlider;
+        content.Children.Add(amountRow);
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("羽化"), FontWeight = FontWeights.SemiBold });
+        var featherRow = CreateEditorMaskSlider("maskFeather", "羽化", out var featherSlider);
+        _editorMaskFeatherSlider = featherSlider;
+        content.Children.Add(featherRow);
+        content.Children.Add(new TextBlock { Text = AppLocalization.T("画笔大小"), FontWeight = FontWeights.SemiBold });
+        var brushSizeRow = CreateEditorMaskSlider("maskBrushSize", "画笔大小", out var brushSizeSlider);
+        _editorMaskBrushSizeSlider = brushSizeSlider;
+        content.Children.Add(brushSizeRow);
+        var invert = new CheckBox { Content = AppLocalization.T("反向蒙版") };
+        _editorMaskInvertCheckBox = invert;
+        invert.Checked += (_, _) =>
+        {
+            if (_updatingEditorControls) return;
+            _editorAdjustments.MaskInvert = true;
+            UpdateEditorPreview();
+        };
+        invert.Unchecked += (_, _) =>
+        {
+            if (_updatingEditorControls) return;
+            _editorAdjustments.MaskInvert = false;
+            UpdateEditorPreview();
+        };
+        content.Children.Add(invert);
+        content.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("蒙版内调整"),
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 5)
+        });
+        foreach (var parameter in new (string Key, string Label)[]
+                 {
+                     ("maskExposure", "曝光"),
+                     ("maskContrast", "对比度"),
+                     ("maskHighlights", "高光"),
+                     ("maskShadows", "阴影"),
+                     ("maskTemperature", "色温"),
+                     ("maskTint", "色调"),
+                     ("maskSaturation", "饱和度"),
+                     ("maskClarity", "清晰度")
+                 })
+        {
+            content.Children.Add(CreateEditorMaskSlider(
+                parameter.Key,
+                parameter.Label,
+                out _));
+        }
+        content.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("在预览画面拖动画笔；蓝色为添加，白色为减去。"),
+            Foreground = (Brush)FindResource("MutedBrush"),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap
+        });
+        return new Expander { Header = AppLocalization.T("蒙版"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+    }
+
+    private void RefreshEditorMaskList()
+    {
+        if (_editorMaskListPanel is null) return;
+        _editorMaskListPanel.Children.Clear();
+        if (_editorAdjustments.MaskLayers.Count == 0)
+        {
+            _editorMaskListPanel.Children.Add(new TextBlock
+            {
+                Text = AppLocalization.T("暂无蒙版"),
+                Foreground = (Brush)FindResource("MutedBrush"),
+                MinHeight = 44,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            return;
+        }
+        foreach (var layer in _editorAdjustments.MaskLayers)
+        {
+            var displayed = _editorAdjustments.DisplayedMaskLayer(layer);
+            var row = new Border
+            {
+                Background = layer.Id == _editorAdjustments.ActiveMaskLayerId
+                    ? (Brush)FindResource("AccentSoftBrush")
+                    : (Brush)FindResource("SurfaceBrush"),
+                BorderBrush = layer.Id == _editorAdjustments.ActiveMaskLayerId
+                    ? (Brush)FindResource("AccentBrush")
+                    : (Brush)FindResource("RuleBrush"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var layout = new DockPanel { LastChildFill = true };
+            var visibility = new CheckBox
+            {
+                Content = AppLocalization.T("显示"),
+                IsChecked = layer.IsVisible,
+                MinWidth = 68,
+                MinHeight = 44,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 4, 0),
+                ToolTip = AppLocalization.T(
+                    layer.IsVisible ? "隐藏蒙版" : "显示蒙版")
+            };
+            visibility.Checked += (_, _) =>
+            {
+                _editorAdjustments.SetMaskLayerVisible(layer.Id, true);
+                RefreshEditorMaskList();
+                RedrawEditorMaskOverlay();
+                UpdateEditorPreview();
+            };
+            visibility.Unchecked += (_, _) =>
+            {
+                _editorAdjustments.SetMaskLayerVisible(layer.Id, false);
+                RefreshEditorMaskList();
+                RedrawEditorMaskOverlay();
+                UpdateEditorPreview();
+            };
+            DockPanel.SetDock(visibility, Dock.Right);
+            layout.Children.Add(visibility);
+            var select = new Button
+            {
+                Content = $"{(layer.Id == _editorAdjustments.ActiveMaskLayerId ? "●" : "○")}  {AppLocalization.T(layer.Name)} · {AppLocalization.T(displayed.Type)}",
+                MinHeight = 44,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Style = (Style)FindResource("ButtonBase")
+            };
+            select.Click += (_, _) =>
+            {
+                _editorAdjustments.SelectMaskLayer(layer.Id);
+                _activeEditorMaskStroke = null;
+                EditorStatusText.Text = AppLocalization.T("已切换蒙版");
+                SyncEditorSliders();
+                RefreshEditorMaskList();
+                RedrawEditorMaskOverlay();
+                UpdateEditorPreview();
+            };
+            layout.Children.Add(select);
+            row.Child = layout;
+            _editorMaskListPanel.Children.Add(row);
+        }
+    }
+
+    private FrameworkElement CreateEditorMaskSlider(string key, string label, out Slider slider)
+    {
+        var valueText = new TextBlock { Text = "0", Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), HorizontalAlignment = HorizontalAlignment.Right };
+        var heading = new DockPanel();
+        heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
+        DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
+        var isExposure = key == "maskExposure";
+        var isLocal = key is "maskContrast" or "maskHighlights" or "maskShadows"
+            or "maskTemperature" or "maskTint" or "maskSaturation" or "maskClarity";
+        var createdSlider = new Slider
+        {
+            Tag = $"grade:{key}",
+            Minimum = key == "maskBrushSize" ? 4 : isExposure ? -2 : isLocal ? -100 : 0,
+            Maximum = key == "maskBrushSize" ? 64 : isExposure ? 2 : 100,
+            TickFrequency = isExposure ? .05 : 1,
+            SmallChange = isExposure ? .05 : 1,
+            IsSnapToTickEnabled = true,
+            Value = EditorAdjustmentForKey(key)
+        };
+        slider = createdSlider;
+        _editorGradeSliders[key] = createdSlider;
+        createdSlider.ValueChanged += (_, _) => { valueText.Text = isExposure ? $"{createdSlider.Value:+0.00;-0.00;0.00} EV" : $"{createdSlider.Value:+0;-0;0}"; SetEditorAdjustment(key, createdSlider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
+        var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
+        row.Children.Add(heading); row.Children.Add(createdSlider);
+        return row;
     }
 
     private Expander CreateEditorGroup(
@@ -4079,6 +7247,49 @@ public partial class MainWindow : Window
             case "vignette":
                 _editorAdjustments.Vignette = value;
                 break;
+            case "lift": _editorAdjustments.Lift = value; break;
+            case "gamma": _editorAdjustments.Gamma = value; break;
+            case "gain": _editorAdjustments.Gain = value; break;
+            case "curveShadows": _editorAdjustments.CurveShadows = value; break;
+            case "curveMidtones": _editorAdjustments.CurveMidtones = value; break;
+            case "curveHighlights": _editorAdjustments.CurveHighlights = value; break;
+            case "maskAmount": _editorAdjustments.MaskAmount = value; break;
+            case "maskFeather": _editorAdjustments.MaskFeather = value; break;
+            case "maskBrushSize": _editorAdjustments.MaskBrushSize = value; break;
+            case "maskExposure": _editorAdjustments.MaskExposure = value; break;
+            case "maskContrast": _editorAdjustments.MaskContrast = value; break;
+            case "maskHighlights": _editorAdjustments.MaskHighlights = value; break;
+            case "maskShadows": _editorAdjustments.MaskShadows = value; break;
+            case "maskTemperature": _editorAdjustments.MaskTemperature = value; break;
+            case "maskTint": _editorAdjustments.MaskTint = value; break;
+            case "maskSaturation": _editorAdjustments.MaskSaturation = value; break;
+            case "maskClarity": _editorAdjustments.MaskClarity = value; break;
+        }
+    }
+
+    private double EditorWheelXForKey(string key) => key switch
+    {
+        "lift" => _editorAdjustments.LiftX,
+        "gamma" => _editorAdjustments.GammaX,
+        "gain" => _editorAdjustments.GainX,
+        _ => 0
+    };
+
+    private double EditorWheelYForKey(string key) => key switch
+    {
+        "lift" => _editorAdjustments.LiftY,
+        "gamma" => _editorAdjustments.GammaY,
+        "gain" => _editorAdjustments.GainY,
+        _ => 0
+    };
+
+    private void SetEditorWheelAdjustment(string key, double x, double y)
+    {
+        switch (key)
+        {
+            case "lift": _editorAdjustments.LiftX = x; _editorAdjustments.LiftY = y; break;
+            case "gamma": _editorAdjustments.GammaX = x; _editorAdjustments.GammaY = y; break;
+            case "gain": _editorAdjustments.GainX = x; _editorAdjustments.GainY = y; break;
         }
     }
 
@@ -4100,8 +7311,85 @@ public partial class MainWindow : Window
         UpdateEditorPreview();
     }
 
+    private void NikonCloudPresetBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            _updatingEditorControls ||
+            NikonCloudPresetBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+        if (item.Tag is not NikonCloudPreset preset)
+        {
+            _selectedNikonCloudPreset = null;
+            ApplyEditorPreset("original");
+            SyncEditorSliders();
+            UpdateEditorPreview();
+            EditorStatusText.Text = AppLocalization.T(
+                "尼康云创预览已关闭");
+            return;
+        }
+        ApplyNikonCloudPreset(preset);
+        SyncEditorSliders();
+        UpdateEditorPreview();
+    }
+
+    private void ClearNikonCloudPresetSelection()
+    {
+        _selectedNikonCloudPreset = null;
+        if (NikonCloudPresetBox.SelectedIndex == 0) return;
+        var wasUpdating = _updatingEditorControls;
+        _updatingEditorControls = true;
+        NikonCloudPresetBox.SelectedIndex = 0;
+        _updatingEditorControls = wasUpdating;
+    }
+
+    private void ApplyNikonCloudPreset(NikonCloudPreset preset)
+    {
+        _updatingEditorControls = true;
+        EditorPresetBox.SelectedIndex = 0;
+        _updatingEditorControls = false;
+        _editorAdjustments.ResetTone();
+        var tone = preset.Tone;
+        _editorAdjustments.Contrast = tone.Contrast;
+        _editorAdjustments.Highlights = tone.Highlights;
+        _editorAdjustments.Shadows = tone.Shadows;
+        _editorAdjustments.Whites = tone.Whites;
+        _editorAdjustments.Blacks = tone.Blacks;
+        _editorAdjustments.Saturation = tone.Saturation;
+        _editorAdjustments.Texture = tone.Texture;
+        _editorAdjustments.Clarity = tone.Clarity;
+        _editorAdjustments.Sharpening = tone.Sharpening;
+        _editorAdjustments.LiftX = preset.Grading.Lift.X;
+        _editorAdjustments.LiftY = preset.Grading.Lift.Y;
+        _editorAdjustments.GammaX = preset.Grading.Gamma.X;
+        _editorAdjustments.GammaY = preset.Grading.Gamma.Y;
+        _editorAdjustments.GainX = preset.Grading.Gain.X;
+        _editorAdjustments.GainY = preset.Grading.Gain.Y;
+        if (preset.ToneCurve.Count > 1)
+        {
+            var denominator = preset.ToneCurve.Count - 1.0;
+            _editorAdjustments.CurvePoints = preset.ToneCurve
+                .Select((value, index) => new EditorCurvePoint(
+                    index / denominator,
+                    Math.Clamp(value, 0, 1)))
+                .ToList();
+        }
+        _selectedNikonCloudPreset = preset;
+        _editorSettingsBeforeAI = null;
+        _editorAIAnalysis = null;
+        UndoEditorAIButton.IsEnabled = false;
+        EditorAISummaryText.Text = AppLocalization.T("等待分析当前照片");
+        _editorAdjustments.ShowingOriginal = false;
+        EditorStatusText.Text = AppLocalization.T(
+            $"尼康云创预览 · {preset.Name} · SDR 近似");
+    }
+
     private void ApplyEditorPreset(string preset)
     {
+        ClearNikonCloudPresetSelection();
         _editorAdjustments.ResetTone();
         switch (preset)
         {
@@ -4169,6 +7457,24 @@ public partial class MainWindow : Window
         {
             entry.Value.Value = EditorAdjustmentForKey(entry.Key);
         }
+        foreach (var entry in _editorGradeSliders)
+        {
+            entry.Value.Value = EditorAdjustmentForKey(entry.Key);
+        }
+        foreach (var entry in _editorWheelControls)
+        {
+            entry.Value.XValue = EditorWheelXForKey(entry.Key);
+            entry.Value.YValue = EditorWheelYForKey(entry.Key);
+            entry.Value.InvalidateVisual();
+        }
+        _editorCurveControl?.InvalidateVisual();
+        if (_editorMaskBox is not null)
+            _editorMaskBox.SelectedIndex = _editorAdjustments.MaskType switch { "画笔" => 1, "线性渐变" => 2, "径向渐变" => 3, "智能主体" => 4, "智能天空" => 5, "智能背景" => 6, "智能人物" => 7, "智能亮部" => 8, "智能暗部" => 9, _ => 0 };
+        if (_editorMaskAmountSlider is not null) _editorMaskAmountSlider.Value = _editorAdjustments.MaskAmount;
+        if (_editorMaskFeatherSlider is not null) _editorMaskFeatherSlider.Value = _editorAdjustments.MaskFeather;
+        if (_editorMaskBrushSizeSlider is not null) _editorMaskBrushSizeSlider.Value = _editorAdjustments.MaskBrushSize;
+        if (_editorMaskInvertCheckBox is not null) _editorMaskInvertCheckBox.IsChecked = _editorAdjustments.MaskInvert;
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = AppLocalization.T(_editorAdjustments.PickedColorHex);
         _updatingEditorControls = false;
     }
 
@@ -4190,6 +7496,23 @@ public partial class MainWindow : Window
         "noiseReduction" => _editorAdjustments.NoiseReduction,
         "dehaze" => _editorAdjustments.Dehaze,
         "vignette" => _editorAdjustments.Vignette,
+        "lift" => _editorAdjustments.Lift,
+        "gamma" => _editorAdjustments.Gamma,
+        "gain" => _editorAdjustments.Gain,
+        "curveShadows" => _editorAdjustments.CurveShadows,
+        "curveMidtones" => _editorAdjustments.CurveMidtones,
+        "curveHighlights" => _editorAdjustments.CurveHighlights,
+        "maskAmount" => _editorAdjustments.MaskAmount,
+        "maskFeather" => _editorAdjustments.MaskFeather,
+        "maskBrushSize" => _editorAdjustments.MaskBrushSize,
+        "maskExposure" => _editorAdjustments.MaskExposure,
+        "maskContrast" => _editorAdjustments.MaskContrast,
+        "maskHighlights" => _editorAdjustments.MaskHighlights,
+        "maskShadows" => _editorAdjustments.MaskShadows,
+        "maskTemperature" => _editorAdjustments.MaskTemperature,
+        "maskTint" => _editorAdjustments.MaskTint,
+        "maskSaturation" => _editorAdjustments.MaskSaturation,
+        "maskClarity" => _editorAdjustments.MaskClarity,
         _ => 0
     };
 
@@ -4218,15 +7541,35 @@ public partial class MainWindow : Window
     {
         _updatingEditorControls = true;
         _editorAdjustments.Reset();
+        _selectedNikonCloudPreset = null;
+        _editorCloudPresetBeforeAI = null;
         foreach (var slider in _editorSliders.Values)
         {
             slider.Value = 0;
         }
+        foreach (var slider in _editorGradeSliders.Values)
+        {
+            slider.Value = slider.Tag?.ToString() == "grade:maskFeather" ? 50 : 0;
+        }
+        foreach (var wheel in _editorWheelControls)
+        {
+            wheel.Value.XValue = 0;
+            wheel.Value.YValue = 0;
+            wheel.Value.InvalidateVisual();
+        }
+        _editorCurveControl?.InvalidateVisual();
         if (_editorCropBox is not null)
         {
             _editorCropBox.SelectedIndex = 0;
         }
+        if (_editorMaskBox is not null) _editorMaskBox.SelectedIndex = 0;
+        if (_editorMaskAmountSlider is not null) _editorMaskAmountSlider.Value = 0;
+        if (_editorMaskFeatherSlider is not null) _editorMaskFeatherSlider.Value = 50;
+        if (_editorMaskBrushSizeSlider is not null) _editorMaskBrushSizeSlider.Value = 18;
+        _editorPickerArmed = false;
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = AppLocalization.T("未取样");
         EditorPresetBox.SelectedIndex = 0;
+        NikonCloudPresetBox.SelectedIndex = 0;
         CompareEditorPhotoButton.Content =
             AppLocalization.T("查看原图");
         _editorSettingsBeforeAI = null;
@@ -4259,6 +7602,7 @@ public partial class MainWindow : Window
         {
             var analysis = _editorAIAnalysis ?? AnalyzeEditorPhoto(_editorSelectedPath);
             _editorSettingsBeforeAI = _editorAdjustments.Copy();
+            _editorCloudPresetBeforeAI = _selectedNikonCloudPreset;
             _editorAIAnalysis = analysis;
             ApplyEditorAI(
                 analysis,
@@ -4314,6 +7658,7 @@ public partial class MainWindow : Window
             return;
         }
         RestoreEditorAdjustments(_editorAICopiedSettings);
+        ClearNikonCloudPresetSelection();
         _editorAdjustments.ShowingOriginal = false;
         UpdateEditorPreview();
         EditorStatusText.Text = AppLocalization.T("已粘贴 AI 调整");
@@ -4341,6 +7686,14 @@ public partial class MainWindow : Window
             return;
         }
         RestoreEditorAdjustments(_editorSettingsBeforeAI);
+        _selectedNikonCloudPreset = _editorCloudPresetBeforeAI;
+        _updatingEditorControls = true;
+        NikonCloudPresetBox.SelectedIndex = _selectedNikonCloudPreset is null
+            ? 0
+            : _nikonCloudCatalog.Presets.FindIndex(
+                item => item.Id == _selectedNikonCloudPreset.Id) + 1;
+        _updatingEditorControls = false;
+        _editorCloudPresetBeforeAI = null;
         _editorSettingsBeforeAI = null;
         SyncEditorSliders();
         UndoEditorAIButton.IsEnabled = false;
@@ -4368,6 +7721,19 @@ public partial class MainWindow : Window
         _editorAdjustments.NoiseReduction = source.NoiseReduction;
         _editorAdjustments.Dehaze = source.Dehaze;
         _editorAdjustments.Vignette = source.Vignette;
+        _editorAdjustments.Lift = source.Lift;
+        _editorAdjustments.Gamma = source.Gamma;
+        _editorAdjustments.Gain = source.Gain;
+        _editorAdjustments.LiftX = source.LiftX;
+        _editorAdjustments.LiftY = source.LiftY;
+        _editorAdjustments.GammaX = source.GammaX;
+        _editorAdjustments.GammaY = source.GammaY;
+        _editorAdjustments.GainX = source.GainX;
+        _editorAdjustments.GainY = source.GainY;
+        _editorAdjustments.CurveShadows = source.CurveShadows;
+        _editorAdjustments.CurveMidtones = source.CurveMidtones;
+        _editorAdjustments.CurveHighlights = source.CurveHighlights;
+        _editorAdjustments.CurvePoints = source.CurvePoints.Select(point => point.Copy()).ToList();
         _editorAdjustments.Rotation = source.Rotation;
         _editorAdjustments.FlipHorizontal = source.FlipHorizontal;
         _editorAdjustments.FlipVertical = source.FlipVertical;
@@ -4379,6 +7745,7 @@ public partial class MainWindow : Window
         EditorAIAnalysis analysis,
         double intensity)
     {
+        ClearNikonCloudPresetSelection();
         _editorAdjustments.ResetTone();
         var amount = Math.Clamp(intensity, 0.35, 1);
         var targetExposure = Math.Clamp(
@@ -4540,9 +7907,11 @@ public partial class MainWindow : Window
             EditorPreviewImage.Source = RenderEditedBitmap(
                 _editorSelectedPath,
                 _editorAdjustments,
+                _selectedNikonCloudPreset,
                 1600);
             EditorPreviewEmpty.Visibility = Visibility.Collapsed;
             SaveEditedPhotoButton.IsEnabled = true;
+            RedrawEditorMaskOverlay();
         }
         catch (Exception error)
         {
@@ -4552,6 +7921,152 @@ public partial class MainWindow : Window
             EditorStatusText.Text =
                 AppLocalization.T($"无法预览：{error.Message}");
         }
+    }
+
+    private void EditorPreviewImage_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_editorPickerArmed || string.IsNullOrWhiteSpace(_editorSelectedPath)) return;
+        var point = e.GetPosition(EditorPreviewImage);
+        var bitmap = EditorPreviewImage.Source as BitmapSource;
+        if (bitmap is null || EditorPreviewImage.ActualWidth <= 0 || EditorPreviewImage.ActualHeight <= 0) return;
+        var x = (int)Math.Clamp(point.X / EditorPreviewImage.ActualWidth * bitmap.PixelWidth, 0, bitmap.PixelWidth - 1);
+        var y = (int)Math.Clamp(point.Y / EditorPreviewImage.ActualHeight * bitmap.PixelHeight, 0, bitmap.PixelHeight - 1);
+        ApplyEditorPickerSample(bitmap, x, y);
+        e.Handled = true;
+    }
+
+    private void EditorMaskCanvas_MouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (EditorPreviewImage.Source is not BitmapSource bitmap) return;
+        var point = e.GetPosition(EditorMaskCanvas);
+        var rect = GetUniformImageRect(EditorMaskCanvas, bitmap);
+        if (!rect.Contains(point)) return;
+        if (_editorPickerArmed)
+        {
+            var sampleX = (int)Math.Clamp(
+                (point.X - rect.Left) / rect.Width * bitmap.PixelWidth,
+                0,
+                bitmap.PixelWidth - 1);
+            var sampleY = (int)Math.Clamp(
+                (point.Y - rect.Top) / rect.Height * bitmap.PixelHeight,
+                0,
+                bitmap.PixelHeight - 1);
+            ApplyEditorPickerSample(bitmap, sampleX, sampleY);
+            e.Handled = true;
+            return;
+        }
+        if (_editorAdjustments.MaskType == "无" ||
+            !_editorAdjustments.ActiveMaskLayerIsVisible()) return;
+        _activeEditorMaskStroke = new EditorMaskStroke
+        {
+            Subtract = _editorAdjustments.MaskSubtract,
+            Size = _editorAdjustments.MaskBrushSize
+        };
+        _activeEditorMaskStroke.Points.Add(EditorMaskPointFromPreview(point, rect));
+        _editorAdjustments.MaskStrokes.Add(_activeEditorMaskStroke);
+        EditorMaskCanvas.CaptureMouse();
+        RedrawEditorMaskOverlay();
+        e.Handled = true;
+    }
+
+    private void EditorMaskCanvas_MouseMove(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (_activeEditorMaskStroke is null ||
+            e.LeftButton != MouseButtonState.Pressed ||
+            EditorPreviewImage.Source is not BitmapSource bitmap)
+        {
+            return;
+        }
+        var rect = GetUniformImageRect(EditorMaskCanvas, bitmap);
+        var point = e.GetPosition(EditorMaskCanvas);
+        point.X = Math.Clamp(point.X, rect.Left, rect.Right);
+        point.Y = Math.Clamp(point.Y, rect.Top, rect.Bottom);
+        _activeEditorMaskStroke.Points.Add(EditorMaskPointFromPreview(point, rect));
+        RedrawEditorMaskOverlay();
+        e.Handled = true;
+    }
+
+    private void EditorMaskCanvas_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_activeEditorMaskStroke is null) return;
+        _activeEditorMaskStroke = null;
+        EditorMaskCanvas.ReleaseMouseCapture();
+        EditorStatusText.Text = AppLocalization.T(
+            _editorAdjustments.MaskSubtract
+                ? "已减去蒙版区域"
+                : "已添加蒙版区域");
+        UpdateEditorPreview();
+        e.Handled = true;
+    }
+
+    private static EditorMaskPoint EditorMaskPointFromPreview(
+        Point point,
+        Rect rect) => new(
+            Math.Clamp((point.X - rect.Left) / Math.Max(1, rect.Width), 0, 1),
+            Math.Clamp((point.Y - rect.Top) / Math.Max(1, rect.Height), 0, 1));
+
+    private void RedrawEditorMaskOverlay()
+    {
+        EditorMaskCanvas.Children.Clear();
+        if (_editorAdjustments.MaskType == "无" ||
+            !_editorAdjustments.ActiveMaskLayerIsVisible() ||
+            EditorPreviewImage.Source is not BitmapSource bitmap)
+        {
+            return;
+        }
+        var rect = GetUniformImageRect(EditorMaskCanvas, bitmap);
+        foreach (var stroke in _editorAdjustments.MaskStrokes)
+        {
+            if (stroke.Points.Count == 0) continue;
+            var points = new PointCollection(
+                stroke.Points.Select(point => new Point(
+                    rect.Left + point.X * rect.Width,
+                    rect.Top + point.Y * rect.Height)));
+            var line = new System.Windows.Shapes.Polyline
+            {
+                Points = points,
+                Stroke = stroke.Subtract
+                    ? Brushes.White
+                    : (Brush)FindResource("AccentBrush"),
+                StrokeThickness = Math.Max(
+                    3,
+                    stroke.Size / 100 * Math.Min(rect.Width, rect.Height)),
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
+                StrokeLineJoin = PenLineJoin.Round,
+                Opacity = stroke.Subtract ? .82 : .58,
+                IsHitTestVisible = false
+            };
+            EditorMaskCanvas.Children.Add(line);
+        }
+    }
+
+    private void SampleEditorPixelAtCenter()
+    {
+        if (EditorPreviewImage.Source is not BitmapSource bitmap) return;
+        ApplyEditorPickerSample(bitmap, bitmap.PixelWidth / 2, bitmap.PixelHeight / 2);
+    }
+
+    private void ApplyEditorPickerSample(BitmapSource bitmap, int x, int y)
+    {
+        var sampled = new byte[4];
+        bitmap.CopyPixels(new Int32Rect(Math.Clamp(x, 0, bitmap.PixelWidth - 1), Math.Clamp(y, 0, bitmap.PixelHeight - 1), 1, 1), sampled, 4, 0);
+        var hex = $"#{sampled[2]:X2}{sampled[1]:X2}{sampled[0]:X2}";
+        _editorAdjustments.PickedColorHex = hex;
+        _editorAdjustments.PickerEnabled = false;
+        _editorPickerArmed = false;
+        _editorAdjustments.Temperature = Math.Clamp((sampled[0] - sampled[2]) / 2.55, -100, 100);
+        _editorAdjustments.Tint = Math.Clamp((sampled[1] - (sampled[0] + sampled[2]) / 2) / 2.55, -100, 100);
+        if (_editorPickedColorText is not null) _editorPickedColorText.Text = hex;
+        EditorStatusText.Text = AppLocalization.T($"已取样 {hex} · 已微调色温/色调");
+        SyncEditorSliders();
+        UpdateEditorPreview();
     }
 
     private void SaveEditedPhoto_Click(
@@ -4571,7 +8086,8 @@ public partial class MainWindow : Window
             savedAdjustments.ShowingOriginal = false;
             var bitmap = RenderEditedBitmap(
                 _editorSelectedPath,
-                savedAdjustments);
+                savedAdjustments,
+                _selectedNikonCloudPreset);
             var destination = UniqueEditedPath(_editorSelectedPath);
             var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
             encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -4609,6 +8125,7 @@ public partial class MainWindow : Window
     private static BitmapSource RenderEditedBitmap(
         string path,
         EditorAdjustments settings,
+        NikonCloudPreset? nikonCloudPreset,
         int decodePixelWidth = 0)
     {
         using var stream = new MemoryStream(File.ReadAllBytes(path));
@@ -4695,6 +8212,7 @@ public partial class MainWindow : Window
             red = luminance + (red - luminance) * saturation;
             green = luminance + (green - luminance) * saturation;
             blue = luminance + (blue - luminance) * saturation;
+            nikonCloudPreset?.ApplyColorMixer(ref red, ref green, ref blue);
 
             var pixelIndex = index / 4;
             var x = pixelIndex % converted.PixelWidth;
@@ -4712,6 +8230,27 @@ public partial class MainWindow : Window
                     normalizedY * normalizedY));
             var vignette =
                 1 + settings.Vignette / 100 * edge * edge * 0.72;
+            // Apply independent X/Y wheel axes and the editable curve.
+            var shadowWeight = Math.Pow(1 - ClampUnit(luminance), 2);
+            var midWeight = 1 - Math.Abs(ClampUnit(luminance) * 2 - 1);
+            var highlightWeight = Math.Pow(ClampUnit(luminance), 2);
+            var wheelX = settings.LiftX / 100 * shadowWeight * 0.12
+                + settings.GammaX / 100 * midWeight * 0.12
+                + settings.GainX / 100 * highlightWeight * 0.12;
+            var wheelY = settings.LiftY / 100 * shadowWeight * 0.12
+                + settings.GammaY / 100 * midWeight * 0.12
+                + settings.GainY / 100 * highlightWeight * 0.12;
+            red += wheelX - wheelY * .5;
+            green += wheelY - wheelX * .5;
+            blue -= (wheelX + wheelY) * .5;
+            if (settings.CurvePoints.Count > 2)
+            {
+                var mapped = CurveValue(settings.CurvePoints, luminance);
+                var delta = mapped - luminance;
+                red += delta;
+                green += delta;
+                blue += delta;
+            }
             pixels[index] = ClampChannel(blue * vignette * 255);
             pixels[index + 1] = ClampChannel(green * vignette * 255);
             pixels[index + 2] = ClampChannel(red * vignette * 255);
@@ -4767,8 +8306,282 @@ public partial class MainWindow : Window
                     Math.Max(1, cropWidth),
                     Math.Max(1, cropHeight)));
         }
+        foreach (var layer in settings.EffectiveMaskLayers())
+        {
+            if (layer.IsVisible && layer.Type != "无")
+                result = ApplyEditorMaskAdjustments(result, layer);
+        }
         result.Freeze();
         return result;
+    }
+
+    private static BitmapSource ApplyEditorMaskAdjustments(
+        BitmapSource source,
+        EditorMaskLayer layer)
+    {
+        var converted = new FormatConvertedBitmap(
+            source,
+            PixelFormats.Bgra32,
+            null,
+            0);
+        var width = converted.PixelWidth;
+        var height = converted.PixelHeight;
+        var stride = width * 4;
+        var original = new byte[stride * height];
+        converted.CopyPixels(original, stride, 0);
+        var local = (byte[])original.Clone();
+        var exposure = Math.Pow(2, layer.Exposure);
+        var contrast = 1 + layer.Contrast / 100;
+        var saturation = Math.Max(0, 1 + layer.Saturation / 100);
+        var temperature = layer.Temperature / 100;
+        var tint = layer.Tint / 100;
+        for (var offset = 0; offset < local.Length; offset += 4)
+        {
+            var blue = original[offset] / 255.0 * exposure;
+            var green = original[offset + 1] / 255.0 * exposure;
+            var red = original[offset + 2] / 255.0 * exposure;
+            red += temperature * .12 + tint * .045;
+            green -= tint * .08;
+            blue -= temperature * .12 - tint * .045;
+            var luma = red * .2126 + green * .7152 + blue * .0722;
+            var tone = layer.Shadows / 100
+                * Math.Pow(1 - ClampUnit(luma), 2) * .38
+                + layer.Highlights / 100
+                * Math.Pow(ClampUnit(luma), 2) * .30;
+            red += tone;
+            green += tone;
+            blue += tone;
+            var clarityWeight = 1 - Math.Abs(ClampUnit(luma) * 2 - 1);
+            var localContrast = contrast
+                * (1 + layer.Clarity / 100 * clarityWeight * .38);
+            red = (red - .5) * localContrast + .5;
+            green = (green - .5) * localContrast + .5;
+            blue = (blue - .5) * localContrast + .5;
+            luma = red * .2126 + green * .7152 + blue * .0722;
+            red = luma + (red - luma) * saturation;
+            green = luma + (green - luma) * saturation;
+            blue = luma + (blue - luma) * saturation;
+            local[offset] = ClampChannel(blue * 255);
+            local[offset + 1] = ClampChannel(green * 255);
+            local[offset + 2] = ClampChannel(red * 255);
+        }
+        var mask = BuildEditorMask(width, height, layer, original);
+        var intensity = Math.Clamp(layer.Amount / 100, 0, 1);
+        for (var offset = 0; offset < local.Length; offset += 4)
+        {
+            var coverage = mask[offset / 4] / 255.0;
+            var amount = (layer.Invert ? 1 - coverage : coverage)
+                * intensity;
+            for (var channel = 0; channel < 3; channel++)
+            {
+                local[offset + channel] = ClampChannel(
+                    original[offset + channel]
+                    + (local[offset + channel] - original[offset + channel])
+                    * amount);
+            }
+        }
+        return BitmapSource.Create(
+            width,
+            height,
+            converted.DpiX,
+            converted.DpiY,
+            PixelFormats.Bgra32,
+            null,
+            local,
+            stride);
+    }
+
+    private static byte[] BuildEditorMask(
+        int width,
+        int height,
+        EditorMaskLayer layer,
+        byte[] sourcePixels)
+    {
+        var mask = new byte[Math.Max(1, width * height)];
+        if (layer.Type != "画笔")
+        {
+            for (var index = 0; index < mask.Length; index++)
+            {
+                var offset = index * 4;
+                var coverage = SmartEditorMaskCoverage(
+                    layer.Type,
+                    sourcePixels[offset + 2] / 255.0,
+                    sourcePixels[offset + 1] / 255.0,
+                    sourcePixels[offset] / 255.0,
+                    index % width,
+                    index / width,
+                    width,
+                    height);
+                mask[index] = (byte)Math.Clamp(
+                    (int)Math.Round(coverage * 255),
+                    0,
+                    255);
+            }
+        }
+        foreach (var stroke in layer.Strokes)
+        {
+            if (stroke.Points.Count == 0) continue;
+            var previous = stroke.Points[0];
+            StampEditorMask(mask, width, height, previous, stroke, layer.Feather);
+            foreach (var current in stroke.Points.Skip(1))
+            {
+                var deltaX = (current.X - previous.X) * width;
+                var deltaY = (current.Y - previous.Y) * height;
+                var radius = Math.Max(
+                    1,
+                    stroke.Size / 200 * Math.Min(width, height));
+                var steps = Math.Max(
+                    1,
+                    (int)Math.Ceiling(
+                        Math.Sqrt(deltaX * deltaX + deltaY * deltaY)
+                        / Math.Max(1, radius * .45)));
+                for (var step = 1; step <= steps; step++)
+                {
+                    var progress = step / (double)steps;
+                    StampEditorMask(
+                        mask,
+                        width,
+                        height,
+                        new EditorMaskPoint(
+                            previous.X + (current.X - previous.X) * progress,
+                            previous.Y + (current.Y - previous.Y) * progress),
+                        stroke,
+                        layer.Feather);
+                }
+                previous = current;
+            }
+        }
+        var blurRadius = Math.Min(
+            24,
+            Math.Max(
+                0,
+                (int)Math.Round(
+                    layer.Feather / 100
+                    * Math.Min(width, height) * .015)));
+        if (blurRadius > 0) BlurEditorMask(mask, width, height, blurRadius);
+        return mask;
+    }
+
+    private static double SmartEditorMaskCoverage(
+        string type,
+        double red,
+        double green,
+        double blue,
+        int x,
+        int y,
+        int width,
+        int height)
+    {
+        var luma = red * .2126 + green * .7152 + blue * .0722;
+        var chroma = Math.Max(red, Math.Max(green, blue))
+            - Math.Min(red, Math.Min(green, blue));
+        var unitX = x / (double)Math.Max(1, width - 1);
+        var unitY = y / (double)Math.Max(1, height - 1);
+        var center = 1 - Math.Min(1, Math.Sqrt(
+            Math.Pow((unitX - .5) / .72, 2)
+            + Math.Pow((unitY - .52) / .82, 2)));
+        var subject = ClampUnit(center * .72 + chroma * .72
+            + Math.Abs(luma - .5) * .18);
+        if (type == "智能背景") return 1 - subject;
+        if (type == "智能天空")
+        {
+            var top = ClampUnit((.76 - unitY) / .62);
+            var skyColor = ClampUnit((blue - red * .88) * 2.5
+                + (blue - green * .78) * 1.6 + .18);
+            return top * skyColor * SmoothStep(.18, .82, luma);
+        }
+        if (type == "智能人物")
+        {
+            var skin = SmoothStep(.02, .20, red - blue)
+                * SmoothStep(-.05, .16, red - green)
+                * SmoothStep(.16, .78, luma);
+            return ClampUnit(skin * .78 + subject * center * .42);
+        }
+        if (type == "智能亮部") return SmoothStep(.55, .88, luma);
+        if (type == "智能暗部") return 1 - SmoothStep(.12, .48, luma);
+        if (type == "线性渐变") return unitY;
+        if (type == "径向渐变") return center;
+        return subject;
+    }
+
+    private static void BlurEditorMask(
+        byte[] mask,
+        int width,
+        int height,
+        int radius)
+    {
+        var horizontal = new byte[mask.Length];
+        var divisor = radius * 2 + 1;
+        for (var y = 0; y < height; y++)
+        {
+            var sum = 0;
+            for (var x = -radius; x <= radius; x++)
+                sum += mask[y * width + Math.Clamp(x, 0, width - 1)];
+            for (var x = 0; x < width; x++)
+            {
+                horizontal[y * width + x] = (byte)(sum / divisor);
+                var removeX = Math.Max(0, x - radius);
+                var addX = Math.Min(width - 1, x + radius + 1);
+                sum += mask[y * width + addX] - mask[y * width + removeX];
+            }
+        }
+        for (var x = 0; x < width; x++)
+        {
+            var sum = 0;
+            for (var y = -radius; y <= radius; y++)
+                sum += horizontal[Math.Clamp(y, 0, height - 1) * width + x];
+            for (var y = 0; y < height; y++)
+            {
+                mask[y * width + x] = (byte)(sum / divisor);
+                var removeY = Math.Max(0, y - radius);
+                var addY = Math.Min(height - 1, y + radius + 1);
+                sum += horizontal[addY * width + x]
+                    - horizontal[removeY * width + x];
+            }
+        }
+    }
+
+    private static void StampEditorMask(
+        byte[] mask,
+        int width,
+        int height,
+        EditorMaskPoint point,
+        EditorMaskStroke stroke,
+        double feather)
+    {
+        var radius = Math.Max(
+            1,
+            stroke.Size / 200 * Math.Min(width, height));
+        var softEdge = radius * Math.Clamp(feather, 0, 100) / 100;
+        var outerRadius = radius + softEdge;
+        var centerX = (int)Math.Round(point.X * (width - 1));
+        var centerY = (int)Math.Round(point.Y * (height - 1));
+        var extent = Math.Max(1, (int)Math.Ceiling(outerRadius));
+        for (var y = Math.Max(0, centerY - extent);
+             y <= Math.Min(height - 1, centerY + extent);
+             y++)
+        {
+            for (var x = Math.Max(0, centerX - extent);
+                 x <= Math.Min(width - 1, centerX + extent);
+                 x++)
+            {
+                var deltaX = x - centerX;
+                var deltaY = y - centerY;
+                var distance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+                if (distance > outerRadius) continue;
+                var coverage = distance <= radius || softEdge <= 0
+                    ? 1
+                    : 1 - (distance - radius) / softEdge;
+                var offset = y * width + x;
+                var value = (byte)Math.Clamp(
+                    (int)Math.Round(coverage * 255),
+                    0,
+                    255);
+                mask[offset] = stroke.Subtract
+                    ? (byte)Math.Max(0, mask[offset] - value)
+                    : Math.Max(mask[offset], value);
+            }
+        }
     }
 
     private static void ApplyEditorDetail(
@@ -4830,6 +8643,28 @@ public partial class MainWindow : Window
     {
         var scaled = ClampUnit((value - edge0) / (edge1 - edge0));
         return scaled * scaled * (3 - 2 * scaled);
+    }
+
+    private static double CurveValue(List<EditorCurvePoint> source, double input)
+    {
+        var points = source.OrderBy(point => point.X).ToList();
+        var x = ClampUnit(input);
+        if (points.Count < 2) return x;
+        if (x <= points[0].X) return points[0].Y;
+        if (x >= points[^1].X) return points[^1].Y;
+        var index = 1;
+        while (index < points.Count && points[index].X < x) index++;
+        var p0 = points[Math.Max(0, index - 2)];
+        var p1 = points[index - 1];
+        var p2 = points[index];
+        var p3 = points[Math.Min(points.Count - 1, index + 1)];
+        var t = (x - p1.X) / Math.Max(.0001, p2.X - p1.X);
+        var t2 = t * t;
+        var t3 = t2 * t;
+        var y = .5 * (2 * p1.Y + (-p0.Y + p2.Y) * t
+            + (2 * p0.Y - 5 * p1.Y + 4 * p2.Y - p3.Y) * t2
+            + (-p0.Y + 3 * p1.Y - 3 * p2.Y + p3.Y) * t3);
+        return ClampUnit(y);
     }
 
     private static double ClampUnit(double value) =>
@@ -5095,6 +8930,266 @@ public partial class MainWindow : Window
                 new JsonSerializerOptions { WriteIndented = true }));
     }
 
+    private static List<RememberedCameraDevice> LoadRememberedDevices()
+    {
+        try
+        {
+            if (!File.Exists(RememberedDevicesStatePath)) return [];
+            return JsonSerializer.Deserialize<List<RememberedCameraDevice>>(
+                       File.ReadAllText(RememberedDevicesStatePath))?
+                   .OrderByDescending(device => device.LastConnectedAt)
+                   .ToList() ?? [];
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "devices",
+                $"读取已连接设备失败：{error.Message}");
+            return [];
+        }
+    }
+
+    private void SaveRememberedDevices()
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(RememberedDevicesStatePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            File.WriteAllText(
+                RememberedDevicesStatePath,
+                JsonSerializer.Serialize(
+                    _rememberedDevices,
+                    new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "devices",
+                $"保存已连接设备失败：{error.Message}");
+        }
+    }
+
+    private void RememberConnectedDevice(CameraProfile profile)
+    {
+        var id = $"{profile.VendorId:x4}:{profile.ProductId:x4}:{profile.Name}";
+        _rememberedDevices.RemoveAll(device => device.Id == id);
+        _rememberedDevices.Insert(0, new RememberedCameraDevice
+        {
+            Id = id,
+            Name = profile.Name,
+            Vendor = profile.VendorName,
+            Transport = "USB/PTP",
+            LastConnectedAt = DateTime.Now
+        });
+        if (_rememberedDevices.Count > 12)
+        {
+            _rememberedDevices.RemoveRange(12, _rememberedDevices.Count - 12);
+        }
+        SaveRememberedDevices();
+        RefreshRememberedDevices();
+    }
+
+    private void RememberLocalCamera(string name)
+    {
+        const string id = "windows-local-camera";
+        _rememberedDevices.RemoveAll(device => device.Id == id);
+        _rememberedDevices.Insert(0, new RememberedCameraDevice
+        {
+            Id = id,
+            Name = name,
+            Vendor = "System",
+            Transport = "本机摄像头",
+            LastConnectedAt = DateTime.Now
+        });
+        if (_rememberedDevices.Count > 12)
+        {
+            _rememberedDevices.RemoveRange(12, _rememberedDevices.Count - 12);
+        }
+        SaveRememberedDevices();
+        RefreshRememberedDevices();
+    }
+
+    private void RefreshRememberedDevices()
+    {
+        if (DevicesWrapPanel is null || DevicesEmptyState is null) return;
+        DevicesWrapPanel.Children.Clear();
+        DevicesEmptyState.Visibility = _rememberedDevices.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        foreach (var device in _rememberedDevices)
+        {
+            DevicesWrapPanel.Children.Add(BuildRememberedDeviceCard(device));
+        }
+    }
+
+    private Border BuildRememberedDeviceCard(RememberedCameraDevice device)
+    {
+        var current = device.Transport == "本机摄像头"
+            ? _localCamera.IsConnected && _localCamera.DeviceName == device.Name
+            : _camera.IsConnected && _camera.Profile?.Name == device.Name;
+        var card = new Border
+        {
+            Width = 360,
+            Margin = new Thickness(0, 0, 16, 16),
+            Background = (Brush)FindResource("SurfaceRaisedBrush"),
+            BorderBrush = (Brush)FindResource(
+                current ? "PositiveBrush" : "RuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(18),
+            ClipToBounds = true
+        };
+        var content = new StackPanel();
+        var filename = device.Vendor.Contains(
+                "Sony",
+                StringComparison.OrdinalIgnoreCase)
+            ? "camera-sony.jpg"
+            : device.Vendor.Contains(
+                "Canon",
+                StringComparison.OrdinalIgnoreCase)
+                ? "camera-canon.jpg"
+                : "camera-nikon.jpg";
+        try
+        {
+            content.Children.Add(new Image
+            {
+                Height = 190,
+                Stretch = Stretch.UniformToFill,
+                Source = new BitmapImage(new Uri(
+                    $"pack://application:,,,/Assets/{filename}",
+                    UriKind.Absolute))
+            });
+        }
+        catch
+        {
+            content.Children.Add(new Border
+            {
+                Height = 190,
+                Background = (Brush)FindResource("GraphiteBrush"),
+                Child = new TextBlock
+                {
+                    Text = "◉",
+                    FontSize = 46,
+                    Foreground = Brushes.White,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            });
+        }
+
+        var body = new StackPanel { Margin = new Thickness(16) };
+        var heading = new DockPanel();
+        if (current)
+        {
+            var badge = new TextBlock
+            {
+                Text = AppLocalization.T("当前已连接"),
+                Foreground = (Brush)FindResource("PositiveBrush"),
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            DockPanel.SetDock(badge, Dock.Right);
+            heading.Children.Add(badge);
+        }
+        heading.Children.Add(new TextBlock
+        {
+            Text = device.Name,
+            FontFamily = (FontFamily)FindResource("DisplayFont"),
+            FontSize = 18,
+            FontWeight = FontWeights.Bold,
+            Foreground = (Brush)FindResource("InkBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        body.Children.Add(heading);
+        body.Children.Add(new TextBlock
+        {
+            Text = $"{device.Vendor} · {device.Transport}",
+            Margin = new Thickness(0, 9, 0, 0),
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = $"{AppLocalization.T("最近连接")} · " +
+                   device.LastConnectedAt.ToString("yyyy-MM-dd HH:mm"),
+            Margin = new Thickness(0, 7, 0, 0),
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            FontSize = 11,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+
+        var actions = new Grid { Margin = new Thickness(0, 14, 0, 0) };
+        actions.ColumnDefinitions.Add(new ColumnDefinition());
+        actions.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(112)
+        });
+        var reconnect = new Button
+        {
+            Content = AppLocalization.T("快速连接"),
+            Height = 44,
+            IsEnabled = !current && !_operationInProgress,
+            Style = (Style)FindResource("PrimaryButton")
+        };
+        reconnect.Click += async (_, _) =>
+            await ReconnectRememberedDeviceAsync(device);
+        actions.Children.Add(reconnect);
+        var forget = new Button
+        {
+            Content = AppLocalization.T("忘记设备"),
+            Height = 44,
+            Margin = new Thickness(10, 0, 0, 0),
+            Style = (Style)FindResource("ButtonBase")
+        };
+        Grid.SetColumn(forget, 1);
+        forget.Click += (_, _) =>
+        {
+            _rememberedDevices.RemoveAll(item => item.Id == device.Id);
+            SaveRememberedDevices();
+            RefreshRememberedDevices();
+        };
+        actions.Children.Add(forget);
+        body.Children.Add(actions);
+        content.Children.Add(body);
+        card.Child = content;
+        return card;
+    }
+
+    private async Task ReconnectRememberedDeviceAsync(
+        RememberedCameraDevice device)
+    {
+        if (_operationInProgress) return;
+        if (device.Transport == "本机摄像头")
+        {
+            if (!_localCamera.IsConnected)
+            {
+                await ToggleLocalCameraConnectionAsync();
+            }
+            return;
+        }
+        if (_camera.IsConnected)
+        {
+            await RunOperationAsync("正在断开相机…", async token =>
+            {
+                await FinishExternalRecordingForDisconnectAsync();
+                await StopPreviewLoopAsync();
+                await _camera.DisconnectAsync(token);
+                SetConnectionState(null);
+            });
+        }
+        if (_operationInProgress || _camera.IsConnected) return;
+        await RunOperationAsync("正在连接相机…", async token =>
+        {
+            var profile = await _camera.ConnectAsync(token);
+            SetConnectionState(profile);
+            RememberConnectedDevice(profile);
+            OperationStatusText.Text = AppLocalization.T(
+                $"{profile.Name} 已连接");
+        });
+    }
+
     private void SetCurrentNavigation(Button? current)
     {
         var videoActive = current == MonitorNav;
@@ -5103,6 +9198,7 @@ public partial class MainWindow : Window
                      CaptureNav,
                      MonitorNav,
                      EditorNav,
+                     DevicesNav,
                      LibraryNav
                  })
         {
@@ -5142,19 +9238,26 @@ public partial class MainWindow : Window
         e.Cancel = true;
         _shutdownStarted = true;
         Closing -= Window_Closing;
+        _monitorTimecodeTimer.Stop();
         if (_immersivePreviewWindow is { } immersive)
         {
             CloseImmersivePreview(immersive);
         }
         try
         {
+            await FinishExternalRecordingForDisconnectAsync();
             await StopPreviewLoopAsync();
             await _wirelessServer.DisposeAsync();
+            await _wifiCamera.DisposeAsync();
+            await _localCamera.DisposeAsync();
+            await _bluetoothRemote.DisposeAsync();
+            await _locationTagging.SetEnabledAsync(false);
             if (_camera.IsConnected)
             {
                 await _camera.DisconnectAsync();
             }
             _camera.Dispose();
+            _externalVideoRecorder.Dispose();
         }
         catch
         {

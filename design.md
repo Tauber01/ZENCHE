@@ -40,14 +40,32 @@ modern-minimal
 
 ## Theme
 
-- Paper: `oklch(98.5% 0.004 250)`
-- Paper secondary: `oklch(96.5% 0.008 250)`
-- Ink: `oklch(20% 0.022 258)`
-- Muted ink: `oklch(44% 0.018 257)`
-- Rule: `oklch(88% 0.012 252)`
-- Photo accent: `oklch(49% 0.2 256)` — cobalt
-- Video accent: `oklch(50% 0.2 25)` — signal red
-- Focus: use the platform accessibility focus colour with at least 3:1 contrast.
+The calibrated workbench tokens replace the original near-white palette. Use
+these sRGB values as the cross-platform source of truth; platform resource APIs
+may expose equivalent dynamic colours for system dark appearance.
+
+| Token | Light | Dark | Purpose |
+| --- | --- | --- | --- |
+| Workbench | `#E9EDF2` | `#131519` | Application background |
+| Workbench secondary | `#E4E9EF` | `#23272E` | Sidebars and recessed navigation |
+| Surface | `#F8FAFC` | `#1B1E24` | Tool panels and control surfaces |
+| Surface raised | `#FFFFFF` | `#23272E` | Dialog and raised-card surface |
+| Ink | `#171C26` | `#ECEEF2` | Primary text |
+| Muted ink | `#5A616C` | `#9AA1AD` | Secondary text |
+| Rule | `#CFD6DF` | `#FFFFFF1F` | Dividers and quiet borders |
+| Photo accent | `#1673E6` | `#2E86E0` | Photo actions and selected state |
+| Photo soft | `#DCEAFD` | `#14293E` | Photo selection background |
+| Video accent | `#D8323A` | `#FF5257` | Recording and video state |
+| Video soft | `#FBE2E3` | `#3A1B1E` | Video selection background |
+| Positive | `#1FA869` | `#35C97B` | Connected and successful state |
+| Graphite | `#0A0B0D` | `#0A0B0D` | Colour-stable preview well |
+| Readout glow | `#6BAEFF` | `#6BAEFF` | User-writable exposure values |
+
+- Focus uses the platform accessibility focus colour with at least 3:1 contrast.
+- Preview wells stay graphite in every appearance so ambient UI colour never
+  changes colour-critical image judgement.
+- Use solid semantic fills for commands. A restrained photo-accent gradient is
+  reserved for the compact Z brand mark and never becomes a page background.
 
 Use platform colour APIs and existing native resource tokens. Do not introduce
 Web CSS as a dependency of native implementations.
@@ -82,6 +100,55 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
   control in the main parameter surface on cameras that expose those capabilities.
 - Disabled parameters include a visible reason; never rely on colour alone.
 
+## Calibration readout rail
+
+- Photo workspaces show a compact graphite calibration rail directly after the
+  preview and before capture actions.
+- The rail uses monospaced tabular numerals and exposes the platform's real
+  source, mode, shutter or shutter angle, aperture when available, ISO, and
+  exposure compensation.
+- Values currently writable by the user use `Readout glow`; camera-controlled
+  values use high-contrast neutral text and an explicit `AUTO` label.
+- A disconnected camera or unavailable source shows em-dash placeholders and
+  never presents model defaults as live camera values.
+- The rail is informational. Existing native parameter controls remain the
+  editing surface, and the rail must not introduce a second write path.
+- Narrow layouts may horizontally scroll or reduce the number of simultaneous
+  fields, but values and labels must not overlap or resize the surrounding page.
+
+## Capture workflow hierarchy
+
+The capture workspace follows the decisions made during a real production day,
+rather than exposing one undifferentiated list of camera properties:
+
+1. **Session and delivery** — project name, naming template, creator and rights
+   metadata, default rating, RAW + JPEG pairing, backup destination, and
+   checksum manifest. This appears before camera setup so captured files have a
+   destination and identity from the first frame.
+2. **Exposure** — exposure mode first, followed by shutter or shutter angle,
+   aperture, ISO, exposure compensation, and timed Bulb when the selected mode
+   permits it. Mode-dependent locks remain visible and explain ownership.
+3. **Focus and colour** — autofocus mode or focus position, white balance, and
+   picture control. Composition aids and local zoom stay beside the preview
+   because they change framing rather than the recorded camera property set.
+4. **Capture automation** — interval capture, exposure bracketing, focus
+   bracketing, and timed Bulb share one task surface with task-specific count,
+   interval, duration, and step fields.
+5. **Monitor and handoff** — live-view format, frame-rate reference, focus
+   peaking, false colour, scopes, LUT, wireless receipt, library organisation,
+   and verified export remain downstream of capture setup.
+
+- Native targets expose only parameters backed by a working platform or camera
+  capability. Future drive-mode, metering, image-quality, colour-space, flash,
+  and video-codec controls plug into the relevant group after capability
+  discovery; they are not shown as speculative or disabled placeholders.
+- Supported-camera inventories belong in compatibility documentation and help.
+  They never substitute for the current source in a status badge, preview
+  overlay, connection prompt, or disconnected empty state.
+- Mobile targets may collapse the session and automation surfaces, while desktop
+  targets may keep exposure and focus/colour in a persistent inspector. The
+  order and terminology remain aligned across platforms.
+
 ## Monitor controls
 
 - Always show live view state, exposure, zoom, grid/safe-area aids, and output
@@ -89,6 +156,34 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - Zebra, LUT, peaking, supersampling, codec, resolution, and frame-rate controls
   appear only where the native pipeline genuinely implements them.
 - Clearly distinguish local preview processing from settings written to the camera.
+
+## Waveform scopes
+
+- Every native waveform uses the same colour-stable oscilloscope treatment:
+  black plot wells with a subtle blue cast, a square high-contrast outer frame,
+  three white quarter guides, a thin upper envelope, and a dense luminous particle
+  cloud beneath it. Waveform data is never shown as a text-only block-character
+  sparkline or a single clean chart line.
+- Scope data is a spatial density measurement, not a column-average graph. Map
+  each sampled source pixel to source X and its Y′, R′, G′, B′, Cb, or Cr level,
+  accumulate a two-dimensional 64 × 48 density field, then apply logarithmic
+  intensity compression for display. Preserve the decoded frame's full signal
+  range and keep the channel calculation aligned with BT.709 coefficients.
+- Luma traces are neutral white. YUV overlays keep green, blue/cyan, and
+  magenta/red channels distinguishable. RGB parade views divide the plot into
+  three equal, labelled R, G, and B channels using signal red, green, and blue.
+- Compact monitor layouts may show an RGB parade and audio plot as separate
+  cards. The professional monitor panel combines Y, YUV, and RGB plots in that
+  order so exposure, colour balance, and per-channel clipping remain scannable.
+- A missing audio source uses a centred cyan baseline and exposes the localized
+  empty-source state to accessibility without placing status copy inside the plot.
+  It must not fabricate audio activity.
+- Scope labels are measurement metadata in the platform monospaced face. Keep
+  them small, centred beneath the plot frame, and quiet without reducing plot
+  contrast or shrinking touch targets. RGB parade plots show separate R, G, and B
+  labels beneath their thirds instead of a corner title.
+- Scope plots contain no decorative signature, watermark, corner branding, or
+  borrowed application chrome.
 
 ## System album and cloud drives
 
@@ -141,6 +236,34 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
   users to enter a cloud-drive password.
 - The supported guide set is Baidu Netdisk, Aliyun Drive, Tencent Weiyun, Quark
   Cloud Drive, Xunlei Cloud Drive, and 115.
+
+## In-camera storage
+
+- In-camera storage is a first-class source in the native Library/File workspace
+  on iOS / iPadOS, Android, HarmonyOS, macOS, and Windows. It uses standard
+  PTP object operations over USB/PTP or Wi-Fi PTP/IP; system/UVC cameras show a
+  clear unavailable state instead of an empty or simulated card.
+- The source is a native disclosure surface. Its summary shows storage volumes,
+  total/free capacity when the camera reports it, object count, and current task
+  status. File rows show a thumbnail or explicit media placeholder, filename,
+  size, capture date, dimensions when known, and protected state.
+- Refresh, selection, batch download, and delete are separate native controls
+  with at least 44-point targets. Protected objects are visible but cannot be
+  selected for deletion.
+- Download copies the original object into the existing 帧澈 ZENCHE capture
+  workflow and library, preserving its file extension and applying the active
+  session's naming, backup, metadata, and integrity behavior. Download never
+  removes the camera copy.
+- Delete acts on the camera memory card and is irreversible from 帧澈 ZENCHE.
+  Every delete requires a native destructive confirmation that includes the
+  selected count and explicitly says that the operation cannot be undone.
+- Storage commands are serialized with capture commands. If live view is active,
+  the native camera service pauses it before object operations and attempts to
+  restore it afterward so the PTP session is not used concurrently.
+- iOS / iPadOS exposes this source for connected Wi-Fi PTP/IP cameras. Android,
+  HarmonyOS, macOS, and Windows also expose USB/PTP where their native platform
+  connection allows it. A vendor SDK session that does not expose object
+  enumeration directs the user to a standard USB/PTP or PTP/IP connection.
 
 ## Image editor
 

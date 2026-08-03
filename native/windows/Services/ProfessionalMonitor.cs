@@ -1,3 +1,4 @@
+using NikonLink.Windows.Models;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -15,12 +16,20 @@ public sealed record ProfessionalMonitorResult(
 
 public static class ProfessionalMonitor
 {
-    private static readonly char[] Bars = "▁▂▃▄▅▆▇█".ToCharArray();
+    private const int ScopeColumns = 64;
+    private const int ScopeRows = 48;
+    private const string Hex = "0123456789ABCDEF";
 
     public static ProfessionalMonitorResult Process(
         BitmapSource source,
         bool focusPeaking,
-        bool falseColor)
+        bool falseColor) => Process(source, focusPeaking, falseColor, null);
+
+    internal static ProfessionalMonitorResult Process(
+        BitmapSource source,
+        bool focusPeaking,
+        bool falseColor,
+        NikonCloudPreset? nikonCloudPreset)
     {
         BitmapSource working = new FormatConvertedBitmap(
             source,
@@ -46,13 +55,12 @@ public static class ProfessionalMonitor
         var luminance = focusPeaking
             ? new int[width * height]
             : null;
-        var red = new int[16];
-        var green = new int[16];
-        var blue = new int[16];
-        var waveformSum = new int[24];
-        var waveformCount = new int[24];
-        var hueSum = new int[24];
-        var hueCount = new int[24];
+        var red = ScopeBuffer();
+        var green = ScopeBuffer();
+        var blue = ScopeBuffer();
+        var lumaScope = ScopeBuffer();
+        var cbScope = ScopeBuffer();
+        var crScope = ScopeBuffer();
 
         for (var y = 0; y < height; y++)
         {
@@ -60,29 +68,40 @@ public static class ProfessionalMonitor
             {
                 var pixel = y * width + x;
                 var offset = y * stride + x * 4;
-                var b = pixels[offset];
-                var g = pixels[offset + 1];
-                var r = pixels[offset + 2];
+                var b = (int)pixels[offset];
+                var g = (int)pixels[offset + 1];
+                var r = (int)pixels[offset + 2];
+                if (nikonCloudPreset is not null)
+                {
+                    var cloudRed = r / 255.0;
+                    var cloudGreen = g / 255.0;
+                    var cloudBlue = b / 255.0;
+                    nikonCloudPreset.ApplyPreviewEffect(
+                        ref cloudRed,
+                        ref cloudGreen,
+                        ref cloudBlue);
+                    r = Clamp8((int)Math.Round(cloudRed * 255));
+                    g = Clamp8((int)Math.Round(cloudGreen * 255));
+                    b = Clamp8((int)Math.Round(cloudBlue * 255));
+                    pixels[offset] = (byte)b;
+                    pixels[offset + 1] = (byte)g;
+                    pixels[offset + 2] = (byte)r;
+                    pixels[offset + 3] = 255;
+                }
                 var value = (54 * r + 183 * g + 19 * b) >> 8;
                 if (luminance is not null)
                 {
                     luminance[pixel] = value;
                 }
-                red[Math.Min(15, r >> 4)]++;
-                green[Math.Min(15, g >> 4)]++;
-                blue[Math.Min(15, b >> 4)]++;
-                var column = Math.Min(23, x * 24 / Math.Max(1, width));
-                waveformSum[column] += value;
-                waveformCount[column]++;
-                var maximum = Math.Max(r, Math.Max(g, b));
-                var minimum = Math.Min(r, Math.Min(g, b));
-                var saturation = maximum - minimum;
-                if (saturation > 8)
-                {
-                    var hue = HueIndex(r, g, b, maximum, saturation);
-                    hueSum[hue] += saturation;
-                    hueCount[hue]++;
-                }
+                var column = Math.Min(ScopeColumns - 1, x * ScopeColumns / Math.Max(1, width));
+                Accumulate(red, column, r);
+                Accumulate(green, column, g);
+                Accumulate(blue, column, b);
+                Accumulate(lumaScope, column, value);
+                var cb = Clamp8(128 + ((-29 * r - 99 * g + 128 * b) >> 8));
+                var cr = Clamp8(128 + ((128 * r - 116 * g - 12 * b) >> 8));
+                Accumulate(cbScope, column, cb);
+                Accumulate(crScope, column, cr);
                 if (falseColor)
                 {
                     var color = FalseColor(value);
@@ -121,7 +140,7 @@ public static class ProfessionalMonitor
         }
 
         BitmapSource output;
-        if (focusPeaking || falseColor)
+        if (focusPeaking || falseColor || nikonCloudPreset is not null)
         {
             var rendered = new WriteableBitmap(
                 width,
@@ -145,42 +164,24 @@ public static class ProfessionalMonitor
         }
         return new ProfessionalMonitorResult(
             output,
-            Sparkline(red),
-            Sparkline(green),
-            Sparkline(blue),
-            Sparkline(Averages(waveformSum, waveformCount)),
-            Sparkline(Averages(hueSum, hueCount)),
+            DensityMap(red),
+            DensityMap(green),
+            DensityMap(blue),
+            DensityMap(lumaScope),
+            $"{DensityMap(cbScope)}|{DensityMap(crScope)}",
             (int)Math.Round(
                 peakingPixels * 100.0 / Math.Max(1, width * height)));
     }
 
-    private static int HueIndex(
-        int red,
-        int green,
-        int blue,
-        int maximum,
-        int delta)
+    private static int[] ScopeBuffer() => new int[ScopeColumns * ScopeRows];
+
+    private static void Accumulate(int[] buffer, int column, int value)
     {
-        double hue;
-        if (maximum == red)
-        {
-            hue = (green - blue) / (double)delta;
-        }
-        else if (maximum == green)
-        {
-            hue = 2 + (blue - red) / (double)delta;
-        }
-        else
-        {
-            hue = 4 + (red - green) / (double)delta;
-        }
-        var degrees = hue * 60 % 360;
-        if (degrees < 0)
-        {
-            degrees += 360;
-        }
-        return Math.Min(23, (int)(degrees / 15));
+        var row = ScopeRows - 1 - Clamp8(value) * (ScopeRows - 1) / 255;
+        buffer[row * ScopeColumns + column]++;
     }
+
+    private static int Clamp8(int value) => Math.Min(255, Math.Max(0, value));
 
     private static Color FalseColor(int luma) => luma switch
     {
@@ -193,24 +194,13 @@ public static class ProfessionalMonitor
         _ => Color.FromRgb(255, 32, 56)
     };
 
-    private static int[] Averages(int[] sums, int[] counts)
-    {
-        var values = new int[sums.Length];
-        for (var index = 0; index < sums.Length; index++)
-        {
-            values[index] = counts[index] == 0
-                ? 0
-                : sums[index] / counts[index];
-        }
-        return values;
-    }
-
-    private static string Sparkline(int[] values)
+    private static string DensityMap(int[] values)
     {
         var maximum = Math.Max(1, values.Max());
-        return new string(values.Select(value =>
-            Bars[Math.Min(
-                Bars.Length - 1,
-                value * (Bars.Length - 1) / maximum)]).ToArray());
+        var divisor = Math.Log(1.0 + maximum);
+        return $"S{ScopeColumns}x{ScopeRows}:" + new string(values.Select(value =>
+            Hex[Math.Min(15, Math.Max(0,
+                (int)Math.Round(Math.Log(1.0 + value) / divisor * 15)))])
+            .ToArray());
     }
 }

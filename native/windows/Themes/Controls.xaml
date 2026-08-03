@@ -111,6 +111,18 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <Style x:Key="MonitorIconButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+    <Setter Property="Width" Value="82" />
+    <Setter Property="Height" Value="62" />
+    <Setter Property="Margin" Value="4,0" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource GraphiteInkBrush}" />
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+
   <Style TargetType="ComboBox">
     <Setter Property="MinHeight" Value="42" />
     <Setter Property="Padding" Value="12,8" />
@@ -139,14 +151,14 @@
     <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource RuleBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="CornerRadius" Value="14" />
     <Setter Property="Padding" Value="20" />
     <Setter Property="Effect">
       <Setter.Value>
-        <DropShadowEffect BlurRadius="16"
+        <DropShadowEffect BlurRadius="12"
                           Color="{StaticResource ColorShadow}"
-                          Opacity="0.42"
-                          ShadowDepth="4" />
+                          Opacity="0.30"
+                          ShadowDepth="3" />
       </Setter.Value>
     </Setter>
   </Style>

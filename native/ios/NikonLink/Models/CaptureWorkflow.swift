@@ -111,7 +111,8 @@ final class CaptureWorkflow: ObservableObject {
         data: Data,
         originalFilename: String,
         cameraName: String,
-        reservedBaseName: String? = nil
+        reservedBaseName: String? = nil,
+        location: CaptureLocation? = nil
     ) throws -> URL {
         try ensureSessionDirectories()
         let original = URL(fileURLWithPath: originalFilename)
@@ -126,8 +127,42 @@ final class CaptureWorkflow: ObservableObject {
             extension: fileExtension
         )
         try data.write(to: destination, options: .atomic)
-        try finalize(destination)
+        try finalize(destination, location: location)
         status = "已写入会话 · \(destination.lastPathComponent)"
+        return destination
+    }
+
+    @discardableResult
+    func replace(
+        data: Data,
+        at destination: URL,
+        originalFilename: String,
+        cameraName: String
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let temporary = destination
+            .deletingLastPathComponent()
+            .appendingPathComponent(".replace-\(UUID().uuidString).tmp")
+        try data.write(to: temporary, options: .atomic)
+        do {
+            if fileManager.fileExists(atPath: destination.path) {
+                _ = try fileManager.replaceItem(
+                    at: destination,
+                    withItemAt: temporary,
+                    backupItemName: nil,
+                    options: .usingNewMetadataOnly,
+                    resultingItemURL: nil
+                )
+            } else {
+                try fileManager.moveItem(at: temporary, to: destination)
+            }
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            throw error
+        }
+        try finalize(destination, location: nil)
+        replaceChecksumEntry(for: destination)
+        status = "已替换原图 · \(destination.lastPathComponent)"
         return destination
     }
 
@@ -152,17 +187,50 @@ final class CaptureWorkflow: ObservableObject {
         )
     }
 
-    private func finalize(_ primary: URL) throws {
-        let digest = SHA256.hash(data: try Data(contentsOf: primary))
+    @discardableResult
+    func adoptTemporaryRecording(
+        from source: URL,
+        cameraName: String
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let fileExtension = source.pathExtension.isEmpty
+            ? "mov"
+            : source.pathExtension.lowercased()
+        let destination = uniqueURL(
+            in: primaryDirectory,
+            base: reserveBaseName(cameraName: cameraName),
+            extension: fileExtension
+        )
+        try fileManager.moveItem(at: source, to: destination)
+        try finalize(destination, location: nil)
+        status = "外录已写入会话 · \(destination.lastPathComponent)"
+        return destination
+    }
+
+    private func finalize(
+        _ primary: URL,
+        location: CaptureLocation?
+    ) throws {
+        var hasher = SHA256()
+        let input = try FileHandle(forReadingFrom: primary)
+        while let chunk = try input.read(upToCount: 1024 * 1024),
+              !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        try input.close()
+        let digest = hasher.finalize()
             .map { String(format: "%02x", $0) }
             .joined()
-        if isActive {
-            let xmp = xmpSidecar(for: primary.lastPathComponent)
+        if isActive || location != nil {
+            let xmp = xmpSidecar(
+                for: primary.lastPathComponent,
+                location: location
+            )
             let sidecar = primary
                 .deletingPathExtension()
                 .appendingPathExtension("xmp")
             try xmp.write(to: sidecar, atomically: true, encoding: .utf8)
-            if let backupDirectory {
+            if isActive, let backupDirectory {
                 let backup = backupDirectory
                     .appendingPathComponent(primary.lastPathComponent)
                 try? fileManager.removeItem(at: backup)
@@ -173,7 +241,7 @@ final class CaptureWorkflow: ObservableObject {
                 try? fileManager.removeItem(at: backupSidecar)
                 try fileManager.copyItem(at: sidecar, to: backupSidecar)
             }
-            if let sessionRoot {
+            if isActive, let sessionRoot {
                 let manifest = sessionRoot.appendingPathComponent(
                     "checksums.sha256"
                 )
@@ -194,10 +262,32 @@ final class CaptureWorkflow: ObservableObject {
         }
     }
 
-    private func xmpSidecar(for filename: String) -> String {
+    private func replaceChecksumEntry(for primary: URL) {
+        guard let sessionRoot else { return }
+        let manifest = sessionRoot.appendingPathComponent("checksums.sha256")
+        guard let data = try? Data(contentsOf: primary) else { return }
+        let digest = SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let relative = "Primary/\(primary.lastPathComponent)"
+        let lines = (try? String(contentsOf: manifest, encoding: .utf8))?
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map(String.init)
+            .filter { !$0.hasSuffix("  \(relative)") } ?? []
+        try? (lines + ["\(digest)  \(relative)"])
+            .joined(separator: "\n")
+            .appending("\n")
+            .write(to: manifest, atomically: true, encoding: .utf8)
+    }
+
+    private func xmpSidecar(
+        for filename: String,
+        location: CaptureLocation?
+    ) -> String {
         let title = xmlEscaped(configuration.name)
         let creator = xmlEscaped(configuration.creator)
         let rights = xmlEscaped(configuration.rights)
+        let gps = location.map(gpsAttributes) ?? ""
         return """
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -205,7 +295,8 @@ final class CaptureWorkflow: ObservableObject {
             <rdf:Description rdf:about=""
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
-              xmp:Rating="\(configuration.rating)">
+              xmlns:exif="http://ns.adobe.com/exif/1.0/"
+              xmp:Rating="\(configuration.rating)"\(gps)>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">\(title)</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>\(creator)</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">\(rights)</rdf:li></rdf:Alt></dc:rights>
@@ -215,6 +306,41 @@ final class CaptureWorkflow: ObservableObject {
         </x:xmpmeta>
         <?xpacket end="w"?>
         """
+    }
+
+    private func gpsAttributes(_ location: CaptureLocation) -> String {
+        let latitude = gpsCoordinate(location.latitude, positive: "N", negative: "S")
+        let longitude = gpsCoordinate(location.longitude, positive: "E", negative: "W")
+        let altitude = Int((abs(location.altitude) * 100).rounded())
+        let altitudeReference = location.altitude < 0 ? 1 : 0
+        let accuracy = Int((max(0, location.horizontalAccuracy) * 100).rounded())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return """
+
+              exif:GPSLatitude="\(latitude)"
+              exif:GPSLongitude="\(longitude)"
+              exif:GPSAltitude="\(altitude)/100"
+              exif:GPSAltitudeRef="\(altitudeReference)"
+              exif:GPSHPositioningError="\(accuracy)/100"
+              exif:GPSDateStamp="\(formatter.string(from: location.capturedAt))"
+        """
+    }
+
+    private func gpsCoordinate(
+        _ value: Double,
+        positive: String,
+        negative: String
+    ) -> String {
+        let absolute = abs(value)
+        let degrees = Int(absolute)
+        let minutes = (absolute - Double(degrees)) * 60
+        return String(
+            format: "%d,%.6f%@",
+            degrees,
+            minutes,
+            value >= 0 ? positive : negative
+        )
     }
 
     private func ensureSessionDirectories() throws {

@@ -1,0 +1,8592 @@
+{
+  "schemaVersion": 1,
+  "renderer": "zenche-nikon-flexible-color-sdr-preview-v1",
+  "accuracy": "approximate-sdr-preview",
+  "sourceFormat": "Nikon NP3 Custom Picture Control",
+  "presetCount": 107,
+  "presets": [
+    {
+      "id": "np3-2c7236272aa4",
+      "name": "ari green gunji",
+      "filename": "ari green gunji.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 75,
+        "texture": 45,
+        "clarity": 8,
+        "sharpening": 60
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 91
+        },
+        "gamma": {
+          "x": 0,
+          "y": 39
+        },
+        "lift": {
+          "x": 0,
+          "y": 86
+        }
+      },
+      "mixer": [
+        {
+          "hue": 50,
+          "chroma": -15,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": -15,
+          "brightness": 6
+        },
+        {
+          "hue": -34,
+          "chroma": 8,
+          "brightness": -10
+        },
+        {
+          "hue": 65,
+          "chroma": -55,
+          "brightness": -50
+        },
+        {
+          "hue": 0,
+          "chroma": 55,
+          "brightness": -35
+        },
+        {
+          "hue": -50,
+          "chroma": -20,
+          "brightness": -40
+        },
+        {
+          "hue": -10,
+          "chroma": -40,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": -32,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.056276,
+        0.133366,
+        0.229225,
+        0.329356,
+        0.429121,
+        0.525681,
+        0.616657,
+        0.698996,
+        0.764946,
+        0.819697,
+        0.857143,
+        0.883602,
+        0.90701,
+        0.933988,
+        0.964934,
+        0.997925
+      ]
+    },
+    {
+      "id": "np3-2fa449ee8ca6",
+      "name": "at dusk woo",
+      "filename": "at dusk woo.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 34,
+        "highlights": -50,
+        "shadows": -40,
+        "whites": 0,
+        "blacks": -7,
+        "saturation": 19,
+        "texture": 48,
+        "clarity": 24,
+        "sharpening": 64
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -46
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "mixer": [
+        {
+          "hue": -60,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -44,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -67,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 53,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -9,
+          "chroma": -10,
+          "brightness": -22
+        },
+        {
+          "hue": 36,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-cc2bfc4be8ea",
+      "name": "BLEACH PASS 01A",
+      "filename": "BLEACH PASS 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": -20,
+        "shadows": -55,
+        "whites": 0,
+        "blacks": -10,
+        "saturation": -50,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 2,
+          "chroma": -2,
+          "brightness": -15
+        },
+        {
+          "hue": 12,
+          "chroma": -2,
+          "brightness": -9
+        },
+        {
+          "hue": 4,
+          "chroma": -2,
+          "brightness": -6
+        },
+        {
+          "hue": 8,
+          "chroma": -15,
+          "brightness": -28
+        },
+        {
+          "hue": 2,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -12,
+          "chroma": -12,
+          "brightness": -10
+        },
+        {
+          "hue": -2,
+          "chroma": -17,
+          "brightness": 0
+        },
+        {
+          "hue": 8,
+          "chroma": -12,
+          "brightness": -10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-28c403c92647",
+      "name": "bluehour luna",
+      "filename": "bluehour luna.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 10,
+        "highlights": -10,
+        "shadows": -20,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 30,
+          "chroma": 15,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-24c63308a2d7",
+      "name": "bluem luizclas",
+      "filename": "bluem luizclas.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 57,
+        "clarity": 8,
+        "sharpening": 76
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 94
+        },
+        "gamma": {
+          "x": 0,
+          "y": -71
+        },
+        "lift": {
+          "x": 0,
+          "y": -60
+        }
+      },
+      "mixer": [
+        {
+          "hue": -2,
+          "chroma": 28,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -31,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -83,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 48,
+          "chroma": -35,
+          "brightness": 0
+        },
+        {
+          "hue": -6,
+          "chroma": 38,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.082339,
+        0.098758,
+        0.120884,
+        0.154332,
+        0.204749,
+        0.272164,
+        0.348613,
+        0.425611,
+        0.49501,
+        0.551866,
+        0.60744,
+        0.661733,
+        0.718772,
+        0.781701,
+        0.84994,
+        0.921751,
+        0.995361
+      ]
+    },
+    {
+      "id": "np3-df90bdfc6ce1",
+      "name": "britfilm bw",
+      "filename": "britfilm bw.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 3,
+        "highlights": -20,
+        "shadows": 31,
+        "whites": -34,
+        "blacks": -10,
+        "saturation": -98,
+        "texture": 24,
+        "clarity": 24,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 1,
+          "y": -19
+        },
+        "gamma": {
+          "x": 0,
+          "y": 53
+        },
+        "lift": {
+          "x": 0,
+          "y": 48
+        }
+      },
+      "mixer": [
+        {
+          "hue": -31,
+          "chroma": -69,
+          "brightness": -15
+        },
+        {
+          "hue": 0,
+          "chroma": -32,
+          "brightness": 0
+        },
+        {
+          "hue": 1,
+          "chroma": -58,
+          "brightness": -16
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-b31e3efd0865",
+      "name": "calllt love faloo m",
+      "filename": "calllt love faloo m.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 30,
+        "texture": 24,
+        "clarity": -4,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -66
+        },
+        "gamma": {
+          "x": 0,
+          "y": -25
+        },
+        "lift": {
+          "x": 1,
+          "y": -52
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -5,
+          "brightness": 15
+        },
+        {
+          "hue": 10,
+          "chroma": -7,
+          "brightness": 4
+        },
+        {
+          "hue": 21,
+          "chroma": 21,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -26,
+          "chroma": 0,
+          "brightness": 9
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": 4,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.123875,
+        0.230354,
+        0.318583,
+        0.393902,
+        0.461653,
+        0.525132,
+        0.583819,
+        0.636586,
+        0.679708,
+        0.717917,
+        0.747185,
+        0.771355,
+        0.799646,
+        0.841487,
+        0.906339,
+        0.994201
+      ]
+    },
+    {
+      "id": "np3-42e375511384",
+      "name": "calmbreeze dond",
+      "filename": "calmbreeze dond.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 18,
+        "highlights": 31,
+        "shadows": -20,
+        "whites": -27,
+        "blacks": 5,
+        "saturation": 7,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -44
+        },
+        "gamma": {
+          "x": 0,
+          "y": -69
+        },
+        "lift": {
+          "x": 0,
+          "y": -28
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -4,
+          "chroma": 1,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-b3ba57aea7bf",
+      "name": "cineblue brandon",
+      "filename": "cineblue brandon.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": -5,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 1,
+          "y": -83
+        },
+        "gamma": {
+          "x": 0,
+          "y": 77
+        },
+        "lift": {
+          "x": 0,
+          "y": -61
+        }
+      },
+      "mixer": [
+        {
+          "hue": 28,
+          "chroma": -14,
+          "brightness": 30
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 29,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -52,
+          "brightness": 0
+        },
+        {
+          "hue": 20,
+          "chroma": 78,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 100,
+          "brightness": 16
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.050966,
+        0.062746,
+        0.083651,
+        0.119266,
+        0.177679,
+        0.264504,
+        0.36961,
+        0.477035,
+        0.572771,
+        0.648915,
+        0.715873,
+        0.768548,
+        0.808924,
+        0.839686,
+        0.863491,
+        0.882962,
+        0.894131
+      ]
+    },
+    {
+      "id": "np3-4acfa36b866e",
+      "name": "cinem luizclas",
+      "filename": "cinem luizclas.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 57,
+        "clarity": 8,
+        "sharpening": 76
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 70
+        },
+        "gamma": {
+          "x": 0,
+          "y": -67
+        },
+        "lift": {
+          "x": 0,
+          "y": -70
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.074496,
+        0.098849,
+        0.127445,
+        0.164525,
+        0.214148,
+        0.276376,
+        0.347026,
+        0.421735,
+        0.4962,
+        0.562029,
+        0.627125,
+        0.68865,
+        0.748466,
+        0.808466,
+        0.86993,
+        0.932676,
+        0.996033
+      ]
+    },
+    {
+      "id": "np3-aef87763e99f",
+      "name": "CLA GN 01B",
+      "filename": "CLA GN 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 80,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": -10,
+        "saturation": 30,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 30,
+          "chroma": 4,
+          "brightness": 2
+        },
+        {
+          "hue": 8,
+          "chroma": -13,
+          "brightness": -8
+        },
+        {
+          "hue": -5,
+          "chroma": 4,
+          "brightness": -2
+        },
+        {
+          "hue": 5,
+          "chroma": 5,
+          "brightness": -8
+        },
+        {
+          "hue": 15,
+          "chroma": 40,
+          "brightness": 15
+        },
+        {
+          "hue": 4,
+          "chroma": -8,
+          "brightness": 8
+        },
+        {
+          "hue": -20,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": 0,
+          "brightness": 2
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-0b71b25eba7d",
+      "name": "cloudy forest y2",
+      "filename": "cloudy forest y2.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 28,
+        "highlights": 38,
+        "shadows": -15,
+        "whites": 0,
+        "blacks": 8,
+        "saturation": 11,
+        "texture": 24,
+        "clarity": 20,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 72
+        },
+        "gamma": {
+          "x": 0,
+          "y": -63
+        },
+        "lift": {
+          "x": 0,
+          "y": -60
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 7,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 26,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-8d4d8410561b",
+      "name": "CLR BU 01A",
+      "filename": "CLR BU 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 15,
+        "highlights": 25,
+        "shadows": -5,
+        "whites": -5,
+        "blacks": -10,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 9
+        },
+        "gamma": {
+          "x": 0,
+          "y": 17
+        },
+        "lift": {
+          "x": 0,
+          "y": 17
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": -25,
+          "brightness": 25
+        },
+        {
+          "hue": 10,
+          "chroma": -15,
+          "brightness": 25
+        },
+        {
+          "hue": 10,
+          "chroma": -35,
+          "brightness": 10
+        },
+        {
+          "hue": -7,
+          "chroma": 15,
+          "brightness": 20
+        },
+        {
+          "hue": 30,
+          "chroma": 25,
+          "brightness": 25
+        },
+        {
+          "hue": -30,
+          "chroma": 15,
+          "brightness": 60
+        },
+        {
+          "hue": -50,
+          "chroma": 10,
+          "brightness": 45
+        },
+        {
+          "hue": 0,
+          "chroma": -5,
+          "brightness": 20
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-69dca0553a62",
+      "name": "CLR BU 01B",
+      "filename": "CLR BU 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 15,
+        "highlights": 25,
+        "shadows": -5,
+        "whites": -5,
+        "blacks": -10,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 62
+        },
+        "gamma": {
+          "x": 0,
+          "y": 62
+        },
+        "lift": {
+          "x": 0,
+          "y": 88
+        }
+      },
+      "mixer": [
+        {
+          "hue": 50,
+          "chroma": -45,
+          "brightness": 20
+        },
+        {
+          "hue": 45,
+          "chroma": -20,
+          "brightness": 20
+        },
+        {
+          "hue": 15,
+          "chroma": -45,
+          "brightness": 8
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 5
+        },
+        {
+          "hue": 30,
+          "chroma": 20,
+          "brightness": 10
+        },
+        {
+          "hue": -20,
+          "chroma": -10,
+          "brightness": 60
+        },
+        {
+          "hue": -80,
+          "chroma": -70,
+          "brightness": 40
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": 10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-1cb9595eb5cc",
+      "name": "CLR GN 01A",
+      "filename": "CLR GN 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 80,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": -10,
+        "saturation": 30,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 20,
+          "chroma": -15,
+          "brightness": 2
+        },
+        {
+          "hue": 6,
+          "chroma": -10,
+          "brightness": -8
+        },
+        {
+          "hue": -1,
+          "chroma": 8,
+          "brightness": 2
+        },
+        {
+          "hue": -8,
+          "chroma": 0,
+          "brightness": -14
+        },
+        {
+          "hue": 6,
+          "chroma": 30,
+          "brightness": 5
+        },
+        {
+          "hue": 4,
+          "chroma": -13,
+          "brightness": 8
+        },
+        {
+          "hue": -10,
+          "chroma": 10,
+          "brightness": 5
+        },
+        {
+          "hue": -18,
+          "chroma": -10,
+          "brightness": 2
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-bdc4c134f5fc",
+      "name": "CLR TEALOR 01A",
+      "filename": "CLR TEALOR 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 80,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 3,
+        "blacks": -12,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 35,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": -55,
+          "chroma": 85,
+          "brightness": 10
+        },
+        {
+          "hue": -55,
+          "chroma": -45,
+          "brightness": -5
+        },
+        {
+          "hue": 30,
+          "chroma": 20,
+          "brightness": 5
+        },
+        {
+          "hue": -30,
+          "chroma": 45,
+          "brightness": 25
+        },
+        {
+          "hue": -65,
+          "chroma": -50,
+          "brightness": 5
+        },
+        {
+          "hue": 100,
+          "chroma": -20,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-cf9b218ddc4f",
+      "name": "CLR TEALOR 01B",
+      "filename": "CLR TEALOR 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 80,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 3,
+        "blacks": -12,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 35,
+          "chroma": 10,
+          "brightness": -7
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": -25
+        },
+        {
+          "hue": -100,
+          "chroma": 50,
+          "brightness": -3
+        },
+        {
+          "hue": -100,
+          "chroma": -90,
+          "brightness": -15
+        },
+        {
+          "hue": 100,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 20
+        },
+        {
+          "hue": -100,
+          "chroma": -70,
+          "brightness": 10
+        },
+        {
+          "hue": 100,
+          "chroma": -25,
+          "brightness": 5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-375a99bde817",
+      "name": "CLR YE 01A",
+      "filename": "CLR YE 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 60,
+        "highlights": 0,
+        "shadows": -8,
+        "whites": 8,
+        "blacks": -13,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": 58
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 30,
+          "chroma": 27,
+          "brightness": 17
+        },
+        {
+          "hue": 17,
+          "chroma": 46,
+          "brightness": 6
+        },
+        {
+          "hue": -7,
+          "chroma": 80,
+          "brightness": 20
+        },
+        {
+          "hue": -27,
+          "chroma": 5,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": 20,
+          "brightness": 10
+        },
+        {
+          "hue": -4,
+          "chroma": 10,
+          "brightness": 12
+        },
+        {
+          "hue": -24,
+          "chroma": -10,
+          "brightness": 12
+        },
+        {
+          "hue": 45,
+          "chroma": -10,
+          "brightness": 12
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-3d0a2db783a3",
+      "name": "CLR YE01B",
+      "filename": "CLR YE01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 60,
+        "highlights": 0,
+        "shadows": -8,
+        "whites": 8,
+        "blacks": -13,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": 73
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 46,
+          "chroma": 80,
+          "brightness": 40
+        },
+        {
+          "hue": 28,
+          "chroma": 80,
+          "brightness": 30
+        },
+        {
+          "hue": 0,
+          "chroma": 80,
+          "brightness": 20
+        },
+        {
+          "hue": -30,
+          "chroma": -10,
+          "brightness": -5
+        },
+        {
+          "hue": 55,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 25,
+          "brightness": 20
+        },
+        {
+          "hue": -30,
+          "chroma": -25,
+          "brightness": 15
+        },
+        {
+          "hue": 100,
+          "chroma": -10,
+          "brightness": 20
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-baf8a277d380",
+      "name": "clrportrait tsakai",
+      "filename": "clrportrait tsakai.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 13,
+        "texture": 24,
+        "clarity": 12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 9
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 63
+        }
+      },
+      "mixer": [
+        {
+          "hue": 6,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": 0,
+          "brightness": 16
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 8
+        },
+        {
+          "hue": 0,
+          "chroma": -18,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.01175,
+        0.038759,
+        0.078738,
+        0.144688,
+        0.230903,
+        0.325358,
+        0.42085,
+        0.513779,
+        0.600665,
+        0.673513,
+        0.740196,
+        0.796808,
+        0.844966,
+        0.886349,
+        0.922605,
+        0.955382,
+        0.986328
+      ]
+    },
+    {
+      "id": "np3-e080e1cd5fe7",
+      "name": "coastal glow nm",
+      "filename": "coastal glow nm.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 8,
+        "texture": 54,
+        "clarity": 8,
+        "sharpening": 72
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -76
+        },
+        "gamma": {
+          "x": 0,
+          "y": 65
+        },
+        "lift": {
+          "x": 0,
+          "y": -51
+        }
+      },
+      "mixer": [
+        {
+          "hue": -27,
+          "chroma": 35,
+          "brightness": 52
+        },
+        {
+          "hue": -14,
+          "chroma": 25,
+          "brightness": 38
+        },
+        {
+          "hue": -19,
+          "chroma": 15,
+          "brightness": 44
+        },
+        {
+          "hue": 13,
+          "chroma": -21,
+          "brightness": 0
+        },
+        {
+          "hue": 40,
+          "chroma": 18,
+          "brightness": 0
+        },
+        {
+          "hue": -55,
+          "chroma": -21,
+          "brightness": -62
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.049959,
+        0.103549,
+        0.164342,
+        0.234321,
+        0.311258,
+        0.392529,
+        0.475326,
+        0.556993,
+        0.630634,
+        0.704672,
+        0.772546,
+        0.832759,
+        0.883938,
+        0.926695,
+        0.963775,
+        0.997894
+      ]
+    },
+    {
+      "id": "np3-e9ad7877ee17",
+      "name": "colorsplash gilmar",
+      "filename": "colorsplash gilmar.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": 25,
+        "shadows": -20,
+        "whites": 25,
+        "blacks": 10,
+        "saturation": 25,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -58
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 11,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": -5,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": 20,
+          "brightness": 20
+        },
+        {
+          "hue": 10,
+          "chroma": -10,
+          "brightness": 5
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 15
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-74bc8e112de1",
+      "name": "cozy autumn leno",
+      "filename": "cozy autumn leno.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -15,
+        "highlights": -48,
+        "shadows": 48,
+        "whites": -31,
+        "blacks": -17,
+        "saturation": -2,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -76
+        },
+        "gamma": {
+          "x": 0,
+          "y": -74
+        },
+        "lift": {
+          "x": 0,
+          "y": 80
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 8,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-f4b36ae52529",
+      "name": "dawnhues leno",
+      "filename": "dawnhues leno.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -23,
+        "highlights": -29,
+        "shadows": 19,
+        "whites": 29,
+        "blacks": -17,
+        "saturation": 8,
+        "texture": 18,
+        "clarity": -32,
+        "sharpening": 24
+      },
+      "grading": {
+        "gain": {
+          "x": 1,
+          "y": -33
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -62
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 20,
+          "brightness": 9
+        },
+        {
+          "hue": -10,
+          "chroma": 20,
+          "brightness": 10
+        },
+        {
+          "hue": 5,
+          "chroma": 20,
+          "brightness": 10
+        },
+        {
+          "hue": 5,
+          "chroma": -20,
+          "brightness": -10
+        },
+        {
+          "hue": 40,
+          "chroma": -40,
+          "brightness": -10
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": -10
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-2c7d1a7f4224",
+      "name": "dgfilmlook danny",
+      "filename": "dgfilmlook danny.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": -50,
+        "shadows": -57,
+        "whites": 0,
+        "blacks": 8,
+        "saturation": -5,
+        "texture": 12,
+        "clarity": -4,
+        "sharpening": 16
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 68
+        },
+        "gamma": {
+          "x": 0,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": -47
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": -22
+        },
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": -5
+        },
+        {
+          "hue": -5,
+          "chroma": -20,
+          "brightness": -10
+        },
+        {
+          "hue": 1,
+          "chroma": -10,
+          "brightness": -12
+        },
+        {
+          "hue": 3,
+          "chroma": -20,
+          "brightness": -19
+        },
+        {
+          "hue": 0,
+          "chroma": -20,
+          "brightness": -33
+        },
+        {
+          "hue": -5,
+          "chroma": -16,
+          "brightness": -33
+        },
+        {
+          "hue": 0,
+          "chroma": -12,
+          "brightness": -30
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-d547c0c2493b",
+      "name": "fern lanharland",
+      "filename": "fern lanharland.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 68
+        },
+        "gamma": {
+          "x": 0,
+          "y": -62
+        },
+        "lift": {
+          "x": 0,
+          "y": -55
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -6,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -21,
+          "brightness": -10
+        },
+        {
+          "hue": 11,
+          "chroma": -25,
+          "brightness": -18
+        },
+        {
+          "hue": -4,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -8,
+          "chroma": 9,
+          "brightness": -15
+        },
+        {
+          "hue": 0,
+          "chroma": -30,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -30,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.01886,
+        0.046571,
+        0.091403,
+        0.154729,
+        0.23368,
+        0.323466,
+        0.416761,
+        0.506058,
+        0.581042,
+        0.651631,
+        0.713584,
+        0.767998,
+        0.816187,
+        0.859706,
+        0.900052,
+        0.93878
+      ]
+    },
+    {
+      "id": "np3-ed1491153c0f",
+      "name": "filmic fabio",
+      "filename": "filmic fabio.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": 9,
+        "clarity": -12,
+        "sharpening": 12
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 50
+        },
+        "gamma": {
+          "x": 0,
+          "y": -82
+        },
+        "lift": {
+          "x": 0,
+          "y": -57
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": -2,
+          "brightness": 14
+        },
+        {
+          "hue": 10,
+          "chroma": -5,
+          "brightness": 15
+        },
+        {
+          "hue": -27,
+          "chroma": 5,
+          "brightness": 30
+        },
+        {
+          "hue": -15,
+          "chroma": -40,
+          "brightness": 0
+        },
+        {
+          "hue": -4,
+          "chroma": -50,
+          "brightness": 10
+        },
+        {
+          "hue": -45,
+          "chroma": -30,
+          "brightness": -25
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": 15
+        },
+        {
+          "hue": 20,
+          "chroma": -35,
+          "brightness": 5
+        }
+      ],
+      "toneCurve": [
+        0.019593,
+        0.030671,
+        0.063723,
+        0.106113,
+        0.166753,
+        0.240089,
+        0.321268,
+        0.407178,
+        0.494644,
+        0.575121,
+        0.65627,
+        0.729362,
+        0.791009,
+        0.83816,
+        0.871639,
+        0.896084,
+        0.912809
+      ]
+    },
+    {
+      "id": "np3-1141c1f39be2",
+      "name": "filmpop leno",
+      "filename": "filmpop leno.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -46,
+        "highlights": -34,
+        "shadows": 45,
+        "whites": -85,
+        "blacks": 18,
+        "saturation": 12,
+        "texture": -18,
+        "clarity": -28,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -67
+        },
+        "gamma": {
+          "x": 0,
+          "y": -53
+        },
+        "lift": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "mixer": [
+        {
+          "hue": 13,
+          "chroma": 38,
+          "brightness": 9
+        },
+        {
+          "hue": -8,
+          "chroma": 5,
+          "brightness": 11
+        },
+        {
+          "hue": -62,
+          "chroma": 16,
+          "brightness": -12
+        },
+        {
+          "hue": 75,
+          "chroma": -46,
+          "brightness": -25
+        },
+        {
+          "hue": 26,
+          "chroma": 22,
+          "brightness": 0
+        },
+        {
+          "hue": 11,
+          "chroma": -3,
+          "brightness": 22
+        },
+        {
+          "hue": -40,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": 60,
+          "chroma": -6,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-b3aadb07f3a6",
+      "name": "FLEXIBLECOLOR-07",
+      "filename": "FLEXIBLECOLOR-07.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": 9,
+        "clarity": -12,
+        "sharpening": 12
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 50
+        },
+        "gamma": {
+          "x": 0,
+          "y": -82
+        },
+        "lift": {
+          "x": 0,
+          "y": -57
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": -2,
+          "brightness": 14
+        },
+        {
+          "hue": 10,
+          "chroma": -5,
+          "brightness": 15
+        },
+        {
+          "hue": -27,
+          "chroma": 5,
+          "brightness": 30
+        },
+        {
+          "hue": -15,
+          "chroma": -40,
+          "brightness": 0
+        },
+        {
+          "hue": -4,
+          "chroma": -50,
+          "brightness": 10
+        },
+        {
+          "hue": -45,
+          "chroma": -30,
+          "brightness": -25
+        },
+        {
+          "hue": 0,
+          "chroma": -40,
+          "brightness": 15
+        },
+        {
+          "hue": 20,
+          "chroma": -35,
+          "brightness": 5
+        }
+      ],
+      "toneCurve": [
+        0.019593,
+        0.028413,
+        0.057711,
+        0.098209,
+        0.157811,
+        0.230567,
+        0.311441,
+        0.39732,
+        0.485,
+        0.565935,
+        0.647908,
+        0.722129,
+        0.785333,
+        0.834468,
+        0.870327,
+        0.897427,
+        0.916501
+      ]
+    },
+    {
+      "id": "np3-9d98760a61d0",
+      "name": "glow lan harland",
+      "filename": "glow lan harland.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -24,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -58
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -53
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -20,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -16,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.007843,
+        0.019562,
+        0.052553,
+        0.104862,
+        0.181921,
+        0.275765,
+        0.377056,
+        0.476516,
+        0.567553,
+        0.64452,
+        0.71749,
+        0.780938,
+        0.835383,
+        0.882473,
+        0.924039,
+        0.961852,
+        0.997772
+      ]
+    },
+    {
+      "id": "np3-e356c97dcb60",
+      "name": "GLOW LANHARLAND",
+      "filename": "GLOW LANHARLAND.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -24,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -58
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -53
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -20,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -16,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.007843,
+        0.019562,
+        0.052553,
+        0.104862,
+        0.181921,
+        0.275765,
+        0.377056,
+        0.476516,
+        0.567553,
+        0.64452,
+        0.71749,
+        0.780938,
+        0.835383,
+        0.882473,
+        0.924039,
+        0.961852,
+        0.997772
+      ]
+    },
+    {
+      "id": "np3-9bf1a4486cdc",
+      "name": "glowup preston",
+      "filename": "glowup preston.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": -26,
+        "shadows": 22,
+        "whites": 20,
+        "blacks": -17,
+        "saturation": 39,
+        "texture": 45,
+        "clarity": 8,
+        "sharpening": 60
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -68
+        },
+        "gamma": {
+          "x": 0,
+          "y": -44
+        },
+        "lift": {
+          "x": 0,
+          "y": -49
+        }
+      },
+      "mixer": [
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": 4
+        },
+        {
+          "hue": -10,
+          "chroma": -7,
+          "brightness": 4
+        },
+        {
+          "hue": -11,
+          "chroma": -13,
+          "brightness": -3
+        },
+        {
+          "hue": 18,
+          "chroma": -56,
+          "brightness": 17
+        },
+        {
+          "hue": 20,
+          "chroma": -17,
+          "brightness": 11
+        },
+        {
+          "hue": -11,
+          "chroma": -13,
+          "brightness": -24
+        },
+        {
+          "hue": 10,
+          "chroma": 10,
+          "brightness": -15
+        },
+        {
+          "hue": 29,
+          "chroma": 20,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-89db001d8584",
+      "name": "goldendusk emili",
+      "filename": "goldendusk emili.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 12,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 1,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -66
+        },
+        "lift": {
+          "x": 0,
+          "y": -55
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 16,
+          "brightness": -19
+        },
+        {
+          "hue": -49,
+          "chroma": 7,
+          "brightness": 4
+        },
+        {
+          "hue": -100,
+          "chroma": -5,
+          "brightness": 29
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -1,
+          "brightness": -13
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.059236,
+        0.120426,
+        0.185492,
+        0.256203,
+        0.33198,
+        0.410749,
+        0.490432,
+        0.568957,
+        0.639668,
+        0.710013,
+        0.773125,
+        0.82812,
+        0.876431,
+        0.919675,
+        0.959532,
+        0.99765
+      ]
+    },
+    {
+      "id": "np3-4ceb07a49c1c",
+      "name": "hazy memories ju",
+      "filename": "hazy memories ju.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -10,
+        "highlights": -35,
+        "shadows": -79,
+        "whites": -41,
+        "blacks": -18,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -73
+        },
+        "gamma": {
+          "x": 0,
+          "y": -60
+        },
+        "lift": {
+          "x": 0,
+          "y": -92
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -27,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -11,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": -14,
+          "chroma": -26,
+          "brightness": 0
+        },
+        {
+          "hue": 4,
+          "chroma": 14,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -22,
+          "brightness": -12
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-2fe6fddc5eb4",
+      "name": "heartwarming yoh",
+      "filename": "heartwarming yoh.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 25,
+        "texture": 69,
+        "clarity": -4,
+        "sharpening": 92
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -37
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -63
+        }
+      },
+      "mixer": [
+        {
+          "hue": 6,
+          "chroma": -15,
+          "brightness": 10
+        },
+        {
+          "hue": 15,
+          "chroma": -15,
+          "brightness": 5
+        },
+        {
+          "hue": -5,
+          "chroma": -10,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": -5
+        },
+        {
+          "hue": -12,
+          "chroma": -10,
+          "brightness": 9
+        },
+        {
+          "hue": -28,
+          "chroma": -19,
+          "brightness": -10
+        },
+        {
+          "hue": 15,
+          "chroma": -30,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": -30,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.082339,
+        0.093204,
+        0.109653,
+        0.136174,
+        0.172857,
+        0.218604,
+        0.272286,
+        0.332774,
+        0.39903,
+        0.465316,
+        0.538102,
+        0.609455,
+        0.675741,
+        0.733757,
+        0.784143,
+        0.82934,
+        0.871883
+      ]
+    },
+    {
+      "id": "np3-c72bcafaff17",
+      "name": "hidanaei hanuka",
+      "filename": "hidanaei hanuka.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": -5,
+        "shadows": 90,
+        "whites": -5,
+        "blacks": 30,
+        "saturation": 10,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 76
+        },
+        "gamma": {
+          "x": 1,
+          "y": -24
+        },
+        "lift": {
+          "x": 0,
+          "y": -76
+        }
+      },
+      "mixer": [
+        {
+          "hue": 15,
+          "chroma": -10,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": -15,
+          "brightness": 0
+        },
+        {
+          "hue": 45,
+          "chroma": -10,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -55,
+          "chroma": 10,
+          "brightness": 0
+        },
+        {
+          "hue": -15,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 25,
+          "chroma": 10,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-feddb07a58e6",
+      "name": "hk reminisce hiu",
+      "filename": "hk reminisce hiu.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 64,
+        "highlights": 0,
+        "shadows": 36,
+        "whites": 0,
+        "blacks": -18,
+        "saturation": 45,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 56
+        },
+        "gamma": {
+          "x": 0,
+          "y": -62
+        },
+        "lift": {
+          "x": 0,
+          "y": 66
+        }
+      },
+      "mixer": [
+        {
+          "hue": 11,
+          "chroma": 18,
+          "brightness": 0
+        },
+        {
+          "hue": -25,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": -17,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -31,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 36,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-9d34150dadd0",
+      "name": "honey lan harland",
+      "filename": "honey lan harland.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -58
+        },
+        "gamma": {
+          "x": 0,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": -58
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -14,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -18,
+          "chroma": -9,
+          "brightness": -5
+        },
+        {
+          "hue": -30,
+          "chroma": -26,
+          "brightness": -18
+        },
+        {
+          "hue": -4,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": -2
+        },
+        {
+          "hue": 0,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.01175,
+        0.04059,
+        0.071352,
+        0.123295,
+        0.195471,
+        0.280862,
+        0.37318,
+        0.466445,
+        0.556749,
+        0.636097,
+        0.712241,
+        0.776727,
+        0.826716,
+        0.862484,
+        0.887539,
+        0.905362,
+        0.918607
+      ]
+    },
+    {
+      "id": "np3-838b5bde0995",
+      "name": "ht harmony hana",
+      "filename": "ht harmony hana.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 8,
+        "highlights": -27,
+        "shadows": 13,
+        "whites": 9,
+        "blacks": -10,
+        "saturation": 10,
+        "texture": 36,
+        "clarity": 8,
+        "sharpening": 48
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 52,
+          "chroma": 11,
+          "brightness": 16
+        },
+        {
+          "hue": -24,
+          "chroma": 16,
+          "brightness": -6
+        },
+        {
+          "hue": -37,
+          "chroma": 6,
+          "brightness": 8
+        },
+        {
+          "hue": -32,
+          "chroma": 0,
+          "brightness": -5
+        },
+        {
+          "hue": -83,
+          "chroma": 0,
+          "brightness": -19
+        },
+        {
+          "hue": -90,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -5,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-031b29c5214d",
+      "name": "indoorharmony ju",
+      "filename": "indoorharmony ju.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -30,
+        "highlights": -44,
+        "shadows": -43,
+        "whites": -63,
+        "blacks": 17,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 76
+        },
+        "gamma": {
+          "x": 0,
+          "y": -69
+        },
+        "lift": {
+          "x": 0,
+          "y": -60
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -18,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -11,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": -14,
+          "chroma": -26,
+          "brightness": 0
+        },
+        {
+          "hue": 4,
+          "chroma": 32,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -22,
+          "brightness": -12
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-0c7848f6c53f",
+      "name": "japanesque aras",
+      "filename": "japanesque aras.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -35
+        },
+        "gamma": {
+          "x": 0,
+          "y": 87
+        },
+        "lift": {
+          "x": 0,
+          "y": -85
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": 25,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -21,
+          "chroma": 39,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -22,
+          "chroma": 8,
+          "brightness": -45
+        },
+        {
+          "hue": 0,
+          "chroma": -15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -15,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.086276,
+        0.085726,
+        0.093142,
+        0.116489,
+        0.16364,
+        0.23835,
+        0.329264,
+        0.421979,
+        0.507279,
+        0.580462,
+        0.652211,
+        0.718284,
+        0.779687,
+        0.837306,
+        0.892056,
+        0.944914,
+        0.996765
+      ]
+    },
+    {
+      "id": "np3-85eb8abe5706",
+      "name": "KOTA CREEN TAKA",
+      "filename": "KOTA CREEN TAKA.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -12,
+        "highlights": -25,
+        "shadows": 26,
+        "whites": -29,
+        "blacks": -4,
+        "saturation": 9,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -44
+        },
+        "gamma": {
+          "x": 0,
+          "y": 50
+        },
+        "lift": {
+          "x": 1,
+          "y": -31
+        }
+      },
+      "mixer": [
+        {
+          "hue": 7,
+          "chroma": 0,
+          "brightness": -10
+        },
+        {
+          "hue": -9,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": 12,
+          "chroma": -20,
+          "brightness": 5
+        },
+        {
+          "hue": 57,
+          "chroma": -6,
+          "brightness": 9
+        },
+        {
+          "hue": -4,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -3,
+          "chroma": -8,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -13,
+          "brightness": 5
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-d531954ffc09",
+      "name": "kota green taka",
+      "filename": "kota green taka.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -12,
+        "highlights": -25,
+        "shadows": 26,
+        "whites": -29,
+        "blacks": -4,
+        "saturation": 9,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -44
+        },
+        "gamma": {
+          "x": 0,
+          "y": 50
+        },
+        "lift": {
+          "x": 1,
+          "y": -31
+        }
+      },
+      "mixer": [
+        {
+          "hue": 7,
+          "chroma": 0,
+          "brightness": -10
+        },
+        {
+          "hue": -9,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": 12,
+          "chroma": -20,
+          "brightness": 5
+        },
+        {
+          "hue": 57,
+          "chroma": -6,
+          "brightness": 9
+        },
+        {
+          "hue": -4,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -3,
+          "chroma": -8,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -13,
+          "brightness": 5
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-2f42127d3300",
+      "name": "Mattebluegray",
+      "filename": "Mattebluegray.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": -6,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 76
+        },
+        "gamma": {
+          "x": 0,
+          "y": 50
+        },
+        "lift": {
+          "x": 0,
+          "y": -66
+        }
+      },
+      "mixer": [
+        {
+          "hue": 7,
+          "chroma": -15,
+          "brightness": 4
+        },
+        {
+          "hue": -3,
+          "chroma": -5,
+          "brightness": 20
+        },
+        {
+          "hue": 1,
+          "chroma": -8,
+          "brightness": 9
+        },
+        {
+          "hue": -9,
+          "chroma": -12,
+          "brightness": 24
+        },
+        {
+          "hue": 5,
+          "chroma": -15,
+          "brightness": 0
+        },
+        {
+          "hue": -12,
+          "chroma": -16,
+          "brightness": -4
+        },
+        {
+          "hue": 9,
+          "chroma": -3,
+          "brightness": 5
+        },
+        {
+          "hue": 3,
+          "chroma": -4,
+          "brightness": 5
+        }
+      ],
+      "toneCurve": [
+        0.157567,
+        0.167028,
+        0.182196,
+        0.205329,
+        0.240822,
+        0.29313,
+        0.36494,
+        0.448531,
+        0.532212,
+        0.60271,
+        0.668996,
+        0.727409,
+        0.779229,
+        0.82577,
+        0.868313,
+        0.90817,
+        0.946623
+      ]
+    },
+    {
+      "id": "np3-498ba81e9d82",
+      "name": "mninght blush",
+      "filename": "mninght blush.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -74,
+        "highlights": 11,
+        "shadows": -30,
+        "whites": -5,
+        "blacks": -60,
+        "saturation": 1,
+        "texture": 27,
+        "clarity": -16,
+        "sharpening": 36
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -86
+        },
+        "gamma": {
+          "x": 0,
+          "y": 80
+        },
+        "lift": {
+          "x": 0,
+          "y": -77
+        }
+      },
+      "mixer": [
+        {
+          "hue": 2,
+          "chroma": 20,
+          "brightness": 12
+        },
+        {
+          "hue": -7,
+          "chroma": 12,
+          "brightness": 19
+        },
+        {
+          "hue": 8,
+          "chroma": -48,
+          "brightness": 5
+        },
+        {
+          "hue": -25,
+          "chroma": -54,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -65,
+          "brightness": 17
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-e16b2be5f375",
+      "name": "moody gr brittanyk",
+      "filename": "moody gr brittanyk.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 6,
+        "highlights": 9,
+        "shadows": 12,
+        "whites": 8,
+        "blacks": -17,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 0,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 57
+        },
+        "gamma": {
+          "x": 1,
+          "y": -30
+        },
+        "lift": {
+          "x": 0,
+          "y": -79
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 1,
+          "chroma": 8,
+          "brightness": 1
+        },
+        {
+          "hue": 0,
+          "chroma": 29,
+          "brightness": 81
+        },
+        {
+          "hue": 95,
+          "chroma": -32,
+          "brightness": -3
+        },
+        {
+          "hue": 38,
+          "chroma": 25,
+          "brightness": 0
+        },
+        {
+          "hue": -30,
+          "chroma": -40,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-deb0ad763f26",
+      "name": "moodyshadows g",
+      "filename": "moodyshadows g.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": -30,
+        "shadows": -30,
+        "whites": -40,
+        "blacks": 10,
+        "saturation": -5,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": -51
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": -24
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": -10
+        },
+        {
+          "hue": 5,
+          "chroma": 40,
+          "brightness": -20
+        },
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": -19
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 35,
+          "brightness": -45
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-6f9835756830",
+      "name": "moodyshadows",
+      "filename": "moodyshadows.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": -30,
+        "shadows": -30,
+        "whites": -40,
+        "blacks": 10,
+        "saturation": -5,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": -51
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": -24
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": -10
+        },
+        {
+          "hue": 5,
+          "chroma": 40,
+          "brightness": -20
+        },
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": -19
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 35,
+          "brightness": -45
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-dafdc847bd96",
+      "name": "MSLT-Portra400-V1",
+      "filename": "MSLT-Portra400-V1.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 0,
+        "clarity": 0,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 59
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -61
+        }
+      },
+      "mixer": [
+        {
+          "hue": 11,
+          "chroma": -1,
+          "brightness": 6
+        },
+        {
+          "hue": 8,
+          "chroma": 0,
+          "brightness": 7
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 8
+        },
+        {
+          "hue": 4,
+          "chroma": -8,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -16,
+          "chroma": -7,
+          "brightness": 11
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.031373,
+        0.059175,
+        0.093814,
+        0.140996,
+        0.202063,
+        0.277169,
+        0.364177,
+        0.458846,
+        0.556749,
+        0.647572,
+        0.739189,
+        0.821131,
+        0.888943,
+        0.938353,
+        0.969298,
+        0.987579,
+        0.999329
+      ]
+    },
+    {
+      "id": "np3-7afef75098eb",
+      "name": "mv green orange",
+      "filename": "mv green orange.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 30,
+        "highlights": 52,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 21,
+        "texture": 57,
+        "clarity": 28,
+        "sharpening": 76
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 32
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -48,
+          "chroma": 20,
+          "brightness": 43
+        },
+        {
+          "hue": -43,
+          "chroma": 7,
+          "brightness": 0
+        },
+        {
+          "hue": 58,
+          "chroma": 57,
+          "brightness": 0
+        },
+        {
+          "hue": -100,
+          "chroma": 39,
+          "brightness": 19
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-f9e7822b29ca",
+      "name": "nature links",
+      "filename": "nature links.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 18,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -12,
+          "chroma": 19,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.02353,
+        0.054048,
+        0.096377,
+        0.159856,
+        0.241615,
+        0.334971,
+        0.43321,
+        0.529679,
+        0.617725,
+        0.689108,
+        0.754326,
+        0.80987,
+        0.857295,
+        0.898251,
+        0.934294,
+        0.96704,
+        0.998077
+      ]
+    },
+    {
+      "id": "np3-1c4659d4f4a7",
+      "name": "NEG YECY 01A",
+      "filename": "NEG YECY 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -20,
+        "highlights": -5,
+        "shadows": 0,
+        "whites": -10,
+        "blacks": -40,
+        "saturation": -15,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 2,
+          "chroma": -7,
+          "brightness": 11
+        },
+        {
+          "hue": 5,
+          "chroma": -7,
+          "brightness": 9
+        },
+        {
+          "hue": 5,
+          "chroma": 20,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 13,
+          "brightness": -14
+        },
+        {
+          "hue": 2,
+          "chroma": 20,
+          "brightness": -14
+        },
+        {
+          "hue": -3,
+          "chroma": 5,
+          "brightness": 8
+        },
+        {
+          "hue": -5,
+          "chroma": -25,
+          "brightness": 12
+        },
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": 14
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-83a3ff062f31",
+      "name": "NEGA BU 01A",
+      "filename": "NEGA BU 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": -30,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -40
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -93
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -15,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 5
+        },
+        {
+          "hue": -45,
+          "chroma": 5,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": -15,
+          "brightness": 5
+        },
+        {
+          "hue": 5,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": 10
+        },
+        {
+          "hue": -45,
+          "chroma": -15,
+          "brightness": -15
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-ca56c5923e2b",
+      "name": "NEGA BU 01B",
+      "filename": "NEGA BU 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": -20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -40
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -93
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -15,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 5
+        },
+        {
+          "hue": -45,
+          "chroma": 5,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": -15,
+          "brightness": 5
+        },
+        {
+          "hue": 5,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": 10
+        },
+        {
+          "hue": -45,
+          "chroma": -15,
+          "brightness": -15
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-dbf5cbbca0a0",
+      "name": "NEGA CY 01A",
+      "filename": "NEGA CY 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -70,
+        "whites": 0,
+        "blacks": -15,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -21
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -77
+        }
+      },
+      "mixer": [
+        {
+          "hue": 20,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": -5
+        },
+        {
+          "hue": -10,
+          "chroma": -5,
+          "brightness": -2
+        },
+        {
+          "hue": 35,
+          "chroma": -30,
+          "brightness": -32
+        },
+        {
+          "hue": 40,
+          "chroma": 25,
+          "brightness": -40
+        },
+        {
+          "hue": -10,
+          "chroma": -15,
+          "brightness": -5
+        },
+        {
+          "hue": 5,
+          "chroma": -50,
+          "brightness": 5
+        },
+        {
+          "hue": 60,
+          "chroma": -15,
+          "brightness": 10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-2dbdeded77c9",
+      "name": "NEGA CYBU 01A",
+      "filename": "NEGA CYBU 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -36
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 10
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -45,
+          "chroma": -10,
+          "brightness": -10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-86ae6398b916",
+      "name": "NEGA CYBU 01B",
+      "filename": "NEGA CYBU 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -36
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 10
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -45,
+          "chroma": -10,
+          "brightness": -10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-412e71b632a8",
+      "name": "NEGA GNCY 01A",
+      "filename": "NEGA GNCY 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -28
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 92
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": 10,
+          "brightness": -5
+        },
+        {
+          "hue": 15,
+          "chroma": 5,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 5
+        },
+        {
+          "hue": -40,
+          "chroma": 15,
+          "brightness": 20
+        },
+        {
+          "hue": 25,
+          "chroma": 5,
+          "brightness": 25
+        },
+        {
+          "hue": 5,
+          "chroma": -5,
+          "brightness": 25
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 5
+        },
+        {
+          "hue": -35,
+          "chroma": 10,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-1fc4b6f35378",
+      "name": "NEGA GNCY 01B",
+      "filename": "NEGA GNCY 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -28
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 92
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": 10,
+          "brightness": -5
+        },
+        {
+          "hue": 15,
+          "chroma": 5,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 5
+        },
+        {
+          "hue": -40,
+          "chroma": 15,
+          "brightness": 20
+        },
+        {
+          "hue": 25,
+          "chroma": 5,
+          "brightness": 25
+        },
+        {
+          "hue": 5,
+          "chroma": -5,
+          "brightness": 25
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": 5
+        },
+        {
+          "hue": -35,
+          "chroma": 10,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-f4f25f1ecda4",
+      "name": "NEGA RDCY 01B",
+      "filename": "NEGA RDCY 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -21
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 92
+        }
+      },
+      "mixer": [
+        {
+          "hue": -30,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 15,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": 10,
+          "chroma": 25,
+          "brightness": 5
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 15,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": -10,
+          "brightness": 25
+        },
+        {
+          "hue": -25,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-bf9b94aa7ceb",
+      "name": "NEGA RDCY01A",
+      "filename": "NEGA RDCY01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -21
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 92
+        }
+      },
+      "mixer": [
+        {
+          "hue": -30,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 15,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": 10,
+          "chroma": 25,
+          "brightness": 5
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 15,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": -10,
+          "brightness": 25
+        },
+        {
+          "hue": -25,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-d91faf864171",
+      "name": "NEGA T 01B",
+      "filename": "NEGA T 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 10,
+        "shadows": -40,
+        "whites": 5,
+        "blacks": -5,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -32
+        },
+        "gamma": {
+          "x": 0,
+          "y": -81
+        },
+        "lift": {
+          "x": 0,
+          "y": 88
+        }
+      },
+      "mixer": [
+        {
+          "hue": -55,
+          "chroma": -15,
+          "brightness": -20
+        },
+        {
+          "hue": 30,
+          "chroma": -15,
+          "brightness": 20
+        },
+        {
+          "hue": 10,
+          "chroma": 20,
+          "brightness": 15
+        },
+        {
+          "hue": -35,
+          "chroma": -5,
+          "brightness": 30
+        },
+        {
+          "hue": 40,
+          "chroma": -15,
+          "brightness": 35
+        },
+        {
+          "hue": 10,
+          "chroma": -15,
+          "brightness": -25
+        },
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": -30
+        },
+        {
+          "hue": 30,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-7bdb265f1d3d",
+      "name": "NEGA T01A",
+      "filename": "NEGA T01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -25,
+        "highlights": -10,
+        "shadows": -30,
+        "whites": -5,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -32
+        },
+        "gamma": {
+          "x": 0,
+          "y": -81
+        },
+        "lift": {
+          "x": 0,
+          "y": 88
+        }
+      },
+      "mixer": [
+        {
+          "hue": -55,
+          "chroma": -15,
+          "brightness": -20
+        },
+        {
+          "hue": 30,
+          "chroma": -15,
+          "brightness": 20
+        },
+        {
+          "hue": 10,
+          "chroma": 20,
+          "brightness": 15
+        },
+        {
+          "hue": -35,
+          "chroma": -5,
+          "brightness": 30
+        },
+        {
+          "hue": 40,
+          "chroma": -15,
+          "brightness": 35
+        },
+        {
+          "hue": 10,
+          "chroma": -15,
+          "brightness": -25
+        },
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": -30
+        },
+        {
+          "hue": 30,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-45bc29917f3f",
+      "name": "NEGA YE 01A",
+      "filename": "NEGA YE 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 92
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -85
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -10,
+          "brightness": -5
+        },
+        {
+          "hue": 30,
+          "chroma": -5,
+          "brightness": 10
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 20
+        },
+        {
+          "hue": -40,
+          "chroma": 10,
+          "brightness": 10
+        },
+        {
+          "hue": -5,
+          "chroma": -25,
+          "brightness": 0
+        },
+        {
+          "hue": 15,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": -5,
+          "chroma": -10,
+          "brightness": -20
+        },
+        {
+          "hue": -20,
+          "chroma": 5,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-3e0f65e54b04",
+      "name": "NEGA YE 01B",
+      "filename": "NEGA YE 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 92
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -85
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -10,
+          "brightness": -5
+        },
+        {
+          "hue": 30,
+          "chroma": -5,
+          "brightness": 10
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 20
+        },
+        {
+          "hue": -40,
+          "chroma": 10,
+          "brightness": 10
+        },
+        {
+          "hue": -5,
+          "chroma": -25,
+          "brightness": 0
+        },
+        {
+          "hue": 15,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": -5,
+          "chroma": -10,
+          "brightness": -20
+        },
+        {
+          "hue": -20,
+          "chroma": 5,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-470c1a30d0a6",
+      "name": "NEGA YE 02A",
+      "filename": "NEGA YE 02A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": -10,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -51
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -93
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -20,
+          "brightness": -5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 10,
+          "chroma": 40,
+          "brightness": 20
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 15
+        },
+        {
+          "hue": 25,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": -15,
+          "brightness": 10
+        },
+        {
+          "hue": -5,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -35,
+          "chroma": -15,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-a1039ec95462",
+      "name": "NEGA YE 02B",
+      "filename": "NEGA YE 02B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -20,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -51
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -93
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -20,
+          "brightness": -5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 10,
+          "chroma": 40,
+          "brightness": 20
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 15
+        },
+        {
+          "hue": 25,
+          "chroma": -20,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": -15,
+          "brightness": 10
+        },
+        {
+          "hue": -5,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -35,
+          "chroma": -15,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-1855ad8d3e7e",
+      "name": "NEGA YE 03A",
+      "filename": "NEGA YE 03A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -15,
+        "highlights": -10,
+        "shadows": -15,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -32
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": 20,
+          "chroma": -35,
+          "brightness": 15
+        },
+        {
+          "hue": 35,
+          "chroma": -5,
+          "brightness": 20
+        },
+        {
+          "hue": 15,
+          "chroma": 45,
+          "brightness": 15
+        },
+        {
+          "hue": -50,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": 20,
+          "chroma": -25,
+          "brightness": 5
+        },
+        {
+          "hue": 10,
+          "chroma": -20,
+          "brightness": -5
+        },
+        {
+          "hue": -25,
+          "chroma": -15,
+          "brightness": 15
+        },
+        {
+          "hue": -15,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-c902622b8f3d",
+      "name": "NEGA YE 03B",
+      "filename": "NEGA YE 03B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 25,
+        "highlights": 10,
+        "shadows": -20,
+        "whites": 10,
+        "blacks": -25,
+        "saturation": 30,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -32
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": 20,
+          "chroma": -35,
+          "brightness": 15
+        },
+        {
+          "hue": 35,
+          "chroma": -5,
+          "brightness": 20
+        },
+        {
+          "hue": 15,
+          "chroma": 45,
+          "brightness": 15
+        },
+        {
+          "hue": -50,
+          "chroma": -5,
+          "brightness": -5
+        },
+        {
+          "hue": 20,
+          "chroma": -25,
+          "brightness": 5
+        },
+        {
+          "hue": 10,
+          "chroma": -20,
+          "brightness": -5
+        },
+        {
+          "hue": -25,
+          "chroma": -15,
+          "brightness": 15
+        },
+        {
+          "hue": -15,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-9a5915e11e84",
+      "name": "NEGA YECY 02A",
+      "filename": "NEGA YECY 02A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": -8,
+        "shadows": -12,
+        "whites": -10,
+        "blacks": -40,
+        "saturation": -15,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 4,
+          "chroma": -5,
+          "brightness": 22
+        },
+        {
+          "hue": 5,
+          "chroma": 2,
+          "brightness": 18
+        },
+        {
+          "hue": -5,
+          "chroma": 15,
+          "brightness": 8
+        },
+        {
+          "hue": -10,
+          "chroma": 10,
+          "brightness": -16
+        },
+        {
+          "hue": 21,
+          "chroma": 25,
+          "brightness": -9
+        },
+        {
+          "hue": -20,
+          "chroma": 6,
+          "brightness": 8
+        },
+        {
+          "hue": -4,
+          "chroma": -14,
+          "brightness": 16
+        },
+        {
+          "hue": 6,
+          "chroma": -15,
+          "brightness": 27
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-dccb7fa48b33",
+      "name": "NEGA YEGN 01A",
+      "filename": "NEGA YEGN 01A.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 5,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 10,
+        "blacks": -10,
+        "saturation": 10,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 43
+        },
+        "gamma": {
+          "x": 1,
+          "y": -33
+        },
+        "lift": {
+          "x": 0,
+          "y": -21
+        }
+      },
+      "mixer": [
+        {
+          "hue": -40,
+          "chroma": -20,
+          "brightness": -30
+        },
+        {
+          "hue": 45,
+          "chroma": 5,
+          "brightness": 10
+        },
+        {
+          "hue": 10,
+          "chroma": 55,
+          "brightness": 20
+        },
+        {
+          "hue": -35,
+          "chroma": 25,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": -50,
+          "brightness": -5
+        },
+        {
+          "hue": 15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -15,
+          "chroma": 5,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-763dc999df8d",
+      "name": "NEGA YEGN 01B",
+      "filename": "NEGA YEGN 01B.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 40,
+        "highlights": 20,
+        "shadows": -10,
+        "whites": 10,
+        "blacks": -10,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -16,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 43
+        },
+        "gamma": {
+          "x": 1,
+          "y": -33
+        },
+        "lift": {
+          "x": 0,
+          "y": -21
+        }
+      },
+      "mixer": [
+        {
+          "hue": -40,
+          "chroma": -20,
+          "brightness": -30
+        },
+        {
+          "hue": 45,
+          "chroma": 5,
+          "brightness": 10
+        },
+        {
+          "hue": 10,
+          "chroma": 55,
+          "brightness": 20
+        },
+        {
+          "hue": -35,
+          "chroma": 25,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": -50,
+          "brightness": -5
+        },
+        {
+          "hue": 15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -15,
+          "chroma": 5,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -25,
+          "brightness": -5
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-db01edb51215",
+      "name": "NEGATIVE CY BU",
+      "filename": "NEGATIVE CY BU.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -36
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 10
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -45,
+          "chroma": -10,
+          "brightness": -10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-eea4889eee50",
+      "name": "Negative Cyan01a",
+      "filename": "Negative Cyan01a .NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -70,
+        "whites": 0,
+        "blacks": -15,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -21
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -77
+        }
+      },
+      "mixer": [
+        {
+          "hue": 20,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": -5
+        },
+        {
+          "hue": -10,
+          "chroma": -5,
+          "brightness": -2
+        },
+        {
+          "hue": 35,
+          "chroma": -30,
+          "brightness": -32
+        },
+        {
+          "hue": 40,
+          "chroma": 25,
+          "brightness": -40
+        },
+        {
+          "hue": -10,
+          "chroma": -15,
+          "brightness": -5
+        },
+        {
+          "hue": 5,
+          "chroma": -50,
+          "brightness": 5
+        },
+        {
+          "hue": 60,
+          "chroma": -15,
+          "brightness": 10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-5b5340271904",
+      "name": "negative cybu 01a",
+      "filename": "negative cybu 01a.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": -5,
+        "whites": 10,
+        "blacks": -15,
+        "saturation": 20,
+        "texture": -18,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -36
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": 84
+        }
+      },
+      "mixer": [
+        {
+          "hue": -15,
+          "chroma": -15,
+          "brightness": -10
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 15
+        },
+        {
+          "hue": 5,
+          "chroma": 45,
+          "brightness": 10
+        },
+        {
+          "hue": -40,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 20,
+          "chroma": -10,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": -15,
+          "chroma": -5,
+          "brightness": -15
+        },
+        {
+          "hue": -45,
+          "chroma": -10,
+          "brightness": -10
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-fcce67e54190",
+      "name": "neon glow brando",
+      "filename": "neon glow brando.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 8,
+        "texture": 24,
+        "clarity": 12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 93
+        },
+        "gamma": {
+          "x": 1,
+          "y": -37
+        },
+        "lift": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": 5
+        },
+        {
+          "hue": 27,
+          "chroma": 30,
+          "brightness": 45
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 35
+        },
+        {
+          "hue": 0,
+          "chroma": -62,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -15,
+          "chroma": -25,
+          "brightness": 100
+        },
+        {
+          "hue": 35,
+          "chroma": 40,
+          "brightness": 0
+        },
+        {
+          "hue": -5,
+          "chroma": -19,
+          "brightness": 15
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.050386,
+        0.112949,
+        0.177129,
+        0.251289,
+        0.347118,
+        0.456526,
+        0.560747,
+        0.646809,
+        0.712607,
+        0.770714,
+        0.820307,
+        0.863826,
+        0.902524,
+        0.937651,
+        0.970397,
+        1
+      ]
+    },
+    {
+      "id": "np3-8d1f3aad7f8f",
+      "name": "nighta like dondre",
+      "filename": "nighta like dondre.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 67,
+        "highlights": -15,
+        "shadows": 20,
+        "whites": -13,
+        "blacks": -52,
+        "saturation": 17,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -53
+        },
+        "gamma": {
+          "x": 0,
+          "y": 74
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-579960f08348",
+      "name": "painterly light da",
+      "filename": "painterly light da.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 51,
+        "highlights": 40,
+        "shadows": 12,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 21,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 71
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": 22
+        },
+        {
+          "hue": 0,
+          "chroma": 13,
+          "brightness": 31
+        },
+        {
+          "hue": -5,
+          "chroma": 15,
+          "brightness": 44
+        },
+        {
+          "hue": 44,
+          "chroma": 0,
+          "brightness": -58
+        },
+        {
+          "hue": 25,
+          "chroma": 0,
+          "brightness": -12
+        },
+        {
+          "hue": -20,
+          "chroma": 24,
+          "brightness": -50
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 7
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-cfc42487972f",
+      "name": "pastelpink yuki",
+      "filename": "pastelpink yuki.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 5,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 1,
+          "y": -43
+        },
+        "gamma": {
+          "x": 0,
+          "y": 88
+        },
+        "lift": {
+          "x": 1,
+          "y": -78
+        }
+      },
+      "mixer": [
+        {
+          "hue": 12,
+          "chroma": -10,
+          "brightness": -10
+        },
+        {
+          "hue": 0,
+          "chroma": -1,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -5,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": -30
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": -31
+        }
+      ],
+      "toneCurve": [
+        0.050966,
+        0.074496,
+        0.103519,
+        0.143559,
+        0.198248,
+        0.264534,
+        0.337992,
+        0.414136,
+        0.48854,
+        0.553606,
+        0.618305,
+        0.67925,
+        0.737663,
+        0.794671,
+        0.851375,
+        0.9082,
+        0.965087
+      ]
+    },
+    {
+      "id": "np3-e235a9862c5d",
+      "name": "primarypop gilmar",
+      "filename": "primarypop gilmar.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": 40,
+        "shadows": -50,
+        "whites": 15,
+        "blacks": 15,
+        "saturation": -10,
+        "texture": 24,
+        "clarity": -24,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 5,
+          "chroma": 25,
+          "brightness": -24
+        },
+        {
+          "hue": 5,
+          "chroma": -15,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": 60,
+          "brightness": -10
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 25,
+          "brightness": -20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-34c679a0eef2",
+      "name": "redm luizclas",
+      "filename": "redm luizclas.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 54,
+        "clarity": 8,
+        "sharpening": 72
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -83
+        },
+        "gamma": {
+          "x": 0,
+          "y": -69
+        },
+        "lift": {
+          "x": 0,
+          "y": -52
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 28,
+          "brightness": 0
+        },
+        {
+          "hue": -3,
+          "chroma": 5,
+          "brightness": 7
+        },
+        {
+          "hue": -34,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.074496,
+        0.088412,
+        0.107456,
+        0.135228,
+        0.176275,
+        0.235054,
+        0.312052,
+        0.400861,
+        0.49443,
+        0.580187,
+        0.663167,
+        0.735435,
+        0.7987,
+        0.854732,
+        0.905301,
+        0.952208,
+        0.997223
+      ]
+    },
+    {
+      "id": "np3-dd74b33790ea",
+      "name": "rose old film hina",
+      "filename": "rose old film hina.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": -5,
+        "texture": 45,
+        "clarity": 28,
+        "sharpening": 60
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 65
+        },
+        "gamma": {
+          "x": 0,
+          "y": -93
+        },
+        "lift": {
+          "x": 0,
+          "y": -77
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 15,
+          "chroma": -18,
+          "brightness": 43
+        },
+        {
+          "hue": 0,
+          "chroma": -35,
+          "brightness": -9
+        },
+        {
+          "hue": 8,
+          "chroma": -32,
+          "brightness": -72
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 15,
+          "chroma": 3,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 19,
+          "chroma": -14,
+          "brightness": 27
+        }
+      ],
+      "toneCurve": [
+        0.0571,
+        0.083193,
+        0.119266,
+        0.158269,
+        0.20188,
+        0.250282,
+        0.301553,
+        0.353557,
+        0.404248,
+        0.44966,
+        0.498245,
+        0.550096,
+        0.608417,
+        0.674917,
+        0.747887,
+        0.82522,
+        0.904813
+      ]
+    },
+    {
+      "id": "np3-62cb44e6994c",
+      "name": "setouchiblue noci",
+      "filename": "setouchiblue noci.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": -35,
+        "shadows": 0,
+        "whites": 9,
+        "blacks": 0,
+        "saturation": -13,
+        "texture": 12,
+        "clarity": 8,
+        "sharpening": 16
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 54
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -77
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-052b68746347",
+      "name": "shadefall brittany",
+      "filename": "shadefall brittany.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 39,
+        "clarity": -4,
+        "sharpening": 52
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 34,
+          "brightness": 0
+        },
+        {
+          "hue": -63,
+          "chroma": 35,
+          "brightness": 0
+        },
+        {
+          "hue": -94,
+          "chroma": 25,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-5571aa015d94",
+      "name": "sky mistfilm hinano",
+      "filename": "sky mistfilm hinano.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 5,
+        "texture": 45,
+        "clarity": 8,
+        "sharpening": 60
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 37
+        },
+        "gamma": {
+          "x": 0,
+          "y": -75
+        },
+        "lift": {
+          "x": 0,
+          "y": 47
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -7,
+          "brightness": 0
+        },
+        {
+          "hue": 7,
+          "chroma": -18,
+          "brightness": 43
+        },
+        {
+          "hue": 0,
+          "chroma": -35,
+          "brightness": -9
+        },
+        {
+          "hue": 12,
+          "chroma": -46,
+          "brightness": -70
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -42,
+          "chroma": 7,
+          "brightness": -18
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 19,
+          "chroma": -33,
+          "brightness": 9
+        }
+      ],
+      "toneCurve": [
+        0.087497,
+        0.094333,
+        0.107425,
+        0.13007,
+        0.167333,
+        0.218421,
+        0.278207,
+        0.341472,
+        0.403272,
+        0.459243,
+        0.519303,
+        0.582415,
+        0.651296,
+        0.726951,
+        0.807947,
+        0.892483,
+        0.978881
+      ]
+    },
+    {
+      "id": "np3-af93b8f28df3",
+      "name": "soft vivid vijay",
+      "filename": "soft vivid vijay.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 98,
+        "highlights": 25,
+        "shadows": 75,
+        "whites": -25,
+        "blacks": 10,
+        "saturation": 10,
+        "texture": 39,
+        "clarity": -28,
+        "sharpening": 52
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 8,
+          "chroma": -55,
+          "brightness": 50
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 30,
+          "chroma": 8,
+          "brightness": 30
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-950300c82fc7",
+      "name": "softfilm leno",
+      "filename": "softfilm leno.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -38,
+        "highlights": -64,
+        "shadows": 52,
+        "whites": -33,
+        "blacks": -40,
+        "saturation": -10,
+        "texture": 0,
+        "clarity": -32,
+        "sharpening": 0
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -67
+        },
+        "gamma": {
+          "x": 0,
+          "y": -73
+        },
+        "lift": {
+          "x": 0,
+          "y": 68
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-1967aea8eef6",
+      "name": "softglow harpreet",
+      "filename": "softglow harpreet.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 3,
+        "texture": 12,
+        "clarity": -12,
+        "sharpening": 16
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -46
+        },
+        "gamma": {
+          "x": 0,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 5,
+          "brightness": 3
+        },
+        {
+          "hue": 1,
+          "chroma": 4,
+          "brightness": -10
+        },
+        {
+          "hue": -22,
+          "chroma": -3,
+          "brightness": 0
+        },
+        {
+          "hue": -37,
+          "chroma": 12,
+          "brightness": -23
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 11,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.054109,
+        0.109653,
+        0.168035,
+        0.230384,
+        0.296213,
+        0.364544,
+        0.434431,
+        0.504898,
+        0.570635,
+        0.639485,
+        0.706107,
+        0.769524,
+        0.829432,
+        0.886685,
+        0.942106,
+        0.996612
+      ]
+    },
+    {
+      "id": "np3-153b696cb4e7",
+      "name": "summershine do",
+      "filename": "summershine do.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -58
+        },
+        "gamma": {
+          "x": 1,
+          "y": -75
+        },
+        "lift": {
+          "x": 0,
+          "y": -71
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.039216,
+        0.039216,
+        0.061007,
+        0.111606,
+        0.162603,
+        0.21424,
+        0.266823,
+        0.320566,
+        0.375744,
+        0.428663,
+        0.486282,
+        0.544877,
+        0.604297,
+        0.664388,
+        0.724967,
+        0.785852,
+        0.839228
+      ]
+    },
+    {
+      "id": "np3-a9e261d97150",
+      "name": "sunkissedcool",
+      "filename": "sunkissedcool.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -10,
+        "highlights": -76,
+        "shadows": -79,
+        "whites": -83,
+        "blacks": 17,
+        "saturation": 0,
+        "texture": 3,
+        "clarity": -36,
+        "sharpening": 4
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -69
+        },
+        "gamma": {
+          "x": 0,
+          "y": 83
+        },
+        "lift": {
+          "x": 0,
+          "y": 89
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -27,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -11,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": -14,
+          "chroma": -26,
+          "brightness": 0
+        },
+        {
+          "hue": 4,
+          "chroma": 14,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -22,
+          "brightness": -12
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-a70d9801baaa",
+      "name": "sunkisssedwarm",
+      "filename": "sunkisssedwarm.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -10,
+        "highlights": -76,
+        "shadows": -79,
+        "whites": -83,
+        "blacks": -18,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -12,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -69
+        },
+        "gamma": {
+          "x": 0,
+          "y": -56
+        },
+        "lift": {
+          "x": 1,
+          "y": -23
+        }
+      },
+      "mixer": [
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -27,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -11,
+          "chroma": -16,
+          "brightness": 0
+        },
+        {
+          "hue": -14,
+          "chroma": -26,
+          "brightness": 0
+        },
+        {
+          "hue": 4,
+          "chroma": 14,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 30,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -22,
+          "brightness": -12
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-80f966f29bbb",
+      "name": "sunlight happy da",
+      "filename": "sunlight happy da.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 32,
+        "highlights": 24,
+        "shadows": 15,
+        "whites": 42,
+        "blacks": -20,
+        "saturation": 17,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -73
+        }
+      },
+      "mixer": [
+        {
+          "hue": 8,
+          "chroma": 0,
+          "brightness": 11
+        },
+        {
+          "hue": -1,
+          "chroma": 24,
+          "brightness": 60
+        },
+        {
+          "hue": -41,
+          "chroma": 28,
+          "brightness": 53
+        },
+        {
+          "hue": -3,
+          "chroma": 5,
+          "brightness": -11
+        },
+        {
+          "hue": 0,
+          "chroma": 10,
+          "brightness": -15
+        },
+        {
+          "hue": 12,
+          "chroma": 4,
+          "brightness": -19
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 13,
+          "chroma": -2,
+          "brightness": 21
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-7d619f440abd",
+      "name": "sunsetfilm jkboy",
+      "filename": "sunsetfilm jkboy.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": 0,
+        "shadows": 45,
+        "whites": 5,
+        "blacks": -20,
+        "saturation": -25,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 1,
+          "brightness": 15
+        },
+        {
+          "hue": 8,
+          "chroma": 8,
+          "brightness": 20
+        },
+        {
+          "hue": -20,
+          "chroma": 0,
+          "brightness": 15
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -76,
+          "brightness": -74
+        },
+        {
+          "hue": 0,
+          "chroma": -97,
+          "brightness": -100
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-fe8450e375d8",
+      "name": "sunsetglow mikan",
+      "filename": "sunsetglow mikan.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": -20,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -43
+        },
+        "gamma": {
+          "x": 0,
+          "y": -66
+        },
+        "lift": {
+          "x": 0,
+          "y": -71
+        }
+      },
+      "mixer": [
+        {
+          "hue": 25,
+          "chroma": 10,
+          "brightness": -20
+        },
+        {
+          "hue": 5,
+          "chroma": 40,
+          "brightness": 21
+        },
+        {
+          "hue": -20,
+          "chroma": -20,
+          "brightness": 30
+        },
+        {
+          "hue": -30,
+          "chroma": -20,
+          "brightness": -40
+        },
+        {
+          "hue": -30,
+          "chroma": -30,
+          "brightness": 0
+        },
+        {
+          "hue": -30,
+          "chroma": -25,
+          "brightness": 20
+        },
+        {
+          "hue": 65,
+          "chroma": -50,
+          "brightness": 0
+        },
+        {
+          "hue": 30,
+          "chroma": -40,
+          "brightness": 10
+        }
+      ],
+      "toneCurve": [
+        0.058809,
+        0.073366,
+        0.094119,
+        0.127262,
+        0.177435,
+        0.24604,
+        0.33375,
+        0.434065,
+        0.534104,
+        0.61916,
+        0.699271,
+        0.768181,
+        0.826746,
+        0.876888,
+        0.920713,
+        0.960295,
+        0.997681
+      ]
+    },
+    {
+      "id": "np3-80c3bf15bbad",
+      "name": "sunsetreaet baek",
+      "filename": "sunsetreaet baek.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 15,
+        "highlights": 0,
+        "shadows": 10,
+        "whites": 1,
+        "blacks": -25,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 20,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -58
+        },
+        "gamma": {
+          "x": 0,
+          "y": -66
+        },
+        "lift": {
+          "x": 0,
+          "y": 12
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 5
+        },
+        {
+          "hue": 0,
+          "chroma": 1,
+          "brightness": 5
+        },
+        {
+          "hue": -10,
+          "chroma": 11,
+          "brightness": 10
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-d3aba6e8b841",
+      "name": "t&o brandonw",
+      "filename": "t&o brandonw.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 25,
+        "highlights": 10,
+        "shadows": -25,
+        "whites": 4,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 71
+        },
+        "gamma": {
+          "x": 0,
+          "y": 79
+        },
+        "lift": {
+          "x": 0,
+          "y": -64
+        }
+      },
+      "mixer": [
+        {
+          "hue": 13,
+          "chroma": 25,
+          "brightness": 30
+        },
+        {
+          "hue": -9,
+          "chroma": 45,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 8,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 70,
+          "brightness": 0
+        },
+        {
+          "hue": -45,
+          "chroma": 35,
+          "brightness": 20
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 45,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-96d6f55ba38f",
+      "name": "tenderclera",
+      "filename": "tenderclera.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 15,
+        "texture": 12,
+        "clarity": -20,
+        "sharpening": 16
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 77
+        },
+        "gamma": {
+          "x": 0,
+          "y": -70
+        },
+        "lift": {
+          "x": 0,
+          "y": -82
+        }
+      },
+      "mixer": [
+        {
+          "hue": 14,
+          "chroma": -10,
+          "brightness": 3
+        },
+        {
+          "hue": 12,
+          "chroma": 5,
+          "brightness": 13
+        },
+        {
+          "hue": -8,
+          "chroma": -5,
+          "brightness": 10
+        },
+        {
+          "hue": 13,
+          "chroma": -10,
+          "brightness": 18
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -20,
+          "chroma": 9,
+          "brightness": 7
+        },
+        {
+          "hue": 18,
+          "chroma": -3,
+          "brightness": 4
+        },
+        {
+          "hue": 17,
+          "chroma": 0,
+          "brightness": 3
+        }
+      ],
+      "toneCurve": [
+        0.031373,
+        0.034211,
+        0.073428,
+        0.129185,
+        0.202918,
+        0.296823,
+        0.403424,
+        0.505387,
+        0.588366,
+        0.649556,
+        0.702048,
+        0.746391,
+        0.78695,
+        0.826228,
+        0.866634,
+        0.909482,
+        0.954039
+      ]
+    },
+    {
+      "id": "np3-073dd03b5578",
+      "name": "textured docmntry",
+      "filename": "textured docmntry.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 100,
+        "highlights": 54,
+        "shadows": 33,
+        "whites": 0,
+        "blacks": -6,
+        "saturation": 0,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 1,
+          "y": -33
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 63,
+          "brightness": -57
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 23,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 15,
+          "brightness": -25
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-0d6d0b51b926",
+      "name": "turquoise blue yu",
+      "filename": "turquoise blue yu.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 5,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 81
+        },
+        "gamma": {
+          "x": 0,
+          "y": -89
+        },
+        "lift": {
+          "x": 0,
+          "y": 83
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": -5,
+          "brightness": -9
+        },
+        {
+          "hue": 0,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": -5,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -10,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -30,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -20,
+          "brightness": -30
+        },
+        {
+          "hue": -10,
+          "chroma": -10,
+          "brightness": -31
+        }
+      ],
+      "toneCurve": [
+        0.058809,
+        0.072665,
+        0.095737,
+        0.136052,
+        0.197027,
+        0.272927,
+        0.356975,
+        0.442213,
+        0.521592,
+        0.586657,
+        0.648213,
+        0.704855,
+        0.759911,
+        0.816431,
+        0.875118,
+        0.93527,
+        0.996185
+      ]
+    },
+    {
+      "id": "np3-31e9165df01a",
+      "name": "vintage a brittanyk",
+      "filename": "vintage a brittanyk.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -9,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 0,
+        "texture": 39,
+        "clarity": -4,
+        "sharpening": 52
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -96
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 34,
+          "brightness": 0
+        },
+        {
+          "hue": -63,
+          "chroma": 35,
+          "brightness": 0
+        },
+        {
+          "hue": -94,
+          "chroma": 25,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-a73a86811cac",
+      "name": "vintagem tsakai",
+      "filename": "vintagem tsakai.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 13,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 9
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -76
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": -19,
+          "brightness": 0
+        },
+        {
+          "hue": -11,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": -10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": [
+        0.054903,
+        0.06827,
+        0.085208,
+        0.109226,
+        0.143925,
+        0.191382,
+        0.249641,
+        0.315928,
+        0.387555,
+        0.457076,
+        0.531236,
+        0.60271,
+        0.670095,
+        0.734092,
+        0.795495,
+        0.85519,
+        0.913968
+      ]
+    },
+    {
+      "id": "np3-4e9717de2e37",
+      "name": "vintagevibe prest",
+      "filename": "vintagevibe prest.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 50,
+        "highlights": -21,
+        "shadows": -15,
+        "whites": 29,
+        "blacks": -7,
+        "saturation": 20,
+        "texture": 24,
+        "clarity": 0,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -79
+        },
+        "gamma": {
+          "x": 1,
+          "y": -64
+        },
+        "lift": {
+          "x": 0,
+          "y": 9
+        }
+      },
+      "mixer": [
+        {
+          "hue": 5,
+          "chroma": -17,
+          "brightness": -15
+        },
+        {
+          "hue": 4,
+          "chroma": -16,
+          "brightness": -25
+        },
+        {
+          "hue": -18,
+          "chroma": -25,
+          "brightness": 0
+        },
+        {
+          "hue": 1,
+          "chroma": -19,
+          "brightness": 0
+        },
+        {
+          "hue": 23,
+          "chroma": -79,
+          "brightness": 0
+        },
+        {
+          "hue": -4,
+          "chroma": 0,
+          "brightness": -22
+        },
+        {
+          "hue": 25,
+          "chroma": -25,
+          "brightness": 0
+        },
+        {
+          "hue": -25,
+          "chroma": -25,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-b180cf2f9bf2",
+      "name": "vitality film pman",
+      "filename": "vitality film pman.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": -4,
+        "highlights": 54,
+        "shadows": -17,
+        "whites": 0,
+        "blacks": -3,
+        "saturation": 0,
+        "texture": 42,
+        "clarity": -16,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 42
+        },
+        "gamma": {
+          "x": 0,
+          "y": -35
+        },
+        "lift": {
+          "x": 1,
+          "y": -27
+        }
+      },
+      "mixer": [
+        {
+          "hue": -8,
+          "chroma": 8,
+          "brightness": -6
+        },
+        {
+          "hue": 5,
+          "chroma": 9,
+          "brightness": 2
+        },
+        {
+          "hue": -13,
+          "chroma": -22,
+          "brightness": -9
+        },
+        {
+          "hue": 85,
+          "chroma": -44,
+          "brightness": -53
+        },
+        {
+          "hue": 49,
+          "chroma": 37,
+          "brightness": -21
+        },
+        {
+          "hue": -30,
+          "chroma": 43,
+          "brightness": -39
+        },
+        {
+          "hue": -4,
+          "chroma": 14,
+          "brightness": 0
+        },
+        {
+          "hue": 7,
+          "chroma": 15,
+          "brightness": -11
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-4d577aae1aa2",
+      "name": "warm street ben",
+      "filename": "warm street ben.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 36,
+        "highlights": -51,
+        "shadows": 64,
+        "whites": 33,
+        "blacks": -10,
+        "saturation": 7,
+        "texture": 24,
+        "clarity": 16,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 69
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -43
+        }
+      },
+      "mixer": [
+        {
+          "hue": 16,
+          "chroma": 26,
+          "brightness": 54
+        },
+        {
+          "hue": -7,
+          "chroma": 60,
+          "brightness": 23
+        },
+        {
+          "hue": -47,
+          "chroma": 59,
+          "brightness": 12
+        },
+        {
+          "hue": 1,
+          "chroma": 33,
+          "brightness": 27
+        },
+        {
+          "hue": 59,
+          "chroma": -49,
+          "brightness": 0
+        },
+        {
+          "hue": -2,
+          "chroma": -3,
+          "brightness": 0
+        },
+        {
+          "hue": -72,
+          "chroma": -45,
+          "brightness": -17
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-9dc131d62646",
+      "name": "warmdimlight lu",
+      "filename": "warmdimlight lu.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 5,
+        "highlights": 30,
+        "shadows": 10,
+        "whites": 25,
+        "blacks": 0,
+        "saturation": 15,
+        "texture": 42,
+        "clarity": 24,
+        "sharpening": 56
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 0
+        },
+        "gamma": {
+          "x": 0,
+          "y": -96
+        },
+        "lift": {
+          "x": 0,
+          "y": -96
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 25,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 15,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 10,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    },
+    {
+      "id": "np3-5941e74058e9",
+      "name": "warmportrait y2",
+      "filename": "warmportrait y2.NP3",
+      "sourceBytes": 978,
+      "hasCustomToneCurve": true,
+      "tone": {
+        "contrast": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+        "blacks": 0,
+        "saturation": 8,
+        "texture": 33,
+        "clarity": -4,
+        "sharpening": 44
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": 70
+        },
+        "gamma": {
+          "x": 0,
+          "y": -63
+        },
+        "lift": {
+          "x": 0,
+          "y": -49
+        }
+      },
+      "mixer": [
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 5,
+          "chroma": -10,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 16
+        }
+      ],
+      "toneCurve": [
+        0,
+        0.050905,
+        0.104312,
+        0.162633,
+        0.228339,
+        0.301889,
+        0.380444,
+        0.460829,
+        0.539842,
+        0.610553,
+        0.680898,
+        0.744346,
+        0.79928,
+        0.844295,
+        0.880306,
+        0.910306,
+        0.937254
+      ]
+    },
+    {
+      "id": "np3-f296afafbdc3",
+      "name": "warmtoned ptt",
+      "filename": "warmtoned ptt.NP3",
+      "sourceBytes": 392,
+      "hasCustomToneCurve": false,
+      "tone": {
+        "contrast": 29,
+        "highlights": -22,
+        "shadows": 14,
+        "whites": 22,
+        "blacks": 0,
+        "saturation": 20,
+        "texture": 24,
+        "clarity": 8,
+        "sharpening": 32
+      },
+      "grading": {
+        "gain": {
+          "x": 0,
+          "y": -49
+        },
+        "gamma": {
+          "x": 0,
+          "y": -43
+        },
+        "lift": {
+          "x": 0,
+          "y": -67
+        }
+      },
+      "mixer": [
+        {
+          "hue": -6,
+          "chroma": 37,
+          "brightness": 16
+        },
+        {
+          "hue": 3,
+          "chroma": 9,
+          "brightness": 19
+        },
+        {
+          "hue": -46,
+          "chroma": 27,
+          "brightness": -32
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        },
+        {
+          "hue": 0,
+          "chroma": 0,
+          "brightness": 0
+        }
+      ],
+      "toneCurve": []
+    }
+  ]
+}

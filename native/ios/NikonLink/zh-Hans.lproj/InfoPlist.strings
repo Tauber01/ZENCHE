@@ -2,4 +2,6 @@
 "NSCameraUsageDescription" = "用于显示实时画面、点按对焦并拍摄照片。";
 "NSPhotoLibraryAddUsageDescription" = "用于将你选择的拍摄文件保存到系统照片库。";
 "NSPhotoLibraryUsageDescription" = "用于在文件页面直接显示机主相册中的照片和视频。";
-"NSLocalNetworkUsageDescription" = "用于在可信局域网内通过 FTP、HTTP 或 WebDAV 接收照片。";
+"NSLocalNetworkUsageDescription" = "用于在可信局域网内通过 PTP/IP 连接相机，并通过 FTP、HTTP 或 WebDAV 接收照片。";
+"NSBluetoothAlwaysUsageDescription" = "用于连接兼容的蓝牙遥控器并接收快门指令。";
+"NSLocationWhenInUseUsageDescription" = "用于在拍摄时把当前位置写入照片的 XMP GPS 元数据。";

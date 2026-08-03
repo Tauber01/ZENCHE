@@ -24,11 +24,149 @@ final class Localization {
     private static final Map<String, Entry> STRINGS = new LinkedHashMap<>();
 
     static {
+        add("尼康云创", "Nikon Imaging Cloud", "Nikon Imaging Cloud");
+        add("尼康云创预览", "Nikon Imaging Cloud Preview", "Nikon Imaging Cloud プレビュー");
+        add("选择尼康云创预设", "Choose a Nikon Cloud Preset", "Nikon Cloud プリセットを選択");
+        add("关闭云创预览", "Disable Cloud Preview", "Cloud プレビューを無効化");
+        add("尼康云创预览已关闭", "Nikon cloud preview disabled", "Nikon Cloud プレビューを無効にしました");
+        add("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同",
+                "On-device approximate SDR preview · Camera and NX Studio output may differ",
+                "デバイス上の SDR 近似プレビュー · カメラ／NX Studio の出力とは異なる場合があります");
+        add("尼康云创监看", "Nikon Imaging Cloud Monitor", "Nikon Imaging Cloud モニター");
+        add("关闭云创监看", "Disable Cloud Monitor", "Cloud モニターを無効化");
+        add("尼康云创监看已关闭", "Nikon Imaging Cloud monitor disabled", "Nikon Imaging Cloud モニターを無効にしました");
+        add("照片与视频实时生效 · SDR 近似 · 不写入原片",
+                "Live on photo and video monitoring · Approximate SDR · Originals unchanged",
+                "写真・動画モニターへリアルタイム適用 · SDR 近似 · オリジナルは変更されません");
+        add("选择预设", "Choose Preset", "プリセットを選択");
+        add("搜索云创预设", "Search Cloud Presets", "Cloud プリセットを検索");
+        add("已关闭", "Off", "オフ");
+        add("应用", "Apply", "適用");
+        add("107 款设备端 SDR 预设", "107 on-device SDR presets", "デバイス上の SDR プリセット 107 種類");
+        add("选择尼康云创监看预设",
+                "Choose Nikon Imaging Cloud monitor preset",
+                "Nikon Imaging Cloud モニタープリセットを選択");
+        add("尼康官方 SDK", "Nikon Official SDK", "ニコン公式 SDK");
+        add("官方桌面 SDK 不提供当前平台运行库",
+                "The official desktop SDK has no runtime for this platform",
+                "公式デスクトップ SDK はこのプラットフォーム向けランタイムを提供していません");
+        add("尼康只为 macOS 与 Windows 提供本次 SDK 运行库；当前平台继续使用原生相机连接后端。",
+                "Nikon supplies these SDK runtimes only for macOS and Windows; this platform continues using its native camera connection backend.",
+                "今回の SDK ランタイムは macOS と Windows のみ提供されています。このプラットフォームではネイティブのカメラ接続バックエンドを継続して使用します。");
+        add("索尼官方 SDK", "Sony Official SDK", "ソニー公式 SDK");
+        add("索尼 Camera Remote SDK 2.02.00 只提供 macOS 与 Windows 运行库；当前平台继续使用原生 Camera Remote Command 连接后端。",
+                "Sony Camera Remote SDK 2.02.00 supplies runtimes only for macOS and Windows; this platform continues using its native Camera Remote Command backend.",
+                "Sony Camera Remote SDK 2.02.00 のランタイムは macOS と Windows のみ提供されています。このプラットフォームではネイティブの Camera Remote Command バックエンドを継続して使用します。");
+        add("连接管理", "Connection Manager", "接続管理");
+        add("相机连接", "Camera Connections", "カメラ接続");
+        add("本机摄像头、USB/PTP 与官方 SDK",
+                "Local camera, USB/PTP, and official SDKs",
+                "ローカルカメラ、USB/PTP、公式 SDK");
+        add("相机控制", "Camera Control", "カメラ制御");
+        add("文件接收", "File Receiving", "ファイル受信");
+        add("拍摄辅助", "Capture Assistants", "撮影アシスト");
+        add("蓝牙遥控与拍摄定位",
+                "Bluetooth remote and capture location",
+                "Bluetooth リモートと撮影位置");
+        add("通用、拍摄辅助、更新、诊断与支持。",
+                "General, capture assistants, updates, diagnostics, and support.",
+                "一般、撮影アシスト、更新、診断、サポート。");
+        add("兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。",
+                "Compatible with the ZENCHE BLE Remote service. A shutter notification triggers the currently connected camera.",
+                "ZENCHE BLE Remote サービスに対応し、シャッター通知で現在接続中のカメラを撮影します。");
+        add("仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。",
+                "Location is used only while the app is active. Downloaded photos receive a standard XMP GPS sidecar.",
+                "位置情報はアプリ使用中のみ取得し、ダウンロードした写真に標準 XMP GPS サイドカーを作成します。");
+        add("Wi‑Fi 相机 · PTP/IP", "Wi‑Fi Camera · PTP/IP", "Wi‑Fi カメラ · PTP/IP");
+        add("连接模式", "Connection Mode", "接続モード");
+        add("AP 直连", "AP Direct", "AP ダイレクト");
+        add("STA 局域网", "STA LAN", "STA LAN");
+        add("AP 模式：让手机加入相机热点；相机地址通常为 192.168.1.1。",
+                "AP mode: Join the camera hotspot on this phone; the camera address is usually 192.168.1.1.",
+                "AP モード：スマートフォンをカメラのアクセスポイントに接続します。カメラのアドレスは通常 192.168.1.1 です。");
+        add("STA 模式：让相机与手机加入同一局域网，并输入路由器分配给相机的 IP 地址。",
+                "STA mode: Connect the camera and phone to the same LAN, then enter the camera IP address assigned by the router.",
+                "STA モード：カメラとスマートフォンを同じ LAN に接続し、ルーターがカメラに割り当てた IP アドレスを入力します。");
+        add("先在相机中开启无线遥控/PTP‑IP，并让手机加入相机热点或同一局域网。默认端口为 15740。",
+                "Enable wireless remote/PTP‑IP on the camera, then join its hotspot or local network on your phone. The default port is 15740.",
+                "カメラでワイヤレスリモート／PTP‑IP を有効にし、スマートフォンをカメラのアクセスポイントまたは同じ LAN に接続してください。既定ポートは 15740 です。");
+        add("相机 IP 地址", "Camera IP address", "カメラの IP アドレス");
+        add("端口", "Port", "ポート");
+        add("断开 Wi‑Fi 相机", "Disconnect Wi‑Fi Camera", "Wi‑Fi カメラを切断");
+        add("连接 Wi‑Fi 相机", "Connect Wi‑Fi Camera", "Wi‑Fi カメラに接続");
+        add("Wi‑Fi 相机未连接", "Wi‑Fi camera not connected", "Wi‑Fi カメラ未接続");
+        add("蓝牙遥控快门", "Bluetooth Remote Shutter", "Bluetooth リモートシャッター");
+        add("蓝牙遥控拍摄", "Bluetooth Remote Capture", "Bluetooth リモート撮影");
+        add("蓝牙遥控未开启", "Bluetooth remote is off", "Bluetooth リモコンはオフです");
+        add("拍摄定位", "Capture Location", "撮影位置");
+        add("拍摄位置", "Capture Location", "撮影位置");
+        add("定位未开启", "Location is off", "位置情報はオフです");
+        add("拍摄文件会生成标准 XMP GPS 旁车文件",
+                "Captured files receive a standard XMP GPS sidecar",
+                "撮影ファイルに標準 XMP GPS サイドカーを作成します");
         add("AI 创作", "AI Create", "AI クリエイト");
-        add("联网生成与修图 · 结果保存为新文件", "Online generation and editing · Results are saved as new files", "オンライン生成・編集 · 結果は新規ファイルとして保存");
+        add("修图覆盖原图 · 生图保存新文件", "AI editing overwrites the original · generation saves a new file", "AI編集は元画像を上書き · 生成は新規ファイルとして保存");
         add("需要激活", "Activation required", "アクティベーションが必要");
         add("已解锁", "Unlocked", "ロック解除済み");
         add("输出参数", "Output parameters", "出力パラメータ");
+        add("视频曝光模式", "Video Exposure Mode", "動画露出モード");
+        add("视频快门表示", "Video Shutter Display", "動画シャッター表示");
+        add("视频编码", "Video Codec", "動画コーデック");
+        add("视频录制规格", "Video Recording Format", "動画記録形式");
+        add("录制规格来源", "Recording Format Source", "記録形式のソース");
+        add("Log / Picture Profile", "Log / Picture Profile", "Log / ピクチャープロファイル");
+        add("编码", "Codec", "コーデック");
+        add("N-Log 已开启", "N-Log enabled", "N-Log を有効にしました");
+        add("N-Log 已关闭", "N-Log disabled", "N-Log を無効にしました");
+        add("我的设备", "My Devices", "マイデバイス");
+        add("管理连接过的相机，轻触即可快速重连",
+                "Keep connected cameras ready for one-tap reconnection.",
+                "接続済みカメラを管理し、すばやく再接続できます。");
+        add("尚未连接过设备", "No Saved Devices", "保存済みデバイスはありません");
+        add("成功连接相机后会自动保存在这里。",
+                "Cameras are saved here automatically after a successful connection.",
+                "接続に成功したカメラは自動的にここへ保存されます。");
+        add("当前已连接", "Connected", "接続中");
+        add("最近连接", "Last connected", "最終接続");
+        add("快速连接", "Quick Connect", "クイック接続");
+        add("忘记设备", "Forget Device", "デバイスを削除");
+        add("生成图像", "Generate Image", "画像を生成");
+        add("创建蒙版", "Create Mask", "マスクを作成");
+        add("蒙版", "Mask", "マスク");
+        add("蒙版列表", "Mask List", "マスク一覧");
+        add("暂无蒙版", "No masks yet", "マスクはまだありません");
+        add("显示", "Visible", "表示");
+        add("显示蒙版", "Show Mask", "マスクを表示");
+        add("隐藏蒙版", "Hide Mask", "マスクを非表示");
+        add("蒙版已显示", "Mask shown", "マスクを表示しました");
+        add("蒙版已隐藏", "Mask hidden", "マスクを非表示にしました");
+        add("已切换蒙版", "Mask selected", "マスクを選択しました");
+        add("删除蒙版", "Delete Mask", "マスクを削除");
+        add("添加蒙版（画笔）", "Add to Mask (Brush)", "マスクに追加（ブラシ）");
+        add("减去蒙版（画笔）", "Subtract from Mask (Brush)", "マスクから削除（ブラシ）");
+        add("画笔大小", "Brush Size", "ブラシサイズ");
+        add("画笔", "Brush", "ブラシ");
+        add("智能识别", "Smart Selection", "スマート選択");
+        add("智能主体", "Smart Subject", "スマート被写体");
+        add("智能天空", "Smart Sky", "スマート空");
+        add("智能背景", "Smart Background", "スマート背景");
+        add("智能人物", "Smart Person", "スマート人物");
+        add("智能亮部", "Smart Highlights", "スマートハイライト");
+        add("智能暗部", "Smart Shadows", "スマートシャドウ");
+        add("反向蒙版", "Invert Mask", "マスクを反転");
+        add("蒙版内调整", "Mask Adjustments", "マスク内調整");
+        add("蒙版已反向", "Mask inverted", "マスクを反転しました");
+        add("蒙版已恢复正向", "Mask restored", "マスクを通常方向に戻しました");
+        add("智能蒙版已创建 · 可继续添加或减去画笔",
+                "Smart mask created · Refine with the add or subtract brush",
+                "スマートマスクを作成しました · 追加／削除ブラシで調整できます");
+        add("区域 · 可继续添加或减去画笔", " area · Refine with add or subtract brush", "領域 · 追加／削除ブラシで調整できます");
+        add("蒙版已创建 · 在预览画面涂抹", "Mask created · Paint on the preview", "マスクを作成しました · プレビュー上で描画してください");
+        add("蒙版已删除", "Mask deleted", "マスクを削除しました");
+        add("添加蒙版画笔已启用", "Add-mask brush enabled", "追加ブラシを有効にしました");
+        add("减去蒙版画笔已启用", "Subtract-mask brush enabled", "削除ブラシを有効にしました");
+        add("在预览画面拖动画笔；蓝色为添加，白色为减去。", "Drag on the preview; blue adds and white subtracts.", "プレビュー上をドラッグします。青は追加、白は削除です。");
+        add("先创建蒙版，再选择添加或减去画笔。", "Create a mask, then choose the add or subtract brush.", "マスクを作成してから追加または削除ブラシを選択します。");
         add("次剩余", "uses remaining", "回残り");
         add("前往官网兑换密钥", "Redeem Key on Official Website", "公式サイトでキーを交換");
         add("复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。",
@@ -98,23 +236,41 @@ final class Localization {
                 "アプリの機能は無料のままで、ご支援は任意です。");
         add("更新公告", "What's New", "アップデートのお知らせ");
         add("本次更新", "In This Update", "今回の更新");
-        add("• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n"
-                        + "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n"
-                        + "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n"
-                        + "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n"
-                        + "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n"
+        add("• 修复 AI 修图原图链路：客户端发送当前选中照片的完整 data:image 数据，代理按上游要求放入 images 并等待任务完成，修图结果真正基于原图。\n"
+                        + "• AI 修图成功后覆盖当前原图并保留文件记录；AI 生图仍保存为新文件，避免混淆。\n"
+                        + "• AI 次数由服务器统一扣减并回传剩余次数；失败请求自动回滚，不再出现调用未扣次数。\n"
+                        + "• 继续保留设备码绑定、官网兑换、爱发电购买提示和防诈骗说明。\n"
+                        + "• 优化 Nikon / Sony / Canon 相机识别、PTP 拍摄与专业编辑稳定性。\n"
                         + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
-                "• Unified the AI photo editing and generation workspace: editing now opens Professional Develop by default, with an explicit AI Tools switch; quick presets, ratios, resolutions, and library export remain.\n"
-                        + "• Restored the device-code system: each activation key is bound to the current device and AI cloud usage is counted server-side; ZENCHE itself remains free and open source.\n"
-                        + "• Added the official redemption path: copy the device ID and visit https://zenche.top to redeem a key bound to this device.\n"
-                        + "• Added an Afdian redemption-code purchase prompt, QR code, and purchase entry. Only the official website and in-app Afdian entry are trusted.\n"
-                        + "• Removed the editable AI Server window from Settings while retaining legacy configuration reads; Sony / Canon / Nikon camera compatibility remains.\n"
+                "• Fixed the AI photo-editing reference-image path: the selected photo is sent as a complete data URL, the proxy forwards it in the upstream images array, and waits for the task result so edits are based on the original.\n"
+                        + "• Successful AI retouching overwrites the current original while preserving library records; AI generation still saves a new file.\n"
+                        + "• AI usage is deducted by the server and the remaining count is returned; failed requests roll back, preventing missing quota deductions.\n"
+                        + "• Kept device-bound activation, official redemption, Afdian purchase guidance, and scam warnings.\n"
+                        + "• Improved Nikon / Sony / Canon camera detection, PTP capture, and professional editor stability.\n"
                         + "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
-                "• AI の写真編集・生成ワークスペースを統一改善。編集画面は「プロ現像」を既定にし、「AI ツール」へ明示的に切り替え可能。クイックプリセット、比率、解像度、ライブラリ保存を維持。\n"
-                        + "• デバイスコードシステムを復旧。各アクティベーションキーは現在のデバイスに紐づき、AI クラウド利用回数はサーバーで計数。ZENCHE 本体は無料オープンソースのまま。\n"
-                        + "• 公式交換導線を追加。デバイス ID をコピーし、https://zenche.top でこのデバイス用キーに交換。\n"
-                        + "• Afdian で交換コードを購入する案内、QR コード、購入導線を追加。公式サイトとアプリ内 Afdian 導線だけを利用してください。\n"
-                        + "• 設定から編集可能な AI サーバー欄を削除し、過去の設定読み込み互換性は維持。Sony / Canon / Nikon 対応は継続。\n"
+                "• AI 写真編集の参照画像経路を修正。選択した写真を完全な data URL として送り、プロキシが上流の images 配列へ転送してタスク完了まで待機するため、編集結果が元画像に基づくようになりました。\n"
+                        + "• AI レタッチ成功時は現在の元画像を上書きし、ライブラリ記録を保持します。AI 生成は新規ファイルとして保存します。\n"
+                        + "• AI 利用回数はサーバーで減算し、残り回数を返します。失敗したリクエストはロールバックされ、回数が減らない問題を防ぎます。\n"
+                        + "• デバイス紐付け認証、公式交換、Afdian 購入案内、詐欺注意を継続します。\n"
+                        + "• Nikon / Sony / Canon のカメラ検出、PTP 撮影、プロ現像の安定性を改善しました。\n"
+                        + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。");
+        add("• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n"
+                        + "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n"
+                        + "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n"
+                        + "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n"
+                        + "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n"
+                        + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
+                "• Added “Record to This Smart Device”: video can be written live to the ZENCHE library alongside in-camera card recording.\n"
+                        + "• Added in-camera storage management with volume and file browsing, thumbnails, protection state, batch download, and confirmed permanent deletion.\n"
+                        + "• Photos continue to save directly to this device; external video keeps session naming, backups, and SHA-256 integrity records.\n"
+                        + "• PTP live view contains no audio. Android, HarmonyOS, macOS, and Windows record silent Motion-JPEG AVI; local and UVC sources on iOS / iPadOS record MOV.\n"
+                        + "• Stopping, disconnecting the camera, or encountering a write error safely finalizes the recorded video to reduce footage loss.\n"
+                        + "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
+                "• 「このスマートデバイスへ外部収録」を追加。動画を ZENCHE ライブラリへリアルタイム保存し、カメラ内カード記録と併用できます。\n"
+                        + "• カメラ内ストレージ管理を追加。ストレージとファイルの参照、サムネイル、保護状態、一括ダウンロード、確認付き完全削除に対応します。\n"
+                        + "• 写真は引き続きこのデバイスへ直接保存。外部収録動画にはセッション命名、バックアップ、SHA-256 整合性記録を適用します。\n"
+                        + "• PTP ライブビューに音声は含まれません。Android、HarmonyOS、macOS、Windows は無音の Motion-JPEG AVI、iOS / iPadOS のローカル／UVC ソースは MOV で収録します。\n"
+                        + "• 収録停止、カメラ切断、書き込みエラー時も記録済み動画を安全に確定し、素材損失を抑えます。\n"
                         + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。");
         add("谨防诈骗", "Scam Warning", "詐欺にご注意ください");
         add("帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”"
@@ -343,6 +499,27 @@ final class Localization {
         add("录制已停止 · 视频保存在相机存储卡",
                 "Recording Stopped · Video Saved to Camera Card",
                 "録画を停止しました · 動画はカメラのメモリーカードに保存されます");
+        add("外录到当前智能设备",
+                "Record to This Smart Device",
+                "このスマートデバイスへ外部収録");
+        add("生成无声 Motion‑JPEG AVI，可与机身录制并行",
+                "Creates a silent Motion-JPEG AVI alongside in-camera recording",
+                "無音の Motion-JPEG AVI を生成し、カメラ内記録と併用できます");
+        add("外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。",
+                "External recording creates a silent Motion-JPEG AVI from live view alongside in-camera recording; photos are always written directly to this device.",
+                "外部収録はライブビューから無音の Motion-JPEG AVI を生成し、カメラ内記録と併用できます。写真は常にこのデバイスへ直接保存されます。");
+        add("外录已开启 · 视频将写入 ZENCHE 文件库",
+                "External recording on · Video will be written to the ZENCHE library",
+                "外部収録オン · 動画を ZENCHE ライブラリへ保存します");
+        add("外录已关闭 · PTP 相机仅记录到机身存储卡",
+                "External recording off · PTP cameras record only to the camera card",
+                "外部収録オフ · PTP カメラはカメラ内カードのみに記録します");
+        add("● EXT REC · 正在外录到当前智能设备",
+                "● EXT REC · Recording to this smart device",
+                "● EXT REC · このスマートデバイスへ外部収録中");
+        add("录制已停止 · 外录文件已保存到 ZENCHE 文件库",
+                "Recording stopped · External recording saved to the ZENCHE library",
+                "収録停止 · 外部収録ファイルを ZENCHE ライブラリへ保存しました");
         add("处理中…", "Processing…", "処理中…");
         add("停止", "Stop", "停止");
         add("录制", "Record", "録画");
@@ -537,6 +714,23 @@ final class Localization {
                 "Saved high-quality copy",
                 "高品質コピーを保存しました");
         add("正在查看原图", "Viewing original", "元画像を表示中");
+        add("相机机内存储", "In-Camera Storage", "カメラ内ストレージ");
+        add("连接相机后可浏览存储卡", "Connect a camera to browse its memory card", "カメラを接続するとメモリーカードを参照できます");
+        add("正在读取存储卡…", "Reading camera card…", "カメラ内カードを読み込み中…");
+        add("读取完成", "Ready", "読み込み完了");
+        add("读取失败", "Unable to read storage", "ストレージを読み込めません");
+        add("全选", "Select All", "すべて選択");
+        add("取消全选", "Deselect All", "すべての選択を解除");
+        add("下载到 ZENCHE", "Download to ZENCHE", "ZENCHE へダウンロード");
+        add("从相机删除", "Delete from Camera", "カメラから削除");
+        add("从相机永久删除？", "Permanently delete from camera?", "カメラから完全に削除しますか？");
+        add("永久删除", "Delete Permanently", "完全に削除");
+        add("此操作无法撤销；已保护文件不会被选择。", "This cannot be undone. Protected files are not selected.", "この操作は取り消せません。保護されたファイルは選択されません。");
+        add("正在下载", "Downloading", "ダウンロード中");
+        add("已下载", "Downloaded", "ダウンロード完了");
+        add("正在从相机删除…", "Deleting from camera…", "カメラから削除中…");
+        add("已从相机删除", "Deleted from camera", "カメラから削除しました");
+        add("受保护", "Protected", "保護済み");
     }
 
     private Localization() {}

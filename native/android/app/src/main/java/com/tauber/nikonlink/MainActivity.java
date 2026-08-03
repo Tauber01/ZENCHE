@@ -8,6 +8,7 @@ import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
@@ -21,10 +22,13 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Matrix;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.media.MediaMetadataRetriever;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -37,15 +41,19 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.StatFs;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.content.ContentUris;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Base64;
 import android.util.Size;
 import android.view.Gravity;
 import android.view.DragEvent;
 import android.view.GestureDetector;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -96,6 +104,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -108,6 +117,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
+import java.util.function.BiConsumer;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -120,6 +130,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_OWNER_PHOTO = 4103;
     private static final int REQUEST_CLOUD_PHOTOS = 4104;
     private static final int REQUEST_MEDIA_LIBRARY = 4105;
+    private static final int REQUEST_BLUETOOTH_REMOTE = 4106;
+    private static final int REQUEST_CAPTURE_LOCATION = 4107;
+    private static final int REQUEST_LOCAL_CAMERA = 4108;
     private static final int PAPER = Color.rgb(233, 237, 242);
     private static final int PAPER_2 = Color.rgb(228, 233, 239);
     private static final int SURFACE = Color.rgb(248, 250, 252);
@@ -136,6 +149,8 @@ public final class MainActivity extends Activity {
     private static final int RULE_STRONG = Color.rgb(174, 184, 199);
     private static final String LATEST_RELEASE_API =
             "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
+    private static final String DEFAULT_SELF_HOSTED_UPDATE_ENDPOINT =
+            "https://zenche.top/api/update";
     private static final String RELEASES_URL =
             "https://github.com/Tauber01/ZENCHE/releases";
     private static final String MIRROR_CHYAN_RESOURCE_ID = "ZENCHE";
@@ -155,6 +170,119 @@ public final class MainActivity extends Activity {
     private static final String LIBRARY_BRANCHES_KEY = "libraryUserBranches";
     private static final String LIBRARY_FILE_ASSIGNMENTS_KEY =
             "libraryFileBranchAssignments";
+    private static final String REMEMBERED_DEVICES_KEY =
+            "rememberedCameraDevices.v1";
+
+    private static final class RememberedDevice {
+        final String id;
+        final String name;
+        final String vendor;
+        final String transport;
+        final long lastConnectedAt;
+
+        RememberedDevice(
+                String id,
+                String name,
+                String vendor,
+                String transport,
+                long lastConnectedAt) {
+            this.id = id;
+            this.name = name;
+            this.vendor = vendor;
+            this.transport = transport;
+            this.lastConnectedAt = lastConnectedAt;
+        }
+    }
+
+    private static final class EditorCurvePoint {
+        float x;
+        float y;
+
+        EditorCurvePoint(float x, float y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        EditorCurvePoint copy() { return new EditorCurvePoint(x, y); }
+    }
+
+    private static final class EditorMaskPoint {
+        final float x;
+        final float y;
+
+        EditorMaskPoint(float x, float y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    private static final class EditorMaskStroke {
+        final ArrayList<EditorMaskPoint> points = new ArrayList<>();
+        final boolean subtract;
+        final int size;
+
+        EditorMaskStroke(boolean subtract, int size) {
+            this.subtract = subtract;
+            this.size = size;
+        }
+
+        EditorMaskStroke copy() {
+            EditorMaskStroke copy = new EditorMaskStroke(subtract, size);
+            copy.points.addAll(points);
+            return copy;
+        }
+    }
+
+    private static final class EditorMaskLayer {
+        final String id;
+        String name;
+        boolean visible = true;
+        String type = "画笔";
+        int amount = 100;
+        int feather = 55;
+        boolean invert;
+        boolean subtract;
+        int brushSize = 18;
+        final ArrayList<EditorMaskStroke> strokes = new ArrayList<>();
+        int exposure;
+        int contrast;
+        int highlights;
+        int shadows;
+        int temperature;
+        int tint;
+        int saturation;
+        int clarity;
+
+        EditorMaskLayer(String name) {
+            this(UUID.randomUUID().toString(), name);
+        }
+
+        private EditorMaskLayer(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        EditorMaskLayer copy() {
+            EditorMaskLayer copy = new EditorMaskLayer(id, name);
+            copy.visible = visible;
+            copy.type = type;
+            copy.amount = amount;
+            copy.feather = feather;
+            copy.invert = invert;
+            copy.subtract = subtract;
+            copy.brushSize = brushSize;
+            for (EditorMaskStroke stroke : strokes) copy.strokes.add(stroke.copy());
+            copy.exposure = exposure;
+            copy.contrast = contrast;
+            copy.highlights = highlights;
+            copy.shadows = shadows;
+            copy.temperature = temperature;
+            copy.tint = tint;
+            copy.saturation = saturation;
+            copy.clarity = clarity;
+            return copy;
+        }
+    }
 
     private static final class EditorAdjustments {
         int exposure;
@@ -173,11 +301,44 @@ public final class MainActivity extends Activity {
         int noiseReduction;
         int dehaze;
         int vignette;
+        int wheelLift;
+        int wheelGamma;
+        int wheelGain;
+        int wheelLiftX;
+        int wheelLiftY;
+        int wheelGammaX;
+        int wheelGammaY;
+        int wheelGainX;
+        int wheelGainY;
+        int curveContrast;
+        int curvePivot = 50;
+        final ArrayList<EditorCurvePoint> curvePoints = new ArrayList<>();
+        boolean maskEnabled;
+        String maskType = "画笔";
+        int maskAmount = 100;
+        int maskFeather = 55;
+        boolean maskInvert;
+        boolean maskSubtract;
+        int maskBrushSize = 18;
+        final ArrayList<EditorMaskStroke> maskStrokes = new ArrayList<>();
+        int maskExposure;
+        int maskContrast;
+        int maskHighlights;
+        int maskShadows;
+        int maskTemperature;
+        int maskTint;
+        int maskSaturation;
+        int maskClarity;
+        final ArrayList<EditorMaskLayer> maskLayers = new ArrayList<>();
+        String activeMaskLayerId;
+        int nextMaskNumber = 1;
         int rotation;
         boolean flipHorizontal;
         boolean flipVertical;
         boolean showingOriginal;
         String cropRatio = "original";
+
+        EditorAdjustments() { reset(); }
 
         void reset() {
             exposure = 0;
@@ -196,6 +357,42 @@ public final class MainActivity extends Activity {
             noiseReduction = 0;
             dehaze = 0;
             vignette = 0;
+            wheelLift = 0;
+            wheelGamma = 0;
+            wheelGain = 0;
+            wheelLiftX = 0;
+            wheelLiftY = 0;
+            wheelGammaX = 0;
+            wheelGammaY = 0;
+            wheelGainX = 0;
+            wheelGainY = 0;
+            curveContrast = 0;
+            curvePivot = 50;
+            curvePoints.clear();
+            curvePoints.add(new EditorCurvePoint(0f, 0f));
+            curvePoints.add(new EditorCurvePoint(.25f, .25f));
+            curvePoints.add(new EditorCurvePoint(.5f, .5f));
+            curvePoints.add(new EditorCurvePoint(.75f, .75f));
+            curvePoints.add(new EditorCurvePoint(1f, 1f));
+            maskEnabled = false;
+            maskType = "画笔";
+            maskAmount = 100;
+            maskFeather = 55;
+            maskInvert = false;
+            maskSubtract = false;
+            maskBrushSize = 18;
+            maskStrokes.clear();
+            maskExposure = 0;
+            maskContrast = 0;
+            maskHighlights = 0;
+            maskShadows = 0;
+            maskTemperature = 0;
+            maskTint = 0;
+            maskSaturation = 0;
+            maskClarity = 0;
+            maskLayers.clear();
+            activeMaskLayerId = null;
+            nextMaskNumber = 1;
             rotation = 0;
             flipHorizontal = false;
             flipVertical = false;
@@ -233,6 +430,43 @@ public final class MainActivity extends Activity {
             copy.noiseReduction = noiseReduction;
             copy.dehaze = dehaze;
             copy.vignette = vignette;
+            copy.wheelLift = wheelLift;
+            copy.wheelGamma = wheelGamma;
+            copy.wheelGain = wheelGain;
+            copy.wheelLiftX = wheelLiftX;
+            copy.wheelLiftY = wheelLiftY;
+            copy.wheelGammaX = wheelGammaX;
+            copy.wheelGammaY = wheelGammaY;
+            copy.wheelGainX = wheelGainX;
+            copy.wheelGainY = wheelGainY;
+            copy.curveContrast = curveContrast;
+            copy.curvePivot = curvePivot;
+            for (EditorCurvePoint point : curvePoints) copy.curvePoints.add(point.copy());
+            copy.maskEnabled = maskEnabled;
+            copy.maskType = maskType;
+            copy.maskAmount = maskAmount;
+            copy.maskFeather = maskFeather;
+            copy.maskInvert = maskInvert;
+            copy.maskSubtract = maskSubtract;
+            copy.maskBrushSize = maskBrushSize;
+            copy.maskStrokes.clear();
+            for (EditorMaskStroke stroke : maskStrokes) {
+                copy.maskStrokes.add(stroke.copy());
+            }
+            copy.maskExposure = maskExposure;
+            copy.maskContrast = maskContrast;
+            copy.maskHighlights = maskHighlights;
+            copy.maskShadows = maskShadows;
+            copy.maskTemperature = maskTemperature;
+            copy.maskTint = maskTint;
+            copy.maskSaturation = maskSaturation;
+            copy.maskClarity = maskClarity;
+            copy.maskLayers.clear();
+            for (EditorMaskLayer layer : maskLayers) {
+                copy.maskLayers.add(layer.copy());
+            }
+            copy.activeMaskLayerId = activeMaskLayerId;
+            copy.nextMaskNumber = nextMaskNumber;
             copy.rotation = rotation;
             copy.flipHorizontal = flipHorizontal;
             copy.flipVertical = flipVertical;
@@ -258,11 +492,684 @@ public final class MainActivity extends Activity {
             noiseReduction = source.noiseReduction;
             dehaze = source.dehaze;
             vignette = source.vignette;
+            wheelLift = source.wheelLift;
+            wheelGamma = source.wheelGamma;
+            wheelGain = source.wheelGain;
+            wheelLiftX = source.wheelLiftX;
+            wheelLiftY = source.wheelLiftY;
+            wheelGammaX = source.wheelGammaX;
+            wheelGammaY = source.wheelGammaY;
+            wheelGainX = source.wheelGainX;
+            wheelGainY = source.wheelGainY;
+            curveContrast = source.curveContrast;
+            curvePivot = source.curvePivot;
+            curvePoints.clear();
+            for (EditorCurvePoint point : source.curvePoints) curvePoints.add(point.copy());
+            maskEnabled = source.maskEnabled;
+            maskType = source.maskType;
+            maskAmount = source.maskAmount;
+            maskFeather = source.maskFeather;
+            maskInvert = source.maskInvert;
+            maskSubtract = source.maskSubtract;
+            maskBrushSize = source.maskBrushSize;
+            maskStrokes.clear();
+            for (EditorMaskStroke stroke : source.maskStrokes) {
+                maskStrokes.add(stroke.copy());
+            }
+            maskExposure = source.maskExposure;
+            maskContrast = source.maskContrast;
+            maskHighlights = source.maskHighlights;
+            maskShadows = source.maskShadows;
+            maskTemperature = source.maskTemperature;
+            maskTint = source.maskTint;
+            maskSaturation = source.maskSaturation;
+            maskClarity = source.maskClarity;
+            maskLayers.clear();
+            for (EditorMaskLayer layer : source.maskLayers) {
+                maskLayers.add(layer.copy());
+            }
+            activeMaskLayerId = source.activeMaskLayerId;
+            nextMaskNumber = source.nextMaskNumber;
             rotation = source.rotation;
             flipHorizontal = source.flipHorizontal;
             flipVertical = source.flipVertical;
             showingOriginal = source.showingOriginal;
             cropRatio = source.cropRatio;
+        }
+
+        EditorMaskLayer activeMaskLayer() {
+            if (activeMaskLayerId == null) return null;
+            for (EditorMaskLayer layer : maskLayers) {
+                if (activeMaskLayerId.equals(layer.id)) return layer;
+            }
+            return null;
+        }
+
+        boolean activeMaskLayerVisible() {
+            EditorMaskLayer layer = activeMaskLayer();
+            return layer != null && layer.visible;
+        }
+
+        void createMaskLayer() {
+            persistActiveMaskLayer();
+            EditorMaskLayer layer = new EditorMaskLayer("蒙版 " + nextMaskNumber++);
+            maskLayers.add(layer);
+            loadMaskLayer(layer);
+        }
+
+        void ensureMaskLayer() {
+            if (!maskEnabled || activeMaskLayer() == null) createMaskLayer();
+        }
+
+        void selectMaskLayer(String id) {
+            if (id == null || id.equals(activeMaskLayerId)) return;
+            persistActiveMaskLayer();
+            for (EditorMaskLayer layer : maskLayers) {
+                if (id.equals(layer.id)) {
+                    loadMaskLayer(layer);
+                    return;
+                }
+            }
+        }
+
+        void deleteActiveMaskLayer() {
+            EditorMaskLayer active = activeMaskLayer();
+            if (active == null) return;
+            int index = maskLayers.indexOf(active);
+            persistActiveMaskLayer();
+            maskLayers.remove(index);
+            if (maskLayers.isEmpty()) {
+                maskEnabled = false;
+                activeMaskLayerId = null;
+                maskStrokes.clear();
+            } else {
+                loadMaskLayer(maskLayers.get(Math.min(index, maskLayers.size() - 1)));
+            }
+        }
+
+        void setMaskLayerVisible(String id, boolean visible) {
+            persistActiveMaskLayer();
+            for (EditorMaskLayer layer : maskLayers) {
+                if (id.equals(layer.id)) {
+                    layer.visible = visible;
+                    return;
+                }
+            }
+        }
+
+        ArrayList<EditorMaskLayer> effectiveMaskLayers() {
+            ArrayList<EditorMaskLayer> result = new ArrayList<>();
+            for (EditorMaskLayer layer : maskLayers) {
+                result.add(layer.id.equals(activeMaskLayerId)
+                        ? snapshotMaskLayer(layer)
+                        : layer.copy());
+            }
+            return result;
+        }
+
+        EditorMaskLayer displayedMaskLayer(EditorMaskLayer layer) {
+            return layer.id.equals(activeMaskLayerId)
+                    ? snapshotMaskLayer(layer)
+                    : layer.copy();
+        }
+
+        private void persistActiveMaskLayer() {
+            EditorMaskLayer active = activeMaskLayer();
+            if (active == null) return;
+            int index = maskLayers.indexOf(active);
+            maskLayers.set(index, snapshotMaskLayer(active));
+        }
+
+        private EditorMaskLayer snapshotMaskLayer(EditorMaskLayer identity) {
+            EditorMaskLayer layer = new EditorMaskLayer(identity.id, identity.name);
+            layer.visible = identity.visible;
+            layer.type = maskType;
+            layer.amount = maskAmount;
+            layer.feather = maskFeather;
+            layer.invert = maskInvert;
+            layer.subtract = maskSubtract;
+            layer.brushSize = maskBrushSize;
+            for (EditorMaskStroke stroke : maskStrokes) layer.strokes.add(stroke.copy());
+            layer.exposure = maskExposure;
+            layer.contrast = maskContrast;
+            layer.highlights = maskHighlights;
+            layer.shadows = maskShadows;
+            layer.temperature = maskTemperature;
+            layer.tint = maskTint;
+            layer.saturation = maskSaturation;
+            layer.clarity = maskClarity;
+            return layer;
+        }
+
+        private void loadMaskLayer(EditorMaskLayer layer) {
+            maskEnabled = true;
+            activeMaskLayerId = layer.id;
+            maskType = layer.type;
+            maskAmount = layer.amount;
+            maskFeather = layer.feather;
+            maskInvert = layer.invert;
+            maskSubtract = layer.subtract;
+            maskBrushSize = layer.brushSize;
+            maskStrokes.clear();
+            for (EditorMaskStroke stroke : layer.strokes) maskStrokes.add(stroke.copy());
+            maskExposure = layer.exposure;
+            maskContrast = layer.contrast;
+            maskHighlights = layer.highlights;
+            maskShadows = layer.shadows;
+            maskTemperature = layer.temperature;
+            maskTint = layer.tint;
+            maskSaturation = layer.saturation;
+            maskClarity = layer.clarity;
+        }
+    }
+
+    private final class EditorMaskImageView extends ImageView {
+        private final EditorAdjustments adjustments;
+        private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private Runnable maskChanged = () -> {};
+        private EditorMaskStroke activeStroke;
+
+        EditorMaskImageView(EditorAdjustments adjustments) {
+            super(MainActivity.this);
+            this.adjustments = adjustments;
+            setScaleType(ScaleType.FIT_CENTER);
+            setBackgroundColor(GRAPHITE);
+            setClickable(true);
+        }
+
+        void setMaskChangedListener(Runnable listener) {
+            maskChanged = listener == null ? () -> {} : listener;
+        }
+
+        private RectF displayedImageRect() {
+            Drawable drawable = getDrawable();
+            if (drawable == null || drawable.getIntrinsicWidth() <= 0
+                    || drawable.getIntrinsicHeight() <= 0) {
+                return new RectF(0, 0, getWidth(), getHeight());
+            }
+            float scale = Math.min(
+                    getWidth() / (float) drawable.getIntrinsicWidth(),
+                    getHeight() / (float) drawable.getIntrinsicHeight());
+            float width = drawable.getIntrinsicWidth() * scale;
+            float height = drawable.getIntrinsicHeight() * scale;
+            return new RectF(
+                    (getWidth() - width) / 2f,
+                    (getHeight() - height) / 2f,
+                    (getWidth() + width) / 2f,
+                    (getHeight() + height) / 2f);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (!adjustments.maskEnabled
+                    || !adjustments.activeMaskLayerVisible()
+                    || getDrawable() == null) {
+                return super.onTouchEvent(event);
+            }
+            RectF rect = displayedImageRect();
+            if (!rect.contains(event.getX(), event.getY())
+                    && event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                return false;
+            }
+            getParent().requestDisallowInterceptTouchEvent(true);
+            float x = Math.max(0, Math.min(1,
+                    (event.getX() - rect.left) / Math.max(1, rect.width())));
+            float y = Math.max(0, Math.min(1,
+                    (event.getY() - rect.top) / Math.max(1, rect.height())));
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    activeStroke = new EditorMaskStroke(
+                            adjustments.maskSubtract,
+                            adjustments.maskBrushSize);
+                    activeStroke.points.add(new EditorMaskPoint(x, y));
+                    adjustments.maskStrokes.add(activeStroke);
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (activeStroke != null) {
+                        activeStroke.points.add(new EditorMaskPoint(x, y));
+                        invalidate();
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    if (activeStroke != null) {
+                        activeStroke.points.add(new EditorMaskPoint(x, y));
+                        activeStroke = null;
+                        maskChanged.run();
+                        performClick();
+                    }
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+                default:
+                    return super.onTouchEvent(event);
+            }
+        }
+
+        @Override
+        public boolean performClick() {
+            super.performClick();
+            return true;
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (!adjustments.maskEnabled
+                    || !adjustments.activeMaskLayerVisible()
+                    || adjustments.maskStrokes.isEmpty()) {
+                return;
+            }
+            RectF rect = displayedImageRect();
+            for (EditorMaskStroke stroke : adjustments.maskStrokes) {
+                if (stroke.points.isEmpty()) continue;
+                overlayPaint.setStyle(Paint.Style.STROKE);
+                overlayPaint.setStrokeCap(Paint.Cap.ROUND);
+                overlayPaint.setStrokeJoin(Paint.Join.ROUND);
+                overlayPaint.setStrokeWidth(Math.max(
+                        dp(3),
+                        stroke.size / 100f * Math.min(rect.width(), rect.height())));
+                overlayPaint.setColor(stroke.subtract
+                        ? Color.argb(210, 255, 255, 255)
+                        : Color.argb(150, 22, 115, 230));
+                Path path = new Path();
+                EditorMaskPoint first = stroke.points.get(0);
+                path.moveTo(
+                        rect.left + first.x * rect.width(),
+                        rect.top + first.y * rect.height());
+                for (int index = 1; index < stroke.points.size(); index++) {
+                    EditorMaskPoint point = stroke.points.get(index);
+                    path.lineTo(
+                            rect.left + point.x * rect.width(),
+                            rect.top + point.y * rect.height());
+                }
+                canvas.drawPath(path, overlayPaint);
+                if (stroke.points.size() == 1) {
+                    canvas.drawPoint(
+                            rect.left + first.x * rect.width(),
+                            rect.top + first.y * rect.height(),
+                            overlayPaint);
+                }
+            }
+        }
+    }
+
+    private final class WaveformScopeView extends View {
+        static final int RGB_PARADE = 0;
+        static final int AUDIO = 1;
+        static final int PROFESSIONAL = 2;
+
+        private final int mode;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private String red = "—";
+        private String green = "—";
+        private String blue = "—";
+        private String luma = "—";
+        private String chroma = "—";
+
+        WaveformScopeView(int mode) {
+            super(MainActivity.this);
+            this.mode = mode;
+            setBackgroundColor(Color.BLACK);
+            setContentDescription(mode == AUDIO
+                    ? tr("音频波形") + "，" + tr("无音频源")
+                    : mode == RGB_PARADE
+                            ? tr("RGB 波形")
+                            : tr("专业波形图"));
+        }
+
+        void setData(
+                String red,
+                String green,
+                String blue,
+                String luma,
+                String chroma) {
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+            this.luma = luma;
+            this.chroma = chroma;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            RectF bounds = new RectF(1, 1, getWidth() - 1, getHeight() - 1);
+            if (mode == AUDIO) {
+                drawAudio(canvas, bounds);
+                return;
+            }
+            if (mode == RGB_PARADE) {
+                drawPanel(
+                        canvas,
+                        bounds,
+                        "RGB",
+                        new String[]{red, green, blue},
+                        new int[]{Color.rgb(255, 48, 42), Color.rgb(40, 255, 105), Color.rgb(34, 64, 255)},
+                        true);
+                return;
+            }
+
+            float gap = dpf(1);
+            float panelHeight = (bounds.height() - gap * 2) / 3f;
+            RectF yBounds = new RectF(
+                    bounds.left, bounds.top, bounds.right, bounds.top + panelHeight);
+            RectF yuvBounds = new RectF(
+                    bounds.left,
+                    yBounds.bottom + gap,
+                    bounds.right,
+                    yBounds.bottom + gap + panelHeight);
+            RectF rgbBounds = new RectF(
+                    bounds.left,
+                    yuvBounds.bottom + gap,
+                    bounds.right,
+                    bounds.bottom);
+            drawPanel(
+                    canvas,
+                    yBounds,
+                    "Y",
+                    new String[]{luma},
+                    new int[]{Color.WHITE},
+                    false);
+            drawPanel(
+                    canvas,
+                    yuvBounds,
+                    "YUV",
+                    new String[]{luma, chromaPart(chroma, 0), chromaPart(chroma, 1)},
+                    new int[]{Color.rgb(20, 255, 92), Color.rgb(0, 210, 255), Color.rgb(255, 38, 222)},
+                    false);
+            drawPanel(
+                    canvas,
+                    rgbBounds,
+                    "RGB",
+                    new String[]{red, green, blue},
+                    new int[]{Color.rgb(255, 48, 42), Color.rgb(40, 255, 105), Color.rgb(34, 64, 255)},
+                    true);
+        }
+
+        private void drawPanel(
+                Canvas canvas,
+                RectF bounds,
+                String label,
+                String[] values,
+                int[] colors,
+                boolean parade) {
+            float footerHeight = Math.min(dp(14), Math.max(dp(10), bounds.height() * 0.17f));
+            RectF plotBounds = new RectF(
+                    bounds.left,
+                    bounds.top,
+                    bounds.right,
+                    Math.max(bounds.top + 1, bounds.bottom - footerHeight));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.BLACK);
+            canvas.drawRect(bounds, paint);
+            paint.setColor(Color.rgb(5, 10, 15));
+            canvas.drawRect(plotBounds, paint);
+
+            for (int index = 0; index < values.length; index++) {
+                int segment = parade ? index : -1;
+                drawTrace(canvas, plotBounds, values[index], colors[index], segment, index + 1);
+            }
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dpf(0.72f));
+            paint.setColor(Color.argb(144, 255, 255, 255));
+            for (int guide = 1; guide < 4; guide++) {
+                float y = plotBounds.top + plotBounds.height() * guide / 4f;
+                canvas.drawLine(plotBounds.left, y, plotBounds.right, y, paint);
+            }
+            if (parade) {
+                for (int guide = 1; guide < 3; guide++) {
+                    float x = plotBounds.left + plotBounds.width() * guide / 3f;
+                    canvas.drawLine(x, plotBounds.top, x, plotBounds.bottom, paint);
+                }
+            }
+            paint.setStrokeWidth(dpf(1.1f));
+            paint.setColor(Color.argb(240, 255, 255, 255));
+            canvas.drawRect(plotBounds, paint);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
+            paint.setTextSize(Math.min(dp(9), footerHeight * 0.68f));
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setColor(Color.argb(224, 255, 255, 255));
+            float baseline = bounds.bottom - Math.max(dpf(1.5f), footerHeight * 0.12f);
+            if (parade) {
+                canvas.drawText("R", bounds.left + bounds.width() / 6f, baseline, paint);
+                canvas.drawText("G", bounds.left + bounds.width() / 2f, baseline, paint);
+                canvas.drawText("B", bounds.left + bounds.width() * 5f / 6f, baseline, paint);
+            } else {
+                canvas.drawText(label, bounds.centerX(), baseline, paint);
+            }
+            paint.setTextAlign(Paint.Align.LEFT);
+        }
+
+        private void drawAudio(Canvas canvas, RectF bounds) {
+            drawPanel(canvas, bounds, "AUDIO", new String[0], new int[0], false);
+            float footerHeight = Math.min(dp(14), Math.max(dp(10), bounds.height() * 0.17f));
+            float y = bounds.top + (bounds.height() - footerHeight) / 2f;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(5));
+            paint.setColor(Color.argb(55, 76, 199, 232));
+            canvas.drawLine(bounds.left + dp(4), y, bounds.right - dp(4), y, paint);
+            paint.setStrokeWidth(dp(1));
+            paint.setColor(Color.rgb(76, 199, 232));
+            canvas.drawLine(bounds.left + dp(4), y, bounds.right - dp(4), y, paint);
+        }
+
+        private void drawTrace(
+                Canvas canvas,
+                RectF bounds,
+                String value,
+                int color,
+                int segment,
+                int seed) {
+            float inset = Math.max(dp(2), bounds.width() * 0.009f);
+            float startX;
+            float width;
+            if (segment >= 0) {
+                float segmentWidth = bounds.width() / 3f;
+                startX = bounds.left + segmentWidth * segment + inset;
+                width = Math.max(1, segmentWidth - inset * 2);
+            } else {
+                startX = bounds.left + inset;
+                width = Math.max(1, bounds.width() - inset * 2);
+            }
+            float topInset = Math.max(dp(3), bounds.height() * 0.035f);
+            float bottom = bounds.bottom - Math.max(dp(3), bounds.height() * 0.035f);
+            float plotHeight = Math.max(1, bottom - bounds.top - topInset);
+            ScopeDensity density = parseDensity(value);
+            if (density != null) {
+                drawDensity(canvas, density, color, startX, width, bounds.top + topInset, plotHeight);
+                return;
+            }
+            float[] levels = scopeLevels(value);
+            if (levels.length < 2) return;
+            int columns = Math.min(190, Math.max(48, (int) (width / dpf(1.35f))));
+            Path envelope = new Path();
+            Path haze = new Path();
+            Path cloud = new Path();
+            Path sparks = new Path();
+
+            for (int column = 0; column < columns; column++) {
+                float progress = column / (float) Math.max(1, columns - 1);
+                float sample = progress * (levels.length - 1);
+                int lower = Math.min(levels.length - 1, (int) Math.floor(sample));
+                int upper = Math.min(levels.length - 1, lower + 1);
+                float blend = sample - lower;
+                float interpolated = levels[lower] + (levels[upper] - levels[lower]) * blend;
+                float ripple = (scopeNoise(column, 0, seed) - 0.5f) * 0.075f;
+                float level = Math.min(1, Math.max(0.04f, interpolated + ripple));
+                float x = startX + width * progress;
+                float envelopeY = bounds.top + topInset
+                        + plotHeight * (1 - (0.12f + level * 0.82f));
+                if (column == 0) envelope.moveTo(x, envelopeY);
+                else envelope.lineTo(x, envelopeY);
+
+                int particles = 18 + Math.round(level * 28);
+                for (int particle = 0; particle < particles; particle++) {
+                    float distribution = scopeNoise(column, particle + 1, seed * 7);
+                    float depth = (float) Math.pow(
+                            distribution,
+                            particle % 3 == 0 ? 2.25 : 0.72);
+                    float jitterX = (scopeNoise(column, particle + 11, seed * 13) - 0.5f) * dpf(2.2f);
+                    float jitterY = (scopeNoise(column, particle + 29, seed * 17) - 0.5f) * dpf(2.4f);
+                    float y = Math.min(bottom, Math.max(
+                            bounds.top + topInset,
+                            envelopeY + (bottom - envelopeY) * depth + jitterY));
+                    boolean bright = (column + particle + seed) % 5 == 0;
+                    float dot = bright ? dpf(1.12f) : dpf(0.72f);
+                    haze.addCircle(x + jitterX, y, dot, Path.Direction.CW);
+                    if (bright) sparks.addCircle(x + jitterX, y, dot * 0.55f, Path.Direction.CW);
+                    else cloud.addCircle(x + jitterX, y, dot * 0.52f, Path.Direction.CW);
+                }
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(color, 18));
+            canvas.drawPath(haze, paint);
+            paint.setColor(withAlpha(color, 76));
+            canvas.drawPath(cloud, paint);
+            paint.setColor(withAlpha(color, 164));
+            canvas.drawPath(sparks, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(dpf(3.2f));
+            paint.setColor(withAlpha(color, 36));
+            canvas.drawPath(envelope, paint);
+            paint.setStrokeWidth(dpf(0.72f));
+            paint.setColor(withAlpha(color, 160));
+            canvas.drawPath(envelope, paint);
+        }
+
+        private void drawDensity(
+                Canvas canvas,
+                ScopeDensity density,
+                int color,
+                float startX,
+                float width,
+                float top,
+                float height) {
+            float cellWidth = width / density.columns;
+            float cellHeight = height / density.rows;
+            float dot = Math.max(dpf(0.62f), Math.min(dpf(1.5f), cellWidth * 0.72f));
+            Path haze = new Path();
+            Path cloud = new Path();
+            Path sparks = new Path();
+            Path envelope = new Path();
+            boolean hasEnvelope = false;
+            for (int column = 0; column < density.columns; column++) {
+                int firstRow = -1;
+                for (int row = 0; row < density.rows; row++) {
+                    int level = density.values[row * density.columns + column];
+                    if (level <= 0) continue;
+                    if (firstRow < 0) firstRow = row;
+                    float x = startX + (column + 0.5f) * cellWidth;
+                    float y = top + (row + 0.5f) * cellHeight;
+                    float intensity = level / 15f;
+                    haze.addCircle(x, y, dot, Path.Direction.CW);
+                    float core = dot * (0.46f + intensity * 0.38f);
+                    if (level >= 9) sparks.addCircle(x, y, core, Path.Direction.CW);
+                    else if (level >= 3) cloud.addCircle(x, y, core, Path.Direction.CW);
+                }
+                if (firstRow >= 0) {
+                    float x = startX + (column + 0.5f) * cellWidth;
+                    float y = top + (firstRow + 0.5f) * cellHeight;
+                    if (!hasEnvelope) {
+                        envelope.moveTo(x, y);
+                        hasEnvelope = true;
+                    } else {
+                        envelope.lineTo(x, y);
+                    }
+                }
+            }
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(withAlpha(color, 26));
+            canvas.drawPath(haze, paint);
+            paint.setColor(withAlpha(color, 90));
+            canvas.drawPath(cloud, paint);
+            paint.setColor(withAlpha(color, 200));
+            canvas.drawPath(sparks, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(dpf(2.8f));
+            paint.setColor(withAlpha(color, 56));
+            canvas.drawPath(envelope, paint);
+            paint.setStrokeWidth(dpf(0.68f));
+            paint.setColor(withAlpha(color, 184));
+            canvas.drawPath(envelope, paint);
+        }
+
+        private ScopeDensity parseDensity(String value) {
+            int colon = value.indexOf(':');
+            if (!value.startsWith("S") || colon < 2) return null;
+            String[] dimensions = value.substring(1, colon).split("x", 2);
+            if (dimensions.length != 2) return null;
+            try {
+                int columns = Integer.parseInt(dimensions[0]);
+                int rows = Integer.parseInt(dimensions[1]);
+                String payload = value.substring(colon + 1);
+                if (payload.length() != columns * rows) return null;
+                int[] values = new int[payload.length()];
+                for (int index = 0; index < payload.length(); index++) {
+                    int level = Character.digit(payload.charAt(index), 16);
+                    if (level < 0) return null;
+                    values[index] = level;
+                }
+                return new ScopeDensity(columns, rows, values);
+            } catch (NumberFormatException error) {
+                return null;
+            }
+        }
+
+        private String chromaPart(String value, int index) {
+            String[] parts = value.split("\\|", 2);
+            return parts.length > index ? parts[index] : value;
+        }
+
+        private final class ScopeDensity {
+            final int columns;
+            final int rows;
+            final int[] values;
+
+            ScopeDensity(int columns, int rows, int[] values) {
+                this.columns = columns;
+                this.rows = rows;
+                this.values = values;
+            }
+        }
+
+        private float scopeNoise(int column, int particle, int seed) {
+            double value = Math.sin(
+                    ((column + 1) * 17 + (particle + 3) * 31 + seed * 47) * 12.9898)
+                    * 43758.5453;
+            return (float) (value - Math.floor(value));
+        }
+
+        private float[] scopeLevels(String value) {
+            String bars = "▁▂▃▄▅▆▇█";
+            ArrayList<Float> output = new ArrayList<>();
+            for (int index = 0; index < value.length(); index++) {
+                int level = bars.indexOf(value.charAt(index));
+                if (level >= 0) output.add(level / 7f);
+            }
+            if (output.size() < 2) return new float[]{0.08f, 0.08f};
+            float[] levels = new float[output.size()];
+            for (int index = 0; index < output.size(); index++) {
+                levels[index] = output.get(index);
+            }
+            return levels;
+        }
+
+        private int withAlpha(int color, int alpha) {
+            return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));
+        }
+
+        private float dpf(float value) {
+            return value * getResources().getDisplayMetrics().density;
         }
     }
 
@@ -295,6 +1202,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService previewExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService editorExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
     private final AtomicBoolean previewWorkerRunning = new AtomicBoolean();
@@ -305,14 +1213,31 @@ public final class MainActivity extends Activity {
     private final Map<String, Boolean> disclosureStates = new HashMap<>();
     private final List<LibraryBranch> userLibraryBranches = new ArrayList<>();
     private final Map<String, String> libraryFileAssignments = new HashMap<>();
+    private final List<RememberedDevice> rememberedDevices = new ArrayList<>();
+    private final Set<Long> selectedCameraStorageHandles = new LinkedHashSet<>();
+    private volatile CameraStorage.Snapshot cameraStorageSnapshot =
+            new CameraStorage.Snapshot(Collections.emptyList(), Collections.emptyList());
+    private volatile String cameraStorageStatus = "连接相机后可浏览存储卡";
+    private volatile boolean cameraStorageLoading;
 
     private PtpCamera camera;
+    private PtpIpCamera wifiCamera;
+    private LocalCameraController localCamera;
+    private final ExternalVideoRecorder externalVideoRecorder =
+            new ExternalVideoRecorder();
+    private BluetoothRemoteController bluetoothRemote;
+    private LocationTaggingController locationTagging;
     private DiagnosticLogger diagnostics;
     private FrameLayout contentHost;
+    private LinearLayout applicationRoot;
+    private View applicationTopBar;
+    private View applicationBottomNavigation;
+    private View applicationStatusBar;
     private TextView statusText;
     private TextView countText;
     private Button connectButton;
     private ImageView previewImage;
+    private TextView monitorFocusReticle;
     private ImageView zebraImage;
     private TextView previewPlaceholder;
     private Button shutterButton;
@@ -322,11 +1247,8 @@ public final class MainActivity extends Activity {
     private TextView wirelessAddressText;
     private TextView lutStatusText;
     private TextView updateStatusText;
-    private TextView redHistogramText;
-    private TextView greenHistogramText;
-    private TextView blueHistogramText;
-    private TextView waveformText;
-    private TextView vectorscopeText;
+    private WaveformScopeView monitorRgbScopeView;
+    private WaveformScopeView professionalScopeView;
     private TextView peakingCoverageText;
     private Button checkUpdateButton;
     private Button openUpdateButton;
@@ -338,6 +1260,7 @@ public final class MainActivity extends Activity {
     private ImageView immersivePreviewImage;
     private ImageView immersiveZebraImage;
     private Dialog immersiveDialog;
+    private AlertDialog nikonCloudPresetDialog;
     private FrameLayout immersiveChrome;
     private Button immersiveRecordButton;
     private TextView immersiveExposureText;
@@ -352,6 +1275,7 @@ public final class MainActivity extends Activity {
     private TextView isoReadoutValue;
     private TextView compensationReadoutLabel;
     private TextView compensationReadoutValue;
+    private TextView monitorTimerText;
     private SensorManager immersiveSensorManager;
     private Sensor immersiveRotationSensor;
     private boolean immersiveLandscape;
@@ -364,15 +1288,44 @@ public final class MainActivity extends Activity {
 
     private volatile boolean connected;
     private volatile boolean connecting;
+    private volatile boolean localCameraConnected;
+    private volatile boolean localCameraConnecting;
+    private volatile boolean wifiConnected;
+    private volatile boolean wifiConnecting;
+    private volatile String wifiConnectionMode = "ap";
+    private volatile boolean bluetoothRemoteEnabled;
+    private volatile boolean locationTaggingEnabled;
+    private volatile String wifiCameraName = "PTP/IP Camera";
+    private volatile String bluetoothRemoteStatus = "蓝牙遥控未开启";
+    private volatile String locationTaggingStatus = "定位未开启";
     private volatile boolean liveViewEnabled;
     private volatile boolean capturing;
     private volatile boolean videoRecording;
+    private volatile boolean externalRecordToDevice = true;
+    private volatile long recordingStartedAt;
+    private final Runnable monitorTimerTicker = new Runnable() {
+        @Override public void run() {
+            if (monitorTimerText == null || !"monitor".equals(currentSection)) return;
+            long elapsed = videoRecording && recordingStartedAt > 0
+                    ? Math.max(0, System.currentTimeMillis() - recordingStartedAt)
+                    : 0;
+            long centis = (elapsed / 10) % 100;
+            long seconds = (elapsed / 1000) % 60;
+            long minutes = (elapsed / 60000) % 60;
+            long hours = elapsed / 3600000;
+            monitorTimerText.setText(String.format(
+                    Locale.CHINA, "%02d:%02d:%02d:%02d",
+                    hours, minutes, seconds, centis));
+            mainHandler.postDelayed(this, 100);
+        }
+    };
     private volatile boolean wirelessRequested;
     private volatile String wirelessStatus = "无线收件箱未开启";
     private volatile int previewGeneration;
     private volatile int previewFailureCount;
     private volatile int previewAnalysisSequence;
     private volatile String connectedCameraName = "Nikon 相机";
+    private volatile String connectedCameraVendor = "Nikon";
     private volatile String exposureMode = "manual";
     private volatile boolean zebraEnabled;
     private volatile int zebraThreshold = 95;
@@ -389,6 +1342,10 @@ public final class MainActivity extends Activity {
     private volatile String monitorVideoProfile = "source";
     private volatile int monitorFrameRate = 30;
     private volatile double monitorShutterAngle = 180;
+    private volatile boolean monitorShutterAngleMode = true;
+    private volatile String videoCodec = "h265";
+    private volatile boolean nLogEnabled;
+    private volatile String videoLogProfile = "off";
     private volatile double currentShutterSeconds = 0.008;
     private volatile double currentAperture = 4.0;
     private volatile int currentIso = 400;
@@ -411,6 +1368,10 @@ public final class MainActivity extends Activity {
     private String editorSelectedPath;
     private final EditorAdjustments editorAdjustments =
             new EditorAdjustments();
+    private List<NikonCloudPreview.Preset> nikonCloudPresets =
+            Collections.emptyList();
+    private NikonCloudPreview.Preset selectedNikonCloudPreset;
+    private NikonCloudPreview.Preset monitorNikonCloudPreset;
     private String aiPrompt = "";
     private int aiMode = 0; // 0=edit, 1=generate
     private int aiRatioIndex = 0;
@@ -425,14 +1386,20 @@ public final class MainActivity extends Activity {
 
     private static boolean aiActivated = false;
     private static int aiUsageCount = 0;
+    private static boolean aiUsageLoaded;
     private static final int AI_MAX_USAGE = 100;
 
     private boolean isAiActivated() {
-        if (!aiActivated) {
-            aiActivated = getSharedPreferences("nikon-link", MODE_PRIVATE)
-                    .getBoolean("ai_activated", false);
+        if (!aiUsageLoaded) {
+            android.content.SharedPreferences preferences =
+                    getSharedPreferences("nikon-link", MODE_PRIVATE);
+            aiActivated = preferences.getBoolean("ai_activated", false);
+            aiUsageCount = Math.max(
+                    0,
+                    preferences.getInt("ai_usage_count", 0));
+            aiUsageLoaded = true;
         }
-        return aiActivated;
+        return aiActivated && aiUsageCount < AI_MAX_USAGE;
     }
 
     private int getRemainingUsage() {
@@ -440,7 +1407,7 @@ public final class MainActivity extends Activity {
     }
 
     private void recordAiUsage() {
-        aiUsageCount++;
+        aiUsageCount = Math.min(AI_MAX_USAGE, aiUsageCount + 1);
         getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .edit().putInt("ai_usage_count", aiUsageCount).apply();
         if (aiUsageCount >= AI_MAX_USAGE) {
@@ -459,7 +1426,7 @@ public final class MainActivity extends Activity {
                 android.provider.Settings.Secure.ANDROID_ID);
         if (id == null) id = java.util.UUID.randomUUID().toString();
         getSharedPreferences("nikon-link", MODE_PRIVATE)
-                .edit().putString("ai_device_id", id).apply();
+                .edit().putString("ai_device_id", id).commit();
         return id;
     }
 
@@ -475,12 +1442,12 @@ public final class MainActivity extends Activity {
 
     private static final String AI_PUBLIC_KEY =
             "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
-            "FdMmWywGAwrL5bA+JK/uW+Mf/YDs5hQopYcxoDiSY2yQnGmGSo8XJ4apYLVH1bDt" +
-            "PFGGj+TxfFNLGicPJzGkRKY7UVQHvlYPNiCBRPWgFw0gCNArqoHDXoTLj4q8C5MZ" +
-            "9kZPv9qWeMZ5A5m5q8n2KjYfN8vLz5XH2LdPm9QaW7RzVYfJbGvKRhJzL3NxP8" +
-            "+ZzVjQmzHjKlK2Qw9MkPvN7J2GXYxHdVfRjQ8GvKzL5XgP3XjH9mQz5YzQdGhN" +
-            "VbKzYxHV9fHjGkJzX8DfNzVbYzGdRmNkQzNxGkPvMkHjKjYzJ2L5NxP8iQzvQ" +
-            "MjQzRwIDAQAB";
+            "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL" +
+            "32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj" +
+            "c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW" +
+            "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap" +
+            "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI" +
+            "3wIDAQAB";
 
     private boolean verifyActivationCode(String code) {
         if (code == null) return false;
@@ -495,8 +1462,10 @@ public final class MainActivity extends Activity {
             String expiryPart = parts[parts.length - 1];
             java.text.SimpleDateFormat sdf =
                     new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US);
+            sdf.setLenient(false);
             java.util.Date expiry = sdf.parse(expiryPart);
-            if (expiry != null && expiry.before(new java.util.Date())) {
+            if (expiry == null || !expiryPart.equals(sdf.format(expiry))
+                    || expiryPart.compareTo(sdf.format(new java.util.Date())) < 0) {
                 return false;
             }
             StringBuilder sigBuilder = new StringBuilder();
@@ -532,6 +1501,7 @@ public final class MainActivity extends Activity {
                         .apply();
                 aiActivated = true;
                 aiUsageCount = 0;
+                aiUsageLoaded = true;
             }
             return valid;
         } catch (Exception ignored) {
@@ -563,6 +1533,21 @@ public final class MainActivity extends Activity {
             {"城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"},
             {"产品展示", "professional product photography, clean studio background, soft lighting, high detail"},
     };
+    private static final String[][] AI_EDIT_MODULES = {
+            {"主体", "人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"},
+            {"光线", "柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"},
+            {"色彩", "自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"},
+            {"质感", "保留真实皮肤纹理", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"},
+            {"构图", "浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"},
+            {"约束", "保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"}
+    };
+    private static final String[][] AI_GENERATE_MODULES = {
+            {"主体", "人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"},
+            {"光线", "柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"},
+            {"色彩", "自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"},
+            {"质感", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"},
+            {"构图", "浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"}
+    };
     private static final String[] AI_PROVIDERS = {
             "aimlapi.com",
             "fal.ai",
@@ -579,11 +1564,24 @@ public final class MainActivity extends Activity {
             "https://crazyrouter.com"
     };
 
+    private static final class AiImageResponse {
+        final byte[] image;
+        final Integer remaining;
+
+        AiImageResponse(byte[] image, Integer remaining) {
+            this.image = image;
+            this.remaining = remaining;
+        }
+    }
+
     private EditorAdjustments editorSettingsBeforeAI;
     private EditorAdjustments editorAICopiedSettings;
     private EditorAIAnalysis editorAIAnalysis;
     private int editorAIIntensity = 72;
     private String editorAISummary = "等待分析当前照片";
+    private final LinkedHashSet<String> aiSelectedPresetKeys = new LinkedHashSet<>();
+    private String aiManualPrompt = "";
+    private boolean suppressAiPromptChange;
     private String appLanguage = Localization.SIMPLIFIED_CHINESE;
     private final float[] immersiveRotationMatrix = new float[9];
     private final float[] immersiveOrientation = new float[3];
@@ -625,7 +1623,9 @@ public final class MainActivity extends Activity {
                         .getString(
                                 Localization.PREFERENCE_KEY,
                                 Localization.SIMPLIFIED_CHINESE));
+        nikonCloudPresets = NikonCloudPreview.load(this);
         loadLibraryBranches();
+        loadRememberedDevices();
         Window window = getWindow();
         window.setStatusBarColor(PAPER);
         window.setNavigationBarColor(GRAPHITE);
@@ -636,10 +1636,45 @@ public final class MainActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
 
         camera = new PtpCamera(this, diagnostics);
+        wifiCamera = new PtpIpCamera();
+        localCamera = new LocalCameraController(this);
+        bluetoothRemote = new BluetoothRemoteController(
+                this,
+                new BluetoothRemoteController.Listener() {
+                    @Override
+                    public void onStatus(String status, boolean isConnected) {
+                        bluetoothRemoteStatus = status;
+                        diagnostics.info("bluetooth-remote", status);
+                    }
+
+                    @Override
+                    public void onShutter() {
+                        mainHandler.post(() -> capturePhoto());
+                    }
+                });
+        locationTagging = new LocationTaggingController(
+                this,
+                status -> {
+                    locationTaggingStatus = status;
+                    diagnostics.info("location", status);
+                });
+        bluetoothRemoteEnabled = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("bluetoothRemoteEnabled", false);
+        locationTaggingEnabled = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("captureLocationEnabled", false);
+        externalRecordToDevice = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("externalRecordToDevice", true);
         monitorVideoProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("monitorVideoProfile", "source");
         monitorFrameRate = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getInt("monitorFrameRate", 30);
+        videoCodec = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("videoCodec", "h265");
+        nLogEnabled = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("nLogEnabled", false);
+        videoLogProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("videoLogProfile", nLogEnabled ? "nlog" : "off");
+        nLogEnabled = !"off".equals(videoLogProfile);
         monitorShutterAngle = Double.longBitsToDouble(
                 getSharedPreferences("nikon-link", MODE_PRIVATE)
                         .getLong(
@@ -696,6 +1731,8 @@ public final class MainActivity extends Activity {
         showSplash();
         showSection("capture");
         updateConnectionUi();
+        if (bluetoothRemoteEnabled) bluetoothRemote.start();
+        if (locationTaggingEnabled) locationTagging.start();
         showLaunchAnnouncementIfNeeded();
         if (getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getBoolean(AUTOMATIC_UPDATE_KEY, true)) {
@@ -711,6 +1748,20 @@ public final class MainActivity extends Activity {
         immersiveLandscape =
                 configuration.orientation == Configuration.ORIENTATION_LANDSCAPE;
         buildImmersiveChrome(immersiveDialog);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (bluetoothRemoteEnabled
+                && !event.isCanceled()
+                && (keyCode == KeyEvent.KEYCODE_CAMERA
+                        || keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                        || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            diagnostics.info("bluetooth-remote", "收到硬件遥控快门键");
+            capturePhoto();
+            return true;
+        }
+        return super.onKeyUp(keyCode, event);
     }
 
     private void chooseLutFile() {
@@ -784,6 +1835,23 @@ public final class MainActivity extends Activity {
             String[] permissions,
             int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_BLUETOOTH_REMOTE) {
+            if (bluetoothRemoteEnabled) bluetoothRemote.start();
+            return;
+        }
+        if (requestCode == REQUEST_CAPTURE_LOCATION) {
+            if (locationTaggingEnabled) locationTagging.start();
+            return;
+        }
+        if (requestCode == REQUEST_LOCAL_CAMERA) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                connectLocalCamera();
+            } else {
+                showError("未获得相机权限，无法使用本机摄像头");
+            }
+            return;
+        }
         if (requestCode != REQUEST_MEDIA_LIBRARY) return;
         if (hasAlbumAccess()) {
             showSection("library");
@@ -1206,7 +2274,8 @@ public final class MainActivity extends Activity {
         String lower = file.getName().toLowerCase(Locale.ROOT);
         return lower.endsWith(".mp4")
                 || lower.endsWith(".mov")
-                || lower.endsWith(".m4v");
+                || lower.endsWith(".m4v")
+                || lower.endsWith(".avi");
     }
 
     private void showLargeSystemMedia(MediaEntry entry) {
@@ -1386,14 +2455,17 @@ public final class MainActivity extends Activity {
 
 
     private View buildApplication() {
+        boolean compact = isCompactPhone();
         LinearLayout root = new LinearLayout(this);
+        applicationRoot = root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(PAPER);
 
         View topBar = buildTopBar();
+        applicationTopBar = topBar;
         root.addView(topBar, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(72)));
+                dp(compact ? 64 : 72)));
 
         contentHost = new FrameLayout(this);
         root.addView(contentHost, new LinearLayout.LayoutParams(
@@ -1401,20 +2473,26 @@ public final class MainActivity extends Activity {
                 0,
                 1f));
 
-        root.addView(buildBottomNavigation(), new LinearLayout.LayoutParams(
+        View bottomNavigation = buildBottomNavigation();
+        applicationBottomNavigation = bottomNavigation;
+        root.addView(bottomNavigation, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(70)));
+                dp(compact ? 64 : 70)));
         View statusBar = buildStatusBar();
-        root.addView(statusBar, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(30)));
-        applySystemBarInsets(root, topBar, statusBar);
+        applicationStatusBar = statusBar;
+        if (!compact) {
+            root.addView(statusBar, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(30)));
+        }
+        applySystemBarInsets(root, topBar, bottomNavigation, statusBar);
         return root;
     }
 
     private void applySystemBarInsets(
             LinearLayout root,
             View topBar,
+            View bottomNavigation,
             View statusBar) {
         int rootPaddingLeft = root.getPaddingLeft();
         int rootPaddingRight = root.getPaddingRight();
@@ -1426,8 +2504,13 @@ public final class MainActivity extends Activity {
         int statusPaddingTop = statusBar.getPaddingTop();
         int statusPaddingRight = statusBar.getPaddingRight();
         int statusPaddingBottom = statusBar.getPaddingBottom();
-        int topBarHeight = dp(72);
-        int statusBarHeight = dp(30);
+        int navigationPaddingLeft = bottomNavigation.getPaddingLeft();
+        int navigationPaddingTop = bottomNavigation.getPaddingTop();
+        int navigationPaddingRight = bottomNavigation.getPaddingRight();
+        int navigationPaddingBottom = bottomNavigation.getPaddingBottom();
+        int topBarHeight = dp(isCompactPhone() ? 64 : 72);
+        int statusBarHeight = isCompactPhone() ? 0 : dp(30);
+        int navigationHeight = dp(isCompactPhone() ? 64 : 70);
 
         root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
             int left;
@@ -1466,18 +2549,35 @@ public final class MainActivity extends Activity {
             topParams.height = topBarHeight + top;
             topBar.setLayoutParams(topParams);
             ViewGroup.LayoutParams statusParams = statusBar.getLayoutParams();
-            statusParams.height = statusBarHeight + bottom;
-            statusBar.setLayoutParams(statusParams);
+            if (isCompactPhone()) {
+                bottomNavigation.setPadding(
+                        navigationPaddingLeft,
+                        navigationPaddingTop,
+                        navigationPaddingRight,
+                        navigationPaddingBottom + bottom);
+                ViewGroup.LayoutParams navigationParams =
+                        bottomNavigation.getLayoutParams();
+                navigationParams.height = navigationHeight + bottom;
+                bottomNavigation.setLayoutParams(navigationParams);
+            } else if (statusParams != null) {
+                statusParams.height = statusBarHeight + bottom;
+                statusBar.setLayoutParams(statusParams);
+            }
             return windowInsets;
         });
         root.requestApplyInsets();
     }
 
     private View buildTopBar() {
+        boolean compact = isCompactPhone();
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(12), dp(8), dp(12), dp(8));
+        top.setPadding(
+                dp(compact ? 10 : 12),
+                dp(8),
+                dp(compact ? 10 : 12),
+                dp(8));
         top.setBackgroundColor(SURFACE);
         top.setElevation(dp(6));
 
@@ -1485,23 +2585,38 @@ public final class MainActivity extends Activity {
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(brandGradient(13));
         logo.setElevation(dp(5));
-        top.addView(logo, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        top.addView(logo, new LinearLayout.LayoutParams(
+                dp(compact ? 38 : 40),
+                dp(compact ? 38 : 40)));
 
         LinearLayout brand = new LinearLayout(this);
         brand.setOrientation(LinearLayout.VERTICAL);
         brand.setPadding(dp(8), 0, 0, 0);
-        brand.addView(text("帧澈 ZENCHE", 15, Typeface.BOLD, INK));
-        brand.addView(text("Capture · Connect · Flow", 10, Typeface.NORMAL, MUTED));
-        top.addView(brand, new LinearLayout.LayoutParams(dp(142), dp(44)));
+        brand.addView(text(
+                "帧澈 ZENCHE",
+                compact ? 14 : 15,
+                Typeface.BOLD,
+                INK));
+        if (!compact) {
+            brand.addView(text("Capture · Connect · Flow", 10, Typeface.NORMAL, MUTED));
+        }
+        top.addView(brand, new LinearLayout.LayoutParams(
+                dp(compact ? 112 : 142),
+                dp(44)));
 
         connectionDot = text("●", 13, Typeface.BOLD, MUTED);
         connectionDot.setGravity(Gravity.CENTER);
         top.addView(connectionDot, new LinearLayout.LayoutParams(dp(22), dp(44)));
 
-        connectButton = nativeButton("连接相机", true);
+        connectButton = nativeButton(compact ? "连接" : "连接相机", true);
         connectButton.setOnClickListener(view -> {
-            if (connected) disconnectCamera();
-            else showConnectionDialog();
+            if (connected || wifiConnected || localCameraConnected) {
+                if (connected) disconnectCamera();
+                if (wifiConnected) disconnectWifiCamera();
+                if (localCameraConnected) disconnectLocalCamera();
+            } else {
+                showConnectionDialog();
+            }
         });
         top.addView(connectButton, new LinearLayout.LayoutParams(0, dp(46), 1f));
 
@@ -1523,15 +2638,21 @@ public final class MainActivity extends Activity {
     }
 
     private View buildBottomNavigation() {
+        boolean compact = isCompactPhone();
         LinearLayout navigation = new LinearLayout(this);
         navigation.setOrientation(LinearLayout.HORIZONTAL);
         navigation.setGravity(Gravity.CENTER);
-        navigation.setPadding(dp(8), dp(7), dp(8), dp(7));
-        navigation.setBackgroundColor(PAPER_2);
+        navigation.setPadding(
+                dp(6),
+                dp(compact ? 5 : 7),
+                dp(6),
+                dp(compact ? 5 : 7));
+        navigation.setBackgroundColor(SURFACE);
         navigation.setElevation(dp(8));
         navigation.addView(navButton("照片", "capture"));
         navigation.addView(navButton("视频", "monitor"));
         navigation.addView(navButton("编辑", "editor"));
+        navigation.addView(navButton("设备", "devices"));
         navigation.addView(navButton("分支", "library"));
         return navigation;
     }
@@ -1539,7 +2660,7 @@ public final class MainActivity extends Activity {
     private View navButton(String label, String section) {
         Button button = nativeButton(label, false);
         button.setTag(section);
-        button.setTextSize(11);
+        button.setTextSize(isCompactPhone() ? 10 : 11);
         button.setIncludeFontPadding(false);
         button.setCompoundDrawablePadding(dp(4));
         button.setPadding(dp(8), dp(6), dp(8), dp(5));
@@ -1553,6 +2674,9 @@ public final class MainActivity extends Activity {
                 break;
             case "editor":
                 iconResource = R.drawable.ic_nav_library;
+                break;
+            case "devices":
+                iconResource = R.drawable.ic_nav_camera;
                 break;
             default:
                 iconResource = R.drawable.ic_nav_camera;
@@ -1571,8 +2695,11 @@ public final class MainActivity extends Activity {
             showSection(section);
         });
         navigationButtons.add(button);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(54), 1f);
-        params.setMargins(dp(4), 0, dp(4), 0);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                0,
+                dp(isCompactPhone() ? 52 : 54),
+                1f);
+        params.setMargins(dp(2), 0, dp(2), 0);
         button.setLayoutParams(params);
         return button;
     }
@@ -1613,6 +2740,9 @@ public final class MainActivity extends Activity {
             case "settings":
                 content = buildSettingsView();
                 break;
+            case "devices":
+                content = buildMyDevicesView();
+                break;
             default:
                 content = buildCaptureView();
                 break;
@@ -1620,6 +2750,30 @@ public final class MainActivity extends Activity {
         contentHost.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        boolean darkMonitor = "monitor".equals(section);
+        if (applicationRoot != null) applicationRoot.setBackgroundColor(
+                darkMonitor ? Color.rgb(4, 10, 18) : PAPER);
+        if (applicationTopBar != null) {
+            applicationTopBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
+            applicationTopBar.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
+            applicationTopBar.setElevation(darkMonitor ? 0 : dp(6));
+        }
+        if (applicationBottomNavigation != null) {
+            applicationBottomNavigation.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
+        }
+        if (applicationStatusBar != null) {
+            applicationStatusBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
+        }
+        getWindow().setStatusBarColor(darkMonitor ? Color.BLACK : PAPER);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | (darkMonitor ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+        if (darkMonitor) {
+            mainHandler.removeCallbacks(monitorTimerTicker);
+            mainHandler.post(monitorTimerTicker);
+        }
         for (Button button : navigationButtons) {
             boolean active = section.equals(button.getTag());
             boolean videoSection = "monitor".equals(section);
@@ -1635,15 +2789,20 @@ public final class MainActivity extends Activity {
     }
 
     private View buildCaptureView() {
+        boolean compact = isCompactPhone();
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.setPadding(dp(20), dp(22), dp(20), dp(28));
+        content.setPadding(
+                dp(compact ? 16 : 20),
+                dp(compact ? 16 : 22),
+                dp(compact ? 16 : 20),
+                dp(28));
         content.addView(sectionHeader(
                 "照片拍摄",
                 "会话、曝光、对焦与交付按拍摄流程组织",
                 COBALT));
-        content.addView(buildCaptureSessionPanel());
         content.addView(buildPreviewStage(false));
+        content.addView(buildNikonCloudMonitorPanel());
         content.addView(buildExposureReadoutRail());
 
         LinearLayout actions = new LinearLayout(this);
@@ -1654,14 +2813,21 @@ public final class MainActivity extends Activity {
         liveViewButton.setOnClickListener(view -> toggleLiveView());
         shutterButton = nativeButton("拍摄", true);
         shutterButton.setOnClickListener(view -> capturePhoto());
+        Button afOnButton = nativeButton("AF-ON", false);
+        afOnButton.setOnClickListener(view -> requestAutoFocusOn());
+        cameraControls.add(afOnButton);
         cameraControls.add(liveViewButton);
         cameraControls.add(shutterButton);
         actions.addView(liveViewButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
         LinearLayout.LayoutParams shutterParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         shutterParams.setMargins(dp(12), 0, 0, 0);
         actions.addView(shutterButton, shutterParams);
+        LinearLayout.LayoutParams afParams = new LinearLayout.LayoutParams(dp(96), dp(48));
+        afParams.setMargins(dp(12), 0, 0, 0);
+        actions.addView(afOnButton, afParams);
         content.addView(actions);
 
+        content.addView(buildCaptureSessionPanel());
         content.addView(buildProfessionalControls());
         content.addView(buildShootingTaskPanel());
         scroll.addView(content);
@@ -1725,7 +2891,8 @@ public final class MainActivity extends Activity {
 
     private void updateExposureReadoutRail() {
         if (sourceReadoutValue == null) return;
-        sourceReadoutValue.setText(connected ? "USB/PTP" : "—");
+        sourceReadoutValue.setText(
+                connected ? "USB/PTP" : wifiConnected ? "Wi‑Fi/PTP‑IP" : "—");
         modeReadoutValue.setText(connected ? exposureModeCode() : "—");
         shutterReadoutValue.setText(connected ? shutterDisplayValue() : "—");
         apertureReadoutValue.setText(
@@ -1872,47 +3039,214 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorView() {
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.rgb(4, 10, 18));
+        scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content = verticalContainer();
-        content.setPadding(dp(20), dp(22), dp(20), dp(24));
-        content.addView(sectionHeader(
-                "视频监看",
-                connected
-                        ? connectedCameraName + " · 视频取景与本地监看处理"
-                        : "连接相机后显示当前机型与实时画面",
-                VIDEO));
+        content.setPadding(dp(16), dp(10), dp(16), dp(24));
+        content.setBackgroundColor(Color.rgb(4, 10, 18));
+
+        monitorTimerText = text("00:00:00:00", 38, Typeface.BOLD, Color.WHITE);
+        monitorTimerText.setGravity(Gravity.CENTER);
+        monitorTimerText.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        content.addView(monitorTimerText, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(74)));
+        mainHandler.removeCallbacks(monitorTimerTicker);
+        mainHandler.post(monitorTimerTicker);
+
         content.addView(buildPreviewStage(true), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(300)));
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        liveViewButton = nativeButton(
-                liveViewEnabled ? "停止实时取景" : "开启实时取景",
-                false);
+        content.addView(buildNikonCloudMonitorPanel());
+
+        liveViewButton = monitorActionButton(
+                liveViewEnabled ? "停止取景" : "开启取景", false);
         liveViewButton.setOnClickListener(view -> toggleLiveView());
-        shutterButton = nativeButton(
-                videoRecording ? "停止录制" : "开始录制",
-                true);
-        shutterButton.setBackground(rounded(VIDEO, 9, 0));
+        shutterButton = monitorActionButton(
+                videoRecording ? "停止录制" : "开始录制", true);
         shutterButton.setOnClickListener(view -> toggleVideoRecording());
         cameraControls.add(liveViewButton);
         cameraControls.add(shutterButton);
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                0,
-                dp(50),
-                1f);
-        buttonParams.setMargins(0, dp(16), 0, 0);
-        actions.addView(liveViewButton, buttonParams);
-        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(
-                0,
-                dp(50),
-                1f);
-        recordParams.setMargins(dp(10), dp(16), 0, 0);
-        actions.addView(shutterButton, recordParams);
+
+        LinearLayout scopeRow = new LinearLayout(this);
+        scopeRow.setOrientation(LinearLayout.HORIZONTAL);
+        scopeRow.setGravity(Gravity.CENTER_VERTICAL);
+        scopeRow.setPadding(0, dp(12), 0, dp(4));
+        scopeRow.addView(buildMonitorScopeCard("RGB 波形", true), new LinearLayout.LayoutParams(0, dp(118), 1f));
+        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(dp(92), dp(92));
+        recordParams.setMargins(dp(10), 0, dp(10), 0);
+        scopeRow.addView(shutterButton, recordParams);
+        scopeRow.addView(buildMonitorScopeCard("音频波形", false), new LinearLayout.LayoutParams(0, dp(118), 1f));
+        content.addView(scopeRow);
+
+        content.addView(buildMonitorParameterRail());
+        content.addView(buildMonitorToolRail());
+        content.addView(buildMonitorStorageCard());
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        actions.setPadding(0, dp(6), 0, dp(10));
+        actions.addView(liveViewButton, new LinearLayout.LayoutParams(0, dp(44), 1f));
         content.addView(actions);
+        // Keep the established camera parameter/output controls available below the new monitor surface.
         content.addView(buildMonitorParameterControls());
         content.addView(buildMonitorOutputControls());
         scroll.addView(content);
         return scroll;
+    }
+
+    private View buildMonitorScopeCard(String title, boolean histogram) {
+        LinearLayout card = verticalContainer();
+        card.setPadding(dp(3), dp(3), dp(3), dp(3));
+        card.setBackgroundColor(Color.BLACK);
+        if (histogram) {
+            monitorRgbScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
+            monitorRgbScopeView.setData(
+                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+            card.addView(monitorRgbScopeView, new LinearLayout.LayoutParams(-1, -1));
+        } else {
+            card.addView(
+                    new WaveformScopeView(WaveformScopeView.AUDIO),
+                    new LinearLayout.LayoutParams(-1, -1));
+        }
+        return card;
+    }
+
+    private View buildMonitorParameterRail() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setGravity(Gravity.CENTER);
+        rail.setPadding(0, dp(12), 0, dp(3));
+        addMonitorReadout(rail, "帧率", connected ? String.valueOf(monitorFrameRate) : "—");
+        addMonitorReadout(rail, "快门", connected ? shutterDisplayValue() : "—");
+        addMonitorReadout(rail, "光圈", connected ? String.format(Locale.CHINA, "f/%.1f", currentAperture) : "—");
+        addMonitorReadout(rail, "ISO", connected ? String.valueOf(currentIso) : "—");
+        addMonitorReadout(rail, "白平衡", connected
+                ? ("continuous".equals(currentWhiteBalance) ? "自动" : "预设")
+                : "—");
+        addMonitorReadout(rail, "色调", connected ? String.format(Locale.CHINA, "%+d", (int) currentCompensation) : "—");
+        scroll.addView(rail);
+        return scroll;
+    }
+
+    private void addMonitorReadout(LinearLayout rail, String label, String value) {
+        LinearLayout cell = verticalContainer();
+        cell.setGravity(Gravity.CENTER);
+        cell.setPadding(dp(7), 0, dp(7), 0);
+        TextView title = text(label, 10, Typeface.BOLD, Color.rgb(166, 176, 191));
+        title.setGravity(Gravity.CENTER);
+        TextView reading = text(value, 17, Typeface.BOLD, Color.WHITE);
+        reading.setGravity(Gravity.CENTER);
+        reading.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        cell.addView(title, new LinearLayout.LayoutParams(dp(64), dp(20)));
+        cell.addView(reading, new LinearLayout.LayoutParams(dp(64), dp(28)));
+        rail.addView(cell);
+    }
+
+    private View buildMonitorToolRail() {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER);
+        row.setPadding(0, dp(8), 0, dp(10));
+        String[] glyphs = {"◎", "LUT", "◉", "AF-ON"};
+        String[] descriptions = {"峰值对焦", "LUT", "假色", "AF-ON"};
+        for (int i = 0; i < glyphs.length; i++) {
+            final int index = i;
+            Button tool = new Button(this);
+            tool.setText(glyphs[i]);
+            tool.setTextColor(Color.WHITE);
+            tool.setTextSize(i == 1 ? 11 : 24);
+            tool.setTypeface(Typeface.create("sans", Typeface.BOLD));
+            tool.setAllCaps(false);
+            tool.setGravity(Gravity.CENTER);
+            tool.setPadding(0, 0, 0, 0);
+            tool.setBackgroundColor(Color.TRANSPARENT);
+            tool.setContentDescription(descriptions[i]);
+            tool.setOnClickListener(view -> {
+                if (index == 0) {
+                    focusPeakingEnabled = !focusPeakingEnabled;
+                    refreshPreviewProcessing();
+                    showToast(focusPeakingEnabled ? "已开启峰值对焦" : "已关闭峰值对焦");
+                } else if (index == 1) {
+                    showSection("monitor");
+                    showToast("LUT 设置位于监看输出");
+                } else if (index == 2) {
+                    falseColorEnabled = !falseColorEnabled;
+                    refreshPreviewProcessing();
+                    showToast(falseColorEnabled ? "已开启假色" : "已关闭假色");
+                } else if (index == 3) {
+                    requestAutoFocusOn();
+                }
+            });
+            row.addView(tool, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        }
+        return row;
+    }
+
+    private View buildMonitorStorageCard() {
+        String freeSpace = "—";
+        String usage = "存储状态暂不可用";
+        if (photoDirectory != null) {
+            try {
+                StatFs stats = new StatFs(photoDirectory.getAbsolutePath());
+                long total = stats.getTotalBytes();
+                long available = stats.getAvailableBytes();
+                freeSpace = formatStorageBytes(available);
+                if (total > 0) {
+                    usage = String.format(
+                            Locale.CHINA,
+                            "%d%% 已用 · 本地缓存",
+                            Math.max(0, Math.min(100, Math.round(
+                                    (1 - available / (double) total) * 100))));
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+        LinearLayout card = new LinearLayout(this);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(12), dp(16), dp(12));
+        card.setBackground(rounded(Color.rgb(29, 38, 53), 10, 0));
+        TextView icon = text("▯", 38, Typeface.NORMAL, Color.WHITE);
+        icon.setGravity(Gravity.CENTER);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(70)));
+        LinearLayout copy = verticalContainer();
+        TextView capacity = text("—", 22, Typeface.BOLD, Color.WHITE);
+        capacity.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        copy.addView(capacity);
+        TextView barLabel = text(freeSpace, 15, Typeface.BOLD, Color.rgb(56, 155, 239));
+        copy.addView(barLabel, new LinearLayout.LayoutParams(-1, dp(22)));
+        LinearLayout detail = new LinearLayout(this);
+        detail.setGravity(Gravity.CENTER_VERTICAL);
+        detail.addView(text(usage, 11, Typeface.BOLD, Color.WHITE), new LinearLayout.LayoutParams(0, dp(18), 1f));
+        TextView space = text("可用空间", 11, Typeface.BOLD, Color.WHITE);
+        space.setGravity(Gravity.RIGHT);
+        detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
+        copy.addView(detail);
+        card.addView(copy, new LinearLayout.LayoutParams(0, dp(72), 1f));
+        return card;
+    }
+
+    private static String formatStorageBytes(long bytes) {
+        if (bytes < 0) return "—";
+        double value = bytes;
+        String[] units = {"B", "KB", "MB", "GB", "TB"};
+        int index = 0;
+        while (value >= 1024 && index < units.length - 1) {
+            value /= 1024;
+            index++;
+        }
+        return index == 0
+                ? String.format(Locale.CHINA, "%.0f %s", value, units[index])
+                : String.format(Locale.CHINA, "%.1f %s", value, units[index]);
+    }
+
+    private Button monitorActionButton(String label, boolean primary) {
+        Button button = nativeButton(label, primary);
+        button.setTextSize(12);
+        button.setTextColor(Color.WHITE);
+        button.setBackground(rounded(primary ? Color.rgb(163, 28, 35) : Color.rgb(30, 40, 55), 8, primary ? 0 : Color.rgb(67, 80, 101)));
+        return button;
     }
 
     private View buildPreviewStage(boolean monitoring) {
@@ -1922,11 +3256,31 @@ public final class MainActivity extends Activity {
         previewImage = new ImageView(this);
         previewImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
         previewImage.setBackgroundColor(GRAPHITE);
-        Bitmap previewFrame = monitoring ? latestFrame : latestSourceFrame;
+        Bitmap previewFrame = monitoring || monitorNikonCloudPreset != null
+                ? latestFrame : latestSourceFrame;
         if (previewFrame != null) previewImage.setImageBitmap(previewFrame);
         stage.addView(previewImage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        if (monitoring) {
+            monitorFocusReticle = text("＋", 34, Typeface.NORMAL, Color.YELLOW);
+            monitorFocusReticle.setGravity(Gravity.CENTER);
+            monitorFocusReticle.setVisibility(View.GONE);
+            FrameLayout.LayoutParams reticleParams = new FrameLayout.LayoutParams(
+                    dp(58), dp(58));
+            stage.addView(monitorFocusReticle, reticleParams);
+            previewImage.setOnTouchListener((view, event) -> {
+                if (event.getAction() != MotionEvent.ACTION_UP) return true;
+                float[] point = normalizePreviewPoint(
+                        event.getX(), event.getY(), view.getWidth(), view.getHeight(), latestFrame);
+                if (point == null) {
+                    showToast("请点击画面区域进行对焦");
+                    return true;
+                }
+                requestMonitorFocusAt(point[0], point[1], stage);
+                return true;
+            });
+        }
 
         zebraImage = new ImageView(this);
         zebraImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -1939,7 +3293,9 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         previewPlaceholder = text(
-                connected ? "等待实时取景画面" : "连接支持的 Nikon 相机后开启实时取景",
+                connected || localCameraConnected
+                        ? "等待实时取景画面"
+                        : "连接外接相机或本机摄像头后开启实时取景",
                 15,
                 Typeface.NORMAL,
                 Color.rgb(132, 140, 153));
@@ -1961,16 +3317,15 @@ public final class MainActivity extends Activity {
         badgeParams.setMargins(dp(14), dp(10), 0, 0);
         stage.addView(badge, badgeParams);
 
-        Button fullscreen = nativeButton("全屏", false);
-        fullscreen.setContentDescription(
-                monitoring ? "打开视频全屏取景" : "打开照片全屏取景");
-        fullscreen.setOnClickListener(view -> showImmersivePreview(monitoring));
-        FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(
-                dp(82),
-                dp(44),
-                Gravity.TOP | Gravity.END);
-        fullscreenParams.setMargins(0, dp(10), dp(14), 0);
-        stage.addView(fullscreen, fullscreenParams);
+        if (!monitoring) {
+            Button fullscreen = nativeButton("全屏", false);
+            fullscreen.setContentDescription("打开照片全屏取景");
+            fullscreen.setOnClickListener(view -> showImmersivePreview(false));
+            FrameLayout.LayoutParams fullscreenParams = new FrameLayout.LayoutParams(
+                    dp(82), dp(44), Gravity.TOP | Gravity.END);
+            fullscreenParams.setMargins(0, dp(10), dp(14), 0);
+            stage.addView(fullscreen, fullscreenParams);
+        }
 
         TextView outputBadge = text(
                 monitoring
@@ -1993,9 +3348,79 @@ public final class MainActivity extends Activity {
         if (!monitoring) {
             stage.setLayoutParams(new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(380)));
+                    dp(isCompactPhone() ? 268 : 380)));
         }
         return stage;
+    }
+
+    private void requestMonitorFocusAt(float normalizedX, float normalizedY, ViewGroup stage) {
+        if (monitorFocusReticle != null && stage != null) {
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) monitorFocusReticle.getLayoutParams();
+            float[] rect = previewImageRect(stage.getWidth(), stage.getHeight(), latestFrame);
+            params.leftMargin = Math.round(rect[0] + normalizedX * rect[2] - dp(29));
+            params.topMargin = Math.round(rect[1] + normalizedY * rect[3] - dp(29));
+            monitorFocusReticle.setLayoutParams(params);
+            monitorFocusReticle.setVisibility(View.VISIBLE);
+            mainHandler.postDelayed(() -> {
+                if (monitorFocusReticle != null) monitorFocusReticle.setVisibility(View.GONE);
+            }, 1400);
+        }
+        if (!connected || camera == null || !liveViewEnabled) {
+            showToast("请先开启实时取景");
+            return;
+        }
+        float dx = normalizedX - 0.5f;
+        float dy = normalizedY - 0.5f;
+        int step = Math.abs(dx) >= Math.abs(dy)
+                ? Math.round(Math.max(-3f, Math.min(3f, dx * 8f)))
+                : Math.round(Math.max(-3f, Math.min(3f, dy * 8f)));
+        final int focusStep = step;
+        cameraExecutor.submit(() -> {
+            try {
+                camera.setParameter("focusMode", "single-shot");
+                if (focusStep != 0) camera.moveFocus(focusStep);
+                mainHandler.post(() -> showToast(
+                        focusStep == 0
+                                ? "已触发单次自动对焦"
+                                : "焦点步进已完成（当前相机不支持二维对焦点）"));
+            } catch (Exception error) {
+                mainHandler.post(() -> showToast("对焦请求失败：" + error.getMessage()));
+            }
+        });
+    }
+
+    private void requestAutoFocusOn() {
+        if (!connected || camera == null || !liveViewEnabled) {
+            showToast("请先开启实时取景");
+            return;
+        }
+        cameraExecutor.submit(() -> {
+            try {
+                camera.triggerAutoFocus();
+                mainHandler.post(() -> showToast("AF-ON 已触发"));
+            } catch (Exception error) {
+                mainHandler.post(() -> showToast("AF-ON 失败：" + error.getMessage()));
+            }
+        });
+    }
+
+    private static float[] previewImageRect(int width, int height, Bitmap bitmap) {
+        if (width <= 0 || height <= 0 || bitmap == null || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) {
+            return new float[]{0f, 0f, Math.max(1, width), Math.max(1, height)};
+        }
+        float scale = Math.min(width / (float) bitmap.getWidth(), height / (float) bitmap.getHeight());
+        float displayWidth = bitmap.getWidth() * scale;
+        float displayHeight = bitmap.getHeight() * scale;
+        return new float[]{(width - displayWidth) / 2f, (height - displayHeight) / 2f, displayWidth, displayHeight};
+    }
+
+    private static float[] normalizePreviewPoint(float x, float y, int width, int height, Bitmap bitmap) {
+        float[] rect = previewImageRect(width, height, bitmap);
+        if (x < rect[0] || y < rect[1] || x > rect[0] + rect[2] || y > rect[1] + rect[3]) return null;
+        return new float[]{
+                Math.max(0f, Math.min(1f, (x - rect[0]) / rect[2])),
+                Math.max(0f, Math.min(1f, (y - rect[1]) / rect[3]))
+        };
     }
 
     private void showImmersivePreview(boolean monitoring) {
@@ -2242,7 +3667,7 @@ public final class MainActivity extends Activity {
                 immersiveMonitoring ? VIDEO : COBALT,
                 48,
                 0));
-        capture.setEnabled(connected && !capturing);
+        capture.setEnabled((connected || localCameraConnected) && !capturing);
         capture.setOnClickListener(view -> {
             if (immersiveMonitoring) {
                 toggleVideoRecording();
@@ -2296,7 +3721,7 @@ public final class MainActivity extends Activity {
                 ? new String[]{"角度", "光圈", "ISO", "补偿"}
                 : new String[]{"快门", "光圈", "ISO", "补偿"};
         String[] moreParameters = immersiveMonitoring
-                ? new String[]{"帧率", "对焦", "白平衡", "优化"}
+                ? new String[]{"帧率", "模式", "编码", "Log", "对焦", "白平衡", "优化"}
                 : new String[]{"模式", "对焦", "白平衡", "优化"};
         HorizontalScrollView primaryScroller =
                 immersiveParameterScroller(primaryParameters);
@@ -2616,7 +4041,7 @@ public final class MainActivity extends Activity {
         parameterBar.setOrientation(LinearLayout.HORIZONTAL);
         parameterBar.setGravity(Gravity.CENTER);
         if (monitoring) {
-            parameterBar.addView(immersiveParameterStepper("角度"));
+            parameterBar.addView(immersiveParameterStepper(monitorShutterAngleMode ? "角度" : "快门"));
             parameterBar.addView(immersiveParameterStepper("帧率"));
             parameterBar.addView(immersiveParameterStepper("光圈"));
             parameterBar.addView(immersiveParameterStepper("ISO"));
@@ -2774,6 +4199,11 @@ public final class MainActivity extends Activity {
                         + ("neutral".equals(currentPictureControl)
                         ? "自然"
                         : "标准");
+            case "编码":
+                return "编码\n" + videoCodecLabel(videoCodec);
+            case "Log":
+            case "N-Log":
+                return "Log\n" + videoLogLabel(videoLogProfile);
             default:
                 return "ISO\n" + currentIso;
         }
@@ -2781,7 +4211,7 @@ public final class MainActivity extends Activity {
 
     private void adjustImmersiveParameter(String parameter, int direction) {
         if (!connected || capturing) return;
-        if ("角度".equals(parameter)) {
+        if ("角度".equals(parameter) && monitorShutterAngleMode) {
             double[] values = new double[]{
                     45, 60, 72, 90, 108, 120, 144, 150, 172.8, 180,
                     216, 240, 270, 300, 324, 360
@@ -2792,11 +4222,11 @@ public final class MainActivity extends Activity {
             int[] values = new int[]{24, 25, 30, 50, 60};
             monitorFrameRate = adjacentValue(values, monitorFrameRate, direction);
             applyVideoShutterAngle();
-        } else if ("快门".equals(parameter)) {
+        } else if ("快门".equals(parameter) || ("角度".equals(parameter) && !monitorShutterAngleMode)) {
             double[] values = fineShutterValues();
             currentShutterSeconds =
                     adjacentValue(values, currentShutterSeconds, direction);
-            applyParameter("exposureTime", currentShutterSeconds, "快门速度");
+            applyParameter("videoExposureTime", currentShutterSeconds, "快门速度");
         } else if ("光圈".equals(parameter)) {
             double[] values = fineApertureValues();
             currentAperture = adjacentValue(values, currentAperture, direction);
@@ -2837,6 +4267,15 @@ public final class MainActivity extends Activity {
                     "pictureControl",
                     currentPictureControl,
                     "优化校准");
+        } else if ("编码".equals(parameter)) {
+            String[] values = videoCodecValues();
+            videoCodec = values[adjacentIndex(values, videoCodec, direction)];
+            applyParameter("videoCodec", videoCodec, "视频录制规格");
+        } else if ("Log".equals(parameter) || "N-Log".equals(parameter)) {
+            String[] values = videoLogValues();
+            videoLogProfile = values[adjacentIndex(values, videoLogProfile, direction)];
+            nLogEnabled = !"off".equals(videoLogProfile);
+            applyParameter("videoLog", videoLogProfile, "Log / Picture Profile");
         } else {
             Object[] supported = isoValues();
             if (supported.length == 0) return;
@@ -2866,6 +4305,9 @@ public final class MainActivity extends Activity {
             case "对焦": return "focusMode";
             case "白平衡": return "whiteBalanceMode";
             case "优化": return "pictureControl";
+            case "编码": return "videoCodec";
+            case "Log":
+            case "N-Log": return "videoLog";
             default: return null;
         }
     }
@@ -2958,7 +4400,41 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 3, 0, 14));
 
         addVideoFrameRateControl(panel);
+        addSpinnerControl(
+                panel,
+                "视频曝光模式",
+                new String[]{"P 程序自动", "S 快门优先", "A 光圈优先", "M 手动"},
+                new Object[]{"program", "shutterPriority", "aperturePriority", "manual"},
+                exposureModeIndex(),
+                "exposureMode");
+        panel.addView(text("视频快门表示", 13, Typeface.NORMAL, MUTED));
+        Spinner representation = monitorSpinner(new String[]{"快门角度", "快门速度"});
+        representation.setSelection(monitorShutterAngleMode ? 0 : 1, false);
+        representation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            private boolean initialized;
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                if (!initialized) { initialized = true; return; }
+                monitorShutterAngleMode = position == 0;
+                showSection(currentSection);
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        panel.addView(representation, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
         addShutterAngleControl(panel);
+        addSpinnerControl(
+                panel,
+                "视频录制规格",
+                videoCodecLabels(),
+                videoCodecValues(),
+                videoCodecIndex(),
+                "videoCodec");
+        addSpinnerControl(
+                panel,
+                "Log / Picture Profile",
+                videoLogLabels(),
+                videoLogValues(),
+                videoLogIndex(),
+                "videoLog");
         addSpinnerControl(
                 panel,
                 "光圈",
@@ -3021,6 +4497,28 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 12));
+
+        Switch externalRecording = new Switch(this);
+        externalRecording.setText(tr("外录到当前智能设备"));
+        externalRecording.setChecked(externalRecordToDevice);
+        externalRecording.setEnabled(!videoRecording);
+        externalRecording.setOnCheckedChangeListener((button, enabled) -> {
+            externalRecordToDevice = enabled;
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("externalRecordToDevice", enabled)
+                    .apply();
+            showToast(enabled
+                    ? "外录已开启 · 视频将写入 ZENCHE 文件库"
+                    : "外录已关闭 · PTP 相机仅记录到机身存储卡");
+        });
+        panel.addView(externalRecording);
+        panel.addView(text(
+                "外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 10));
 
         panel.addView(
                 text("实时取景格式", 13, Typeface.BOLD, MUTED),
@@ -3101,32 +4599,24 @@ public final class MainActivity extends Activity {
         panel.addView(falseColor);
 
         LinearLayout scopes = verticalContainer();
-        scopes.setPadding(dp(10), dp(10), dp(10), dp(10));
-        scopes.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
-        redHistogramText = scopeText("R", redHistogram, Color.rgb(210, 45, 52));
-        greenHistogramText = scopeText("G", greenHistogram, Color.rgb(25, 145, 82));
-        blueHistogramText = scopeText("B", blueHistogram, COBALT);
-        waveformText = scopeText("波形", waveform, INK);
-        vectorscopeText = scopeText("矢量", vectorscope, INK);
+        scopes.setPadding(dp(4), dp(4), dp(4), dp(6));
+        scopes.setBackgroundColor(Color.BLACK);
+        professionalScopeView = new WaveformScopeView(WaveformScopeView.PROFESSIONAL);
+        professionalScopeView.setData(
+                redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
         peakingCoverageText = text(
                 "峰值覆盖 · " + peakingCoverage + "%",
                 11,
                 Typeface.NORMAL,
-                MUTED);
-        scopes.addView(redHistogramText);
-        scopes.addView(greenHistogramText);
-        scopes.addView(blueHistogramText);
-        scopes.addView(waveformText);
-        scopes.addView(vectorscopeText);
-        scopes.addView(peakingCoverageText);
+                Color.argb(190, 255, 255, 255));
+        peakingCoverageText.setTypeface(Typeface.MONOSPACE);
+        scopes.addView(
+                professionalScopeView,
+                new LinearLayout.LayoutParams(-1, dp(190)));
+        scopes.addView(
+                peakingCoverageText,
+                marginParams(-1, -2, 0, 6, 0, 0));
         panel.addView(scopes, marginParams(-1, -2, 0, 10, 0, 0));
-    }
-
-    private TextView scopeText(String label, String value, int color) {
-        TextView output = text(label + "  " + value, 11, Typeface.NORMAL, color);
-        output.setTypeface(Typeface.MONOSPACE);
-        output.setSingleLine(true);
-        return output;
     }
 
     private View buildCaptureSessionPanel() {
@@ -3273,17 +4763,20 @@ public final class MainActivity extends Activity {
 
     private void addShutterAngleControl(LinearLayout parent) {
         TextView label = text(
-                "快门角度 · 按 " + monitorFrameRate + "p 换算曝光时间",
+                (monitorShutterAngleMode ? "快门角度 · 按 " : "快门速度 · ")
+                        + monitorFrameRate + "p",
                 13,
                 Typeface.BOLD,
                 MUTED);
         label.setTag("快门角度");
         parent.addView(label, marginParams(-1, -2, 0, 12, 0, 4));
         Double[] angles = new Double[]{45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0};
-        String[] labels = new String[]{"45°", "90°", "144°", "172.8°", "180°", "270°", "360°"};
+        String[] labels = monitorShutterAngleMode
+                ? new String[]{"45°", "90°", "144°", "172.8°", "180°", "270°", "360°"}
+                : shutterLabels();
         Spinner spinner = monitorSpinner(labels);
         int selection = 4;
-        for (int index = 0; index < angles.length; index++) {
+        for (int index = 0; index < angles.length && monitorShutterAngleMode; index++) {
             if (Math.abs(angles[index] - monitorShutterAngle) < 0.01) {
                 selection = index;
                 break;
@@ -3303,14 +4796,19 @@ public final class MainActivity extends Activity {
                     initialized = true;
                     return;
                 }
-                monitorShutterAngle = angles[position];
+                if (monitorShutterAngleMode) {
+                    monitorShutterAngle = angles[position];
+                } else {
+                    currentShutterSeconds = fineShutterValues()[position];
+                }
                 getSharedPreferences("nikon-link", MODE_PRIVATE)
                         .edit()
                         .putLong(
                                 "monitorShutterAngle",
                                 Double.doubleToRawLongBits(monitorShutterAngle))
                         .apply();
-                applyVideoShutterAngle();
+                if (monitorShutterAngleMode) applyVideoShutterAngle();
+                else applyParameter("videoExposureTime", currentShutterSeconds, "快门速度");
             }
 
             @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
@@ -3333,6 +4831,109 @@ public final class MainActivity extends Activity {
                         "快门角度 %.1f°（%dp）",
                         monitorShutterAngle,
                         monitorFrameRate));
+    }
+
+    private int videoCodecIndex() {
+        String[] values = videoCodecValues();
+        for (int index = 0; index < values.length; index++) {
+            if (values[index].equals(videoCodec)) return index;
+        }
+        videoCodec = values[0];
+        return 0;
+    }
+
+    private String videoCodecLabel(String codec) {
+        String[] values = videoCodecValues();
+        String[] labels = videoCodecLabels();
+        for (int index = 0; index < values.length; index++) {
+            if (values[index].equals(codec)) return labels[index];
+        }
+        return codec;
+    }
+
+    private String[] videoCodecValues() {
+        if ("Sony".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "sonyXavcHs8k", "sonyXavcHs4k", "sonyXavcS4k",
+                    "sonyXavcSHd", "sonyXavcSi4k", "sonyXavcSiHd"};
+        }
+        if ("Canon".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "canonRaw", "canonXfHevc422", "canonXfHevc420",
+                    "canonXfAvc422", "canonXfAvc420"};
+        }
+        return new String[]{"h264", "h265", "prores422hq", "proresRaw", "nraw"};
+    }
+
+    private String[] videoCodecLabels() {
+        if ("Sony".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "XAVC HS 8K · HEVC Long GOP",
+                    "XAVC HS 4K · HEVC Long GOP",
+                    "XAVC S 4K · AVC Long GOP",
+                    "XAVC S HD · AVC Long GOP",
+                    "XAVC S-I 4K · AVC Intra",
+                    "XAVC S-I HD · AVC Intra"};
+        }
+        if ("Canon".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "RAW · 12-bit",
+                    "XF-HEVC S · 4:2:2 10-bit",
+                    "XF-HEVC S · 4:2:0 10-bit",
+                    "XF-AVC S · 4:2:2 10-bit",
+                    "XF-AVC S · 4:2:0 8-bit"};
+        }
+        return new String[]{
+                "H.264 / AVC · 8-bit",
+                "H.265 / HEVC · 10-bit",
+                "Apple ProRes 422 HQ · 10-bit",
+                "Apple ProRes RAW HQ · 12-bit",
+                "N-RAW · 12-bit NEV"};
+    }
+
+    private String[] videoLogValues() {
+        if ("Sony".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "off", "sonySLog2", "sonySLog3Cine", "sonySLog3", "sonyHlg"};
+        }
+        if ("Canon".equals(connectedCameraVendor)) {
+            return new String[]{"off", "canonLog", "canonLog2", "canonLog3"};
+        }
+        return new String[]{"off", "nlog"};
+    }
+
+    private String[] videoLogLabels() {
+        if ("Sony".equals(connectedCameraVendor)) {
+            return new String[]{
+                    "关闭 · SDR",
+                    "PP7 · S-Log2",
+                    "PP8 · S-Log3 / S-Gamut3.Cine",
+                    "PP9 · S-Log3 / S-Gamut3",
+                    "PP10 · HLG"};
+        }
+        if ("Canon".equals(connectedCameraVendor)) {
+            return new String[]{"关闭 · SDR", "Canon Log", "Canon Log 2", "Canon Log 3"};
+        }
+        return new String[]{"关闭 · SDR", "N-Log"};
+    }
+
+    private int videoLogIndex() {
+        String[] values = videoLogValues();
+        for (int index = 0; index < values.length; index++) {
+            if (values[index].equals(videoLogProfile)) return index;
+        }
+        videoLogProfile = "off";
+        nLogEnabled = false;
+        return 0;
+    }
+
+    private String videoLogLabel(String value) {
+        String[] values = videoLogValues();
+        String[] labels = videoLogLabels();
+        for (int index = 0; index < values.length; index++) {
+            if (values[index].equals(value)) return labels[index];
+        }
+        return value;
     }
 
     private View buildProfessionalControls() {
@@ -3741,6 +5342,17 @@ public final class MainActivity extends Activity {
                         ? buildMobileBranchDrawer(files)
                         : buildBranchWorkspace(files));
 
+        content.addView(collapsibleGroup(
+                "wireless-transfer",
+                "无线传输",
+                (wifiConnected ? "Wi‑Fi 已连接" : "Wi‑Fi 未连接")
+                        + " · "
+                        + (wirelessRequested ? wirelessStatus : "收件箱已停止"),
+                buildWirelessTransferPanel(),
+                true));
+
+        content.addView(buildCameraStoragePanel());
+
         LinearLayout sourceActions = new LinearLayout(this);
         sourceActions.setOrientation(LinearLayout.HORIZONTAL);
         Button albumButton = nativeButton(
@@ -3807,14 +5419,291 @@ public final class MainActivity extends Activity {
                 systemBody,
                 true));
 
-        content.addView(collapsibleGroup(
-                "wireless-transfer",
-                "无线传输",
-                wirelessRequested ? wirelessStatus : "FTP · HTTP · WebDAV",
-                buildWirelessTransferPanel(),
-                false));
         scroll.addView(content);
         return scroll;
+    }
+
+    private View buildCameraStoragePanel() {
+        LinearLayout body = verticalContainer();
+        CameraStorage.Snapshot snapshot = cameraStorageSnapshot;
+        boolean available = camera != null && camera.isConnected()
+                || wifiCamera != null && wifiCamera.isConnected();
+        long capacity = snapshot.capacityBytes();
+        long free = snapshot.freeBytes();
+        String capacityText = capacity > 0
+                ? formatStorageBytes(Math.max(0, capacity - free))
+                        + " 已用 / " + formatStorageBytes(capacity)
+                : cameraStorageStatus;
+        TextView summary = text(
+                capacityText,
+                13,
+                Typeface.BOLD,
+                available ? INK : MUTED);
+        body.addView(summary, marginParams(-1, -2, 0, 2, 0, 10));
+
+        LinearLayout primaryActions = new LinearLayout(this);
+        primaryActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button refresh = nativeButton(
+                cameraStorageLoading ? "正在读取…" : "刷新机内文件",
+                true);
+        refresh.setEnabled(available && !cameraStorageLoading);
+        refresh.setOnClickListener(view -> refreshCameraStorage());
+        primaryActions.addView(refresh, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button selectAll = nativeButton(
+                selectedCameraStorageHandles.size() == snapshot.items.size()
+                        && !snapshot.items.isEmpty() ? "取消全选" : "全选",
+                false);
+        selectAll.setEnabled(!snapshot.items.isEmpty() && !cameraStorageLoading);
+        selectAll.setOnClickListener(view -> {
+            if (selectedCameraStorageHandles.size() == snapshot.items.size()) {
+                selectedCameraStorageHandles.clear();
+            } else {
+                selectedCameraStorageHandles.clear();
+                for (CameraStorage.Item item : snapshot.items) {
+                    if (!item.protectedObject) selectedCameraStorageHandles.add(item.handle);
+                }
+            }
+            showSection("library");
+        });
+        LinearLayout.LayoutParams selectParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        selectParams.setMargins(dp(8), 0, 0, 0);
+        primaryActions.addView(selectAll, selectParams);
+        body.addView(primaryActions);
+
+        LinearLayout batchActions = new LinearLayout(this);
+        batchActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button download = nativeButton("下载所选", true);
+        download.setEnabled(!snapshot.items.isEmpty() && !cameraStorageLoading);
+        download.setOnClickListener(view -> downloadSelectedCameraStorage());
+        batchActions.addView(download, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button delete = nativeButton("从相机删除", false);
+        delete.setTextColor(VIDEO);
+        delete.setEnabled(!snapshot.items.isEmpty() && !cameraStorageLoading);
+        delete.setOnClickListener(view -> confirmDeleteSelectedCameraStorage());
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        deleteParams.setMargins(dp(8), 0, 0, 0);
+        batchActions.addView(delete, deleteParams);
+        body.addView(batchActions, marginParams(-1, dp(48), 0, 8, 0, 12));
+
+        if (!available) {
+            body.addView(emptyStorageText(
+                    "请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机。系统摄像头不开放机内存储。"));
+        } else if (cameraStorageLoading && snapshot.items.isEmpty()) {
+            body.addView(emptyStorageText("正在读取存储卷与文件信息…"));
+        } else if (snapshot.items.isEmpty()) {
+            body.addView(emptyStorageText(
+                    "暂无机内文件。点击“刷新机内文件”读取相机存储卡。"));
+        } else {
+            int thumbnailBudget = 40;
+            for (CameraStorage.Item item : snapshot.items) {
+                body.addView(cameraStorageRow(item, thumbnailBudget-- > 0));
+            }
+        }
+        return collapsibleGroup(
+                "camera-internal-storage",
+                "相机机内存储",
+                snapshot.items.size() + " 个文件 · " + cameraStorageStatus,
+                body,
+                true);
+    }
+
+    private TextView emptyStorageText(String value) {
+        TextView empty = text(value, 13, Typeface.NORMAL, MUTED);
+        empty.setGravity(Gravity.CENTER);
+        empty.setPadding(dp(16), dp(24), dp(16), dp(24));
+        return empty;
+    }
+
+    private View cameraStorageRow(CameraStorage.Item item, boolean requestThumbnail) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(6), dp(7), dp(6), dp(7));
+        CheckBox selected = new CheckBox(this);
+        selected.setChecked(selectedCameraStorageHandles.contains(item.handle));
+        selected.setEnabled(!item.protectedObject && !cameraStorageLoading);
+        selected.setContentDescription(tr("选择") + " " + item.filename);
+        selected.setOnCheckedChangeListener((button, checked) -> {
+            if (checked) selectedCameraStorageHandles.add(item.handle);
+            else selectedCameraStorageHandles.remove(item.handle);
+        });
+        row.addView(selected, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        ImageView thumbnail = new ImageView(this);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbnail.setBackgroundColor(GRAPHITE);
+        thumbnail.setImageResource(item.isVideo()
+                ? android.R.drawable.ic_media_play
+                : android.R.drawable.ic_menu_gallery);
+        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(72), dp(52)));
+
+        LinearLayout copy = verticalContainer();
+        copy.setPadding(dp(12), 0, 0, 0);
+        copy.addView(text(item.filename, 14, Typeface.BOLD, INK));
+        String detail = formatStorageBytes(item.sizeBytes)
+                + (item.width > 0 && item.height > 0
+                        ? " · " + item.width + " × " + item.height : "")
+                + " · " + item.capturedAt
+                + (item.protectedObject ? " · 已保护" : "");
+        copy.addView(text(detail, 11, Typeface.NORMAL, MUTED));
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        if (requestThumbnail && !item.isVideo()) {
+            storageExecutor.submit(() -> {
+                try {
+                    byte[] bytes = activeStorageThumbnail(item.handle);
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    if (bitmap != null) mainHandler.post(() -> thumbnail.setImageBitmap(bitmap));
+                } catch (Exception ignored) {
+                }
+            });
+        }
+        return row;
+    }
+
+    private void refreshCameraStorage() {
+        if (cameraStorageLoading) return;
+        if (!(camera != null && camera.isConnected())
+                && !(wifiCamera != null && wifiCamera.isConnected())) {
+            showToast("请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机。");
+            return;
+        }
+        cameraStorageLoading = true;
+        cameraStorageStatus = "正在读取存储卡…";
+        showSection("library");
+        storageExecutor.submit(() -> {
+            try {
+                CameraStorage.Snapshot snapshot = camera != null && camera.isConnected()
+                        ? camera.listStorage()
+                        : wifiCamera.listStorage();
+                mainHandler.post(() -> {
+                    cameraStorageSnapshot = snapshot;
+                    Set<Long> valid = new HashSet<>();
+                    for (CameraStorage.Item item : snapshot.items) valid.add(item.handle);
+                    selectedCameraStorageHandles.retainAll(valid);
+                    cameraStorageStatus = "读取完成";
+                    cameraStorageLoading = false;
+                    showSection("library");
+                });
+            } catch (Exception error) {
+                diagnostics.error("camera-storage", "读取机内存储失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    cameraStorageLoading = false;
+                    cameraStorageStatus = "读取失败 · " + error.getMessage();
+                    showSection("library");
+                    showError(error.getMessage());
+                });
+            }
+        });
+    }
+
+    private byte[] activeStorageThumbnail(long handle) throws Exception {
+        return camera != null && camera.isConnected()
+                ? camera.getStorageThumbnail(handle)
+                : wifiCamera.getStorageThumbnail(handle);
+    }
+
+    private byte[] activeStorageObject(long handle) throws Exception {
+        return camera != null && camera.isConnected()
+                ? camera.downloadStorageObject(handle)
+                : wifiCamera.downloadStorageObject(handle);
+    }
+
+    private void deleteActiveStorageObject(long handle) throws Exception {
+        if (camera != null && camera.isConnected()) camera.deleteStorageObject(handle);
+        else wifiCamera.deleteStorageObject(handle);
+    }
+
+    private List<CameraStorage.Item> selectedCameraStorageItems() {
+        List<CameraStorage.Item> result = new ArrayList<>();
+        for (CameraStorage.Item item : cameraStorageSnapshot.items) {
+            if (selectedCameraStorageHandles.contains(item.handle)) result.add(item);
+        }
+        return result;
+    }
+
+    private void downloadSelectedCameraStorage() {
+        List<CameraStorage.Item> selected = selectedCameraStorageItems();
+        if (selected.isEmpty()) {
+            showToast("请先选择要下载的机内文件。");
+            return;
+        }
+        cameraStorageLoading = true;
+        cameraStorageStatus = "正在下载 0 / " + selected.size();
+        showSection("library");
+        storageExecutor.submit(() -> {
+            try {
+                int completed = 0;
+                for (CameraStorage.Item item : selected) {
+                    byte[] bytes = activeStorageObject(item.handle);
+                    captureWorkflow.store(
+                            bytes,
+                            item.filename,
+                            camera != null && camera.isConnected()
+                                    ? connectedCameraName : wifiCameraName,
+                            null);
+                    int progress = ++completed;
+                    mainHandler.post(() -> {
+                        cameraStorageStatus = "正在下载 " + progress + " / " + selected.size();
+                        if (statusText != null) statusText.setText(cameraStorageStatus);
+                    });
+                }
+                mainHandler.post(() -> {
+                    cameraStorageLoading = false;
+                    cameraStorageStatus = "已下载 " + selected.size() + " 个文件到 ZENCHE 文件库";
+                    selectedCameraStorageHandles.clear();
+                    showSection("library");
+                    updateFileCount();
+                });
+            } catch (Exception error) {
+                diagnostics.error("camera-storage", "下载机内文件失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    cameraStorageLoading = false;
+                    cameraStorageStatus = "下载失败 · " + error.getMessage();
+                    showSection("library");
+                    showError(error.getMessage());
+                });
+            }
+        });
+    }
+
+    private void confirmDeleteSelectedCameraStorage() {
+        List<CameraStorage.Item> selected = selectedCameraStorageItems();
+        if (selected.isEmpty()) {
+            showToast("请先选择要从相机删除的文件。");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(tr("从相机永久删除？"))
+                .setMessage(tr("将从相机存储卡永久删除所选 " + selected.size()
+                        + " 个文件；此操作无法撤销。已保护文件不会被选择。"))
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(tr("永久删除"), (dialog, which) -> {
+                    cameraStorageLoading = true;
+                    cameraStorageStatus = "正在从相机删除…";
+                    showSection("library");
+                    storageExecutor.submit(() -> {
+                        try {
+                            for (CameraStorage.Item item : selected) {
+                                deleteActiveStorageObject(item.handle);
+                            }
+                            mainHandler.post(() -> {
+                                cameraStorageLoading = false;
+                                selectedCameraStorageHandles.clear();
+                                cameraStorageStatus = "已从相机删除 " + selected.size() + " 个文件";
+                                refreshCameraStorage();
+                            });
+                        } catch (Exception error) {
+                            diagnostics.error("camera-storage", "删除机内文件失败：" + error.getMessage());
+                            mainHandler.post(() -> {
+                                cameraStorageLoading = false;
+                                cameraStorageStatus = "删除失败 · " + error.getMessage();
+                                showSection("library");
+                                showError(error.getMessage());
+                            });
+                        }
+                    });
+                })
+                .show();
     }
 
     private boolean isPhoneLayout() {
@@ -3921,25 +5810,9 @@ public final class MainActivity extends Activity {
             editorSelectedPath = photos.get(0).getAbsolutePath();
         }
 
-        Spinner picker = new Spinner(this);
-        List<String> names = new ArrayList<>();
-        for (File file : photos) {
-            names.add(file.getName());
-        }
-        picker.setAdapter(new ArrayAdapter<>(
-                this,
-                android.R.layout.simple_spinner_dropdown_item,
-                names));
-        for (int index = 0; index < photos.size(); index++) {
-            if (photos.get(index).getAbsolutePath().equals(
-                    editorSelectedPath)) {
-                picker.setSelection(index);
-                break;
-            }
-        }
         content.addView(
-                picker,
-                marginParams(-1, dp(48), 0, 0, 0, 12));
+                buildEditorPhotoPicker(photos),
+                marginParams(-1, dp(64), 0, 0, 0, 12));
 
         LinearLayout aiPanel = panel();
         aiPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -4084,6 +5957,7 @@ public final class MainActivity extends Activity {
         pasteAI.setOnClickListener(view -> {
             if (editorAICopiedSettings == null) return;
             editorAdjustments.copyFrom(editorAICopiedSettings);
+            selectedNikonCloudPreset = null;
             editorAISummary = "已粘贴 AI 调整";
             showSection("editor");
         });
@@ -4113,9 +5987,37 @@ public final class MainActivity extends Activity {
                 presetScroll,
                 marginParams(-1, dp(48), 0, 0, 0, 12));
 
-        ImageView preview = new ImageView(this);
-        preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        preview.setBackgroundColor(GRAPHITE);
+        LinearLayout nikonCloudPanel = panel();
+        nikonCloudPanel.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout cloudHeading = new LinearLayout(this);
+        cloudHeading.setOrientation(LinearLayout.HORIZONTAL);
+        cloudHeading.setGravity(Gravity.CENTER_VERTICAL);
+        cloudHeading.addView(
+                text("尼康云创预览", 14, Typeface.BOLD, INK),
+                new LinearLayout.LayoutParams(0, dp(40), 1f));
+        cloudHeading.addView(
+                text(nikonCloudPresets.size() + " 款 NP3", 11,
+                        Typeface.BOLD, COBALT),
+                new LinearLayout.LayoutParams(dp(88), dp(40)));
+        nikonCloudPanel.addView(cloudHeading);
+        Button cloudPicker = nativeButton(
+                selectedNikonCloudPreset == null
+                        ? "选择尼康云创预设"
+                        : selectedNikonCloudPreset.name,
+                true);
+        cloudPicker.setEnabled(!nikonCloudPresets.isEmpty());
+        cloudPicker.setOnClickListener(view -> showNikonCloudPresetPicker());
+        nikonCloudPanel.addView(cloudPicker,
+                new LinearLayout.LayoutParams(-1, dp(48)));
+        nikonCloudPanel.addView(
+                text("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同",
+                        11, Typeface.NORMAL, MUTED),
+                marginParams(-1, -2, 0, 8, 0, 0));
+        content.addView(
+                nikonCloudPanel,
+                marginParams(-1, -2, 0, 0, 0, 12));
+
+        EditorMaskImageView preview = new EditorMaskImageView(editorAdjustments);
         content.addView(
                 preview,
                 marginParams(-1, dp(360), 0, 0, 0, 14));
@@ -4142,31 +6044,7 @@ public final class MainActivity extends Activity {
                                 : "调整不会覆盖原文件"));
             }
         };
-
-        picker.setOnItemSelectedListener(
-                new AdapterView.OnItemSelectedListener() {
-                    @Override
-                    public void onItemSelected(
-                            AdapterView<?> parent,
-                            View view,
-                            int position,
-                            long id) {
-                        String selectedPath =
-                                photos.get(position).getAbsolutePath();
-                        if (!selectedPath.equals(editorSelectedPath)) {
-                            editorAdjustments.reset();
-                            editorSettingsBeforeAI = null;
-                            editorAIAnalysis = null;
-                            editorAISummary = "等待分析当前照片";
-                        }
-                        editorSelectedPath = selectedPath;
-                        refreshPreview.run();
-                    }
-
-                    @Override
-                    public void onNothingSelected(AdapterView<?> parent) {
-                    }
-                });
+        preview.setMaskChangedListener(refreshPreview);
 
         LinearLayout light = editorAdjustmentGroup();
         addEditorAdjustment(
@@ -4274,6 +6152,223 @@ public final class MainActivity extends Activity {
                 color,
                 false));
 
+        // Secondary grading tools mirror the iOS and Harmony editor tabs.
+        LinearLayout wheels = editorAdjustmentGroup();
+        wheels.addView(text("Lift / Gamma / Gain · 在圆盘内拖动色点", 12, Typeface.BOLD, MUTED));
+        LinearLayout wheelRow = new LinearLayout(this);
+        wheelRow.setOrientation(LinearLayout.HORIZONTAL);
+        wheelRow.setGravity(Gravity.CENTER);
+        wheelRow.addView(createEditorWheel("Lift", COBALT, editorAdjustments.wheelLiftX, editorAdjustments.wheelLiftY,
+                (x, y) -> { editorAdjustments.wheelLiftX = x; editorAdjustments.wheelLiftY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheelRow.addView(createEditorWheel("Gamma", Color.rgb(198, 140, 255), editorAdjustments.wheelGammaX, editorAdjustments.wheelGammaY,
+                (x, y) -> { editorAdjustments.wheelGammaX = x; editorAdjustments.wheelGammaY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheelRow.addView(createEditorWheel("Gain", Color.rgb(255, 211, 106), editorAdjustments.wheelGainX, editorAdjustments.wheelGainY,
+                (x, y) -> { editorAdjustments.wheelGainX = x; editorAdjustments.wheelGainY = y; }, refreshPreview),
+                new LinearLayout.LayoutParams(0, dp(122), 1f));
+        wheels.addView(wheelRow);
+        content.addView(collapsibleGroup("editor-wheels", "色轮", "三向色轮", wheels, false));
+
+        LinearLayout curves = editorAdjustmentGroup();
+        curves.addView(text("主曲线 · 拖动曲线控制点", 12, Typeface.BOLD, MUTED));
+        curves.addView(createEditorCurvePad(refreshPreview), marginParams(-1, dp(156), 0, 0, 0, 6));
+        curves.addView(text("点击任意位置新增控制点，拖动控制点调整曲线", 11, Typeface.NORMAL, MUTED));
+        content.addView(collapsibleGroup("editor-curves", "曲线", "主曲线", curves, false));
+
+        LinearLayout pickerPanel = editorAdjustmentGroup();
+        TextView pickerValue = text("RGB 取样：点击取样器读取中心像素", 12, Typeface.NORMAL, MUTED);
+        pickerPanel.addView(pickerValue, marginParams(-1, -2, 0, 0, 0, 6));
+        Button sample = nativeButton("取样当前照片", false);
+        sample.setOnClickListener(view -> {
+            Bitmap bitmap = renderEditorAnalysisBitmap(new File(editorSelectedPath), 256);
+            if (bitmap == null) { pickerValue.setText("无法读取当前照片"); return; }
+            int colorValue = bitmap.getPixel(bitmap.getWidth() / 2, bitmap.getHeight() / 2);
+            pickerValue.setText(String.format(Locale.ROOT, "RGB 取样：#%06X", 0xFFFFFF & colorValue));
+            int red = Color.red(colorValue);
+            int green = Color.green(colorValue);
+            int blue = Color.blue(colorValue);
+            editorAdjustments.temperature = Math.max(-100, Math.min(100, Math.round((blue - red) / 2.55f)));
+            editorAdjustments.tint = Math.max(-100, Math.min(100, Math.round((green - (red + blue) / 2f) / 2.55f)));
+            bitmap.recycle();
+            refreshPreview.run();
+        });
+        pickerPanel.addView(sample, new LinearLayout.LayoutParams(-1, dp(44)));
+        content.addView(collapsibleGroup("editor-picker", "取色器", "中心像素", pickerPanel, false));
+
+        LinearLayout mask = editorAdjustmentGroup();
+        mask.addView(text("蒙版列表", 12, Typeface.BOLD, INK));
+        if (editorAdjustments.maskLayers.isEmpty()) {
+            mask.addView(text(
+                    "暂无蒙版",
+                    11,
+                    Typeface.NORMAL,
+                    MUTED),
+                    marginParams(-1, dp(44), 0, 2, 0, 6));
+        } else {
+            LinearLayout maskList = verticalContainer();
+            for (EditorMaskLayer layer : editorAdjustments.maskLayers) {
+                EditorMaskLayer displayed = editorAdjustments.displayedMaskLayer(layer);
+                LinearLayout row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(8), 0, dp(4), 0);
+                row.setBackground(rounded(
+                        layer.id.equals(editorAdjustments.activeMaskLayerId)
+                                ? COBALT_SOFT
+                                : SURFACE,
+                        10,
+                        layer.id.equals(editorAdjustments.activeMaskLayerId)
+                                ? COBALT
+                                : RULE));
+                Button select = nativeButton(
+                        (layer.id.equals(editorAdjustments.activeMaskLayerId) ? "● " : "○ ")
+                                + (layer.name.startsWith("蒙版 ")
+                                    ? tr("蒙版") + layer.name.substring(2)
+                                    : tr(layer.name))
+                                + " · " + tr(displayed.type),
+                        false);
+                select.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+                select.setOnClickListener(view -> {
+                    editorAdjustments.selectMaskLayer(layer.id);
+                    showSection("editor");
+                });
+                row.addView(select, new LinearLayout.LayoutParams(0, dp(48), 1f));
+                Switch visibility = new Switch(this);
+                visibility.setChecked(layer.visible);
+                visibility.setContentDescription(tr(
+                        layer.visible ? "隐藏蒙版" : "显示蒙版"));
+                visibility.setMinimumHeight(dp(48));
+                visibility.setOnCheckedChangeListener((button, visible) -> {
+                    editorAdjustments.setMaskLayerVisible(layer.id, visible);
+                    showSection("editor");
+                });
+                row.addView(visibility, new LinearLayout.LayoutParams(dp(56), dp(48)));
+                maskList.addView(row, marginParams(-1, dp(48), 0, 0, 0, 6));
+            }
+            mask.addView(maskList);
+        }
+        LinearLayout maskLifecycle = new LinearLayout(this);
+        maskLifecycle.setOrientation(LinearLayout.HORIZONTAL);
+        Button createMask = nativeButton("创建蒙版", !editorAdjustments.maskEnabled);
+        createMask.setOnClickListener(view -> {
+            editorAdjustments.createMaskLayer();
+            showSection("editor");
+        });
+        maskLifecycle.addView(createMask, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button deleteMask = nativeButton("删除蒙版", false);
+        deleteMask.setEnabled(editorAdjustments.maskEnabled);
+        deleteMask.setOnClickListener(view -> {
+            editorAdjustments.deleteActiveMaskLayer();
+            showSection("editor");
+        });
+        LinearLayout.LayoutParams deleteMaskParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        deleteMaskParams.setMargins(dp(8), 0, 0, 0);
+        maskLifecycle.addView(deleteMask, deleteMaskParams);
+        mask.addView(maskLifecycle);
+
+        LinearLayout maskBrushes = new LinearLayout(this);
+        maskBrushes.setOrientation(LinearLayout.HORIZONTAL);
+        Button addMaskBrush = nativeButton("添加蒙版（画笔）",
+                editorAdjustments.maskEnabled && !editorAdjustments.maskSubtract);
+        addMaskBrush.setOnClickListener(view -> {
+            editorAdjustments.ensureMaskLayer();
+            if (editorAdjustments.maskType == null
+                    || editorAdjustments.maskType.isEmpty()) {
+                editorAdjustments.maskType = "画笔";
+            }
+            editorAdjustments.maskSubtract = false;
+            status.setText(tr("添加蒙版画笔已启用"));
+            preview.invalidate();
+        });
+        maskBrushes.addView(addMaskBrush, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        Button subtractMaskBrush = nativeButton("减去蒙版（画笔）",
+                editorAdjustments.maskEnabled && editorAdjustments.maskSubtract);
+        subtractMaskBrush.setOnClickListener(view -> {
+            editorAdjustments.ensureMaskLayer();
+            if (editorAdjustments.maskType == null
+                    || editorAdjustments.maskType.isEmpty()) {
+                editorAdjustments.maskType = "画笔";
+            }
+            editorAdjustments.maskSubtract = true;
+            status.setText(tr("减去蒙版画笔已启用"));
+            preview.invalidate();
+        });
+        LinearLayout.LayoutParams subtractMaskParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        subtractMaskParams.setMargins(dp(8), 0, 0, 0);
+        maskBrushes.addView(subtractMaskBrush, subtractMaskParams);
+        mask.addView(maskBrushes, marginParams(-1, -2, 0, 8, 0, 0));
+
+        mask.addView(text("智能识别", 12, Typeface.BOLD, MUTED));
+        HorizontalScrollView smartMaskScroll = new HorizontalScrollView(this);
+        smartMaskScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout smartMasks = new LinearLayout(this);
+        smartMasks.setOrientation(LinearLayout.HORIZONTAL);
+        for (String type : new String[] {
+                "智能主体", "智能天空", "智能背景",
+                "智能人物", "智能亮部", "智能暗部"}) {
+            Button smartMask = nativeButton(
+                    type,
+                    editorAdjustments.maskEnabled
+                            && type.equals(editorAdjustments.maskType));
+            smartMask.setOnClickListener(view -> {
+                editorAdjustments.ensureMaskLayer();
+                editorAdjustments.maskType = type;
+                editorAdjustments.maskAmount = 100;
+                editorAdjustments.maskInvert = false;
+                editorAdjustments.maskStrokes.clear();
+                editorAdjustments.maskSubtract = false;
+                status.setText(tr("智能蒙版已创建 · 可继续添加或减去画笔"));
+                refreshPreview.run();
+            });
+            LinearLayout.LayoutParams smartParams =
+                    new LinearLayout.LayoutParams(-2, dp(44));
+            smartParams.setMargins(0, dp(6), dp(8), dp(8));
+            smartMasks.addView(smartMask, smartParams);
+        }
+        smartMaskScroll.addView(smartMasks);
+        mask.addView(smartMaskScroll);
+        addEditorAdjustment(mask, "强度", editorAdjustments.maskAmount, 0, 100, false,
+                value -> editorAdjustments.maskAmount = value, refreshPreview);
+        addEditorAdjustment(mask, "羽化", editorAdjustments.maskFeather, 0, 100, false,
+                value -> editorAdjustments.maskFeather = value, refreshPreview);
+        addEditorAdjustment(mask, "画笔大小", editorAdjustments.maskBrushSize, 4, 64, false,
+                value -> editorAdjustments.maskBrushSize = value, () -> preview.invalidate());
+        Button invertMask = nativeButton("反向蒙版", editorAdjustments.maskInvert);
+        invertMask.setOnClickListener(view -> {
+            editorAdjustments.maskInvert = !editorAdjustments.maskInvert;
+            status.setText(tr(editorAdjustments.maskInvert
+                    ? "蒙版已反向"
+                    : "蒙版已恢复正向"));
+            refreshPreview.run();
+        });
+        mask.addView(invertMask, marginParams(-1, dp(44), 0, 4, 0, 10));
+        mask.addView(text("蒙版内调整", 12, Typeface.BOLD, INK));
+        addEditorAdjustment(mask, "曝光", editorAdjustments.maskExposure, -200, 200, true,
+                value -> editorAdjustments.maskExposure = value, refreshPreview);
+        addEditorAdjustment(mask, "对比度", editorAdjustments.maskContrast, -100, 100, false,
+                value -> editorAdjustments.maskContrast = value, refreshPreview);
+        addEditorAdjustment(mask, "高光", editorAdjustments.maskHighlights, -100, 100, false,
+                value -> editorAdjustments.maskHighlights = value, refreshPreview);
+        addEditorAdjustment(mask, "阴影", editorAdjustments.maskShadows, -100, 100, false,
+                value -> editorAdjustments.maskShadows = value, refreshPreview);
+        addEditorAdjustment(mask, "色温", editorAdjustments.maskTemperature, -100, 100, false,
+                value -> editorAdjustments.maskTemperature = value, refreshPreview);
+        addEditorAdjustment(mask, "色调", editorAdjustments.maskTint, -100, 100, false,
+                value -> editorAdjustments.maskTint = value, refreshPreview);
+        addEditorAdjustment(mask, "饱和度", editorAdjustments.maskSaturation, -100, 100, false,
+                value -> editorAdjustments.maskSaturation = value, refreshPreview);
+        addEditorAdjustment(mask, "清晰度", editorAdjustments.maskClarity, -100, 100, false,
+                value -> editorAdjustments.maskClarity = value, refreshPreview);
+        mask.addView(text(
+                editorAdjustments.maskEnabled
+                        ? "在预览画面拖动画笔；蓝色为添加，白色为减去。"
+                        : "先创建蒙版，再选择添加或减去画笔。",
+                11,
+                Typeface.NORMAL,
+                MUTED));
+        content.addView(collapsibleGroup("editor-mask", "蒙版", "画笔范围", mask, false));
+
         LinearLayout detail = editorAdjustmentGroup();
         addEditorAdjustment(
                 detail,
@@ -4369,6 +6464,7 @@ public final class MainActivity extends Activity {
         Button reset = nativeButton("全部重置", false);
         reset.setOnClickListener(view -> {
             editorAdjustments.reset();
+            selectedNikonCloudPreset = null;
             editorSettingsBeforeAI = null;
             editorAIAnalysis = null;
             editorAISummary = "等待分析当前照片";
@@ -4414,6 +6510,7 @@ public final class MainActivity extends Activity {
                         editorSelectedPath =
                                 destination.getAbsolutePath();
                         editorAdjustments.reset();
+                        selectedNikonCloudPreset = null;
                         updateFileCount();
                         showToast("已保存编辑副本：" + destination.getName());
                         showSection("editor");
@@ -4453,7 +6550,7 @@ public final class MainActivity extends Activity {
         aiIntro.setBackground(rounded(COBALT_SOFT, 12, COBALT));
         aiIntro.addView(text("AI 创作", 16, Typeface.BOLD, INK));
         aiIntro.addView(text(
-                "联网生成与修图 · 结果保存为新文件",
+                "修图覆盖原图 · 生图保存新文件",
                 12,
                 Typeface.NORMAL,
                 MUTED), marginParams(-1, -2, 0, 6, 0, 0));
@@ -4466,28 +6563,16 @@ public final class MainActivity extends Activity {
                 isAiActivated() ? POSITIVE : MUTED));
         content.addView(aiIntro, marginParams(-1, -2, 0, 0, 0, 12));
 
-        Spinner picker = null;
         if (aiMode == 0) {
-            picker = new Spinner(this);
-            List<String> names = new ArrayList<>();
-            for (File file : photos) {
-                names.add(file.getName());
-            }
-            picker.setAdapter(new ArrayAdapter<>(
-                    this, android.R.layout.simple_spinner_dropdown_item, names));
             if (editorSelectedPath == null || photos.stream().noneMatch(
                     f -> f.getAbsolutePath().equals(editorSelectedPath))) {
                 editorSelectedPath = photos.isEmpty()
                         ? null
                         : photos.get(0).getAbsolutePath();
             }
-            for (int i = 0; i < photos.size(); i++) {
-                if (photos.get(i).getAbsolutePath().equals(editorSelectedPath)) {
-                    picker.setSelection(i);
-                    break;
-                }
-            }
-            content.addView(picker, marginParams(-1, dp(48), 0, 0, 0, 10));
+            content.addView(
+                    buildEditorPhotoPicker(photos),
+                    marginParams(-1, dp(64), 0, 0, 0, 10));
         }
 
         LinearLayout modeRow = new LinearLayout(this);
@@ -4512,11 +6597,19 @@ public final class MainActivity extends Activity {
 
         EditText promptInput = new EditText(this);
         promptInput.setHint(aiMode == 0 ? tr("输入修图描述…") : tr("输入生图描述…"));
+        if (aiSelectedPresetKeys.isEmpty() && aiManualPrompt.isEmpty()) aiManualPrompt = aiPrompt;
         promptInput.setText(aiPrompt);
         promptInput.setMinLines(2);
         promptInput.setMaxLines(4);
         promptInput.setBackgroundColor(SURFACE);
         promptInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        promptInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!suppressAiPromptChange) aiManualPrompt = s.toString().trim();
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
 
         TextView aiStatus = text("请输入提示词", 11, Typeface.NORMAL, MUTED);
         LinearLayout promptSection = new LinearLayout(this);
@@ -4527,8 +6620,6 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 0, 0, 6));
         promptSection.addView(promptInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        promptSection.addView(buildAiPresetRow(promptInput, aiStatus),
-                marginParams(-1, -2, 0, 8, 0, 0));
         content.addView(promptSection, marginParams(-1, -2, 0, 0, 0, 10));
 
         content.addView(text("输出参数", 12, Typeface.BOLD, MUTED),
@@ -4570,7 +6661,7 @@ public final class MainActivity extends Activity {
         paramRow.addView(resSpinner, resParams);
         content.addView(paramRow, marginParams(-1, -2, 0, 0, 0, 10));
 
-        Button generateBtn = nativeButton("生成", true);
+        Button generateBtn = nativeButton("生成图像", true);
         generateBtn.setOnClickListener(v -> {
             aiPrompt = promptInput.getText().toString().trim();
             if (aiPrompt.isEmpty()) {
@@ -4595,13 +6686,21 @@ public final class MainActivity extends Activity {
             editorExecutor.execute(() -> {
                 boolean ok = false;
                 try {
-                    byte[] result = callAiImageApi(
+                    AiImageResponse result = callAiImageApi(
                             loadActivationCode(), aiDeviceId(),
                             aiPrompt, sourcePath, size);
                     if (result != null) {
                         aiResultBitmap = BitmapFactory.decodeByteArray(
-                                result, 0, result.length);
+                                result.image, 0, result.image.length);
                         ok = aiResultBitmap != null;
+                        if (ok) {
+                            if (result.remaining != null) {
+                                setAiRemainingUsage(result.remaining);
+                            } else {
+                                // Older proxies did not expose the server count.
+                                recordAiUsage();
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     diagnostics.error("ai", "AI 调用失败：" + e.getMessage());
@@ -4610,7 +6709,7 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     aiIsGenerating = false;
                     generateBtn.setEnabled(true);
-                    generateBtn.setText(tr("生成"));
+                    generateBtn.setText(tr("生成图像"));
                     if (success) {
                         aiStatus.setText(tr("生成完成"));
                         showSection("editor");
@@ -4621,6 +6720,8 @@ public final class MainActivity extends Activity {
             });
         });
         content.addView(generateBtn, marginParams(-1, dp(48), 0, 8, 0, 8));
+        content.addView(buildAiPresetRow(promptInput, aiStatus),
+                marginParams(-1, -2, 0, 0, 0, 8));
         content.addView(aiStatus, marginParams(-1, -2, 0, 8, 0, 0));
 
         if (aiResultBitmap != null) {
@@ -4635,16 +6736,43 @@ public final class MainActivity extends Activity {
                 saveBtn.setEnabled(false);
                 Bitmap bmp = aiResultBitmap;
                 editorExecutor.execute(() -> {
+                    File source = aiMode == 0 && editorSelectedPath != null
+                            ? new File(editorSelectedPath)
+                            : null;
                     String stem = aiMode == 0 ? "edited" : "generated";
-                    File dest = new File(
-                            photoDirectory,
-                            "ai_" + stem + "_" + new java.text.SimpleDateFormat(
-                                    "yyyyMMdd_HHmmss", java.util.Locale.US)
-                                    .format(new Date()) + ".jpg");
+                    File dest = source != null
+                            ? source
+                            : new File(
+                                    photoDirectory,
+                                    "ai_" + stem + "_" + new java.text.SimpleDateFormat(
+                                            "yyyyMMdd_HHmmss", java.util.Locale.US)
+                                            .format(new Date()) + ".jpg");
+                    File temporary = source != null
+                            ? new File(dest.getAbsolutePath() + ".ai.tmp")
+                            : dest;
                     boolean ok = false;
-                    try (FileOutputStream stream = new FileOutputStream(dest)) {
+                    try (FileOutputStream stream = new FileOutputStream(temporary)) {
                         ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
+                        stream.getFD().sync();
+                        if (ok && source != null) {
+                            try {
+                                java.nio.file.Files.move(
+                                        temporary.toPath(),
+                                        dest.toPath(),
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                                java.nio.file.Files.move(
+                                        temporary.toPath(),
+                                        dest.toPath(),
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            }
+                        }
                     } catch (Exception e) {
+                        if (source != null && temporary.exists()) {
+                            // Best-effort cleanup of an interrupted atomic write.
+                            temporary.delete();
+                        }
                         diagnostics.error("ai", "保存失败：" + e.getMessage());
                     }
                     boolean saved = ok;
@@ -4666,35 +6794,251 @@ public final class MainActivity extends Activity {
         return scroll;
     }
 
+    private View buildEditorPhotoPicker(List<File> photos) {
+        LinearLayout holder = new LinearLayout(this);
+        holder.setOrientation(LinearLayout.VERTICAL);
+        Button picker = nativeButton("", false);
+        picker.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        picker.setPadding(dp(10), 0, dp(10), 0);
+        updateEditorPhotoPickerLabel(picker);
+        picker.setOnClickListener(view -> showEditorPhotoPickerDialog(photos));
+        holder.addView(picker, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(56)));
+        return holder;
+    }
+
+    private void updateEditorPhotoPickerLabel(Button picker) {
+        File selected = editorSelectedPath == null
+                ? null
+                : new File(editorSelectedPath);
+        picker.setText(selected == null
+                ? "选择照片"
+                : "▧  " + selected.getName());
+        if (selected != null && selected.exists() && !isVideoFile(selected)) {
+            Bitmap bitmap = decodeEditorThumbnail(selected, 84, 56);
+            if (bitmap != null) {
+                ImageView icon = new ImageView(this);
+                icon.setImageBitmap(bitmap);
+                icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                picker.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
+                picker.setCompoundDrawablePadding(dp(8));
+                picker.setCompoundDrawables(
+                        new BitmapDrawable(getResources(), bitmap),
+                        null,
+                        null,
+                        null);
+            }
+        }
+    }
+
+    private Bitmap decodeEditorThumbnail(File file, int width, int height) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = 4;
+        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        return bitmap == null
+                ? null
+                : Bitmap.createScaledBitmap(bitmap, dp(width), dp(height), true);
+    }
+
+    private void showEditorPhotoPickerDialog(List<File> photos) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout tree = verticalContainer();
+        tree.setPadding(dp(8), dp(4), dp(8), dp(4));
+        List<File> unclassified = new ArrayList<>();
+        for (File file : photos) {
+            if (!libraryFileAssignments.containsKey(file.getAbsolutePath())) {
+                unclassified.add(file);
+            }
+        }
+        tree.addView(buildEditorPickerGroup("未分类", unclassified, null, 0));
+        for (LibraryBranch branch : userLibraryBranches) {
+            tree.addView(buildEditorPickerBranch(branch, photos, 0));
+        }
+        scroll.addView(tree);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("选择编辑照片")
+                .setView(scroll)
+                .setNegativeButton("取消", null)
+                .create();
+        dialog.show();
+    }
+
+    private View buildEditorPickerBranch(
+            LibraryBranch branch,
+            List<File> photos,
+            int depth) {
+        LinearLayout group = verticalContainer();
+        List<File> assigned = filesAssignedToBranch(branch.id, photos);
+        View body = buildEditorPickerGroup(branch.name, assigned, branch.id, depth);
+        group.addView(body);
+        for (LibraryBranch child : branch.children) {
+            group.addView(buildEditorPickerBranch(child, photos, depth + 1));
+        }
+        return group;
+    }
+
+    private View buildEditorPickerGroup(
+            String title,
+            List<File> files,
+            String branchId,
+            int depth) {
+        LinearLayout group = verticalContainer();
+        Button header = nativeButton(
+                "⌄  " + title + " · " + files.size(),
+                false);
+        header.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(8 + depth * 14), 0, dp(4), 0);
+        LinearLayout body = verticalContainer();
+        for (File file : files) {
+            body.addView(buildEditorPickerFileRow(file));
+        }
+        if (files.isEmpty()) {
+            body.addView(text(
+                    "此分支暂无可编辑照片",
+                    12,
+                    Typeface.NORMAL,
+                    MUTED),
+                    marginParams(-1, dp(36), dp(54 + depth * 14), 0, 0, 0));
+        }
+        header.setOnClickListener(view -> {
+            boolean expanded = body.getVisibility() != View.VISIBLE;
+            body.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            header.setText((expanded ? "⌄  " : "›  ") + title + " · " + files.size());
+        });
+        group.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+        group.addView(body);
+        return group;
+    }
+
+    private View buildEditorPickerFileRow(File file) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(10), dp(7), dp(8), dp(7));
+        row.setBackground(rounded(
+                file.getAbsolutePath().equals(editorSelectedPath)
+                        ? COBALT_SOFT : SURFACE,
+                8,
+                file.getAbsolutePath().equals(editorSelectedPath)
+                        ? COBALT : RULE));
+        ImageView thumbnail = new ImageView(this);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        Bitmap bitmap = decodeEditorThumbnail(file, 84, 56);
+        if (bitmap != null) {
+            thumbnail.setImageBitmap(bitmap);
+        } else {
+            thumbnail.setImageResource(android.R.drawable.ic_menu_gallery);
+        }
+        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(84), dp(56)));
+        TextView name = text(file.getName(), 12, Typeface.BOLD, INK);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        row.addView(name, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        if (file.getAbsolutePath().equals(editorSelectedPath)) {
+            row.addView(text("✓", 18, Typeface.BOLD, COBALT),
+                    new LinearLayout.LayoutParams(dp(32), dp(56)));
+        }
+        row.setOnClickListener(view -> {
+            editorSelectedPath = file.getAbsolutePath();
+            editorAdjustments.reset();
+            selectedNikonCloudPreset = null;
+            editorSettingsBeforeAI = null;
+            editorAIAnalysis = null;
+            editorAISummary = "等待分析当前照片";
+            showSection("editor");
+        });
+        return row;
+    }
+
     private LinearLayout buildAiPresetRow(EditText promptInput, TextView aiStatus) {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.addView(text("快捷预设", 11, Typeface.BOLD, MUTED),
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(text("可组合预设", 11, Typeface.BOLD, MUTED),
+                new LinearLayout.LayoutParams(0, dp(36), 1f));
+        Button clear = nativeButton("清空", false);
+        clear.setContentDescription("清空已选 AI 提示词预设");
+        clear.setOnClickListener(v -> {
+            aiSelectedPresetKeys.clear();
+            aiManualPrompt = "";
+            setComposedAiPrompt(promptInput);
+            aiStatus.setText("已清空预设");
+        });
+        header.addView(clear, new LinearLayout.LayoutParams(dp(72), dp(44)));
+        container.addView(header,
                 marginParams(-1, -2, 0, 8, 0, 2));
-        String[][] presets = aiMode == 0 ? AI_EDIT_PRESETS : AI_GEN_PRESETS;
-        LinearLayout current = null;
-        for (int i = 0; i < presets.length; i++) {
-            if (i % 4 == 0) {
-                current = new LinearLayout(this);
-                current.setOrientation(LinearLayout.HORIZONTAL);
-                container.addView(current, marginParams(-1, -2, 0, 0, 0, 4));
+        String[][] modules = aiMode == 0 ? AI_EDIT_MODULES : AI_GENERATE_MODULES;
+        for (String[] module : modules) {
+            TextView title = text(module[0], 10, Typeface.BOLD, MUTED);
+            container.addView(title, marginParams(-1, -2, 0, 0, 0, 4));
+            HorizontalScrollView scroll = new HorizontalScrollView(this);
+            scroll.setHorizontalScrollBarEnabled(false);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int i = 1; i < module.length; i++) {
+                String value = module[i];
+                Button chip = nativeButton(value, isAiPresetSelected(module[0], value));
+                final String category = module[0];
+                chip.setMinHeight(dp(44));
+                chip.setOnClickListener(v -> {
+                    toggleAiPreset(category, value);
+                    chip.setBackground(rounded(
+                            isAiPresetSelected(category, value) ? COBALT_SOFT : SURFACE,
+                            8,
+                            isAiPresetSelected(category, value) ? COBALT : RULE));
+                    setComposedAiPrompt(promptInput);
+                    aiStatus.setText((isAiPresetSelected(category, value) ? "已选择 · " : "已取消 · ") + value);
+                });
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
+                if (i > 1) params.setMargins(dp(6), 0, 0, 0);
+                row.addView(chip, params);
             }
-            String[] preset = presets[i];
-            Button chip = nativeButton(preset[0], false);
-            chip.setOnClickListener(v -> {
-                promptInput.setText(preset[1]);
-                aiStatus.setText("已应用预设 · " + preset[0]);
-            });
-            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(36), 1f);
-            if (i % 4 != 0) {
-                chipParams.setMargins(dp(8), 0, 0, 0);
-            }
-            current.addView(chip, chipParams);
+            scroll.addView(row);
+            container.addView(scroll, marginParams(-1, dp(44), 0, 0, 0, 6));
         }
         return container;
     }
 
-    private byte[] callAiImageApi(
+    private boolean isAiPresetSelected(String category, String value) {
+        return aiSelectedPresetKeys.contains(category + "\u001f" + value);
+    }
+
+    private void toggleAiPreset(String category, String value) {
+        String key = category + "\u001f" + value;
+        boolean wasSelected = aiSelectedPresetKeys.contains(key);
+        aiSelectedPresetKeys.removeIf(item -> item.startsWith(category + "\u001f"));
+        if (!wasSelected) aiSelectedPresetKeys.add(key);
+    }
+
+    private String composeAiPrompt() {
+        List<String> groups = new ArrayList<>();
+        if (!aiManualPrompt.isEmpty()) groups.add(aiManualPrompt);
+        String[] categories = {"主体", "光线", "色彩", "质感", "构图", "约束"};
+        for (String category : categories) {
+            List<String> values = new ArrayList<>();
+            for (String key : aiSelectedPresetKeys) {
+                String prefix = category + "\u001f";
+                if (key.startsWith(prefix)) values.add(key.substring(prefix.length()));
+            }
+            if (!values.isEmpty()) groups.add(category + "：" + String.join("、", values));
+        }
+        return String.join("。", groups);
+    }
+
+    private void setComposedAiPrompt(EditText input) {
+        aiPrompt = composeAiPrompt();
+        suppressAiPromptChange = true;
+        input.setText(aiPrompt);
+        input.setSelection(input.length());
+        suppressAiPromptChange = false;
+    }
+
+    private AiImageResponse callAiImageApi(
             String activationCode,
             String deviceId,
             String prompt,
@@ -4712,19 +7056,21 @@ public final class MainActivity extends Activity {
         conn.setDoOutput(true);
 
         org.json.JSONObject body = new org.json.JSONObject();
-        try {
-            body.put("activationCode", activationCode);
-            body.put("deviceId", deviceId);
-            body.put("prompt", prompt);
-            body.put("size", size);
-            if (sourcePath != null) {
-                byte[] srcBytes = java.nio.file.Files.readAllBytes(
-                        new File(sourcePath).toPath());
-                String b64 = android.util.Base64.encodeToString(
-                        srcBytes, android.util.Base64.NO_WRAP);
-                body.put("image", "data:image/jpeg;base64," + b64);
+        body.put("activationCode", activationCode);
+        body.put("deviceId", deviceId);
+        body.put("prompt", prompt);
+        body.put("size", size);
+        if (sourcePath != null && !sourcePath.isEmpty()) {
+            File source = new File(sourcePath);
+            byte[] srcBytes = java.nio.file.Files.readAllBytes(source.toPath());
+            if (srcBytes.length == 0) {
+                throw new Exception("原图为空，未发送 AI 修图请求");
             }
-        } catch (Exception ignored) {}
+            String b64 = android.util.Base64.encodeToString(
+                    srcBytes, android.util.Base64.NO_WRAP);
+            body.put("image", "data:" + imageMimeType(source.getName())
+                    + ";base64," + b64);
+        }
 
         java.io.OutputStream os = conn.getOutputStream();
         os.write(body.toString().getBytes("UTF-8"));
@@ -4741,6 +7087,7 @@ public final class MainActivity extends Activity {
             throw new Exception("API 服务返回错误 " + code);
         }
 
+        Integer remaining = parseAiRemaining(conn.getHeaderField("X-ZENCHE-Remaining"));
         java.io.InputStream is = conn.getInputStream();
         byte[] respBytes = readAllBytes(is);
         is.close();
@@ -4755,7 +7102,9 @@ public final class MainActivity extends Activity {
         org.json.JSONObject first = dataArr.getJSONObject(0);
         String b64Json = first.optString("b64_json", null);
         if (b64Json != null && !b64Json.isEmpty()) {
-            return android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT);
+            return new AiImageResponse(
+                    android.util.Base64.decode(b64Json, android.util.Base64.DEFAULT),
+                    remaining);
         }
         String imageUrl = first.optString("url", null);
         if (imageUrl != null && !imageUrl.isEmpty()) {
@@ -4768,9 +7117,40 @@ public final class MainActivity extends Activity {
             byte[] data = readAllBytes(imgIs);
             imgIs.close();
             imgConn.disconnect();
-            return data;
+            return new AiImageResponse(data, remaining);
         }
         throw new Exception("AI 未返回有效图片");
+    }
+
+    private static Integer parseAiRemaining(String value) {
+        if (value == null) return null;
+        try {
+            int remaining = Integer.parseInt(value.trim());
+            return Math.max(0, Math.min(AI_MAX_USAGE, remaining));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String imageMimeType(String filename) {
+        String ext = filename == null ? "" : filename.toLowerCase(Locale.US);
+        if (ext.endsWith(".png")) return "image/png";
+        if (ext.endsWith(".heic") || ext.endsWith(".heif")) return "image/heic";
+        if (ext.endsWith(".tif") || ext.endsWith(".tiff")) return "image/tiff";
+        if (ext.endsWith(".bmp")) return "image/bmp";
+        return "image/jpeg";
+    }
+
+    private void setAiRemainingUsage(int remaining) {
+        int bounded = Math.max(0, Math.min(AI_MAX_USAGE, remaining));
+        aiUsageCount = AI_MAX_USAGE - bounded;
+        aiUsageLoaded = true;
+        aiActivated = bounded > 0;
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putInt("ai_usage_count", aiUsageCount)
+                .putBoolean("ai_activated", aiActivated)
+                .apply();
     }
 
     private String loadAiApiKey() {
@@ -4854,6 +7234,176 @@ public final class MainActivity extends Activity {
         return group;
     }
 
+    private View createEditorWheel(
+            String title,
+            int tint,
+            int initialX,
+            int initialY,
+            BiConsumer<Integer, Integer> setter,
+            Runnable refreshPreview) {
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setGravity(Gravity.CENTER_HORIZONTAL);
+        EditorWheelView wheel = new EditorWheelView(this, tint, initialX, initialY, (x, y) -> {
+            setter.accept(x, y);
+            refreshPreview.run();
+        });
+        column.addView(wheel, new LinearLayout.LayoutParams(dp(82), dp(82)));
+        TextView label = text(title, 11, Typeface.BOLD, INK);
+        label.setGravity(Gravity.CENTER);
+        column.addView(label, new LinearLayout.LayoutParams(-1, dp(20)));
+        TextView value = text(String.format(Locale.ROOT, "%+d, %+d", initialX, initialY), 10, Typeface.NORMAL, MUTED);
+        value.setGravity(Gravity.CENTER);
+        wheel.setValueLabel(value);
+        column.addView(value, new LinearLayout.LayoutParams(-1, dp(18)));
+        return column;
+    }
+
+    private View createEditorCurvePad(Runnable refreshPreview) {
+        return new EditorCurveView(this, editorAdjustments, refreshPreview);
+    }
+
+    private final class EditorWheelView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int tint;
+        private int xValue;
+        private int yValue;
+        private final BiConsumer<Integer, Integer> onValue;
+        private TextView valueLabel;
+
+        EditorWheelView(Context context, int tint, int initialX, int initialY, BiConsumer<Integer, Integer> onValue) {
+            super(context);
+            this.tint = tint;
+            this.xValue = initialX;
+            this.yValue = initialY;
+            this.onValue = onValue;
+            setContentDescription("直接拖动色轮调节");
+        }
+
+        void setValueLabel(TextView label) { valueLabel = label; }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float radius = Math.min(getWidth(), getHeight()) * 0.39f;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(5));
+            paint.setShader(new android.graphics.SweepGradient(cx, cy,
+                    new int[]{Color.RED, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.MAGENTA, Color.RED}, null));
+            canvas.drawCircle(cx, cy, radius, paint);
+            paint.setShader(null);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(GRAPHITE);
+            canvas.drawCircle(cx, cy, radius - dp(6), paint);
+            paint.setColor(tint);
+            float knobX = cx + (xValue / 100f) * radius * 0.72f;
+            float knobY = cy - (yValue / 100f) * radius * 0.72f;
+            canvas.drawCircle(knobX, knobY, dp(6), paint);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                float cx = getWidth() / 2f;
+                float cy = getHeight() / 2f;
+                float radius = Math.min(getWidth(), getHeight()) * 0.39f;
+                float dx = Math.max(-1f, Math.min(1f, (event.getX() - cx) / (radius * 0.72f)));
+                float dy = Math.max(-1f, Math.min(1f, (cy - event.getY()) / (radius * 0.72f)));
+                xValue = Math.round(dx * 100);
+                yValue = Math.round(dy * 100);
+                if (valueLabel != null) valueLabel.setText(String.format(Locale.ROOT, "%+d, %+d", xValue, yValue));
+                onValue.accept(xValue, yValue);
+                invalidate();
+                return true;
+            }
+            return event.getAction() == MotionEvent.ACTION_UP;
+        }
+    }
+
+    private final class EditorCurveView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final EditorAdjustments settings;
+        private final Runnable refreshPreview;
+        private int activePoint = -1;
+
+        EditorCurveView(Context context, EditorAdjustments settings, Runnable refreshPreview) {
+            super(context);
+            this.settings = settings;
+            this.refreshPreview = refreshPreview;
+            setContentDescription("直接拖动曲线控制点调节");
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(GRAPHITE);
+            canvas.drawRoundRect(0, 0, w, h, dp(8), dp(8), paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(1));
+            paint.setColor(Color.argb(80, 255, 255, 255));
+            canvas.drawLine(0, h, w, 0, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(2));
+            paint.setColor(COBALT);
+            android.graphics.Path path = new android.graphics.Path();
+            ArrayList<EditorCurvePoint> points = new ArrayList<>(settings.curvePoints);
+            Collections.sort(points, (a, b) -> Float.compare(a.x, b.x));
+            if (points.isEmpty()) points.add(new EditorCurvePoint(0, 0));
+            path.moveTo(points.get(0).x * w, (1 - points.get(0).y) * h);
+            for (int i = 0; i < points.size() - 1; i++) {
+                EditorCurvePoint p0 = points.get(Math.max(0, i - 1));
+                EditorCurvePoint p1 = points.get(i);
+                EditorCurvePoint p2 = points.get(i + 1);
+                EditorCurvePoint p3 = points.get(Math.min(points.size() - 1, i + 2));
+                float c1x = p1.x + (p2.x - p0.x) / 6f;
+                float c1y = p1.y + (p2.y - p0.y) / 6f;
+                float c2x = p2.x - (p3.x - p1.x) / 6f;
+                float c2y = p2.y - (p3.y - p1.y) / 6f;
+                path.cubicTo(c1x * w, (1 - c1y) * h, c2x * w, (1 - c2y) * h, p2.x * w, (1 - p2.y) * h);
+            }
+            canvas.drawPath(path, paint);
+            paint.setStyle(Paint.Style.FILL);
+            for (EditorCurvePoint point : settings.curvePoints) {
+                paint.setColor(COBALT);
+                canvas.drawCircle(point.x * w, (1 - point.y) * h, dp(5), paint);
+            }
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE) {
+                float x = Math.max(0, Math.min(getWidth(), event.getX())) / Math.max(1, getWidth());
+                float y = Math.max(0, Math.min(getHeight(), event.getY())) / Math.max(1, getHeight());
+                float normalizedY = 1 - y;
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    activePoint = -1;
+                    float best = .06f * .06f;
+                    for (int i = 0; i < settings.curvePoints.size(); i++) {
+                        EditorCurvePoint point = settings.curvePoints.get(i);
+                        float dx = point.x - x;
+                        float dy = point.y - normalizedY;
+                        float distance = dx * dx + dy * dy;
+                        if (distance < best) { best = distance; activePoint = i; }
+                    }
+                    if (activePoint < 0) {
+                        settings.curvePoints.add(new EditorCurvePoint(x, normalizedY));
+                        activePoint = settings.curvePoints.size() - 1;
+                    }
+                }
+                if (activePoint >= 0 && activePoint < settings.curvePoints.size()) {
+                    EditorCurvePoint point = settings.curvePoints.get(activePoint);
+                    point.x = x;
+                    point.y = normalizedY;
+                }
+                refreshPreview.run();
+                invalidate();
+                return true;
+            }
+            return event.getAction() == MotionEvent.ACTION_UP;
+        }
+    }
+
     private void addEditorAIMetric(
             LinearLayout parent,
             String title,
@@ -4888,7 +7438,205 @@ public final class MainActivity extends Activity {
         parent.addView(button, params);
     }
 
+    private void showNikonCloudPresetPicker() {
+        showStableNikonCloudPresetPicker(false);
+    }
+
+    private View buildNikonCloudMonitorPanel() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(12), dp(12), dp(10));
+        boolean darkSurface = "monitor".equals(currentSection);
+        int cardColor = darkSurface ? Color.rgb(24, 36, 52) : COBALT_SOFT;
+        int borderColor = darkSurface ? Color.rgb(48, 78, 112) : COBALT;
+        int primaryText = darkSurface ? Color.WHITE : INK;
+        int secondaryText = darkSurface ? Color.rgb(202, 211, 224) : MUTED;
+        card.setBackground(rounded(cardColor, 14, borderColor));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView badge = text("NP3", 11, Typeface.BOLD, Color.WHITE);
+        badge.setGravity(Gravity.CENTER);
+        badge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        badge.setBackground(rounded(COBALT, 12, 0));
+        header.addView(badge, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(12), 0, dp(8), 0);
+        labels.addView(text("尼康云创监看", 13, Typeface.BOLD, primaryText));
+        TextView selected = text(
+                monitorNikonCloudPreset == null
+                        ? "已关闭"
+                        : monitorNikonCloudPreset.name,
+                11,
+                Typeface.NORMAL,
+                secondaryText);
+        selected.setSingleLine(true);
+        selected.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        labels.addView(selected);
+        header.addView(labels, new LinearLayout.LayoutParams(0, dp(42), 1f));
+
+        Button picker = nativeButton("选择预设", true);
+        picker.setOnClickListener(view -> showNikonCloudMonitorPresetPicker());
+        header.addView(picker, new LinearLayout.LayoutParams(dp(132), dp(44)));
+        card.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView note = text(
+                "照片与视频实时生效 · SDR 近似 · 不写入原片",
+                11,
+                Typeface.NORMAL,
+                secondaryText);
+        note.setPadding(0, dp(7), 0, 0);
+        card.addView(note, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(8), 0, dp(4));
+        card.setLayoutParams(params);
+        return card;
+    }
+
+    private void showNikonCloudMonitorPresetPicker() {
+        showStableNikonCloudPresetPicker(true);
+    }
+
+    private void showStableNikonCloudPresetPicker(boolean monitorPicker) {
+        if (isFinishing() || isDestroyed()) return;
+        if (nikonCloudPresetDialog != null
+                && nikonCloudPresetDialog.isShowing()) {
+            return;
+        }
+        String[] labels = new String[nikonCloudPresets.size() + 1];
+        labels[0] = tr(monitorPicker
+                ? "关闭云创监看"
+                : "关闭云创预览");
+        for (int index = 0; index < nikonCloudPresets.size(); index++) {
+            NikonCloudPreview.Preset preset = nikonCloudPresets.get(index);
+            labels[index + 1] = preset.name
+                    + (preset.hasCustomToneCurve ? " · Curve" : "");
+        }
+        NikonCloudPreview.Preset current = monitorPicker
+                ? monitorNikonCloudPreset
+                : selectedNikonCloudPreset;
+        int selectedIndex = current == null ? 0 : 1;
+        if (current != null) {
+            for (int index = 0; index < nikonCloudPresets.size(); index++) {
+                if (nikonCloudPresets.get(index).id.equals(current.id)) {
+                    selectedIndex = index + 1;
+                    break;
+                }
+            }
+        }
+        final int[] pendingSelection = {selectedIndex};
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(tr(monitorPicker
+                                ? "尼康云创监看"
+                                : "尼康云创预览") + " · "
+                        + nikonCloudPresets.size() + " NP3")
+                .setSingleChoiceItems(
+                        labels,
+                        selectedIndex,
+                        (pickerDialog, which) -> pendingSelection[0] = which)
+                .setPositiveButton(tr("应用"), null)
+                .setNegativeButton(tr("取消"), null)
+                .create();
+        nikonCloudPresetDialog = dialog;
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+                    .setOnClickListener(view -> {
+                        int index = pendingSelection[0];
+                        if (monitorPicker) {
+                            monitorNikonCloudPreset = index == 0
+                                    ? null
+                                    : nikonCloudPresets.get(index - 1);
+                            showSection(currentSection);
+                            refreshPreviewProcessing();
+                            showToast(monitorNikonCloudPreset == null
+                                    ? "尼康云创监看已关闭"
+                                    : "尼康云创监看 · "
+                                            + monitorNikonCloudPreset.name
+                                            + " · 照片/视频 · SDR 近似");
+                        } else {
+                            if (index == 0) {
+                                selectedNikonCloudPreset = null;
+                                applyEditorPreset("original");
+                            } else {
+                                applyNikonCloudPreset(
+                                        nikonCloudPresets.get(index - 1));
+                            }
+                            showSection("editor");
+                        }
+                        dialog.dismiss();
+                    });
+        });
+        dialog.setOnDismissListener(ignored -> {
+            if (nikonCloudPresetDialog == dialog) {
+                nikonCloudPresetDialog = null;
+            }
+        });
+        dialog.show();
+        if (dialog.getListView() != null) {
+            dialog.getListView().setFastScrollEnabled(true);
+            dialog.getListView().setDividerHeight(dp(1));
+        }
+        Window window = dialog.getWindow();
+        if (window != null) {
+            int width = Math.min(
+                    getResources().getDisplayMetrics().widthPixels - dp(32),
+                    dp(560));
+            int height = Math.min(
+                    (int) (getResources().getDisplayMetrics().heightPixels * .78f),
+                    dp(680));
+            window.setLayout(width, height);
+        }
+    }
+
+    private void applyNikonCloudPreset(NikonCloudPreview.Preset preset) {
+        editorAdjustments.resetTone();
+        NikonCloudPreview.Tone tone = preset.tone;
+        editorAdjustments.contrast = tone.contrast;
+        editorAdjustments.highlights = tone.highlights;
+        editorAdjustments.shadows = tone.shadows;
+        editorAdjustments.whites = tone.whites;
+        editorAdjustments.blacks = tone.blacks;
+        editorAdjustments.saturation = tone.saturation;
+        editorAdjustments.texture = tone.texture;
+        editorAdjustments.clarity = tone.clarity;
+        editorAdjustments.sharpening = tone.sharpening;
+        editorAdjustments.wheelLiftX = preset.grading.lift.x;
+        editorAdjustments.wheelLiftY = preset.grading.lift.y;
+        editorAdjustments.wheelGammaX = preset.grading.gamma.x;
+        editorAdjustments.wheelGammaY = preset.grading.gamma.y;
+        editorAdjustments.wheelGainX = preset.grading.gain.x;
+        editorAdjustments.wheelGainY = preset.grading.gain.y;
+        if (preset.toneCurve.size() > 1) {
+            editorAdjustments.curvePoints.clear();
+            double denominator = preset.toneCurve.size() - 1.0;
+            for (int index = 0; index < preset.toneCurve.size(); index++) {
+                editorAdjustments.curvePoints.add(new EditorCurvePoint(
+                        (float)(index / denominator),
+                        (float)Math.max(0, Math.min(
+                                1,
+                                preset.toneCurve.get(index)))));
+            }
+        }
+        selectedNikonCloudPreset = preset;
+        editorSettingsBeforeAI = null;
+        editorAIAnalysis = null;
+        editorAISummary = "等待分析当前照片";
+        editorAdjustments.showingOriginal = false;
+        showToast("尼康云创预览 · " + preset.name + " · SDR 近似");
+    }
+
     private void applyEditorPreset(String preset) {
+        selectedNikonCloudPreset = null;
         editorAdjustments.resetTone();
         editorSettingsBeforeAI = null;
         editorAIAnalysis = null;
@@ -4953,6 +7701,7 @@ public final class MainActivity extends Activity {
     private void applyEditorAI(
             EditorAIAnalysis analysis,
             double intensity) {
+        selectedNikonCloudPreset = null;
         editorAdjustments.resetTone();
         double amount = Math.max(0.35, Math.min(1, intensity));
         double targetExposure = Math.max(
@@ -5037,7 +7786,7 @@ public final class MainActivity extends Activity {
         if (bitmap == null) return null;
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
-        int[] pixels = new int[width * height];
+            int[] pixels = new int[width * height];
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
         bitmap.recycle();
         EditorAIAnalysis analysis = new EditorAIAnalysis();
@@ -5254,6 +8003,28 @@ public final class MainActivity extends Activity {
                 || lower.endsWith(".tiff");
     }
 
+    private static double curveValue(ArrayList<EditorCurvePoint> source, double input) {
+        ArrayList<EditorCurvePoint> points = new ArrayList<>(source);
+        Collections.sort(points, (a, b) -> Float.compare(a.x, b.x));
+        double x = Math.max(0, Math.min(1, input));
+        if (points.size() < 2) return x;
+        if (x <= points.get(0).x) return points.get(0).y;
+        if (x >= points.get(points.size() - 1).x) return points.get(points.size() - 1).y;
+        int index = 1;
+        while (index < points.size() && points.get(index).x < x) index++;
+        EditorCurvePoint p0 = points.get(Math.max(0, index - 2));
+        EditorCurvePoint p1 = points.get(index - 1);
+        EditorCurvePoint p2 = points.get(index);
+        EditorCurvePoint p3 = points.get(Math.min(points.size() - 1, index + 1));
+        double t = (x - p1.x) / Math.max(.0001, p2.x - p1.x);
+        double t2 = t * t;
+        double t3 = t2 * t;
+        double y = .5 * (2 * p1.y + (-p0.y + p2.y) * t
+                + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
+                + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+        return Math.max(0, Math.min(1, y));
+    }
+
     private Bitmap renderEditedBitmap(
             File file,
             EditorAdjustments settings,
@@ -5293,8 +8064,14 @@ public final class MainActivity extends Activity {
                 1
                         + settings.saturation / 100.0
                         + settings.dehaze / 520.0;
-        double temperature = settings.temperature / 100.0;
-        double tint = settings.tint / 100.0;
+            double temperature = settings.temperature / 100.0;
+            double tint = settings.tint / 100.0;
+        double[] cloudChannels = selectedNikonCloudPreset == null
+                ? null
+                : new double[3];
+        double[] cloudHsl = selectedNikonCloudPreset == null
+                ? null
+                : new double[3];
         for (int index = 0; index < pixels.length; index++) {
             int color = pixels[index];
             double red = Color.red(color) / 255.0 * exposure;
@@ -5305,8 +8082,22 @@ public final class MainActivity extends Activity {
             green -= tint * 0.08;
             blue -= temperature * 0.12 - tint * 0.045;
 
+            // Compact Lift/Gamma/Gain and curve controls.
             double luma =
                     red * 0.2126 + green * 0.7152 + blue * 0.0722;
+            double shadowWeight = Math.pow(1 - clampUnit(luma), 2);
+            double highlightWeight = Math.pow(clampUnit(luma), 2);
+            double midWeight = 1 - Math.abs(clampUnit(luma) * 2 - 1);
+            double wheelX = settings.wheelLiftX / 100.0 * 0.10 * shadowWeight
+                    + settings.wheelGammaX / 100.0 * 0.10 * midWeight
+                    + settings.wheelGainX / 100.0 * 0.10 * highlightWeight;
+            double wheelY = settings.wheelLiftY / 100.0 * 0.10 * shadowWeight
+                    + settings.wheelGammaY / 100.0 * 0.10 * midWeight
+                    + settings.wheelGainY / 100.0 * 0.10 * highlightWeight;
+            red += wheelX - wheelY * .5;
+            green += wheelY - wheelX * .5;
+            blue -= (wheelX + wheelY) * .5;
+            luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
             double toneShift =
                     settings.shadows / 100.0
                             * Math.pow(1 - clampUnit(luma), 2)
@@ -5333,6 +8124,14 @@ public final class MainActivity extends Activity {
             green = (green - 0.5) * contrast * localContrast + 0.5;
             blue = (blue - 0.5) * contrast * localContrast + 0.5;
 
+            if (settings.curvePoints.size() > 2) {
+                double curveValue = curveValue(settings.curvePoints, luma);
+                double delta = curveValue - luma;
+                red += delta;
+                green += delta;
+                blue += delta;
+            }
+
             luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
             double colorfulness =
                     Math.max(red, Math.max(green, blue))
@@ -5347,6 +8146,18 @@ public final class MainActivity extends Activity {
             red = luma + (red - luma) * saturation;
             green = luma + (green - luma) * saturation;
             blue = luma + (blue - luma) * saturation;
+
+            if (cloudChannels != null) {
+                cloudChannels[0] = red;
+                cloudChannels[1] = green;
+                cloudChannels[2] = blue;
+                selectedNikonCloudPreset.applyColorMixer(
+                        cloudChannels,
+                        cloudHsl);
+                red = cloudChannels[0];
+                green = cloudChannels[1];
+                blue = cloudChannels[2];
+            }
 
             int x = index % width;
             int y = index / width;
@@ -5383,7 +8194,242 @@ public final class MainActivity extends Activity {
                 width,
                 height,
                 Bitmap.Config.ARGB_8888);
-        return applyEditorGeometry(adjusted, settings);
+        Bitmap geometryAdjusted = applyEditorGeometry(adjusted, settings);
+        Bitmap result = geometryAdjusted;
+        for (EditorMaskLayer layer : settings.effectiveMaskLayers()) {
+            if (layer.visible && layer.type != null && !layer.type.isEmpty()) {
+                result = applyEditorMaskAdjustments(result, layer);
+            }
+        }
+        return result;
+    }
+
+    private Bitmap applyEditorMaskAdjustments(
+            Bitmap base,
+            EditorMaskLayer layer) {
+        int width = base.getWidth();
+        int height = base.getHeight();
+        int[] original = new int[width * height];
+        base.getPixels(original, 0, width, 0, 0, width, height);
+        int[] local = original.clone();
+        double exposure = Math.pow(2, layer.exposure / 100.0);
+        double contrast = 1 + layer.contrast / 100.0;
+        double saturation = Math.max(0, 1 + layer.saturation / 100.0);
+        double temperature = layer.temperature / 100.0;
+        double tint = layer.tint / 100.0;
+        for (int index = 0; index < local.length; index++) {
+            int color = original[index];
+            double red = Color.red(color) / 255.0 * exposure;
+            double green = Color.green(color) / 255.0 * exposure;
+            double blue = Color.blue(color) / 255.0 * exposure;
+            red += temperature * .12 + tint * .045;
+            green -= tint * .08;
+            blue -= temperature * .12 - tint * .045;
+            double luma = red * .2126 + green * .7152 + blue * .0722;
+            double tone = layer.shadows / 100.0
+                    * Math.pow(1 - clampUnit(luma), 2) * .38
+                    + layer.highlights / 100.0
+                    * Math.pow(clampUnit(luma), 2) * .30;
+            red += tone;
+            green += tone;
+            blue += tone;
+            double clarityWeight = 1 - Math.abs(clampUnit(luma) * 2 - 1);
+            double localContrast = contrast
+                    * (1 + layer.clarity / 100.0 * clarityWeight * .38);
+            red = (red - .5) * localContrast + .5;
+            green = (green - .5) * localContrast + .5;
+            blue = (blue - .5) * localContrast + .5;
+            luma = red * .2126 + green * .7152 + blue * .0722;
+            red = luma + (red - luma) * saturation;
+            green = luma + (green - luma) * saturation;
+            blue = luma + (blue - luma) * saturation;
+            local[index] = Color.argb(
+                    Color.alpha(color),
+                    editorChannel(red * 255),
+                    editorChannel(green * 255),
+                    editorChannel(blue * 255));
+        }
+        byte[] mask = buildEditorMask(width, height, layer, original);
+        double intensity = Math.max(0, Math.min(1, layer.amount / 100.0));
+        for (int index = 0; index < local.length; index++) {
+            double coverage = (mask[index] & 0xff) / 255.0;
+            double amount = (layer.invert ? 1 - coverage : coverage)
+                    * intensity;
+            int originalColor = original[index];
+            int localColor = local[index];
+            local[index] = Color.argb(
+                    Color.alpha(originalColor),
+                    editorChannel(Color.red(originalColor)
+                            + (Color.red(localColor) - Color.red(originalColor)) * amount),
+                    editorChannel(Color.green(originalColor)
+                            + (Color.green(localColor) - Color.green(originalColor)) * amount),
+                    editorChannel(Color.blue(originalColor)
+                            + (Color.blue(localColor) - Color.blue(originalColor)) * amount));
+        }
+        return Bitmap.createBitmap(local, width, height, Bitmap.Config.ARGB_8888);
+    }
+
+    private byte[] buildEditorMask(
+            int width,
+            int height,
+            EditorMaskLayer layer,
+            int[] sourcePixels) {
+        byte[] mask = new byte[Math.max(1, width * height)];
+        if (!"画笔".equals(layer.type)) {
+            for (int index = 0; index < mask.length; index++) {
+                int color = sourcePixels[index];
+                double coverage = smartEditorMaskCoverage(
+                        layer.type,
+                        Color.red(color) / 255.0,
+                        Color.green(color) / 255.0,
+                        Color.blue(color) / 255.0,
+                        index % width,
+                        index / width,
+                        width,
+                        height);
+                mask[index] = (byte) Math.max(0, Math.min(255,
+                        (int) Math.round(coverage * 255)));
+            }
+        }
+        for (EditorMaskStroke stroke : layer.strokes) {
+            if (stroke.points.isEmpty()) continue;
+            EditorMaskPoint previous = stroke.points.get(0);
+            stampEditorMask(mask, width, height, previous, stroke, layer.feather);
+            for (int index = 1; index < stroke.points.size(); index++) {
+                EditorMaskPoint current = stroke.points.get(index);
+                double dx = (current.x - previous.x) * width;
+                double dy = (current.y - previous.y) * height;
+                int radius = Math.max(1,
+                        Math.round(stroke.size / 200f * Math.min(width, height)));
+                int steps = Math.max(1,
+                        (int) Math.ceil(Math.hypot(dx, dy) / Math.max(1, radius * .45)));
+                for (int step = 1; step <= steps; step++) {
+                    float progress = step / (float) steps;
+                    stampEditorMask(
+                            mask,
+                            width,
+                            height,
+                            new EditorMaskPoint(
+                                    previous.x + (current.x - previous.x) * progress,
+                                    previous.y + (current.y - previous.y) * progress),
+                            stroke,
+                            layer.feather);
+                }
+                previous = current;
+            }
+        }
+        int blurRadius = Math.min(24, Math.max(0, (int) Math.round(
+                layer.feather / 100.0 * Math.min(width, height) * .015)));
+        if (blurRadius > 0) blurEditorMask(mask, width, height, blurRadius);
+        return mask;
+    }
+
+    private double smartEditorMaskCoverage(
+            String type,
+            double red,
+            double green,
+            double blue,
+            int x,
+            int y,
+            int width,
+            int height) {
+        double luma = red * .2126 + green * .7152 + blue * .0722;
+        double chroma = Math.max(red, Math.max(green, blue))
+                - Math.min(red, Math.min(green, blue));
+        double unitX = x / (double) Math.max(1, width - 1);
+        double unitY = y / (double) Math.max(1, height - 1);
+        double center = 1 - Math.min(1, Math.hypot(
+                (unitX - .5) / .72,
+                (unitY - .52) / .82));
+        double subject = clampUnit(center * .72 + chroma * .72
+                + Math.abs(luma - .5) * .18);
+        if ("智能背景".equals(type)) return 1 - subject;
+        if ("智能天空".equals(type)) {
+            double top = clampUnit((.76 - unitY) / .62);
+            double skyColor = clampUnit((blue - red * .88) * 2.5
+                    + (blue - green * .78) * 1.6 + .18);
+            return top * skyColor * smoothStep(.18, .82, luma);
+        }
+        if ("智能人物".equals(type)) {
+            double skin = smoothStep(.02, .20, red - blue)
+                    * smoothStep(-.05, .16, red - green)
+                    * smoothStep(.16, .78, luma);
+            return clampUnit(skin * .78 + subject * center * .42);
+        }
+        if ("智能亮部".equals(type)) return smoothStep(.55, .88, luma);
+        if ("智能暗部".equals(type)) return 1 - smoothStep(.12, .48, luma);
+        return subject;
+    }
+
+    private void blurEditorMask(
+            byte[] mask,
+            int width,
+            int height,
+            int radius) {
+        byte[] horizontal = new byte[mask.length];
+        int divisor = radius * 2 + 1;
+        for (int y = 0; y < height; y++) {
+            int sum = 0;
+            for (int x = -radius; x <= radius; x++) {
+                sum += mask[y * width + Math.max(0, Math.min(width - 1, x))] & 0xff;
+            }
+            for (int x = 0; x < width; x++) {
+                horizontal[y * width + x] = (byte) (sum / divisor);
+                int removeX = Math.max(0, x - radius);
+                int addX = Math.min(width - 1, x + radius + 1);
+                sum += (mask[y * width + addX] & 0xff)
+                        - (mask[y * width + removeX] & 0xff);
+            }
+        }
+        for (int x = 0; x < width; x++) {
+            int sum = 0;
+            for (int y = -radius; y <= radius; y++) {
+                sum += horizontal[Math.max(0, Math.min(height - 1, y)) * width + x] & 0xff;
+            }
+            for (int y = 0; y < height; y++) {
+                mask[y * width + x] = (byte) (sum / divisor);
+                int removeY = Math.max(0, y - radius);
+                int addY = Math.min(height - 1, y + radius + 1);
+                sum += (horizontal[addY * width + x] & 0xff)
+                        - (horizontal[removeY * width + x] & 0xff);
+            }
+        }
+    }
+
+    private void stampEditorMask(
+            byte[] mask,
+            int width,
+            int height,
+            EditorMaskPoint point,
+            EditorMaskStroke stroke,
+            int feather) {
+        double radius = Math.max(1,
+                stroke.size / 200.0 * Math.min(width, height));
+        double softEdge = radius * Math.max(0, Math.min(100, feather)) / 100.0;
+        double outerRadius = radius + softEdge;
+        int centerX = Math.round(point.x * (width - 1));
+        int centerY = Math.round(point.y * (height - 1));
+        int extent = Math.max(1, (int) Math.ceil(outerRadius));
+        for (int y = Math.max(0, centerY - extent);
+                y <= Math.min(height - 1, centerY + extent);
+                y++) {
+            for (int x = Math.max(0, centerX - extent);
+                    x <= Math.min(width - 1, centerX + extent);
+                    x++) {
+                double distance = Math.hypot(x - centerX, y - centerY);
+                if (distance > outerRadius) continue;
+                double coverage = distance <= radius || softEdge <= 0
+                        ? 1
+                        : 1 - (distance - radius) / softEdge;
+                int offset = y * width + x;
+                int current = mask[offset] & 0xff;
+                int value = Math.max(0, Math.min(255,
+                        (int) Math.round(coverage * 255)));
+                mask[offset] = (byte) (stroke.subtract
+                        ? Math.max(0, current - value)
+                        : Math.max(current, value));
+            }
+        }
     }
 
     private void applyEditorDetail(
@@ -6242,7 +9288,12 @@ public final class MainActivity extends Activity {
     }
 
     private View buildWirelessTransferPanel() {
+        LinearLayout content = verticalContainer();
+        content.addView(
+                buildWifiCameraPanel(),
+                marginParams(-1, -2, 0, 0, 0, 12));
         LinearLayout settings = panel();
+        settings.addView(text("文件接收", 12, Typeface.BOLD, MUTED));
         settings.addView(text("多协议无线图片收件箱", 18, Typeface.BOLD, INK));
         settings.addView(text(
                 wirelessStatus,
@@ -6284,7 +9335,155 @@ public final class MainActivity extends Activity {
         settings.addView(
                 wirelessStatusText,
                 marginParams(-1, -2, 0, 10, 0, 0));
-        return settings;
+        content.addView(settings);
+        return content;
+    }
+
+    private View buildWifiCameraPanel() {
+        LinearLayout wifiCard = panel();
+        wifiCard.addView(text("相机控制", 12, Typeface.BOLD, MUTED));
+        wifiCard.addView(text("Wi‑Fi 相机 · PTP/IP", 18, Typeface.BOLD, INK));
+        wifiCard.addView(text(
+                "先在相机中开启无线遥控/PTP‑IP，并让手机加入相机热点或同一局域网。默认端口为 15740。",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        wifiCard.addView(text("连接模式", 12, Typeface.BOLD, INK));
+        Spinner wifiMode = new Spinner(this);
+        String[] wifiModeLabels = {tr("AP 直连"), tr("STA 局域网")};
+        ArrayAdapter<String> wifiModeAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                wifiModeLabels);
+        wifiModeAdapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item);
+        wifiMode.setAdapter(wifiModeAdapter);
+        wifiConnectionMode = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("wifiCameraConnectionMode", "ap");
+        wifiMode.setSelection("sta".equals(wifiConnectionMode) ? 1 : 0);
+        wifiMode.setEnabled(!wifiConnected && !wifiConnecting);
+        wifiCard.addView(wifiMode, marginParams(-1, dp(48), 0, 0, 0, 4));
+        TextView wifiModeHelp = text(
+                "sta".equals(wifiConnectionMode)
+                        ? "STA 模式：让相机与手机加入同一局域网，并输入路由器分配给相机的 IP 地址。"
+                        : "AP 模式：让手机加入相机热点；相机地址通常为 192.168.1.1。",
+                12,
+                Typeface.NORMAL,
+                MUTED);
+        wifiCard.addView(wifiModeHelp, marginParams(-1, -2, 0, 0, 0, 8));
+        wifiMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(
+                    AdapterView<?> parent,
+                    View view,
+                    int position,
+                    long id) {
+                wifiConnectionMode = position == 1 ? "sta" : "ap";
+                wifiModeHelp.setText(tr(
+                        position == 1
+                                ? "STA 模式：让相机与手机加入同一局域网，并输入路由器分配给相机的 IP 地址。"
+                                : "AP 模式：让手机加入相机热点；相机地址通常为 192.168.1.1。"));
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
+        });
+        LinearLayout wifiAddress = new LinearLayout(this);
+        wifiAddress.setOrientation(LinearLayout.HORIZONTAL);
+        EditText host = new EditText(this);
+        host.setSingleLine(true);
+        host.setInputType(InputType.TYPE_CLASS_PHONE);
+        host.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("wifiCameraHost", "192.168.1.1"));
+        host.setHint(tr("相机 IP 地址"));
+        wifiAddress.addView(host, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        EditText port = new EditText(this);
+        port.setSingleLine(true);
+        port.setInputType(InputType.TYPE_CLASS_NUMBER);
+        port.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("wifiCameraPort", "15740"));
+        port.setHint(tr("端口"));
+        LinearLayout.LayoutParams portParams = new LinearLayout.LayoutParams(
+                dp(104), dp(48));
+        portParams.setMargins(dp(8), 0, 0, 0);
+        wifiAddress.addView(port, portParams);
+        wifiCard.addView(wifiAddress);
+        wifiCard.addView(text(
+                wifiConnecting
+                        ? "正在连接 Wi‑Fi 相机…"
+                        : wifiConnected
+                                ? "Wi‑Fi 已连接 · " + wifiCameraName
+                                : "Wi‑Fi 相机未连接",
+                12,
+                Typeface.NORMAL,
+                wifiConnected ? POSITIVE : MUTED),
+                marginParams(-1, -2, 0, 8, 0, 10));
+        Button wifiButton = nativeButton(
+                wifiConnected ? "断开 Wi‑Fi 相机" : "连接 Wi‑Fi 相机",
+                !wifiConnected);
+        wifiButton.setOnClickListener(view -> {
+            if (wifiConnected) {
+                disconnectWifiCamera();
+                showSection("library");
+                return;
+            }
+            int targetPort;
+            try {
+                targetPort = Integer.parseInt(port.getText().toString().trim());
+            } catch (NumberFormatException error) {
+                showError("Wi‑Fi 相机端口无效");
+                return;
+            }
+            String targetHost = host.getText().toString().trim();
+            String targetMode = wifiMode.getSelectedItemPosition() == 1
+                    ? "sta"
+                    : "ap";
+            wifiConnectionMode = targetMode;
+            getSharedPreferences("nikon-link", MODE_PRIVATE).edit()
+                    .putString("wifiCameraHost", targetHost)
+                    .putString("wifiCameraPort", String.valueOf(targetPort))
+                    .putString("wifiCameraConnectionMode", targetMode)
+                    .apply();
+            connectWifiCamera(targetHost, targetPort, targetMode);
+        });
+        wifiCard.addView(wifiButton, new LinearLayout.LayoutParams(-1, dp(48)));
+        return wifiCard;
+    }
+
+    private View buildCaptureAssistantsPanel() {
+        LinearLayout remoteCard = panel();
+        remoteCard.addView(text("拍摄辅助", 18, Typeface.BOLD, INK));
+        remoteCard.addView(text(
+                "蓝牙遥控与拍摄定位",
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 12));
+        Switch bluetooth = new Switch(this);
+        bluetooth.setText(tr("蓝牙遥控快门"));
+        bluetooth.setChecked(bluetoothRemoteEnabled);
+        bluetooth.setOnCheckedChangeListener((button, checked) ->
+                setBluetoothRemoteEnabled(checked));
+        remoteCard.addView(bluetooth);
+        remoteCard.addView(text(
+                bluetoothRemoteStatus,
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 12));
+        Switch location = new Switch(this);
+        location.setText(tr("拍摄定位"));
+        location.setChecked(locationTaggingEnabled);
+        location.setOnCheckedChangeListener((button, checked) ->
+                setLocationTaggingEnabled(checked));
+        remoteCard.addView(location);
+        remoteCard.addView(text(
+                tr(locationTaggingStatus)
+                        + " · " + tr("拍摄文件会生成标准 XMP GPS 旁车文件"),
+                12,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 0));
+        return remoteCard;
     }
 
     private View buildSettingsView() {
@@ -6293,7 +9492,7 @@ public final class MainActivity extends Activity {
         content.setPadding(dp(20), dp(22), dp(20), dp(24));
         content.addView(sectionHeader(
                 "设置",
-                "更新、诊断与支持。",
+                "通用、拍摄辅助、更新、诊断与支持。",
                 COBALT));
 
         LinearLayout languagePanel = panel();
@@ -6345,6 +9544,46 @@ public final class MainActivity extends Activity {
                 dp(48)));
         content.addView(
                 languagePanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
+        content.addView(
+                buildCaptureAssistantsPanel(),
+                marginParams(-1, -2, 0, 18, 0, 0));
+
+        LinearLayout nikonSdkPanel = panel();
+        nikonSdkPanel.addView(text(
+                "尼康官方 SDK", 18, Typeface.BOLD, INK));
+        nikonSdkPanel.addView(text(
+                "官方桌面 SDK 不提供当前平台运行库",
+                13,
+                Typeface.BOLD,
+                INK),
+                marginParams(-1, -2, 0, 5, 0, 5));
+        nikonSdkPanel.addView(text(
+                "尼康只为 macOS 与 Windows 提供本次 SDK 运行库；当前平台继续使用原生相机连接后端。",
+                12,
+                Typeface.NORMAL,
+                MUTED));
+        content.addView(
+                nikonSdkPanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
+
+        LinearLayout sonySdkPanel = panel();
+        sonySdkPanel.addView(text(
+                "索尼官方 SDK", 18, Typeface.BOLD, INK));
+        sonySdkPanel.addView(text(
+                "官方桌面 SDK 不提供当前平台运行库",
+                13,
+                Typeface.BOLD,
+                INK),
+                marginParams(-1, -2, 0, 5, 0, 5));
+        sonySdkPanel.addView(text(
+                "索尼 Camera Remote SDK 2.02.00 只提供 macOS 与 Windows 运行库；当前平台继续使用原生 Camera Remote Command 连接后端。",
+                12,
+                Typeface.NORMAL,
+                MUTED));
+        content.addView(
+                sonySdkPanel,
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout aiPanel = panel();
@@ -6669,9 +9908,221 @@ public final class MainActivity extends Activity {
         return card;
     }
 
+    private View buildMyDevicesView() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(20), dp(22), dp(20), dp(28));
+        content.addView(sectionHeader(
+                "我的设备",
+                "管理连接过的相机，轻触即可快速重连",
+                COBALT));
+
+        if (rememberedDevices.isEmpty()) {
+            LinearLayout empty = verticalContainer();
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(dp(24), dp(72), dp(24), dp(72));
+            empty.setBackground(rounded(SURFACE, 20, RULE));
+            TextView icon = text("◉", 46, Typeface.BOLD, COBALT);
+            icon.setGravity(Gravity.CENTER);
+            empty.addView(icon, marginParams(-1, -2, 0, 0, 0, 12));
+            TextView title = text(
+                    tr("尚未连接过设备"), 20, Typeface.BOLD, INK);
+            title.setGravity(Gravity.CENTER);
+            empty.addView(title);
+            TextView detail = text(
+                    tr("成功连接相机后会自动保存在这里。"),
+                    13,
+                    Typeface.NORMAL,
+                    MUTED);
+            detail.setGravity(Gravity.CENTER);
+            empty.addView(detail, marginParams(-1, -2, 0, 8, 0, 0));
+            content.addView(empty, marginParams(-1, -2, 0, 8, 0, 0));
+        } else {
+            for (RememberedDevice device : rememberedDevices) {
+                content.addView(
+                        buildRememberedDeviceCard(device),
+                        marginParams(-1, -2, 0, 8, 0, 10));
+            }
+        }
+        scroll.addView(content);
+        return scroll;
+    }
+
+    private View buildRememberedDeviceCard(RememberedDevice device) {
+        LinearLayout card = verticalContainer();
+        card.setBackground(rounded(SURFACE, 20, RULE));
+        card.setClipToOutline(true);
+
+        ImageView photo = new ImageView(this);
+        photo.setImageResource(cameraImageResource(device.vendor));
+        photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        photo.setContentDescription(device.name);
+        card.addView(photo, new LinearLayout.LayoutParams(-1, dp(190)));
+
+        LinearLayout body = verticalContainer();
+        body.setPadding(dp(16), dp(15), dp(16), dp(16));
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.addView(
+                text(device.name, 18, Typeface.BOLD, INK),
+                new LinearLayout.LayoutParams(0, -2, 1f));
+        boolean current = connected
+                && device.name.equals(connectedCameraName);
+        if (current) {
+            TextView badge = text(
+                    tr("当前已连接"), 11, Typeface.BOLD, POSITIVE);
+            badge.setPadding(dp(9), dp(5), dp(9), dp(5));
+            badge.setBackground(rounded(Color.rgb(228, 247, 238), 14, 0));
+            heading.addView(badge);
+        }
+        body.addView(heading);
+        body.addView(
+                text(device.transport, 13, Typeface.NORMAL, MUTED),
+                marginParams(-1, -2, 0, 8, 0, 0));
+        String timestamp = new SimpleDateFormat(
+                "yyyy-MM-dd HH:mm",
+                Locale.getDefault()).format(new Date(device.lastConnectedAt));
+        body.addView(text(
+                tr("最近连接") + " · " + timestamp,
+                12,
+                Typeface.NORMAL,
+                MUTED));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        Button reconnect = nativeButton("快速连接", true);
+        reconnect.setText(tr("快速连接"));
+        reconnect.setEnabled(!current && !connecting);
+        reconnect.setOnClickListener(view -> {
+            if (connected) disconnectCamera();
+            connectCamera();
+        });
+        actions.addView(reconnect, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        Button forget = nativeButton("忘记设备", false);
+        forget.setText(tr("忘记设备"));
+        forget.setOnClickListener(view -> forgetRememberedDevice(device.id));
+        LinearLayout.LayoutParams forgetParams =
+                new LinearLayout.LayoutParams(dp(112), dp(46));
+        forgetParams.setMargins(dp(10), 0, 0, 0);
+        actions.addView(forget, forgetParams);
+        body.addView(actions, marginParams(-1, -2, 0, 14, 0, 0));
+        card.addView(body);
+        return card;
+    }
+
+    private int cameraImageResource(String vendor) {
+        String normalized = vendor.toLowerCase(Locale.ROOT);
+        if (normalized.contains("sony")) return R.drawable.camera_sony;
+        if (normalized.contains("canon")) return R.drawable.camera_canon;
+        return R.drawable.camera_nikon;
+    }
+
+    private void loadRememberedDevices() {
+        rememberedDevices.clear();
+        String raw = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString(REMEMBERED_DEVICES_KEY, "[]");
+        try {
+            JSONArray data = new JSONArray(raw == null ? "[]" : raw);
+            for (int index = 0; index < data.length(); index++) {
+                JSONObject item = data.getJSONObject(index);
+                rememberedDevices.add(new RememberedDevice(
+                        item.optString("id"),
+                        item.optString("name"),
+                        item.optString("vendor", "Camera"),
+                        item.optString("transport", "USB/PTP"),
+                        item.optLong("lastConnectedAt")));
+            }
+        } catch (Exception error) {
+            diagnostics.warning(
+                    "devices",
+                    "读取已连接设备失败：" + error.getMessage());
+        }
+    }
+
+    private void rememberConnectedDevice(
+            String id,
+            String name,
+            String vendor) {
+        rememberConnectedDevice(id, name, vendor, "USB/PTP");
+    }
+
+    private void rememberConnectedDevice(
+            String id,
+            String name,
+            String vendor,
+            String transport) {
+        String resolvedVendor = vendor == null || vendor.isEmpty()
+                ? "Camera"
+                : vendor;
+        rememberedDevices.removeIf(item -> item.id.equals(id));
+        rememberedDevices.add(0, new RememberedDevice(
+                id,
+                name,
+                resolvedVendor,
+                transport,
+                System.currentTimeMillis()));
+        while (rememberedDevices.size() > 12) {
+            rememberedDevices.remove(rememberedDevices.size() - 1);
+        }
+        persistRememberedDevices();
+    }
+
+    private void forgetRememberedDevice(String id) {
+        rememberedDevices.removeIf(item -> item.id.equals(id));
+        persistRememberedDevices();
+        showSection("devices");
+    }
+
+    private void persistRememberedDevices() {
+        JSONArray data = new JSONArray();
+        for (RememberedDevice device : rememberedDevices) {
+            JSONObject item = new JSONObject();
+            try {
+                item.put("id", device.id);
+                item.put("name", device.name);
+                item.put("vendor", device.vendor);
+                item.put("transport", device.transport);
+                item.put("lastConnectedAt", device.lastConnectedAt);
+                data.put(item);
+            } catch (Exception ignored) {
+            }
+        }
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putString(REMEMBERED_DEVICES_KEY, data.toString())
+                .apply();
+    }
+
     private void showConnectionDialog() {
-        LinearLayout content = panel();
+        LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(18), dp(20), dp(18));
+
+        LinearLayout localCard = verticalContainer();
+        localCard.setPadding(dp(18), dp(16), dp(18), dp(16));
+        localCard.setBackground(rounded(COBALT_SOFT, 14, 0));
+        localCard.addView(text("本机摄像头", 18, Typeface.BOLD, INK));
+        localCard.addView(text(
+                localCameraConnecting
+                        ? "正在打开本机摄像头…"
+                        : localCameraConnected
+                                ? localCamera.getCameraName() + " · 已连接"
+                                : "使用手机或平板内置镜头取景、拍照并保存到文件库",
+                12,
+                Typeface.NORMAL,
+                localCameraConnected ? POSITIVE : MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        Button localButton = nativeButton(
+                localCameraConnected ? "断开本机摄像头" : "使用本机摄像头",
+                !localCameraConnected);
+        localButton.setEnabled(!localCameraConnecting);
+        localButton.setOnClickListener(view -> {
+            if (localCameraConnected) disconnectLocalCamera();
+            else requestLocalCameraConnection();
+        });
+        localCard.addView(localButton, new LinearLayout.LayoutParams(-1, dp(48)));
+        content.addView(localCard, marginParams(-1, -2, 0, 0, 0, 16));
 
         LinearLayout card = verticalContainer();
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
@@ -6697,14 +10148,196 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 12, 0, 16));
 
+        Button usbButton = nativeButton(
+                connected ? "断开 USB 相机" : "连接 USB 相机",
+                !connected);
+        usbButton.setOnClickListener(view -> {
+            if (connected) disconnectCamera();
+            else connectCamera();
+        });
+        content.addView(usbButton, marginParams(-1, dp(48), 0, 0, 0, 18));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(content);
+
         new AlertDialog.Builder(this)
                 .setTitle(tr("连接相机"))
-                .setView(content)
-                .setNegativeButton(tr("取消"), null)
-                .setPositiveButton(
-                        tr("连接 Nikon 相机"),
-                        (dialog, which) -> connectCamera())
+                .setView(scroll)
+                .setPositiveButton(tr("关闭"), null)
                 .show();
+    }
+
+    private void connectWifiCamera(String host, int port, String connectionMode) {
+        if (wifiConnecting || wifiConnected) return;
+        wifiConnectionMode = "sta".equals(connectionMode) ? "sta" : "ap";
+        wifiConnecting = true;
+        updateConnectionUi();
+        cameraExecutor.submit(() -> {
+            try {
+                String name = wifiCamera.connect(host, port);
+                diagnostics.info(
+                        "wifi-camera",
+                        "PTP/IP 已连接；模式="
+                                + wifiConnectionMode.toUpperCase(Locale.ROOT)
+                                + "；相机=" + name);
+                mainHandler.post(() -> {
+                    wifiCameraName = name;
+                    wifiConnected = true;
+                    wifiConnecting = false;
+                    updateConnectionUi();
+                    if ("library".equals(currentSection)) showSection("library");
+                    showToast(
+                            wifiConnectionMode.toUpperCase(Locale.ROOT)
+                                    + " · Wi‑Fi 已连接 · " + name);
+                });
+            } catch (Exception error) {
+                diagnostics.error("wifi-camera", "连接失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    wifiConnected = false;
+                    wifiConnecting = false;
+                    updateConnectionUi();
+                    if ("library".equals(currentSection)) showSection("library");
+                    showError(error.getMessage());
+                });
+            }
+        });
+    }
+
+    private void requestLocalCameraConnection() {
+        if (checkSelfPermission(Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.CAMERA},
+                    REQUEST_LOCAL_CAMERA);
+            return;
+        }
+        connectLocalCamera();
+    }
+
+    private void connectLocalCamera() {
+        if (localCameraConnecting || localCameraConnected) return;
+        if (connected) disconnectCamera();
+        if (wifiConnected) disconnectWifiCamera();
+        localCameraConnecting = true;
+        updateConnectionUi();
+        cameraExecutor.submit(() -> {
+            try {
+                localCamera.connect();
+                String name = localCamera.getCameraName();
+                diagnostics.info("local-camera", name + " 已连接");
+                mainHandler.post(() -> {
+                    localCameraConnecting = false;
+                    localCameraConnected = true;
+                    connectedCameraName = name;
+                    connectedCameraVendor = "System";
+                    liveViewEnabled = false;
+                    rememberConnectedDevice(
+                            "android-local-camera",
+                            name,
+                            "System",
+                            "本机摄像头");
+                    showSection(currentSection);
+                    updateConnectionUi();
+                    showToast(name + " 已连接，可开启实时取景或直接拍摄。");
+                });
+            } catch (Exception error) {
+                diagnostics.error("local-camera", "连接失败：" + error.getMessage());
+                localCamera.close();
+                mainHandler.post(() -> {
+                    localCameraConnecting = false;
+                    localCameraConnected = false;
+                    updateConnectionUi();
+                    showError(error.getMessage());
+                });
+            }
+        });
+    }
+
+    private void disconnectLocalCamera() {
+        diagnostics.info("local-camera", "用户断开本机摄像头");
+        previewGeneration++;
+        pendingPreview.set(null);
+        localCameraConnected = false;
+        localCameraConnecting = false;
+        liveViewEnabled = false;
+        videoRecording = false;
+        cameraExecutor.submit(() -> {
+            finishExternalRecordingForDisconnect();
+            localCamera.close();
+        });
+        connectedCameraName = "Nikon 相机";
+        connectedCameraVendor = "Nikon";
+        latestFrame = null;
+        latestSourceFrame = null;
+        latestZebraMask = null;
+        updateConnectionUi();
+        showSection(currentSection);
+    }
+
+    private void disconnectWifiCamera() {
+        wifiCamera.close();
+        wifiConnected = false;
+        wifiConnecting = false;
+        wifiCameraName = "PTP/IP Camera";
+        updateConnectionUi();
+        if ("library".equals(currentSection)) showSection("library");
+    }
+
+    private void setBluetoothRemoteEnabled(boolean enabled) {
+        bluetoothRemoteEnabled = enabled;
+        getSharedPreferences("nikon-link", MODE_PRIVATE).edit()
+                .putBoolean("bluetoothRemoteEnabled", enabled)
+                .apply();
+        if (!enabled) {
+            bluetoothRemote.stop();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 31
+                && (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)
+                        != PackageManager.PERMISSION_GRANTED
+                || checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)
+                        != PackageManager.PERMISSION_GRANTED)) {
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.BLUETOOTH_SCAN,
+                            Manifest.permission.BLUETOOTH_CONNECT
+                    },
+                    REQUEST_BLUETOOTH_REMOTE);
+            return;
+        }
+        if (Build.VERSION.SDK_INT < 31
+                && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    REQUEST_BLUETOOTH_REMOTE);
+            return;
+        }
+        bluetoothRemote.start();
+    }
+
+    private void setLocationTaggingEnabled(boolean enabled) {
+        locationTaggingEnabled = enabled;
+        getSharedPreferences("nikon-link", MODE_PRIVATE).edit()
+                .putBoolean("captureLocationEnabled", enabled)
+                .apply();
+        if (!enabled) {
+            locationTagging.stop();
+            return;
+        }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                    },
+                    REQUEST_CAPTURE_LOCATION);
+            return;
+        }
+        locationTagging.start();
     }
 
     private void connectCamera() {
@@ -6716,9 +10349,17 @@ public final class MainActivity extends Activity {
             try {
                 camera.connect();
                 String detectedCameraName = camera.getConnectedCameraName();
+                String detectedCameraVendor = camera.getConnectedCameraVendor();
                 diagnostics.info("camera", "已连接 " + detectedCameraName);
                 mainHandler.post(() -> {
                     connectedCameraName = detectedCameraName;
+                    connectedCameraVendor = detectedCameraVendor;
+                    rememberConnectedDevice(
+                            camera.getConnectedDeviceId(),
+                            detectedCameraName,
+                            detectedCameraVendor);
+                    videoCodecIndex();
+                    videoLogIndex();
                     connected = true;
                     connecting = false;
                     liveViewEnabled = false;
@@ -6749,8 +10390,12 @@ public final class MainActivity extends Activity {
         connected = false;
         liveViewEnabled = false;
         videoRecording = false;
-        cameraExecutor.submit(camera::disconnect);
+        cameraExecutor.submit(() -> {
+            finishExternalRecordingForDisconnect();
+            camera.disconnect();
+        });
         connectedCameraName = "Nikon 相机";
+        connectedCameraVendor = "Nikon";
         latestFrame = null;
         latestSourceFrame = null;
         latestZebraMask = null;
@@ -6759,7 +10404,7 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleLiveView() {
-        if (!connected) {
+        if (!connected && !localCameraConnected) {
             showConnectionDialog();
             return;
         }
@@ -6767,7 +10412,10 @@ public final class MainActivity extends Activity {
             previewGeneration++;
             pendingPreview.set(null);
             liveViewEnabled = false;
-            cameraExecutor.submit(camera::stopLiveView);
+            cameraExecutor.submit(() -> {
+                if (localCameraConnected) localCamera.stopLiveView();
+                else camera.stopLiveView();
+            });
             updateConnectionUi();
             if (liveViewButton != null) {
                 liveViewButton.setText(tr("开启实时取景"));
@@ -6775,7 +10423,8 @@ public final class MainActivity extends Activity {
         } else {
             cameraExecutor.submit(() -> {
                 try {
-                    camera.startLiveView();
+                    if (localCameraConnected) localCamera.startLiveView();
+                    else camera.startLiveView();
                     mainHandler.post(() -> {
                         liveViewEnabled = true;
                         updateConnectionUi();
@@ -6800,15 +10449,29 @@ public final class MainActivity extends Activity {
     }
 
     private void pullPreview(int generation) {
-        if (!connected || !liveViewEnabled || generation != previewGeneration) return;
+        if ((!connected && !localCameraConnected)
+                || !liveViewEnabled
+                || generation != previewGeneration) return;
         cameraExecutor.submit(() -> {
             try {
                 if (generation != previewGeneration
-                        || !connected
+                        || (!connected && !localCameraConnected)
                         || !liveViewEnabled) {
                     return;
                 }
-                byte[] jpeg = camera.getLiveViewFrame();
+                byte[] jpeg = localCameraConnected
+                        ? localCamera.getLiveViewFrame()
+                        : camera.getLiveViewFrame();
+                if (externalVideoRecorder.isRecording()) {
+                    try {
+                        externalVideoRecorder.appendJpeg(jpeg);
+                    } catch (Exception recordingError) {
+                        diagnostics.error(
+                                "external-recording",
+                                "外录写入失败：" + recordingError.getMessage());
+                        finishExternalRecordingAfterFailure(recordingError);
+                    }
+                }
                 if (generation != previewGeneration) return;
                 previewFailureCount = 0;
                 enqueuePreviewFrame(
@@ -6839,7 +10502,11 @@ public final class MainActivity extends Activity {
                         previewGeneration++;
                         liveViewEnabled = false;
                         previewFailureCount = 0;
-                        cameraExecutor.submit(camera::stopLiveView);
+                        cameraExecutor.submit(() -> {
+                            finishExternalRecordingForDisconnect();
+                            if (localCameraConnected) localCamera.stopLiveView();
+                            else camera.stopLiveView();
+                        });
                         updateConnectionUi();
                         showError(
                                 "连续 3 次未收到实时取景画面，帧澈 ZENCHE 已停止重试并释放相机。"
@@ -6866,14 +10533,11 @@ public final class MainActivity extends Activity {
                 PreviewPacket packet = pendingPreview.getAndSet(null);
                 if (packet == null
                         || packet.generation != previewGeneration
-                        || !connected
+                        || (!connected && !localCameraConnected)
                         || !liveViewEnabled) {
                     return;
                 }
                 BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
-                if (packet.monitoring) {
-                    decodeOpts.inSampleSize = 2;
-                }
                 Bitmap source = BitmapFactory.decodeByteArray(
                         packet.jpeg,
                         0,
@@ -6903,7 +10567,7 @@ public final class MainActivity extends Activity {
                                         null);
                 mainHandler.post(() -> {
                     if (packet.generation != previewGeneration
-                            || !connected
+                            || (!connected && !localCameraConnected)
                             || !liveViewEnabled) {
                         return;
                     }
@@ -6923,17 +10587,51 @@ public final class MainActivity extends Activity {
     }
 
     private void capturePhoto() {
-        if (!connected) {
+        if (!connected && !wifiConnected && !localCameraConnected) {
             showConnectionDialog();
             return;
         }
         if (capturing) return;
         capturing = true;
         if (shutterButton != null) shutterButton.setText(tr("拍摄中…"));
+        if ((connected || localCameraConnected) && locationTaggingEnabled) {
+            locationTagging.refresh();
+        }
+        if (!connected && !localCameraConnected) {
+            cameraExecutor.submit(() -> {
+                try {
+                    wifiCamera.capture();
+                    diagnostics.info("wifi-camera", "PTP/IP 快门已触发");
+                    mainHandler.post(() -> {
+                        capturing = false;
+                        if (shutterButton != null) shutterButton.setText(tr("拍摄"));
+                        if (statusText != null) {
+                            statusText.setText(tr(
+                                    "Wi‑Fi 快门已触发 · 原图保存在相机卡内"));
+                        }
+                        updateConnectionUi();
+                    });
+                } catch (Exception error) {
+                    diagnostics.error(
+                            "wifi-camera",
+                            "快门失败：" + error.getMessage());
+                    mainHandler.post(() -> {
+                        capturing = false;
+                        if (shutterButton != null) shutterButton.setText(tr("拍摄"));
+                        showError(error.getMessage());
+                    });
+                }
+            });
+            return;
+        }
         cameraExecutor.submit(() -> {
             try {
-                byte[] jpeg = camera.capture();
-                boolean liveViewRestored = camera.isLiveView();
+                byte[] jpeg = localCameraConnected
+                        ? localCamera.capture()
+                        : camera.capture();
+                boolean liveViewRestored = localCameraConnected
+                        ? localCamera.isLiveView()
+                        : camera.isLiveView();
                 File file = savePhoto(jpeg);
                 diagnostics.info(
                         "capture",
@@ -6988,6 +10686,9 @@ public final class MainActivity extends Activity {
         String originalMode = exposureMode;
         shootingTaskRunning = true;
         shootingTaskStatus = tr(taskLabel(kind)) + tr("准备中");
+        if (locationTaggingEnabled) {
+            locationTagging.refresh();
+        }
         showSection(currentSection);
         cameraExecutor.submit(() -> {
             try {
@@ -7020,7 +10721,8 @@ public final class MainActivity extends Activity {
                             jpeg,
                             "capture.jpg",
                             connectedCameraName,
-                            null);
+                            null,
+                            locationTagging.snapshot());
                     int completed = index + 1;
                     int finalTotal = total;
                     Bitmap source = BitmapFactory.decodeByteArray(
@@ -7122,8 +10824,12 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleVideoRecording() {
-        if (!connected) {
+        if (!connected && !localCameraConnected) {
             showConnectionDialog();
+            return;
+        }
+        if (localCameraConnected && !externalRecordToDevice) {
+            showToast("本机摄像头视频需要开启“外录到当前智能设备”。");
             return;
         }
         if (capturing) return;
@@ -7132,20 +10838,85 @@ public final class MainActivity extends Activity {
         cameraExecutor.submit(() -> {
             try {
                 if (videoRecording) {
-                    camera.stopMovieRecording();
+                    Exception bodyError = null;
+                    if (connected && camera.isMovieRecording()) {
+                        try {
+                            camera.stopMovieRecording();
+                        } catch (Exception error) {
+                            bodyError = error;
+                        }
+                    }
+                    ExternalVideoRecorder.Result result =
+                            externalVideoRecorder.stopIfRecording();
+                    if (result != null) {
+                        captureWorkflow.completeExternalRecording(result.file);
+                        diagnostics.info(
+                                "external-recording",
+                                "外录完成；文件=" + result.file.getName()
+                                        + "；帧数=" + result.frames
+                                        + "；大小=" + result.bytes);
+                    }
+                    if (bodyError != null) throw bodyError;
                 } else {
-                    camera.startMovieRecording();
+                    boolean startedLiveView = false;
+                    if (externalRecordToDevice && !liveViewEnabled) {
+                        if (localCameraConnected) localCamera.startLiveView();
+                        else camera.startLiveView();
+                        startedLiveView = true;
+                    }
+                    if (externalRecordToDevice) {
+                        File target = captureWorkflow.reserveExternalRecording(
+                                connectedCameraName,
+                                "avi");
+                        externalVideoRecorder.start(target, monitorFrameRate);
+                    }
+                    Exception bodyError = null;
+                    if (connected) {
+                        try {
+                            camera.startMovieRecording();
+                        } catch (Exception error) {
+                            bodyError = error;
+                        }
+                    }
+                    if (bodyError != null && !externalVideoRecorder.isRecording()) {
+                        throw bodyError;
+                    }
+                    boolean shouldStartPreview = startedLiveView;
+                    Exception bodyStartError = bodyError;
+                    mainHandler.post(() -> {
+                        if (shouldStartPreview) {
+                            liveViewEnabled = true;
+                            updateConnectionUi();
+                            startPreviewLoop();
+                        }
+                        if (bodyStartError != null) {
+                            showToast("机身录制不可用，已继续外录到当前设备。");
+                        }
+                    });
                 }
-                boolean nowRecording = camera.isMovieRecording();
+                boolean nowRecording = externalVideoRecorder.isRecording()
+                        || (connected && camera.isMovieRecording());
                 diagnostics.info(
                         "recording",
                         nowRecording
-                                ? "机身视频录制已开始"
-                                : "机身视频录制已停止");
+                                ? "视频录制已开始；外录="
+                                        + externalVideoRecorder.isRecording()
+                                : "视频录制已停止并完成本地封装");
                 mainHandler.post(() -> {
                     videoRecording = nowRecording;
+                    recordingStartedAt = nowRecording
+                            ? System.currentTimeMillis()
+                            : 0;
                     capturing = false;
                     updateRecordingButtons();
+                    if (statusText != null) {
+                        statusText.setText(tr(nowRecording
+                                ? externalVideoRecorder.isRecording()
+                                        ? "● EXT REC · 正在外录到当前智能设备"
+                                        : "● REC · 正在录制到相机存储卡"
+                                : "录制已停止 · 外录文件已保存到 ZENCHE 文件库"));
+                    }
+                    if (!nowRecording) updateFileCount();
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -7153,6 +10924,9 @@ public final class MainActivity extends Activity {
                         "切换视频录制失败：" + error.getMessage());
                 mainHandler.post(() -> {
                     videoRecording = camera.isMovieRecording();
+                    recordingStartedAt = videoRecording
+                            ? System.currentTimeMillis()
+                            : 0;
                     capturing = false;
                     updateRecordingButtons();
                     showError("视频录制失败：" + error.getMessage());
@@ -7168,14 +10942,52 @@ public final class MainActivity extends Activity {
                             ? "处理中…"
                             : videoRecording ? "停止录制" : "开始录制"));
             shutterButton.setBackground(rounded(VIDEO, 9, 0));
-            shutterButton.setEnabled(connected && !capturing);
+            shutterButton.setEnabled((connected || localCameraConnected) && !capturing);
         }
         if (immersiveRecordButton != null) {
             immersiveRecordButton.setText(tr(
                     capturing
                             ? "…"
                             : videoRecording ? "■\n停止" : "●\n录制"));
-            immersiveRecordButton.setEnabled(connected && !capturing);
+            immersiveRecordButton.setEnabled(
+                    (connected || localCameraConnected) && !capturing);
+        }
+    }
+
+    private void finishExternalRecordingAfterFailure(Exception cause) {
+        try {
+            ExternalVideoRecorder.Result result =
+                    externalVideoRecorder.stopIfRecording();
+            if (result != null) {
+                captureWorkflow.completeExternalRecording(result.file);
+            }
+        } catch (Exception finishError) {
+            externalVideoRecorder.abort();
+        }
+        mainHandler.post(() -> {
+            videoRecording = connected && camera.isMovieRecording();
+            if (!videoRecording) recordingStartedAt = 0;
+            updateRecordingButtons();
+            showError("外录已停止：" + cause.getMessage());
+            updateFileCount();
+        });
+    }
+
+    private void finishExternalRecordingForDisconnect() {
+        try {
+            ExternalVideoRecorder.Result result =
+                    externalVideoRecorder.stopIfRecording();
+            if (result != null) {
+                captureWorkflow.completeExternalRecording(result.file);
+                diagnostics.info(
+                        "external-recording",
+                        "连接结束，已安全保存外录：" + result.file.getName());
+            }
+        } catch (Exception error) {
+            externalVideoRecorder.abort();
+            diagnostics.error(
+                    "external-recording",
+                    "连接结束时无法完成外录：" + error.getMessage());
         }
     }
 
@@ -7185,7 +10997,8 @@ public final class MainActivity extends Activity {
         ProfessionalMonitor.Result monitor = ProfessionalMonitor.process(
                 graded,
                 focusPeakingEnabled,
-                falseColorEnabled);
+                falseColorEnabled,
+                monitorNikonCloudPreset);
         redHistogram = monitor.redHistogram;
         greenHistogram = monitor.greenHistogram;
         blueHistogram = monitor.blueHistogram;
@@ -7226,7 +11039,9 @@ public final class MainActivity extends Activity {
         latestZebraMask = output.zebra;
         boolean monitoring = "monitor".equals(currentSection);
         if (previewImage != null) {
-            previewImage.setImageBitmap(monitoring ? output.display : source);
+            previewImage.setImageBitmap(
+                    monitoring || monitorNikonCloudPreset != null
+                            ? output.display : source);
         }
         if (zebraImage != null) {
             zebraImage.setImageBitmap(
@@ -7234,18 +11049,22 @@ public final class MainActivity extends Activity {
         }
         if (immersivePreviewImage != null) {
             immersivePreviewImage.setImageBitmap(
-                    immersiveMonitoring ? output.display : source);
+                    immersiveMonitoring || monitorNikonCloudPreset != null
+                            ? output.display : source);
         }
         if (immersiveZebraImage != null) {
             immersiveZebraImage.setImageBitmap(
                     immersiveMonitoring && zebraEnabled ? output.zebra : null);
         }
-        if (redHistogramText != null) {
-            redHistogramText.setText("R  " + redHistogram);
-            greenHistogramText.setText("G  " + greenHistogram);
-            blueHistogramText.setText("B  " + blueHistogram);
-            waveformText.setText(tr("波形") + "  " + waveform);
-            vectorscopeText.setText(tr("矢量") + "  " + vectorscope);
+        if (monitorRgbScopeView != null) {
+            monitorRgbScopeView.setData(
+                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+        }
+        if (professionalScopeView != null) {
+            professionalScopeView.setData(
+                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+        }
+        if (peakingCoverageText != null) {
             peakingCoverageText.setText(
                     tr("峰值覆盖") + " · " + peakingCoverage + "%");
         }
@@ -7302,12 +11121,13 @@ public final class MainActivity extends Activity {
                 jpeg,
                 "capture.jpg",
                 connectedCameraName,
-                null);
+                null,
+                locationTagging.snapshot());
     }
 
     private void applyParameter(String name, Object value, String label) {
         if (!connected) {
-            showToast("连接支持的 Nikon 相机后才能调整参数。");
+            showToast("连接支持的相机后才能调整参数。");
             return;
         }
         if (!camera.isParameterWritable(name)) {
@@ -7334,6 +11154,22 @@ public final class MainActivity extends Activity {
                         currentCompensation =
                                 ((Number) value).doubleValue();
                     }
+                    if ("videoCodec".equals(name)) {
+                        videoCodec = String.valueOf(value);
+                        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                                .edit()
+                                .putString("videoCodec", videoCodec)
+                                .apply();
+                    }
+                    if ("videoLog".equals(name)) {
+                        videoLogProfile = String.valueOf(value);
+                        nLogEnabled = !"off".equals(videoLogProfile);
+                        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                                .edit()
+                                .putString("videoLogProfile", videoLogProfile)
+                                .putBoolean("nLogEnabled", nLogEnabled)
+                                .apply();
+                    }
                     if (statusText != null) {
                         statusText.setText(tr(label) + tr("已应用"));
                     }
@@ -7352,24 +11188,38 @@ public final class MainActivity extends Activity {
     }
 
     private void updateConnectionUi() {
+        boolean anyCamera = connected || wifiConnected || localCameraConnected;
         if (connectionDot != null) {
-            connectionDot.setTextColor(connected ? POSITIVE : MUTED);
+            connectionDot.setTextColor(anyCamera ? POSITIVE : MUTED);
         }
         if (connectButton != null) {
             connectButton.setText(tr(
-                    connecting
+                    connecting || wifiConnecting || localCameraConnecting
                             ? "正在连接…"
-                            : connected
+                            : anyCamera
                                     ? "断开 "
-                                            + connectedCameraName.replace("Nikon ", "")
+                                            + (connected
+                                                    ? connectedCameraName.replace("Nikon ", "")
+                                                    : localCameraConnected
+                                                            ? "本机摄像头"
+                                                            : "Wi‑Fi")
                                     : "连接相机"));
-            connectButton.setEnabled(!connecting);
+            connectButton.setEnabled(
+                    !connecting && !wifiConnecting && !localCameraConnecting);
         }
         if (statusText != null) {
-            statusText.setText(tr(connecting
-                    ? "正在检测 Nikon 相机"
+            statusText.setText(tr(connecting || wifiConnecting || localCameraConnecting
+                    ? (wifiConnecting
+                            ? "正在连接 Wi‑Fi 相机"
+                            : localCameraConnecting
+                                    ? "正在打开本机摄像头"
+                                    : "正在检测 Nikon 相机")
                     : connected
                             ? connectedCameraName + " · USB/PTP"
+                            : localCameraConnected
+                                    ? localCamera.getCameraName() + " · 本机摄像头"
+                            : wifiConnected
+                                    ? wifiCameraName + " · Wi‑Fi/PTP‑IP"
                             : "未连接"));
         }
         if (liveViewButton != null) {
@@ -7383,6 +11233,9 @@ public final class MainActivity extends Activity {
 
     private void updateCameraControls() {
         for (View control : cameraControls) control.setEnabled(connected);
+        if (liveViewButton != null) {
+            liveViewButton.setEnabled(connected || localCameraConnected);
+        }
         for (Map.Entry<String, View> entry : parameterControls.entrySet()) {
             boolean enabled = connected && camera.isParameterWritable(entry.getKey());
             entry.getValue().setEnabled(enabled);
@@ -7401,6 +11254,10 @@ public final class MainActivity extends Activity {
             entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
         }
         updateExposureReadoutRail();
+        if (shutterButton != null && !"monitor".equals(currentSection)) {
+            shutterButton.setEnabled(
+                    (connected || wifiConnected || localCameraConnected) && !capturing);
+        }
     }
 
     private boolean canAdjustExposureParameter(String name) {
@@ -7466,7 +11323,8 @@ public final class MainActivity extends Activity {
                     || lower.endsWith(".tiff")
                     || lower.endsWith(".mp4")
                     || lower.endsWith(".mov")
-                    || lower.endsWith(".m4v");
+                    || lower.endsWith(".m4v")
+                    || lower.endsWith(".avi");
             if (supported) result.add(file);
         }
     }
@@ -7558,6 +11416,7 @@ public final class MainActivity extends Activity {
     }
 
     private View sectionHeader(String title, String subtitle, int accent) {
+        boolean compact = isCompactPhone();
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.TOP);
@@ -7565,20 +11424,24 @@ public final class MainActivity extends Activity {
         View rail = new View(this);
         rail.setBackground(rounded(accent, 2, 0));
         LinearLayout.LayoutParams railParams = new LinearLayout.LayoutParams(dp(4), dp(44));
-        railParams.setMargins(0, dp(2), dp(12), 0);
+        railParams.setMargins(0, dp(2), dp(compact ? 10 : 12), 0);
         header.addView(rail, railParams);
 
         LinearLayout copy = verticalContainer();
-        copy.addView(text(title, 30, Typeface.BOLD, INK));
+        copy.addView(text(title, compact ? 25 : 30, Typeface.BOLD, INK));
         copy.addView(
-                text(subtitle, 14, Typeface.NORMAL, MUTED),
+                text(subtitle, compact ? 12 : 14, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 3, 0, 0));
         header.addView(copy, new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1f));
-        header.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 20));
+        header.setLayoutParams(marginParams(-1, -2, 0, 0, 0, compact ? 14 : 20));
         return header;
+    }
+
+    private boolean isCompactPhone() {
+        return getResources().getConfiguration().smallestScreenWidthDp < 600;
     }
 
     private String tr(String value) {
@@ -7741,7 +11604,7 @@ public final class MainActivity extends Activity {
             try {
                 UpdateCandidate candidate;
                 try {
-                    candidate = checkMirrorChyan();
+                    candidate = checkSelfHostedUpdate();
                     if (isNewerVersion(
                             candidate.version,
                             currentVersion())
@@ -7752,26 +11615,40 @@ public final class MainActivity extends Activity {
                                 github.url,
                                 candidate.notice);
                     }
-                } catch (MirrorChyanException error) {
-                    diagnostics.warning(
-                            "update",
-                            "Mirror酱检查失败，准备回退 GitHub；code="
-                                    + error.code);
-                    UpdateCandidate github = checkGitHub();
-                    candidate = new UpdateCandidate(
-                            github.version,
-                            github.url,
-                            mirrorFallbackStatus(error.code));
-                } catch (Exception error) {
-                    diagnostics.warning(
-                            "update",
-                            "Mirror酱检查失败，准备回退 GitHub："
-                                    + error.getMessage());
-                    UpdateCandidate github = checkGitHub();
-                    candidate = new UpdateCandidate(
-                            github.version,
-                            github.url,
-                            "Mirror酱暂不可用，已回退 GitHub");
+                } catch (Exception selfHostedError) {
+                    try {
+                        candidate = checkMirrorChyan();
+                        if (isNewerVersion(
+                                candidate.version,
+                                currentVersion())
+                                && candidate.url == null) {
+                            UpdateCandidate github = checkGitHub();
+                            candidate = new UpdateCandidate(
+                                    candidate.version,
+                                    github.url,
+                                    candidate.notice);
+                        }
+                    } catch (MirrorChyanException error) {
+                        diagnostics.warning(
+                                "update",
+                                "Mirror酱检查失败，准备回退 GitHub；code="
+                                        + error.code);
+                        UpdateCandidate github = checkGitHub();
+                        candidate = new UpdateCandidate(
+                                github.version,
+                                github.url,
+                                mirrorFallbackStatus(error.code));
+                    } catch (Exception error) {
+                        diagnostics.warning(
+                                "update",
+                                "Mirror酱检查失败，准备回退 GitHub："
+                                        + error.getMessage());
+                        UpdateCandidate github = checkGitHub();
+                        candidate = new UpdateCandidate(
+                                github.version,
+                                github.url,
+                                "Mirror酱暂不可用，已回退 GitHub");
+                    }
                 }
                 boolean newer = isNewerVersion(
                         candidate.version,
@@ -7803,6 +11680,48 @@ public final class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private UpdateCandidate checkSelfHostedUpdate() throws Exception {
+        String configured = System.getenv("ZENCHE_UPDATE_ENDPOINT");
+        String endpoint = configured == null || configured.trim().isEmpty()
+                ? DEFAULT_SELF_HOSTED_UPDATE_ENDPOINT
+                : configured.trim();
+        Uri.Builder builder = Uri.parse(endpoint).buildUpon()
+                .appendQueryParameter("platform", "android")
+                .appendQueryParameter("arch", mirrorChyanArchitecture())
+                .appendQueryParameter("current_version", currentVersion())
+                .appendQueryParameter("channel", "stable");
+        JSONObject root = requestJson(
+                builder.build().toString(),
+                "ZENCHE-Android/" + currentVersion());
+        if (root.optInt("schema_version", -1) != 1
+                || !"ZENCHE".equalsIgnoreCase(root.optString("product"))) {
+            throw new IllegalStateException("Invalid self-hosted update feed");
+        }
+        String version = normalizeVersion(
+                root.optString("version", currentVersion()));
+        String url = root.optString("url", "");
+        if (url.isEmpty()) {
+            url = root.optString("release_url", RELEASES_URL);
+        }
+        String updateType = root.optString("update_type", "");
+        if ("incremental".equalsIgnoreCase(updateType)) {
+            url = "";
+        }
+        String notice = null;
+        JSONObject announcement = root.optJSONObject("announcement");
+        if (announcement != null) {
+            String title = announcement.optString("title", "").trim();
+            String body = announcement.optString("body", "").trim();
+            String combined = title.isEmpty() ? body
+                    : (body.isEmpty() ? title : title + "：" + body);
+            if (!combined.isEmpty()) notice = combined;
+        }
+        return new UpdateCandidate(
+                version,
+                url.isEmpty() ? null : url,
+                notice);
     }
 
     private UpdateCandidate checkMirrorChyan() throws Exception {
@@ -8080,9 +11999,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.3.1" : version;
+            return version == null || version.isEmpty() ? "1.5.0" : version;
         } catch (Exception error) {
-            return "1.3.1";
+            return "1.5.0";
         }
     }
 
@@ -8230,11 +12149,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n"
-                                + "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n"
-                                + "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n"
-                                + "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n"
-                                + "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n"
+                        "• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n"
+                                + "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n"
+                                + "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n"
+                                + "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n"
+                                + "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n"
                                 + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
                         14,
                         Typeface.NORMAL,
@@ -8439,16 +12358,26 @@ public final class MainActivity extends Activity {
         diagnostics.endSession();
         previewGeneration++;
         pendingPreview.set(null);
+        if (nikonCloudPresetDialog != null) {
+            nikonCloudPresetDialog.dismiss();
+            nikonCloudPresetDialog = null;
+        }
         if (immersiveDialog != null) {
             closeImmersivePreview(immersiveDialog);
         }
         wirelessRequested = false;
         wirelessServer.stop();
+        bluetoothRemote.stop();
+        locationTagging.stop();
+        wifiCamera.close();
+        localCamera.close();
+        finishExternalRecordingForDisconnect();
         cameraExecutor.submit(camera::disconnect);
         cameraExecutor.shutdown();
         previewExecutor.shutdownNow();
         updateExecutor.shutdownNow();
         editorExecutor.shutdownNow();
+        storageExecutor.shutdownNow();
         super.onDestroy();
     }
 }

@@ -2,4 +2,6 @@
 "NSCameraUsageDescription" = "Used to show live video, tap to focus, and capture photos.";
 "NSPhotoLibraryAddUsageDescription" = "Used to save capture files you choose to the system photo library.";
 "NSPhotoLibraryUsageDescription" = "Used to show photos and videos from your system library on the Files page.";
-"NSLocalNetworkUsageDescription" = "Used to receive photos over FTP, HTTP, or WebDAV on a trusted local network.";
+"NSLocalNetworkUsageDescription" = "Used to connect to cameras over PTP/IP and receive photos over FTP, HTTP, or WebDAV on a trusted local network.";
+"NSBluetoothAlwaysUsageDescription" = "Used to connect a compatible Bluetooth remote and receive shutter commands.";
+"NSLocationWhenInUseUsageDescription" = "Used to add the current location to captured-photo XMP GPS metadata.";

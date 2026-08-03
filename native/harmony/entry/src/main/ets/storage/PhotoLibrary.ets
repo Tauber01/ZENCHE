@@ -13,7 +13,8 @@ const SUPPORTED_EXTENSIONS: Array<string> = [
   '.tiff',
   '.mp4',
   '.mov',
-  '.m4v'
+  '.m4v',
+  '.avi'
 ];
 
 export class PhotoItem {
@@ -42,7 +43,8 @@ export class PhotoItem {
     const lower: string = this.name.toLowerCase();
     return lower.endsWith('.mp4') ||
       lower.endsWith('.mov') ||
-      lower.endsWith('.m4v');
+      lower.endsWith('.m4v') ||
+      lower.endsWith('.avi');
   }
 }
 
@@ -185,6 +187,73 @@ export class PhotoLibrary {
     const stem: string =
       dot > 0 ? originalName.substring(0, dot) : originalName;
     return this.saveReceived(`${stem}_edited.jpg`, bytes);
+  }
+
+  // Replace an existing photo only after the encoded result is fully flushed.
+  replaceFile(path: string, bytes: Uint8Array): string {
+    const temporaryPath: string = `${path}.${Date.now()}.ai.tmp`;
+    let target: fs.File | undefined;
+    try {
+      target = fs.openSync(
+        temporaryPath,
+        fs.OpenMode.CREATE |
+        fs.OpenMode.READ_WRITE |
+        fs.OpenMode.TRUNC
+      );
+      let offset: number = 0;
+      while (offset < bytes.length) {
+        const count: number = fs.writeSync(
+          target.fd,
+          bytes.slice(offset).buffer
+        );
+        if (count <= 0) {
+          throw new Error('无法写入 AI 修图结果。');
+        }
+        offset += count;
+      }
+      fs.fsyncSync(target.fd);
+      fs.closeSync(target);
+      target = undefined;
+      try {
+        fs.renameSync(temporaryPath, path);
+      } catch (renameError) {
+        // Some Harmony filesystem providers reject rename over an existing file.
+        const backupPath: string = `${path}.${Date.now()}.ai.bak`;
+        fs.renameSync(path, backupPath);
+        try {
+          fs.renameSync(temporaryPath, path);
+          if (fs.accessSync(backupPath)) {
+            fs.unlinkSync(backupPath);
+          }
+        } catch (replaceError) {
+          if (fs.accessSync(path)) {
+            fs.unlinkSync(path);
+          }
+          if (fs.accessSync(backupPath)) {
+            fs.renameSync(backupPath, path);
+          }
+          throw new Error('无法替换原照片。');
+        }
+      }
+      return path;
+    } catch (error) {
+      if (target !== undefined) {
+        try {
+          fs.closeSync(target);
+        } catch (closeError) {
+        }
+      }
+      if (fs.accessSync(temporaryPath)) {
+        try {
+          fs.unlinkSync(temporaryPath);
+        } catch (cleanupError) {
+        }
+      }
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('无法替换原照片。');
+    }
   }
 
   beginReceive(remoteName: string): IncomingPhotoFile {

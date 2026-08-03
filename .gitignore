@@ -3,10 +3,15 @@
 .idea/
 .hallmark/
 .gradle/
+.hvigor/
 .toolchains/
 .signing/
 build/
 dist/
+deliverables/
+tmp/
+__pycache__/
+*.bak*
 native/android/.gradle/
 native/android/app/build/
 native/android/app/src/main/assets/web/
@@ -22,7 +27,17 @@ native/harmony/entry/oh_modules/
 
 # Nikon's proprietary SDK is intentionally not redistributed.
 NikonSDK/
+S-SDKNEF-*-ALLIN.zip
+S-SDKZ-*-ALLIN.zip
 *.framework
+
+# Sony Camera Remote SDK archives and prepared proprietary runtimes stay local.
+SonySDK/
+CrSDK_v*-Mac.zip
+CrSDK_v*_Mac.zip
+CrSDK_v*-Win64.zip
+CrSDK_v*_Win64.zip
+CameraRemoteCommand-*.zip
 
 # Generated promotional media and review frames.
 ZENCHE_BGM_*

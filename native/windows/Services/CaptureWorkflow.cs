@@ -93,7 +93,8 @@ public sealed class CaptureWorkflow
         string originalFilename,
         string cameraName,
         string? reservedBaseName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        CaptureLocation? location = null)
     {
         EnsureDirectories();
         var extension = Path.GetExtension(originalFilename);
@@ -106,7 +107,7 @@ public sealed class CaptureWorkflow
             : Sanitize(reservedBaseName);
         var destination = UniquePath(PrimaryDirectory, baseName, extension);
         await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
-        await FinalizeAsync(destination, cancellationToken);
+        await FinalizeAsync(destination, cancellationToken, location);
         Status = $"已写入会话 · {Path.GetFileName(destination)}";
         return destination;
     }
@@ -126,10 +127,47 @@ public sealed class CaptureWorkflow
             cancellationToken);
     }
 
+    public string ReserveExternalRecording(
+        string cameraName,
+        string extension = ".avi")
+    {
+        EnsureDirectories();
+        var normalized = extension.Equals(
+            ".avi",
+            StringComparison.OrdinalIgnoreCase) ? ".avi" : ".avi";
+        return UniquePath(
+            PrimaryDirectory,
+            ReserveBaseName(cameraName),
+            normalized);
+    }
+
+    public async Task CompleteExternalRecordingAsync(
+        string recording,
+        CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(recording) || new FileInfo(recording).Length == 0)
+        {
+            throw new IOException("外录文件为空。");
+        }
+        await FinalizeAsync(recording, cancellationToken, null);
+        Status = $"外录已写入会话 · {Path.GetFileName(recording)}";
+    }
+
     private async Task FinalizeAsync(
         string primary,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CaptureLocation? location)
     {
+        if (!IsActive && location is null)
+        {
+            return;
+        }
+        var sidecar = Path.ChangeExtension(primary, ".xmp");
+        await File.WriteAllTextAsync(
+            sidecar,
+            Xmp(Path.GetFileName(primary), location),
+            Encoding.UTF8,
+            cancellationToken);
         if (!IsActive || SessionRoot is null)
         {
             return;
@@ -138,12 +176,6 @@ public sealed class CaptureWorkflow
         var digest = Convert.ToHexString(
             await SHA256.HashDataAsync(stream, cancellationToken))
             .ToLowerInvariant();
-        var sidecar = Path.ChangeExtension(primary, ".xmp");
-        await File.WriteAllTextAsync(
-            sidecar,
-            Xmp(Path.GetFileName(primary)),
-            Encoding.UTF8,
-            cancellationToken);
         if (BackupDirectory is not null)
         {
             Directory.CreateDirectory(BackupDirectory);
@@ -164,15 +196,18 @@ public sealed class CaptureWorkflow
             cancellationToken);
     }
 
-    private string Xmp(string filename) =>
-        $"""
+    private string Xmp(string filename, CaptureLocation? location)
+    {
+        var gps = location is null ? "" : GpsAttributes(location);
+        return $"""
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
           <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
             <rdf:Description rdf:about=""
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
-              xmp:Rating="{Configuration.Rating}">
+              xmlns:exif="http://ns.adobe.com/exif/1.0/"
+              xmp:Rating="{Configuration.Rating}"{gps}>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Name)}</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>{Xml(Configuration.Creator)}</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Rights)}</rdf:li></rdf:Alt></dc:rights>
@@ -182,6 +217,33 @@ public sealed class CaptureWorkflow
         </x:xmpmeta>
         <?xpacket end="w"?>
         """;
+    }
+
+    private static string GpsAttributes(CaptureLocation location)
+    {
+        var altitudeReference = location.Altitude < 0 ? 1 : 0;
+        return $"""
+
+              exif:GPSLatitude="{GpsCoordinate(location.Latitude, "N", "S")}"
+              exif:GPSLongitude="{GpsCoordinate(location.Longitude, "E", "W")}"
+              exif:GPSAltitude="{Math.Abs(location.Altitude):0.00}"
+              exif:GPSAltitudeRef="{altitudeReference}"
+              exif:GPSHPositioningError="{Math.Max(0, location.HorizontalAccuracy):0.00}"
+              exif:GPSDateStamp="{location.CapturedAt.UtcDateTime:yyyy:MM:dd}"
+        """;
+    }
+
+    private static string GpsCoordinate(
+        double value,
+        string positive,
+        string negative)
+    {
+        var direction = value >= 0 ? positive : negative;
+        var absolute = Math.Abs(value);
+        var degrees = (int)absolute;
+        var minutes = (absolute - degrees) * 60;
+        return FormattableString.Invariant($"{degrees},{minutes:0.000000}{direction}");
+    }
 
     private void EnsureDirectories()
     {

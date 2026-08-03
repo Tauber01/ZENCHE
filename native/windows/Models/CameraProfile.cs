@@ -36,7 +36,7 @@ public sealed record CameraProfile(
         new("Nikon Z50II", "Nikon", 0x04b0, 0x0455, 100, 51200),
         new("Nikon Z5II", "Nikon", 0x04b0, 0x0456, 100, 64000),
         new("Nikon ZR", "Nikon", 0x04b0, 0x0457, 100, 51200),
-        // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+        // ── Sony α ── (Product ID 0 means vendor wildcard)
         // Full-frame E-mount
         new("Sony A1", "Sony", 0x054c, 0x0000, 100, 32000),
         new("Sony A1 II", "Sony", 0x054c, 0x0000, 100, 32000),
@@ -69,7 +69,24 @@ public sealed record CameraProfile(
             .Select(camera => camera.Name)
             .Distinct());
 
-    public static CameraProfile? Find(ushort vendorId, ushort productId) =>
-        Supported.FirstOrDefault(
-            camera => camera.VendorId == vendorId && camera.ProductId == productId);
+    public static CameraProfile? Find(ushort vendorId, ushort productId)
+    {
+        var exact = Supported.FirstOrDefault(
+            camera => camera.VendorId == vendorId
+                && camera.ProductId != 0
+                && camera.ProductId == productId);
+        if (exact is not null)
+        {
+            return exact;
+        }
+
+        // Keep the fallback generic when libusb cannot expose a model
+        // descriptor, rather than guessing a specific camera.
+        return vendorId switch
+        {
+            0x054c => new("Sony " + "α USB/PTP", "Sony", vendorId, 0, 100, 102400),
+            0x04a9 => new("Canon " + "EOS USB/PTP", "Canon", vendorId, 0, 100, 102400),
+            _ => null,
+        };
+    }
 }

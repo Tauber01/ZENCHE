@@ -1,6 +1,10 @@
 {
   "string": [
     {
+      "name": "permission_camera",
+      "value": "端末のカメラを開いて撮影し、ZENCHE ライブラリに保存するために使用します。"
+    },
+    {
       "name": "module_desc",
       "value": "クロスプラットフォームのカメラ制御と画像転送 · Capture · Connect · Flow"
     },
@@ -23,6 +27,14 @@
     {
       "name": "permission_album",
       "value": "ファイル画面にシステムライブラリの写真と動画を表示するために使用します"
+    },
+    {
+      "name": "permission_bluetooth",
+      "value": "Bluetooth シャッターリモコンに接続して撮影指示を受信するために使用します"
+    },
+    {
+      "name": "permission_location",
+      "value": "撮影時に現在地を XMP GPS メタデータへ記録するために使用します"
     }
   ]
 }
