@@ -17,14 +17,29 @@
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-	<string>1.3.1</string>
+	<string>1.5.0</string>
   <key>CFBundleVersion</key>
-	<string>22</string>
+	<string>25</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+  </dict>
   <key>NSPhotoLibraryUsageDescription</key>
   <string>用于在文件页面直接显示机主相册中的照片和视频。</string>
+  <key>NSCameraUsageDescription</key>
+  <string>用于调用 Mac 内置或外接摄像头进行实时取景和照片拍摄。</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>用于在相机热点或可信局域网中通过 PTP/IP 连接并遥控相机。</string>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>用于连接蓝牙快门遥控器并接收拍摄指令。</string>
+  <key>NSLocationUsageDescription</key>
+  <string>用于在拍摄时将当前位置写入照片的 XMP GPS 元数据。</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>用于在拍摄时将当前位置写入照片的 XMP GPS 元数据。</string>
 </dict>
 </plist>

@@ -2,10 +2,17 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=1.3.1
+VERSION=1.5.0
 ANDROID_ROOT="$PROJECT_ROOT/native/android"
 ASSET_ROOT="$ANDROID_ROOT/app/src/main/assets/web"
 DIST_ROOT="$PROJECT_ROOT/dist"
+BUILD_LOCK="$PROJECT_ROOT/build/.android-build.lock"
+
+if ! mkdir "$BUILD_LOCK" 2>/dev/null; then
+  print -u2 "Another Android package build is already running: $BUILD_LOCK"
+  exit 1
+fi
+trap 'rmdir "$BUILD_LOCK" 2>/dev/null || true' EXIT
 
 rm -rf "$ASSET_ROOT"
 mkdir -p "$DIST_ROOT"
@@ -28,11 +35,14 @@ if [[ ! -x ./gradlew ]]; then
     --gradle-distribution-url "https://mirrors.cloud.tencent.com/gradle/gradle-8.10.2-bin.zip"
 fi
 if [[ -x "$PROJECT_ROOT/.toolchains/gradle-8.10.2/bin/gradle" ]]; then
-  "$PROJECT_ROOT/.toolchains/gradle-8.10.2/bin/gradle" --no-daemon clean assembleDebug
+  "$PROJECT_ROOT/.toolchains/gradle-8.10.2/bin/gradle" --no-daemon clean
+  "$PROJECT_ROOT/.toolchains/gradle-8.10.2/bin/gradle" --no-daemon assembleDebug
 elif command -v gradle >/dev/null; then
-  gradle --no-daemon clean assembleDebug
+  gradle --no-daemon clean
+  gradle --no-daemon assembleDebug
 else
-  ./gradlew --no-daemon clean assembleDebug
+  ./gradlew --no-daemon clean
+  ./gradlew --no-daemon assembleDebug
 fi
 
 APK_SOURCE="$ANDROID_ROOT/app/build/outputs/apk/debug/app-debug.apk"

@@ -16,6 +16,14 @@ interface PersistedWorkflow {
   counter: number;
 }
 
+export interface CaptureLocationMetadata {
+  latitude: number;
+  longitude: number;
+  altitude: number;
+  accuracy: number;
+  timestamp: number;
+}
+
 export class CaptureWorkflow {
   private readonly rootDirectory: string;
   private readonly statePath: string;
@@ -85,7 +93,8 @@ export class CaptureWorkflow {
     bytes: Uint8Array,
     originalFilename: string,
     cameraName: string,
-    reservedBaseName?: string
+    reservedBaseName?: string,
+    location?: CaptureLocationMetadata
   ): Promise<string> {
     this.ensureDirectories();
     const extension: string = fileExtension(originalFilename);
@@ -98,7 +107,7 @@ export class CaptureWorkflow {
       extension
     );
     writeBytes(destination, bytes);
-    await this.finalize(destination);
+    await this.finalize(destination, location);
     this.statusValue =
       `已写入会话 · ${destination.substring(destination.lastIndexOf('/') + 1)}`;
     return destination;
@@ -126,19 +135,63 @@ export class CaptureWorkflow {
     }
   }
 
-  private async finalize(primary: string): Promise<void> {
+  reserveExternalRecording(
+    cameraName: string,
+    extension: string = 'avi'
+  ): string {
+    this.ensureDirectories();
+    const normalized: string = extension.toLowerCase() === 'avi'
+      ? 'avi'
+      : 'avi';
+    return this.uniquePath(
+      this.primaryDirectory(),
+      this.reserveBaseName(cameraName),
+      normalized
+    );
+  }
+
+  async completeExternalRecording(path: string): Promise<void> {
+    if (!fs.accessSync(path) || fs.statSync(path).size === 0) {
+      throw new Error('外录文件为空。');
+    }
+    await this.finalize(path);
+    this.statusValue = `外录已写入会话 · ${filename(path)}`;
+  }
+
+  private async finalize(
+    primary: string,
+    location?: CaptureLocationMetadata
+  ): Promise<void> {
+    if (!this.activeValue && location === undefined) {
+      return;
+    }
+    const sidecar: string = `${withoutExtension(primary)}.xmp`;
+    writeText(sidecar, this.xmp(filename(primary), location));
     if (!this.activeValue) {
       return;
     }
-    const bytes: Uint8Array = readBytes(primary);
     const md = cryptoFramework.createMd('SHA256');
-    await md.update({ data: bytes });
+    const source: fs.File = fs.openSync(primary, fs.OpenMode.READ_ONLY);
+    try {
+      const size: number = fs.statSync(source.fd).size;
+      let consumed: number = 0;
+      while (consumed < size) {
+        const length: number = Math.min(1024 * 1024, size - consumed);
+        const buffer: ArrayBuffer = new ArrayBuffer(length);
+        const count: number = fs.readSync(source.fd, buffer);
+        if (count <= 0) break;
+        await md.update({
+          data: new Uint8Array(buffer, 0, count)
+        });
+        consumed += count;
+      }
+    } finally {
+      fs.closeSync(source);
+    }
     const digest = await md.digest();
     const checksum: string = Array.from(digest.data)
       .map((value: number): string => value.toString(16).padStart(2, '0'))
       .join('');
-    const sidecar: string = `${withoutExtension(primary)}.xmp`;
-    writeText(sidecar, this.xmp(filename(primary)));
     const backupDirectory: string | undefined = this.backupDirectory();
     if (backupDirectory !== undefined) {
       fs.copyFileSync(primary, `${backupDirectory}/${filename(primary)}`);
@@ -250,14 +303,21 @@ export class CaptureWorkflow {
     return result;
   }
 
-  private xmp(mediaName: string): string {
+  private xmp(
+    mediaName: string,
+    location?: CaptureLocationMetadata
+  ): string {
+    const gps: string = location === undefined
+      ? ''
+      : gpsAttributes(location);
     return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
       `<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF ` +
       `xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
       `<rdf:Description rdf:about="" ` +
       `xmlns:xmp="http://ns.adobe.com/xap/1.0/" ` +
       `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
-      `xmp:Rating="${this.configurationValue.rating}">` +
+      `xmlns:exif="http://ns.adobe.com/exif/1.0/" ` +
+      `xmp:Rating="${this.configurationValue.rating}"${gps}>` +
       `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">` +
       `${xml(this.configurationValue.name)}</rdf:li></rdf:Alt></dc:title>` +
       `<dc:creator><rdf:Seq><rdf:li>` +
@@ -269,6 +329,40 @@ export class CaptureWorkflow {
       `</rdf:Description></rdf:RDF></x:xmpmeta>\n` +
       `<?xpacket end="w"?>`;
   }
+}
+
+function gpsAttributes(location: CaptureLocationMetadata): string {
+  const altitude: number = Math.abs(location.altitude);
+  const altitudeRef: number = location.altitude < 0 ? 1 : 0;
+  const date: Date = new Date(location.timestamp);
+  const dateStamp: string = `${date.getUTCFullYear()}:` +
+    `${pad(date.getUTCMonth() + 1)}:${pad(date.getUTCDate())}`;
+  return ` exif:GPSLatitude="${gpsCoordinate(
+    location.latitude,
+    'N',
+    'S'
+  )}"` +
+    ` exif:GPSLongitude="${gpsCoordinate(
+      location.longitude,
+      'E',
+      'W'
+    )}"` +
+    ` exif:GPSAltitude="${altitude.toFixed(2)}"` +
+    ` exif:GPSAltitudeRef="${altitudeRef}"` +
+    ` exif:GPSHPositioningError="${Math.max(0, location.accuracy).toFixed(2)}"` +
+    ` exif:GPSDateStamp="${dateStamp}"`;
+}
+
+function gpsCoordinate(
+  value: number,
+  positive: string,
+  negative: string
+): string {
+  const direction: string = value >= 0 ? positive : negative;
+  const absolute: number = Math.abs(value);
+  const degrees: number = Math.floor(absolute);
+  const minutes: number = (absolute - degrees) * 60;
+  return `${degrees},${minutes.toFixed(6)}${direction}`;
 }
 
 function ensureDirectory(path: string): void {

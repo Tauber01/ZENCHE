@@ -11,10 +11,18 @@ public sealed class PtpCamera : IDisposable
     private const ushort ContainerData = 2;
     private const ushort ContainerResponse = 3;
     private const ushort ResponseOk = 0x2001;
+    private const ushort ResponseSessionAlreadyOpen = 0x201e;
     private const ushort OpenSession = 0x1002;
     private const ushort CloseSession = 0x1003;
+    private const ushort GetStorageIds = 0x1004;
+    private const ushort GetStorageInfo = 0x1005;
+    private const ushort GetObjectHandles = 0x1007;
+    private const ushort GetObjectInfo = 0x1008;
     private const ushort GetObject = 0x1009;
+    private const ushort GetThumb = 0x100a;
+    private const ushort DeleteObject = 0x100b;
     private const ushort GetDevicePropertyDescription = 0x1014;
+    private const ushort GetDevicePropertyValue = 0x1015;
     private const ushort SetDeviceProperty = 0x1016;
     private const ushort ChangeCameraMode = 0x90c2;
     private const ushort DeviceReady = 0x90c8;
@@ -29,6 +37,20 @@ public sealed class PtpCamera : IDisposable
     private const ushort TerminateCapture = 0x920c;
     private const ushort ObjectAddedInSdram = 0xc101;
     private const ushort ExposureTime = 0x500d;
+    private const ushort NikonMovieFileType = 0xd0af;
+    private const uint NikonMovieProResToneMode = 0x0001d000;
+    private const uint NikonMovieH265ToneMode = 0x0001d001;
+    private const uint NikonMovieNRawToneMode = 0x0001d028;
+    private const uint NikonMovieProResRawToneMode = 0x0001d029;
+    private const uint NikonH264EightBit = 0x00000801;
+    private const uint NikonH265TenBit = 0x00010a00;
+    private const uint NikonNRawTwelveBit = 0x00020c02;
+    private const uint NikonProRes422TenBit = 0x00100a00;
+    private const uint NikonProResRawTwelveBit = 0x00110c00;
+    private const ushort SonyPictureProfile = 0xd23f;
+    private const ushort SonyMovieFileFormat = 0xd241;
+    private const ushort CanonEosSetDevicePropValueEx = 0x9110;
+    private const ushort CanonLogGamma = 0xd176;
     private const int StillImageClass = 6;
     private const int MaximumContainerSize = 256 * 1024 * 1024;
 
@@ -44,14 +66,214 @@ public sealed class PtpCamera : IDisposable
     private bool _disposed;
     private string _exposureMode = "manual";
     private int _bulbDurationSeconds = 5;
-    private readonly Dictionary<ushort, bool> _writableProperties = [];
+    private readonly Dictionary<uint, bool> _writableProperties = [];
     private readonly HashSet<string> _deniedParameters = [];
+    private readonly SonyOfficialSdkCamera _sonySDK =
+        SonyOfficialSdkCamera.Shared;
     private IPtpVendorOps _vendorOps = new NikonVendorOps();
 
     public CameraProfile? Profile { get; private set; }
-    public bool IsConnected => _deviceHandle != nint.Zero;
-    public bool IsLiveView => _liveView;
-    public bool IsMovieRecording => _movieRecording;
+    public bool IsConnected => _sonySDK.IsConnected || _deviceHandle != nint.Zero;
+    public bool IsLiveView => _sonySDK.IsConnected
+        ? _sonySDK.IsLiveView
+        : _liveView;
+    public bool IsMovieRecording => _sonySDK.IsConnected
+        ? _sonySDK.IsMovieRecording
+        : _movieRecording;
+
+    public async Task<CameraStorageSnapshot> ListStorageAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureStorageTransport();
+            var resumeLiveView = _liveView;
+            if (resumeLiveView) await StopLiveViewCoreAsync(cancellationToken);
+            try
+            {
+                var volumes = new List<CameraStorageVolume>();
+                var items = new List<CameraStorageItem>();
+                var storageIds = CameraStorageParser.StorageIds(
+                    await TransactAsync(
+                        GetStorageIds,
+                        null,
+                        null,
+                        15_000,
+                        cancellationToken));
+                foreach (var storageId in storageIds)
+                {
+                    volumes.Add(CameraStorageParser.StorageInfo(
+                        storageId,
+                        await TransactAsync(
+                            GetStorageInfo,
+                            [storageId],
+                            null,
+                            15_000,
+                            cancellationToken)));
+                    var pendingHandles = new Queue<uint>(CameraStorageParser.StorageIds(
+                        await TransactAsync(
+                            GetObjectHandles,
+                            [storageId, 0, uint.MaxValue],
+                            null,
+                            30_000,
+                            cancellationToken)));
+                    var visitedHandles = new HashSet<uint>();
+                    while (pendingHandles.TryDequeue(out var handle))
+                    {
+                        if (!visitedHandles.Add(handle)) continue;
+                        var objectInfo = await TransactAsync(
+                            GetObjectInfo,
+                            [handle],
+                            null,
+                            15_000,
+                            cancellationToken);
+                        if (CameraStorageParser.IsAssociation(objectInfo))
+                        {
+                            var children = CameraStorageParser.StorageIds(
+                                await TransactAsync(
+                                    GetObjectHandles,
+                                    [storageId, 0, handle],
+                                    null,
+                                    30_000,
+                                    cancellationToken));
+                            foreach (var child in children)
+                            {
+                                if (!visitedHandles.Contains(child)) pendingHandles.Enqueue(child);
+                            }
+                        }
+                        else
+                        {
+                            var item = CameraStorageParser.ObjectInfo(handle, objectInfo);
+                            if (item is not null) items.Add(item);
+                        }
+                    }
+                }
+                items.Sort((left, right) =>
+                {
+                    var byDate = string.Compare(
+                        right.CapturedAt,
+                        left.CapturedAt,
+                        StringComparison.Ordinal);
+                    return byDate != 0
+                        ? byDate
+                        : string.Compare(
+                            right.Filename,
+                            left.Filename,
+                            StringComparison.OrdinalIgnoreCase);
+                });
+                return new CameraStorageSnapshot(volumes, items);
+            }
+            finally
+            {
+                if (resumeLiveView && IsConnected)
+                {
+                    await ResumeLiveViewAfterExclusiveOperationAsync(cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<byte[]> GetStorageThumbnailAsync(
+        uint handle,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureStorageTransport();
+            return await TransactAsync(
+                GetThumb,
+                [handle],
+                null,
+                30_000,
+                cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<byte[]> DownloadStorageObjectAsync(
+        uint handle,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureStorageTransport();
+            var resumeLiveView = _liveView;
+            if (resumeLiveView) await StopLiveViewCoreAsync(cancellationToken);
+            try
+            {
+                return await TransactAsync(
+                    GetObject,
+                    [handle],
+                    null,
+                    180_000,
+                    cancellationToken);
+            }
+            finally
+            {
+                if (resumeLiveView && IsConnected)
+                {
+                    await ResumeLiveViewAfterExclusiveOperationAsync(cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task DeleteStorageObjectAsync(
+        uint handle,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureStorageTransport();
+            var resumeLiveView = _liveView;
+            if (resumeLiveView) await StopLiveViewCoreAsync(cancellationToken);
+            try
+            {
+                await TransactAsync(
+                    DeleteObject,
+                    [handle, 0],
+                    null,
+                    30_000,
+                    cancellationToken);
+            }
+            finally
+            {
+                if (resumeLiveView && IsConnected)
+                {
+                    await ResumeLiveViewAfterExclusiveOperationAsync(cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private void EnsureStorageTransport()
+    {
+        if (_sonySDK.IsConnected)
+        {
+            throw new NotSupportedException(
+                "当前 Sony 官方 SDK 会话未开放机内文件枚举；请切换相机为 USB/PTP 或使用 Wi‑Fi/PTP‑IP。");
+        }
+        EnsureConnected();
+    }
 
     public async Task<CameraProfile> ConnectAsync(
         CancellationToken cancellationToken = default)
@@ -60,8 +282,28 @@ public sealed class PtpCamera : IDisposable
         try
         {
             DisconnectCore();
+            cancellationToken.ThrowIfCancellationRequested();
+            CameraProfile? sonyProfile = null;
+            if (await Task.Run(() =>
+                {
+                    var connected = _sonySDK.TryConnect(out var matched);
+                    if (connected) sonyProfile = matched;
+                    return connected;
+                }, cancellationToken))
+            {
+                var sonyMatchedProfile =
+                    sonyProfile ?? CameraProfile.Find(0x054c, 0)!;
+                Profile = sonyMatchedProfile;
+                return sonyMatchedProfile;
+            }
             InitializeLibUsb();
             var profile = OpenSupportedDevice();
+            if (profile.VendorId == 0x054c)
+            {
+                throw new InvalidOperationException(
+                    "已检测到索尼相机，但 Camera Remote SDK 2.02.00 未能建立会话。" +
+                    "请在机身 USB 连接设置中启用电脑遥控后重试。");
+            }
             _vendorOps = PtpVendorOps.ForVendor(profile.VendorId);
             await TransactAsync(
                 OpenSession,
@@ -69,8 +311,8 @@ public sealed class PtpCamera : IDisposable
                 null,
                 10_000,
                 cancellationToken);
-            await RefreshParameterCapabilitiesAsync(cancellationToken);
             Profile = profile;
+            await RefreshParameterCapabilitiesAsync(cancellationToken);
             return profile;
         }
         catch
@@ -91,6 +333,11 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                await Task.Run(_sonySDK.StartLiveView, cancellationToken);
+                return;
+            }
             if (_liveView)
             {
                 return;
@@ -130,6 +377,16 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                if (!_sonySDK.IsLiveView)
+                {
+                    throw new InvalidOperationException("实时取景尚未开启。");
+                }
+                return await Task.Run(
+                    _sonySDK.GetLiveViewFrame,
+                    cancellationToken);
+            }
             if (!_liveView)
             {
                 throw new InvalidOperationException("实时取景尚未开启。");
@@ -155,6 +412,13 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                await Task.Run(
+                    () => _sonySDK.SetMovieRecording(true),
+                    cancellationToken);
+                return;
+            }
             if (_movieRecording)
             {
                 return;
@@ -190,6 +454,13 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                await Task.Run(
+                    () => _sonySDK.SetMovieRecording(false),
+                    cancellationToken);
+                return;
+            }
             if (!_movieRecording)
             {
                 return;
@@ -221,6 +492,10 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                return await Task.Run(_sonySDK.Capture, cancellationToken);
+            }
             var resumeLiveView = _liveView;
             var releaseRemoteMode = false;
             if (resumeLiveView)
@@ -229,6 +504,7 @@ public sealed class PtpCamera : IDisposable
             }
             try
             {
+                await WaitUntilDeviceReadyAsync(8_000, cancellationToken);
                 if (_exposureMode == "bulb")
                 {
                     await TransactAsync(
@@ -364,6 +640,13 @@ public sealed class PtpCamera : IDisposable
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                await Task.Run(
+                    () => _sonySDK.SetParameter(name, rawValue),
+                    cancellationToken);
+                return;
+            }
             if (name == "bulbDuration")
             {
                 if (_exposureMode != "bulb")
@@ -413,6 +696,28 @@ public sealed class PtpCamera : IDisposable
                         [(byte)liveValue],
                         cancellationToken);
                 }
+                return;
+            }
+
+            if (name == "videoCodec")
+            {
+                await SetVideoCodecAsync(
+                    Convert.ToString(rawValue) ?? "h265",
+                    cancellationToken);
+                return;
+            }
+            if (name == "videoLog")
+            {
+                await SetVideoLogAsync(
+                    Convert.ToString(rawValue) ?? "off",
+                    cancellationToken);
+                return;
+            }
+            if (name == "nLog")
+            {
+                await SetVideoLogAsync(
+                    Convert.ToBoolean(rawValue) ? "nlog" : "off",
+                    cancellationToken);
                 return;
             }
 
@@ -512,14 +817,187 @@ public sealed class PtpCamera : IDisposable
         }
     }
 
+    private async Task SetVideoCodecAsync(
+        string codec,
+        CancellationToken cancellationToken)
+    {
+        if (Profile is null)
+        {
+            throw new InvalidOperationException("请先连接支持的相机。");
+        }
+        if (Profile.VendorId == 0x054c)
+        {
+            var sonyValue = codec switch
+            {
+                "sonyXavcHs8k" => 10,
+                "sonyXavcHs4k" => 11,
+                "sonyXavcS4k" => 8,
+                "sonyXavcSHd" => 9,
+                "sonyXavcSi4k" => 14,
+                "sonyXavcSiHd" => 15,
+                _ => -1
+            };
+            if (sonyValue < 0)
+            {
+                throw new InvalidOperationException(
+                    "Sony 不支持所选视频录制规格。");
+            }
+            await SetPropertyCoreAsync(
+                SonyMovieFileFormat,
+                [(byte)sonyValue],
+                cancellationToken);
+            return;
+        }
+        if (Profile.VendorId == 0x04a9)
+        {
+            throw new InvalidOperationException(
+                $"{CameraName} 未报告可写的佳能录制格式属性；" +
+                "规格已展示，请在机身中选择 RAW、XF-HEVC S 或 XF-AVC S。");
+        }
+        if (Profile.VendorId != 0x04b0)
+        {
+            throw new InvalidOperationException(
+                "当前相机不支持远程切换视频录制规格。");
+        }
+        if ((codec is "nRaw" or "proResRAW" or "proRes422HQ") &&
+            !(CameraName.Contains("Z9", StringComparison.OrdinalIgnoreCase) ||
+              CameraName.Contains("Z8", StringComparison.OrdinalIgnoreCase) ||
+              CameraName.Contains("Z6III", StringComparison.OrdinalIgnoreCase) ||
+              CameraName.Contains("ZR", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                $"{CameraName} 不支持所选 RAW/ProRes 视频编码。");
+        }
+        var value = codec.ToLowerInvariant() switch
+        {
+            "h265" => NikonH265TenBit,
+            "prores422hq" => NikonProRes422TenBit,
+            "proresraw" => NikonProResRawTwelveBit,
+            "nraw" => NikonNRawTwelveBit,
+            _ => NikonH264EightBit
+        };
+        await SetPropertyCoreAsync(
+            NikonMovieFileType,
+            LittleEndian32(value),
+            cancellationToken);
+    }
+
+    private async Task SetVideoLogAsync(
+        string logProfile,
+        CancellationToken cancellationToken)
+    {
+        if (Profile is null)
+        {
+            throw new InvalidOperationException("请先连接支持的相机。");
+        }
+        if (Profile.VendorId == 0x054c)
+        {
+            var sonyValue = logProfile switch
+            {
+                "off" => 0,
+                "sonySLog2" => 7,
+                "sonySLog3Cine" => 8,
+                "sonySLog3" => 9,
+                "sonyHlg" => 10,
+                _ => -1
+            };
+            if (sonyValue < 0)
+            {
+                throw new InvalidOperationException(
+                    "Sony 不支持所选 Log / Picture Profile。");
+            }
+            await SetPropertyCoreAsync(
+                SonyPictureProfile,
+                [(byte)sonyValue],
+                cancellationToken);
+            return;
+        }
+        if (Profile.VendorId == 0x04a9)
+        {
+            var canonValue = logProfile switch
+            {
+                "off" => 0,
+                "canonLog" => 1,
+                "canonLog2" => 2,
+                "canonLog3" => 3,
+                _ => -1
+            };
+            if (canonValue < 0)
+            {
+                throw new InvalidOperationException(
+                    "Canon 不支持所选 Canon Log 曲线。");
+            }
+            var payload = new byte[12];
+            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 12);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                payload.AsSpan(4, 4), CanonLogGamma);
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                payload.AsSpan(8, 4), (uint)canonValue);
+            await TransactAsync(
+                CanonEosSetDevicePropValueEx,
+                null,
+                payload,
+                10_000,
+                cancellationToken);
+            return;
+        }
+        if (Profile.VendorId != 0x04b0)
+        {
+            throw new InvalidOperationException(
+                "当前相机不支持远程切换 Log 曲线。");
+        }
+        var enabled = logProfile != "off";
+        if (enabled && logProfile != "nlog")
+        {
+            throw new InvalidOperationException("Nikon 机身仅支持 N-Log。");
+        }
+        var fileTypeData = await TransactAsync(
+            GetDevicePropertyValue,
+            [NikonMovieFileType],
+            null,
+            10_000,
+            cancellationToken);
+        if (fileTypeData.Length < 4)
+        {
+            throw new InvalidOperationException(
+                "相机未返回有效的视频编码值。");
+        }
+        var fileType = BinaryPrimitives.ReadUInt32LittleEndian(fileTypeData);
+        var toneProperty = NikonToneProperty(fileType, enabled);
+        if (toneProperty == 0) return;
+        await SetPropertyCoreAsync(
+            toneProperty,
+            [(byte)(enabled ? 1 : 0)],
+            cancellationToken);
+    }
+
+    private static uint NikonToneProperty(uint fileType, bool enabled) =>
+        fileType switch
+        {
+            NikonH265TenBit => NikonMovieH265ToneMode,
+            NikonNRawTwelveBit => NikonMovieNRawToneMode,
+            NikonProRes422TenBit => NikonMovieProResToneMode,
+            NikonProResRawTwelveBit => NikonMovieProResRawToneMode,
+            _ when !enabled => 0,
+            _ => throw new InvalidOperationException(
+                "当前编码不支持 N-Log；请选择 H.265 10-bit、N-RAW、" +
+                "ProRes 422 HQ 或 ProRes RAW。")
+        };
+
     public async Task MoveFocusAsync(
         int signedStep,
         CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
+        var resumeLiveView = false;
         try
         {
             EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                throw new InvalidOperationException(
+                    "Sony Camera Remote SDK 当前未开放本机型的相对焦点步进。");
+            }
             if (!_liveView)
             {
                 throw new InvalidOperationException(
@@ -530,6 +1008,20 @@ public sealed class PtpCamera : IDisposable
             {
                 return;
             }
+
+            // A live-view frame can still be draining inside the camera when
+            // the host receives its response.  Nikon reports that transition
+            // as PTP DeviceBusy (0x2019), which gphoto2 surfaces as
+            // "I/O in progress".  Make the focus operation exclusive and
+            // restart live view before issuing 0x9204 so polling cannot race
+            // the lens-drive command.
+            resumeLiveView = _liveView;
+            if (resumeLiveView)
+            {
+                await StopLiveViewCoreAsync(cancellationToken);
+                await StartLiveViewForManualFocusAsync(cancellationToken);
+            }
+
             var direction = normalized < 0 ? 0x1u : 0x2u;
             var amount = Math.Abs(normalized) switch
             {
@@ -537,18 +1029,200 @@ public sealed class PtpCamera : IDisposable
                 2 => 512u,
                 _ => 1024u
             };
-            await TransactAsync(
-                ManualFocusDriveOperation,
-                [direction, amount],
-                null,
-                10_000,
+            await SendManualFocusDriveWithRetryAsync(
+                direction,
+                amount,
                 cancellationToken);
             await WaitUntilDeviceReadyAsync(4_000, cancellationToken);
         }
         finally
         {
+            if (resumeLiveView && IsConnected && !_liveView)
+            {
+                await ResumeLiveViewAfterExclusiveOperationAsync(
+                    CancellationToken.None);
+            }
             _gate.Release();
         }
+    }
+
+    public async Task TriggerAutoFocusAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        var resumeLiveView = false;
+        try
+        {
+            EnsureConnected();
+            if (_sonySDK.IsConnected)
+            {
+                if (!_sonySDK.IsLiveView)
+                {
+                    throw new InvalidOperationException(
+                        "AF-ON 仅能在实时取景开启时使用。");
+                }
+                await Task.Run(_sonySDK.TriggerAutofocus, cancellationToken);
+                return;
+            }
+            if (!_liveView)
+            {
+                throw new InvalidOperationException(
+                    "AF-ON 仅能在实时取景开启时使用。");
+            }
+            resumeLiveView = _liveView;
+            if (resumeLiveView)
+            {
+                await StopLiveViewCoreAsync(cancellationToken);
+                await StartLiveViewForManualFocusAsync(cancellationToken);
+            }
+            try
+            {
+                await SetPropertyCoreAsync(
+                    0xd061,
+                    [0],
+                    cancellationToken);
+            }
+            catch (CameraProtocolException)
+            {
+                await SetPropertyCoreAsync(
+                    0x500a,
+                    LittleEndian16(0x8010),
+                    cancellationToken);
+            }
+            await SendAutoFocusDriveWithRetryAsync(cancellationToken);
+            await WaitUntilDeviceReadyAsync(4_000, cancellationToken);
+        }
+        finally
+        {
+            if (resumeLiveView && IsConnected && !_liveView)
+            {
+                await ResumeLiveViewAfterExclusiveOperationAsync(
+                    CancellationToken.None);
+            }
+            _gate.Release();
+        }
+    }
+
+    private async Task SendAutoFocusDriveWithRetryAsync(
+        CancellationToken cancellationToken)
+    {
+        Exception? finalError = null;
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            try
+            {
+                await TransactAsync(
+                    0x90c1,
+                    [],
+                    null,
+                    10_000,
+                    cancellationToken);
+                return;
+            }
+            catch (CameraProtocolException error)
+                when (IsDeviceBusyResponse(error.ResponseCode))
+            {
+                finalError = error;
+            }
+            catch (IOException error)
+                when (IsUsbBusy(error))
+            {
+                finalError = error;
+            }
+            if (attempt < 5)
+            {
+                await Task.Delay(180 * attempt, cancellationToken);
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 当前正在处理上一条相机指令，AF-ON 未执行。",
+            finalError);
+    }
+
+    private async Task StartLiveViewForManualFocusAsync(
+        CancellationToken cancellationToken)
+    {
+        Exception? finalError = null;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            try
+            {
+                await WaitUntilDeviceReadyAsync(4_000, cancellationToken);
+                await TransactAsync(
+                    StartLiveViewOperation,
+                    null,
+                    null,
+                    10_000,
+                    cancellationToken);
+                _liveView = true;
+                // Give the body one frame interval to leave the start-live-view
+                // transition before accepting the lens-drive command.
+                await Task.Delay(180, cancellationToken);
+                return;
+            }
+            catch (Exception error)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                finalError = error;
+                _liveView = false;
+                if (attempt < 3)
+                {
+                    await Task.Delay(180 * attempt, cancellationToken);
+                }
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 无法为手动对焦恢复实时取景。",
+            finalError);
+    }
+
+    private async Task SendManualFocusDriveWithRetryAsync(
+        uint direction,
+        uint amount,
+        CancellationToken cancellationToken)
+    {
+        Exception? finalError = null;
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            try
+            {
+                await TransactAsync(
+                    ManualFocusDriveOperation,
+                    [direction, amount],
+                    null,
+                    10_000,
+                    cancellationToken);
+                return;
+            }
+            catch (CameraProtocolException error)
+                when (IsDeviceBusyResponse(error.ResponseCode))
+            {
+                finalError = error;
+            }
+            catch (IOException error)
+                when (IsUsbBusy(error))
+            {
+                finalError = error;
+            }
+
+            if (attempt < 5)
+            {
+                await Task.Delay(180 * attempt, cancellationToken);
+            }
+        }
+        throw new InvalidOperationException(
+            $"{CameraName} 当前正在处理上一条相机指令，手动对焦未执行。",
+            finalError);
+    }
+
+    private static bool IsDeviceBusyResponse(ushort responseCode) =>
+        responseCode == 0x2019;
+
+    private static bool IsUsbBusy(IOException error)
+    {
+        var message = error.Message;
+        return message.Contains("BUSY", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("I/O in progress", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task DisconnectAsync(
@@ -557,6 +1231,17 @@ public sealed class PtpCamera : IDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            if (_sonySDK.IsConnected)
+            {
+                if (_sonySDK.IsMovieRecording)
+                {
+                    try { _sonySDK.SetMovieRecording(false); } catch { }
+                }
+                _sonySDK.StopLiveView();
+                _sonySDK.Disconnect();
+                Profile = null;
+                return;
+            }
             if (_movieRecording)
             {
                 try
@@ -812,7 +1497,8 @@ public sealed class PtpCamera : IDisposable
         CancellationToken cancellationToken)
     {
         EnsureConnectedForOperation(operation);
-        var transaction = ++_transaction;
+        var transaction = operation == OpenSession ? 0 : ++_transaction;
+        _transaction = transaction;
         var parameterBytes = new byte[(parameters?.Length ?? 0) * 4];
         if (parameters is not null)
         {
@@ -861,7 +1547,9 @@ public sealed class PtpCamera : IDisposable
             throw new CameraProtocolException(
                 $"{CameraName} 返回了不匹配的 PTP 事务编号。");
         }
-        if (response.Code != ResponseOk)
+        if (response.Code != ResponseOk &&
+            !(operation == OpenSession &&
+              response.Code == ResponseSessionAlreadyOpen))
         {
             throw new CameraProtocolException(
                 $"{CameraName} PTP 错误 0x{response.Code:X4}（操作 0x{operation:X4}）",
@@ -981,7 +1669,7 @@ public sealed class PtpCamera : IDisposable
     }
 
     private Task SetPropertyCoreAsync(
-        ushort property,
+        uint property,
         byte[] value,
         CancellationToken cancellationToken) =>
         TransactAsync(
@@ -1177,6 +1865,11 @@ public sealed class PtpCamera : IDisposable
     private async Task StopLiveViewCoreAsync(
         CancellationToken cancellationToken)
     {
+        if (_sonySDK.IsConnected)
+        {
+            _sonySDK.StopLiveView();
+            return;
+        }
         if (!_liveView || !IsConnected)
         {
             _liveView = false;
@@ -1199,6 +1892,16 @@ public sealed class PtpCamera : IDisposable
 
     public bool CanAdjustParameter(string name)
     {
+        if (_sonySDK.IsConnected)
+        {
+            return name is "exposureTime" or "videoExposureTime" or
+                "aperture" or "iso" or "exposureCompensation" or
+                "videoCodec" or "videoLog";
+        }
+        if (name == "videoCodec" && Profile?.VendorId == 0x04a9)
+        {
+            return false;
+        }
         if (_deniedParameters.Contains(name) || !CanAdjust(name))
         {
             return false;
@@ -1208,6 +1911,10 @@ public sealed class PtpCamera : IDisposable
 
     public string ParameterLockReason(string name)
     {
+        if (name == "videoCodec" && Profile?.VendorId == 0x04a9)
+        {
+            return "该 Canon 机身未报告通用可写的录制格式属性，请在机身菜单中选择规格";
+        }
         if (_deniedParameters.Contains(name))
         {
             return "相机已拒绝此参数，本次连接内保持锁定";
@@ -1236,17 +1943,21 @@ public sealed class PtpCamera : IDisposable
     {
         _writableProperties.Clear();
         _deniedParameters.Clear();
-        var vendorProperties = new List<ushort> { ExposureTime };
+        var vendorProperties = new List<uint> { ExposureTime };
         foreach (var p in _vendorOps.ShutterProperties)
             if (!vendorProperties.Contains(p)) vendorProperties.Add(p);
         foreach (var p in _vendorOps.VideoShutterProperties)
             if (!vendorProperties.Contains(p)) vendorProperties.Add(p);
         if (_vendorOps.PictureControlProperty is { } pc && !vendorProperties.Contains(pc))
             vendorProperties.Add(pc);
-        ushort[] properties =
+        uint[] properties =
         [
             0x5005, 0x5007, 0x500a,
             0x500e, 0x500f, 0x5010,
+            NikonMovieFileType, NikonMovieProResToneMode,
+            NikonMovieH265ToneMode, NikonMovieNRawToneMode,
+            NikonMovieProResRawToneMode,
+            SonyMovieFileFormat, SonyPictureProfile,
             .. vendorProperties,
         ];
         foreach (var property in properties)
@@ -1271,7 +1982,7 @@ public sealed class PtpCamera : IDisposable
         }
     }
 
-    private ushort PropertyCode(string name) => name switch
+    private uint PropertyCode(string name) => name switch
     {
         "whiteBalanceMode" => 0x5005,
         "aperture" => 0x5007,
@@ -1282,6 +1993,15 @@ public sealed class PtpCamera : IDisposable
         "iso" => 0x500f,
         "exposureCompensation" => 0x5010,
         "pictureControl" => _vendorOps.PictureControlProperty ?? 0,
+        "videoCodec" => Profile?.VendorId == 0x054c
+            ? SonyMovieFileFormat
+            : NikonMovieFileType,
+        "videoLog" or "nLog" => Profile?.VendorId switch
+        {
+            0x054c => SonyPictureProfile,
+            0x04a9 => CanonLogGamma,
+            _ => NikonMovieH265ToneMode
+        },
         _ => 0
     };
 
@@ -1371,6 +2091,10 @@ public sealed class PtpCamera : IDisposable
 
     private void DisconnectCore()
     {
+        if (_sonySDK.IsConnected)
+        {
+            _sonySDK.Disconnect();
+        }
         if (_deviceHandle != nint.Zero)
         {
             if (_interfaceNumber >= 0)

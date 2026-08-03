@@ -1,4 +1,6 @@
 import { image } from '@kit.ImageKit';
+import { NikonCloudPreset } from '../presets/NikonCloudPreview';
+import { applyNikonCloudPreviewEffect } from '../presets/NikonCloudPreviewRenderer';
 
 export class ProfessionalMonitorResult {
   readonly pixelMap: image.PixelMap;
@@ -28,12 +30,15 @@ export class ProfessionalMonitorResult {
   }
 }
 
-const BARS: Array<string> = Array.from('▁▂▃▄▅▆▇█');
+const SCOPE_COLUMNS: number = 64;
+const SCOPE_ROWS: number = 48;
+const HEX: Array<string> = Array.from('0123456789ABCDEF');
 
 export async function processProfessionalMonitor(
   source: image.PixelMap,
   focusPeaking: boolean,
-  falseColorEnabled: boolean
+  falseColorEnabled: boolean,
+  nikonCloudPreset?: NikonCloudPreset
 ): Promise<ProfessionalMonitorResult> {
   const info: image.ImageInfo = await source.getImageInfo();
   const width: number = info.size.width;
@@ -41,49 +46,63 @@ export async function processProfessionalMonitor(
   const buffer: ArrayBuffer = new ArrayBuffer(width * height * 4);
   await source.readPixelsToBuffer(buffer);
   const pixels: Uint8Array = new Uint8Array(buffer);
-  const visualProcessing: boolean = focusPeaking || falseColorEnabled;
+  const visualProcessing: boolean =
+    focusPeaking || falseColorEnabled || nikonCloudPreset !== undefined;
   const sampleStep: number = visualProcessing
     ? 1
     : Math.max(1, Math.floor(Math.max(width, height) / 640));
   const luminance: Uint8Array = new Uint8Array(
     focusPeaking ? width * height : 0
   );
-  const red: Array<number> = new Array<number>(16).fill(0);
-  const green: Array<number> = new Array<number>(16).fill(0);
-  const blue: Array<number> = new Array<number>(16).fill(0);
-  const waveformSum: Array<number> = new Array<number>(24).fill(0);
-  const waveformCount: Array<number> = new Array<number>(24).fill(0);
-  const hueSum: Array<number> = new Array<number>(24).fill(0);
-  const hueCount: Array<number> = new Array<number>(24).fill(0);
+  const red: Array<number> = scopeBuffer();
+  const green: Array<number> = scopeBuffer();
+  const blue: Array<number> = scopeBuffer();
+  const lumaScope: Array<number> = scopeBuffer();
+  const cbScope: Array<number> = scopeBuffer();
+  const crScope: Array<number> = scopeBuffer();
+  const cloudChannels: Array<number> = [0, 0, 0];
+  const cloudHsl: Array<number> = [0, 0, 0];
 
   for (let y: number = 0; y < height; y += sampleStep) {
     for (let x: number = 0; x < width; x += sampleStep) {
       const pixel: number = y * width + x;
       const offset: number = pixel * 4;
-      const r: number = pixels[offset];
-      const g: number = pixels[offset + 1];
-      const b: number = pixels[offset + 2];
+      let r: number = pixels[offset];
+      let g: number = pixels[offset + 1];
+      let b: number = pixels[offset + 2];
+      if (nikonCloudPreset !== undefined) {
+        cloudChannels[0] = r / 255;
+        cloudChannels[1] = g / 255;
+        cloudChannels[2] = b / 255;
+        applyNikonCloudPreviewEffect(
+          nikonCloudPreset,
+          cloudChannels,
+          cloudHsl
+        );
+        r = clamp8(Math.round(cloudChannels[0] * 255));
+        g = clamp8(Math.round(cloudChannels[1] * 255));
+        b = clamp8(Math.round(cloudChannels[2] * 255));
+        pixels[offset] = r;
+        pixels[offset + 1] = g;
+        pixels[offset + 2] = b;
+        pixels[offset + 3] = 255;
+      }
       const value: number = (54 * r + 183 * g + 19 * b) >> 8;
       if (focusPeaking) {
         luminance[pixel] = value;
       }
-      red[Math.min(15, r >> 4)]++;
-      green[Math.min(15, g >> 4)]++;
-      blue[Math.min(15, b >> 4)]++;
       const column: number = Math.min(
-        23,
-        Math.floor(x * 24 / Math.max(1, width))
+        SCOPE_COLUMNS - 1,
+        Math.floor(x * SCOPE_COLUMNS / Math.max(1, width))
       );
-      waveformSum[column] += value;
-      waveformCount[column]++;
-      const maximum: number = Math.max(r, Math.max(g, b));
-      const minimum: number = Math.min(r, Math.min(g, b));
-      const saturation: number = maximum - minimum;
-      if (saturation > 8) {
-        const hue: number = hueIndex(r, g, b, maximum, saturation);
-        hueSum[hue] += saturation;
-        hueCount[hue]++;
-      }
+      accumulate(red, column, r);
+      accumulate(green, column, g);
+      accumulate(blue, column, b);
+      accumulate(lumaScope, column, value);
+      const cb: number = clamp8(128 + ((-29 * r - 99 * g + 128 * b) >> 8));
+      const cr: number = clamp8(128 + ((128 * r - 116 * g - 12 * b) >> 8));
+      accumulate(cbScope, column, cb);
+      accumulate(crScope, column, cr);
       if (falseColorEnabled) {
         const color: Array<number> = falseColor(value);
         pixels[offset] = color[0];
@@ -129,35 +148,27 @@ export async function processProfessionalMonitor(
     : source;
   return new ProfessionalMonitorResult(
     output,
-    sparkline(red),
-    sparkline(green),
-    sparkline(blue),
-    sparkline(averages(waveformSum, waveformCount)),
-    sparkline(averages(hueSum, hueCount)),
+    densityMap(red),
+    densityMap(green),
+    densityMap(blue),
+    densityMap(lumaScope),
+    `${densityMap(cbScope)}|${densityMap(crScope)}`,
     Math.round(peakingPixels * 100 / Math.max(1, width * height))
   );
 }
 
-function hueIndex(
-  red: number,
-  green: number,
-  blue: number,
-  maximum: number,
-  delta: number
-): number {
-  let hue: number;
-  if (maximum === red) {
-    hue = (green - blue) / delta;
-  } else if (maximum === green) {
-    hue = 2 + (blue - red) / delta;
-  } else {
-    hue = 4 + (red - green) / delta;
-  }
-  let degrees: number = (hue * 60) % 360;
-  if (degrees < 0) {
-    degrees += 360;
-  }
-  return Math.min(23, Math.floor(degrees / 15));
+function scopeBuffer(): Array<number> {
+  return new Array<number>(SCOPE_COLUMNS * SCOPE_ROWS).fill(0);
+}
+
+function accumulate(buffer: Array<number>, column: number, value: number): void {
+  const row: number = SCOPE_ROWS - 1
+    - Math.floor(clamp8(value) * (SCOPE_ROWS - 1) / 255);
+  buffer[row * SCOPE_COLUMNS + column]++;
+}
+
+function clamp8(value: number): number {
+  return Math.min(255, Math.max(0, value));
 }
 
 function falseColor(luma: number): Array<number> {
@@ -170,22 +181,12 @@ function falseColor(luma: number): Array<number> {
   return [255, 32, 56];
 }
 
-function averages(
-  sums: Array<number>,
-  counts: Array<number>
-): Array<number> {
-  return sums.map((sum: number, index: number): number =>
-    counts[index] === 0 ? 0 : Math.floor(sum / counts[index])
-  );
-}
-
-function sparkline(values: Array<number>): string {
+function densityMap(values: Array<number>): string {
   const maximum: number = Math.max(1, ...values);
-  return values.map((value: number): string => {
-    const index: number = Math.min(
-      BARS.length - 1,
-      Math.floor(value * (BARS.length - 1) / maximum)
-    );
-    return BARS[index];
+  const divisor: number = Math.log1p(maximum);
+  const payload: string = values.map((value: number): string => {
+    const level: number = Math.round(Math.log1p(value) / divisor * 15);
+    return HEX[Math.min(15, Math.max(0, level))];
   }).join('');
+  return `S${SCOPE_COLUMNS}x${SCOPE_ROWS}:${payload}`;
 }

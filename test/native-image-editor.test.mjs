@@ -30,6 +30,23 @@ test("all native targets expose image editing in primary navigation", async () =
   assert.match(windows, /destination == "editor"/);
 });
 
+test("macOS editor isolates the workspace and bounds its preview", async () => {
+  const macos = await read("native/macos/Sources/NikonLink/main.swift");
+
+  assert.match(macos, /private var currentWorkspace: some View/);
+  assert.match(macos, /currentWorkspace\s*\.id\(model\.section\)/);
+  assert.match(
+    macos,
+    /GeometryReader \{ geometry in[\s\S]*?preview[\s\S]*?frame\(width: previewWidth, height: geometry\.size\.height\)/,
+  );
+  assert.match(macos, /\.clipped\(\)\s*\.contentShape\(Rectangle\(\)\)/);
+  assert.match(
+    macos,
+    /Keep the Menu label text-only[\s\S]*?Image\(systemName: "photo\.on\.rectangle"\)/,
+  );
+  assert.doesNotMatch(macos, /Group \{\s*switch model\.section/);
+});
+
 test("all native editors provide professional grouped adjustments", async () => {
   const [
     iosModel,
@@ -243,6 +260,191 @@ test("all native AI workspaces keep creation controls and make authorization sta
   assert.match(windows, /AiResolutionBox_SelectionChanged/);
 });
 
+test("native AI generation stays reachable and mask brushes support lifecycle operations", async () => {
+  const [ios, android, harmony, macos, windowsXaml, windows] =
+    await Promise.all([
+      read("native/ios/NikonLink/Views/RootView.swift"),
+      read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+      read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+      read("native/macos/Sources/NikonLink/main.swift"),
+      read("native/windows/MainWindow.xaml"),
+      read("native/windows/MainWindow.xaml.cs"),
+    ]);
+
+  for (const source of [ios, android, harmony, macos, `${windowsXaml}\n${windows}`]) {
+    assert.match(source, /生成图像/);
+    assert.match(source, /创建蒙版/);
+    assert.match(source, /删除蒙版/);
+    assert.match(source, /添加蒙版（画笔）/);
+    assert.match(source, /减去蒙版（画笔）/);
+    assert.match(source, /画笔大小/);
+  }
+
+  assert.match(ios, /EditorMaskStroke/);
+  assert.match(ios, /CIBlendWithMask/);
+  assert.match(android, /EditorMaskImageView/);
+  assert.match(android, /buildEditorMask/);
+  assert.match(harmony, /handleEditorMaskTouch/);
+  assert.match(harmony, /buildEditorMask/);
+  assert.match(macos, /activeMaskStrokeID/);
+  assert.match(macos, /CIBlendWithMask/);
+  assert.match(
+    macos,
+    /private var aiToolsPanel[\s\S]*ScrollView \{[\s\S]*Divider\(\)[\s\S]*生成图像/,
+  );
+  assert.match(windowsXaml, /EditorMaskCanvas/);
+  assert.match(
+    windowsXaml,
+    /EditorAiGrid[\s\S]*ScrollViewer[\s\S]*AiGenerateBtn[\s\S]*Content="生成图像"/,
+  );
+  assert.match(windows, /BuildEditorMask/);
+});
+
+test("native mask systems align brush coordinates, subtract coverage, invert, and local adjustments", async () => {
+  const [ios, android, harmony, macos, windows] = await Promise.all([
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/MainWindow.xaml.cs"),
+  ]);
+
+  const nativeEditors = [ios, android, harmony, macos, windows];
+  const smartTypes = [
+    "智能主体",
+    "智能天空",
+    "智能背景",
+    "智能人物",
+    "智能亮部",
+    "智能暗部",
+  ];
+  const localAdjustments = [
+    "MaskExposure",
+    "MaskContrast",
+    "MaskHighlights",
+    "MaskShadows",
+    "MaskTemperature",
+    "MaskTint",
+    "MaskSaturation",
+    "MaskClarity",
+  ];
+
+  for (const source of nativeEditors) {
+    for (const type of smartTypes) assert.match(source, new RegExp(type));
+    assert.match(source, /蒙版内调整/);
+    assert.match(source, /反向蒙版|反相蒙版/);
+    for (const adjustment of localAdjustments) {
+      assert.match(source, new RegExp(adjustment, "i"));
+    }
+  }
+
+  // Apple gestures and output masks share the fitted, transformed preview rect.
+  for (const source of [ios, macos]) {
+    assert.match(source, /coordinateSpace: \.named\("editorPreview"\)/);
+    assert.match(source, /recordMaskPoint\([\s\S]*imageRect: imageRect/);
+    assert.match(source, /CIMaximumCompositing/);
+    assert.match(source, /CIMultiplyCompositing/);
+    assert.match(source, /inputRVector.*-1[\s\S]*inputBiasVector.*1/);
+  }
+
+  // Android, HarmonyOS, and Windows normalize through the visible image rect,
+  // not the padded preview container, so brush strokes land at the cursor.
+  assert.match(android, /displayedImageRect\(\)/);
+  assert.match(android, /\(event\.getX\(\) - rect\.left\).*rect\.width\(\)/s);
+  assert.match(harmony, /private editorImageRect\(\): EditorPreviewRect/);
+  assert.match(harmony, /\(touch\.x - rect\.left\).*rect\.width/s);
+  assert.match(windows, /GetUniformImageRect\(EditorMaskCanvas, bitmap\)/);
+  assert.match(windows, /\(point\.X - rect\.Left\).*rect\.Width/s);
+
+  // Subtract must remove existing coverage; min(current, 255 - value) made
+  // light strokes ineffective whenever current coverage was already lower.
+  assert.match(android, /stroke\.subtract\s*\? Math\.max\(0, current - value\)/);
+  assert.match(harmony, /stroke\.subtract\s*\? Math\.max\(0, mask\[offset\] - value\)/);
+  assert.match(windows, /stroke\.Subtract\s*\? \(byte\)Math\.Max\(0, mask\[offset\] - value\)/);
+
+  // Inversion happens before intensity is applied, preserving the selected
+  // region/complement relationship at every mask strength.
+  assert.match(android, /layer\.amount \/ 100\.0/);
+  assert.match(android, /\(layer\.invert \? 1 - coverage : coverage\)\s*\* intensity/);
+  assert.match(harmony, /\(\s*layer\.invert \? 1 - coverage : coverage\s*\) \* intensity/);
+  assert.match(windows, /\(layer\.Invert \? 1 - coverage : coverage\)\s*\* intensity/);
+});
+
+test("native mask systems provide switching lists and independent visibility", async () => {
+  const [ios, android, harmony, macos, windows] = await Promise.all([
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/MainWindow.xaml.cs"),
+  ]);
+
+  for (const source of [ios, android, harmony, macos, windows]) {
+    assert.match(source, /蒙版列表/);
+    assert.match(source, /暂无蒙版/);
+    assert.match(source, /MaskLayer/);
+    assert.match(source, /[Vv]isible/);
+    assert.match(source, /[Ss]elect(?:Editor)?MaskLayer/);
+    assert.match(source, /[Ee]ffective(?:Editor)?MaskLayers/);
+  }
+
+  assert.match(ios, /Toggle\("", isOn: Binding/);
+  assert.match(macos, /Toggle\("", isOn: Binding/);
+  assert.match(android, /Switch visibility = new Switch/);
+  assert.match(harmony, /type: ToggleType\.Switch,[\s\S]*isOn: layer\.visible/);
+  assert.match(windows, /IsChecked = layer\.IsVisible/);
+});
+
+test("Windows AI uses server quota and overwrites the selected source for retouch", async () => {
+  const windows = await read("native/windows/MainWindow.xaml.cs");
+
+  assert.match(windows, /X-ZENCHE-Remaining/);
+  assert.match(windows, /ReadServerRemainingUsage\(response\)/);
+  assert.match(windows, /if \(serverRemaining is null\)[\s\S]*RecordAiUsage\(\)/);
+  assert.match(windows, /_aiServerRemainingUsage = remaining/);
+  assert.match(
+    windows,
+    /if \(_aiMode == 0[\s\S]*SaveBitmapAtomically\(originalPath, frame\)/,
+  );
+  assert.match(windows, /File\.Replace\(temporary, destination, null\)/);
+  assert.match(windows, /ai_generated_/);
+});
+
+test("all native AI clients consume server quota and replace retouched originals", async () => {
+  const [ios, android, harmony, macos, windows] = await Promise.all([
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/MainWindow.xaml.cs"),
+  ]);
+
+  assert.match(ios, /X-ZENCHE-Remaining/);
+  assert.match(ios, /ActivationManager\.updateServerRemaining/);
+  assert.match(ios, /ActivationManager\.recordUsageFallback/);
+  assert.match(ios, /replaceEditedImage/);
+
+  assert.match(android, /parseAiRemaining\(conn\.getHeaderField\("X-ZENCHE-Remaining"\)\)/);
+  assert.match(android, /setAiRemainingUsage\(result\.remaining\)/);
+  assert.match(android, /recordAiUsage\(\)/);
+  assert.match(android, /StandardCopyOption\.ATOMIC_MOVE/);
+
+  assert.match(harmony, /parseAiRemaining\(/);
+  assert.match(harmony, /setAiRemainingUsage\(/);
+  assert.match(harmony, /recordAiUsage\(\)/);
+  assert.match(harmony, /library\.replaceFile\(/);
+
+  assert.match(macos, /X-ZENCHE-Remaining/);
+  assert.match(macos, /ActivationManager\.updateServerRemaining/);
+  assert.match(macos, /ActivationManager\.recordUsageFallback/);
+  assert.match(macos, /replaceEditedPhoto/);
+
+  assert.match(windows, /X-ZENCHE-Remaining/);
+  assert.match(windows, /ReadServerRemainingUsage\(response\)/);
+  assert.match(windows, /if \(serverRemaining is null\)[\s\S]*RecordAiUsage\(\)/);
+  assert.match(windows, /SaveBitmapAtomically\(originalPath, frame\)/);
+});
+
 test("AI server address is no longer editable in native Settings while legacy readers remain", async () => {
   const [ios, android, harmony, macosSettings, macosMain, windowsXaml, windows] =
     await Promise.all([
@@ -271,6 +473,20 @@ test("AI server address is no longer editable in native Settings while legacy re
   assert.doesNotMatch(windowsXaml, /AiServerUrlBox/);
   assert.doesNotMatch(windows, /SaveAiServerUrl|AiServerUrlBox|保存服务器地址/);
   assert.match(windows, /Path\.Combine\(AiDataDir, "ai-server-url\.txt"\)/);
+});
+
+test("Apple packages allow the legacy HTTP AI proxy through ATS", async () => {
+  const [iosInfo, macosInfo] = await Promise.all([
+    read("native/ios/NikonLink/Info.plist"),
+    read("native/macos/Info.plist"),
+  ]);
+
+  for (const info of [iosInfo, macosInfo]) {
+    assert.match(
+      info,
+      /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>\s*<\/dict>/,
+    );
+  }
 });
 
 test("mobile editor navigation opens professional develop and exposes an explicit AI mode switch", async () => {

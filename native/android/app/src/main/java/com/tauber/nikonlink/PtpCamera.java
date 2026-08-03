@@ -53,7 +53,7 @@ final class PtpCamera {
             new CameraProfile("Nikon Z50II", "Nikon", 0x04b0, 0x0455, 100, 51200),
             new CameraProfile("Nikon Z5II", "Nikon", 0x04b0, 0x0456, 100, 64000),
             new CameraProfile("Nikon ZR", "Nikon", 0x04b0, 0x0457, 100, 51200),
-            // ── Sony α ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
+            // ── Sony α ── (Product ID 0 means vendor wildcard)
             // Full-frame E-mount
             new CameraProfile("Sony A1", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony A1 II", "Sony", 0x054c, 0x0000, 100, 32000),
@@ -88,8 +88,15 @@ final class PtpCamera {
     private static final int RESPONSE_SESSION_ALREADY_OPEN = 0x201e;
     private static final int OPEN_SESSION = 0x1002;
     private static final int CLOSE_SESSION = 0x1003;
+    private static final int GET_STORAGE_IDS = 0x1004;
+    private static final int GET_STORAGE_INFO = 0x1005;
+    private static final int GET_OBJECT_HANDLES = 0x1007;
+    private static final int GET_OBJECT_INFO = 0x1008;
     private static final int GET_OBJECT = 0x1009;
+    private static final int GET_THUMB = 0x100a;
+    private static final int DELETE_OBJECT = 0x100b;
     private static final int GET_DEVICE_PROP_DESC = 0x1014;
+    private static final int GET_DEVICE_PROP_VALUE = 0x1015;
     private static final int SET_DEVICE_PROP = 0x1016;
     private static final int CHANGE_CAMERA_MODE = 0x90c2;
     private static final int DEVICE_READY = 0x90c8;
@@ -98,6 +105,7 @@ final class PtpCamera {
     private static final int END_LIVE_VIEW = 0x9202;
     private static final int GET_LIVE_VIEW_IMAGE = 0x9203;
     private static final int MANUAL_FOCUS_DRIVE = 0x9204;
+    private static final int AUTO_FOCUS_DRIVE = 0x90c1;
     private static final int CAPTURE_TO_SDRAM = 0x9207;
     private static final int START_MOVIE_RECORDING = 0x920a;
     private static final int END_MOVIE_RECORDING = 0x920b;
@@ -112,6 +120,20 @@ final class PtpCamera {
     private static final int EXPOSURE_TIME = 0x500d;
     private static final int NIKON_EXPOSURE_TIME = 0xd100;
     private static final int NIKON_MOVIE_EXPOSURE_TIME = 0xd1a8;
+    private static final int NIKON_MOVIE_FILE_TYPE = 0xd0af;
+    private static final int NIKON_MOVIE_PRORES_TONE_MODE = 0x0001d000;
+    private static final int NIKON_MOVIE_H265_TONE_MODE = 0x0001d001;
+    private static final int NIKON_MOVIE_NRAW_TONE_MODE = 0x0001d028;
+    private static final int NIKON_MOVIE_PRORES_RAW_TONE_MODE = 0x0001d029;
+    private static final int NIKON_H264_8_BIT = 0x00000801;
+    private static final int NIKON_H265_10_BIT = 0x00010a00;
+    private static final int NIKON_NRAW_12_BIT = 0x00020c02;
+    private static final int NIKON_PRORES_422_10_BIT = 0x00100a00;
+    private static final int NIKON_PRORES_RAW_12_BIT = 0x00110c00;
+    private static final int SONY_PICTURE_PROFILE = 0xd23f;
+    private static final int SONY_MOVIE_FILE_FORMAT = 0xd241;
+    private static final int CANON_EOS_SET_DEVICE_PROP_VALUE_EX = 0x9110;
+    private static final int CANON_LOG_GAMMA = 0xd176;
     private static final int USB_BULK_CHUNK_BYTES =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
                     ? 64 * 1024
@@ -243,12 +265,122 @@ final class PtpCamera {
         return liveView;
     }
 
+    synchronized boolean isConnected() {
+        return connection != null;
+    }
+
+    synchronized CameraStorage.Snapshot listStorage() throws Exception {
+        ensureConnected();
+        boolean resumeLiveView = liveView;
+        if (resumeLiveView) stopLiveView();
+        try {
+            java.util.List<CameraStorage.Volume> volumes = new java.util.ArrayList<>();
+            java.util.List<CameraStorage.Item> items = new java.util.ArrayList<>();
+            byte[] storageIds = transact(GET_STORAGE_IDS, null, null, 15_000);
+            for (long storageId : CameraStorage.parseStorageIds(storageIds)) {
+                byte[] storageInfo = transact(
+                        GET_STORAGE_INFO,
+                        new long[]{storageId},
+                        null,
+                        15_000);
+                volumes.add(CameraStorage.parseStorageInfo(storageId, storageInfo));
+                appendStorageItems(storageId, items);
+            }
+            items.sort((left, right) -> {
+                int byDate = right.capturedAt.compareTo(left.capturedAt);
+                return byDate != 0
+                        ? byDate
+                        : right.filename.compareToIgnoreCase(left.filename);
+            });
+            diagnostics.info(
+                    "camera-storage",
+                    cameraName() + " 已读取 " + volumes.size() + " 个存储卷、"
+                            + items.size() + " 个文件");
+            return new CameraStorage.Snapshot(volumes, items);
+        } finally {
+            if (resumeLiveView && connection != null) {
+                resumeLiveViewAfterExclusiveOperation();
+            }
+        }
+    }
+
+    private void appendStorageItems(
+            long storageId,
+            java.util.List<CameraStorage.Item> items) throws Exception {
+        java.util.ArrayDeque<Long> pending = new java.util.ArrayDeque<>(
+                CameraStorage.parseObjectHandles(transact(
+                        GET_OBJECT_HANDLES,
+                        new long[]{storageId, 0, 0xffff_ffffL},
+                        null,
+                        30_000)));
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        while (!pending.isEmpty()) {
+            long handle = pending.removeFirst();
+            if (!visited.add(handle)) continue;
+            byte[] objectInfo = transact(
+                    GET_OBJECT_INFO,
+                    new long[]{handle},
+                    null,
+                    15_000);
+            if (CameraStorage.isAssociation(objectInfo)) {
+                for (long child : CameraStorage.parseObjectHandles(transact(
+                        GET_OBJECT_HANDLES,
+                        new long[]{storageId, 0, handle},
+                        null,
+                        30_000))) {
+                    if (!visited.contains(child)) pending.addLast(child);
+                }
+                continue;
+            }
+            CameraStorage.Item item = CameraStorage.parseObjectInfo(handle, objectInfo);
+            if (item != null) items.add(item);
+        }
+    }
+
+    synchronized byte[] getStorageThumbnail(long handle) throws Exception {
+        ensureConnected();
+        return transact(GET_THUMB, new long[]{handle}, null, 30_000);
+    }
+
+    synchronized byte[] downloadStorageObject(long handle) throws Exception {
+        ensureConnected();
+        boolean resumeLiveView = liveView;
+        if (resumeLiveView) stopLiveView();
+        try {
+            return transact(GET_OBJECT, new long[]{handle}, null, 180_000);
+        } finally {
+            if (resumeLiveView && connection != null) {
+                resumeLiveViewAfterExclusiveOperation();
+            }
+        }
+    }
+
+    synchronized void deleteStorageObject(long handle) throws Exception {
+        ensureConnected();
+        boolean resumeLiveView = liveView;
+        if (resumeLiveView) stopLiveView();
+        try {
+            transact(DELETE_OBJECT, new long[]{handle, 0}, null, 30_000);
+            diagnostics.info(
+                    "camera-storage",
+                    cameraName() + " 已删除机内对象 " + Long.toUnsignedString(handle));
+        } finally {
+            if (resumeLiveView && connection != null) {
+                resumeLiveViewAfterExclusiveOperation();
+            }
+        }
+    }
+
     synchronized byte[] capture() throws Exception {
         ensureConnected();
         boolean resumeLiveView = liveView;
         boolean releaseRemoteMode = false;
-        if (resumeLiveView) stopLiveView();
         try {
+            if (resumeLiveView) {
+                stopLiveView();
+                waitUntilDeviceReady(6_000);
+            }
+            waitUntilDeviceReady(6_000);
             if ("bulb".equals(exposureMode)) {
                 transact(CHANGE_CAMERA_MODE, new long[]{1}, null, 10_000);
                 releaseRemoteMode = true;
@@ -264,7 +396,7 @@ final class PtpCamera {
             } else {
                 transact(CAPTURE_TO_SDRAM, new long[]{0xffffffffL, 1}, null, 60_000);
             }
-            long handle = 0xffff0001L;
+            long handle = 0;
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
                 try {
@@ -279,8 +411,40 @@ final class PtpCamera {
                 }
                 Thread.sleep(180);
             }
-            byte[] jpeg = extractJpeg(
-                    transact(GET_OBJECT, new long[]{handle}, null, 60_000));
+            if (handle == 0) {
+                waitUntilDeviceReady(8_000);
+                handle = 0xffff0001L;
+            }
+            byte[] objectData = null;
+            Exception objectError = null;
+            for (int attempt = 0; attempt < 4; attempt++) {
+                try {
+                    objectData = transact(
+                            GET_OBJECT,
+                            new long[]{handle},
+                            null,
+                            60_000);
+                    break;
+                } catch (Exception error) {
+                    objectError = error;
+                    String message = error.getMessage();
+                    if (message == null || !message.contains("0x2009")) {
+                        throw error;
+                    }
+                    diagnostics.warning(
+                            "capture",
+                            cameraName()
+                                    + " 读取照片时相机忙，第 "
+                                    + (attempt + 1)
+                                    + " 次重试："
+                                    + message);
+                    waitUntilDeviceReady(3_000);
+                }
+            }
+            if (objectData == null && objectError != null) {
+                throw objectError;
+            }
+            byte[] jpeg = extractJpeg(objectData);
             waitUntilDeviceReady(8_000);
             return jpeg;
         } finally {
@@ -312,7 +476,12 @@ final class PtpCamera {
         if (!isParameterWritable(name)) {
             throw new Exception(parameterLockReason(name));
         }
-        boolean resumeLiveView = liveView;
+        // Nikon exposes the live-view AF property while viewfinder streaming is
+        // active. Do not tear down/restart the stream just to switch AF mode;
+        // doing so races the next preview request and can leave MANUAL_FOCUS_DRIVE
+        // rejected as an in-progress I/O operation.
+        boolean preserveLiveViewForFocus = "focusMode".equals(name) && liveView;
+        boolean resumeLiveView = liveView && !preserveLiveViewForFocus;
         if (resumeLiveView) stopLiveView();
         try {
             Exception lastError = null;
@@ -322,7 +491,11 @@ final class PtpCamera {
                     return setParameterCore(name, rawValue);
                 } catch (Exception error) {
                     lastError = error;
-                    if (!isTransientPtpError(error) || attempt >= maxRetries - 1) {
+                    boolean focusTransient = "focusMode".equals(name)
+                            && isTransientFocusError(error);
+                    if ((!isTransientPtpError(error) && !focusTransient)
+                            || attempt >= maxRetries - 1) {
+                        if (focusTransient) throw enhanceFocusError(error);
                         throw enhanceTransientError(error, name);
                     }
                     diagnostics.warning(
@@ -359,12 +532,71 @@ final class PtpCamera {
         long amount = Math.abs(normalized) == 1
                 ? 128
                 : Math.abs(normalized) == 2 ? 512 : 1024;
-        transact(
-                MANUAL_FOCUS_DRIVE,
-                new long[]{direction, amount},
-                null,
-                10_000);
-        waitUntilDeviceReady(4_000);
+        Exception lastError = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                transact(
+                        MANUAL_FOCUS_DRIVE,
+                        new long[]{direction, amount},
+                        null,
+                        10_000);
+            } catch (Exception error) {
+                lastError = error;
+                if (!isTransientFocusError(error) || attempt >= 2) {
+                    throw enhanceFocusError(error);
+                }
+                try {
+                    Thread.sleep(180L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw error;
+                }
+                continue;
+            }
+            try {
+                waitUntilDeviceReady(4_000);
+                return;
+            } catch (Exception readyError) {
+                // The drive response means the lens already moved. Retry
+                // readiness only so a slow body does not get two focus moves.
+                if (!isTransientFocusError(readyError)) throw readyError;
+                try {
+                    waitUntilDeviceReady(4_000);
+                    return;
+                } catch (Exception finalReadyError) {
+                    throw enhanceFocusError(finalReadyError);
+                }
+            }
+        }
+        throw lastError != null ? lastError : new Exception(cameraName() + " 对焦请求失败。");
+    }
+
+    synchronized void triggerAutoFocus() throws Exception {
+        ensureConnected();
+        if (!liveView) {
+            throw new Exception("AF-ON 仅能在实时取景开启时使用。");
+        }
+        setParameter("focusMode", "single-shot");
+        Exception lastError = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                transact(AUTO_FOCUS_DRIVE, null, null, 10_000);
+                waitUntilDeviceReady(4_000);
+                return;
+            } catch (Exception error) {
+                lastError = error;
+                if (!isTransientFocusError(error) || attempt >= 2) {
+                    throw enhanceFocusError(error);
+                }
+                try {
+                    Thread.sleep(180L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw error;
+                }
+            }
+        }
+        throw lastError != null ? lastError : new Exception("AF-ON 请求失败。");
     }
 
     private Object setParameterCore(String name, Object rawValue) throws Exception {
@@ -386,22 +618,50 @@ final class PtpCamera {
             int stillFocusMode = "manual".equals(mode)
                     ? 0x0001
                     : "continuous".equals(mode) ? 0x8011 : 0x8010;
-            try {
-                transact(
-                        SET_DEVICE_PROP,
-                        new long[]{0x500a},
-                        littleEndian16(stillFocusMode),
-                        10_000);
-            } catch (Exception stillFocusError) {
-                int liveViewFocusMode = "manual".equals(mode)
-                        ? 4
-                        : "continuous".equals(mode) ? 1 : 0;
-                transact(
-                        SET_DEVICE_PROP,
-                        new long[]{0xd061},
-                        new byte[]{(byte) liveViewFocusMode},
-                        10_000);
+            int liveViewFocusMode = "manual".equals(mode)
+                    ? 4
+                    : "continuous".equals(mode) ? 1 : 0;
+            if (liveView) {
+                try {
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0xd061},
+                            new byte[]{(byte) liveViewFocusMode},
+                            10_000);
+                } catch (Exception liveViewFocusError) {
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0x500a},
+                            littleEndian16(stillFocusMode),
+                            10_000);
+                }
+            } else {
+                try {
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0x500a},
+                            littleEndian16(stillFocusMode),
+                            10_000);
+                } catch (Exception stillFocusError) {
+                    transact(
+                            SET_DEVICE_PROP,
+                            new long[]{0xd061},
+                            new byte[]{(byte) liveViewFocusMode},
+                            10_000);
+                }
             }
+            return rawValue;
+        }
+        if ("videoCodec".equals(name)) {
+            setVideoCodec(String.valueOf(rawValue));
+            return rawValue;
+        }
+        if ("videoLog".equals(name)) {
+            setVideoLog(String.valueOf(rawValue));
+            return rawValue;
+        }
+        if ("nLog".equals(name)) {
+            setVideoLog(Boolean.parseBoolean(String.valueOf(rawValue)) ? "nlog" : "off");
             return rawValue;
         }
         int property;
@@ -470,6 +730,127 @@ final class PtpCamera {
             refreshParameterCapabilities();
         }
         return rawValue;
+    }
+
+    private void setVideoCodec(String codec) throws Exception {
+        if (profile == null) throw new Exception("请先连接支持的相机。");
+        if (profile.vendorId == 0x054c) {
+            int rawValue;
+            if ("sonyXavcHs8k".equals(codec)) rawValue = 10;
+            else if ("sonyXavcHs4k".equals(codec)) rawValue = 11;
+            else if ("sonyXavcS4k".equals(codec)) rawValue = 8;
+            else if ("sonyXavcSHd".equals(codec)) rawValue = 9;
+            else if ("sonyXavcSi4k".equals(codec)) rawValue = 14;
+            else if ("sonyXavcSiHd".equals(codec)) rawValue = 15;
+            else throw new Exception("Sony 不支持所选视频录制规格。");
+            transact(
+                    SET_DEVICE_PROP,
+                    new long[]{SONY_MOVIE_FILE_FORMAT},
+                    new byte[]{(byte) rawValue},
+                    10_000);
+            return;
+        }
+        if (profile.vendorId == 0x04a9) {
+            throw new Exception(
+                    profile.name
+                            + " 未报告可写的佳能录制格式属性；规格已展示，请在机身中选择 RAW、XF-HEVC S 或 XF-AVC S。");
+        }
+        if (profile.vendorId != 0x04b0) {
+            throw new Exception("当前相机不支持远程切换视频录制规格。");
+        }
+        if (("nraw".equals(codec) || "proresRaw".equals(codec)
+                || "prores422hq".equals(codec))
+                && !supportsAdvancedNikonVideo(profile.name)) {
+            throw new Exception(profile.name + " 不支持所选 RAW/ProRes 视频编码。");
+        }
+        String normalized = codec.toLowerCase(Locale.ROOT);
+        int rawValue;
+        if ("h265".equals(normalized)) rawValue = NIKON_H265_10_BIT;
+        else if ("prores422hq".equals(normalized)) rawValue = NIKON_PRORES_422_10_BIT;
+        else if ("proresraw".equals(normalized)) rawValue = NIKON_PRORES_RAW_12_BIT;
+        else if ("nraw".equals(normalized)) rawValue = NIKON_NRAW_12_BIT;
+        else rawValue = NIKON_H264_8_BIT;
+        transact(
+                SET_DEVICE_PROP,
+                new long[]{NIKON_MOVIE_FILE_TYPE},
+                littleEndian32(rawValue),
+                10_000);
+    }
+
+    private void setVideoLog(String logProfile) throws Exception {
+        if (profile == null) throw new Exception("请先连接支持的相机。");
+        if (profile.vendorId == 0x054c) {
+            int pictureProfile;
+            if ("off".equals(logProfile)) pictureProfile = 0;
+            else if ("sonySLog2".equals(logProfile)) pictureProfile = 7;
+            else if ("sonySLog3Cine".equals(logProfile)) pictureProfile = 8;
+            else if ("sonySLog3".equals(logProfile)) pictureProfile = 9;
+            else if ("sonyHlg".equals(logProfile)) pictureProfile = 10;
+            else throw new Exception("Sony 不支持所选 Log / Picture Profile。");
+            transact(
+                    SET_DEVICE_PROP,
+                    new long[]{SONY_PICTURE_PROFILE},
+                    new byte[]{(byte) pictureProfile},
+                    10_000);
+            return;
+        }
+        if (profile.vendorId == 0x04a9) {
+            int value;
+            if ("off".equals(logProfile)) value = 0;
+            else if ("canonLog".equals(logProfile)) value = 1;
+            else if ("canonLog2".equals(logProfile)) value = 2;
+            else if ("canonLog3".equals(logProfile)) value = 3;
+            else throw new Exception("Canon 不支持所选 Canon Log 曲线。");
+            byte[] payload = new byte[12];
+            ByteBuffer buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN);
+            buffer.putInt(12);
+            buffer.putInt(CANON_LOG_GAMMA);
+            buffer.putInt(value);
+            transact(CANON_EOS_SET_DEVICE_PROP_VALUE_EX, null, payload, 10_000);
+            return;
+        }
+        if (profile.vendorId != 0x04b0) {
+            throw new Exception("当前相机不支持远程切换 Log 曲线。");
+        }
+        boolean enabled = !"off".equals(logProfile);
+        if (enabled && !"nlog".equals(logProfile)) {
+            throw new Exception("Nikon 机身仅支持 N-Log。");
+        }
+        byte[] fileTypeData = transact(
+                GET_DEVICE_PROP_VALUE,
+                new long[]{NIKON_MOVIE_FILE_TYPE},
+                null,
+                10_000);
+        if (fileTypeData.length < 4) {
+            throw new Exception("相机未返回有效的视频编码值。");
+        }
+        int fileType = ByteBuffer.wrap(fileTypeData)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .getInt();
+        int toneProperty = nikonToneProperty(fileType, enabled);
+        if (toneProperty == 0) return;
+        transact(
+                SET_DEVICE_PROP,
+                new long[]{toneProperty},
+                new byte[]{(byte) (enabled ? 1 : 0)},
+                10_000);
+    }
+
+    private static int nikonToneProperty(int fileType, boolean enabled) throws Exception {
+        if (fileType == NIKON_H265_10_BIT) return NIKON_MOVIE_H265_TONE_MODE;
+        if (fileType == NIKON_NRAW_12_BIT) return NIKON_MOVIE_NRAW_TONE_MODE;
+        if (fileType == NIKON_PRORES_422_10_BIT) return NIKON_MOVIE_PRORES_TONE_MODE;
+        if (fileType == NIKON_PRORES_RAW_12_BIT) return NIKON_MOVIE_PRORES_RAW_TONE_MODE;
+        if (!enabled) return 0;
+        throw new Exception(
+                "当前编码不支持 N-Log；请选择 H.265 10-bit、N-RAW、ProRes 422 HQ 或 ProRes RAW。");
+    }
+
+    private static boolean supportsAdvancedNikonVideo(String name) {
+        return name.contains("Z9")
+                || name.contains("Z8")
+                || name.contains("Z6III")
+                || name.contains("ZR");
     }
 
     private void setShutterSeconds(double seconds, boolean video) throws Exception {
@@ -594,6 +975,31 @@ final class PtpCamera {
         return message.contains("0x200F") || message.contains("0x201C");
     }
 
+    private boolean isTransientFocusError(Exception error) {
+        String message = error.getMessage();
+        if (message == null) return false;
+        String normalized = message.toLowerCase(Locale.US);
+        return message.contains("0x2019")
+                || normalized.contains("busy")
+                || normalized.contains("in progress")
+                || normalized.contains("i/o")
+                || normalized.contains("timeout")
+                || normalized.contains("error code=-110")
+                || normalized.contains("错误码=-110")
+                || normalized.contains("-110")
+                || normalized.contains("超时")
+                || normalized.contains("传输失败");
+    }
+
+    private Exception enhanceFocusError(Exception error) {
+        if (!isTransientFocusError(error)) return error;
+        return new Exception(
+                cameraName()
+                        + " 当前正在传输实时取景画面，暂时无法执行焦点步进。"
+                        + "请稍候片刻后重试。",
+                error);
+    }
+
     private Exception enhanceTransientError(Exception error, String name) {
         String message = error.getMessage();
         if (message == null) return error;
@@ -656,6 +1062,11 @@ final class PtpCamera {
     }
 
     synchronized boolean isParameterWritable(String name) {
+        if ("videoCodec".equals(name)
+                && profile != null
+                && profile.vendorId == 0x04a9) {
+            return false;
+        }
         if (deniedParameters.contains(name) || !canAdjustExposureParameter(name)) {
             return false;
         }
@@ -663,6 +1074,11 @@ final class PtpCamera {
     }
 
     synchronized String parameterLockReason(String name) {
+        if ("videoCodec".equals(name)
+                && profile != null
+                && profile.vendorId == 0x04a9) {
+            return "该 Canon 机身未报告通用可写的录制格式属性，请在机身菜单中选择规格";
+        }
         if (deniedParameters.contains(name)) {
             return parameterDisplayName(name) + "已被相机拒绝，重新连接后再检测";
         }
@@ -699,7 +1115,11 @@ final class PtpCamera {
         deniedParameters.clear();
         int[] properties = new int[]{
                 0x5005, 0x5007, 0x500a, EXPOSURE_TIME, 0x500e, 0x500f,
-                0x5010, NIKON_EXPOSURE_TIME, NIKON_MOVIE_EXPOSURE_TIME, 0xd200
+                0x5010, NIKON_EXPOSURE_TIME, NIKON_MOVIE_EXPOSURE_TIME, 0xd200,
+                NIKON_MOVIE_FILE_TYPE, NIKON_MOVIE_PRORES_TONE_MODE,
+                NIKON_MOVIE_H265_TONE_MODE, NIKON_MOVIE_NRAW_TONE_MODE,
+                NIKON_MOVIE_PRORES_RAW_TONE_MODE, SONY_MOVIE_FILE_FORMAT,
+                SONY_PICTURE_PROFILE
         };
         for (int property : properties) {
             try {
@@ -733,6 +1153,19 @@ final class PtpCamera {
             case "iso": return 0x500f;
             case "exposureCompensation": return 0x5010;
             case "pictureControl": return 0xd200;
+            case "videoCodec":
+                return profile != null && profile.vendorId == 0x054c
+                        ? SONY_MOVIE_FILE_FORMAT
+                        : NIKON_MOVIE_FILE_TYPE;
+            case "videoLog":
+            case "nLog":
+                if (profile != null && profile.vendorId == 0x054c) {
+                    return SONY_PICTURE_PROFILE;
+                }
+                if (profile != null && profile.vendorId == 0x04a9) {
+                    return CANON_LOG_GAMMA;
+                }
+                return NIKON_MOVIE_H265_TONE_MODE;
             default: return -1;
         }
     }
@@ -748,6 +1181,9 @@ final class PtpCamera {
             case "whiteBalanceMode": return "白平衡";
             case "pictureControl": return "优化校准";
             case "exposureMode": return "拍摄模式";
+            case "videoCodec": return "视频录制规格";
+            case "videoLog": return "Log / Picture Profile";
+            case "nLog": return "N-Log";
             default: return "参数";
         }
     }
@@ -1449,6 +1885,20 @@ final class PtpCamera {
         return cameraName();
     }
 
+    synchronized String getConnectedCameraVendor() {
+        return profile == null ? "" : profile.vendorName;
+    }
+
+    synchronized String getConnectedDeviceId() {
+        if (profile == null) return cameraName();
+        return String.format(
+                Locale.ROOT,
+                "%04x:%04x:%s",
+                profile.vendorId,
+                connectedProductId,
+                cameraName());
+    }
+
     synchronized int getMinimumIso() {
         return profile == null ? 100 : profile.minIso;
     }
@@ -1463,7 +1913,11 @@ final class PtpCamera {
 
     private static CameraProfile profileFor(int vendorId, int productId) {
         for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-            if (candidate.vendorId == vendorId && candidate.productId == productId) return candidate;
+            if (candidate.vendorId == vendorId
+                    && candidate.productId != 0
+                    && candidate.productId == productId) {
+                return candidate;
+            }
         }
         return null;
     }
@@ -1472,33 +1926,51 @@ final class PtpCamera {
         CameraProfile byProductId = profileFor(device.getVendorId(), device.getProductId());
         if (byProductId != null) return byProductId;
         String descriptor = device.getProductName();
-        if (descriptor == null) return null;
-        String normalized = descriptor
-                .toLowerCase(Locale.ROOT)
-                .replace("_", "")
-                .replace("-", "")
-                .replace(" ", "");
-        String generationAlias = normalized
-                .replace("iii", "3")
-                .replace("ii", "2");
         CameraProfile bestMatch = null;
         int bestMatchLength = 0;
-        for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-            String candidateName = candidate.name
+        if (descriptor != null) {
+            String normalized = descriptor
                     .toLowerCase(Locale.ROOT)
-                    .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
+                    .replace("_", "")
+                    .replace("-", "")
                     .replace(" ", "");
-            String candidateAlias = candidateName
+            String generationAlias = normalized
                     .replace("iii", "3")
                     .replace("ii", "2");
-            if ((normalized.contains(candidateName)
-                    || generationAlias.contains(candidateAlias))
-                    && candidateAlias.length() > bestMatchLength) {
-                bestMatch = candidate;
-                bestMatchLength = candidateAlias.length();
+            for (CameraProfile candidate : SUPPORTED_CAMERAS) {
+                String candidateName = candidate.name
+                        .toLowerCase(Locale.ROOT)
+                        .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
+                        .replace(" ", "");
+                String candidateAlias = candidateName
+                        .replace("iii", "3")
+                        .replace("ii", "2");
+                if ((normalized.contains(candidateName)
+                        || generationAlias.contains(candidateAlias))
+                        && candidateAlias.length() > bestMatchLength) {
+                    bestMatch = candidate;
+                    bestMatchLength = candidateAlias.length();
+                }
             }
         }
-        return bestMatch;
+        if (bestMatch != null) return bestMatch;
+        // Sony and Canon may expose model-specific Product IDs that are not
+        // stable across firmware generations. Keep the fallback generic when
+        // Android cannot expose a product descriptor, rather than guessing a
+        // specific model.
+        return vendorFallbackProfile(device.getVendorId());
+    }
+
+    private static CameraProfile vendorFallbackProfile(int vendorId) {
+        if (vendorId == 0x054c) {
+            return new CameraProfile(
+                    "Sony " + "α USB/PTP", "Sony", vendorId, 0, 100, 102400);
+        }
+        if (vendorId == 0x04a9) {
+            return new CameraProfile(
+                    "Canon " + "EOS USB/PTP", "Canon", vendorId, 0, 100, 102400);
+        }
+        return null;
     }
 
     private static final class CameraProfile {

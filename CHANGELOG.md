@@ -3,6 +3,103 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.5.0] - 2026-08-03
+
+### Added
+
+- Added native external recording across iOS / iPadOS, Android, HarmonyOS,
+  macOS, and Windows so photos and video can be stored on the connected smart
+  device instead of relying only on the camera card.
+- Added streaming Motion-JPEG AVI writers on Android, HarmonyOS, macOS, and
+  Windows, with safe RIFF finalization when recording stops or the camera
+  disconnects. iOS / iPadOS keeps the native AVFoundation MOV path.
+- Added external recordings to project-session naming, dual-destination backup,
+  SHA-256 manifests, and each platform's local ZENCHE media library.
+- Added 107 Nikon NP3 cloud presets for native photo editing and live photo/video
+  monitoring. The SDR approximation is display-only and never alters originals.
+- Added native in-camera storage management across all five targets, including
+  volume and object browsing, thumbnails, protected-object handling, batch
+  download, and confirmed permanent deletion from the camera card.
+- Added explicit AP-direct and STA-LAN modes to the native PTP/IP connection
+  manager, with topology guidance and remembered mode selection.
+- Added a self-hosted update metadata service at `/api/update` (plus the
+  `/api/updates` compatibility alias and `/healthz`) and made all native clients
+  query `https://zenche.top/api/update` before MirrorChyan and GitHub fallbacks.
+
+### Changed
+
+- PTP recording can now run in parallel: camera-body recording continues while
+  live-view frames are written to the smart-device disk when external recording
+  is enabled.
+- Large video checksum calculation now streams in bounded chunks on iOS / iPadOS
+  and HarmonyOS instead of loading the whole file into memory.
+- Refined the Nikon cloud monitor card colors and responsive hierarchy, and
+  stabilized native preset sheets, dialogs, and bounded drop-down selectors.
+- Raised native release metadata to version `1.5.0` / build `25` and synchronized
+  launch announcements, localization, package scripts, and three-language README
+  documentation across all five native targets.
+
+### Limitations
+
+- Standard PTP live view does not carry an audio track; PTP external recordings
+  are therefore silent Motion-JPEG AVI files. Local and UVC sources on iOS /
+  iPadOS record MOV through AVFoundation.
+
+### Fixed
+
+- Fixed standard PTP camera-card browsing so USB and PTP/IP transports start
+  from the root association and recursively enumerate nested `DCIM` folders
+  instead of discarding directory objects and showing an empty file list.
+- Fixed macOS camera-card browsing by retaining gphoto2's detailed file-list
+  output, including the folder-local indexes, sizes, and deletion flags needed
+  by the storage parser, instead of receiving an unparseable quiet path list.
+
+## [1.4.1] - 2026-08-02
+
+### Added
+
+- Added native RGB three-channel waveform and audio waveform monitor cards across
+  iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.
+- Added monitor-preview tap-to-focus feedback and native focus requests across
+  all five targets.
+
+### Changed
+
+- Moved the Android recording control between the RGB and audio waveform cards.
+- Removed the monitor lens readout, the monitor “曝光” tool entry, and the
+  Android monitor preview fullscreen control.
+- Exposed adjustable frame rate, shutter angle, ISO, and related monitor
+  parameters directly in the monitor surfaces.
+- The audio card reports a silent baseline because no camera audio transport is
+  currently available; it does not fabricate live audio levels.
+- Raised native release metadata to version `1.4.1` / build `24` and aligned
+  package scripts, README downloads, announcements, and validation assets.
+
+## [1.4.0] - 2026-08-02
+
+### Fixed
+
+- Fixed AI reference-image forwarding: the complete selected image data URL is
+  sent through the proxy in the upstream `images` array, so edits are based on
+  the original photo instead of becoming unrelated generations.
+- Added server-authoritative AI quota deduction with remaining-count response
+  headers and automatic rollback when an upstream request fails.
+- AI retouching now atomically overwrites the current original; AI generation
+  continues to save a separate new file.
+
+### Changed
+
+- Synchronized the five native targets and their launch announcements around
+  the AI workflow, quota behavior, and original-versus-generated file semantics.
+- Reorganized the native professional editor around a DaVinci-style grading
+  workflow with Lift / Gamma / Gain color wheels, a master curve, RGB picker,
+  and linear, radial, and subject mask controls. These controls are connected
+  to native previews and high-quality non-destructive copies on all five
+  targets.
+- Improved Nikon, Sony, and Canon camera/PTP and professional-editor stability.
+- Raised native release metadata to version `1.4.0` / build `23` and aligned
+  package scripts, README downloads, and validation assets.
+
 ## [1.3.1] - 2026-08-02
 
 ### Added

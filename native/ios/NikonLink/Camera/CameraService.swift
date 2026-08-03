@@ -37,14 +37,143 @@ enum MonitorVideoCodec: String, CaseIterable, Identifiable {
     case automatic
     case h264
     case hevc
+    case proRes422HQ
+    case proResRAW
+    case nRaw
+    case sonyXavcHs8k
+    case sonyXavcHs4k
+    case sonyXavcS4k
+    case sonyXavcSHd
+    case sonyXavcSi4k
+    case sonyXavcSiHd
+    case canonRaw
+    case canonXfHevc422
+    case canonXfHevc420
+    case canonXfAvc422
+    case canonXfAvc420
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .automatic: return "自动（输出目标）"
-        case .h264: return "H.264 / AVC"
-        case .hevc: return "H.265 / HEVC"
+        case .h264: return "H.264 / AVC · 8-bit"
+        case .hevc: return "H.265 / HEVC · 10-bit"
+        case .proRes422HQ: return "Apple ProRes 422 HQ · 10-bit"
+        case .proResRAW: return "Apple ProRes RAW HQ · 12-bit"
+        case .nRaw: return "N-RAW · 12-bit NEV"
+        case .sonyXavcHs8k: return "XAVC HS 8K · HEVC Long GOP"
+        case .sonyXavcHs4k: return "XAVC HS 4K · HEVC Long GOP"
+        case .sonyXavcS4k: return "XAVC S 4K · AVC Long GOP"
+        case .sonyXavcSHd: return "XAVC S HD · AVC Long GOP"
+        case .sonyXavcSi4k: return "XAVC S-I 4K · AVC Intra"
+        case .sonyXavcSiHd: return "XAVC S-I HD · AVC Intra"
+        case .canonRaw: return "RAW · 12-bit"
+        case .canonXfHevc422: return "XF-HEVC S · 4:2:2 10-bit"
+        case .canonXfHevc420: return "XF-HEVC S · 4:2:0 10-bit"
+        case .canonXfAvc422: return "XF-AVC S · 4:2:2 10-bit"
+        case .canonXfAvc420: return "XF-AVC S · 4:2:0 8-bit"
+        }
+    }
+
+    var supportsNLog: Bool {
+        switch self {
+        case .automatic, .h264: return false
+        case .hevc, .proRes422HQ, .proResRAW, .nRaw,
+             .sonyXavcHs8k, .sonyXavcHs4k, .sonyXavcS4k,
+             .sonyXavcSHd, .sonyXavcSi4k, .sonyXavcSiHd,
+             .canonRaw, .canonXfHevc422, .canonXfHevc420,
+             .canonXfAvc422, .canonXfAvc420:
+            return true
+        }
+    }
+
+    var requiredBodyVendor: MonitorVideoVendor? {
+        switch self {
+        case .nRaw: return .nikon
+        case .sonyXavcHs8k, .sonyXavcHs4k, .sonyXavcS4k,
+             .sonyXavcSHd, .sonyXavcSi4k, .sonyXavcSiHd:
+            return .sony
+        case .canonRaw, .canonXfHevc422, .canonXfHevc420,
+             .canonXfAvc422, .canonXfAvc420:
+            return .canon
+        default: return nil
+        }
+    }
+
+    var requiresNikonBody: Bool { requiredBodyVendor == .nikon }
+
+    var avVideoCodecType: AVVideoCodecType? {
+        switch self {
+        case .automatic, .nRaw,
+             .sonyXavcHs8k, .sonyXavcHs4k, .sonyXavcS4k,
+             .sonyXavcSHd, .sonyXavcSi4k, .sonyXavcSiHd,
+             .canonRaw, .canonXfHevc422, .canonXfHevc420,
+             .canonXfAvc422, .canonXfAvc420:
+            return nil
+        case .h264:
+            return .h264
+        case .hevc:
+            return .hevc
+        case .proRes422HQ:
+            return .proRes422HQ
+        case .proResRAW:
+            if #available(iOS 26.0, *) {
+                return .proResRAWHQ
+            }
+            return nil
+        }
+    }
+}
+
+enum MonitorVideoVendor: String, CaseIterable, Identifiable {
+    case system
+    case nikon
+    case sony
+    case canon
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .system: return "本机 / UVC"
+        case .nikon: return "Nikon"
+        case .sony: return "Sony"
+        case .canon: return "Canon"
+        }
+    }
+}
+
+enum MonitorVideoLog: String, CaseIterable, Identifiable {
+    case off
+    case nlog
+    case sonySLog2
+    case sonySLog3Cine
+    case sonySLog3
+    case sonyHlg
+    case canonLog
+    case canonLog2
+    case canonLog3
+
+    var id: String { rawValue }
+    var vendor: MonitorVideoVendor? {
+        switch self {
+        case .off: return nil
+        case .nlog: return .nikon
+        case .sonySLog2, .sonySLog3Cine, .sonySLog3, .sonyHlg: return .sony
+        case .canonLog, .canonLog2, .canonLog3: return .canon
+        }
+    }
+    var label: String {
+        switch self {
+        case .off: return "关闭 · SDR"
+        case .nlog: return "N-Log"
+        case .sonySLog2: return "PP7 · S-Log2"
+        case .sonySLog3Cine: return "PP8 · S-Log3 / S-Gamut3.Cine"
+        case .sonySLog3: return "PP9 · S-Log3 / S-Gamut3"
+        case .sonyHlg: return "PP10 · HLG"
+        case .canonLog: return "Canon Log"
+        case .canonLog2: return "Canon Log 2"
+        case .canonLog3: return "Canon Log 3"
         }
     }
 }
@@ -106,6 +235,10 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var activeFrameRate: Double = 30
     @Published private(set) var maxZoomFactor: CGFloat = 1
     @Published private(set) var activeVideoSpecLabel = "—"
+    @Published private(set) var availableVideoCodecs: [MonitorVideoCodec] = [.automatic]
+    @Published private(set) var activeVideoCodecLabel = "自动（输出目标）"
+    @Published private(set) var supportsNLog = false
+    @Published private(set) var nLogEnabled = false
     @Published private(set) var supportsMovieRecording = false
     @Published private(set) var isRecording = false
     @Published var exposureBias: Float = 0
@@ -121,6 +254,10 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     @Published private(set) var peakingCoverage = 0
     @Published private(set) var focusPeakingEnabled = false
     @Published private(set) var falseColorEnabled = false
+
+    private var monitorNikonCloudPreset: NikonCloudPreset?
+
+    private(set) var preferredVideoCodec: MonitorVideoCodec = .automatic
 
     let session = AVCaptureSession()
     var onPhotoCaptured: ((Data, String) -> Void)?
@@ -224,6 +361,10 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self.supportsCustomExposure = false
                 self.exposureModeIsCustom = false
                 self.supportsMovieRecording = false
+                self.availableVideoCodecs = [.automatic]
+                self.activeVideoCodecLabel = "自动（输出目标）"
+                self.supportsNLog = false
+                self.nLogEnabled = false
                 self.isRecording = false
                 self.state = .disconnected
                 self.onMessage?("相机已断开")
@@ -309,6 +450,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 return
             }
             guard !self.movieOutput.isRecording else { return }
+            guard self.applyRecordingCodec(notify: true) else { return }
 
             let folder = FileManager.default.temporaryDirectory
                 .appendingPathComponent("NikonLinkRecording", isDirectory: true)
@@ -327,7 +469,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 )
                 DispatchQueue.main.async {
                     self.isRecording = true
-                    self.onMessage?("视频录制中 · 再按一次停止")
+                    self.onMessage?("● EXT REC · 正在外录到当前智能设备")
                 }
             } catch {
                 self.onMessage?("开始录制失败：\(error.localizedDescription)")
@@ -339,7 +481,7 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
         sessionQueue.async { [weak self] in
             guard let self, self.movieOutput.isRecording else { return }
             self.movieOutput.stopRecording()
-            self.onMessage?("正在停止并保存视频…")
+            self.onMessage?("正在停止并封装外录视频…")
         }
     }
 
@@ -384,6 +526,119 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     func setVideoISO(_ value: Float) {
         applyVideoExposure(shutterAngle: shutterAngle, iso: value)
+    }
+
+    func setVideoExposureMode(custom: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            do {
+                try device.lockForConfiguration()
+                if custom {
+                    device.setExposureModeCustom(
+                        duration: CMTimeMakeWithSeconds(
+                            self.shutterAngle / (360 * max(Self.activeFrameRate(for: device), 1)),
+                            preferredTimescale: 1_000_000_000
+                        ),
+                        iso: min(max(self.exposureISO, device.activeFormat.minISO), device.activeFormat.maxISO),
+                        completionHandler: nil
+                    )
+                } else if device.isExposureModeSupported(.continuousAutoExposure) {
+                    device.exposureMode = .continuousAutoExposure
+                } else if device.isExposureModeSupported(.autoExpose) {
+                    device.exposureMode = .autoExpose
+                }
+                device.unlockForConfiguration()
+                DispatchQueue.main.async {
+                    self.exposureModeIsCustom = custom
+                }
+            } catch {
+                self.onMessage?("视频曝光模式设置失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    func setRecordingCodec(_ codec: MonitorVideoCodec) {
+        preferredVideoCodec = codec
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            _ = self.applyRecordingCodec(notify: self.currentDevice != nil)
+        }
+    }
+
+    func setNLogEnabled(_ enabled: Bool) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            guard self.supportsNLog else {
+                DispatchQueue.main.async {
+                    self.nLogEnabled = false
+                    self.onMessage?("当前视频来源不能由本机切换 N-Log；请连接支持 N-Log 控制的 Nikon 机身")
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                self.nLogEnabled = enabled
+                self.onMessage?(enabled ? "N-Log 已开启" : "N-Log 已关闭")
+            }
+        }
+    }
+
+    func setVideoLog(_ log: MonitorVideoLog) {
+        if log == .off {
+            setNLogEnabled(false)
+            return
+        }
+        onMessage?(
+            "\(log.label) 是相机机身录制曲线；当前 iOS AVFoundation / UVC 视频来源不提供厂商 Picture Profile 写入通道"
+        )
+    }
+
+    private func applyRecordingCodec(notify: Bool) -> Bool {
+        let availableTypes = movieOutput.availableVideoCodecTypes
+        let mapped = MonitorVideoCodec.allCases.filter { codec in
+            codec == .automatic
+                || codec.avVideoCodecType.map(availableTypes.contains) == true
+        }
+        let supported = mapped.contains(preferredVideoCodec)
+        DispatchQueue.main.async {
+            self.availableVideoCodecs = mapped
+            // iOS controls local/UVC encoding. Nikon's proprietary N-Log
+            // switch is intentionally not mapped to Apple Log.
+            self.supportsNLog = false
+            self.nLogEnabled = false
+        }
+
+        guard supported else {
+            if notify {
+                onMessage?(
+                    preferredVideoCodec.requiredBodyVendor != nil
+                        ? "\(preferredVideoCodec.label) 需要兼容 \(preferredVideoCodec.requiredBodyVendor?.label ?? "相机") 机身；当前 AVFoundation / UVC 来源不提供此编码"
+                        : "当前视频设备不支持 \(preferredVideoCodec.label)"
+                )
+            }
+            return false
+        }
+        guard preferredVideoCodec != .automatic else {
+            DispatchQueue.main.async {
+                self.activeVideoCodecLabel = self.preferredVideoCodec.label
+            }
+            return true
+        }
+        guard let connection = movieOutput.connection(with: .video),
+              let codecType = preferredVideoCodec.avVideoCodecType else {
+            if notify { onMessage?("当前视频输出没有可配置的编码连接") }
+            return false
+        }
+        movieOutput.setOutputSettings(
+            [AVVideoCodecKey: codecType],
+            for: connection
+        )
+        DispatchQueue.main.async {
+            self.activeVideoCodecLabel = self.preferredVideoCodec.label
+            if notify {
+                self.onMessage?("视频编码已应用 · \(self.preferredVideoCodec.label)")
+            }
+        }
+        return true
     }
 
     func setTimedExposure(seconds: Double) {
@@ -592,6 +847,30 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
         }
     }
 
+    /// Trigger one autofocus cycle at the current focus point (the AF-ON action).
+    /// AVFoundation starts the cycle when autofocus mode is selected; keeping the
+    /// operation on the session queue avoids racing preview configuration.
+    func triggerAutoFocus() {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.currentDevice else { return }
+            guard device.isFocusModeSupported(.autoFocus) else {
+                self.onMessage?("当前设备不支持 AF-ON")
+                return
+            }
+            do {
+                try device.lockForConfiguration()
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+                }
+                device.focusMode = .autoFocus
+                device.unlockForConfiguration()
+                self.onMessage?("AF-ON 已触发")
+            } catch {
+                self.onMessage?("AF-ON 失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
     func moveFocus(_ signedStep: Int) {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.currentDevice else { return }
@@ -618,14 +897,23 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
 
     func setFocusPeakingEnabled(_ enabled: Bool) {
         focusPeakingEnabled = enabled
-        if !enabled, !falseColorEnabled {
+        if !enabled, !falseColorEnabled, monitorNikonCloudPreset == nil {
             monitorOverlay = nil
         }
     }
 
     func setFalseColorEnabled(_ enabled: Bool) {
         falseColorEnabled = enabled
-        if !enabled, !focusPeakingEnabled {
+        if !enabled, !focusPeakingEnabled, monitorNikonCloudPreset == nil {
+            monitorOverlay = nil
+        }
+    }
+
+    func setMonitorNikonCloudPreset(_ preset: NikonCloudPreset?) {
+        monitorQueue.async { [weak self] in
+            self?.monitorNikonCloudPreset = preset
+        }
+        if preset == nil, !focusPeakingEnabled, !falseColorEnabled {
             monitorOverlay = nil
         }
     }
@@ -680,6 +968,9 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 }
                 self.session.commitConfiguration()
                 self.currentDevice = device
+                if canRecordMovie {
+                    _ = self.applyRecordingCodec(notify: false)
+                }
                 self.session.startRunning()
 
                 DispatchQueue.main.async {
@@ -755,7 +1046,8 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
         let result = ProfessionalMonitor.process(
             pixelBuffer,
             focusPeaking: focusPeakingEnabled,
-            falseColor: falseColorEnabled
+            falseColor: falseColorEnabled,
+            nikonCloudPreset: monitorNikonCloudPreset
         )
         DispatchQueue.main.async { [weak self] in
             self?.monitorOverlay = result.overlay

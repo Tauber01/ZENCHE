@@ -2,4 +2,6 @@
 "NSCameraUsageDescription" = "ライブ映像の表示、タップフォーカス、写真撮影に使用します。";
 "NSPhotoLibraryAddUsageDescription" = "選択した撮影ファイルをシステムの写真ライブラリへ保存するために使用します。";
 "NSPhotoLibraryUsageDescription" = "ファイル画面にシステムライブラリの写真と動画を表示するために使用します。";
-"NSLocalNetworkUsageDescription" = "信頼できるローカルネットワーク上で FTP、HTTP、WebDAV により写真を受信するために使用します。";
+"NSLocalNetworkUsageDescription" = "信頼できるローカルネットワーク上で PTP/IP カメラに接続し、FTP、HTTP、WebDAV により写真を受信するために使用します。";
+"NSBluetoothAlwaysUsageDescription" = "対応する Bluetooth リモコンに接続してシャッター指令を受信するために使用します。";
+"NSLocationWhenInUseUsageDescription" = "撮影写真の XMP GPS メタデータに現在地を追加するために使用します。";

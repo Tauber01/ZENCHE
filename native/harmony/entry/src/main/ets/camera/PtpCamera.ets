@@ -1,22 +1,54 @@
 import { BusinessError, usbManager } from '@kit.BasicServicesKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   CameraProfile,
   SUPPORTED_VENDOR_IDS,
   profileForProduct,
   supportedCameraSummary
 } from './CameraProfiles';
+import {
+  CameraStorageItem,
+  CameraStorageSnapshot,
+  CameraStorageVolume,
+  isObjectAssociation,
+  parseObjectInfo,
+  parseStorageIds,
+  parseStorageInfo
+} from '../storage/CameraStorage';
 
 const CONTAINER_COMMAND: number = 1;
 const CONTAINER_DATA: number = 2;
 const CONTAINER_RESPONSE: number = 3;
 const RESPONSE_OK: number = 0x2001;
+const RESPONSE_SESSION_ALREADY_OPEN: number = 0x201e;
 const OPEN_SESSION: number = 0x1002;
 const CLOSE_SESSION: number = 0x1003;
+const GET_STORAGE_IDS: number = 0x1004;
+const GET_STORAGE_INFO: number = 0x1005;
+const GET_OBJECT_HANDLES: number = 0x1007;
+const GET_OBJECT_INFO: number = 0x1008;
 const GET_OBJECT: number = 0x1009;
+const GET_THUMB: number = 0x100a;
+const DELETE_OBJECT: number = 0x100b;
+const GET_DEVICE_PROPERTY_VALUE: number = 0x1015;
 const SET_DEVICE_PROPERTY: number = 0x1016;
 const EXPOSURE_TIME: number = 0x500d;
 const NIKON_EXPOSURE_TIME: number = 0xd100;
 const NIKON_MOVIE_EXPOSURE_TIME: number = 0xd1a8;
+const NIKON_MOVIE_FILE_TYPE: number = 0xd0af;
+const NIKON_MOVIE_PRORES_TONE_MODE: number = 0x0001d000;
+const NIKON_MOVIE_H265_TONE_MODE: number = 0x0001d001;
+const NIKON_MOVIE_NRAW_TONE_MODE: number = 0x0001d028;
+const NIKON_MOVIE_PRORES_RAW_TONE_MODE: number = 0x0001d029;
+const NIKON_H264_8_BIT: number = 0x00000801;
+const NIKON_H265_10_BIT: number = 0x00010a00;
+const NIKON_NRAW_12_BIT: number = 0x00020c02;
+const NIKON_PRORES_422_10_BIT: number = 0x00100a00;
+const NIKON_PRORES_RAW_12_BIT: number = 0x00110c00;
+const SONY_PICTURE_PROFILE: number = 0xd23f;
+const SONY_MOVIE_FILE_FORMAT: number = 0xd241;
+const CANON_EOS_SET_DEVICE_PROP_VALUE_EX: number = 0x9110;
+const CANON_LOG_GAMMA: number = 0xd176;
 const CHANGE_CAMERA_MODE: number = 0x90c2;
 const DEVICE_READY: number = 0x90c8;
 const GET_EVENT: number = 0x90c7;
@@ -24,6 +56,7 @@ const START_LIVE_VIEW: number = 0x9201;
 const END_LIVE_VIEW: number = 0x9202;
 const GET_LIVE_VIEW_IMAGE: number = 0x9203;
 const MANUAL_FOCUS_DRIVE: number = 0x9204;
+const AUTO_FOCUS_DRIVE: number = 0x90c1;
 const CAPTURE_TO_SDRAM: number = 0x9207;
 const START_MOVIE_RECORDING: number = 0x920a;
 const END_MOVIE_RECORDING: number = 0x920b;
@@ -83,6 +116,126 @@ export class PtpCamera {
 
   get profile(): CameraProfile | undefined {
     return this.activeProfile;
+  }
+
+  async listStorage(): Promise<CameraStorageSnapshot> {
+    this.ensureConnected();
+    const resumeLiveView: boolean = this.liveView;
+    if (resumeLiveView) {
+      await this.stopLiveView();
+    }
+    try {
+      const volumes: Array<CameraStorageVolume> = [];
+      const items: Array<CameraStorageItem> = [];
+      const storageIds: Array<number> = parseStorageIds(
+        await this.transact(GET_STORAGE_IDS, [], undefined, 15000)
+      );
+      for (const storageId of storageIds) {
+        volumes.push(parseStorageInfo(
+          storageId,
+          await this.transact(
+            GET_STORAGE_INFO,
+            [storageId],
+            undefined,
+            15000
+          )
+        ));
+        const pendingHandles: Array<number> = parseStorageIds(
+          await this.transact(
+            GET_OBJECT_HANDLES,
+            [storageId, 0, 0xffffffff],
+            undefined,
+            30000
+          )
+        );
+        const visitedHandles: Set<number> = new Set<number>();
+        let pendingIndex: number = 0;
+        while (pendingIndex < pendingHandles.length) {
+          const handle: number = pendingHandles[pendingIndex++];
+          if (visitedHandles.has(handle)) {
+            continue;
+          }
+          visitedHandles.add(handle);
+          const objectInfo: Uint8Array = await this.transact(
+            GET_OBJECT_INFO,
+            [handle],
+            undefined,
+            15000
+          );
+          if (isObjectAssociation(objectInfo)) {
+            const children: Array<number> = parseStorageIds(
+              await this.transact(
+                GET_OBJECT_HANDLES,
+                [storageId, 0, handle],
+                undefined,
+                30000
+              )
+            );
+            children.forEach((child: number): void => {
+              if (!visitedHandles.has(child)) {
+                pendingHandles.push(child);
+              }
+            });
+          } else {
+            const item: CameraStorageItem | undefined = parseObjectInfo(
+              handle,
+              objectInfo
+            );
+            if (item !== undefined) {
+              items.push(item);
+            }
+          }
+        }
+      }
+      items.sort((left: CameraStorageItem, right: CameraStorageItem): number => {
+        const byDate: number = right.capturedAt.localeCompare(left.capturedAt);
+        return byDate !== 0
+          ? byDate
+          : right.filename.localeCompare(left.filename);
+      });
+      hilog.info(0x0000, 'ZENCHE',
+        `[camera-storage] ${this.cameraName()} 已读取 ${volumes.length} 个存储卷、${items.length} 个文件`);
+      return new CameraStorageSnapshot(volumes, items);
+    } finally {
+      if (resumeLiveView && this.isConnected) {
+        await this.resumeLiveViewAfterExclusiveOperation();
+      }
+    }
+  }
+
+  async getStorageThumbnail(handle: number): Promise<Uint8Array> {
+    this.ensureConnected();
+    return this.transact(GET_THUMB, [handle], undefined, 30000);
+  }
+
+  async downloadStorageObject(handle: number): Promise<Uint8Array> {
+    this.ensureConnected();
+    const resumeLiveView: boolean = this.liveView;
+    if (resumeLiveView) {
+      await this.stopLiveView();
+    }
+    try {
+      return await this.transact(GET_OBJECT, [handle], undefined, 180000);
+    } finally {
+      if (resumeLiveView && this.isConnected) {
+        await this.resumeLiveViewAfterExclusiveOperation();
+      }
+    }
+  }
+
+  async deleteStorageObject(handle: number): Promise<void> {
+    this.ensureConnected();
+    const resumeLiveView: boolean = this.liveView;
+    if (resumeLiveView) {
+      await this.stopLiveView();
+    }
+    try {
+      await this.transact(DELETE_OBJECT, [handle, 0], undefined, 30000);
+    } finally {
+      if (resumeLiveView && this.isConnected) {
+        await this.resumeLiveViewAfterExclusiveOperation();
+      }
+    }
   }
 
   async connect(): Promise<CameraProfile> {
@@ -256,10 +409,12 @@ export class PtpCamera {
     this.ensureConnected();
     const resumeLiveView: boolean = this.liveView;
     let releaseRemoteMode: boolean = false;
-    if (resumeLiveView) {
-      await this.stopLiveView();
-    }
     try {
+      if (resumeLiveView) {
+        await this.stopLiveView();
+        await this.waitUntilDeviceReady(6000);
+      }
+      await this.waitUntilDeviceReady(6000);
       if (this.exposureMode === 'bulb') {
         await this.transact(CHANGE_CAMERA_MODE, [1], undefined, 10000);
         releaseRemoteMode = true;
@@ -311,14 +466,38 @@ export class PtpCamera {
         await this.sleep(180);
       }
 
-      const source: Uint8Array = await this.transact(
-        GET_OBJECT,
-        [handle],
-        undefined,
-        60000
-      );
+      let source: Uint8Array | undefined = undefined;
+      let objectError: Error | undefined;
+      for (let attempt: number = 0; attempt < 4; attempt++) {
+        try {
+          source = await this.transact(
+            GET_OBJECT,
+            [handle],
+            undefined,
+            60000
+          );
+          break;
+        } catch (error) {
+          const candidate: Error = error as Error;
+          objectError = candidate;
+          if (!candidate.message.includes('0x2009') &&
+              !candidate.message.includes('busy') &&
+              !candidate.message.includes('Busy')) {
+            throw candidate;
+          }
+          hilog.warn(
+            0x0000,
+            'NikonLink',
+            `[camera] ${this.cameraName()} 读取照片时相机忙，第 ${attempt + 1} 次重试：${candidate.message}`
+          );
+          await this.waitUntilDeviceReady(3000);
+        }
+      }
+      if (source === undefined && objectError !== undefined) {
+        throw objectError;
+      }
       await this.waitUntilDeviceReady(8000);
-      return this.extractJpeg(source);
+      return this.extractJpeg(source as Uint8Array);
     } finally {
       if (releaseRemoteMode && this.isConnected) {
         try {
@@ -340,7 +519,11 @@ export class PtpCamera {
     if (!this.canAdjustParameter(name)) {
       throw new Error(this.parameterLockReason(name));
     }
-    const resumeLiveView: boolean = this.liveView;
+    // Keep the live-view stream alive while changing AF mode. Restarting it
+    // immediately before MANUAL_FOCUS_DRIVE races the next preview transfer
+    // and surfaces as "I/O in progress" on some camera/USB stacks.
+    const preserveLiveViewForFocus: boolean = name === 'focusMode' && this.liveView;
+    const resumeLiveView: boolean = this.liveView && !preserveLiveViewForFocus;
     if (resumeLiveView) {
       await this.stopLiveView();
     }
@@ -354,8 +537,13 @@ export class PtpCamera {
         } catch (error) {
           lastError = error as Error;
           const message: string = lastError.message;
-          if (!this.isTransientPtpError(lastError)
+          const focusTransient: boolean = name === 'focusMode' &&
+            this.isTransientFocusError(lastError);
+          if ((!this.isTransientPtpError(lastError) && !focusTransient)
               || attempt >= maxRetries - 1) {
+            if (focusTransient) {
+              throw this.enhanceFocusError(lastError);
+            }
             if (message.includes('0x200F') || message.includes('0x201C')) {
               throw new Error(
                 `${this.cameraName()} 当前状态暂时拒绝写入此参数。` +
@@ -390,13 +578,64 @@ export class PtpCamera {
     const direction: number = normalized < 0 ? 0x1 : 0x2;
     const magnitude: number = Math.abs(normalized);
     const amount: number = magnitude === 1 ? 128 : magnitude === 2 ? 512 : 1024;
-    await this.transact(
-      MANUAL_FOCUS_DRIVE,
-      [direction, amount],
-      undefined,
-      10000
-    );
-    await this.waitUntilDeviceReady(4000);
+    let lastError: Error | undefined;
+    for (let attempt: number = 0; attempt < 3; attempt++) {
+      try {
+        await this.transact(
+          MANUAL_FOCUS_DRIVE,
+          [direction, amount],
+          undefined,
+          10000
+        );
+      } catch (error) {
+        lastError = error as Error;
+        if (!this.isTransientFocusError(lastError) || attempt >= 2) {
+          throw this.enhanceFocusError(lastError);
+        }
+        await this.sleep(180 * (attempt + 1));
+        continue;
+      }
+      try {
+        await this.waitUntilDeviceReady(4000);
+        return;
+      } catch (readyError) {
+        // The drive response means the lens already moved. Retry readiness
+        // only so a slow body does not get two focus moves.
+        if (!this.isTransientFocusError(readyError as Error)) {
+          throw new Error((readyError as Error).message);
+        }
+        try {
+          await this.waitUntilDeviceReady(4000);
+          return;
+        } catch (finalReadyError) {
+          throw this.enhanceFocusError(finalReadyError as Error);
+        }
+      }
+    }
+    throw lastError ?? new Error(`${this.cameraName()} 对焦请求失败。`);
+  }
+
+  async triggerAutoFocus(): Promise<void> {
+    this.ensureConnected();
+    if (!this.liveView) {
+      throw new Error('AF-ON 仅能在实时取景开启时使用。');
+    }
+    await this.setParameter('focusMode', 'single-shot');
+    let lastError: Error | undefined;
+    for (let attempt: number = 0; attempt < 3; attempt++) {
+      try {
+        await this.transact(AUTO_FOCUS_DRIVE, [], undefined, 10000);
+        await this.waitUntilDeviceReady(4000);
+        return;
+      } catch (error) {
+        lastError = error as Error;
+        if (!this.isTransientFocusError(lastError) || attempt >= 2) {
+          throw this.enhanceFocusError(lastError);
+        }
+        await this.sleep(180 * (attempt + 1));
+      }
+    }
+    throw lastError ?? new Error('AF-ON 请求失败。');
   }
 
   private async setParameterCore(
@@ -425,13 +664,34 @@ export class PtpCamera {
       const stillValue: number =
         mode === 'manual' ? 0x0001 :
         mode === 'continuous' ? 0x8011 : 0x8010;
-      try {
-        await this.setProperty(0x500a, this.littleEndian16(stillValue));
-      } catch (error) {
-        const liveValue: number =
-          mode === 'manual' ? 4 : mode === 'continuous' ? 1 : 0;
-        await this.setProperty(0xd061, new Uint8Array([liveValue]));
+      const liveValue: number =
+        mode === 'manual' ? 4 : mode === 'continuous' ? 1 : 0;
+      if (this.liveView) {
+        try {
+          await this.setProperty(0xd061, new Uint8Array([liveValue]));
+        } catch (liveViewError) {
+          await this.setProperty(0x500a, this.littleEndian16(stillValue));
+        }
+      } else {
+        try {
+          await this.setProperty(0x500a, this.littleEndian16(stillValue));
+        } catch (stillError) {
+          await this.setProperty(0xd061, new Uint8Array([liveValue]));
+        }
       }
+      return;
+    }
+
+    if (name === 'videoCodec') {
+      await this.setVideoCodec(String(rawValue));
+      return;
+    }
+    if (name === 'videoLog') {
+      await this.setVideoLog(String(rawValue));
+      return;
+    }
+    if (name === 'nLog') {
+      await this.setVideoLog(Number(rawValue) !== 0 ? 'nlog' : 'off');
       return;
     }
 
@@ -492,11 +752,147 @@ export class PtpCamera {
     }
   }
 
+  private async setVideoCodec(codec: string): Promise<void> {
+    if (this.activeProfile === undefined) {
+      throw new Error('请先连接支持的相机。');
+    }
+    if (this.activeProfile.vendorId === 0x054c) {
+      const value: number = codec === 'sonyXavcHs8k' ? 10 :
+        codec === 'sonyXavcHs4k' ? 11 :
+        codec === 'sonyXavcS4k' ? 8 :
+        codec === 'sonyXavcSHd' ? 9 :
+        codec === 'sonyXavcSi4k' ? 14 :
+        codec === 'sonyXavcSiHd' ? 15 : -1;
+      if (value < 0) throw new Error('Sony 不支持所选视频录制规格。');
+      await this.setProperty(
+        SONY_MOVIE_FILE_FORMAT,
+        new Uint8Array([value])
+      );
+      return;
+    }
+    if (this.activeProfile.vendorId === 0x04a9) {
+      throw new Error(
+        `${this.activeProfile.name} 未报告可写的佳能录制格式属性；` +
+        '规格已展示，请在机身中选择 RAW、XF-HEVC S 或 XF-AVC S。'
+      );
+    }
+    if (this.activeProfile.vendorId !== 0x04b0) {
+      throw new Error('当前相机不支持远程切换视频录制规格。');
+    }
+    if (
+      ['nraw', 'proresRaw', 'prores422hq'].includes(codec) &&
+      !this.supportsAdvancedNikonVideo(this.activeProfile.name)
+    ) {
+      throw new Error(`${this.activeProfile.name} 不支持所选 RAW/ProRes 视频编码。`);
+    }
+    const normalized: string = codec.toLowerCase();
+    const value: number = normalized === 'h265' ? NIKON_H265_10_BIT :
+      normalized === 'prores422hq' ? NIKON_PRORES_422_10_BIT :
+        normalized === 'proresraw' ? NIKON_PRORES_RAW_12_BIT :
+          normalized === 'nraw' ? NIKON_NRAW_12_BIT : NIKON_H264_8_BIT;
+    await this.setProperty(
+      NIKON_MOVIE_FILE_TYPE,
+      this.littleEndian32(value)
+    );
+  }
+
+  private async setVideoLog(logProfile: string): Promise<void> {
+    if (this.activeProfile === undefined) {
+      throw new Error('请先连接支持的相机。');
+    }
+    if (this.activeProfile.vendorId === 0x054c) {
+      const value: number = logProfile === 'off' ? 0 :
+        logProfile === 'sonySLog2' ? 7 :
+        logProfile === 'sonySLog3Cine' ? 8 :
+        logProfile === 'sonySLog3' ? 9 :
+        logProfile === 'sonyHlg' ? 10 : -1;
+      if (value < 0) throw new Error('Sony 不支持所选 Log / Picture Profile。');
+      await this.setProperty(SONY_PICTURE_PROFILE, new Uint8Array([value]));
+      return;
+    }
+    if (this.activeProfile.vendorId === 0x04a9) {
+      const value: number = logProfile === 'off' ? 0 :
+        logProfile === 'canonLog' ? 1 :
+        logProfile === 'canonLog2' ? 2 :
+        logProfile === 'canonLog3' ? 3 : -1;
+      if (value < 0) throw new Error('Canon 不支持所选 Canon Log 曲线。');
+      const payload: Uint8Array = new Uint8Array(12);
+      const view: DataView = new DataView(payload.buffer);
+      view.setUint32(0, 12, true);
+      view.setUint32(4, CANON_LOG_GAMMA, true);
+      view.setUint32(8, value, true);
+      await this.transact(
+        CANON_EOS_SET_DEVICE_PROP_VALUE_EX,
+        [],
+        payload,
+        10000
+      );
+      return;
+    }
+    if (this.activeProfile.vendorId !== 0x04b0) {
+      throw new Error('当前相机不支持远程切换 Log 曲线。');
+    }
+    const enabled: boolean = logProfile !== 'off';
+    if (enabled && logProfile !== 'nlog') {
+      throw new Error('Nikon 机身仅支持 N-Log。');
+    }
+    const fileTypeData: Uint8Array = await this.transact(
+      GET_DEVICE_PROPERTY_VALUE,
+      [NIKON_MOVIE_FILE_TYPE],
+      undefined,
+      10000
+    );
+    if (fileTypeData.length < 4) {
+      throw new Error('相机未返回有效的视频编码值。');
+    }
+    const fileType: number = new DataView(
+      fileTypeData.buffer,
+      fileTypeData.byteOffset,
+      fileTypeData.byteLength
+    ).getUint32(0, true);
+    const toneProperty: number = this.nikonToneProperty(fileType, enabled);
+    if (toneProperty === 0) return;
+    await this.setProperty(
+      toneProperty,
+      new Uint8Array([enabled ? 1 : 0])
+    );
+  }
+
+  private nikonToneProperty(fileType: number, enabled: boolean): number {
+    if (fileType === NIKON_H265_10_BIT) return NIKON_MOVIE_H265_TONE_MODE;
+    if (fileType === NIKON_NRAW_12_BIT) return NIKON_MOVIE_NRAW_TONE_MODE;
+    if (fileType === NIKON_PRORES_422_10_BIT) return NIKON_MOVIE_PRORES_TONE_MODE;
+    if (fileType === NIKON_PRORES_RAW_12_BIT) {
+      return NIKON_MOVIE_PRORES_RAW_TONE_MODE;
+    }
+    if (!enabled) return 0;
+    throw new Error(
+      '当前编码不支持 N-Log；请选择 H.265 10-bit、N-RAW、ProRes 422 HQ 或 ProRes RAW。'
+    );
+  }
+
+  private supportsAdvancedNikonVideo(name: string): boolean {
+    return name.includes('Z9') || name.includes('Z8') ||
+      name.includes('Z6III') || name.includes('ZR');
+  }
+
   canAdjustParameter(name: string): boolean {
+    if (
+      name === 'videoCodec' &&
+      this.activeProfile?.vendorId === 0x04a9
+    ) {
+      return false;
+    }
     return !this.deniedParameters.has(name) && this.canAdjust(name);
   }
 
   parameterLockReason(name: string): string {
+    if (
+      name === 'videoCodec' &&
+      this.activeProfile?.vendorId === 0x04a9
+    ) {
+      return '该 Canon 机身未报告通用可写的录制格式属性，请在机身菜单中选择规格';
+    }
     if (this.deniedParameters.has(name)) {
       return '相机已拒绝此参数，本次连接内保持锁定';
     }
@@ -588,8 +984,10 @@ export class PtpCamera {
     timeout: number
   ): Promise<Uint8Array> {
     this.ensureConnectedForOperation(operation);
-    this.transaction = (this.transaction + 1) >>> 0;
-    const current: number = this.transaction;
+    const current: number = operation === OPEN_SESSION
+      ? 0
+      : ((this.transaction + 1) >>> 0);
+    this.transaction = current;
     const parameterBytes: Uint8Array = new Uint8Array(parameters.length * 4);
     const parameterView: DataView = new DataView(parameterBytes.buffer);
     parameters.forEach((parameter: number, index: number) => {
@@ -631,7 +1029,11 @@ export class PtpCamera {
     ) {
       throw new Error(`${this.cameraName()} 返回了不匹配的 PTP 事务编号。`);
     }
-    if (response.code !== RESPONSE_OK) {
+    if (
+      response.code !== RESPONSE_OK &&
+      !(operation === OPEN_SESSION &&
+        response.code === RESPONSE_SESSION_ALREADY_OPEN)
+    ) {
       throw new Error(
         `${this.cameraName()} PTP 错误 0x${response.code
           .toString(16)
@@ -859,6 +1261,31 @@ export class PtpCamera {
     const message: string = error.message;
     return message.includes('0x200f') || message.includes('0x200F') ||
       message.includes('0x201c') || message.includes('0x201C');
+  }
+
+  private isTransientFocusError(error: Error): boolean {
+    const message: string = error.message;
+    const normalized: string = message.toLowerCase();
+    return message.includes('0x2019') ||
+      normalized.includes('busy') ||
+      normalized.includes('in progress') ||
+      normalized.includes('i/o') ||
+      normalized.includes('timeout') ||
+      normalized.includes('error code=-110') ||
+      normalized.includes('错误码=-110') ||
+      normalized.includes('-110') ||
+      message.includes('超时') ||
+      message.includes('传输失败');
+  }
+
+  private enhanceFocusError(error: Error): Error {
+    if (!this.isTransientFocusError(error)) {
+      return error;
+    }
+    return new Error(
+      `${this.cameraName()} 当前正在传输实时取景画面，暂时无法执行焦点步进。` +
+      '请稍候片刻后重试。'
+    );
   }
 
   private async waitUntilDeviceReady(timeout: number): Promise<void> {

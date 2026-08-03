@@ -133,6 +133,56 @@ test("all platforms expose Sony and Canon vendor IDs in their supported sets", a
   assert.ok(androidCam.includes("0x04a9"), "Android missing Canon vendor ID");
 });
 
+test("zero Product IDs act as vendor wildcards for Sony and Canon USB devices", async () => {
+  const [android, harmony, macos, windows] = await Promise.all([
+    read("native/android/app/src/main/java/com/tauber/nikonlink/PtpCamera.java"),
+    read("native/harmony/entry/src/main/ets/camera/CameraProfiles.ets"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/Models/CameraProfile.cs"),
+  ]);
+
+  assert.match(
+    android,
+    /candidate\.productId != 0[\s\S]*candidate\.productId == productId/,
+    "Android must prefer exact Product IDs",
+  );
+  assert.match(
+    android,
+    /vendorFallbackProfile\(device\.getVendorId\(\)\)/,
+    "Android must fall back to a generic vendor profile",
+  );
+  assert.match(
+    harmony,
+    /profile\.productId !== 0[\s\S]*profile\.productId === productId/,
+    "HarmonyOS must prefer exact Product IDs",
+  );
+  assert.match(
+    harmony,
+    /Sony ' \+ 'α USB\/PTP[\s\S]*Canon ' \+ 'EOS USB\/PTP/,
+    "HarmonyOS must fall back to generic vendor profiles",
+  );
+  assert.match(
+    macos,
+    /\$0\.productID != 0[\s\S]*\$0\.productID == productID/,
+    "macOS must prefer exact Product IDs",
+  );
+  assert.match(
+    macos,
+    /matchingVendor\(vendorID: Int\)[\s\S]*Sony " \+ "α USB\/PTP[\s\S]*Canon " \+ "EOS USB\/PTP/,
+    "macOS must fall back to generic vendor profiles",
+  );
+  assert.match(
+    windows,
+    /camera\.ProductId != 0[\s\S]*camera\.ProductId == productId/,
+    "Windows must prefer exact Product IDs",
+  );
+  assert.match(
+    windows,
+    /Sony " \+ "α USB\/PTP[\s\S]*Canon " \+ "EOS USB\/PTP/,
+    "Windows must fall back to generic vendor profiles",
+  );
+});
+
 test("Android USB attachment filter includes Nikon, Sony, and Canon fallbacks", async () => {
   const filter = await read("native/android/app/src/main/res/xml/device_filter.xml");
   const vendorIds = [...filter.matchAll(/vendor-id="(\d+)"/g)]

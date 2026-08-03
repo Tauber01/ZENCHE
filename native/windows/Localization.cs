@@ -20,11 +20,197 @@ internal static class AppLocalization
     private static readonly Dictionary<string, Translation> Strings =
         new(StringComparer.Ordinal)
         {
+            ["尼康云创"] = new("Nikon Imaging Cloud", "Nikon Imaging Cloud"),
+            ["尼康云创预览"] = new("Nikon Imaging Cloud Preview", "Nikon Imaging Cloud プレビュー"),
+            ["选择尼康云创预设"] = new("Choose a Nikon Cloud Preset", "Nikon Cloud プリセットを選択"),
+            ["关闭云创预览"] = new("Disable Cloud Preview", "Cloud プレビューを無効化"),
+            ["尼康云创预览已关闭"] = new("Nikon cloud preview disabled", "Nikon Cloud プレビューを無効にしました"),
+            ["设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同"] = new(
+                "On-device approximate SDR preview · Camera and NX Studio output may differ",
+                "デバイス上の SDR 近似プレビュー · カメラ／NX Studio の出力とは異なる場合があります"),
+            ["尼康云创监看"] = new("Nikon Imaging Cloud Monitor", "Nikon Imaging Cloud モニター"),
+            ["关闭云创监看"] = new("Disable Cloud Monitor", "Cloud モニターを無効化"),
+            ["尼康云创监看已关闭"] = new(
+                "Nikon Imaging Cloud monitor disabled",
+                "Nikon Imaging Cloud モニターを無効にしました"),
+            ["照片与视频实时生效 · SDR 近似 · 不写入原片"] = new(
+                "Live on photo and video monitoring · Approximate SDR · Originals unchanged",
+                "写真・動画モニターへリアルタイム適用 · SDR 近似 · オリジナルは変更されません"),
+            ["选择预设"] = new("Choose Preset", "プリセットを選択"),
+            ["搜索云创预设"] = new("Search Cloud Presets", "Cloud プリセットを検索"),
+            ["已关闭"] = new("Off", "オフ"),
+            ["应用"] = new("Apply", "適用"),
+            ["107 款设备端 SDR 预设"] = new(
+                "107 on-device SDR presets",
+                "デバイス上の SDR プリセット 107 種類"),
+            ["选择尼康云创监看预设"] = new(
+                "Choose Nikon Imaging Cloud monitor preset",
+                "Nikon Imaging Cloud モニタープリセットを選択"),
+            ["尼康官方 SDK"] = new("Nikon Official SDK", "ニコン公式 SDK"),
+            ["索尼官方 SDK"] = new("Sony Official SDK", "ソニー公式 SDK"),
+            ["连接即表示同意索尼 SDK 使用限制；帧澈独立提供产品支持。"] = new(
+                "Connecting confirms acceptance of the Sony SDK restrictions; ZENCHE provides product support independently.",
+                "接続すると Sony SDK の利用制限に同意したものとみなされます。製品サポートは ZENCHE が独自に提供します。"),
+            ["Camera Remote SDK 2.02.00 已就绪"] = new(
+                "Camera Remote SDK 2.02.00 is ready",
+                "Camera Remote SDK 2.02.00 は準備完了です"),
+            ["官方 SDK 已安装，初始化或枚举失败"] = new(
+                "Official SDK installed; initialization or enumeration failed",
+                "公式 SDK はインストール済みですが、初期化または列挙に失敗しました"),
+            ["SDK 已就绪 · 未发现空闲索尼相机"] = new(
+                "SDK ready · No available Sony camera found",
+                "SDK 準備完了 · 利用可能なソニーカメラは見つかりません"),
+            ["重新检测"] = new("Check Again", "再検出"),
+            ["断开当前 USB 会话后可重新检测"] = new(
+                "Disconnect the current USB session to check again",
+                "現在の USB セッションを切断して再検出してください"),
+            ["Remote SDK 2.0.0 与 Image SDK 1.46.0 已就绪"] = new(
+                "Remote SDK 2.0.0 and Image SDK 1.46.0 are ready",
+                "Remote SDK 2.0.0 と Image SDK 1.46.0 は準備完了です"),
+            ["官方 SDK 已安装，部分组件初始化失败"] = new(
+                "Official SDK installed; some components failed to initialize",
+                "公式 SDK はインストール済みですが、一部の初期化に失敗しました"),
+            ["官方 SDK 运行库未载入"] = new(
+                "Official SDK runtime not loaded",
+                "公式 SDK ランタイムが読み込まれていません"),
+            ["SDK 已就绪 · 未发现空闲尼康相机"] = new(
+                "SDK ready · No available Nikon camera found",
+                "SDK 準備完了 · 利用可能なニコンカメラは見つかりません"),
+            ["SDK 已安装 · 断开当前 USB 会话后可重新检测"] = new(
+                "SDK installed · Disconnect the current USB session to check again",
+                "SDK インストール済み · 現在の USB セッションを切断して再検出してください"),
+            ["Remote SDK 运行库未找到"] = new(
+                "Remote SDK runtime not found",
+                "Remote SDK ランタイムが見つかりません"),
+            ["NEF / NRW 引擎已完成官方初始化"] = new(
+                "Official NEF / NRW engine initialized",
+                "公式 NEF / NRW エンジンを初期化しました"),
+            ["Image SDK 运行库未找到"] = new(
+                "Image SDK runtime not found",
+                "Image SDK ランタイムが見つかりません"),
+            ["可连接"] = new("Available", "接続可能"),
+            ["正被占用"] = new("In use", "使用中"),
+            ["连接管理"] = new("Connection Manager", "接続管理"),
+            ["相机连接"] = new("Camera Connections", "カメラ接続"),
+            ["本机摄像头、USB/PTP 与官方 SDK"] = new(
+                "Local camera, USB/PTP, and official SDKs",
+                "ローカルカメラ、USB/PTP、公式 SDK"),
+            ["相机控制"] = new("Camera Control", "カメラ制御"),
+            ["文件接收"] = new("File Receiving", "ファイル受信"),
+            ["拍摄辅助"] = new("Capture Assistants", "撮影アシスト"),
+            ["蓝牙遥控与拍摄定位"] = new(
+                "Bluetooth remote and capture location",
+                "Bluetooth リモートと撮影位置"),
+            ["通用、拍摄辅助、更新、诊断与支持。"] = new(
+                "General, capture assistants, updates, diagnostics, and support.",
+                "一般、撮影アシスト、更新、診断、サポート。"),
+            ["兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。"] = new(
+                "Compatible with the ZENCHE BLE Remote service. A shutter notification triggers the currently connected camera.",
+                "ZENCHE BLE Remote サービスに対応し、シャッター通知で現在接続中のカメラを撮影します。"),
+            ["仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。"] = new(
+                "Location is used only while the app is active. Downloaded photos receive a standard XMP GPS sidecar.",
+                "位置情報はアプリ使用中のみ取得し、ダウンロードした写真に標準 XMP GPS サイドカーを作成します。"),
+            ["相机连接与拍摄辅助"] = new(
+                "Camera Connections & Capture Aids",
+                "カメラ接続と撮影支援"),
+            ["USB、Wi‑Fi PTP/IP、蓝牙快门与拍摄位置"] = new(
+                "USB, Wi‑Fi PTP/IP, Bluetooth shutter, and capture location",
+                "USB、Wi‑Fi PTP/IP、Bluetooth シャッター、撮影位置"),
+            ["Wi‑Fi 相机 · PTP/IP"] = new(
+                "Wi‑Fi Camera · PTP/IP",
+                "Wi‑Fi カメラ · PTP/IP"),
+            ["连接模式"] = new("Connection Mode", "接続モード"),
+            ["AP 直连"] = new("AP Direct", "AP ダイレクト"),
+            ["STA 局域网"] = new("STA LAN", "STA LAN"),
+            ["AP 模式：让电脑加入相机热点；相机地址通常为 192.168.1.1。"] = new(
+                "AP mode: Join the camera hotspot on this PC; the camera address is usually 192.168.1.1.",
+                "AP モード：PC をカメラのアクセスポイントに接続します。カメラのアドレスは通常 192.168.1.1 です。"),
+            ["STA 模式：让相机与电脑加入同一局域网，并输入路由器分配给相机的 IP 地址。"] = new(
+                "STA mode: Connect the camera and PC to the same LAN, then enter the camera IP address assigned by the router.",
+                "STA モード：カメラと PC を同じ LAN に接続し、ルーターがカメラに割り当てた IP アドレスを入力します。"),
+            ["请先让电脑加入相机热点；标准 PTP/IP 默认端口为 15740。"] = new(
+                "Join the camera hotspot on this PC first. Standard PTP/IP uses port 15740 by default.",
+                "先に PC をカメラのアクセスポイントへ接続してください。標準 PTP/IP の既定ポートは 15740 です。"),
+            ["蓝牙遥控拍摄"] = new(
+                "Bluetooth Remote Capture",
+                "Bluetooth リモート撮影"),
+            ["拍摄位置"] = new("Capture Location", "撮影位置"),
+            ["拍摄时写入同名 XMP GPS，不在后台持续定位。"] = new(
+                "Writes GPS to a matching XMP sidecar at capture time; no continuous background location.",
+                "撮影時に同名の XMP へ GPS を記録し、バックグラウンドで継続測位しません。"),
+            ["Wi‑Fi 相机未连接"] = new(
+                "Wi‑Fi camera not connected",
+                "Wi‑Fi カメラ未接続"),
+            ["蓝牙遥控未开启"] = new(
+                "Bluetooth remote is off",
+                "Bluetooth リモコンはオフです"),
+            ["定位未开启"] = new("Location is off", "位置情報はオフです"),
+            ["启用"] = new("Enable", "有効"),
             ["AI 创作"] = new("AI Create", "AI クリエイト"),
-            ["联网生成与修图 · 结果保存为新文件"] = new("Online generation and editing · Results are saved as new files", "オンライン生成・編集 · 結果は新規ファイルとして保存"),
+            ["修图覆盖原图 · 生图保存新文件"] = new("AI editing overwrites the original · generation saves a new file", "AI編集は元画像を上書き · 生成は新規ファイルとして保存"),
             ["需要激活"] = new("Activation required", "アクティベーションが必要"),
             ["已解锁"] = new("Unlocked", "ロック解除済み"),
             ["输出参数"] = new("Output parameters", "出力パラメータ"),
+            ["视频曝光模式"] = new("Video Exposure Mode", "動画露出モード"),
+            ["视频快门表示"] = new("Video Shutter Display", "動画シャッター表示"),
+            ["视频编码"] = new("Video Codec", "動画コーデック"),
+            ["视频录制规格"] = new("Video Recording Format", "動画記録形式"),
+            ["录制规格来源"] = new("Recording Format Source", "記録形式のソース"),
+            ["Log / Picture Profile"] = new("Log / Picture Profile", "Log / ピクチャープロファイル"),
+            ["编码"] = new("Codec", "コーデック"),
+            ["N-Log 已开启"] = new("N-Log enabled", "N-Log を有効にしました"),
+            ["N-Log 已关闭"] = new("N-Log disabled", "N-Log を無効にしました"),
+            ["我的设备"] = new("My Devices", "マイデバイス"),
+            ["管理连接过的相机，轻触即可快速重连"] = new(
+                "Keep connected cameras ready for one-tap reconnection.",
+                "接続済みカメラを管理し、すばやく再接続できます。"),
+            ["尚未连接过设备"] = new(
+                "No Saved Devices",
+                "保存済みデバイスはありません"),
+            ["成功连接相机后会自动保存在这里。"] = new(
+                "Cameras are saved here automatically after a successful connection.",
+                "接続に成功したカメラは自動的にここへ保存されます。"),
+            ["当前已连接"] = new("Connected", "接続中"),
+            ["最近连接"] = new("Last connected", "最終接続"),
+            ["快速连接"] = new("Quick Connect", "クイック接続"),
+            ["忘记设备"] = new("Forget Device", "デバイスを削除"),
+            ["生成图像"] = new("Generate Image", "画像を生成"),
+            ["创建蒙版"] = new("Create Mask", "マスクを作成"),
+            ["蒙版"] = new("Mask", "マスク"),
+            ["蒙版列表"] = new("Mask List", "マスク一覧"),
+            ["暂无蒙版"] = new("No masks yet", "マスクはまだありません"),
+            ["显示"] = new("Visible", "表示"),
+            ["显示蒙版"] = new("Show Mask", "マスクを表示"),
+            ["隐藏蒙版"] = new("Hide Mask", "マスクを非表示"),
+            ["蒙版已显示"] = new("Mask shown", "マスクを表示しました"),
+            ["蒙版已隐藏"] = new("Mask hidden", "マスクを非表示にしました"),
+            ["已切换蒙版"] = new("Mask selected", "マスクを選択しました"),
+            ["删除蒙版"] = new("Delete Mask", "マスクを削除"),
+            ["添加蒙版（画笔）"] = new("Add to Mask (Brush)", "マスクに追加（ブラシ）"),
+            ["减去蒙版（画笔）"] = new("Subtract from Mask (Brush)", "マスクから削除（ブラシ）"),
+            ["画笔大小"] = new("Brush Size", "ブラシサイズ"),
+            ["画笔"] = new("Brush", "ブラシ"),
+            ["智能识别"] = new("Smart Selection", "スマート選択"),
+            ["智能主体"] = new("Smart Subject", "スマート被写体"),
+            ["智能天空"] = new("Smart Sky", "スマート空"),
+            ["智能背景"] = new("Smart Background", "スマート背景"),
+            ["智能人物"] = new("Smart Person", "スマート人物"),
+            ["智能亮部"] = new("Smart Highlights", "スマートハイライト"),
+            ["智能暗部"] = new("Smart Shadows", "スマートシャドウ"),
+            ["反向蒙版"] = new("Invert Mask", "マスクを反転"),
+            ["蒙版内调整"] = new("Mask Adjustments", "マスク内調整"),
+            ["蒙版已反向"] = new("Mask inverted", "マスクを反転しました"),
+            ["蒙版已恢复正向"] = new("Mask restored", "マスクを通常方向に戻しました"),
+            ["智能蒙版已创建 · 可继续添加或减去画笔"] = new(
+                "Smart mask created · Refine with the add or subtract brush",
+                "スマートマスクを作成しました · 追加／削除ブラシで調整できます"),
+            ["区域 · 可继续添加或减去画笔"] = new(" area · Refine with add or subtract brush", "領域 · 追加／削除ブラシで調整できます"),
+            ["蒙版已创建 · 在预览画面涂抹"] = new("Mask created · Paint on the preview", "マスクを作成しました · プレビュー上で描画してください"),
+            ["蒙版已删除"] = new("Mask deleted", "マスクを削除しました"),
+            ["添加蒙版画笔已启用"] = new("Add-mask brush enabled", "追加ブラシを有効にしました"),
+            ["减去蒙版画笔已启用"] = new("Subtract-mask brush enabled", "削除ブラシを有効にしました"),
+            ["在预览画面拖动画笔；蓝色为添加，白色为减去。"] = new("Drag on the preview; blue adds and white subtracts.", "プレビュー上をドラッグします。青は追加、白は削除です。"),
+            ["先创建蒙版，再选择添加或减去画笔。"] = new("Create a mask, then choose the add or subtract brush.", "マスクを作成してから追加または削除ブラシを選択します。"),
             ["次剩余"] = new("uses remaining", "回残り"),
             ["前往官网兑换密钥"] =
                 new("Redeem Key on Official Website", "公式サイトでキーを交換"),
@@ -112,24 +298,40 @@ internal static class AppLocalization
                 new("What's New", "アップデートのお知らせ"),
             ["本次更新"] =
                 new("In This Update", "今回の更新"),
-            ["• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n" +
-             "• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n" +
-             "• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n" +
-             "• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n" +
-             "• 设置页移除可编辑的“AI 服务器”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n" +
+            ["• 监看页左侧改为 RGB 三色波形，右侧新增音频波形卡；无音频源时显示静音基线。\n" +
+             "• Android 录制键移动到两张波形图之间，监看预览右上角移除全屏按钮。\n" +
+             "• 移除监看镜头读数与“曝光”工具入口；帧率、快门角度、ISO 等参数可直接调节。\n" +
+             "• 点击监看画面可切换焦点，显示焦点标记并调用原生对焦；PTP 设备按点击区域执行焦点步进。\n" +
              "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"] =
                 new(
-                    "• Unified the AI photo editing and generation workspace: editing now opens Professional Develop by default, with an explicit AI Tools switch; quick presets, ratios, resolutions, and library export remain.\n" +
-                    "• Restored the device-code system: each activation key is bound to the current device and AI cloud usage is counted server-side; ZENCHE itself remains free and open source.\n" +
-                    "• Added the official redemption path: copy the device ID and visit https://zenche.top to redeem a key bound to this device.\n" +
-                    "• Added an Afdian redemption-code purchase prompt, QR code, and purchase entry. Only the official website and in-app Afdian entry are trusted.\n" +
-                    "• Removed the editable AI Server window from Settings while retaining legacy configuration reads; Sony / Canon / Nikon camera compatibility remains.\n" +
+                    "• The monitor now shows separate RGB waveforms on the left and an audio waveform card on the right; without an audio source it displays a silent baseline.\n" +
+                    "• Android moves the recording control between the two waveform cards and removes the monitor preview fullscreen button.\n" +
+                    "• Removed the monitor lens readout and the “曝光” tool entry; frame rate, shutter angle, ISO, and related parameters can be adjusted directly.\n" +
+                    "• Tapping the monitor preview switches focus, shows a focus marker, and requests native focus; PTP devices map the tap region to focus steps.\n" +
                     "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
-                    "• AI の写真編集・生成ワークスペースを統一改善。編集画面は「プロ現像」を既定にし、「AI ツール」へ明示的に切り替え可能。クイックプリセット、比率、解像度、ライブラリ保存を維持。\n" +
-                    "• デバイスコードシステムを復旧。各アクティベーションキーは現在のデバイスに紐づき、AI クラウド利用回数はサーバーで計数。ZENCHE 本体は無料オープンソースのまま。\n" +
-                    "• 公式交換導線を追加。デバイス ID をコピーし、https://zenche.top でこのデバイス用キーに交換。\n" +
-                    "• Afdian で交換コードを購入する案内、QR コード、購入導線を追加。公式サイトとアプリ内 Afdian 導線だけを利用してください。\n" +
-                    "• 設定から編集可能な AI サーバー欄を削除し、過去の設定読み込み互換性は維持。Sony / Canon / Nikon 対応は継続。\n" +
+                    "• モニター左側に RGB 3 チャンネル波形、右側に音声波形カードを追加。音声ソースがない場合は無音の基準線を表示します。\n" +
+                    "• Android では録画ボタンを 2 つの波形カードの中央へ移動し、モニタープレビュー右上の全画面ボタンを削除しました。\n" +
+                    "• モニターのレンズ表示と「曝光」ツール入口を削除し、フレームレート、シャッター角度、ISO などを直接調整できます。\n" +
+                    "• モニタープレビューをタップするとフォーカス位置を切り替え、フォーカスマーカーを表示してネイティブフォーカスを要求します。PTP 機器ではタップ領域をフォーカスステップへ変換します。\n" +
+                    "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。"),
+            ["• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n" +
+             "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n" +
+             "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n" +
+             "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n" +
+             "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n" +
+             "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"] =
+                new(
+                    "• Added “Record to This Smart Device”: video can be written live to the ZENCHE library alongside in-camera card recording.\n" +
+                    "• Added in-camera storage management with volume and file browsing, thumbnails, protection state, batch download, and confirmed permanent deletion.\n" +
+                    "• Photos continue to save directly to this device; external video keeps session naming, backups, and SHA-256 integrity records.\n" +
+                    "• PTP live view contains no audio. Android, HarmonyOS, macOS, and Windows record silent Motion-JPEG AVI; local and UVC sources on iOS / iPadOS record MOV.\n" +
+                    "• Stopping, disconnecting the camera, or encountering a write error safely finalizes the recorded video to reduce footage loss.\n" +
+                    "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
+                    "• 「このスマートデバイスへ外部収録」を追加。動画を ZENCHE ライブラリへリアルタイム保存し、カメラ内カード記録と併用できます。\n" +
+                    "• カメラ内ストレージ管理を追加。ストレージとファイルの参照、サムネイル、保護状態、一括ダウンロード、確認付き完全削除に対応します。\n" +
+                    "• 写真は引き続きこのデバイスへ直接保存。外部収録動画にはセッション命名、バックアップ、SHA-256 整合性記録を適用します。\n" +
+                    "• PTP ライブビューに音声は含まれません。Android、HarmonyOS、macOS、Windows は無音の Motion-JPEG AVI、iOS / iPadOS のローカル／UVC ソースは MOV で収録します。\n" +
+                    "• 収録停止、カメラ切断、書き込みエラー時も記録済み動画を安全に確定し、素材損失を抑えます。\n" +
                     "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。"),
             ["谨防诈骗"] =
                 new("Scam Warning", "詐欺にご注意ください"),
@@ -269,6 +471,27 @@ internal static class AppLocalization
                 new("Unable to analyze this photo", "この写真を解析できません"),
             ["光线"] = new("Light", "ライト"),
             ["色彩"] = new("Color", "カラー"),
+            ["色轮"] = new("Color Wheels", "カラーホイール"),
+            ["曲线"] = new("Curves", "カーブ"),
+            ["蒙版"] = new("Masks", "マスク"),
+            ["阴影曲线"] = new("Shadow Curve", "シャドウカーブ"),
+            ["中间调曲线"] = new("Midtone Curve", "中間調カーブ"),
+            ["高光曲线"] = new("Highlight Curve", "ハイライトカーブ"),
+            ["中间调"] = new("Midtones", "中間調"),
+            ["Lift / Gamma / Gain · 三向色轮"] = new("Lift / Gamma / Gain · Three-way wheels", "Lift / Gamma / Gain · 3ウェイホイール"),
+            ["蒙版类型"] = new("Mask type", "マスクタイプ"),
+            ["线性渐变"] = new("Linear gradient", "線形グラデーション"),
+            ["径向渐变"] = new("Radial gradient", "放射グラデーション"),
+            ["主体"] = new("Subject", "被写体"),
+            ["强度"] = new("Amount", "強度"),
+            ["羽化"] = new("Feather", "ぼかし"),
+            ["反相蒙版"] = new("Invert mask", "マスクを反転"),
+            ["取色器已启用，请点击预览画面"] = new("Picker armed. Click the preview.", "スポイトを有効化しました。プレビューをクリックしてください。"),
+            ["取色器已关闭"] = new("Picker disabled", "スポイトを無効化しました"),
+            ["点击预览取色 · 再次关闭"] = new("Click preview to sample · click again to disable", "プレビューをクリックしてサンプル · 再度クリックで無効化"),
+            ["未取样"] = new("No sample", "未サンプル"),
+            ["在预览画面点击取样色彩，自动微调色温与色调"] = new("Click the preview to sample color and fine-tune temperature and tint", "プレビューをクリックして色をサンプルし、色温と色かぶりを微調整"),
+            ["调色台 · 色轮 · 曲线 · 取色器 · 蒙版 · 始终保留原文件。"] = new("Colorist desk · wheels · curves · picker · masks · originals stay untouched.", "カラーグレーディング · ホイール · カーブ · スポイト · マスク · 元ファイルは保持"),
             ["细节"] = new("Detail", "ディテール"),
             ["效果"] = new("Effects", "効果"),
             ["几何"] = new("Geometry", "ジオメトリ"),
@@ -306,6 +529,29 @@ internal static class AppLocalization
             ["已保存高质量副本"] =
                 new("Saved high-quality copy", "高品質コピーを保存しました"),
             ["正在查看原图"] = new("Viewing original", "元画像を表示中"),
+            ["相机机内存储"] = new("In-Camera Storage", "カメラ内ストレージ"),
+            ["连接相机后可浏览存储卡"] = new(
+                "Connect a camera to browse its memory card",
+                "カメラを接続するとメモリーカードを参照できます"),
+            ["正在读取存储卡…"] = new("Reading camera card…", "カメラ内カードを読み込み中…"),
+            ["读取完成"] = new("Ready", "読み込み完了"),
+            ["读取失败"] = new("Unable to read storage", "ストレージを読み込めません"),
+            ["全选"] = new("Select All", "すべて選択"),
+            ["取消全选"] = new("Deselect All", "すべての選択を解除"),
+            ["下载到 ZENCHE"] = new("Download to ZENCHE", "ZENCHE へダウンロード"),
+            ["从相机删除"] = new("Delete from Camera", "カメラから削除"),
+            ["从相机永久删除？"] = new(
+                "Permanently delete from camera?",
+                "カメラから完全に削除しますか？"),
+            ["永久删除"] = new("Delete Permanently", "完全に削除"),
+            ["此操作无法撤销；已保护文件不会被选择。"] = new(
+                "This cannot be undone. Protected files are not selected.",
+                "この操作は取り消せません。保護されたファイルは選択されません。"),
+            ["正在下载"] = new("Downloading", "ダウンロード中"),
+            ["已下载"] = new("Downloaded", "ダウンロード完了"),
+            ["正在从相机删除…"] = new("Deleting from camera…", "カメラから削除中…"),
+            ["已从相机删除"] = new("Deleted from camera", "カメラから削除しました"),
+            ["受保护"] = new("Protected", "保護済み"),
             ["更新、诊断与应用支持。"] =
                 new("Updates, diagnostics, and support.", "アップデート、診断、サポート。"),
             ["软件更新"] = new("Software Update", "ソフトウェアアップデート"),
@@ -405,6 +651,28 @@ internal static class AppLocalization
                 new(
                     "Video is recording to the camera card",
                     "動画をカメラのメモリーカードに記録中"),
+            ["外录到当前智能设备"] =
+                new("Record to This Smart Device", "このスマートデバイスへ外部収録"),
+            ["实时取景会生成无声 Motion‑JPEG AVI 并写入 ZENCHE 文件库；可与机身录制并行。"] =
+                new(
+                    "Live view creates a silent Motion-JPEG AVI in the ZENCHE library alongside in-camera recording.",
+                    "ライブビューから無音の Motion-JPEG AVI を ZENCHE ライブラリへ保存し、カメラ内記録と併用できます。"),
+            ["外录已开启 · 视频将写入 ZENCHE 文件库"] =
+                new(
+                    "External recording on · Video will be written to the ZENCHE library",
+                    "外部収録オン · 動画を ZENCHE ライブラリへ保存します"),
+            ["外录已关闭 · PTP 相机仅记录到机身存储卡"] =
+                new(
+                    "External recording off · PTP cameras record only to the camera card",
+                    "外部収録オフ · PTP カメラはカメラ内カードのみに記録します"),
+            ["● EXT REC · 正在外录到当前智能设备"] =
+                new(
+                    "● EXT REC · Recording to this smart device",
+                    "● EXT REC · このスマートデバイスへ外部収録中"),
+            ["录制已停止 · 外录文件已保存到 ZENCHE 文件库"] =
+                new(
+                    "Recording stopped · External recording saved to the ZENCHE library",
+                    "収録停止 · 外部収録ファイルを ZENCHE ライブラリへ保存しました"),
             ["实时取景已安全停止 · 机身控制已释放"] =
                 new(
                     "Live View Stopped Safely · Camera Control Released",

@@ -11,7 +11,7 @@ public sealed record PhotoItem(string Path, bool IsLibraryItem = true)
     public string Source => IsLibraryItem ? "帧澈 ZENCHE 文件库" : "系统相册";
     public string SourceGroup => Source;
     public bool IsVideo =>
-        new[] { ".mp4", ".mov", ".m4v" }.Contains(
+        new[] { ".mp4", ".mov", ".m4v", ".avi" }.Contains(
             _info.Extension,
             StringComparer.OrdinalIgnoreCase);
     public string MediaTypeGroup => IsVideo ? "视频" : "照片";

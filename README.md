@@ -23,11 +23,11 @@
 
 ## 简体中文
 
-帧澈 ZENCHE 是一套本地优先的原生相机工作流工具：通过 USB/PTP 连接并控制
-Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、
-管理、导入与分享。
+帧澈 ZENCHE 是一套本地优先的原生相机工作流工具：通过 USB/PTP 或 Wi‑Fi
+PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
+HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- 当前源码版本：**1.3.1**
+- 当前源码版本：**1.5.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
@@ -58,20 +58,29 @@ Nikon 相机，通过 FTP、HTTP 或 WebDAV 接收影像，再在同一个应用
 | --- | --- |
 | Capture · 拍摄 | USB 识别、实时取景、SDRAM 拍摄、JPEG 下载；支持间隔拍摄、曝光包围、焦点包围与 B 门计时 |
 | Control · 控制 | 快门、光圈、ISO、曝光补偿、对焦模式、白平衡与 Picture Control |
-| Monitor · 监看 | 快门角度换算、RGB 直方图、波形、矢量示波器、峰值对焦、假色、条纹图案与自定义 3D `.cube` LUT |
-| Connect · 传输 | 内置 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
-| Flow · 管理 | 显眼的树状分支工作区、任意层级新建与删除、拖拽归类、移动端折叠抽屉，以及项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份和 SHA-256 |
-| Develop · 修图 | AI 修图工作台提供设备端画面分析、曝光/动态范围/色彩/细节指标、可调强度、智能优化、AI 调整复制/粘贴与一键撤销；五组专业显影参数、透明预设、原图对比、旋转翻转、比例裁切及非破坏性高质量 JPEG 副本 |
+| Monitor · 监看 | 可调帧率、快门角度、ISO 等参数；左侧 RGB 三色波形、右侧音频波形（无音频源时显示静音基线）；点击预览画面切换焦点；另含 RGB 直方图、矢量示波器、峰值对焦、假色、条纹图案、自定义 3D `.cube` LUT，以及 107 款 Nikon NP3 云创预设的照片与视频实时 SDR 近似监看；监看效果不写入拍摄或录制原片 |
+| Record · 外录 | 照片直接写入当前智能设备；视频可实时保存到 ZENCHE 文件库并与机身存储卡录制并行。PTP 实时取景不含音频，Android、HarmonyOS、macOS、Windows 保存无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 视频源保存 MOV |
+| Connect · 连接 | USB/PTP、Wi‑Fi PTP/IP 遥控快门、ZENCHE BLE Remote，以及 FTP/PASV、HTTP PUT/POST 与 WebDAV 收件箱 |
+| Locate · 定位 | 按需获取拍摄位置，为下载到本机的照片生成标准 XMP GPS 旁车；不申请后台持续定位 |
+| Flow · 管理 | 相机机内存储浏览、缩略图、批量下载与确认删除；显眼的树状分支工作区、任意层级新建与删除、拖拽归类、移动端折叠抽屉，以及项目会话、命名模板、RAW + JPEG 配对、XMP 评级、双目标备份和 SHA-256 |
+| Develop · 修图 | AI 修图工作台提供设备端画面分析、曝光/动态范围/色彩/细节指标、可调强度、智能优化、AI 调整复制/粘贴与一键撤销；五组专业显影参数、DaVinci 风格 Lift/Gamma/Gain 三向色轮、主曲线、RGB 取色器、线性/径向/主体蒙版、透明预设、原图对比、旋转翻转、比例裁切及非破坏性高质量 JPEG 副本；也可在编辑器中预览 107 款 Nikon NP3 云创预设 |
 | Diagnose · 诊断 | 隐私脱敏的滚动日志、版本检查与预填 GitHub Issue |
+
+## 管理相机机内存储
+
+- iOS / iPadOS、Android、HarmonyOS、macOS、Windows 的“文件”页均提供“相机机内存储”入口；相机支持时可查看存储卷、容量、照片/视频列表、缩略图、文件大小、拍摄时间与保护状态。
+- iOS / iPadOS 通过 Wi‑Fi PTP/IP 访问；Android、HarmonyOS、macOS、Windows 还可通过其原生 USB/PTP 连接访问。系统摄像头和 UVC 输入不提供机内存储。
+- 支持选择与批量下载，原文件会进入现有 ZENCHE 文件库和拍摄工作流；下载不会删除相机卡内副本，受保护文件保持可见且不能被选择删除。
+- “从相机删除”会直接永久改动存储卡，执行前必须确认，且无法从 ZENCHE 恢复。存储操作与拍摄命令串行；实时取景开启时会先暂停，操作后再尝试恢复。
 
 ## AI 修图与生图
 
 编辑器内置 **AI 工具**，接入 nano-banana 图像模型，支持：
 
-- **AI 修图**：基于当前照片的自然美颜、风格转换、天空增强等
-- **AI 生图**：纯文本描述生成人像、风光、城市夜景等
+- **AI 修图**：基于当前照片的自然美颜、风格转换、天空增强等；客户端上传当前原图，成功后原子覆盖原图
+- **AI 生图**：纯文本描述生成人像、风光、城市夜景等，结果另存为新文件
 - 快捷预设：一键美颜、自然增强、胶片质感、日系清新、黑白大片、复古暖调、天空增强、美食诱人等
-- 可调宽高比与分辨率，生成结果以 95 质量 JPEG 保存到文件库
+- 可调宽高比与分辨率，生成结果以 95 质量 JPEG 保存到文件库；服务器成功后扣减次数，失败请求自动回滚并返回剩余次数
 
 AI 功能采用**设备绑定激活码制**：每个激活密钥绑定当前设备，AI 云服务次数由服务器
 计数；应用开源客户端不内置任何模型 API 密钥，帧澈本体继续免费开源。请先复制 AI
@@ -79,21 +88,37 @@ AI 功能采用**设备绑定激活码制**：每个激活密钥绑定当前设�
 使用应用内“在爱发电购买兑换码”入口或二维码，也可以直接打开 [爱发电主页](https://www.ifdian.net/a/Tauber)。设置页不再提供可编辑 AI 服务器窗口，
 但会兼容读取旧版本配置。只认官方官网和应用内爱发电入口，谨防诈骗。
 
-LUT、直方图、波形、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
+监看页支持直接调节帧率、快门角度、ISO 等参数；点击预览画面可切换焦点。RGB 波形、
+音频波形（无音频源时为静音基线）、LUT、直方图、矢量示波器、峰值对焦、假色和条纹图案只影响监看画面，
 不修改原片，也不写入相机的视频设置。
 具体能力取决于平台、相机固件、镜头和当前拍摄模式。
+
+开启“外录到当前智能设备”后，应用会边接收实时取景边流式写入硬盘，停止录制、断开
+相机或发生写入错误时安全封装已经写入的视频。外录文件沿用项目会话命名、双目标备份
+和 SHA-256 完整性记录；重要拍摄仍应保留机身存储卡作为独立备份。
+
+## 尼康官方 SDK
+
+macOS 与 Windows 安装包在构建时从本地官方归档接入 **Nikon Remote SDK
+2.0.0** 和 **Nikon Image SDK 1.46.0**。连接管理会通过 Remote SDK 初始化并列举
+支持的尼康机身，然后释放枚举会话，再交由现有 USB/PTP 后端执行拍摄控制，避免两个
+会话同时占用相机；Image SDK 会执行官方 `OpenLibrary` 初始化，为 NEF/NRW 处理确认
+运行环境。由于 Image SDK 1.46.0 的旧版依赖会在 macOS 26 的动态链接器中崩溃，macOS
+26 使用兼容模式，仅确认运行库已安装而不执行进程内初始化；相机连接与拍摄不受影响。
+官方运行库属于尼康专有组件，不提交到源码仓库。尼康未在本次 SDK 中提供
+iOS/iPadOS、Android 或 HarmonyOS 运行库，因此移动端继续使用各平台原生后端。
 
 ## 平台支持
 
 五个目标均为原生实现，不使用 WebView 复用界面。
 
-| 平台 | Nikon USB/PTP | 无线收图 | 本地工作流 | 当前状态 |
+| 平台 | Nikon USB/PTP | Wi‑Fi / 无线 | 本地工作流 | 当前状态 |
 | --- | :---: | :---: | :---: | --- |
-| macOS | ✅ | FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`，已接通 |
-| Android | ✅ | FTP / HTTP / WebDAV | ✅ | Android Views + USB Host，已接通 |
-| Windows | 🧪 | FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`，实现完成，待扩大真机验收 |
-| HarmonyOS | 🧪 | FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host，实现完成，待扩大真机验收 |
-| iOS / iPadOS | — | FTP / HTTP / WebDAV | ✅ | 支持系统相机；iPadOS 支持兼容的外接 UVC 视频设备 |
+| macOS | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`，已接通 |
+| Android | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | Android Views + USB Host，已接通 |
+| Windows | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`，实现完成，待扩大真机验收 |
+| HarmonyOS | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host，实现完成，待扩大真机验收 |
+| iOS / iPadOS | — | PTP/IP · FTP / HTTP / WebDAV | ✅ | 支持系统相机；iPadOS 支持兼容的外接 UVC 视频设备 |
 
 iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，因此当前不能
 通过 iPhone 或 iPad 调整 Nikon 机身参数或下载 USB 原片。外接 UVC 只作为视频源，
@@ -136,16 +161,16 @@ USB 主机组合均已完成实机验证。请使用
 ## 下载与安装
 
 前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
-版本及同名 `.sha256` 校验文件。1.3.1 的交付文件命名如下：
+版本及同名 `.sha256` 校验文件。1.5.0 的交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.3.1-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.3.1-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.3.1-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.3.1-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.3.1-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.3.1-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.5.0-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.5.0-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.5.0-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.5.0-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.5.0-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.5.0-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -156,13 +181,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.3.1-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.0-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.3.1-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.0-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -179,6 +204,23 @@ Mirror酱增量包；仅接受完整安装包并交给各平台原生安装流�
 并继续使用 GitHub，不影响原有更新检查。服务端接入与上传令牌配置请参考
 [MirrorChyan 官方集成指南](https://github.com/MirrorChyan/docs)。
 
+#### 服务端自动更新 API
+
+项目自带的 `server.mjs` 同时提供只读更新元数据接口：生产环境可将
+`https://zenche.top/api/update`（兼容别名 `/api/updates`）反向代理到该服务；
+`/healthz` 返回服务健康状态。请求可携带 `platform`、`architecture`、`channel` 和
+`current_version`，响应包含 `schema_version: 1`、匹配的完整安装包 `url`、
+`sha256`、`release_url`、公告、`minimum_supported_version` 和
+`update_available`。GitHub 元数据按 channel 缓存（默认 5 分钟），上游暂时不可用时
+返回最近缓存并标记 `stale: true`。部署时可设置 `HOST`、`PORT`、
+`UPDATE_REPOSITORY`、`UPDATE_RELEASE_API_URL`、`UPDATE_CACHE_TTL_MS`、
+`UPDATE_CORS_ORIGIN`、`UPDATE_ASSET_BASE_URL`、`UPDATE_MINIMUM_SUPPORTED_VERSION` 和
+`UPDATE_ANNOUNCEMENT_JSON`；详见 [服务端自动更新部署说明](docs/AUTOMATIC_UPDATES.md)。
+当前生产实例运行于 `101.34.255.115`，由 `zenche-update.service` 监听
+`127.0.0.1:4174`，安装包位于 `/var/www/zenche.top/downloads/`；服务器本机验证已通过，
+但截至 2026-08-02 公网 DNS 仍解析到 `45.207.210.254`，切换 DNS/CDN 到
+`101.34.255.115` 后公网客户端才会收到服务器资产地址。
+
 ## USB 快速开始
 
 1. 关闭 NX Tether、Camera Control Pro、照片、图像捕捉等可能占用 PTP 接口的软件。
@@ -190,6 +232,19 @@ Mirror酱增量包；仅接受完整安装包并交给各平台原生安装流�
 macOS 的系统 PTP 服务有时会先占用相机；应用会尝试释放并重新连接。拍摄或修改
 参数时，实时取景短暂停顿属于正常现象。若机身报告温度过高，请停止取景并等待
 相机冷却。
+
+## Wi-Fi 相机控制（PTP/IP）
+
+在“连接管理”的 Wi-Fi 相机卡片中选择网络拓扑，然后输入相机 IP 地址和 PTP/IP
+端口（默认 `15740`）。两种模式都使用原生 PTP/IP 会话：
+
+| 模式 | 连接方式 |
+| --- | --- |
+| AP 直连 | 相机建立热点，运行帧澈的设备加入该热点；相机地址通常为 `192.168.1.1` |
+| STA 局域网 | 相机和运行帧澈的设备加入同一个可信局域网；输入路由器分配给相机的 IP 地址 |
+
+应用会记住上次选择的模式。Wi-Fi 网络加入和密码确认仍由各平台的系统设置负责；
+切换网络后返回帧澈并发起连接即可。
 
 ## Wi-Fi 无线传图
 
@@ -316,12 +371,12 @@ Nikon 及文中相机型号为 Nikon Corporation 的商标。本项目与 Nikon 
 **帧澈 ZENCHE** is a local-first, cross-platform camera control and image
 transfer tool for macOS, Windows, Android, HarmonyOS, and iOS/iPadOS.
 
-It connects supported Nikon EXPEED 5/6/7 cameras through native USB/PTP
-implementations where the operating system permits it, provides live view and
-capture controls, receives images through FTP/HTTP/WebDAV, and keeps the files
+It connects cameras through native USB/PTP where the operating system permits
+it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
+XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Source version: **1.3.1**
+- Source version: **1.5.0**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
@@ -342,20 +397,29 @@ in a local library for review and export.
 | --- | --- |
 | Capture | USB detection, live view, SDRAM capture, JPEG download, interval capture, exposure bracketing, focus bracketing, and timed Bulb |
 | Control | Shutter speed, aperture, ISO, exposure compensation, focus mode, white balance, and Picture Control |
-| Monitor | Shutter-angle conversion, RGB histograms, waveform, vectorscope, focus peaking, false color, zebra, and custom 3D `.cube` LUTs |
-| Connect | Built-in FTP/PASV, HTTP PUT/POST, and WebDAV inboxes |
-| Flow | A prominent branch-tree workspace with arbitrary nesting, creation, deletion, drag organization, a collapsible mobile drawer, project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, and SHA-256 |
-| Develop | The AI Retouch Workbench provides on-device image analysis, exposure/dynamic-range/color/detail metrics, adjustable strength, smart enhancement, AI adjustment copy/paste, and one-step undo; five professional adjustment groups, transparent presets, before/after comparison, rotation, flipping, aspect-ratio cropping, and non-destructive high-quality JPEG copies |
+| Monitor | Adjustable frame rate, shutter angle, ISO and related parameters; separate RGB waveform and audio waveform cards (silent baseline when no audio source is available); tap-to-focus preview; plus RGB histograms, vectorscope, focus peaking, false color, zebra, custom 3D `.cube` LUTs, and live approximate SDR monitoring for photos and video with 107 Nikon NP3 Imaging Cloud presets; monitor effects are not written to captured or recorded originals |
+| Record | Photos are written directly to the current smart device. Video can stream into the ZENCHE library alongside in-camera card recording. PTP live view has no audio, so Android, HarmonyOS, macOS, and Windows save silent Motion-JPEG AVI; local and UVC video sources on iOS / iPadOS save MOV |
+| Connect | USB/PTP, Wi‑Fi PTP/IP remote shutter, ZENCHE BLE Remote, and built-in FTP/PASV, HTTP PUT/POST, and WebDAV inboxes |
+| Locate | On-demand capture location with a standard XMP GPS sidecar for locally downloaded photos; no continuous background location |
+| Flow | In-camera storage browsing, thumbnails, batch download, and confirmed deletion; a prominent branch-tree workspace with arbitrary nesting, creation, deletion, drag organization, a collapsible mobile drawer, project sessions, naming templates, RAW + JPEG pairing, XMP ratings, dual-destination backup, and SHA-256 |
+| Develop | The AI Retouch Workbench provides on-device image analysis, exposure/dynamic-range/color/detail metrics, adjustable strength, smart enhancement, AI adjustment copy/paste, and one-step undo; five professional adjustment groups, DaVinci-style Lift/Gamma/Gain three-way color wheels, a master curve, RGB picker, linear/radial/subject masks, transparent presets, before/after comparison, rotation, flipping, aspect-ratio cropping, and non-destructive high-quality JPEG copies; the editor can also preview 107 Nikon NP3 Imaging Cloud presets |
 | Diagnose | Privacy-redacted rolling logs, update checks, and prefilled GitHub Issues |
+
+## Manage In-Camera Storage
+
+- The File workspace on iOS / iPadOS, Android, HarmonyOS, macOS, and Windows includes an In-Camera Storage source. When the camera reports them, it shows storage volumes and capacity together with photo/video rows, thumbnails, file size, capture time, and protection state.
+- iOS / iPadOS uses Wi-Fi PTP/IP. Android, HarmonyOS, macOS, and Windows can also use their native USB/PTP connection. System cameras and UVC inputs do not expose in-camera storage.
+- Selection and batch download copy original objects into the existing ZENCHE library and capture workflow. Downloading does not remove the camera copy; protected objects remain visible and cannot be selected for deletion.
+- Delete from Camera permanently changes the memory card, requires confirmation, and cannot be recovered by ZENCHE. Storage work is serialized with capture commands; active live view is paused first and restoration is attempted afterward.
 
 ## AI Photo Editing & Generation
 
 The built-in editor includes **AI Tools** powered by the nano-banana image model:
 
-- **AI Photo Editing**: natural beautification, style transfer, and sky enhancement applied to the current photo
-- **AI Image Generation**: text-to-image for portraits, landscapes, city night scenes, and more
+- **AI Photo Editing**: natural beautification, style transfer, and sky enhancement based on the uploaded current original; successful edits atomically overwrite that original
+- **AI Image Generation**: text-to-image for portraits, landscapes, city night scenes, and more, saved as a new file
 - Quick presets: one-tap beautify, natural enhance, film grain, Japanese clean, high-contrast B&W, retro warm tone, sky enhance, and food enhance
-- Adjustable aspect ratio and resolution; results save as 95-quality JPEG into the library
+- Adjustable aspect ratio and resolution; generated results save as 95-quality JPEG into the library, while the server deducts usage only for successful jobs and rolls failed requests back
 
 AI features use a **device-bound activation-code model**. AI cloud usage is counted
 server-side, while the open-source clients never embed any model API key and ZENCHE
@@ -365,22 +429,43 @@ use the in-app Afdian purchase entry or QR code, or open the [Afdian page](https
 AI Server window, but legacy configuration reads remain compatible. Use only the official
 website and the in-app Afdian entry.
 
-LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
+The monitor exposes frame rate, shutter angle, ISO and related parameters directly, and tapping the preview changes focus when the native camera supports it. RGB and audio waveforms (silent baseline without an audio source), LUTs, scopes, focus peaking, false color, and zebra overlays affect only the
 monitoring image. They do not modify the original file or write video settings
 to the camera.
 Capabilities vary with the platform, camera firmware, lens, and shooting mode.
+
+When “Record to This Smart Device” is enabled, ZENCHE streams incoming live-view
+frames to disk and safely finalizes the written video when recording stops, the
+camera disconnects, or a write error occurs. External recordings inherit project
+session naming, dual-destination backup, and SHA-256 integrity records. Keep the
+camera memory card as an independent copy for important work.
+
+## Nikon Official SDK
+
+The macOS and Windows packages consume the local official archives at build time
+to integrate **Nikon Remote SDK 2.0.0** and **Nikon Image SDK 1.46.0**. Connection
+Manager initializes Remote SDK and enumerates supported Nikon bodies, releases
+that enumeration session, and then hands camera operation to the existing
+USB/PTP backend so two sessions do not claim the camera at once. Image SDK runs
+its official `OpenLibrary` initialization to validate the NEF/NRW processing
+environment. Because legacy dependencies in Image SDK 1.46.0 can crash the
+macOS 26 dynamic linker, macOS 26 uses compatibility mode: it verifies that the
+runtime is installed without initializing it in-process. Camera connection and
+capture are unaffected. These proprietary Nikon runtimes are not committed to the source
+repository. The supplied SDKs contain no iOS/iPadOS, Android, or HarmonyOS
+runtime, so the mobile apps continue to use their native backends.
 
 ### Platform support
 
 All five targets use native implementations rather than a shared WebView UI.
 
-| Platform | Nikon USB/PTP | Wireless inbox | Local workflow | Current status |
+| Platform | Nikon USB/PTP | Wi‑Fi / wireless | Local workflow | Current status |
 | --- | :---: | :---: | :---: | --- |
-| macOS | ✅ | FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`; connected |
-| Android | ✅ | FTP / HTTP / WebDAV | ✅ | Android Views + USB Host; connected |
-| Windows | 🧪 | FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`; implemented, broader hardware validation pending |
-| HarmonyOS | 🧪 | FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host; implemented, broader hardware validation pending |
-| iOS / iPadOS | — | FTP / HTTP / WebDAV | ✅ | System camera; compatible external UVC video input on iPadOS |
+| macOS | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`; connected |
+| Android | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | Android Views + USB Host; connected |
+| Windows | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`; implemented, broader hardware validation pending |
+| HarmonyOS | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host; implemented, broader hardware validation pending |
+| iOS / iPadOS | — | PTP/IP · FTP / HTTP / WebDAV | ✅ | System camera; compatible external UVC video input on iPadOS |
 
 Public iOS/iPadOS APIs do not expose Nikon vendor-specific USB/PTP control to
 ordinary apps. On Apple mobile platforms, ZENCHE supports the system camera,
@@ -421,17 +506,17 @@ completed hardware validation.
 ### Download and install
 
 Download published packages and their matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.3.1
+[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.5.0
 uses the following delivery names:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.3.1-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.3.1-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.3.1-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.3.1-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.3.1-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.3.1-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.5.0-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.5.0-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.5.0-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.5.0-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.5.0-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.5.0-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -458,6 +543,24 @@ resource is not configured and continue using GitHub. See the
 [official MirrorChyan integration guide](https://github.com/MirrorChyan/docs)
 for server-side registration and upload-token setup.
 
+#### Server-side update API
+
+The bundled `server.mjs` also exposes read-only update metadata. Proxy
+`https://zenche.top/api/update` in production (`/api/updates` is a compatibility alias);
+`/healthz` reports service health. Requests may include `platform`, `architecture`,
+`channel`, and `current_version`; responses use `schema_version: 1` and include the matching
+full-package `url`, `sha256`, `release_url`, announcement, `minimum_supported_version`,
+and `update_available`. GitHub metadata is cached per channel (five minutes by default),
+and the last cache is served with `stale: true` during upstream outages. Configure `HOST`,
+`PORT`, `UPDATE_REPOSITORY`, `UPDATE_RELEASE_API_URL`, `UPDATE_CACHE_TTL_MS`,
+`UPDATE_CORS_ORIGIN`, `UPDATE_ASSET_BASE_URL`, `UPDATE_MINIMUM_SUPPORTED_VERSION`, and
+`UPDATE_ANNOUNCEMENT_JSON`; see [server deployment details](docs/AUTOMATIC_UPDATES.md).
+The production instance runs on `101.34.255.115` as `zenche-update.service` at
+`127.0.0.1:4174` and serves packages from `/var/www/zenche.top/downloads/`. The origin
+was verified locally, but as of 2026-08-02 public DNS still resolved `zenche.top` to
+`45.207.210.254`; switch DNS/CDN to `101.34.255.115` before public clients can use the
+self-hosted asset URLs.
+
 ### USB quick start
 
 1. Quit NX Tether, Camera Control Pro, Photos, Image Capture, and other software
@@ -471,6 +574,21 @@ for server-side registration and upload-token setup.
 The macOS PTP service may claim the camera first; ZENCHE attempts to release and
 reconnect it. A short live-view pause during capture or parameter changes is
 normal. Stop live view and let the camera cool if it reports overheating.
+
+### Wi-Fi camera control (PTP/IP)
+
+In the Wi-Fi camera card under **Connection Manager**, select the network
+topology, then enter the camera IP address and PTP/IP port (`15740` by default).
+Both modes use a native PTP/IP session:
+
+| Mode | Connection |
+| --- | --- |
+| AP Direct | The camera creates a hotspot and the device running ZENCHE joins it; the camera address is usually `192.168.1.1` |
+| STA LAN | The camera and the device running ZENCHE join the same trusted LAN; enter the camera IP address assigned by the router |
+
+ZENCHE remembers the selected mode. Joining the Wi-Fi network and confirming
+its password remain in the platform's system settings; return to ZENCHE and
+connect after switching networks.
 
 ### Wi-Fi image transfer
 
@@ -546,11 +664,11 @@ project is not affiliated with, endorsed by, or sponsored by Nikon Corporation.
 
 **帧澈 ZENCHE** は、macOS、Windows、Android、HarmonyOS、iOS/iPadOS に対応する、
 ローカル優先設計のクロスプラットフォーム・カメラ制御／画像転送ツールです。
-OS が許可する環境では Nikon カメラを USB/PTP で接続・制御し、FTP、HTTP、
-WebDAV で画像を受信して、同じアプリ内でプレビュー、管理、読み込み、共有まで
-行えます。
+OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラに接続し、BLE
+リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
+で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- 現在のソースバージョン：**1.3.1**
+- 現在のソースバージョン：**1.5.0**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
@@ -571,20 +689,29 @@ WebDAV で画像を受信して、同じアプリ内でプレビュー、管理�
 | --- | --- |
 | Capture · 撮影 | USB 検出、ライブビュー、SDRAM 撮影、JPEG ダウンロード、インターバル撮影、露出ブラケット、フォーカスブラケット、時間指定バルブ |
 | Control · 制御 | シャッター速度、絞り、ISO、露出補正、フォーカスモード、ホワイトバランス、Picture Control |
-| Monitor · モニター | シャッター角度換算、RGB ヒストグラム、波形、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT |
-| Connect · 転送 | 内蔵 FTP/PASV、HTTP PUT/POST、WebDAV 受信ボックス |
-| Flow · 管理 | 目立つ分岐ツリー、任意階層の作成と削除、ドラッグ分類、モバイル折りたたみドロワー、プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256 |
-| Develop · 現像 | AI レタッチワークベンチでデバイス内解析、露出/ダイナミックレンジ/カラー/ディテール指標、強度調整、スマート補正、AI 調整のコピー/貼り付け、ワンステップ取り消しを提供。5 グループのプロ調整、透明なプリセット、補正前後比較、回転・反転、縦横比クロップ、非破壊の高品質 JPEG コピーにも対応 |
+| Monitor · モニター | フレームレート、シャッター角度、ISO などを調整可能。左側に RGB 3 チャンネル波形、右側に音声波形（音声ソースがない場合は無音の基準線）を表示し、プレビューをタップしてフォーカスを切替。RGB ヒストグラム、ベクトルスコープ、フォーカスピーキング、フォルスカラー、ゼブラ、カスタム 3D `.cube` LUT に加え、107 種類の Nikon NP3 Imaging Cloud プリセットを写真・動画モニターへリアルタイムで SDR 近似適用可能。モニター効果は撮影・収録したオリジナルへ書き込みません |
+| Record · 外部収録 | 写真は現在のスマートデバイスへ直接保存。動画は ZENCHE ライブラリへリアルタイム保存し、カメラ内カード記録と併用可能。PTP ライブビューに音声は含まれないため、Android、HarmonyOS、macOS、Windows は無音の Motion-JPEG AVI、iOS / iPadOS のローカル／UVC 動画ソースは MOV で保存 |
+| Connect · 接続 | USB/PTP、Wi‑Fi PTP/IP リモートシャッター、ZENCHE BLE Remote、内蔵 FTP/PASV、HTTP PUT/POST、WebDAV 受信ボックス |
+| Locate · 位置 | 撮影時にオンデマンドで位置を取得し、ローカルにダウンロードした写真へ標準 XMP GPS サイドカーを生成。バックグラウンドで継続測位しません |
+| Flow · 管理 | カメラ内ストレージの参照、サムネイル、一括ダウンロード、確認付き削除。目立つ分岐ツリー、任意階層の作成と削除、ドラッグ分類、モバイル折りたたみドロワー、プロジェクトセッション、命名テンプレート、RAW + JPEG ペアリング、XMP 評価、二重保存、SHA-256 |
+| Develop · 現像 | AI レタッチワークベンチでデバイス内解析、露出/ダイナミックレンジ/カラー/ディテール指標、強度調整、スマート補正、AI 調整のコピー/貼り付け、ワンステップ取り消しを提供。5 グループのプロ調整、DaVinci 風 Lift/Gamma/Gain 3 ウェイカラーホイール、マスターカーブ、RGB スポイト、線形/放射状/被写体マスク、透明なプリセット、補正前後比較、回転・反転、縦横比クロップ、非破壊の高品質 JPEG コピーに加え、エディターでも 107 種類の Nikon NP3 Imaging Cloud プリセットをプレビューできます |
 | Diagnose · 診断 | プライバシー情報を除去したローテーションログ、更新確認、入力済み GitHub Issue |
+
+## カメラ内ストレージの管理
+
+- iOS / iPadOS、Android、HarmonyOS、macOS、Windows の「ファイル」に「カメラ内ストレージ」を追加しました。カメラが情報を提供する場合、ストレージ、容量、写真／動画、サムネイル、サイズ、撮影日時、保護状態を表示します。
+- iOS / iPadOS は Wi-Fi PTP/IP を使用します。Android、HarmonyOS、macOS、Windows は各プラットフォームのネイティブ USB/PTP 接続も利用できます。システムカメラと UVC 入力はカメラ内ストレージを提供しません。
+- 選択と一括ダウンロードに対応し、原本を既存の ZENCHE ライブラリと撮影ワークフローへコピーします。ダウンロードしてもカメラ側のコピーは削除されず、保護されたファイルは表示されたまま削除対象にはできません。
+- 「カメラから削除」はメモリーカードを完全に変更するため、実行前に確認が必要で、ZENCHE から復元できません。ストレージ操作は撮影コマンドと直列化し、ライブビュー中は一時停止して操作後に復帰を試みます。
 
 ## AI 編集・生成
 
 内蔵エディタに **AI ツール** を搭載し、nano-banana 画像モデルを使用します：
 
-- **AI 編集**：現在の写真に自然な美肌、スタイル変換、空の強調などを適用
-- **AI 生成**：テキストから人物、風景、都市夜景などを生成
+- **AI 編集**：現在の元画像をアップロードして自然な美肌、スタイル変換、空の強調などを適用し、成功時は元画像を原子的に上書き
+- **AI 生成**：テキストから人物、風景、都市夜景などを生成し、新規ファイルとして保存
 - クイックプリセット：ワンタップ美肌、自然強調、フィルム調、和風クリア、モノクロ、レトロ暖色、空強調、フード強調など
-- アスペクト比と解像度を調整可能。結果は 95% 品質の JPEG としてライブラリに保存
+- アスペクト比と解像度を調整可能。生成結果は 95% 品質の JPEG としてライブラリに保存し、サーバーは成功時だけ利用回数を減算、失敗時はロールバック
 
 AI 機能は**デバイス紐付けアクティベーションコード方式**です。AI クラウド利用回数は
 サーバーで計数し、オープンソースのクライアントにはモデル API キーを埋め込みません。
@@ -594,21 +721,40 @@ ZENCHE 本体は無料・オープンソースのままです。AI ツールの�
 編集可能な AI サーバー欄を設けず、旧設定の読み込み互換性だけを維持します。公式サイトと
 アプリ内 Afdian 導線だけを利用してください。
 
-LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
+モニター画面ではフレームレート、シャッター角度、ISO などを直接調整でき、プレビューをタップすると対応するカメラのフォーカスを切り替えます。RGB 波形と音声波形（音声ソースがない場合は無音の基準線）、LUT、スコープ、フォーカスピーキング、フォルスカラー、ゼブラはモニター画像だけに
 適用されます。原本を変更したり、カメラ本体の動画設定へ書き込んだりしません。利用できる機能は、
 プラットフォーム、ファームウェア、レンズ、撮影モードによって異なります。
+
+「このスマートデバイスへ外部収録」を有効にすると、受信したライブビューフレームを
+ディスクへストリーミング書き込みし、収録停止、カメラ切断、書き込みエラー時も記録済み
+動画を安全に確定します。外部収録にはプロジェクトセッションの命名、二重保存、SHA-256
+整合性記録を適用します。重要な撮影ではカメラ内カードを独立したコピーとして残してください。
+
+## ニコン公式 SDK
+
+macOS／Windows パッケージは、ビルド時にローカルの公式アーカイブから **Nikon
+Remote SDK 2.0.0** と **Nikon Image SDK 1.46.0** を組み込みます。接続管理では
+Remote SDK を初期化して対応するニコン機を列挙し、その列挙セッションを解放してから
+既存の USB/PTP バックエンドへ操作を引き渡すため、2 つのセッションが同時にカメラを
+占有しません。Image SDK は公式の `OpenLibrary` 初期化を実行し、NEF/NRW 処理環境を
+確認します。Image SDK 1.46.0 の旧式依存関係は macOS 26 の動的リンカーをクラッシュ
+させる可能性があるため、macOS 26 では互換モードを使用し、プロセス内初期化を行わずに
+ランタイムの配置のみ確認します。カメラ接続と撮影には影響しません。ニコン専有の
+ランタイムはソースリポジトリへコミットしません。今回提供された
+SDK には iOS/iPadOS、Android、HarmonyOS 用ランタイムが含まれないため、モバイル版は
+各プラットフォームのネイティブバックエンドを継続して使用します。
 
 ### プラットフォーム対応
 
 5 つの対象はすべてネイティブ実装で、共通 WebView UI は使用していません。
 
-| プラットフォーム | Nikon USB/PTP | ワイヤレス受信 | ローカルワークフロー | 現在の状態 |
+| プラットフォーム | Nikon USB/PTP | Wi‑Fi / ワイヤレス | ローカルワークフロー | 現在の状態 |
 | --- | :---: | :---: | :---: | --- |
-| macOS | ✅ | FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`、接続済み |
-| Android | ✅ | FTP / HTTP / WebDAV | ✅ | Android Views + USB Host、接続済み |
-| Windows | 🧪 | FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`、実装済み、実機検証拡大中 |
-| HarmonyOS | 🧪 | FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host、実装済み、実機検証拡大中 |
-| iOS / iPadOS | — | FTP / HTTP / WebDAV | ✅ | システムカメラ、iPadOS の互換外付け UVC 入力 |
+| macOS | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | SwiftUI/AppKit + `libgphoto2`、接続済み |
+| Android | ✅ | PTP/IP · FTP / HTTP / WebDAV | ✅ | Android Views + USB Host、接続済み |
+| Windows | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | WPF/.NET 8 + `libusb`、実装済み、実機検証拡大中 |
+| HarmonyOS | 🧪 | PTP/IP · FTP / HTTP / WebDAV | ✅ | Stage/ArkUI + USB Host、実装済み、実機検証拡大中 |
+| iOS / iPadOS | — | PTP/IP · FTP / HTTP / WebDAV | ✅ | システムカメラ、iPadOS の互換外付け UVC 入力 |
 
 iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御を提供して
 いません。Apple のモバイル環境では、システムカメラ、iPadOS の互換外付け UVC
@@ -648,17 +794,17 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 ### ダウンロードとインストール
 
 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から公開済み
-パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.3.1 の
+パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.5.0 の
 配布ファイル名は次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.3.1-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.3.1-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.3.1-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.3.1-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.3.1-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.3.1-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.5.0-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.5.0-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.5.0-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.5.0-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.5.0-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.5.0-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
@@ -684,6 +830,24 @@ HarmonyOS ではアプリの非公開設定に保存され、診断ログには�
 更新確認を継続します。サーバー側の登録とアップロードトークン設定は
 [MirrorChyan 公式統合ガイド](https://github.com/MirrorChyan/docs)を参照してください。
 
+#### サーバー側の自動更新 API
+
+同梱の `server.mjs` は読み取り専用の更新メタデータ API も提供します。本番では
+`https://zenche.top/api/update`（互換エイリアス `/api/updates`）をリバースプロキシし、
+`/healthz` で稼働状態を確認できます。`platform`、`architecture`、`channel`、
+`current_version` を指定でき、`schema_version: 1`、完全パッケージの `url`、
+`sha256`、`release_url`、公告、`minimum_supported_version`、
+`update_available` を返します。GitHub メタデータは channel ごとに既定 5 分間
+キャッシュされ、上流障害時は `stale: true` の直近キャッシュを返します。`HOST`、
+`PORT`、`UPDATE_REPOSITORY`、`UPDATE_RELEASE_API_URL`、`UPDATE_CACHE_TTL_MS`、
+`UPDATE_CORS_ORIGIN`、`UPDATE_ASSET_BASE_URL`、`UPDATE_MINIMUM_SUPPORTED_VERSION`、
+`UPDATE_ANNOUNCEMENT_JSON` を設定でき、詳細は[サーバー配備説明](docs/AUTOMATIC_UPDATES.md)
+を参照してください。現在の本番インスタンスは `101.34.255.115` の
+`zenche-update.service`（`127.0.0.1:4174`）で稼働し、パッケージを
+`/var/www/zenche.top/downloads/` から配信します。オリジンはローカルで検証済みですが、
+2026-08-02 時点の公開 DNS は `45.207.210.254` を返すため、公開クライアントで自前の
+ダウンロード URL を使うには DNS/CDN を `101.34.255.115` に切り替える必要があります。
+
 ### USB クイックスタート
 
 1. NX Tether、Camera Control Pro、「写真」、「イメージキャプチャ」など、
@@ -697,6 +861,21 @@ HarmonyOS ではアプリの非公開設定に保存され、診断ログには�
 macOS の PTP サービスが先にカメラを占有する場合、ZENCHE は解放と再接続を
 試みます。撮影や設定変更中の短いライブビュー停止は正常です。カメラが過熱を
 報告した場合はライブビューを停止し、冷却を待ってください。
+
+### Wi-Fi カメラ制御（PTP/IP）
+
+「接続管理」の Wi-Fi カメラカードでネットワーク構成を選び、カメラの IP
+アドレスと PTP/IP ポート（既定値 `15740`）を入力します。どちらのモードも
+ネイティブ PTP/IP セッションを使用します。
+
+| モード | 接続方法 |
+| --- | --- |
+| AP ダイレクト | カメラがアクセスポイントを作成し、ZENCHE を実行する端末がそこへ接続します。カメラのアドレスは通常 `192.168.1.1` です |
+| STA LAN | カメラと ZENCHE を実行する端末を同じ信頼できる LAN に接続し、ルーターがカメラに割り当てた IP アドレスを入力します |
+
+ZENCHE は選択したモードを記憶します。Wi-Fi ネットワークへの参加とパスワード
+確認は各プラットフォームのシステム設定で行い、切り替え後に ZENCHE へ戻って
+接続してください。
 
 ### Wi-Fi 画像転送
 

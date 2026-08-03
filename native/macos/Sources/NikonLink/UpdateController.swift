@@ -73,6 +73,43 @@ private struct GitHubRelease: Decodable {
     }
 }
 
+private struct SelfHostedAnnouncement: Decodable {
+    let title: String?
+    let body: String?
+
+    var text: String? {
+        let values: [String] = [title, body].compactMap { value -> String? in
+            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+            return value
+        }
+        return values.isEmpty ? nil : values.joined(separator: "：")
+    }
+}
+
+private struct SelfHostedUpdate: Decodable {
+    let schemaVersion: Int
+    let product: String
+    let version: String
+    let url: URL?
+    let sha256: String?
+    let releaseURL: URL?
+    let updateType: String?
+    let announcement: SelfHostedAnnouncement?
+
+    enum CodingKeys: String, CodingKey {
+        case schemaVersion = "schema_version"
+        case product
+        case version
+        case url
+        case sha256
+        case releaseURL = "release_url"
+        case updateType = "update_type"
+        case announcement
+    }
+}
+
 struct AvailableUpdate {
     let version: String
     let releasePage: URL
@@ -91,6 +128,9 @@ final class UpdateController: ObservableObject {
             .nilIfEmpty ?? defaultMirrorChyanResourceID
     private static let latestReleaseAPI = URL(
         string: "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest"
+    )!
+    private static let defaultSelfHostedUpdateEndpoint = URL(
+        string: "https://zenche.top/api/update"
     )!
     private static let releasesURL = URL(
         string: "https://github.com/Tauber01/ZENCHE/releases"
@@ -122,7 +162,7 @@ final class UpdateController: ObservableObject {
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "1.3.1"
+            ?? "1.5.0"
     }
 
     init() {
@@ -151,34 +191,39 @@ final class UpdateController: ObservableObject {
         Task {
             defer { isChecking = false }
             do {
-                let version = try await fetchMirrorChyanVersion()
-                if version.updateType?.lowercased() == "incremental" {
-                    let release = try await fetchGitHubRelease()
-                    applyGitHubRelease(release)
-                } else {
-                    applyMirrorChyanVersion(version)
-                }
+                let update = try await fetchSelfHostedUpdate()
+                applySelfHostedUpdate(update)
             } catch {
-                let fallbackStatus = (error as? MirrorChyanServiceError)?
-                    .fallbackStatus ?? "Mirror酱暂不可用，已回退 GitHub"
-                DiagnosticLogger.shared.warning(
-                    "update",
-                    "Mirror酱检查失败，准备回退 GitHub：\(error.localizedDescription)"
-                )
                 do {
-                    let release = try await fetchGitHubRelease()
-                    applyGitHubRelease(
-                        release,
-                        fallbackStatus: fallbackStatus
-                    )
-                } catch {
-                    if !silent {
-                        statusText = "检查失败，请确认网络后重试"
+                    let version = try await fetchMirrorChyanVersion()
+                    if version.updateType?.lowercased() == "incremental" {
+                        let release = try await fetchGitHubRelease()
+                        applyGitHubRelease(release)
+                    } else {
+                        applyMirrorChyanVersion(version)
                     }
-                    DiagnosticLogger.shared.error(
+                } catch {
+                    let fallbackStatus = (error as? MirrorChyanServiceError)?
+                        .fallbackStatus ?? "Mirror酱暂不可用，已回退 GitHub"
+                    DiagnosticLogger.shared.warning(
                         "update",
-                        "检查更新失败：\(error.localizedDescription)"
+                        "Mirror酱检查失败，准备回退 GitHub：\(error.localizedDescription)"
                     )
+                    do {
+                        let release = try await fetchGitHubRelease()
+                        applyGitHubRelease(
+                            release,
+                            fallbackStatus: fallbackStatus
+                        )
+                    } catch {
+                        if !silent {
+                            statusText = "检查失败，请确认网络后重试"
+                        }
+                        DiagnosticLogger.shared.error(
+                            "update",
+                            "检查更新失败：\(error.localizedDescription)"
+                        )
+                    }
                 }
             }
         }
@@ -258,6 +303,58 @@ final class UpdateController: ObservableObject {
 
     func openMirrorChyan() {
         NSWorkspace.shared.open(Self.mirrorChyanWebsiteURL)
+    }
+
+    private func fetchSelfHostedUpdate() async throws -> SelfHostedUpdate {
+        let endpoint = ProcessInfo.processInfo.environment[
+            "ZENCHE_UPDATE_ENDPOINT"
+        ]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseURL = URL(string: endpoint ?? "") ?? Self.defaultSelfHostedUpdateEndpoint
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
+        components.queryItems = (components.queryItems ?? []) + [
+            URLQueryItem(name: "platform", value: "macos"),
+            URLQueryItem(name: "arch", value: Self.mirrorChyanArchitecture),
+            URLQueryItem(name: "current_version", value: currentVersion),
+            URLQueryItem(name: "channel", value: "stable")
+        ]
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 20
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("ZENCHE-macOS/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse,
+              (200..<300).contains(response.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        let update = try JSONDecoder().decode(SelfHostedUpdate.self, from: data)
+        guard update.schemaVersion == 1,
+              update.product.caseInsensitiveCompare("ZENCHE") == .orderedSame else {
+            throw URLError(.cannotParseResponse)
+        }
+        return update
+    }
+
+    private func applySelfHostedUpdate(_ update: SelfHostedUpdate) {
+        let version = Self.normalizedVersion(update.version)
+        guard Self.isNewer(version, than: currentVersion) else {
+            availableUpdate = nil
+            downloadedInstaller = nil
+            statusText = "已是最新版本"
+            return
+        }
+        availableUpdate = AvailableUpdate(
+            version: version,
+            releasePage: update.releaseURL ?? Self.releasesURL,
+            downloadURL: update.updateType?.lowercased() == "incremental"
+                ? nil
+                : update.url,
+            sha256: update.sha256
+        )
+        downloadedInstaller = nil
+        let announcement = update.announcement?.text
+        statusText = ["发现新版本 \(version)", announcement]
+            .compactMap { $0 }
+            .joined(separator: " · ")
     }
 
     private func fetchMirrorChyanVersion() async throws -> MirrorChyanVersion {

@@ -10,11 +10,15 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $ProjectFile = Join-Path $ProjectRoot "native/windows/NikonLink.Windows.csproj"
 $InstallerScript = Join-Path $ProjectRoot "native/windows/Installer/NikonLink.nsi"
+$PrepareNikonSdk = Join-Path $ProjectRoot "scripts/prepare-nikon-sdk.ps1"
+$PrepareSonySdk = Join-Path $ProjectRoot "scripts/prepare-sony-sdk.ps1"
 $BuildRoot = Join-Path $ProjectRoot "build/windows"
+$NikonSdkRoot = Join-Path $ProjectRoot "build/nikon-sdk/windows"
+$SonySdkRoot = Join-Path $ProjectRoot "build/sony-sdk/windows"
 $PublishDirectory = Join-Path $BuildRoot $Runtime
 $DistDirectory = Join-Path $ProjectRoot "dist"
 $Architecture = if ($Runtime -eq "win-arm64") { "arm64" } else { "x64" }
-$PackageVersion = "1.3.1"
+$PackageVersion = "1.5.0"
 $FileVersion = "$PackageVersion.0"
 $ArchiveName = "ZENCHE-$PackageVersion-Windows-$Architecture.zip"
 $ArchivePath = Join-Path $DistDirectory $ArchiveName
@@ -73,6 +77,9 @@ if (-not $ProjectVersionNode -or $ProjectVersionNode.Node.InnerText -ne $Package
 if ([string]::IsNullOrWhiteSpace($LibUsbDll)) {
     throw "Pass -LibUsbDll or set NIKONLINK_LIBUSB_DLL to the matching official libusb-1.0.dll."
 }
+if ($Runtime -ne "win-x64") {
+    throw "Nikon's official Remote SDK and Image SDK in the supplied archives are x64-only. Build win-x64 for the SDK-enabled Windows package."
+}
 $ResolvedLibUsb = (Resolve-Path -LiteralPath $LibUsbDll).Path
 if ([IO.Path]::GetFileName($ResolvedLibUsb) -ne "libusb-1.0.dll") {
     throw "The native dependency must be named libusb-1.0.dll."
@@ -101,6 +108,22 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath $ResolvedLibUsb `
     -Destination (Join-Path $PublishDirectory "libusb-1.0.dll")
+& $PrepareNikonSdk -OutputDirectory $NikonSdkRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Preparing the Nikon SDK runtime failed with exit code $LASTEXITCODE."
+}
+Copy-Item -LiteralPath $NikonSdkRoot `
+    -Destination (Join-Path $PublishDirectory "NikonSDK") -Recurse -Force
+& $PrepareSonySdk -OutputDirectory $SonySdkRoot
+if ($LASTEXITCODE -ne 0) {
+    throw "Preparing the Sony Camera Remote SDK runtime failed with exit code $LASTEXITCODE."
+}
+Get-ChildItem -LiteralPath $SonySdkRoot -Filter "*.dll" -File |
+    Copy-Item -Destination $PublishDirectory -Force
+Copy-Item -LiteralPath (Join-Path $SonySdkRoot "CrAdapter") `
+    -Destination (Join-Path $PublishDirectory "CrAdapter") -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $SonySdkRoot "documentation") `
+    -Destination (Join-Path $PublishDirectory "SonySDK") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "LICENSE") `
     -Destination (Join-Path $PublishDirectory "LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $ProjectRoot "THIRD_PARTY_NOTICES.md") `

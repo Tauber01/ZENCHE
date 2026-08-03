@@ -13,12 +13,14 @@ struct ProfessionalMonitorResult {
 }
 
 enum ProfessionalMonitor {
-    private static let bars = Array("▁▂▃▄▅▆▇█")
+    private static let scopeColumns = 64
+    private static let scopeRows = 48
 
     static func process(
         _ pixelBuffer: CVPixelBuffer,
         focusPeaking: Bool,
-        falseColor: Bool
+        falseColor: Bool,
+        nikonCloudPreset: NikonCloudPreset? = nil
     ) -> ProfessionalMonitorResult {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
@@ -35,13 +37,12 @@ enum ProfessionalMonitor {
         let sourcePixels = source.assumingMemoryBound(to: UInt8.self)
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
         var luminance = [Int](repeating: 0, count: width * height)
-        var red = [Int](repeating: 0, count: 16)
-        var green = [Int](repeating: 0, count: 16)
-        var blue = [Int](repeating: 0, count: 16)
-        var waveformSum = [Int](repeating: 0, count: 24)
-        var waveformCount = [Int](repeating: 0, count: 24)
-        var hueSum = [Int](repeating: 0, count: 24)
-        var hueCount = [Int](repeating: 0, count: 24)
+        var red = scopeBuffer()
+        var green = scopeBuffer()
+        var blue = scopeBuffer()
+        var lumaScope = scopeBuffer()
+        var cbScope = scopeBuffer()
+        var crScope = scopeBuffer()
 
         for y in 0..<height {
             let sourceY = min(sourceHeight - 1, y * sourceHeight / height)
@@ -50,31 +51,34 @@ enum ProfessionalMonitor {
                 let sourceOffset = sourceY * sourceBytesPerRow + sourceX * 4
                 let pixel = y * width + x
                 let outputOffset = pixel * 4
-                let b = Int(sourcePixels[sourceOffset])
-                let g = Int(sourcePixels[sourceOffset + 1])
-                let r = Int(sourcePixels[sourceOffset + 2])
+                var b = Int(sourcePixels[sourceOffset])
+                var g = Int(sourcePixels[sourceOffset + 1])
+                var r = Int(sourcePixels[sourceOffset + 2])
+                if let nikonCloudPreset {
+                    let preview = nikonCloudPreset.applyingPreviewEffect(
+                        red: Double(r) / 255,
+                        green: Double(g) / 255,
+                        blue: Double(b) / 255
+                    )
+                    r = clamp8(Int((preview.red * 255).rounded()))
+                    g = clamp8(Int((preview.green * 255).rounded()))
+                    b = clamp8(Int((preview.blue * 255).rounded()))
+                    pixels[outputOffset] = UInt8(r)
+                    pixels[outputOffset + 1] = UInt8(g)
+                    pixels[outputOffset + 2] = UInt8(b)
+                    pixels[outputOffset + 3] = 255
+                }
                 let luma = (54 * r + 183 * g + 19 * b) >> 8
                 luminance[pixel] = luma
-                red[min(15, r >> 4)] += 1
-                green[min(15, g >> 4)] += 1
-                blue[min(15, b >> 4)] += 1
-                let column = min(23, x * 24 / max(1, width))
-                waveformSum[column] += luma
-                waveformCount[column] += 1
-                let maximum = max(r, max(g, b))
-                let minimum = min(r, min(g, b))
-                let saturation = maximum - minimum
-                if saturation > 8 {
-                    let hue = hueIndex(
-                        r: r,
-                        g: g,
-                        b: b,
-                        maximum: maximum,
-                        delta: saturation
-                    )
-                    hueSum[hue] += saturation
-                    hueCount[hue] += 1
-                }
+                let column = min(scopeColumns - 1, x * scopeColumns / max(1, width))
+                accumulate(&red, column: column, value: r)
+                accumulate(&green, column: column, value: g)
+                accumulate(&blue, column: column, value: b)
+                accumulate(&lumaScope, column: column, value: luma)
+                let cb = clamp8(128 + ((-29 * r - 99 * g + 128 * b) >> 8))
+                let cr = clamp8(128 + ((128 * r - 116 * g - 12 * b) >> 8))
+                accumulate(&cbScope, column: column, value: cb)
+                accumulate(&crScope, column: column, value: cr)
                 if falseColor {
                     let color = falseColorRGB(luma)
                     pixels[outputOffset] = color.0
@@ -108,21 +112,15 @@ enum ProfessionalMonitor {
             }
         }
 
-        let waveform = zip(waveformSum, waveformCount).map {
-            $0.1 == 0 ? 0 : $0.0 / $0.1
-        }
-        let vectorscope = zip(hueSum, hueCount).map {
-            $0.1 == 0 ? 0 : $0.0 / $0.1
-        }
         return ProfessionalMonitorResult(
-            overlay: focusPeaking || falseColor
+            overlay: focusPeaking || falseColor || nikonCloudPreset != nil
                 ? makeImage(pixels: pixels, width: width, height: height)
                 : nil,
-            redHistogram: sparkline(red),
-            greenHistogram: sparkline(green),
-            blueHistogram: sparkline(blue),
-            waveform: sparkline(waveform),
-            vectorscope: sparkline(vectorscope),
+            redHistogram: densityMap(red),
+            greenHistogram: densityMap(green),
+            blueHistogram: densityMap(blue),
+            waveform: densityMap(lumaScope),
+            vectorscope: densityMap(cbScope) + "|" + densityMap(crScope),
             peakingCoverage: Int(
                 (Double(peakingPixels) / Double(max(1, width * height)) * 100)
                     .rounded()
@@ -130,23 +128,28 @@ enum ProfessionalMonitor {
         )
     }
 
-    private static func hueIndex(
-        r: Int,
-        g: Int,
-        b: Int,
-        maximum: Int,
-        delta: Int
-    ) -> Int {
-        let hue: Double
-        if maximum == r {
-            hue = Double(g - b) / Double(delta)
-        } else if maximum == g {
-            hue = 2 + Double(b - r) / Double(delta)
-        } else {
-            hue = 4 + Double(r - g) / Double(delta)
+    private static func scopeBuffer() -> [Int] {
+        [Int](repeating: 0, count: scopeColumns * scopeRows)
+    }
+
+    private static func accumulate(_ buffer: inout [Int], column: Int, value: Int) {
+        let row = scopeRows - 1 - clamp8(value) * (scopeRows - 1) / 255
+        buffer[row * scopeColumns + column] += 1
+    }
+
+    private static func clamp8(_ value: Int) -> Int {
+        min(255, max(0, value))
+    }
+
+    private static func densityMap(_ values: [Int]) -> String {
+        let digits = Array("0123456789ABCDEF")
+        let maximum = max(1, values.max() ?? 1)
+        let divisor = log1p(Double(maximum))
+        let payload = values.map { value -> Character in
+            let level = Int((log1p(Double(value)) / divisor * 15).rounded())
+            return digits[min(15, max(0, level))]
         }
-        let normalized = (hue * 60).truncatingRemainder(dividingBy: 360)
-        return min(23, Int((normalized < 0 ? normalized + 360 : normalized) / 15))
+        return "S\(scopeColumns)x\(scopeRows):" + String(payload)
     }
 
     private static func falseColorRGB(_ luma: Int) -> (UInt8, UInt8, UInt8) {
@@ -159,13 +162,6 @@ enum ProfessionalMonitor {
         case ..<240: return (255, 92, 32)
         default: return (255, 32, 56)
         }
-    }
-
-    private static func sparkline(_ values: [Int]) -> String {
-        let maximum = max(1, values.max() ?? 1)
-        return String(values.map {
-            bars[min(bars.count - 1, $0 * (bars.count - 1) / maximum)]
-        })
     }
 
     private static func makeImage(

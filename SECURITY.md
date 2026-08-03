@@ -23,3 +23,11 @@ when the application closes, and HarmonyOS stops it when the main page is
 destroyed. Windows and HarmonyOS use the same fixed local FTP credentials as the
 other native clients; they do not provide transport encryption and must not be
 exposed to the public internet.
+
+## AI image generation
+
+The integrated AI features send the user's prompt text and, in AI photo-editing
+mode, a base-64 encoded copy of the selected photo to a third-party image API
+(grsai.dakka.com.cn). No other user data is transmitted. Only the image the
+user explicitly chooses to edit is sent. AI-generated results are saved locally
+in the ZENCHE library and are never uploaded automatically.

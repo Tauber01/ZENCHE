@@ -92,6 +92,20 @@ final class CaptureWorkflow {
             String originalFilename,
             String cameraName,
             String reservedBaseName) throws Exception {
+        return store(
+                bytes,
+                originalFilename,
+                cameraName,
+                reservedBaseName,
+                null);
+    }
+
+    synchronized File store(
+            byte[] bytes,
+            String originalFilename,
+            String cameraName,
+            String reservedBaseName,
+            LocationTaggingController.Snapshot location) throws Exception {
         ensureDirectories();
         String extension = extension(originalFilename);
         String base = reservedBaseName == null
@@ -102,7 +116,7 @@ final class CaptureWorkflow {
             output.write(bytes);
             output.getFD().sync();
         }
-        finalizeFile(destination);
+        finalizeFile(destination, location);
         status = "已写入会话 · " + destination.getName();
         return destination;
     }
@@ -133,24 +147,49 @@ final class CaptureWorkflow {
             }
             output.getFD().sync();
         }
-        finalizeFile(destination);
+        finalizeFile(destination, null);
         status = "已写入会话 · " + destination.getName();
         return destination;
     }
 
-    private void finalizeFile(File primary) throws Exception {
-        if (!active) return;
-        String checksum = sha256(primary);
+    synchronized File reserveExternalRecording(
+            String cameraName,
+            String extension) throws Exception {
+        ensureDirectories();
+        String normalized = extension == null
+                ? "avi"
+                : extension.replace(".", "").toLowerCase(Locale.ROOT);
+        if (!"avi".equals(normalized)) normalized = "avi";
+        return uniqueFile(
+                primaryDirectory(),
+                reserveBaseName(cameraName),
+                normalized);
+    }
+
+    synchronized void completeExternalRecording(File recording) throws Exception {
+        if (recording == null || !recording.isFile() || recording.length() == 0) {
+            throw new Exception("外录文件为空。");
+        }
+        finalizeFile(recording, null);
+        status = "外录已写入会话 · " + recording.getName();
+    }
+
+    private void finalizeFile(
+            File primary,
+            LocationTaggingController.Snapshot location) throws Exception {
+        if (!active && location == null) return;
         File sidecar = new File(
                 primary.getParentFile(),
                 stem(primary.getName()) + ".xmp");
-        writeText(sidecar, xmp(primary.getName()));
-        File backupDirectory = backupDirectory();
-        if (backupDirectory != null) {
+        writeText(sidecar, xmp(primary.getName(), location));
+        File backupDirectory = active ? backupDirectory() : null;
+        if (active && backupDirectory != null) {
             File backup = new File(backupDirectory, primary.getName());
             copy(primary, backup);
             copy(sidecar, new File(backupDirectory, sidecar.getName()));
         }
+        if (!active) return;
+        String checksum = sha256(primary);
         File manifest = new File(sessionRoot(), "checksums.sha256");
         try (FileOutputStream output = new FileOutputStream(manifest, true)) {
             output.write(
@@ -253,14 +292,19 @@ final class CaptureWorkflow {
         return result;
     }
 
-    private String xmp(String filename) {
+    private String xmp(
+            String filename,
+            LocationTaggingController.Snapshot location) {
+        String gps = location == null ? "" : gpsAttributes(location);
         return "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
                 + "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF "
                 + "xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
                 + "<rdf:Description rdf:about=\"\" "
                 + "xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\" "
                 + "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
-                + "xmp:Rating=\"" + configuration.rating + "\">"
+                + "xmlns:exif=\"http://ns.adobe.com/exif/1.0/\" "
+                + "xmp:Rating=\"" + configuration.rating + "\""
+                + gps + ">"
                 + "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">"
                 + xml(configuration.name)
                 + "</rdf:li></rdf:Alt></dc:title>"
@@ -275,6 +319,39 @@ final class CaptureWorkflow {
                 + "</rdf:li></rdf:Alt></dc:description>"
                 + "</rdf:Description></rdf:RDF></x:xmpmeta>\n"
                 + "<?xpacket end=\"w\"?>";
+    }
+
+    private static String gpsAttributes(
+            LocationTaggingController.Snapshot location) {
+        int altitude = (int) Math.round(Math.abs(location.altitude) * 100);
+        int accuracy = (int) Math.round(Math.max(0, location.accuracy) * 100);
+        String date = new SimpleDateFormat(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                Locale.ROOT).format(new Date(location.timestamp));
+        return " exif:GPSLatitude=\""
+                + gpsCoordinate(location.latitude, "N", "S")
+                + "\" exif:GPSLongitude=\""
+                + gpsCoordinate(location.longitude, "E", "W")
+                + "\" exif:GPSAltitude=\"" + altitude + "/100\""
+                + " exif:GPSAltitudeRef=\""
+                + (location.altitude < 0 ? "1" : "0") + "\""
+                + " exif:GPSHPositioningError=\"" + accuracy + "/100\""
+                + " exif:GPSDateStamp=\"" + date + "\"";
+    }
+
+    private static String gpsCoordinate(
+            double value,
+            String positive,
+            String negative) {
+        double absolute = Math.abs(value);
+        int degrees = (int) absolute;
+        double minutes = (absolute - degrees) * 60;
+        return String.format(
+                Locale.ROOT,
+                "%d,%.6f%s",
+                degrees,
+                minutes,
+                value >= 0 ? positive : negative);
     }
 
     private static void copy(File source, File destination) throws Exception {

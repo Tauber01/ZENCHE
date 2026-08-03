@@ -148,6 +148,8 @@ private enum SettingsPalette {
         light: (0.353, 0.380, 0.424), dark: (0.604, 0.631, 0.678))
     static let cobalt = dynamic(
         light: (0.086, 0.451, 0.902), dark: (0.180, 0.525, 0.878))
+    static let positive = dynamic(
+        light: (0.039, 0.494, 0.329), dark: (0.204, 0.780, 0.565))
     static let cobaltSoft = dynamic(
         light: (0.863, 0.918, 0.992), dark: (0.078, 0.161, 0.243))
     static let support = dynamic(
@@ -176,6 +178,8 @@ struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     @Binding var languageRaw: String
     @Binding var themeRaw: String
+    @ObservedObject var bluetoothRemote: BluetoothRemoteService
+    @ObservedObject var locationTagging: LocationTaggingService
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
     @State private var showLogViewer = false
@@ -195,6 +199,9 @@ struct SettingsSheet: View {
                         Text(updater.currentVersion)
                     }
                     .foregroundStyle(SettingsPalette.muted)
+                    RuntimeLocalizedText("通用、拍摄辅助、更新、诊断与支持。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
                 HStack(spacing: 4) {
@@ -246,40 +253,79 @@ struct SettingsSheet: View {
                     Spacer()
                     HStack(spacing: 4) {
                         ForEach(ThemeMode.allCases) { mode in
-                            Button {
-                                themeRaw = mode.rawValue
-                            } label: {
-                                RuntimeLocalizedText(mode.displayName)
-                                    .font(
-                                        .system(
-                                            size: 12,
-                                            weight: mode.rawValue == themeRaw
-                                                ? .bold
-                                                : .medium
-                                        )
-                                    )
-                                    .foregroundStyle(
-                                        mode.rawValue == themeRaw
-                                            ? SettingsPalette.cobalt
-                                            : SettingsPalette.muted
-                                    )
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 30)
-                                    .background(
-                                        mode.rawValue == themeRaw
-                                            ? SettingsPalette.cobaltSoft
-                                            : Color.clear
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 7))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(mode.displayName))
+                            themeButton(mode)
                         }
                     }
                     .padding(3)
                     .background(SettingsPalette.base)
                     .clipShape(RoundedRectangle(cornerRadius: 9))
                     .fixedSize()
+                }
+            }
+
+            settingsCard {
+                HStack(alignment: .top, spacing: 14) {
+                    settingIcon(
+                        "dot.radiowaves.left.and.right",
+                        color: SettingsPalette.cobalt
+                    )
+                    VStack(alignment: .leading, spacing: 4) {
+                        RuntimeLocalizedText("拍摄辅助")
+                            .font(.system(size: 16, weight: .bold))
+                        RuntimeLocalizedText("蓝牙遥控与拍摄定位")
+                            .font(.system(size: 13))
+                            .foregroundStyle(SettingsPalette.muted)
+                    }
+                }
+
+                Divider()
+
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        RuntimeLocalizedText("蓝牙遥控拍摄")
+                            .font(.system(size: 14, weight: .semibold))
+                        RuntimeLocalizedText(bluetoothRemote.status)
+                            .font(.system(size: 12))
+                            .foregroundStyle(
+                                bluetoothRemote.connected
+                                    ? SettingsPalette.positive
+                                    : SettingsPalette.muted
+                            )
+                        RuntimeLocalizedText("兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { bluetoothRemote.enabled },
+                        set: { bluetoothRemote.setEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                }
+
+                Divider()
+
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        RuntimeLocalizedText("拍摄位置")
+                            .font(.system(size: 14, weight: .semibold))
+                        RuntimeLocalizedText(locationTagging.status)
+                            .font(.system(size: 12))
+                            .foregroundStyle(SettingsPalette.muted)
+                        RuntimeLocalizedText("仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { locationTagging.enabled },
+                        set: { locationTagging.setEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
                 }
             }
 
@@ -567,6 +613,25 @@ struct SettingsSheet: View {
         }
     }
 
+    private func themeButton(_ mode: ThemeMode) -> some View {
+        let selected = mode.rawValue == themeRaw
+        return Button {
+            themeRaw = mode.rawValue
+        } label: {
+            RuntimeLocalizedText(mode.displayName)
+                .font(.system(size: 12, weight: selected ? .bold : .medium))
+                .foregroundStyle(
+                    selected ? SettingsPalette.cobalt : SettingsPalette.muted
+                )
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(selected ? SettingsPalette.cobaltSoft : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(mode.displayName))
+    }
+
     private func settingsCard<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
@@ -848,7 +913,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• AI 修图与 AI 生图工作台统一优化：编辑页默认进入“专业显影”，可明确切换“AI 工具”；保留快捷预设、比例、分辨率、保存到文件库。\n• 恢复设备码系统：每个激活密钥绑定当前设备，服务器计数 AI 云服务次数；帧澈本体继续免费开源。\n• 新增官网入口：复制设备 ID 后前往 https://zenche.top 兑换绑定当前设备的激活密钥。\n• 新增“在爱发电购买兑换码”提示、二维码与购买入口；只认官方官网和应用内爱发电入口，谨防诈骗。\n• 设置页移除可编辑的“AI 服务地址”窗口，但继续兼容读取历史配置；Sony / Canon / Nikon 相机适配保持不变。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                        Text("• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

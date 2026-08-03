@@ -12,13 +12,17 @@ public sealed record UpdateCheckResult(
     bool IsAvailable,
     string Version,
     string DownloadUrl,
-    string? Notice = null);
+    string? Notice = null,
+    string? Sha256 = null,
+    string? Announcement = null);
 
 public sealed class UpdateService
 {
     private const string DefaultMirrorChyanResourceId = "ZENCHE";
     private const string LatestReleaseApi =
         "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
+    private const string DefaultSelfHostedUpdateEndpoint =
+        "https://zenche.top/api/update";
     private const string ReleasesUrl =
         "https://github.com/Tauber01/ZENCHE/releases";
     private static readonly HttpClient Client = CreateClient();
@@ -28,7 +32,7 @@ public sealed class UpdateService
         "mirrorchyan-cdk.dat");
 
     public string CurrentVersion { get; } =
-        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.3.1";
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.5.0";
 
     public string MirrorChyanWebsiteUrl
     {
@@ -43,6 +47,15 @@ public sealed class UpdateService
     public async Task<UpdateCheckResult> CheckAsync(
         CancellationToken cancellationToken = default)
     {
+        try
+        {
+            return await CheckSelfHostedAsync(cancellationToken);
+        }
+        catch (Exception)
+        {
+            // The self-hosted feed is optional; retain the established CDN/GitHub chain.
+        }
+
         try
         {
             var mirror = await CheckMirrorChyanAsync(cancellationToken);
@@ -89,6 +102,83 @@ public sealed class UpdateService
                 Notice = "Mirror酱暂不可用，已回退 GitHub"
             };
         }
+    }
+
+    private async Task<UpdateCheckResult> CheckSelfHostedAsync(
+        CancellationToken cancellationToken)
+    {
+        var endpoint = Environment.GetEnvironmentVariable(
+                "ZENCHE_UPDATE_ENDPOINT")?.Trim();
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            endpoint = DefaultSelfHostedUpdateEndpoint;
+        }
+
+        var builder = new UriBuilder(endpoint);
+        var query = new List<string>
+        {
+            $"platform=windows",
+            $"arch={Uri.EscapeDataString(MirrorChyanArchitecture)}",
+            $"current_version={Uri.EscapeDataString(CurrentVersion)}",
+            "channel=stable"
+        };
+        var separator = string.IsNullOrEmpty(builder.Query) ? "?" : "&";
+        builder.Query = builder.Query.TrimStart('?');
+        var requestUri = new Uri(
+            builder.Uri + separator + string.Join("&", query));
+        using var response = await Client.GetAsync(requestUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        await using var stream = await response.Content.ReadAsStreamAsync(
+            cancellationToken);
+        using var document = await JsonDocument.ParseAsync(
+            stream,
+            cancellationToken: cancellationToken);
+        var root = document.RootElement;
+        if (!root.TryGetProperty("schema_version", out var schema) ||
+            schema.GetInt32() != 1 ||
+            !root.TryGetProperty("product", out var product) ||
+            !string.Equals(product.GetString(), "ZENCHE", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("Invalid self-hosted update feed");
+        }
+
+        var version = NormalizeVersion(
+            root.GetProperty("version").GetString() ?? CurrentVersion);
+        var downloadUrl = root.TryGetProperty("url", out var url)
+            ? url.GetString() ?? ""
+            : "";
+        if (string.IsNullOrWhiteSpace(downloadUrl) &&
+            root.TryGetProperty("release_url", out var releaseUrl))
+        {
+            downloadUrl = releaseUrl.GetString() ?? ReleasesUrl;
+        }
+
+        string? announcement = null;
+        if (root.TryGetProperty("announcement", out var announcementNode) &&
+            announcementNode.ValueKind == JsonValueKind.Object)
+        {
+            var title = announcementNode.TryGetProperty("title", out var titleNode)
+                ? titleNode.GetString()
+                : null;
+            var body = announcementNode.TryGetProperty("body", out var bodyNode)
+                ? bodyNode.GetString()
+                : null;
+            announcement = string.Join("：", new[] { title, body }
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (string.IsNullOrWhiteSpace(announcement)) announcement = null;
+        }
+
+        var sha256 = root.TryGetProperty("sha256", out var shaNode)
+            ? shaNode.GetString()
+            : null;
+        var notice = announcement is null ? null : $"{announcement}";
+        return new UpdateCheckResult(
+            IsNewer(version, CurrentVersion),
+            version,
+            string.IsNullOrWhiteSpace(downloadUrl) ? ReleasesUrl : downloadUrl,
+            notice,
+            sha256,
+            announcement);
     }
 
     public string LoadMirrorChyanCdk()
@@ -251,7 +341,7 @@ public sealed class UpdateService
         };
         client.DefaultRequestHeaders.Accept.ParseAdd(
             "application/json");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.3.1");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.0");
         return client;
     }
 
