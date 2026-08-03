@@ -120,7 +120,7 @@ v1.5.0 新增五端原生外录：照片直接写入当前智能设备，PTP 视
 
 ## 7. 文档职责
 
-- `AGENTS.md`：不可违反的项目规则与交付约束。
+- `AGENTS.md`：不可违反的项目规则与交付约束。2026-08-03 由项目负责人提供权威版并纳入版本控制（提交见 `docs/TASK_PROGRESS.md` §12.1）。
 - `docs/PROJECT_OUTLINE.md`：项目是什么、服务谁、支持什么、边界在哪里。
 - `docs/TECHNICAL_APPROACH.md`：五端如何实现、如何验证、如何构建与发布。
 - `docs/TASK_PROGRESS.md`：当前做到了哪里、正在改什么、下一步是什么。

@@ -318,7 +318,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 
 - `docs/CAMERA_TEST_CHECKLIST.md` 的机型清单和“Current build status”仍停留在 17 款 EXPEED 6/7、1.0.0，应更新到当前 20 款、1.3.0，并填入真实验收结果。
 - `docs/DEEPSEEK_V4_PRO_HANDOFF.md` 是 2026-07-30 的历史交接快照，包含 1.0.0、17 款机型等过时信息；可用于追溯，不应作为当前状态来源。
-- 三份基线文档（`PROJECT_OUTLINE.md` / `TECHNICAL_APPROACH.md` / `TASK_PROGRESS.md`）与 `AGENT_START_PROMPT.md` 位于主仓库但尚未纳入版本控制，后续应评估是否纳入 git 以便随源码演进。
+- `AGENTS.md` 已于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制（见 §12.1）；`AGENT_START_PROMPT.md` 不在仓库中，权威副本见工作区 `GUIDES/ZENCHE_START_PROMPT.md`，后续可评估是否纳入 git。
 
 ## 11. 下一步优先级
 
@@ -372,3 +372,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 提交：`606a6ec`（分支 `claude/modest-albattani-34402d`，6 文件 +235/-15）。Android/macOS/HarmonyOS 产物已重建并上传 GitHub Release `v1.3.0`。
 
 本次同步检查：iOS 使用 AVFoundation 无 PTP 拍摄，不受影响；四端监看画质仅 Android 存在减半问题（已修复），其余平台全分辨率。AI 兑换码逻辑确认 NONCE（a1b2c3d4e5f6）在兑换服务、AI 代理、各客户端验签间一致；Windows 激活验签已补齐对齐。
+
+## 12.1 AGENTS.md 恢复并纳入版本控制（2026-08-03）
+
+- 背景：远端 `main` 历史曾删除根目录 `AGENTS.md`；2026-08-03 项目负责人在 general 频道提供权威版（媒体哈希 `294eeccecb7bdba21aec11fb0671253e60d50542da13d67e2d113d7e6d2cd8f7`）。
+- 操作：将权威版原样放入仓库根目录 `AGENTS.md`（SHA-256 与媒体哈希一致）；同步更新 `docs/PROJECT_OUTLINE.md` §7 与 `docs/TECHNICAL_APPROACH.md` 前置阅读注记。
+- 提交：见本次提交（`docs: 恢复 AGENTS.md 权威版并纳入版本控制`），未推送远端。
+- 工作区存档：`GUIDES/ZENCHE_AGENTS.md`（含 frontmatter 的来源注记）与 `GUIDES/ZENCHE_START_PROMPT.md`。

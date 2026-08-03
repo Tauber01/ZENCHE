@@ -3,6 +3,7 @@
 > 文档状态：工程实施基线
 > 最近核对：2026-08-03（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
+> 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
 ## 0. 1.4.0 AI 链路约定
 
