@@ -27,12 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
+- 最新正式版：**v1.5.0**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0)）
 - 当前源码版本：**1.5.0**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[v1.5.0 最新版本](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -160,8 +161,8 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) 下载已发布
-版本及同名 `.sha256` 校验文件。1.5.0 的交付文件命名如下：
+前往 [v1.5.0 最新正式版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0)
+下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
@@ -376,11 +377,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
+- Latest stable release: **v1.5.0** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0))
 - Source version: **1.5.0**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
-- Downloads: [GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [latest v1.5.0 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -505,9 +507,9 @@ completed hardware validation.
 
 ### Download and install
 
-Download published packages and their matching `.sha256` files from
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases). Version 1.5.0
-uses the following delivery names:
+Download packages and their matching `.sha256` files from the
+[latest stable v1.5.0 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0).
+The delivery names are:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
@@ -668,11 +670,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
+- 最新安定版：**v1.5.0**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0)）
 - 現在のソースバージョン：**1.5.0**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
-- ダウンロード：[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[最新の v1.5.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -793,9 +796,9 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[GitHub Releases](https://github.com/Tauber01/ZENCHE/releases) から公開済み
-パッケージと同名の `.sha256` ファイルをダウンロードしてください。1.5.0 の
-配布ファイル名は次のとおりです。
+[最新安定版 v1.5.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.0) から
+パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
+次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
