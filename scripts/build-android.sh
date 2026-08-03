@@ -8,6 +8,7 @@ ASSET_ROOT="$ANDROID_ROOT/app/src/main/assets/web"
 DIST_ROOT="$PROJECT_ROOT/dist"
 BUILD_LOCK="$PROJECT_ROOT/build/.android-build.lock"
 
+mkdir -p "$PROJECT_ROOT/build"
 if ! mkdir "$BUILD_LOCK" 2>/dev/null; then
   print -u2 "Another Android package build is already running: $BUILD_LOCK"
   exit 1

@@ -14,6 +14,7 @@ CONTENTS="$APP_ROOT/Contents"
 RESOURCES="$CONTENTS/Resources"
 DMG_ROOT="$BUILD_ROOT/dmg"
 
+mkdir -p "$PROJECT_ROOT/build"
 if ! mkdir "$BUILD_LOCK" 2>/dev/null; then
   print -u2 "Another macOS package build is already running: $BUILD_LOCK"
   exit 1
