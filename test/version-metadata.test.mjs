@@ -36,7 +36,7 @@ test("native package build numbers stay aligned", async () => {
   ]);
   const buildNumber = android.match(/versionCode (\d+)/)?.[1];
 
-  assert.equal(buildNumber, "25");
+  assert.equal(buildNumber, "26");
   assert.match(harmony, new RegExp(`versionCode: ${buildNumber}`));
   assert.match(ios, new RegExp(`CURRENT_PROJECT_VERSION = ${buildNumber};`, "g"));
   assert.match(

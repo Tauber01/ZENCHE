@@ -8546,6 +8546,13 @@ private struct ProfessionalEditSettings {
         maskLayers.map(displayedMaskLayer)
     }
 
+    func activeDisplayedMaskLayer() -> EditorMaskLayer? {
+        guard let id = activeMaskLayerID,
+              let layer = maskLayers.first(where: { $0.id == id })
+        else { return nil }
+        return displayedMaskLayer(layer)
+    }
+
     private mutating func persistActiveMaskLayer() {
         guard let id = activeMaskLayerID,
               let index = maskLayers.firstIndex(where: { $0.id == id })
@@ -8937,6 +8944,7 @@ private struct ImageEditorView: View {
             selectInitialPhoto()
         }
         .onChange(of: selectedPhotoURL) {
+            aiResultImage = nil
             resetAdjustments()
             status = selectedPhoto == nil
                 ? "请选择文件库中的照片"
@@ -8989,6 +8997,7 @@ private struct ImageEditorView: View {
                             Button {
                                 aiMode = mode
                                 aiResultImage = nil
+                                composeAiPrompt()
                             } label: {
                                 Label(mode.rawValue, systemImage: mode == .edit ? "wand.and.stars" : "photo.badge.plus")
                                     .frame(maxWidth: .infinity)
@@ -9098,14 +9107,24 @@ private struct ImageEditorView: View {
     }
 
     private var aiModules: [(String, [String])] {
-        [
+        var modules: [(String, [String])] = [
             ("主体", ["人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"]),
             ("光线", ["柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"]),
             ("色彩", ["自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"]),
             ("质感", ["保留真实皮肤纹理", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"]),
-            ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"]),
-            ("约束", ["保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"])
+            ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"])
         ]
+        if aiMode == .edit {
+            modules.append(("智能移除", [
+                "去路人并自然补全背景",
+                "去穿帮并移除摄影器材、工作人员、反光与杂物"
+            ]))
+            modules.append(("约束", [
+                "保持人物身份和五官", "不改变产品形状", "不添加多余物体",
+                "不过度磨皮", "保留自然阴影"
+            ]))
+        }
+        return modules
     }
 
     private func composeAiPrompt() {
@@ -9113,7 +9132,7 @@ private struct ImageEditorView: View {
         if !aiManualPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             parts.append(aiManualPrompt.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        for category in ["主体", "光线", "色彩", "质感", "构图", "约束"] {
+        for category in aiModules.map(\.0) {
             let values = aiSelectedPresets.filter { $0.hasPrefix("\(category):") }.map { String($0.dropFirst(category.count + 1)) }
             if !values.isEmpty { parts.append("\(category)：\(values.joined(separator: "、"))") }
         }
@@ -9215,7 +9234,9 @@ private struct ImageEditorView: View {
 
     private var preview: some View {
         GeometryReader { proxy in
-            let image = selectedSection == .aiTools ? aiResultImage : renderedImage
+            let image = selectedSection == .aiTools
+                ? (aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil))
+                : renderedImage
             let imageRect = editorImageRect(
                 in: proxy.size,
                 imageSize: image?.size
@@ -9254,8 +9275,8 @@ private struct ImageEditorView: View {
                         .background(Color.black.opacity(0.58))
                         .clipShape(Capsule())
                         .padding(12)
-                } else if aiResultImage != nil {
-                    Text("AI 生成")
+                } else if image != nil {
+                    Text(aiResultImage != nil ? "AI 生成" : "原图")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
@@ -9305,6 +9326,13 @@ private struct ImageEditorView: View {
 
     @ViewBuilder
     private func maskStrokeOverlay(in imageRect: CGRect) -> some View {
+        if let overlay = activeMaskOverlayImage {
+            Image(nsImage: overlay)
+                .resizable()
+                .frame(width: imageRect.width, height: imageRect.height)
+                .position(x: imageRect.midX, y: imageRect.midY)
+                .allowsHitTesting(false)
+        }
         Rectangle()
             .fill(Color.clear)
             .frame(width: imageRect.width, height: imageRect.height)
@@ -9323,37 +9351,6 @@ private struct ImageEditorView: View {
                     }
                     .onEnded { _ in activeMaskStrokeID = nil }
             )
-        ForEach(settings.maskStrokes) { stroke in
-            let overlayColor = stroke.mode == .add
-                ? Palette.cobalt.opacity(0.58)
-                : Color.white.opacity(0.82)
-            Path { path in
-                guard let first = stroke.points.first else { return }
-                path.move(to: CGPoint(
-                    x: imageRect.minX + CGFloat(first.x) * imageRect.width,
-                    y: imageRect.minY + CGFloat(first.y) * imageRect.height
-                ))
-                for point in stroke.points.dropFirst() {
-                    path.addLine(to: CGPoint(
-                        x: imageRect.minX + CGFloat(point.x) * imageRect.width,
-                        y: imageRect.minY + CGFloat(point.y) * imageRect.height
-                    ))
-                }
-            }
-            .stroke(
-                overlayColor,
-                style: StrokeStyle(
-                    lineWidth: max(
-                        3,
-                        CGFloat(stroke.size) / 100
-                            * min(imageRect.width, imageRect.height)
-                    ),
-                    lineCap: .round,
-                    lineJoin: .round,
-                    dash: stroke.mode == .subtract ? [7, 5] : []
-                )
-            )
-        }
     }
 
     private func recordMaskPoint(at location: CGPoint, imageRect: CGRect) {
@@ -9901,7 +9898,7 @@ private var curvesControls: some View {
             standardSlider("饱和度", value: $settings.maskSaturation)
             standardSlider("清晰度", value: $settings.maskClarity)
             Text(settings.maskExists
-                ? "在预览画面拖动画笔；蓝色为添加，白色虚线为减去。"
+                ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                 : "先创建蒙版，再选择添加或减去画笔。")
                 .font(.system(size: 11))
                 .foregroundStyle(Palette.muted)
@@ -9969,6 +9966,57 @@ private var curvesControls: some View {
         }
         let extent = output.extent.integral
         guard let cgImage = context.createCGImage(output, from: extent) else {
+            return nil
+        }
+        return NSImage(
+            cgImage: cgImage,
+            size: NSSize(width: extent.width, height: extent.height)
+        )
+    }
+
+    private var selectedOriginalImage: NSImage? {
+        guard let selectedPhoto else { return nil }
+        return NSImage(contentsOf: selectedPhoto.url)
+    }
+
+    private var activeMaskOverlayImage: NSImage? {
+        guard let selectedPhoto,
+              let layer = settings.activeDisplayedMaskLayer(),
+              layer.isVisible,
+              layer.type != "无",
+              let source = CIImage(contentsOf: selectedPhoto.url)
+                ?? NSImage(contentsOf: selectedPhoto.url).flatMap({ image in
+                    CIImage(data: image.tiffRepresentation ?? Data())
+                })
+        else { return nil }
+        let base = applyGeometry(to: applyTonePipeline(to: source))
+        let extent = base.extent.integral
+        guard let mask = editorMaskImage(
+            source: base,
+            extent: extent,
+            layer: layer
+        ) else { return nil }
+        let blue = CIImage(color: CIColor(
+            red: 22.0 / 255,
+            green: 115.0 / 255,
+            blue: 230.0 / 255,
+            alpha: 0.58
+        )).cropped(to: extent)
+        let clear = CIImage(color: CIColor(
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0
+        )).cropped(to: extent)
+        let overlay = filtered(
+            "CIBlendWithMask",
+            image: blue,
+            values: [
+                kCIInputBackgroundImageKey: clear,
+                kCIInputMaskImageKey: mask
+            ]
+        )
+        guard let cgImage = context.createCGImage(overlay, from: extent) else {
             return nil
         }
         return NSImage(
@@ -11829,7 +11877,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.0"
+        ) as? String ?? "1.5.1"
     }
 
     var body: some View {

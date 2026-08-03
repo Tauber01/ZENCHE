@@ -109,6 +109,16 @@ final class Localization {
         add("需要激活", "Activation required", "アクティベーションが必要");
         add("已解锁", "Unlocked", "ロック解除済み");
         add("输出参数", "Output parameters", "出力パラメータ");
+        add("智能移除", "Smart Removal", "スマート除去");
+        add("去路人并自然补全背景",
+                "Remove passersby and naturally reconstruct the background",
+                "通行人を削除し、背景を自然に補完");
+        add("去穿帮并移除摄影器材、工作人员、反光与杂物",
+                "Remove production artifacts, including equipment, crew, reflections, and clutter",
+                "撮影機材、スタッフ、映り込み、不要物などの写り込みを除去");
+        add("AI 生成超时，请稍后重试",
+                "AI generation timed out. Please try again later.",
+                "AI 生成がタイムアウトしました。しばらくしてから再試行してください");
         add("视频曝光模式", "Video Exposure Mode", "動画露出モード");
         add("视频快门表示", "Video Shutter Display", "動画シャッター表示");
         add("视频编码", "Video Codec", "動画コーデック");
@@ -166,6 +176,10 @@ final class Localization {
         add("添加蒙版画笔已启用", "Add-mask brush enabled", "追加ブラシを有効にしました");
         add("减去蒙版画笔已启用", "Subtract-mask brush enabled", "削除ブラシを有効にしました");
         add("在预览画面拖动画笔；蓝色为添加，白色为减去。", "Drag on the preview; blue adds and white subtracts.", "プレビュー上をドラッグします。青は追加、白は削除です。");
+        add("蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。",
+                "Blue shows the active mask coverage; the eraser removes blue areas.",
+                "青は現在のマスク範囲です。消しゴムは青い領域を消去します。");
+        add("已选择原图", "Original selected", "元画像を選択済み");
         add("先创建蒙版，再选择添加或减去画笔。", "Create a mask, then choose the add or subtract brush.", "マスクを作成してから追加または削除ブラシを選択します。");
         add("次剩余", "uses remaining", "回残り");
         add("前往官网兑换密钥", "Redeem Key on Official Website", "公式サイトでキーを交換");
@@ -253,6 +267,24 @@ final class Localization {
                         + "• AI 利用回数はサーバーで減算し、残り回数を返します。失敗したリクエストはロールバックされ、回数が減らない問題を防ぎます。\n"
                         + "• デバイス紐付け認証、公式交換、Afdian 購入案内、詐欺注意を継続します。\n"
                         + "• Nikon / Sony / Canon のカメラ検出、PTP 撮影、プロ現像の安定性を改善しました。\n"
+                        + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。");
+        add("• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n"
+                        + "• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n"
+                        + "• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n"
+                        + "• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n"
+                        + "• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n"
+                        + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
+                "• Fixed original selection in AI retouching: the selected photo is immediately previewed, and switching photos clears the previous AI result.\n"
+                        + "• Added Smart Removal for passersby and natural background reconstruction, plus equipment, crew, reflections, and other production artifacts.\n"
+                        + "• Rebuilt mask previews: smart and brush masks now use a true blue overlay, and the eraser removes blue coverage instead of painting white.\n"
+                        + "• Fixed mask deletion and local-adjustment compositing so exposure, contrast, color, and detail affect only the corresponding mask.\n"
+                        + "• Extended mobile AI request timeouts and surfaced server error details to avoid treating long-running jobs as failures.\n"
+                        + "• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.",
+                "• AI 写真編集の元画像選択を修正。編集画面ですぐ元画像を確認でき、写真を切り替えると以前の AI 結果を消去します。\n"
+                        + "• 通行人の削除と自然な背景補完、撮影機材、スタッフ、反射、不要物などの写り込みを除去する「スマート除去」を追加しました。\n"
+                        + "• マスクプレビューを再構築。スマート／ブラシマスクを実際の青いオーバーレイで表示し、消しゴムは白を描かず青い範囲を消去します。\n"
+                        + "• マスク削除と部分調整の合成を修正し、露出、コントラスト、色、ディテールが対応するマスク範囲だけに適用されます。\n"
+                        + "• モバイル AI の待機時間を延長し、サーバーのエラー詳細を表示して長時間処理の誤判定を減らしました。\n"
                         + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。");
         add("• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n"
                         + "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n"

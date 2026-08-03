@@ -123,7 +123,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.5.0" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.5.1" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -1224,7 +1224,7 @@
                            VerticalAlignment="Center"
                            Foreground="{StaticResource GraphiteMutedBrush}"
                            FontSize="14"
-                           Text="AI 生成结果将在这里显示" />
+                           Text="选择原图或生成图像后将在这里显示" />
                 <StackPanel HorizontalAlignment="Left"
                             VerticalAlignment="Top">
                   <Border Background="#99000000"
@@ -1256,6 +1256,69 @@
                         Padding="10,6"
                         Click="EditorPhotoPickerButton_Click"
                         Content="选择照片" />
+                <Popup x:Name="AiPhotoPickerPopup"
+                       PlacementTarget="{Binding ElementName=AiPhotoPickerButton}"
+                       Placement="Bottom"
+                       StaysOpen="False"
+                       AllowsTransparency="True">
+                  <Border Width="420"
+                          MaxHeight="520"
+                          Padding="8"
+                          Background="{StaticResource SurfaceBrush}"
+                          BorderBrush="{StaticResource RuleBrush}"
+                          BorderThickness="1"
+                          CornerRadius="10">
+                    <TreeView x:Name="AiPhotoTree"
+                              SelectedItemChanged="EditorPhotoTree_SelectedItemChanged">
+                      <TreeView.ItemContainerStyle>
+                        <Style TargetType="{x:Type TreeViewItem}">
+                          <Setter Property="IsExpanded"
+                                  Value="{Binding IsExpanded, Mode=TwoWay}" />
+                          <Setter Property="Padding" Value="4" />
+                        </Style>
+                      </TreeView.ItemContainerStyle>
+                      <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                          <Grid Margin="4,3">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="64" />
+                              <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="56" Height="42">
+                              <Image x:Name="AiNodeThumbnail"
+                                     Source="{Binding Thumbnail}"
+                                     Stretch="UniformToFill" />
+                              <TextBlock x:Name="AiNodeIcon"
+                                         Visibility="Collapsed"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"
+                                         FontSize="15"
+                                         Text="{Binding Icon}" />
+                            </Grid>
+                            <StackPanel Grid.Column="1">
+                              <TextBlock FontWeight="SemiBold"
+                                         Text="{Binding Name}" />
+                              <TextBlock Margin="0,2,0,0"
+                                         Style="{StaticResource MetaText}"
+                                         Text="{Binding Detail}" />
+                            </StackPanel>
+                          </Grid>
+                          <HierarchicalDataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Thumbnail}"
+                                         Value="{x:Null}">
+                              <Setter TargetName="AiNodeThumbnail"
+                                      Property="Visibility"
+                                      Value="Collapsed" />
+                              <Setter TargetName="AiNodeIcon"
+                                      Property="Visibility"
+                                      Value="Visible" />
+                            </DataTrigger>
+                          </HierarchicalDataTemplate.Triggers>
+                        </HierarchicalDataTemplate>
+                      </TreeView.ItemTemplate>
+                    </TreeView>
+                  </Border>
+                </Popup>
                 <DockPanel>
                   <StackPanel>
                     <TextBlock FontWeight="SemiBold" Text="AI 创作" />

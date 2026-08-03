@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.0 launch announcements describe external recording on every target', async () => {
+test('version 1.5.1 launch announcements describe AI and mask fixes on every target', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,8 +95,9 @@ test('version 1.5.0 launch announcements describe external recording on every ta
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /新增“外录到当前智能设备”/);
-    assert.match(announcement, /PTP 实时取景不含音频/);
+    assert.match(announcement, /新增“智能移除”/);
+    assert.match(announcement, /重做蒙版预览/);
+    assert.match(announcement, /延长移动端 AI 请求等待时间/);
     assert.match(announcement, /五端同步更新/);
   }
 });

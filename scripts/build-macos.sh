@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=1.5.0
+VERSION=1.5.1
 ARCH=$(uname -m)
 BUILD_ROOT="$PROJECT_ROOT/build/macos"
 SDK_ROOT="$PROJECT_ROOT/build/nikon-sdk/macos"

@@ -37,6 +37,7 @@
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
         android:label="帧澈 ZENCHE"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
