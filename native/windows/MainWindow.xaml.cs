@@ -4299,11 +4299,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n" +
-                "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n" +
-                "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n" +
-                "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n" +
-                "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n" +
+                "• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n" +
+                "• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n" +
+                "• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n" +
+                "• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n" +
+                "• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
@@ -6165,6 +6165,25 @@ public partial class MainWindow : Window
 
     private void RefreshAiEditor()
     {
+        var editablePhotos = _library.List()
+            .Where(item => !item.IsVideo && IsEditableImage(item.Path))
+            .ToList();
+        if (_aiMode == 0 && (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !editablePhotos.Any(item => string.Equals(
+                item.Path,
+                _editorSelectedPath,
+                StringComparison.OrdinalIgnoreCase))))
+        {
+            _editorSelectedPath = editablePhotos.FirstOrDefault()?.Path;
+        }
+        AiPhotoTree.ItemsSource = BuildEditorPhotoTree(editablePhotos);
+        var selectedPhoto = editablePhotos.FirstOrDefault(item => string.Equals(
+            item.Path,
+            _editorSelectedPath,
+            StringComparison.OrdinalIgnoreCase));
+        AiPhotoPickerButton.Content = selectedPhoto is null
+            ? AppLocalization.T("选择照片")
+            : $"▧  {selectedPhoto.Name}";
         EditorHeaderTitle.Text = AppLocalization.T("AI 工具");
         EditorHeaderSubtitle.Text = AppLocalization.T(
             "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中输入激活码解锁。");
@@ -6187,21 +6206,27 @@ public partial class MainWindow : Window
         AiResolutionBox.SelectedIndex = Math.Clamp(_aiResolutionIndex, 0, AiResolutionBox.Items.Count - 1);
         AiStatusText.Text = AppLocalization.T(
             _aiResultPath != null ? "生成完成" : "请输入提示词");
-        AiPreviewBadge.Visibility = _aiResultPath != null
+        var previewPath = _aiResultPath ?? (
+            _aiMode == 0 && File.Exists(_editorSelectedPath)
+                ? _editorSelectedPath
+                : null);
+        AiPreviewBadge.Text = AppLocalization.T(
+            _aiResultPath != null ? "AI 生成" : "原图");
+        AiPreviewBadge.Visibility = previewPath != null
             ? Visibility.Visible
             : Visibility.Collapsed;
         AiSaveBtn.Visibility = _aiResultPath != null
             ? Visibility.Visible
             : Visibility.Collapsed;
-        AiPreviewEmpty.Visibility = _aiResultPath != null
+        AiPreviewEmpty.Visibility = previewPath != null
             ? Visibility.Collapsed
             : Visibility.Visible;
-        if (_aiResultPath != null)
+        if (previewPath != null)
         {
             try
             {
                 AiPreviewImage.Source = new BitmapImage(
-                    new Uri(_aiResultPath));
+                    new Uri(previewPath));
             }
             catch { }
         }
@@ -6218,7 +6243,7 @@ public partial class MainWindow : Window
         var clear = new Button { Content = AppLocalization.T("清空"), Height = 44, Margin = new Thickness(0, 0, 6, 6), Style = (Style)FindResource("ButtonBase") };
         clear.Click += (_, _) => { _aiSelectedPresets.Clear(); _aiManualPrompt = ""; AiPromptBox.Text = ComposeAiPrompt(); };
         AiPresetPanel.Children.Add(clear);
-        var modules = new (string Category, string[] Values)[]
+        var modules = new List<(string Category, string[] Values)>
         {
             ("主体", ["人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"]),
             ("光线", ["柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"]),
@@ -6227,13 +6252,22 @@ public partial class MainWindow : Window
             ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"]),
             ("约束", ["保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"])
         };
+        if (_aiMode == 0)
+        {
+            modules.Insert(5, (
+                "智能移除",
+                [
+                    "去路人并自然补全背景",
+                    "去穿帮并移除摄影器材、工作人员、反光与杂物"
+                ]));
+        }
         foreach (var module in modules)
         {
-            AiPresetPanel.Children.Add(new TextBlock { Text = module.Category, Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(0, 4, 0, 2) });
+            AiPresetPanel.Children.Add(new TextBlock { Text = AppLocalization.T(module.Category), Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(0, 4, 0, 2) });
             foreach (var value in module.Values)
             {
                 var key = $"{module.Category}:{value}";
-                var button = new Button { Content = value, Height = 44, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(10, 0, 10, 0), Style = (Style)FindResource("ButtonBase") };
+                var button = new Button { Content = AppLocalization.T(value), Height = 44, Margin = new Thickness(0, 0, 6, 6), Padding = new Thickness(10, 0, 10, 0), Style = (Style)FindResource("ButtonBase") };
                 button.IsHitTestVisible = true;
                 button.Click += (_, _) =>
                 {
@@ -6256,7 +6290,7 @@ public partial class MainWindow : Window
     {
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(_aiManualPrompt)) parts.Add(_aiManualPrompt.Trim());
-        foreach (var category in new[] { "主体", "光线", "色彩", "质感", "构图", "约束" })
+        foreach (var category in new[] { "主体", "光线", "色彩", "质感", "构图", "智能移除", "约束" })
         {
             var values = _aiSelectedPresets.Where(item => item.StartsWith(category + ":", StringComparison.Ordinal)).Select(item => item[(category.Length + 1)..]).ToArray();
             if (values.Length > 0) parts.Add($"{category}：{string.Join("、", values)}");
@@ -6267,6 +6301,8 @@ public partial class MainWindow : Window
     private void AiEditMode_Click(object sender, RoutedEventArgs e)
     {
         _aiMode = 0;
+        _aiResultPath = null;
+        _aiPrompt = ComposeAiPrompt();
         RefreshAiEditor();
         RefreshAiPresets();
     }
@@ -6274,6 +6310,11 @@ public partial class MainWindow : Window
     private void AiGenMode_Click(object sender, RoutedEventArgs e)
     {
         _aiMode = 1;
+        _aiResultPath = null;
+        _aiSelectedPresets.RemoveWhere(item => item.StartsWith(
+            "智能移除:",
+            StringComparison.Ordinal));
+        _aiPrompt = ComposeAiPrompt();
         RefreshAiEditor();
         RefreshAiPresets();
     }
@@ -6552,6 +6593,11 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
+        if (ReferenceEquals(sender, AiPhotoPickerButton))
+        {
+            AiPhotoPickerPopup.IsOpen = true;
+            return;
+        }
         if (sender is FrameworkElement target)
         {
             EditorPhotoPickerPopup.PlacementTarget = target;
@@ -6569,6 +6615,7 @@ public partial class MainWindow : Window
             return;
         }
         _editorSelectedPath = item.Path;
+        _aiResultPath = null;
         var choice = EditorPhotoBox.Items
             .OfType<EditorPhotoChoice>()
             .FirstOrDefault(candidate =>
@@ -6582,8 +6629,12 @@ public partial class MainWindow : Window
         EditorPhotoPickerButton.Content = $"▧  {item.Name}";
         AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
         EditorPhotoPickerPopup.IsOpen = false;
+        AiPhotoPickerPopup.IsOpen = false;
         ResetEditorControls();
-        UpdateEditorPreview();
+        if (_editorInAiMode)
+            RefreshAiEditor();
+        else
+            UpdateEditorPreview();
     }
 
     private void BuildEditorAdjustmentControls()
@@ -6916,7 +6967,7 @@ public partial class MainWindow : Window
         }
         content.Children.Add(new TextBlock
         {
-            Text = AppLocalization.T("在预览画面拖动画笔；蓝色为添加，白色为减去。"),
+            Text = AppLocalization.T("蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"),
             Foreground = (Brush)FindResource("MutedBrush"),
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap
@@ -8020,31 +8071,56 @@ public partial class MainWindow : Window
         {
             return;
         }
+        var active = _editorAdjustments.ActiveMaskLayer();
+        if (active is null) return;
+        var layer = _editorAdjustments.DisplayedMaskLayer(active);
         var rect = GetUniformImageRect(EditorMaskCanvas, bitmap);
-        foreach (var stroke in _editorAdjustments.MaskStrokes)
+        var converted = new FormatConvertedBitmap(
+            bitmap,
+            PixelFormats.Bgra32,
+            null,
+            0);
+        var width = converted.PixelWidth;
+        var height = converted.PixelHeight;
+        var stride = width * 4;
+        var source = new byte[stride * height];
+        converted.CopyPixels(source, stride, 0);
+        var mask = BuildEditorMask(width, height, layer, source);
+        var overlay = new byte[source.Length];
+        var intensity = Math.Clamp(layer.Amount / 100, 0, 1);
+        for (var index = 0; index < mask.Length; index++)
         {
-            if (stroke.Points.Count == 0) continue;
-            var points = new PointCollection(
-                stroke.Points.Select(point => new Point(
-                    rect.Left + point.X * rect.Width,
-                    rect.Top + point.Y * rect.Height)));
-            var line = new System.Windows.Shapes.Polyline
-            {
-                Points = points,
-                Stroke = stroke.Subtract
-                    ? Brushes.White
-                    : (Brush)FindResource("AccentBrush"),
-                StrokeThickness = Math.Max(
-                    3,
-                    stroke.Size / 100 * Math.Min(rect.Width, rect.Height)),
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round,
-                StrokeLineJoin = PenLineJoin.Round,
-                Opacity = stroke.Subtract ? .82 : .58,
-                IsHitTestVisible = false
-            };
-            EditorMaskCanvas.Children.Add(line);
+            var coverage = mask[index] / 255.0;
+            var effective = (layer.Invert ? 1 - coverage : coverage)
+                * intensity;
+            var alpha = (byte)Math.Round(150 * effective);
+            var offset = index * 4;
+            overlay[offset] = (byte)(230 * alpha / 255);
+            overlay[offset + 1] = (byte)(115 * alpha / 255);
+            overlay[offset + 2] = (byte)(22 * alpha / 255);
+            overlay[offset + 3] = alpha;
         }
+        var overlayBitmap = BitmapSource.Create(
+            width,
+            height,
+            converted.DpiX,
+            converted.DpiY,
+            PixelFormats.Pbgra32,
+            null,
+            overlay,
+            stride);
+        overlayBitmap.Freeze();
+        var overlayImage = new System.Windows.Controls.Image
+        {
+            Source = overlayBitmap,
+            Width = rect.Width,
+            Height = rect.Height,
+            Stretch = Stretch.Fill,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(overlayImage, rect.Left);
+        Canvas.SetTop(overlayImage, rect.Top);
+        EditorMaskCanvas.Children.Add(overlayImage);
     }
 
     private void SampleEditorPixelAtCenter()

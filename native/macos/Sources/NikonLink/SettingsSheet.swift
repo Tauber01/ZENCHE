@@ -913,7 +913,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        Text("• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                        Text("• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                             .font(.system(size: 14))
                             .lineSpacing(5)
                     }

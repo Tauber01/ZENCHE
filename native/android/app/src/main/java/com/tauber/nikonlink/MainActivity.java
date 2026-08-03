@@ -668,6 +668,7 @@ public final class MainActivity extends Activity {
         private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private Runnable maskChanged = () -> {};
         private EditorMaskStroke activeStroke;
+        private Bitmap maskSourceBitmap;
 
         EditorMaskImageView(EditorAdjustments adjustments) {
             super(MainActivity.this);
@@ -679,6 +680,30 @@ public final class MainActivity extends Activity {
 
         void setMaskChangedListener(Runnable listener) {
             maskChanged = listener == null ? () -> {} : listener;
+        }
+
+        void setPreviewBitmap(Bitmap bitmap) {
+            super.setImageBitmap(bitmap);
+            if (maskSourceBitmap != null) maskSourceBitmap.recycle();
+            int maximum = 384;
+            float scale = Math.min(
+                    1f,
+                    maximum / (float) Math.max(bitmap.getWidth(), bitmap.getHeight()));
+            int width = Math.max(1, Math.round(bitmap.getWidth() * scale));
+            int height = Math.max(1, Math.round(bitmap.getHeight() * scale));
+            maskSourceBitmap = width == bitmap.getWidth()
+                    && height == bitmap.getHeight()
+                    ? bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                    : Bitmap.createScaledBitmap(bitmap, width, height, true);
+            invalidate();
+        }
+
+        void clearPreview() {
+            super.setImageDrawable(null);
+            if (maskSourceBitmap != null) {
+                maskSourceBitmap.recycle();
+                maskSourceBitmap = null;
+            }
         }
 
         private RectF displayedImageRect() {
@@ -755,42 +780,37 @@ public final class MainActivity extends Activity {
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
+            EditorMaskLayer active = adjustments.activeMaskLayer();
             if (!adjustments.maskEnabled
-                    || !adjustments.activeMaskLayerVisible()
-                    || adjustments.maskStrokes.isEmpty()) {
+                    || active == null
+                    || !active.visible
+                    || maskSourceBitmap == null) {
                 return;
             }
-            RectF rect = displayedImageRect();
-            for (EditorMaskStroke stroke : adjustments.maskStrokes) {
-                if (stroke.points.isEmpty()) continue;
-                overlayPaint.setStyle(Paint.Style.STROKE);
-                overlayPaint.setStrokeCap(Paint.Cap.ROUND);
-                overlayPaint.setStrokeJoin(Paint.Join.ROUND);
-                overlayPaint.setStrokeWidth(Math.max(
-                        dp(3),
-                        stroke.size / 100f * Math.min(rect.width(), rect.height())));
-                overlayPaint.setColor(stroke.subtract
-                        ? Color.argb(210, 255, 255, 255)
-                        : Color.argb(150, 22, 115, 230));
-                Path path = new Path();
-                EditorMaskPoint first = stroke.points.get(0);
-                path.moveTo(
-                        rect.left + first.x * rect.width(),
-                        rect.top + first.y * rect.height());
-                for (int index = 1; index < stroke.points.size(); index++) {
-                    EditorMaskPoint point = stroke.points.get(index);
-                    path.lineTo(
-                            rect.left + point.x * rect.width(),
-                            rect.top + point.y * rect.height());
-                }
-                canvas.drawPath(path, overlayPaint);
-                if (stroke.points.size() == 1) {
-                    canvas.drawPoint(
-                            rect.left + first.x * rect.width(),
-                            rect.top + first.y * rect.height(),
-                            overlayPaint);
-                }
+            EditorMaskLayer layer = adjustments.displayedMaskLayer(active);
+            int width = maskSourceBitmap.getWidth();
+            int height = maskSourceBitmap.getHeight();
+            int[] source = new int[width * height];
+            maskSourceBitmap.getPixels(source, 0, width, 0, 0, width, height);
+            byte[] mask = buildEditorMask(width, height, layer, source);
+            int[] overlay = new int[mask.length];
+            double intensity = Math.max(0, Math.min(1, layer.amount / 100.0));
+            for (int index = 0; index < mask.length; index++) {
+                double coverage = (mask[index] & 0xff) / 255.0;
+                double effective = (layer.invert ? 1 - coverage : coverage)
+                        * intensity;
+                overlay[index] = Color.argb(
+                        (int) Math.round(150 * effective),
+                        22,
+                        115,
+                        230);
             }
+            Bitmap overlayBitmap = Bitmap.createBitmap(
+                    overlay, width, height, Bitmap.Config.ARGB_8888);
+            RectF rect = displayedImageRect();
+            overlayPaint.setStyle(Paint.Style.FILL);
+            canvas.drawBitmap(overlayBitmap, null, rect, overlayPaint);
+            overlayBitmap.recycle();
         }
     }
 
@@ -1539,6 +1559,7 @@ public final class MainActivity extends Activity {
             {"色彩", "自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"},
             {"质感", "保留真实皮肤纹理", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"},
             {"构图", "浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"},
+            {"智能移除", "去路人并自然补全背景", "去穿帮并移除摄影器材、工作人员、反光与杂物"},
             {"约束", "保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"}
     };
     private static final String[][] AI_GENERATE_MODULES = {
@@ -6034,10 +6055,10 @@ public final class MainActivity extends Activity {
                     editorAdjustments,
                     1600);
             if (rendered == null) {
-                preview.setImageDrawable(null);
+                preview.clearPreview();
                 status.setText(tr("无法解码当前照片"));
             } else {
-                preview.setImageBitmap(rendered);
+                preview.setPreviewBitmap(rendered);
                 status.setText(tr(
                         editorAdjustments.showingOriginal
                                 ? "正在查看原图"
@@ -6362,7 +6383,7 @@ public final class MainActivity extends Activity {
                 value -> editorAdjustments.maskClarity = value, refreshPreview);
         mask.addView(text(
                 editorAdjustments.maskEnabled
-                        ? "在预览画面拖动画笔；蓝色为添加，白色为减去。"
+                        ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                         : "先创建蒙版，再选择添加或减去画笔。",
                 11,
                 Typeface.NORMAL,
@@ -6573,6 +6594,23 @@ public final class MainActivity extends Activity {
             content.addView(
                     buildEditorPhotoPicker(photos),
                     marginParams(-1, dp(64), 0, 0, 0, 10));
+            if (aiResultBitmap == null && editorSelectedPath != null) {
+                Bitmap original = renderEditorAnalysisBitmap(
+                        new File(editorSelectedPath),
+                        1400);
+                if (original != null) {
+                    content.addView(
+                            text(tr("已选择原图"), 11, Typeface.BOLD, MUTED),
+                            marginParams(-1, -2, 0, 0, 0, 6));
+                    ImageView originalPreview = new ImageView(this);
+                    originalPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    originalPreview.setImageBitmap(original);
+                    originalPreview.setBackgroundColor(GRAPHITE);
+                    content.addView(
+                            originalPreview,
+                            marginParams(-1, dp(320), 0, 0, 0, 12));
+                }
+            }
         }
 
         LinearLayout modeRow = new LinearLayout(this);
@@ -6581,6 +6619,7 @@ public final class MainActivity extends Activity {
         editBtn.setOnClickListener(v -> {
             aiMode = 0;
             aiResultBitmap = null;
+            aiPrompt = composeAiPrompt();
             showSection("editor");
         });
         modeRow.addView(editBtn, new LinearLayout.LayoutParams(0, dp(44), 1f));
@@ -6588,6 +6627,9 @@ public final class MainActivity extends Activity {
         genBtn.setOnClickListener(v -> {
             aiMode = 1;
             aiResultBitmap = null;
+            aiSelectedPresetKeys.removeIf(item -> item.startsWith(
+                    "智能移除\u001f"));
+            aiPrompt = composeAiPrompt();
             showSection("editor");
         });
         LinearLayout.LayoutParams genParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
@@ -6685,6 +6727,7 @@ public final class MainActivity extends Activity {
             String sourcePath = isEditMode ? editorSelectedPath : null;
             editorExecutor.execute(() -> {
                 boolean ok = false;
+                String failureMessage = null;
                 try {
                     AiImageResponse result = callAiImageApi(
                             loadActivationCode(), aiDeviceId(),
@@ -6703,9 +6746,13 @@ public final class MainActivity extends Activity {
                         }
                     }
                 } catch (Exception e) {
+                    failureMessage = e instanceof java.net.SocketTimeoutException
+                            ? "AI 生成超时，请稍后重试"
+                            : e.getMessage();
                     diagnostics.error("ai", "AI 调用失败：" + e.getMessage());
                 }
                 boolean success = ok;
+                String finalFailureMessage = failureMessage;
                 mainHandler.post(() -> {
                     aiIsGenerating = false;
                     generateBtn.setEnabled(true);
@@ -6714,7 +6761,11 @@ public final class MainActivity extends Activity {
                         aiStatus.setText(tr("生成完成"));
                         showSection("editor");
                     } else {
-                        aiStatus.setText(tr("AI 生成失败"));
+                        aiStatus.setText(tr(
+                                finalFailureMessage == null
+                                        || finalFailureMessage.isEmpty()
+                                        ? "AI 生成失败"
+                                        : finalFailureMessage));
                     }
                 });
             });
@@ -6943,6 +6994,7 @@ public final class MainActivity extends Activity {
         }
         row.setOnClickListener(view -> {
             editorSelectedPath = file.getAbsolutePath();
+            aiResultBitmap = null;
             editorAdjustments.reset();
             selectedNikonCloudPreset = null;
             editorSettingsBeforeAI = null;
@@ -7018,7 +7070,9 @@ public final class MainActivity extends Activity {
     private String composeAiPrompt() {
         List<String> groups = new ArrayList<>();
         if (!aiManualPrompt.isEmpty()) groups.add(aiManualPrompt);
-        String[] categories = {"主体", "光线", "色彩", "质感", "构图", "约束"};
+        String[] categories = {
+                "主体", "光线", "色彩", "质感", "构图", "智能移除", "约束"
+        };
         for (String category : categories) {
             List<String> values = new ArrayList<>();
             for (String key : aiSelectedPresetKeys) {
@@ -7052,7 +7106,9 @@ public final class MainActivity extends Activity {
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setConnectTimeout(15_000);
-        conn.setReadTimeout(45_000);
+        // Leave headroom around the proxy's polling and image-download
+        // windows so a successful long-running job is not abandoned early.
+        conn.setReadTimeout(300_000);
         conn.setDoOutput(true);
 
         org.json.JSONObject body = new org.json.JSONObject();
@@ -7078,12 +7134,25 @@ public final class MainActivity extends Activity {
 
         int code = conn.getResponseCode();
         if (code != 200) {
-            if (code == 403) {
-                throw new Exception("激活码无效或次数用完");
+            String detail = null;
+            java.io.InputStream errorStream = conn.getErrorStream();
+            if (errorStream != null) {
+                try {
+                    byte[] errorBytes = readAllBytes(errorStream);
+                    org.json.JSONObject errorJson = new org.json.JSONObject(
+                            new String(errorBytes, java.nio.charset.StandardCharsets.UTF_8));
+                    detail = errorJson.optString("error", null);
+                } catch (Exception ignored) {
+                    // Fall through to the status-specific message below.
+                } finally {
+                    errorStream.close();
+                }
             }
-            if (code == 502) {
-                throw new Exception("AI 服务暂时不可用");
-            }
+            conn.disconnect();
+            if (detail != null && !detail.isEmpty()) throw new Exception(detail);
+            if (code == 403) throw new Exception("激活码无效或次数用完");
+            if (code == 429) throw new Exception("请求太频繁，请稍后重试");
+            if (code == 502) throw new Exception("AI 服务暂时不可用");
             throw new Exception("API 服务返回错误 " + code);
         }
 
@@ -11999,9 +12068,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.0" : version;
+            return version == null || version.isEmpty() ? "1.5.1" : version;
         } catch (Exception error) {
-            return "1.5.0";
+            return "1.5.1";
         }
     }
 
@@ -12149,11 +12218,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n"
-                                + "• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n"
-                                + "• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n"
-                                + "• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n"
-                                + "• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n"
+                        "• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n"
+                                + "• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n"
+                                + "• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n"
+                                + "• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n"
+                                + "• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n"
                                 + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
                         14,
                         Typeface.NORMAL,

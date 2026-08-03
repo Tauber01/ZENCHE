@@ -452,7 +452,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.5.0';
+const CURRENT_VERSION: string = '1.5.1';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -898,6 +898,7 @@ struct Index {
   @State private editorImageWidth: number = 1;
   @State private editorImageHeight: number = 1;
   @State private editorRenderedPreview: image.PixelMap | undefined = undefined;
+  @State private editorMaskOverlay: image.PixelMap | undefined = undefined;
   private editorRenderGeneration: number = 0;
   @State private editorPickerSample: string = 'RGB 取样：尚未取样';
   @State private editorRotation: number = 0;
@@ -1464,7 +1465,7 @@ struct Index {
       this.NavButton('我的设备', 'devices')
       this.NavButton('分支文件库', 'library')
       Blank()
-      Text('ZENCHE 1.5.0')
+      Text('ZENCHE 1.5.1')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
@@ -2003,42 +2004,14 @@ struct Index {
             this.editorPanel === 'mask' &&
             this.editorMaskEnabled &&
             this.activeEditorMaskLayerVisible() &&
-            !this.editorShowingOriginal
+            !this.editorShowingOriginal &&
+            this.editorMaskOverlay !== undefined
           ) {
-            ForEach(
-              this.editorMaskStrokes,
-              (stroke: EditorMaskStroke): void => {
-                ForEach(
-                  stroke.points,
-                  (point: EditorMaskPoint): void => {
-                    Circle()
-                      .width(Math.max(
-                        4,
-                        stroke.size / 100 * Math.min(
-                          this.editorImageRect().width,
-                          this.editorImageRect().height
-                        )
-                      ))
-                      .height(Math.max(
-                        4,
-                        stroke.size / 100 * Math.min(
-                          this.editorImageRect().width,
-                          this.editorImageRect().height
-                        )
-                      ))
-                      .fill(stroke.subtract ? '#D9FFFFFF' : '#961673E6')
-                      .position({
-                        x: this.editorImageRect().left
-                          + point.x * this.editorImageRect().width,
-                        y: this.editorImageRect().top
-                          + point.y * this.editorImageRect().height
-                      })
-                  },
-                  (point: EditorMaskPoint): string => `${point.x}-${point.y}`
-                )
-              },
-              (stroke: EditorMaskStroke): string => stroke.id
-            )
+            Image(this.editorMaskOverlay)
+              .width('100%')
+              .height('100%')
+              .padding(12)
+              .objectFit(ImageFit.Contain)
           }
           Text(this.tr(
             this.editorShowingOriginal ? '原图' : '调整后'
@@ -2226,6 +2199,7 @@ struct Index {
             ? $r('app.color.accent') : $r('app.color.rule'), radius: 6 })
           .onClick((): void => {
             this.editorSelectedPath = item.path;
+            this.aiResultPath = '';
             this.editorPickerVisible = false;
             this.resetImageEditor();
             this.refreshEditorImageMetrics();
@@ -2337,6 +2311,20 @@ struct Index {
 
       if (this.aiMode === 0 && this.editablePhotos().length > 0) {
         this.EditorPhotoPicker()
+        if (this.aiResultPath.length === 0 && this.editorSelectedPath.length > 0) {
+          Text(this.tr('已选择原图'))
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Image(`file://${this.editorSelectedPath}`)
+            .width('100%')
+            .height(this.isCompact() ? 300 : 420)
+            .objectFit(ImageFit.Contain)
+            .backgroundColor($r('app.color.graphite'))
+            .borderRadius(14)
+            .padding(12)
+        }
       }
 
       Row({ space: 8 }) {
@@ -2348,6 +2336,7 @@ struct Index {
           .onClick((): void => {
             this.aiMode = 0;
             this.aiResultPath = '';
+            this.composeAiPrompt();
           })
         Button(this.aiMode === 1 ? '● AI 生图' : '○ AI 生图', { type: ButtonType.Normal })
           .height(44)
@@ -2357,6 +2346,7 @@ struct Index {
           .onClick((): void => {
             this.aiMode = 1;
             this.aiResultPath = '';
+            this.composeAiPrompt();
           })
       }
       .width('100%')
@@ -2438,7 +2428,7 @@ struct Index {
       }
       .width('100%')
       ForEach(this.getAiModules(), (module: Array<string>) => {
-        Text(module[0])
+        Text(this.tr(module[0]))
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
@@ -2446,7 +2436,7 @@ struct Index {
         Scroll() {
           Row({ space: 6 }) {
             ForEach(module.slice(1), (value: string) => {
-              Button(value, { type: ButtonType.Normal })
+              Button(this.tr(value), { type: ButtonType.Normal })
                 .height(44)
                 .fontSize(11)
                 .fontColor($r('app.color.ink'))
@@ -2523,14 +2513,29 @@ struct Index {
   }
 
   private getAiModules(): Array<Array<string>> {
-    return [
+    const modules: Array<Array<string>> = [
       ['主体', '人像主体', '产品主体', '建筑主体', '风光主体', '食物主体'],
       ['光线', '柔和自然光', '电影感侧光', '金色时刻', '低调棚拍光', '夜景霓虹光'],
       ['色彩', '自然通透', '胶片暖调', '日系清新', '高反差黑白', '冷色城市'],
       ['质感', '保留真实皮肤纹理', '细节清晰', '轻微胶片颗粒', '柔和高光', '高动态范围'],
-      ['构图', '浅景深', '干净背景', '对称构图', '环境叙事', '视觉焦点明确'],
-      ['约束', '保持人物身份和五官', '不改变产品形状', '不添加多余物体', '不过度磨皮', '保留自然阴影']
+      ['构图', '浅景深', '干净背景', '对称构图', '环境叙事', '视觉焦点明确']
     ];
+    if (this.aiMode === 0) {
+      modules.push([
+        '智能移除',
+        '去路人并自然补全背景',
+        '去穿帮并移除摄影器材、工作人员、反光与杂物'
+      ]);
+      modules.push([
+        '约束',
+        '保持人物身份和五官',
+        '不改变产品形状',
+        '不添加多余物体',
+        '不过度磨皮',
+        '保留自然阴影'
+      ]);
+    }
+    return modules;
   }
 
   private isAiPresetSelected(category: string, value: string): boolean {
@@ -2617,25 +2622,38 @@ struct Index {
           // HTTP client while coercing a Record into request data.
           extraData: JSON.stringify(body),
           connectTimeout: 15000,
-          readTimeout: 60000,
+          // Keep the request alive while the proxy polls and downloads output.
+          readTimeout: 300000,
         }
       );
       httpRequest.destroy();
+      const responseText: string = response.result as string;
+      let serverMessage: string = '';
+      if (response.responseCode !== 200 && responseText.length > 0) {
+        try {
+          const errorResult: Record<string, Object> = JSON.parse(
+            responseText
+          ) as Record<string, Object>;
+          serverMessage = (errorResult['error'] as string) || '';
+        } catch (_) {
+          serverMessage = '';
+        }
+      }
       if (response.responseCode === 403) {
         this.aiGenerating = false;
-        this.aiStatus = '激活码无效或次数用完';
+        this.aiStatus = serverMessage || '激活码无效或次数用完';
         return;
       }
       if (response.responseCode === 502) {
         this.aiGenerating = false;
-        this.aiStatus = 'AI 服务暂时不可用';
+        this.aiStatus = serverMessage || 'AI 服务暂时不可用';
         return;
       }
       if (response.responseCode !== 200) {
-        throw new Error(`AI 服务返回错误 ${response.responseCode}`);
+        throw new Error(serverMessage || `AI 服务返回错误 ${response.responseCode}`);
       }
       const result: Record<string, Object> = JSON.parse(
-        (response.result as string)
+        responseText
       ) as Record<string, Object>;
       const dataArr: Array<Record<string, Object>> =
         result['data'] as Array<Record<string, Object>>;
@@ -2685,7 +2703,11 @@ struct Index {
       this.aiGenerating = false;
     } catch (err) {
       this.aiGenerating = false;
-      const msg: string = (err as Error).message || 'AI 生成失败';
+      const rawMessage: string = (err as Error).message || 'AI 生成失败';
+      const msg: string = rawMessage.toLowerCase().indexOf('timeout') >= 0 ||
+        rawMessage.indexOf('超时') >= 0
+        ? 'AI 生成超时，请稍后重试'
+        : rawMessage;
       this.aiStatus = `生成失败：${msg}`;
     }
   }
@@ -3328,7 +3350,7 @@ struct Index {
           this.editorMaskClarity = value;
         })
         Text(this.tr(this.editorMaskEnabled
-          ? '在预览画面拖动画笔；蓝色为添加，白色为减去。'
+          ? '蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。'
           : '先创建蒙版，再选择添加或减去画笔。'))
           .fontSize(11).fontColor($r('app.color.muted')).width('100%')
       } else if (this.editorPanel === 'detail') {
@@ -5786,11 +5808,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n' +
-                '• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n' +
-                '• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n' +
-                '• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n' +
-                '• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n' +
+                '• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n' +
+                '• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n' +
+                '• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n' +
+                '• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n' +
+                '• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n' +
                 '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
               ))
                 .fontSize(14)
@@ -10194,6 +10216,11 @@ struct Index {
     ) {
       this.editorMaskStrokes[this.editorActiveMaskStroke].points.push(point);
       this.editorMaskStrokes = this.editorMaskStrokes.slice();
+      if (
+        this.editorMaskStrokes[this.editorActiveMaskStroke].points.length % 6 === 0
+      ) {
+        this.refreshEditorRenderedPreview();
+      }
     } else if (event.type === TouchType.Up) {
       this.editorActiveMaskStroke = -1;
       this.status = this.editorMaskSubtract
@@ -10448,6 +10475,44 @@ struct Index {
         }
       }
     );
+  }
+
+  private async createEditorMaskOverlay(
+    sourcePixels: Uint8Array,
+    width: number,
+    height: number
+  ): Promise<image.PixelMap | undefined> {
+    const active: EditorMaskLayer | undefined = this.activeEditorMaskLayer();
+    if (active === undefined || !active.visible) return undefined;
+    const layer: EditorMaskLayer = this.displayedEditorMaskLayer(active);
+    const mask: Uint8Array = this.buildEditorMask(
+      width,
+      height,
+      sourcePixels,
+      layer
+    );
+    const overlay: Uint8Array = new Uint8Array(width * height * 4);
+    const intensity: number = Math.max(
+      0,
+      Math.min(1, layer.amount / 100)
+    );
+    for (let index: number = 0; index < mask.length; index++) {
+      const coverage: number = mask[index] / 255;
+      const effective: number = (
+        layer.invert ? 1 - coverage : coverage
+      ) * intensity;
+      const offset: number = index * 4;
+      overlay[offset] = 22;
+      overlay[offset + 1] = 115;
+      overlay[offset + 2] = 230;
+      overlay[offset + 3] = Math.round(150 * effective);
+    }
+    return image.createPixelMap(overlay.buffer, {
+      editable: false,
+      pixelFormat: image.PixelMapFormat.RGBA_8888,
+      alphaType: image.AlphaType.UNPREMUL,
+      size: { width: width, height: height }
+    });
   }
 
   private processEditorMaskLayerPixels(
@@ -10797,10 +10862,17 @@ struct Index {
   private clearEditorRenderedPreview(): void {
     this.editorRenderGeneration++;
     const previous: image.PixelMap | undefined = this.editorRenderedPreview;
+    const previousOverlay: image.PixelMap | undefined = this.editorMaskOverlay;
     this.editorRenderedPreview = undefined;
+    this.editorMaskOverlay = undefined;
     if (previous !== undefined) {
       setTimeout((): void => {
         previous.release();
+      }, 300);
+    }
+    if (previousOverlay !== undefined) {
+      setTimeout((): void => {
+        previousOverlay.release();
       }, 300);
     }
   }
@@ -10816,6 +10888,7 @@ struct Index {
     const generation: number = ++this.editorRenderGeneration;
     let source: image.ImageSource | undefined = undefined;
     let pixelMap: image.PixelMap | undefined = undefined;
+    let overlayPixelMap: image.PixelMap | undefined = undefined;
     try {
       source = image.createImageSource(`file://${this.editorSelectedPath}`);
       const sourceInfo: image.ImageInfo = await source.getImageInfo();
@@ -10877,6 +10950,11 @@ struct Index {
       );
       await pixelMap.readPixelsToBuffer(finalBuffer);
       if (!this.editorShowingOriginal) {
+        overlayPixelMap = await this.createEditorMaskOverlay(
+          new Uint8Array(finalBuffer),
+          finalInfo.size.width,
+          finalInfo.size.height
+        );
         this.processEditorMaskPixels(
           new Uint8Array(finalBuffer),
           finalInfo.size.width,
@@ -10886,17 +10964,27 @@ struct Index {
       }
       if (generation !== this.editorRenderGeneration) {
         pixelMap.release();
+        overlayPixelMap?.release();
+        overlayPixelMap = undefined;
         pixelMap = undefined;
         return;
       }
       const previous: image.PixelMap | undefined = this.editorRenderedPreview;
+      const previousOverlay: image.PixelMap | undefined = this.editorMaskOverlay;
       this.editorRenderedPreview = pixelMap;
+      this.editorMaskOverlay = overlayPixelMap;
       this.editorImageWidth = finalInfo.size.width;
       this.editorImageHeight = finalInfo.size.height;
       pixelMap = undefined;
+      overlayPixelMap = undefined;
       if (previous !== undefined) {
         setTimeout((): void => {
           previous.release();
+        }, 300);
+      }
+      if (previousOverlay !== undefined) {
+        setTimeout((): void => {
+          previousOverlay.release();
         }, 300);
       }
     } catch (_) {
@@ -10905,6 +10993,7 @@ struct Index {
       }
     } finally {
       pixelMap?.release();
+      overlayPixelMap?.release();
       source?.release();
     }
   }

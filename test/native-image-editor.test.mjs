@@ -395,6 +395,70 @@ test("native mask systems provide switching lists and independent visibility", a
   assert.match(windows, /IsChecked = layer\.IsVisible/);
 });
 
+test("AI retouch previews its selected original and masks render real blue alpha overlays", async () => {
+  const [ios, android, harmony, macos, windowsXaml, windows] =
+    await Promise.all([
+      read("native/ios/NikonLink/Views/RootView.swift"),
+      read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+      read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+      read("native/macos/Sources/NikonLink/main.swift"),
+      read("native/windows/MainWindow.xaml"),
+      read("native/windows/MainWindow.xaml.cs"),
+    ]);
+
+  for (const source of [ios, android, harmony, macos, windows]) {
+    assert.match(source, /蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。/);
+    assert.match(source, /deleteActive(?:Editor)?MaskLayer|DeleteActiveMaskLayer/);
+  }
+
+  assert.match(
+    ios,
+    /aiResultImage \?\? \(aiMode == \.edit \? selectedOriginalImage : nil\)/,
+  );
+  assert.match(ios, /activeMaskOverlayImage[\s\S]*CIBlendWithMask/);
+  assert.match(
+    ios,
+    /onChange\(of: selectedItemID\)[\s\S]*aiResultImage = nil/,
+  );
+  assert.match(
+    macos,
+    /aiResultImage \?\? \(aiMode == \.edit \? selectedOriginalImage : nil\)/,
+  );
+  assert.match(macos, /activeMaskOverlayImage[\s\S]*CIBlendWithMask/);
+  assert.match(
+    macos,
+    /onChange\(of: selectedPhotoURL\)[\s\S]*aiResultImage = nil/,
+  );
+
+  assert.match(android, /已选择原图/);
+  assert.match(
+    android,
+    /editorSelectedPath = file\.getAbsolutePath\(\);\s*aiResultBitmap = null;/s,
+  );
+  assert.match(
+    android,
+    /protected void onDraw\(Canvas canvas\)[\s\S]*buildEditorMask\([\s\S]*150 \* effective/,
+  );
+  assert.match(harmony, /Image\(`file:\/\/\$\{this\.editorSelectedPath\}`\)/);
+  assert.match(
+    harmony,
+    /this\.editorSelectedPath = item\.path;\s*this\.aiResultPath = '';/s,
+  );
+  assert.match(harmony, /createEditorMaskOverlay[\s\S]*AlphaType\.UNPREMUL/);
+
+  assert.match(windowsXaml, /AiPhotoPickerPopup/);
+  assert.match(windowsXaml, /AiPhotoTree/);
+  assert.match(
+    windows,
+    /var previewPath = _aiResultPath \?\?[\s\S]*_editorSelectedPath/,
+  );
+  assert.match(
+    windows,
+    /_editorSelectedPath = item\.Path;\s*_aiResultPath = null;/s,
+  );
+  assert.match(windows, /RedrawEditorMaskOverlay[\s\S]*PixelFormats\.Pbgra32/);
+});
+
 test("Windows AI uses server quota and overwrites the selected source for retouch", async () => {
   const windows = await read("native/windows/MainWindow.xaml.cs");
 

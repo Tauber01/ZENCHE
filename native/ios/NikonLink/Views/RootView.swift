@@ -174,7 +174,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.0"
+        ) as? String ?? "1.5.1"
     }
 
     var body: some View {
@@ -822,6 +822,8 @@ final class ActivationManager {
 }
 
 private final class AiImageService {
+    private static let requestTimeout: TimeInterval = 300
+
     private static var serverURL: String {
         UserDefaults.standard.string(forKey: "aiServerURL") ?? "http://101.34.255.115:8787"
     }
@@ -862,14 +864,23 @@ private final class AiImageService {
         }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.timeoutInterval = 60; r.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, resp) = try await URLSession.shared.data(for: r)
+        r.timeoutInterval = Self.requestTimeout
+        r.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let data: Data
+        let resp: URLResponse
+        do {
+            (data, resp) = try await URLSession.shared.data(for: r)
+        } catch let error as URLError where error.code == .timedOut {
+            throw AiError.requestTimedOut
+        }
         guard let hr = resp as? HTTPURLResponse else { throw AiError.networkError }
         guard (200..<300).contains(hr.statusCode) else {
             if hr.statusCode == 403 { throw AiError.invalidActivationCode }
             if hr.statusCode == 502 { throw AiError.serverUnavailable }
             if hr.statusCode == 429 { throw AiError.rateLimited }
-            throw AiError.serverError(hr.statusCode)
+            let message = (try? JSONSerialization.jsonObject(with: data))
+                .flatMap { $0 as? [String: Any] }?["error"] as? String
+            throw AiError.serverError(hr.statusCode, message)
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let arr = json["data"] as? [[String: Any]], let f = arr.first else { throw AiError.noImageReturned }
@@ -886,17 +897,25 @@ private final class AiImageService {
 }
 
 enum AiError: LocalizedError {
-    case missingActivation, invalidActivationCode, invalidEndpoint, networkError, serverError(Int), rateLimited, noImageReturned, serverUnavailable
+    case missingActivation, invalidActivationCode, invalidEndpoint, networkError
+    case serverError(Int, String?), rateLimited, noImageReturned
+    case serverUnavailable, requestTimedOut
     var errorDescription: String? {
         switch self {
         case .missingActivation: "请先在设置中输入激活码解锁 AI 功能"
         case .invalidActivationCode: "激活码无效或已过期，请联系开发者"
         case .invalidEndpoint: "API 端点地址无效"
         case .networkError: "网络连接失败"
-        case .serverError(let c): "AI 服务返回错误（\(c)）"
+        case .serverError(let c, let message):
+            if let message, !message.isEmpty {
+                "AI 服务返回错误（\(c)）：\(message)"
+            } else {
+                "AI 服务返回错误（\(c)）"
+            }
         case .rateLimited: "请求太频繁，请稍后重试"
         case .noImageReturned: "AI 未返回有效图片"
         case .serverUnavailable: "AI 服务暂不可用，请稍后重试"
+        case .requestTimedOut: "AI 生成超时，请稍后重试"
         }
     }
 }
@@ -1138,6 +1157,13 @@ private struct ProfessionalEditSettings {
 
     func effectiveMaskLayers() -> [EditorMaskLayer] {
         maskLayers.map(displayedMaskLayer)
+    }
+
+    func activeDisplayedMaskLayer() -> EditorMaskLayer? {
+        guard let id = activeMaskLayerID,
+              let layer = maskLayers.first(where: { $0.id == id })
+        else { return nil }
+        return displayedMaskLayer(layer)
     }
 
     private mutating func persistActiveMaskLayer() {
@@ -1470,6 +1496,7 @@ private struct ImageEditorPage: View {
             selectInitialPhoto()
         }
         .onChange(of: selectedItemID) {
+            aiResultImage = nil
             resetAdjustments()
             status = selectedItem == nil
                 ? "请选择文件库中的照片"
@@ -1515,6 +1542,7 @@ private struct ImageEditorPage: View {
                     Button {
                         aiMode = mode
                         aiResultImage = nil
+                        composeAiPrompt()
                     } label: {
                         Label(mode.rawValue, systemImage: mode == .edit ? "wand.and.stars" : "photo.badge.plus")
                             .frame(maxWidth: .infinity)
@@ -1598,20 +1626,30 @@ private struct ImageEditorPage: View {
     }
 
     private var aiModules: [(String, [String])] {
-        [
+        var modules: [(String, [String])] = [
             ("主体", ["人像主体", "产品主体", "建筑主体", "风光主体", "食物主体"]),
             ("光线", ["柔和自然光", "电影感侧光", "金色时刻", "低调棚拍光", "夜景霓虹光"]),
             ("色彩", ["自然通透", "胶片暖调", "日系清新", "高反差黑白", "冷色城市"]),
             ("质感", ["保留真实皮肤纹理", "细节清晰", "轻微胶片颗粒", "柔和高光", "高动态范围"]),
-            ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"]),
-            ("约束", ["保持人物身份和五官", "不改变产品形状", "不添加多余物体", "不过度磨皮", "保留自然阴影"])
+            ("构图", ["浅景深", "干净背景", "对称构图", "环境叙事", "视觉焦点明确"])
         ]
+        if aiMode == .edit {
+            modules.append(("智能移除", [
+                "去路人并自然补全背景",
+                "去穿帮并移除摄影器材、工作人员、反光与杂物"
+            ]))
+            modules.append(("约束", [
+                "保持人物身份和五官", "不改变产品形状", "不添加多余物体",
+                "不过度磨皮", "保留自然阴影"
+            ]))
+        }
+        return modules
     }
 
     private func composeAiPrompt() {
         var parts: [String] = []
         if !aiManualPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { parts.append(aiManualPrompt.trimmingCharacters(in: .whitespacesAndNewlines)) }
-        for category in ["主体", "光线", "色彩", "质感", "构图", "约束"] {
+        for category in aiModules.map(\.0) {
             let values = aiSelectedPresets.filter { $0.hasPrefix("\(category):") }.map { String($0.dropFirst(category.count + 1)) }
             if !values.isEmpty { parts.append("\(category)：\(values.joined(separator: "、"))") }
         }
@@ -1841,7 +1879,9 @@ private struct ImageEditorPage: View {
 
     private var preview: some View {
         GeometryReader { proxy in
-            let image = selectedSection == .aiTools ? aiResultImage : renderedImage
+            let image = selectedSection == .aiTools
+                ? (aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil))
+                : renderedImage
             let imageRect = editorImageRect(
                 in: proxy.size,
                 imageSize: image?.size
@@ -1879,8 +1919,8 @@ private struct ImageEditorPage: View {
                         .background(.black.opacity(0.58))
                         .clipShape(Capsule())
                         .padding(12)
-                } else if aiResultImage != nil {
-                    Text("AI 生成")
+                } else if image != nil {
+                    Text(aiResultImage != nil ? "AI 生成" : "原图")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
@@ -1926,6 +1966,13 @@ private struct ImageEditorPage: View {
 
     @ViewBuilder
     private func maskStrokeOverlay(in imageRect: CGRect) -> some View {
+        if let overlay = activeMaskOverlayImage {
+            Image(uiImage: overlay)
+                .resizable()
+                .frame(width: imageRect.width, height: imageRect.height)
+                .position(x: imageRect.midX, y: imageRect.midY)
+                .allowsHitTesting(false)
+        }
         Rectangle()
             .fill(Color.clear)
             .frame(width: imageRect.width, height: imageRect.height)
@@ -1944,37 +1991,6 @@ private struct ImageEditorPage: View {
                     }
                     .onEnded { _ in activeMaskStrokeID = nil }
             )
-        ForEach(settings.maskStrokes) { stroke in
-            let overlayColor = stroke.mode == .add
-                ? IPalette.cobalt.opacity(0.58)
-                : Color.white.opacity(0.82)
-            Path { path in
-                guard let first = stroke.points.first else { return }
-                path.move(to: CGPoint(
-                    x: imageRect.minX + CGFloat(first.x) * imageRect.width,
-                    y: imageRect.minY + CGFloat(first.y) * imageRect.height
-                ))
-                for point in stroke.points.dropFirst() {
-                    path.addLine(to: CGPoint(
-                        x: imageRect.minX + CGFloat(point.x) * imageRect.width,
-                        y: imageRect.minY + CGFloat(point.y) * imageRect.height
-                    ))
-                }
-            }
-            .stroke(
-                overlayColor,
-                style: StrokeStyle(
-                    lineWidth: max(
-                        3,
-                        CGFloat(stroke.size) / 100
-                            * min(imageRect.width, imageRect.height)
-                    ),
-                    lineCap: .round,
-                    lineJoin: .round,
-                    dash: stroke.mode == .subtract ? [7, 5] : []
-                )
-            )
-        }
     }
 
     private func recordMaskPoint(at location: CGPoint, imageRect: CGRect) {
@@ -2360,7 +2376,7 @@ private struct ImageEditorPage: View {
             standardSlider("饱和度", value: $settings.maskSaturation)
             standardSlider("清晰度", value: $settings.maskClarity)
             Text(settings.maskEnabled
-                ? "在预览画面拖动画笔；蓝色为添加，白色虚线为减去。"
+                ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                 : "先创建蒙版，再选择添加或减去画笔。")
                 .font(.caption)
                 .foregroundStyle(IPalette.muted)
@@ -2452,6 +2468,53 @@ private struct ImageEditorPage: View {
         }
         let extent = output.extent.integral
         guard let cgImage = context.createCGImage(output, from: extent) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage)
+    }
+
+    private var selectedOriginalImage: UIImage? {
+        guard let selectedItem else { return nil }
+        return UIImage(contentsOfFile: selectedItem.url.path)
+    }
+
+    private var activeMaskOverlayImage: UIImage? {
+        guard let selectedItem,
+              let layer = settings.activeDisplayedMaskLayer(),
+              layer.isVisible,
+              !layer.type.isEmpty,
+              let source = CIImage(contentsOf: selectedItem.url)
+                ?? UIImage(contentsOfFile: selectedItem.url.path)
+                    .flatMap({ CIImage(image: $0) })
+        else { return nil }
+        let base = applyGeometry(to: applyTonePipeline(to: source))
+        let extent = base.extent.integral
+        guard let mask = editorMaskImage(
+            source: base,
+            extent: extent,
+            layer: layer
+        ) else { return nil }
+        let blue = CIImage(color: CIColor(
+            red: 22.0 / 255,
+            green: 115.0 / 255,
+            blue: 230.0 / 255,
+            alpha: 0.58
+        )).cropped(to: extent)
+        let clear = CIImage(color: CIColor(
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 0
+        )).cropped(to: extent)
+        let overlay = filtered(
+            "CIBlendWithMask",
+            image: blue,
+            values: [
+                kCIInputBackgroundImageKey: clear,
+                kCIInputMaskImageKey: mask
+            ]
+        )
+        guard let cgImage = context.createCGImage(overlay, from: extent) else {
             return nil
         }
         return UIImage(cgImage: cgImage)
@@ -8154,7 +8217,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 新增“外录到当前智能设备”：视频可实时写入 ZENCHE 文件库，并可与相机机身存储卡录制并行。\n• 新增相机机内存储管理：可浏览存储卷与文件、查看缩略图和保护状态，并批量下载或确认后永久删除。\n• 照片继续直接保存到当前设备；外录视频沿用会话命名、备份与 SHA‑256 完整性记录。\n• PTP 实时取景不含音频，Android、HarmonyOS、macOS 与 Windows 外录为无声 Motion‑JPEG AVI；iOS / iPadOS 本机与 UVC 源外录为 MOV。\n• 停止录制、断开相机或发生写入异常时会安全封装已写入的视频，减少素材损失。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                    Text("• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
                     .font(.subheadline)
                     .lineSpacing(5)
 
