@@ -119,7 +119,9 @@ enum MonitorVideoCodec: String, CaseIterable, Identifiable {
             return .proRes422HQ
         case .proResRAW:
             if #available(iOS 26.0, *) {
-                return .proResRAWHQ
+                // Keep the source buildable with Xcode 16 while using the
+                // public Apple ProRes RAW HQ FourCC introduced in iOS 26.
+                return AVVideoCodecType(rawValue: "aprh")
             }
             return nil
         }

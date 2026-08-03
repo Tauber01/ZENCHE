@@ -40,8 +40,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install gphoto2
-      - run: ./scripts/build-macos.sh
+      - name: Detect locally supplied proprietary SDK archives
+        id: proprietary_sdks
+        shell: bash
+        run: |
+          if [[ -f S-SDKNEF-001BF-ALLIN.zip && \
+                -f S-SDKZ-200BF-ALLIN.zip && \
+                -f CrSDK_v2.02.00_20260610a_Mac.zip ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Nikon/Sony proprietary SDK archives are not stored in Git; running macOS source validation instead of packaging."
+          fi
+      - name: Build macOS package with proprietary SDKs
+        if: steps.proprietary_sdks.outputs.available == 'true'
+        run: ./scripts/build-macos.sh
+      - name: Type-check macOS source without proprietary runtimes
+        if: steps.proprietary_sdks.outputs.available != 'true'
+        run: |
+          xcrun swiftc -swift-version 5 -typecheck \
+            -framework AppKit -framework SwiftUI -framework Photos \
+            -framework AVKit -framework AVFoundation -framework CoreImage \
+            -framework Network -framework CoreBluetooth -framework CoreLocation \
+            native/ios/NikonLink/Models/CameraStorage.swift \
+            native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift \
+            native/shared/NikonCloudPreview.swift \
+            native/macos/Sources/NikonLink/*.swift
       - uses: actions/upload-artifact@v4
+        if: steps.proprietary_sdks.outputs.available == 'true'
         with:
           name: ZENCHE-macOS
           path: dist/ZENCHE-*-macOS-*.dmg*
