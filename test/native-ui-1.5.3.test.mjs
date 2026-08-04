@@ -39,7 +39,7 @@ test('1.5.3 capture controls use device summaries, adaptive parameter cards, and
     [sources.android, /buildControlStatusRow/, /buildStatusCardGrid/, /buildControlParameterGrid/, /buildControlCaptureDock/],
     [sources.harmony, /ControlStatusRow/, /ControlStatusGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
     [sources.macos, /CaptureDeviceSummary/, /ParameterCardGrid/, /CaptureDock/],
-    [sources.windows, /CaptureDeviceSummary/, /ParameterCardDeck/, /CaptureDock/],
+    [sources.windows, /ControlStatusRow/, /ControlStatusGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
   ];
   for (const [source, ...patterns] of contracts) {
     for (const pattern of patterns) assert.match(source, pattern);

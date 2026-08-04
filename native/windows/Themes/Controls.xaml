@@ -111,6 +111,95 @@
     <Setter Property="BorderBrush" Value="Transparent" />
   </Style>
 
+  <!-- v1.5.5 fig1: dark capsule for capture bar on #1C1C1E surface. -->
+  <Style x:Key="UiCapsuleButton" TargetType="Button">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="Padding" Value="16,8" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Background" Value="{StaticResource UiSecondaryBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource UiSecondaryBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Border"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="16"
+                  SnapsToDevicePixels="True">
+            <ContentPresenter
+                Margin="{TemplateBinding Padding}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="{StaticResource UiCardBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="#3A3A3C" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Border" Property="Opacity" Value="0.5" />
+              <Setter Property="Cursor" Value="Arrow" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- v1.5.5 fig1: round shutter, #CDDC39 ring, no shadow. -->
+  <Style x:Key="UiShutterButton" TargetType="Button">
+    <Setter Property="Width" Value="64" />
+    <Setter Property="Height" Value="64" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Foreground" Value="{StaticResource UiAccentBrush}" />
+    <Setter Property="Background" Value="{StaticResource UiCardBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource UiAccentBrush}" />
+    <Setter Property="BorderThickness" Value="3" />
+    <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Border"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="32"
+                  SnapsToDevicePixels="True">
+            <ContentPresenter
+                Margin="{TemplateBinding Padding}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="#262628" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="{StaticResource UiSecondaryBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Border" Property="Opacity" Value="0.5" />
+              <Setter Property="Cursor" Value="Arrow" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+
   <Style x:Key="MonitorIconButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
     <Setter Property="Width" Value="82" />
     <Setter Property="Height" Value="62" />

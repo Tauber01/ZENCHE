@@ -17,15 +17,9 @@
     </Grid.RowDefinitions>
 
     <Border Grid.Row="0"
-            Background="{StaticResource SurfaceRaisedBrush}"
-            BorderBrush="{StaticResource RuleBrush}"
+            Background="{StaticResource GraphiteBrush}"
+            BorderBrush="{StaticResource UiSecondaryBrush}"
             BorderThickness="0,0,0,1">
-      <Border.Effect>
-        <DropShadowEffect BlurRadius="14"
-                          Color="{StaticResource ColorShadow}"
-                          Opacity="0.35"
-                          ShadowDepth="3" />
-      </Border.Effect>
       <Grid Margin="20,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
@@ -36,19 +30,8 @@
         <StackPanel VerticalAlignment="Center" Orientation="Horizontal">
           <Border Width="44"
                   Height="44"
+                  Background="{StaticResource UiBlueBrush}"
                   CornerRadius="13">
-            <Border.Background>
-              <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Offset="0" Color="{StaticResource ColorAccent}" />
-                <GradientStop Offset="1" Color="#2E86E0" />
-              </LinearGradientBrush>
-            </Border.Background>
-            <Border.Effect>
-              <DropShadowEffect BlurRadius="10"
-                                Color="{StaticResource ColorAccent}"
-                                Opacity="0.2"
-                                ShadowDepth="4" />
-            </Border.Effect>
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
                        FontFamily="{StaticResource DisplayFont}"
@@ -61,10 +44,11 @@
             <TextBlock FontFamily="{StaticResource DisplayFont}"
                        FontSize="19"
                        FontWeight="Bold"
-                       Foreground="{StaticResource InkBrush}"
+                       Foreground="White"
                        Text="帧澈 ZENCHE" />
             <TextBlock Margin="0,3,0,0"
                        Style="{StaticResource MetaText}"
+                       Foreground="{StaticResource UiLabelBrush}"
                        Text="Capture · Connect · Flow" />
           </StackPanel>
         </StackPanel>
@@ -72,8 +56,8 @@
                 Margin="16,0"
                 Padding="12,8"
                 VerticalAlignment="Center"
-                Background="{StaticResource Paper2Brush}"
-                BorderBrush="{StaticResource RuleBrush}"
+                Background="{StaticResource UiSecondaryBrush}"
+                BorderBrush="{StaticResource UiSecondaryBrush}"
                 BorderThickness="1"
                 CornerRadius="18">
           <StackPanel Orientation="Horizontal">
@@ -82,9 +66,10 @@
                      Height="8"
                      Margin="0,0,8,0"
                      VerticalAlignment="Center"
-                     Fill="{StaticResource MutedBrush}" />
+                     Fill="{StaticResource UiLabelBrush}" />
             <TextBlock x:Name="CameraStatusText"
                        Style="{StaticResource MetaText}"
+                       Foreground="White"
                        MaxWidth="260"
                        Text="未连接 · WINDOWS USB/PTP"
                        TextTrimming="CharacterEllipsis"
@@ -95,6 +80,7 @@
                 Grid.Column="2"
                 Width="142"
                 Style="{StaticResource PrimaryButton}"
+                Effect="{x:Null}"
                 Content="连接管理"
                 Click="ConnectButton_Click" />
         <Button x:Name="SettingsButton"
@@ -103,7 +89,7 @@
                 Margin="10,0,0,0"
                 FontFamily="Segoe UI Symbol"
                 FontSize="20"
-                Style="{StaticResource ButtonBase}"
+                Style="{StaticResource UiCapsuleButton}"
                 Content="⚙"
                 ToolTip="设置"
                 Click="SettingsButton_Click" />
@@ -172,24 +158,24 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Border Grid.Row="0" Background="#060B14" Padding="20,16" BorderBrush="#152131" BorderThickness="1,1,1,0">
+          <Border Grid.Row="0" Background="{StaticResource GraphiteBrush}" Padding="20,16" BorderBrush="{StaticResource UiSecondaryBrush}" BorderThickness="1,1,1,0">
             <Grid>
               <TextBlock x:Name="MonitorTimecodeText" Text="00:00:00:00" FontFamily="{StaticResource MonoFont}" FontSize="38" FontWeight="SemiBold" Foreground="White" />
               <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                 <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" Fill="#26D07C" />
-                <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="Bold" Foreground="#B9C2CE" />
+                <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource UiLabelBrush}" />
               </StackPanel>
             </Grid>
           </Border>
-          <Border Grid.Row="1" Background="#060B14" BorderBrush="#152131" BorderThickness="1,0,1,0" ClipToBounds="True">
+          <Border Grid.Row="1" Background="{StaticResource GraphiteBrush}" BorderBrush="{StaticResource UiSecondaryBrush}" BorderThickness="1,0,1,0" ClipToBounds="True">
             <Grid>
               <Image x:Name="MonitorPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonUp="MonitorPreviewImage_MouseLeftButtonUp" />
               <TextBlock x:Name="MonitorFocusReticle" Text="＋" Visibility="Collapsed" Foreground="#FFE45C" FontSize="38" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
               <StackPanel x:Name="MonitorPreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="Bold" Foreground="#F0F3F8" />
-                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="连接相机后开启实时取景" Foreground="#ADB5C1" />
+                <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="Bold" Foreground="White" />
+                <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="连接相机后开启实时取景" Foreground="{StaticResource UiLabelBrush}" />
               </StackPanel>
-              <TextBlock x:Name="MonitorCameraOverlay" Margin="16" VerticalAlignment="Top" Text="未连接 · USB/PTP" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#D7DEE8" />
+              <TextBlock x:Name="MonitorCameraOverlay" Margin="16" VerticalAlignment="Top" Text="未连接 · USB/PTP" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource UiLabelBrush}" />
             </Grid>
           </Border>
           <Grid Grid.Row="2" Margin="0,14,0,0">
@@ -213,20 +199,20 @@
             </Border>
           </Grid>
           <UniformGrid Grid.Row="3" Columns="7" Margin="0,18,0,0">
-            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="编码" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorCodecText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="#ADB5C1" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="编码" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorCodecText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="{StaticResource UiLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /></StackPanel>
           </UniformGrid>
           <StackPanel Grid.Row="4" Margin="0,16,0,4">
             <Border MaxWidth="720"
                     HorizontalAlignment="Center"
                     Padding="12,10"
-                    Background="{StaticResource Graphite2Brush}"
-                    BorderBrush="#304E70"
+                    Background="{StaticResource UiCardBrush}"
+                    BorderBrush="{StaticResource UiSecondaryBrush}"
                     BorderThickness="1"
                     CornerRadius="14">
               <Grid>
@@ -249,8 +235,8 @@
                              Text="NP3" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
-                  <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource GraphiteInkBrush}" Text="尼康云创监看" />
-                  <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource GraphiteMutedBrush}" Text="107 款设备端 SDR 预设" />
+                  <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="White" Text="尼康云创监看" />
+                  <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="107 款设备端 SDR 预设" />
                 </StackPanel>
                 <ComboBox x:Name="MonitorNikonCloudPresetBox"
                           Grid.Column="2"
@@ -268,7 +254,7 @@
                            Grid.ColumnSpan="3"
                            Margin="0,8,0,0"
                            FontSize="11"
-                           Foreground="{StaticResource GraphiteMutedBrush}"
+                           Foreground="{StaticResource UiLabelBrush}"
                            Text="照片与视频实时生效 · SDR 近似 · 不写入原片" />
               </Grid>
             </Border>
@@ -281,22 +267,102 @@
               <Button x:Name="MonitorLiveViewButton" Style="{StaticResource MonitorIconButton}" Content="▣\n取景" Click="LiveViewButton_Click" />
             </StackPanel>
           </StackPanel>
-          <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="#1A212D" CornerRadius="10">
+          <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="{StaticResource UiCardBrush}" CornerRadius="10">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="▯" FontSize="28" Foreground="White" VerticalAlignment="Center" />
-              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#ADB5C1" /></StackPanel>
+              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" FontFamily="{StaticResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="White" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource UiLabelBrush}" /></StackPanel>
             </StackPanel>
           </Border>
         </Grid>
         <Grid x:Name="CapturePanel">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Expander Grid.Row="3"
+          <!-- v1.5.5 fig1 control page: status row + status cards (desktop 4-col) -->
+          <Border x:Name="ControlStatusRow"
+                  Grid.Row="0"
+                  Margin="0,0,0,10"
+                  Padding="14,10"
+                  Background="{StaticResource UiCardBrush}"
+                  CornerRadius="14">
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Ellipse x:Name="ControlStatusDot"
+                       Width="10"
+                       Height="10"
+                       VerticalAlignment="Center"
+                       Fill="{StaticResource UiLabelBrush}" />
+              <TextBlock x:Name="ControlStatusText"
+                         Grid.Column="1"
+                         Margin="10,0,0,0"
+                         VerticalAlignment="Center"
+                         FontSize="13"
+                         FontWeight="Bold"
+                         Foreground="White"
+                         Text="未连接" />
+              <Border x:Name="ControlStatusRateCapsule"
+                      Grid.Column="2"
+                      Padding="14,6"
+                      Background="{StaticResource UiSecondaryBrush}"
+                      CornerRadius="15">
+                <TextBlock x:Name="ControlStatusRateText"
+                           FontSize="12"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           Text="待连接" />
+              </Border>
+              <TextBlock x:Name="ControlStatusErrorText"
+                         Grid.Row="1"
+                         Grid.ColumnSpan="3"
+                         Margin="0,6,0,0"
+                         FontSize="12"
+                         Foreground="{StaticResource VideoBrush}"
+                         TextTrimming="CharacterEllipsis"
+                         TextWrapping="NoWrap"
+                         Visibility="Collapsed" />
+            </Grid>
+          </Border>
+          <UniformGrid x:Name="ControlStatusGrid" Grid.Row="1" Columns="4" Margin="0,0,0,10">
+            <Border Margin="0,0,6,0" Padding="14,10" Background="{StaticResource UiCardBrush}" CornerRadius="14">
+              <StackPanel>
+                <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource UiLabelBrush}" Text="机身" />
+                <TextBlock x:Name="CaptureDeviceNameText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="White" Text="—" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </Border>
+            <Border Margin="3,0" Padding="14,10" Background="{StaticResource UiCardBrush}" CornerRadius="14">
+              <StackPanel>
+                <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource UiLabelBrush}" Text="传输" />
+                <TextBlock x:Name="CaptureLinkText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="White" Text="OFFLINE" />
+              </StackPanel>
+            </Border>
+            <Border Margin="3,0" Padding="14,10" Background="{StaticResource UiCardBrush}" CornerRadius="14">
+              <StackPanel>
+                <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource UiLabelBrush}" Text="格式" />
+                <TextBlock x:Name="CaptureOutputText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="White" Text="—" />
+              </StackPanel>
+            </Border>
+            <Border Margin="6,0,0,0" Padding="14,10" Background="{StaticResource UiCardBrush}" CornerRadius="14">
+              <StackPanel>
+                <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource UiLabelBrush}" Text="文件库" />
+                <TextBlock x:Name="CaptureLibraryText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="White" Text="0 个文件" />
+              </StackPanel>
+            </Border>
+          </UniformGrid>
+          <Expander Grid.Row="5"
                     Margin="0,14,0,0"
                     Header="拍前会话与交付"
                     IsExpanded="False">
@@ -366,7 +432,7 @@
               </Grid>
             </Border>
           </Expander>
-          <Border Grid.Row="0"
+          <Border Grid.Row="2"
                   Background="{StaticResource GraphiteBrush}"
                   BorderBrush="{StaticResource GraphiteRuleBrush}"
                   BorderThickness="1"
@@ -408,83 +474,208 @@
                       Style="{StaticResource ButtonBase}"
                       Content="全屏"
                       Click="FullscreenPreviewButton_Click" />
-              <Border x:Name="CaptureDeviceSummary"
-                      Margin="16"
-                      Padding="1"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Bottom"
-                      Background="#DC15191F"
-                      BorderBrush="{StaticResource StudioRuleBrush}"
-                      BorderThickness="1"
-                      CornerRadius="7">
-                <UniformGrid Columns="4">
-                  <StackPanel Margin="12,8">
-                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="CAMERA" />
-                    <TextBlock x:Name="CaptureDeviceNameText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="—" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
-                  <StackPanel Margin="12,8">
-                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="LINK" />
-                    <TextBlock x:Name="CaptureLinkText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="OFFLINE" />
-                  </StackPanel>
-                  <StackPanel Margin="12,8">
-                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="OUTPUT" />
-                    <TextBlock x:Name="CaptureOutputText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="—" />
-                  </StackPanel>
-                  <StackPanel Margin="12,8">
-                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="LIBRARY" />
-                    <TextBlock x:Name="CaptureLibraryText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="0 个文件" />
-                  </StackPanel>
-                </UniformGrid>
-              </Border>
             </Grid>
           </Border>
-          <Border x:Name="ParameterCardDeck"
-                  Grid.Row="1"
-                  Height="82"
+          <Border x:Name="ControlParameterGrid"
+                  Grid.Row="3"
                   Margin="0,14,0,0"
-                  Background="{StaticResource StudioPanelBrush}"
-                  BorderBrush="{StaticResource StudioRuleBrush}"
-                  BorderThickness="1"
+                  Padding="14"
+                  Background="{StaticResource UiCardBrush}"
                   CornerRadius="14">
-            <ScrollViewer HorizontalScrollBarVisibility="Hidden"
-                          VerticalScrollBarVisibility="Disabled">
-              <StackPanel Orientation="Horizontal" Margin="8,0">
-                <StackPanel Width="104" Margin="12,13">
-                  <TextBlock Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="来源" />
-                  <TextBlock x:Name="SourceReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock FontSize="15" FontWeight="Bold" Foreground="White" Text="参数" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                  <Button x:Name="GridEditAllButton"
+                          Width="68"
+                          Height="32"
+                          Margin="0,0,8,0"
+                          Style="{StaticResource ButtonBase}"
+                          Content="全部"
+                          Click="GridEditAllButton_Click" />
+                  <Button x:Name="GridEditButton"
+                          Width="68"
+                          Height="32"
+                          Style="{StaticResource ButtonBase}"
+                          Content="编辑"
+                          Click="GridEditButton_Click" />
                 </StackPanel>
-                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
-                <StackPanel Width="82" Margin="12,13">
-                  <TextBlock Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="模式" />
-                  <TextBlock x:Name="ModeReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
-                </StackPanel>
-                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
-                <StackPanel Width="116" Margin="12,13">
-                  <TextBlock x:Name="ShutterReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="快门" />
-                  <TextBlock x:Name="ShutterReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
-                </StackPanel>
-                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
-                <StackPanel Width="104" Margin="12,13">
-                  <TextBlock x:Name="ApertureReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="光圈" />
-                  <TextBlock x:Name="ApertureReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
-                </StackPanel>
-                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
-                <StackPanel Width="96" Margin="12,13">
-                  <TextBlock x:Name="IsoReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="ISO" />
-                  <TextBlock x:Name="IsoReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
-                </StackPanel>
-                <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
-                <StackPanel Width="132" Margin="12,13">
-                  <TextBlock x:Name="CompensationReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="曝光补偿" />
-                  <TextBlock x:Name="CompensationReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
-                </StackPanel>
-              </StackPanel>
-            </ScrollViewer>
+              </Grid>
+              <UniformGrid Columns="3" Margin="0,12,0,0">
+                <Border x:Name="ParameterTileSource"
+                        Margin="0,0,6,6"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="来源" />
+                      <TextBlock x:Name="SourceReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileSourceHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileSource"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+                <Border x:Name="ParameterTileMode"
+                        Margin="3,0,3,6"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="模式" />
+                      <TextBlock x:Name="ModeReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileModeHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileMode"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+                <Border x:Name="ParameterTileShutter"
+                        Margin="6,0,0,6"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock x:Name="ShutterReadoutLabel" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="快门" />
+                      <TextBlock x:Name="ShutterReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileShutterHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileShutter"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+                <Border x:Name="ParameterTileAperture"
+                        Margin="0,6,6,0"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock x:Name="ApertureReadoutLabel" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="光圈" />
+                      <TextBlock x:Name="ApertureReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileApertureHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileAperture"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+                <Border x:Name="ParameterTileIso"
+                        Margin="3,6,3,0"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock x:Name="IsoReadoutLabel" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="ISO" />
+                      <TextBlock x:Name="IsoReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileIsoHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileIso"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+                <Border x:Name="ParameterTileCompensation"
+                        Margin="6,6,0,0"
+                        Padding="12,10"
+                        Background="{StaticResource UiSecondaryBrush}"
+                        CornerRadius="14">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock x:Name="CompensationReadoutLabel" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="曝光补偿" />
+                      <TextBlock x:Name="CompensationReadoutText" Margin="0,4,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="White" Text="—" />
+                    </StackPanel>
+                    <TextBlock x:Name="ParameterTileCompensationHide"
+                               Grid.Column="1"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource UiLabelBrush}"
+                               Text="×"
+                               Cursor="Hand"
+                               Visibility="Collapsed"
+                               Tag="ParameterTileCompensation"
+                               MouseLeftButtonUp="ParameterTileHide_Click" />
+                  </Grid>
+                </Border>
+              </UniformGrid>
+              <TextBlock x:Name="ParameterTileEmptyText"
+                         Margin="0,12,0,0"
+                         HorizontalAlignment="Center"
+                         FontSize="12"
+                         Foreground="{StaticResource UiLabelBrush}"
+                         Text="参数已全部隐藏"
+                         Visibility="Collapsed" />
+            </StackPanel>
           </Border>
-          <Grid x:Name="CaptureDock"
-                Grid.Row="2"
+          <Grid x:Name="ControlCaptureDock"
+                Grid.Row="4"
                 Margin="0,14,0,0"
-                Background="{StaticResource StudioPanelBrush}">
+                Background="{StaticResource UiCardBrush}">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
@@ -493,12 +684,12 @@
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
               <TextBlock x:Name="PreviewDetailText"
-                         Foreground="{StaticResource MutedBrush}"
+                         Foreground="{StaticResource UiLabelBrush}"
                          Text="相机原生 JPEG · 本地预览" />
               <Border Margin="0,8,0,0"
                       Padding="12,10"
-                      Background="{StaticResource AccentSoftBrush}"
-                      BorderBrush="{StaticResource AccentBrush}"
+                      Background="{StaticResource UiSecondaryBrush}"
+                      BorderBrush="{StaticResource UiSecondaryBrush}"
                       BorderThickness="1"
                       CornerRadius="14">
                 <Grid>
@@ -521,8 +712,8 @@
                                Text="NP3" />
                   </Border>
                   <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
-                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" Text="尼康云创监看" />
-                    <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource MutedBrush}" Text="107 款设备端 SDR 预设" />
+                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="White" Text="尼康云创监看" />
+                    <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{StaticResource UiLabelBrush}" Text="107 款设备端 SDR 预设" />
                   </StackPanel>
                   <ComboBox x:Name="CaptureNikonCloudPresetBox"
                             Grid.Column="2"
@@ -540,7 +731,7 @@
                              Grid.ColumnSpan="3"
                              Margin="0,8,0,0"
                              FontSize="11"
-                             Foreground="{StaticResource MutedBrush}"
+                             Foreground="{StaticResource UiLabelBrush}"
                              Text="照片与视频实时生效 · SDR 近似 · 不写入原片" />
                 </Grid>
               </Border>
@@ -549,28 +740,29 @@
                     Grid.Column="1"
                     Width="132"
                     Margin="8,0"
-                    Style="{StaticResource ButtonBase}"
+                    Style="{StaticResource UiCapsuleButton}"
                     Content="开启取景"
                     IsEnabled="False"
                     Click="LiveViewButton_Click" />
-            <Button x:Name="ShutterButton"
-                    Grid.Column="3"
-                    Width="132"
-                    Style="{StaticResource PrimaryButton}"
-                    Content="拍摄照片"
-                    IsEnabled="False"
-                    Click="ShutterButton_Click" />
             <Button x:Name="CaptureAutoFocusButton"
                     Grid.Column="2"
                     Width="110"
                     Margin="8,0,0,0"
-                    Style="{StaticResource ButtonBase}"
+                    Style="{StaticResource UiCapsuleButton}"
                     Content="AF-ON"
                     IsEnabled="False"
                     Click="CaptureAutoFocusButton_Click" />
+            <Button x:Name="ShutterButton"
+                    Grid.Column="3"
+                    Margin="12,0,0,0"
+                    Style="{StaticResource UiShutterButton}"
+                    Content="●"
+                    ToolTip="拍摄照片"
+                    IsEnabled="False"
+                    Click="ShutterButton_Click" />
           </Grid>
           <Expander x:Name="ShootingTaskPanel"
-                    Grid.Row="4"
+                    Grid.Row="6"
                     Margin="0,14,0,0"
                     Header="拍摄自动化"
                     IsExpanded="False">

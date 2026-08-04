@@ -28,6 +28,11 @@
   <Color x:Key="ColorGraphiteRule">#414856</Color>
   <Color x:Key="ColorGraphiteMuted">#ADB5C1</Color>
   <Color x:Key="ColorGraphiteInk">#F0F3F8</Color>
+  <Color x:Key="ColorUiCard">#1C1C1E</Color>
+  <Color x:Key="ColorUiSecondary">#2C2C2E</Color>
+  <Color x:Key="ColorUiLabel">#8E8E93</Color>
+  <Color x:Key="ColorUiAccent">#CDDC39</Color>
+  <Color x:Key="ColorUiBlue">#0A84FF</Color>
   <Color x:Key="ColorStudioCanvas">#06090D</Color>
   <Color x:Key="ColorStudioPanel">#15191F</Color>
   <Color x:Key="ColorStudioRaised">#20242B</Color>
@@ -63,6 +68,11 @@
   <SolidColorBrush x:Key="GraphiteRuleBrush" Color="{StaticResource ColorGraphiteRule}" />
   <SolidColorBrush x:Key="GraphiteMutedBrush" Color="{StaticResource ColorGraphiteMuted}" />
   <SolidColorBrush x:Key="GraphiteInkBrush" Color="{StaticResource ColorGraphiteInk}" />
+  <SolidColorBrush x:Key="UiCardBrush" Color="{StaticResource ColorUiCard}" />
+  <SolidColorBrush x:Key="UiSecondaryBrush" Color="{StaticResource ColorUiSecondary}" />
+  <SolidColorBrush x:Key="UiLabelBrush" Color="{StaticResource ColorUiLabel}" />
+  <SolidColorBrush x:Key="UiAccentBrush" Color="{StaticResource ColorUiAccent}" />
+  <SolidColorBrush x:Key="UiBlueBrush" Color="{StaticResource ColorUiBlue}" />
   <SolidColorBrush x:Key="StudioCanvasBrush" Color="{StaticResource ColorStudioCanvas}" />
   <SolidColorBrush x:Key="StudioPanelBrush" Color="{StaticResource ColorStudioPanel}" />
   <SolidColorBrush x:Key="StudioRaisedBrush" Color="{StaticResource ColorStudioRaised}" />

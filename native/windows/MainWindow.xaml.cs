@@ -721,6 +721,9 @@ public partial class MainWindow : Window
     private Task? _previewTask;
     private CancellationTokenSource? _shootingTaskCancellation;
     private bool _operationInProgress;
+    private string? _lastConnectionError;
+    private bool _gridEditMode;
+    private bool[] _gridHiddenTiles = new bool[6];
     private bool _initializing = true;
     private bool _shutdownStarted;
     private bool _configuringVideoControls;
@@ -1355,6 +1358,7 @@ public partial class MainWindow : Window
         AppLocalization.Apply(this);
         _initializing = false;
         UpdateExposureReadout();
+        UpdateControlStatusRow();
         ShootingTaskStepText.IsEnabled = false;
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
@@ -1514,6 +1518,7 @@ public partial class MainWindow : Window
                 if (_wifiCamera.IsConnected)
                 {
                     await _wifiCamera.DisconnectAsync();
+                    _lastConnectionError = null;
                 }
                 else
                 {
@@ -1524,6 +1529,7 @@ public partial class MainWindow : Window
                     using var timeout = new CancellationTokenSource(
                         TimeSpan.FromSeconds(12));
                     await _wifiCamera.ConnectAsync(hostBox.Text, port, timeout.Token);
+                    _lastConnectionError = null;
                     _diagnostics.Info(
                         "wifi-camera",
                         $"PTP/IP 已连接；模式={_wifiConnectionMode.ToUpperInvariant()}；相机={_wifiCamera.CameraName}");
@@ -1531,6 +1537,7 @@ public partial class MainWindow : Window
             }
             catch (Exception error)
             {
+                _lastConnectionError = error.Message;
                 ShowError(error.Message);
             }
             status.Text = _wifiCamera.IsConnected
@@ -1701,7 +1708,7 @@ public partial class MainWindow : Window
                 SetConnectionState(null);
                 OperationStatusText.Text =
                     AppLocalization.T("相机已断开");
-            });
+            }, connectionAttempt: true);
             return;
         }
 
@@ -1712,7 +1719,7 @@ public partial class MainWindow : Window
             RememberConnectedDevice(profile);
             OperationStatusText.Text =
                 AppLocalization.T($"{profile.Name} 已连接");
-        });
+        }, connectionAttempt: true);
     }
 
     private async Task ToggleLocalCameraConnectionAsync()
@@ -1728,7 +1735,7 @@ public partial class MainWindow : Window
                 PreviewImage.Source = null;
                 PreviewEmpty.Visibility = Visibility.Visible;
                 OperationStatusText.Text = AppLocalization.T("本机摄像头已断开");
-            });
+            }, connectionAttempt: true);
         }
         else
         {
@@ -1749,7 +1756,7 @@ public partial class MainWindow : Window
                 RememberLocalCamera(_localCamera.DeviceName);
                 OperationStatusText.Text = AppLocalization.T(
                     $"{_localCamera.DeviceName} 已连接");
-            });
+            }, connectionAttempt: true);
         }
         UpdateConnectionSummary();
         UpdateEnabledState();
@@ -2797,6 +2804,92 @@ public partial class MainWindow : Window
             : "M";
     }
 
+    /** v1.5.5 fig1 parameter grid: 全部 resets hidden tiles and exits edit mode. */
+    private void GridEditAllButton_Click(object sender, RoutedEventArgs e)
+    {
+        _gridEditMode = false;
+        Array.Fill(_gridHiddenTiles, false);
+        UpdateControlParameterGrid();
+    }
+
+    /** v1.5.5 fig1 parameter grid: 编辑 reveals per-tile hide affordances. */
+    private void GridEditButton_Click(object sender, RoutedEventArgs e)
+    {
+        _gridEditMode = true;
+        UpdateControlParameterGrid();
+    }
+
+    /** v1.5.5 fig1 parameter grid: hide a single tile (edit mode only). */
+    private void ParameterTileHide_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_gridEditMode ||
+            sender is not FrameworkElement tile)
+        {
+            return;
+        }
+        var tag = Convert.ToString(tile.Tag);
+        var index = Array.IndexOf(
+            new[] { "ParameterTileSource", "ParameterTileMode", "ParameterTileShutter", "ParameterTileAperture", "ParameterTileIso", "ParameterTileCompensation" },
+            tag);
+        if (index >= 0)
+        {
+            _gridHiddenTiles[index] = true;
+        }
+        UpdateControlParameterGrid();
+    }
+
+    /** v1.5.5 fig1 parameter grid: apply edit-mode / hidden-tile state to tiles. */
+    private void UpdateControlParameterGrid()
+    {
+        var tiles = new[]
+        {
+            ParameterTileSource,
+            ParameterTileMode,
+            ParameterTileShutter,
+            ParameterTileAperture,
+            ParameterTileIso,
+            ParameterTileCompensation
+        };
+        var hides = new[]
+        {
+            ParameterTileSourceHide,
+            ParameterTileModeHide,
+            ParameterTileShutterHide,
+            ParameterTileApertureHide,
+            ParameterTileIsoHide,
+            ParameterTileCompensationHide
+        };
+        var shown = 0;
+        for (var index = 0; index < tiles.Length; index++)
+        {
+            var hidden = _gridHiddenTiles[index];
+            tiles[index].Visibility = hidden
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            hides[index].Visibility =
+                !hidden && _gridEditMode
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            if (!hidden)
+            {
+                shown++;
+            }
+        }
+        if (GridEditAllButton is not null)
+        {
+            GridEditAllButton.Opacity = _gridEditMode ? 1.0 : 0.7;
+            GridEditButton.Opacity = _gridEditMode ? 0.7 : 1.0;
+        }
+        if (shown == 0)
+        {
+            ParameterTileEmptyText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ParameterTileEmptyText.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private async void ShutterButton_Click(object sender, RoutedEventArgs e)
     {
         if (_operationInProgress)
@@ -3459,7 +3552,7 @@ public partial class MainWindow : Window
         UpdateMonitorTimecode();
         if (_videoMode)
         {
-            ShutterButton.Content = AppLocalization.T(
+            ShutterButton.ToolTip = AppLocalization.T(
                 _videoRecording ? "停止录制" : "开始录制");
         }
         if (_immersiveRecordButton is not null)
@@ -3984,7 +4077,7 @@ public partial class MainWindow : Window
                 ? "相机原生 JPEG · 监看输出 · 不修改原片"
                 : "相机原生 JPEG · 本地预览");
         ConfigureShutterControl(destination == "monitor");
-        ShutterButton.Content = AppLocalization.T(
+        ShutterButton.ToolTip = AppLocalization.T(
             destination == "monitor"
                 ? (_videoRecording ? "停止录制" : "开始录制")
                 : "拍摄照片");
@@ -5675,7 +5768,8 @@ public partial class MainWindow : Window
 
     private async Task RunOperationAsync(
         string status,
-        Func<CancellationToken, Task> operation)
+        Func<CancellationToken, Task> operation,
+        bool connectionAttempt = false)
     {
         _operationInProgress = true;
         _diagnostics.Info("operation", status);
@@ -5687,6 +5781,10 @@ public partial class MainWindow : Window
                 TimeSpan.FromMinutes(3));
             await operation(cancellation.Token);
             _diagnostics.Info("operation", $"操作完成：{status}");
+            if (connectionAttempt)
+            {
+                _lastConnectionError = null;
+            }
         }
         catch (Exception error)
         {
@@ -5694,6 +5792,10 @@ public partial class MainWindow : Window
                 "operation",
                 $"操作失败：{status}；错误={error}");
             OperationStatusText.Text = AppLocalization.T(error.Message);
+            if (connectionAttempt)
+            {
+                _lastConnectionError = error.Message;
+            }
             ShowError(error.Message);
         }
         finally
@@ -5701,6 +5803,7 @@ public partial class MainWindow : Window
             _operationInProgress = false;
             UpdateEnabledState();
             UpdateLiveViewState();
+            UpdateControlStatusRow();
         }
     }
 
@@ -5742,6 +5845,51 @@ public partial class MainWindow : Window
         ConnectButton.Content = AppLocalization.T("连接管理");
         ConnectionDot.Fill = (Brush)FindResource(
             anyConnected ? "PositiveBrush" : "MutedBrush");
+        UpdateControlStatusRow();
+    }
+
+    /** v1.5.5 fig1 status row: ● state + transport capsule + connection error. */
+    private void UpdateControlStatusRow()
+    {
+        if (ControlStatusText is null)
+        {
+            return;
+        }
+        var anyCamera = _camera.IsConnected ||
+            _localCamera.IsConnected ||
+            _wifiCamera.IsConnected;
+        var loading = _operationInProgress;
+        var failed = _lastConnectionError != null && !anyCamera && !loading;
+        if (loading)
+        {
+            ControlStatusDot.Fill = (Brush)FindResource("UiAccentBrush");
+            ControlStatusText.Text = AppLocalization.T("正在连接…");
+            ControlStatusRateText.Text = AppLocalization.T("连接中");
+        }
+        else if (anyCamera)
+        {
+            ControlStatusDot.Fill = (Brush)FindResource("UiAccentBrush");
+            ControlStatusText.Text = AppLocalization.T("就绪");
+            ControlStatusRateText.Text = _camera.IsConnected
+                ? "USB/PTP"
+                : _wifiCamera.IsConnected ? "Wi‑Fi/PTP‑IP" : "SYSTEM";
+        }
+        else
+        {
+            ControlStatusDot.Fill = (Brush)FindResource(
+                failed ? "VideoBrush" : "UiLabelBrush");
+            ControlStatusText.Text = AppLocalization.T(
+                failed ? "连接失败" : "未连接");
+            ControlStatusRateText.Text = AppLocalization.T(
+                failed ? "重试" : "待连接");
+        }
+        var showError = failed && _lastConnectionError != null;
+        ControlStatusErrorText.Text = showError
+            ? _lastConnectionError
+            : "";
+        ControlStatusErrorText.Visibility = showError
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void UpdateMonitorStorage()
