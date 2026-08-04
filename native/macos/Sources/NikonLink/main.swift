@@ -10557,6 +10557,7 @@ private struct ImageEditorView: View {
                 }
             }
             Slider(value: $aiIntensity, in: 0.35...1, step: 0.05)
+                .tint(Palette.editorAccent)
                 .accessibilityLabel("AI 强度")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -11702,6 +11703,7 @@ private var curvesControls: some View {
                     .foregroundStyle(Palette.muted)
             }
             Slider(value: value, in: range, step: step)
+                .tint(Palette.editorAccent)
         }
         .frame(minHeight: 46)
     }
