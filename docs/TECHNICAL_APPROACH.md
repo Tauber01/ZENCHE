@@ -51,8 +51,9 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 新增界面文案必须在简体中文、英文、日文三套资源中同步；紧凑移动端允许横向滚动或重排，但不得隐藏关键连接、拍摄、监看或编辑入口。
 - 无连接或无可用画面时，新增 HUD、摘要、输出读数和参数托盘必须显示 `—`、`OFFLINE` 或明确空态，不能把初始化的快门、光圈、ISO、帧率、编码或变焦值呈现为实时数据。快捷入口必须导航到真实控件，不能用提示消息代替交互结果。
 - Windows 编辑工作台在 1120 点以下收起媒体栏并压缩工具栏；移动端继续使用可滚动/抽屉式紧凑布局。响应式处理必须优先保留中央画面、拍摄动作与编辑保存入口。
-- 1.5.3 对应版本 `1.5.3 / build 28`。它是本地交付候选；未获得 Tauber 的独立授权前，不得推送、打标签、创建 GitHub Release 或修改生产环境。
-- 当前代码候选固定于 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`；完整 `npm test` 256/256 通过，七个版本化交付包及同名 `.sha256` 已生成并回验。Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS ad-hoc 且未公证，Windows 无 Authenticode 并仍需真实 Windows 主机验收。源码 ZIP 固定于代码提交，包内发布文档是打包前快照；Windows PE 资源记录 `1.5.3`/`1.5.3.0`，未单独编码跨端候选号 `build 28`。完整文件名、字节数和 SHA-256 以 `docs/releases/v1.5.3.md` 为准。
+- 1.5.3 对应版本 `1.5.3 / build 28`，已于 2026-08-04 经 Tauber 明确授权发布为 GitHub Latest。
+- 当前代码候选固定于 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`，发布提交为 `697f3f8d1028426dc5eec430230dcf48754f9b15`（仅含 README/CHANGELOG 发布信息同步）；完整 `npm test` 256/256 通过，七个版本化交付包及同名 `.sha256` 已生成并回验。Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS ad-hoc 且未公证，Windows 无 Authenticode 并仍需真实 Windows 主机验收。源码 ZIP 固定于代码提交，包内发布文档是打包前快照；Windows PE 资源记录 `1.5.3`/`1.5.3.0`，未单独编码跨端候选号 `build 28`。完整文件名、字节数和 SHA-256 以 `docs/releases/v1.5.3.md` 为准。
+- v1.5.3 已于 2026-08-04T07:43:34Z 发布为 [GitHub Latest](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，注释标签解析到发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`。Release 为非草稿、非预发布，共 14 个附件；七个交付包和七份 `.sha256` 的线上字节数及 GitHub SHA-256 摘要已与本地逐项比对，14/14 一致、零差异。GitHub stable 标识不能替代正式证书签名、商店分发、Windows 主机验证或五端实机验收。
 
 ## 1. 总体原则
 

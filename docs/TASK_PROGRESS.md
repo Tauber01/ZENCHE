@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-04（Asia/Shanghai）
-> 基线分支：`main@378ef1f`；1.5.3 在 `agent/1.5.3-ui` / `ZENCHE-wt-ui-1.5.3` 独立 worktree 收口
-> 当前版本：1.5.3 / build 28 本地已打包候选；代码提交 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`；GitHub 最新稳定版仍为 v1.5.2
+> 基线分支：`main@697f3f8`；v1.5.3 已发布为 GitHub 最新稳定版
+> 当前版本：1.5.3 / build 28 已发布；发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；GitHub 最新稳定版为 v1.5.3
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,7 +18,7 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码版本为 **1.5.3 / build 28** 本地已打包候选；代码已在 `agent/1.5.3-ui` 固定为 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`，尚未推送、打标签、发布或部署。GitHub 最新稳定版仍为 [v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)，标签落点 `7376cf102ec5ab14208d047f60f28941843fe1c2`；生产服务未变更。
+- 当前源码版本为 **1.5.3 / build 28**，已发布为 [GitHub 最新稳定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`（代码候选 `846e1a0dc49c59b0cc5d032d84f954a98a61add0` + README/CHANGELOG 发布同步），注释标签 `v1.5.3` 指向同一提交；生产服务未变更。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、真实 RGB 示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - 当前门禁证据：`git diff --check`、1.5.3 专项回归 8/8、完整 `npm test` 256/256 均通过；iOS Simulator 无签名 Release、Android Debug、HarmonyOS release HAP、macOS 全 Swift 类型检查、Windows Release XAML/C# 均通过。独立复核已关闭全部 P1，最终结论为 P0/P1 均为 0；新增三语用户文案已完成一致性与自然度校对。七个版本化交付包及同名 SHA-256 已生成并逐个回验。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
@@ -67,7 +67,7 @@
 - **验证**：`git diff --check`、专项 8/8、完整 256/256 通过；iOS、Android、HarmonyOS、macOS、Windows 编译门禁通过。独立终审确认 P0/P1 均为 0；新增三语用户文案已完成一致性与自然度校对。
 - **候选提交**：`846e1a0dc49c59b0cc5d032d84f954a98a61add0`，提交包含 Tauber 的 `Co-authored-by` 与 `Signed-off-by` trailer；打包时工作树干净。
 - **交付物**：`dist/` 下 APK、HAP、unsigned IPA、macOS arm64 DMG、Windows x64 Setup/便携 ZIP、源码 ZIP 共 7 包及同名 `.sha256` 已生成。SHA-256 依次为 `3c79546bb80ea1d1043aae06fc4d5b848d661b72f871f646b3a4c4db8379b182`、`9dc53cce4375714bfedaac0f7df76e6d225cdeb6fa86f556c6aadc5c30bbd328`、`9ddff92fc0cfc8a98d56edef017a475241ae1f8b4911b84cb559ddba0cd215dd`、`b921f2c3573891fc340e1fac627aa663fa74c7bf28f4ea62a161b8b2eb5e81a5`、`24769cf08627890ee6d67a23aa0567b92b3b9de5c1e0e08d5485a9ec1f7b631c`、`fd9dbcba313d04180b5561e9e3bc96097247c931dc4558305a547f77e10470dc`、`686c318574b78186e8cd80bb41c01130bb18b988ff3c7344fa253a330825e382`；文件名、字节数与签名状态见 `docs/releases/v1.5.3.md`。
-- **签名与版本边界**：Android 为 Debug 证书；HarmonyOS/iOS 未签名；macOS ad-hoc 且深度签名/DMG 校验通过但未公证；Windows PE Security Directory 为 0，未做 Authenticode。Windows 资源版本为 `1.5.3`/`1.5.3.0`，未单独编码跨端候选号 `build 28`。源码 ZIP 固定于代码候选提交，包内的发布说明与任务进度是打包前快照；最终交付表以当前文档及后续文档提交为准。未经 Tauber 另行授权，不推送、打标签、创建 GitHub Release 或修改生产环境。
+- **签名与版本边界**：Android 为 Debug 证书；HarmonyOS/iOS 未签名；macOS ad-hoc 且深度签名/DMG 校验通过但未公证；Windows PE Security Directory 为 0，未做 Authenticode。Windows 资源版本为 `1.5.3`/`1.5.3.0`，未单独编码跨端候选号 `build 28`。源码 ZIP 固定于代码候选提交，包内的发布说明与任务进度是打包前快照；最终交付表以当前文档及后续文档提交为准。经 Tauber 明确授权，v1.5.3 已于 2026-08-04 发布为 GitHub 最新稳定版（见 §12.4）。
 
 ### 4.1 服务器端自动更新系统
 
@@ -413,3 +413,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - README 新增三语等价的 v1.5.2 更新摘要：五端全局状态条、设备码恢复与二次验签、Android 已知异步传输失败的同步 bulk 降级、默认回环监听的零依赖 AI 代理，以及发布说明链接。
 - 验证：`rg` 未发现 README 残留 v1.5.1 或“本地交付候选/未发布”表述；`git diff --check` 通过。未修改应用代码、版本号、Release 附件或生产服务。
 - 下一步：提交并推送本次 README 与三份长期文档同步；继续如实保留 v1.5.2 的签名、Windows 主机、实机矩阵和生产换绑限制。
+
+## 12.4 v1.5.3 五端工作台界面发布（2026-08-04）
+
+- 发布流程由智能体 kimi 接手执行（GPT5.6 因额度停用），授权依据为 Tauber 在本频道的明确指示“1.5.3 上传 GitHub，继续推进 1.5.4”。
+- 发布前复验：`dist/` 七个 1.5.3 交付包 `shasum -a 256 -c` 全部通过，`git diff --check` 干净，完整 `npm test` **256/256** 通过（复跑于 `agent/1.5.3-ui` 工作树）。
+- 提交：发布准备提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`（仅 README 三语与 CHANGELOG 的 v1.5.3 发布信息同步，含 Tauber 的 `Co-authored-by` 与 `Signed-off-by` trailer）；`main` 从 `5ea2a50` 快进到该提交并推送。
+- 标签：注释标签 `v1.5.3`（标签对象 `64d69abe2f2fce4969cc26a89672255bdc9281ad`）解析到 `697f3f8`，已推送。
+- Release：<https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3> 于 2026-08-04T07:43:34Z 发布为 Latest，非草稿、非预发布，正文为详细简体中文（亮点、平台变化、相机兼容、验证、签名状态、已知限制、升级指引、SHA-256 表）。
+- 线上回验：Release 共 14 个附件（七个交付包 + 七份同名 `.sha256`），通过 GitHub API 逐项比对线上字节数与 `digest` 字段，14/14 与本地文件完全一致、零差异。
+- 线上交付包 SHA-256：Android `3c79546bb80ea1d1043aae06fc4d5b848d661b72f871f646b3a4c4db8379b182`；HarmonyOS `9dc53cce4375714bfedaac0f7df76e6d225cdeb6fa86f556c6aadc5c30bbd328`；iOS unsigned `9ddff92fc0cfc8a98d56edef017a475241ae1f8b4911b84cb559ddba0cd215dd`；macOS `b921f2c3573891fc340e1fac627aa663fa74c7bf28f4ea62a161b8b2eb5e81a5`；Windows Setup `24769cf08627890ee6d67a23aa0567b92b3b9de5c1e0e08d5485a9ec1f7b631c`；Windows ZIP `fd9dbcba313d04180b5561e9e3bc96097247c931dc4558305a547f77e10470dc`；源码 ZIP `686c318574b78186e8cd80bb41c01130bb18b988ff3c7344fa253a330825e382`。
+- 签名与主机限制保持披露：Android Debug 证书，HarmonyOS/iOS 未签名，macOS ad-hoc 未公证，Windows 为 macOS 交叉构建且无 Authenticode、未完成真实 Windows 主机验收；GitHub stable 标识不改变这些附件属性。生产下载服务器与生产换绑均未变更。
+- 下一步：继续推进 1.5.4 文件库管理（先完成 `agent/1.5.4-file-core` 第四轮改动的验证收口，再评估集成）。
