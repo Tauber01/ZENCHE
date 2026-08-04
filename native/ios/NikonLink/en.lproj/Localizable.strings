@@ -822,3 +822,14 @@
 "暂无图像源" = "No Image Source";
 "连接相机后可用" = "Available after connecting a camera";
 "• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。" = "• Full-screen monitoring now uses an image-first professional HUD with top telemetry, a focus reticle, tool rail, real RGB scopes, an explicit silent-audio baseline, and a bottom parameter tray.\n• Capture and controls now combine a device summary, adaptive parameter cards, and a persistent capture dock so connection, output, and library state stay visible.\n• The editor now coordinates a media pool, central preview, tool inspector, and analysis scopes; every adjustment still saves non-destructively as a new copy.\n• A unified dark studio system spans all five clients: ZENCHE blue marks primary actions, warm gold is reserved for parameter readouts, and red is reserved for recording and destructive actions.\n• iOS / iPadOS, Android, HarmonyOS, macOS, and Windows are updated together while camera, AI, and transfer capabilities remain compatible.";
+"控制" = "Control";
+"菜单" = "Menu";
+"更多" = "More";
+"全部" = "All";
+"拍摄参数" = "Shooting Parameters";
+"待连接" = "Awaiting Connection";
+"重试" = "Retry";
+"机身" = "Camera Body";
+"镜头" = "Lens";
+"存储" = "Storage";
+"格式" = "Format";

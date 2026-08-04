@@ -118,9 +118,19 @@ private enum IPalette {
     static let studioRule = Color(red: 52 / 255, green: 58 / 255, blue: 67 / 255)
     static let studioGold = Color(red: 216 / 255, green: 182 / 255, blue: 83 / 255)
     static let graphite = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
-    static let monitorBackground = Color(red: 4 / 255, green: 12 / 255, blue: 22 / 255)
+    static let monitorBackground = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let readoutGlow = Color(red: 107 / 255, green: 174 / 255, blue: 255 / 255)
     static let shadow = Color.black.opacity(0.18)
+    // ZENCHE 1.5.5 fig1 control-surface tokens, shared verbatim with the other
+    // four platforms: a near-black canvas, grayscale cards, one yellow-green
+    // accent reserved for selection/shutter/active states, and system blue
+    // for the selected tab and auto marks. No gradients, no shadows.
+    static let uiBackground = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
+    static let uiCard = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
+    static let uiSecondary = Color(red: 44 / 255, green: 44 / 255, blue: 46 / 255)
+    static let uiLabel = Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
+    static let uiAccent = Color(red: 205 / 255, green: 220 / 255, blue: 57 / 255)
+    static let uiBlue = Color(red: 10 / 255, green: 132 / 255, blue: 255 / 255)
 }
 
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
@@ -200,16 +210,18 @@ struct RootView: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack {
-                (model.section == .monitor && proxy.size.width < 820
-                    ? IPalette.monitorBackground
+                (model.section == .capture || model.section == .monitor
+                    ? IPalette.uiBackground
                     : IPalette.paper)
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // The compact monitor is a dedicated camera surface. Keep the
-                    // existing header for the other pages, while letting monitor
-                    // use the full portrait canvas shown in the native reference.
-                    if !(model.section == .monitor && proxy.size.width < 820) {
+                    // The compact monitor is a dedicated camera surface, and
+                    // capture now renders the fig1 control top bar inside the
+                    // page. Keep the shared header for the remaining pages.
+                    if model.section != .capture
+                        && !(model.section == .monitor && proxy.size.width < 820)
+                    {
                         AppHeader()
                         Divider().overlay(IPalette.rule)
                     }
@@ -234,7 +246,9 @@ struct RootView: View {
 
                 }
                 .preferredColorScheme(
-                    model.section == .monitor && proxy.size.width < 820 ? .dark : nil
+                    model.section == .capture || model.section == .monitor
+                        ? .dark
+                        : nil
                 )
             }
         }
@@ -484,12 +498,20 @@ private struct BottomNavigation: View {
     @EnvironmentObject private var model: AppModel
     let bottomInset: CGFloat
 
+    /// fig1 control surfaces (capture/monitor) select tabs with system blue;
+    /// the remaining pages keep the product cobalt.
+    private var controlSurface: Bool {
+        model.section == .capture || model.section == .monitor
+    }
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(AppSection.allCases) { section in
-                let accent = section == .monitor
-                    ? (model.section == .monitor ? IPalette.cobalt : IPalette.video)
-                    : IPalette.cobalt
+                let accent = controlSurface
+                    ? IPalette.uiBlue
+                    : section == .monitor
+                        ? (model.section == .monitor ? IPalette.cobalt : IPalette.video)
+                        : IPalette.cobalt
                 Button {
                     model.section = section
                 } label: {
@@ -524,9 +546,13 @@ private struct BottomNavigation: View {
         .padding(.horizontal, 8)
         .padding(.top, 7)
         .padding(.bottom, max(7, bottomInset))
-        .background(model.section == .monitor ? Color.black : IPalette.surface)
+        .background(
+            controlSurface ? IPalette.uiBackground : IPalette.surface
+        )
         .overlay(alignment: .top) {
-            Rectangle().fill(IPalette.rule).frame(height: 0.5)
+            Rectangle()
+                .fill(controlSurface ? IPalette.uiSecondary : IPalette.rule)
+                .frame(height: 0.5)
         }
     }
 }
@@ -3834,25 +3860,28 @@ private struct CapturePage: View {
     @State private var showingFullscreen = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageTitle(
-                    title: "照片拍摄",
-                    subtitle: "会话、曝光、对焦与交付按拍摄流程组织。"
-                )
-
-                CaptureDeviceSummary()
-                CameraStage {
-                    showingFullscreen = true
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ControlTopBar {
+                        showingFullscreen = true
+                    }
+                    ControlStatusRow()
+                    ControlStatusCardGrid()
+                    ControlParameterGrid()
+                    ControlCaptureDock {
+                        withAnimation {
+                            proxy.scrollTo("captureShootingTasks", anchor: .top)
+                        }
+                    }
+                    NikonCloudMonitorBar()
+                    CaptureSessionCard()
+                    CaptureParameterDeck()
+                    ShootingTaskCard()
+                        .id("captureShootingTasks")
                 }
-                NikonCloudMonitorBar()
-                CaptureParameterCardGrid()
-                CaptureDock()
-                CaptureSessionCard()
-                CaptureParameterDeck()
-                ShootingTaskCard()
+                .padding(horizontalSizeClass == .compact ? 16 : 20)
             }
-            .padding(horizontalSizeClass == .compact ? 16 : 20)
         }
         .fullScreenCover(isPresented: $showingFullscreen) {
             ImmersiveCameraView(mode: .photo)
@@ -3860,175 +3889,610 @@ private struct CapturePage: View {
     }
 }
 
-/// Figure-2 inspired device summary. Every value is sourced from the active
-/// CameraService or LibraryStore; the card never invents lens or storage data.
-private struct CaptureDeviceSummary: View {
+/// fig1 top bar: menu, centered title, viewfinder and overflow buttons.
+/// Routes are unchanged — the bar only re-skins the existing entries.
+private struct ControlTopBar: View {
     @EnvironmentObject private var model: AppModel
-    @Environment(\.locale) private var locale
+    var openFullscreen: () -> Void
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 1) { summaryCells }
-            VStack(spacing: 1) { summaryCells }
-        }
-        .background(IPalette.studioRule)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(IPalette.studioRule, lineWidth: 1)
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    @ViewBuilder
-    private var summaryCells: some View {
-        summaryCell(
-            icon: "camera.fill",
-            label: "相机",
-            value: model.camera.state == .ready
-                ? model.camera.deviceName
-                : "—",
-            active: model.camera.state == .ready
-        )
-        summaryCell(
-            icon: "dot.radiowaves.left.and.right",
-            label: "连接",
-            value: model.camera.state == .ready
-                ? (model.camera.isExternalCamera ? "UVC" : "SYSTEM")
-                : "OFFLINE",
-            active: model.camera.state == .ready
-        )
-        summaryCell(
-            icon: "rectangle.stack",
-            label: "输出",
-            value: model.camera.state == .ready
-                ? model.camera.activeVideoSpecLabel
-                : "—",
-            active: model.camera.state == .ready
-        )
-        summaryCell(
-            icon: "externaldrive.fill",
-            label: "文件库",
-            value: RuntimeLocalization.format(
-                "%lld 个文件",
-                locale: locale,
-                Int64(model.library.items.count)
-            ),
-            active: true
-        )
-    }
-
-    private func summaryCell(
-        icon: String,
-        label: String,
-        value: String,
-        active: Bool
-    ) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(active ? IPalette.cobalt : IPalette.muted)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizedStringKey(label))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(IPalette.muted)
-                Text(value)
-                    .font(.caption.monospaced().weight(.semibold))
-                    .foregroundStyle(IPalette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+        HStack(spacing: 12) {
+            Menu {
+                Button {
+                    model.showingConnection = true
+                } label: {
+                    Label("连接相机", systemImage: "cable.connector")
+                }
+                Button {
+                    model.section = .monitor
+                } label: {
+                    Label("视频", systemImage: AppSection.monitor.icon)
+                }
+                Button {
+                    model.section = .editor
+                } label: {
+                    Label("编辑", systemImage: AppSection.editor.icon)
+                }
+                Button {
+                    model.section = .devices
+                } label: {
+                    Label("我的设备", systemImage: AppSection.devices.icon)
+                }
+                Button {
+                    model.section = .library
+                } label: {
+                    Label("文件", systemImage: AppSection.library.icon)
+                }
+            } label: {
+                controlBarButton("line.3.horizontal")
             }
-            Spacer(minLength: 4)
+            .accessibilityLabel(Text("菜单"))
+
+            Spacer()
+            Text("控制")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+            Spacer()
+
+            Button(action: openFullscreen) {
+                controlBarButton("viewfinder")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("打开全屏取景"))
+
+            Menu {
+                Toggle("网格", isOn: $model.showGrid)
+                Toggle("安全框", isOn: $model.showSafeGuide)
+                Divider()
+                Button {
+                    model.showingSettings = true
+                } label: {
+                    Label("设置", systemImage: "gearshape")
+                }
+            } label: {
+                controlBarButton("ellipsis")
+            }
+            .accessibilityLabel(Text("更多"))
         }
-        .padding(.horizontal, 13)
-        .frame(maxWidth: .infinity, minHeight: 68)
-        .background(IPalette.surface)
+        .frame(height: 44)
+    }
+
+    private func controlBarButton(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 44, height: 44)
+            .background(IPalette.uiSecondary, in: Circle())
     }
 }
 
-/// Adaptive, camera-backed parameter cards. Gold outlines the selected/manual
-/// exposure domain while blue continues to communicate product state.
-private struct CaptureParameterCardGrid: View {
+/// fig1 status row: connection dot and state on the left, a tappable
+/// transport capsule on the right, plus a red error line spelling out the
+/// last connection failure reported by CameraService.
+private struct ControlStatusRow: View {
     @EnvironmentObject private var model: AppModel
+
+    private var connected: Bool {
+        model.camera.state == .ready || model.wifiCamera.isConnected
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                RuntimeLocalizedText(model.connectionTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                if model.camera.state == .ready {
+                    RuntimeLocalizedText(model.camera.deviceName)
+                        .font(.system(size: 13))
+                        .foregroundStyle(IPalette.uiLabel)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    model.showingConnection = true
+                } label: {
+                    RuntimeLocalizedText(transportTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(capsuleTint)
+                        .padding(.horizontal, 12)
+                        .frame(height: 28)
+                        .background(capsuleTint.opacity(0.14), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(capsuleTint.opacity(0.4), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("连接相机"))
+            }
+            if case .failed(let message) = model.camera.state {
+                Text(message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    private var statusColor: Color {
+        if model.wifiCamera.isConnected { return IPalette.positive }
+        switch model.camera.state {
+        case .ready: return IPalette.positive
+        case .connecting: return .orange
+        case .failed: return .red
+        case .disconnected: return IPalette.uiLabel
+        }
+    }
+
+    private var transportTitle: String {
+        if model.wifiCamera.isConnected { return "Wi-Fi" }
+        switch model.camera.state {
+        case .ready:
+            return model.camera.isExternalCamera ? "UVC" : "SYSTEM"
+        case .connecting:
+            return "正在连接"
+        case .failed:
+            return "重试"
+        case .disconnected:
+            return "待连接"
+        }
+    }
+
+    private var capsuleTint: Color {
+        if connected { return IPalette.uiAccent }
+        if case .failed = model.camera.state { return .red }
+        return IPalette.uiLabel
+    }
+}
+
+/// fig1 2×2 status cards: body, lens, storage (accent progress bar) and
+/// format, laid out four across on wide screens. Every value is sourced
+/// from CameraService, WifiCameraService or the file system.
+private struct ControlStatusCardGrid: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var connected: Bool { model.camera.state == .ready }
 
     var body: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.adaptive(minimum: 132), spacing: 8)
-            ],
-            spacing: 8
-        ) {
-            parameterCard("模式", value: connected
-                ? (model.camera.exposureModeIsCustom ? "M" : "AUTO")
-                : "—", symbol: "dial.medium")
-            parameterCard("快门", value: connected
-                ? String(format: "%.1f°", model.camera.shutterAngle)
-                : "—", symbol: "timer")
-            parameterCard("光圈", value: connected && model.camera.lensAperture > 0
-                ? String(format: "F%.1f", model.camera.lensAperture)
-                : "—", symbol: "camera.aperture")
-            parameterCard("ISO", value: connected
-                ? "\(Int(model.camera.exposureISO.rounded()))"
-                : "—", symbol: "circle.lefthalf.filled")
-            parameterCard("曝光", value: connected
-                ? String(format: "%+.1f EV", model.camera.exposureBias)
-                : "—", symbol: "plusminus")
-            parameterCard("变焦", value: connected
-                ? String(format: "%.1f×", model.camera.zoomFactor)
-                : "—", symbol: "magnifyingglass")
+        Group {
+            if horizontalSizeClass == .compact {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ],
+                    spacing: 10
+                ) {
+                    cards
+                }
+            } else {
+                HStack(spacing: 10) { cards }
+            }
         }
-        .padding(8)
-        .background(IPalette.studioPanel, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    private func parameterCard(
-        _ label: String,
+    @ViewBuilder
+    private var cards: some View {
+        statusCard(
+            icon: "camera",
+            title: "机身",
+            value: connected ? model.camera.deviceName : "—",
+            subtitle: transportSubtitle
+        )
+        statusCard(
+            icon: "camera.aperture",
+            title: "镜头",
+            value: connected && model.camera.lensAperture > 0
+                ? String(format: "f/%.1f", model.camera.lensAperture)
+                : "—",
+            subtitle: model.camera.isExternalCamera ? "外接视频设备" : "本机镜头"
+        )
+        storageCard
+        statusCard(
+            icon: "rectangle.on.rectangle",
+            title: "格式",
+            value: model.camera.state == .ready
+                ? model.camera.activeVideoSpecLabel
+                : "—",
+            subtitle: "JPEG"
+        )
+    }
+
+    private var transportSubtitle: String {
+        if model.wifiCamera.isConnected { return "Wi-Fi" }
+        guard connected else { return "—" }
+        return model.camera.isExternalCamera ? "UVC" : "SYSTEM"
+    }
+
+    private func statusCard(
+        icon: String,
+        title: String,
         value: String,
-        symbol: String
+        subtitle: String
     ) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: symbol)
-                .foregroundStyle(connected ? IPalette.studioGold : IPalette.muted)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(LocalizedStringKey(label))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.52))
-                Text(value)
-                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(LocalizedStringKey(title))
+                    .font(.system(size: 12, weight: .medium))
+                Spacer(minLength: 2)
             }
-            Spacer(minLength: 2)
+            .foregroundStyle(IPalette.uiLabel)
+            Text(value)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            RuntimeLocalizedText(subtitle)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(IPalette.uiLabel)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 62)
-        .background(IPalette.studioRaised)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var storageCard: some View {
+        let info = MonitorStorageInfo.current
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: "externaldrive")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IPalette.uiAccent)
+                Text("存储")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(IPalette.uiLabel)
+                Spacer(minLength: 2)
+                Text("\(info.percentUsed)%")
+                    .font(
+                        .system(size: 11, weight: .semibold, design: .monospaced)
+                    )
+                    .foregroundStyle(IPalette.uiLabel)
+            }
+            Text(info.freeDescription)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.white)
+            ProgressView(value: info.progress)
+                .tint(IPalette.uiAccent)
+            HStack(spacing: 4) {
+                Text("剩余录制")
+                Text(info.minutesRemaining)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(IPalette.uiLabel)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
         .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(
-                    connected ? IPalette.studioGold.opacity(0.58) : IPalette.studioRule,
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(IPalette.uiAccent, lineWidth: 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 }
 
-/// Persistent capture dock built on the existing camera actions so the visual
-/// redesign does not fork capture, AF, grid, or safe-guide behavior.
-private struct CaptureDock: View {
+/// fig1 parameter grid: three columns on phones, wider adaptive grids on
+/// large screens, 28pt bold values with gray 12pt labels. 全部/编辑 toggles
+/// an edit mode whose taps hide tiles; the state is pure UI.
+private struct ControlParameterGrid: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var editing = false
+    @State private var hiddenTiles: Set<String> = []
+
+    private var connected: Bool { model.camera.state == .ready }
+
+    private struct Tile: Identifiable {
+        let id: String
+        let symbol: String
+        let value: String
+        let automatic: Bool
+    }
+
+    private var tiles: [Tile] {
+        [
+            Tile(
+                id: "模式",
+                symbol: "dial.medium",
+                value: connected
+                    ? (model.camera.exposureModeIsCustom ? "M" : "AUTO")
+                    : "—",
+                automatic: connected && !model.camera.exposureModeIsCustom
+            ),
+            Tile(
+                id: "快门",
+                symbol: "timer",
+                value: connected
+                    ? String(format: "%.1f°", model.camera.shutterAngle)
+                    : "—",
+                automatic: connected && !model.camera.supportsCustomExposure
+            ),
+            Tile(
+                id: "光圈",
+                symbol: "camera.aperture",
+                value: connected && model.camera.lensAperture > 0
+                    ? String(format: "F%.1f", model.camera.lensAperture)
+                    : "—",
+                automatic: connected
+            ),
+            Tile(
+                id: "ISO",
+                symbol: "circle.lefthalf.filled",
+                value: connected ? "\(Int(model.camera.exposureISO.rounded()))" : "—",
+                automatic: connected && !model.camera.supportsCustomExposure
+            ),
+            Tile(
+                id: "曝光",
+                symbol: "plusminus",
+                value: connected
+                    ? String(format: "%+.1f EV", model.camera.exposureBias)
+                    : "—",
+                automatic: connected && !model.camera.supportsExposureBias
+            ),
+            Tile(
+                id: "变焦",
+                symbol: "magnifyingglass",
+                value: connected
+                    ? String(format: "%.1f×", model.camera.zoomFactor)
+                    : "—",
+                automatic: false
+            )
+        ]
+    }
+
     var body: some View {
-        CaptureActionBar()
-            .padding(10)
-            .background(IPalette.studioPanel, in: RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(IPalette.studioRule, lineWidth: 1)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("拍摄参数")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                capsuleButton("全部", active: !editing) {
+                    editing = false
+                    hiddenTiles = []
+                }
+                capsuleButton("编辑", active: editing) {
+                    editing.toggle()
+                }
             }
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(visibleTiles) { tile in
+                    parameterTile(tile)
+                }
+            }
+        }
+    }
+
+    private var columns: [GridItem] {
+        horizontalSizeClass == .compact
+            ? Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+            : [GridItem(.adaptive(minimum: 150), spacing: 10)]
+    }
+
+    private var visibleTiles: [Tile] {
+        editing ? tiles : tiles.filter { !hiddenTiles.contains($0.id) }
+    }
+
+    private func capsuleButton(
+        _ title: String,
+        active: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(LocalizedStringKey(title))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(active ? Color.black : Color.white)
+                .padding(.horizontal, 14)
+                .frame(height: 30)
+                .background(
+                    active ? IPalette.uiAccent : IPalette.uiSecondary,
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func parameterTile(_ tile: Tile) -> some View {
+        let hidden = hiddenTiles.contains(tile.id)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: tile.symbol)
+                    .font(.system(size: 12, weight: .medium))
+                Text(LocalizedStringKey(tile.id))
+                    .font(.system(size: 12, weight: .medium))
+                Spacer(minLength: 2)
+                if editing {
+                    Image(
+                        systemName: hidden
+                            ? "plus.circle.fill"
+                            : "minus.circle.fill"
+                    )
+                    .font(.system(size: 15))
+                    .foregroundStyle(
+                        hidden ? IPalette.uiAccent : IPalette.uiLabel
+                    )
+                } else if tile.automatic {
+                    Text("A")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 18, height: 18)
+                        .background(IPalette.uiBlue, in: Circle())
+                }
+            }
+            .foregroundStyle(IPalette.uiLabel)
+            Text(tile.value)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(connected ? Color.white : IPalette.uiLabel)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
+        .opacity(editing && hidden ? 0.35 : 1)
+        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .onTapGesture {
+            guard editing else { return }
+            if hidden {
+                hiddenTiles.remove(tile.id)
+            } else {
+                hiddenTiles.insert(tile.id)
+            }
+        }
+    }
+}
+
+/// fig1 capture dock: library thumbnail, AF-ON, the accent-ringed shutter,
+/// INT (scrolls to the shooting task card) and the camera switcher. Every
+/// action reuses the existing AppModel/CameraService entry points.
+private struct ControlCaptureDock: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.locale) private var locale
+    var scrollToTasks: () -> Void
+
+    var body: some View {
+        HStack {
+            libraryButton
+            Spacer()
+            afOnButton
+            Spacer()
+            shutterButton
+            Spacer()
+            intButton
+            Spacer()
+            switchCameraButton
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    private var libraryButton: some View {
+        Button {
+            model.section = .library
+        } label: {
+            VStack(spacing: 4) {
+                Group {
+                    if let item = model.library.items.first,
+                       !item.isVideo,
+                       let image = UIImage(contentsOfFile: item.url.path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(IPalette.uiLabel)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(IPalette.uiSecondary)
+                    }
+                }
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                Text(
+                    RuntimeLocalization.format(
+                        "%lld 个文件",
+                        locale: locale,
+                        Int64(model.library.items.count)
+                    )
+                )
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(IPalette.uiLabel)
+                .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("文件"))
+    }
+
+    private var afOnButton: some View {
+        Button {
+            model.camera.triggerAutoFocus()
+        } label: {
+            Text("AF-ON")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(
+                    model.camera.state == .ready
+                        ? IPalette.uiAccent
+                        : IPalette.uiLabel
+                )
+                .padding(.horizontal, 14)
+                .frame(height: 40)
+                .overlay {
+                    Capsule()
+                        .stroke(
+                            model.camera.state == .ready
+                                ? IPalette.uiAccent
+                                : IPalette.uiSecondary,
+                            lineWidth: 1.5
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(model.camera.state != .ready)
+    }
+
+    private var shutterButton: some View {
+        Button {
+            model.capturePhoto()
+        } label: {
+            ZStack {
+                Circle()
+                    .stroke(IPalette.uiAccent, lineWidth: 4)
+                    .frame(width: 68, height: 68)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 54, height: 54)
+            }
+            .frame(width: 76, height: 76)
+        }
+        .buttonStyle(.plain)
+        .disabled(!model.isCaptureReady)
+        .opacity(model.isCaptureReady ? 1 : 0.45)
+        .accessibilityLabel(Text("拍摄照片"))
+    }
+
+    private var intButton: some View {
+        Button(action: scrollToTasks) {
+            HStack(spacing: 5) {
+                Image(systemName: "timer")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("INT")
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .foregroundStyle(IPalette.uiAccent)
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .overlay {
+                Capsule()
+                    .stroke(IPalette.uiAccent, lineWidth: 1.5)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("拍摄自动化"))
+    }
+
+    private var switchCameraButton: some View {
+        Button {
+            model.showingConnection = true
+        } label: {
+            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 46, height: 46)
+                .background(
+                    IPalette.uiSecondary,
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("选择相机"))
     }
 }
 
@@ -4248,7 +4712,9 @@ private enum ImmersiveCameraMode {
     }
 
     var accent: Color {
-        self == .photo ? .blue : .red
+        // Photo uses the fig1 yellow-green accent; video keeps the safety red
+        // reserved for recording.
+        self == .photo ? IPalette.uiAccent : .red
     }
 }
 
@@ -4540,7 +5006,7 @@ private struct ImmersiveCameraView: View {
                     connected ? String(format: "%.1f×", model.camera.zoomFactor) : "—"
                 )
             }
-            .background(IPalette.studioRule.opacity(0.82))
+            .background(IPalette.uiSecondary.opacity(0.82))
         }
         .frame(height: 50)
         .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -4561,7 +5027,7 @@ private struct ImmersiveCameraView: View {
         }
         .padding(.horizontal, 10)
         .frame(minWidth: 88, maxHeight: .infinity, alignment: .leading)
-        .background(IPalette.studioPanel.opacity(0.86))
+        .background(IPalette.uiCard.opacity(0.86))
     }
 
     /// Compact real-data scope dock; histogram traces are sourced from the
@@ -4582,7 +5048,7 @@ private struct ImmersiveCameraView: View {
                 .frame(width: 86, height: 78)
         }
         .padding(5)
-        .background(IPalette.studioCanvas.opacity(0.86))
+        .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
             RoundedRectangle(cornerRadius: 5)
                 .stroke(Color.white.opacity(0.22), lineWidth: 1)
@@ -4642,7 +5108,7 @@ private struct ImmersiveCameraView: View {
             }
         }
         .padding(5)
-        .background(IPalette.studioPanel.opacity(0.78))
+        .background(IPalette.uiCard.opacity(0.78))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -4697,7 +5163,7 @@ private struct ImmersiveCameraView: View {
                         : model.camera.isRecording ? "stop.fill" : "circle.fill"
                 )
                     .font(.title2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(mode == .photo ? Color.black : Color.white)
             }
             .frame(width: 96, height: 96)
         }
@@ -5090,7 +5556,7 @@ private struct ImmersiveParameterStepper: View {
                     .foregroundStyle(.white.opacity(0.64))
                 Text(value)
                     .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(enabled ? IPalette.studioGold : .white)
+                    .foregroundStyle(enabled ? IPalette.uiAccent : .white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -5102,11 +5568,11 @@ private struct ImmersiveParameterStepper: View {
         }
         .buttonStyle(ImmersiveControlStyle())
         .padding(2)
-        .background(IPalette.studioPanel.opacity(0.88), in: RoundedRectangle(cornerRadius: 7))
+        .background(IPalette.uiCard.opacity(0.88), in: RoundedRectangle(cornerRadius: 7))
         .overlay {
             RoundedRectangle(cornerRadius: 7)
                 .stroke(
-                    enabled ? IPalette.studioGold.opacity(0.48) : IPalette.studioRule,
+                    enabled ? IPalette.uiAccent.opacity(0.48) : IPalette.uiSecondary,
                     lineWidth: 1
                 )
         }
@@ -5121,67 +5587,12 @@ private struct ImmersiveControlStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(.white)
+            .foregroundStyle(active ? Color.black : Color.white)
             .background(
-                active ? Color.blue.opacity(0.78) : Color.black.opacity(0.58),
+                active ? IPalette.uiAccent : Color.black.opacity(0.58),
                 in: RoundedRectangle(cornerRadius: 12)
             )
             .opacity(configuration.isPressed ? 0.68 : 1)
-    }
-}
-
-private struct CaptureActionBar: View {
-    @EnvironmentObject private var model: AppModel
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) {
-                captureButton
-                afOnButton
-                guideToggles
-            }
-            VStack(spacing: 12) {
-                captureButton
-                afOnButton
-                guideToggles
-            }
-        }
-    }
-
-    private var captureButton: some View {
-        Button {
-            model.capturePhoto()
-        } label: {
-            Label("拍摄", systemImage: "camera.fill")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(!model.isCaptureReady)
-    }
-
-    private var guideToggles: some View {
-        HStack(spacing: 10) {
-            Toggle("网格", isOn: $model.showGrid)
-                .toggleStyle(.button)
-            Toggle("安全框", isOn: $model.showSafeGuide)
-                .toggleStyle(.button)
-        }
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var afOnButton: some View {
-        Button {
-            model.camera.triggerAutoFocus()
-        } label: {
-            Label("AF-ON", systemImage: "viewfinder.circle")
-                .font(.headline)
-                .frame(height: 52)
-                .padding(.horizontal, 14)
-        }
-        .buttonStyle(.bordered)
-        .disabled(model.camera.state != .ready)
     }
 }
 
@@ -5202,7 +5613,7 @@ private struct CaptureParameterDeck: View {
                     Spacer()
                     Text(String(format: "%+.1f EV", model.camera.exposureBias))
                         .monospacedDigit()
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(IPalette.uiBlue)
                 }
                 Slider(
                     value: Binding(
@@ -5225,7 +5636,7 @@ private struct CaptureParameterDeck: View {
                     Spacer()
                     Text(String(format: "%.1f×", model.camera.zoomFactor))
                         .monospacedDigit()
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(IPalette.uiBlue)
                 }
                 Slider(
                     value: Binding(
@@ -5257,7 +5668,6 @@ private struct CaptureParameterDeck: View {
         .padding(18)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
-        .shadow(color: IPalette.shadow, radius: 12, y: 6)
     }
 }
 
@@ -5323,7 +5733,6 @@ private struct ShootingTaskCard: View {
         .padding(18)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
-        .shadow(color: IPalette.shadow, radius: 12, y: 6)
     }
 }
 
@@ -5354,7 +5763,7 @@ private struct NikonCloudMonitorBar: View {
     @State private var showingPresetPicker = false
 
     private var usesDarkSurface: Bool {
-        model.section == .monitor
+        model.section == .monitor || model.section == .capture
     }
 
     var body: some View {
@@ -5401,7 +5810,7 @@ private struct NikonCloudMonitorBar: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(usesDarkSurface ? IPalette.readoutGlow : IPalette.cobalt)
+                .tint(usesDarkSurface ? IPalette.uiBlue : IPalette.cobalt)
                 .disabled(NikonCloudPresetLibrary.presets.isEmpty)
             }
 
@@ -5418,7 +5827,7 @@ private struct NikonCloudMonitorBar: View {
         .frame(minHeight: 72)
         .background(
             usesDarkSurface
-                ? Color(red: 24 / 255, green: 36 / 255, blue: 52 / 255)
+                ? IPalette.uiCard
                 : IPalette.cobaltSoft,
             in: RoundedRectangle(cornerRadius: 14)
         )
@@ -5426,7 +5835,7 @@ private struct NikonCloudMonitorBar: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(
                     usesDarkSurface
-                        ? Color(red: 48 / 255, green: 78 / 255, blue: 112 / 255)
+                        ? IPalette.uiSecondary
                         : IPalette.cobalt.opacity(0.34)
                 )
         }
@@ -5571,7 +5980,7 @@ private struct MonitorConsolePage: View {
                 timecode
                     .frame(height: 102)
                     .frame(maxWidth: .infinity)
-                    .background(Color(red: 5 / 255, green: 14 / 255, blue: 24 / 255))
+                    .background(IPalette.uiCard)
 
                 preview(width: proxy.size.width)
 
@@ -5873,7 +6282,7 @@ private struct MonitorConsolePage: View {
                         .foregroundStyle(.white.opacity(0.85))
                 }
                 ProgressView(value: info.progress)
-                    .tint(IPalette.cobalt)
+                    .tint(IPalette.uiAccent)
                     .scaleEffect(x: 1, y: 1.5, anchor: .center)
                 HStack {
                     Text("\(info.percentUsed)% 已用")
@@ -5886,7 +6295,7 @@ private struct MonitorConsolePage: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 286, height: 91)
-        .background(Color(red: 27 / 255, green: 36 / 255, blue: 51 / 255), in: RoundedRectangle(cornerRadius: 9))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 9))
         .overlay(alignment: .leading) {
             Rectangle()
                 .fill(Color.white.opacity(0.04))
@@ -6420,7 +6829,7 @@ private struct MonitorParameterDeck: View {
                             : shutterSpeedLabel(currentShutterSeconds)
                     )
                         .monospacedDigit()
-                        .foregroundStyle(.red)
+                        .foregroundStyle(IPalette.uiAccent)
                 }
                 if videoShutterMode == "angle" {
                     Picker(
@@ -6475,7 +6884,7 @@ private struct MonitorParameterDeck: View {
                     Spacer()
                     Text("ISO \(Int(model.camera.exposureISO.rounded()))")
                         .monospacedDigit()
-                        .foregroundStyle(.red)
+                        .foregroundStyle(IPalette.uiAccent)
                 }
                 Slider(
                     value: Binding(
@@ -6510,7 +6919,7 @@ private struct MonitorParameterDeck: View {
                     Spacer()
                     Text(String(format: "%+.1f EV", model.camera.exposureBias))
                         .monospacedDigit()
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(IPalette.uiBlue)
                 }
                 Slider(
                     value: Binding(
@@ -6529,7 +6938,7 @@ private struct MonitorParameterDeck: View {
                     Spacer()
                     Text(String(format: "%.1f×", model.camera.zoomFactor))
                         .monospacedDigit()
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(IPalette.uiBlue)
                 }
                 Slider(
                     value: Binding(
@@ -6551,7 +6960,7 @@ private struct MonitorParameterDeck: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var shutterSpeedOptions: [Double] {
@@ -6739,7 +7148,6 @@ private struct CaptureSessionCard: View {
         .padding(18)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
-        .shadow(color: IPalette.shadow, radius: 12, y: 6)
         .onAppear(perform: loadConfiguration)
     }
 
