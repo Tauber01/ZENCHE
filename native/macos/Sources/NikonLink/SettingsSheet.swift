@@ -186,6 +186,9 @@ struct SettingsSheet: View {
     @State private var logExportMessage: String?
     @State private var activationCode = ""
     @State private var activationStatus = ""
+    @State private var oldDeviceId = ""
+    @State private var oldActivationCode = ""
+    @State private var isRebindingActivation = false
 
     var body: some View {
         ScrollView {
@@ -548,6 +551,26 @@ struct SettingsSheet: View {
                         if activationStatus.hasPrefix("激活成功") { activationCode = "" }
                     }
                 }
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("恢复设备码")
+                        .font(.system(size: 12, weight: .semibold))
+                    TextField("旧设备 ID", text: $oldDeviceId)
+                        .textFieldStyle(.roundedBorder)
+                    SecureField("旧激活码", text: $oldActivationCode)
+                        .textFieldStyle(.roundedBorder)
+                    Text("恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。")
+                        .font(.system(size: 10))
+                        .foregroundStyle(SettingsPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    actionButton(
+                        isRebindingActivation ? "正在迁移…" : "恢复到当前设备",
+                        primary: false
+                    ) {
+                        Task { await restoreDeviceBinding() }
+                    }
+                    .disabled(isRebindingActivation)
+                }
             }
 
             settingsCard {
@@ -610,6 +633,61 @@ struct SettingsSheet: View {
             Button("好") { logExportMessage = nil }
         } message: {
             RuntimeLocalizedText(logExportMessage ?? "")
+        }
+    }
+
+    @MainActor
+    private func restoreDeviceBinding() async {
+        let locale = Locale(identifier: languageRaw)
+        let oldId = oldDeviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let oldCode = oldActivationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !oldId.isEmpty, !oldCode.isEmpty else {
+            activationStatus = RuntimeLocalization.text(
+                "请输入旧设备 ID 和旧激活码",
+                locale: locale
+            )
+            return
+        }
+        guard ActivationManager.verify(code: oldCode, deviceId: oldId) else {
+            activationStatus = RuntimeLocalization.text(
+                "旧设备 ID 与旧激活码不匹配或已过期",
+                locale: locale
+            )
+            return
+        }
+
+        isRebindingActivation = true
+        activationStatus = RuntimeLocalization.text("正在迁移…", locale: locale)
+        defer { isRebindingActivation = false }
+        do {
+            let result = try await AiRebindService.rebind(
+                oldCode: oldCode,
+                oldDeviceId: oldId,
+                newDeviceId: ActivationManager.deviceId
+            )
+            guard ActivationManager.verify(
+                code: result.newCode,
+                deviceId: ActivationManager.deviceId
+            ) else {
+                activationStatus = RuntimeLocalization.text(
+                    "服务器返回的新激活码验证失败，未修改本机数据",
+                    locale: locale
+                )
+                return
+            }
+            ActivationManager.storeVerifiedActivation(
+                code: result.newCode,
+                remaining: result.remaining
+            )
+            oldDeviceId = ""
+            oldActivationCode = ""
+            activationStatus = RuntimeLocalization.text(
+                "设备码恢复成功，AI 权益已迁移到当前设备",
+                locale: locale
+            )
+        } catch {
+            let prefix = RuntimeLocalization.text("设备码恢复失败：", locale: locale)
+            activationStatus = prefix + error.localizedDescription
         }
     }
 

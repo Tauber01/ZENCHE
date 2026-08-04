@@ -799,6 +799,9 @@ public partial class MainWindow : Window
     ];
 
     private const int AiMaxUsage = 100;
+    private const string AiRebindEndpoint =
+        "https://zenche.top/api/v1/ai/rebind";
+    private const int AiRebindResponseLimit = 64 * 1024;
     private static readonly string AiDataDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink");
@@ -951,6 +954,66 @@ public partial class MainWindow : Window
         }
     }
 
+    private static void SaveReboundActivation(string code, int remaining)
+    {
+        Directory.CreateDirectory(AiDataDir);
+        var bounded = Math.Clamp(remaining, 0, AiMaxUsage);
+        var transactionId = Guid.NewGuid().ToString("N");
+        var codePath = Path.Combine(AiDataDir, "ai-activation-code.txt");
+        var countPath = Path.Combine(AiDataDir, "ai-usage-count.txt");
+        var remainingPath = Path.Combine(AiDataDir, "ai-server-remaining.txt");
+        var activatedPath = Path.Combine(AiDataDir, "ai-activated.txt");
+        var codeTemp = codePath + "." + transactionId + ".tmp";
+        var countTemp = countPath + "." + transactionId + ".tmp";
+        var remainingTemp = remainingPath + "." + transactionId + ".tmp";
+        var activatedTemp = activatedPath + "." + transactionId + ".tmp";
+        var temporaryPaths = new[]
+        {
+            codeTemp, countTemp, remainingTemp, activatedTemp
+        };
+        try
+        {
+            File.WriteAllText(codeTemp, code.Trim());
+            File.WriteAllText(
+                countTemp,
+                (AiMaxUsage - bounded).ToString(CultureInfo.InvariantCulture));
+            File.WriteAllText(
+                remainingTemp,
+                bounded.ToString(CultureInfo.InvariantCulture));
+            File.WriteAllText(activatedTemp, bounded > 0 ? "1" : "0");
+
+            // Same-directory moves are atomic per file. Publish the server
+            // counter first and the activation marker last so a crash cannot
+            // expose unverified data as a newly active entitlement.
+            File.Move(remainingTemp, remainingPath, true);
+            File.Move(countTemp, countPath, true);
+            File.Move(codeTemp, codePath, true);
+            if (bounded > 0)
+            {
+                File.Move(activatedTemp, activatedPath, true);
+            }
+            else
+            {
+                if (File.Exists(activatedPath)) File.Delete(activatedPath);
+                File.Delete(activatedTemp);
+            }
+        }
+        finally
+        {
+            foreach (var path in temporaryPaths)
+            {
+                try
+                {
+                    if (File.Exists(path)) File.Delete(path);
+                }
+                catch
+                {
+                    // A stale transaction file is inert and can be retried.
+                }
+            }
+        }
+    }
+
     private const string AiActivationPublicKey =
         "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB" +
         "FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL" +
@@ -1059,6 +1122,131 @@ public partial class MainWindow : Window
         AiActivationStatusText.Text = AppLocalization.T("激活成功！AI 功能已解锁");
         _aiServerRemainingUsage = null;
         AiActivationCodeBox.Text = "";
+    }
+
+    private async void AiRebind_Click(object sender, RoutedEventArgs e)
+    {
+        var oldDeviceId = AiRebindOldDeviceIdBox.Text.Trim();
+        var oldCode = AiRebindOldCodeBox.Password.Trim();
+        if (oldDeviceId.Length == 0 || oldCode.Length == 0)
+        {
+            AiActivationStatusText.Text =
+                AppLocalization.T("请输入旧设备 ID 和旧激活码");
+            return;
+        }
+        if (!VerifyActivationCode(oldCode, oldDeviceId))
+        {
+            AiActivationStatusText.Text = AppLocalization.T(
+                "旧设备 ID 与旧激活码不匹配或已过期");
+            return;
+        }
+
+        AiRebindButton.IsEnabled = false;
+        AiRebindButton.Content = AppLocalization.T("正在迁移…");
+        AiActivationStatusText.Text = AppLocalization.T("正在迁移…");
+        try
+        {
+            var currentDeviceId = GetDeviceId();
+            var payload = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                activationCode = oldCode,
+                oldDeviceId,
+                newDeviceId = currentDeviceId
+            });
+            using var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                AiRebindEndpoint)
+            {
+                Content = new ByteArrayContent(payload)
+            };
+            request.Content.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue(
+                    "application/json");
+            using var response = await client.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead);
+            var responseBytes = await ReadLimitedResponseAsync(
+                response.Content,
+                AiRebindResponseLimit);
+            using var document = JsonDocument.Parse(responseBytes);
+            var root = document.RootElement;
+            if (!response.IsSuccessStatusCode)
+            {
+                var serverMessage = root.TryGetProperty("error", out var error)
+                    && error.ValueKind == JsonValueKind.String
+                        ? error.GetString()
+                        : null;
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(serverMessage)
+                        ? $"设备码恢复服务返回错误 {(int)response.StatusCode}"
+                        : serverMessage);
+            }
+            if (!root.TryGetProperty("newCode", out var codeElement)
+                || codeElement.ValueKind != JsonValueKind.String
+                || !root.TryGetProperty("remaining", out var remainingElement)
+                || !remainingElement.TryGetInt32(out var remaining)
+                || remaining < 0
+                || remaining > AiMaxUsage)
+            {
+                throw new InvalidOperationException("设备码恢复响应无效");
+            }
+            var newCode = codeElement.GetString()?.Trim() ?? "";
+            if (newCode.Length == 0)
+            {
+                throw new InvalidOperationException("设备码恢复响应无效");
+            }
+            if (!VerifyActivationCode(newCode, currentDeviceId))
+            {
+                throw new InvalidOperationException(
+                    "服务器返回的新激活码验证失败，未修改本机数据");
+            }
+
+            SaveReboundActivation(newCode, remaining);
+            _aiServerRemainingUsage = remaining;
+            AiRebindOldDeviceIdBox.Text = "";
+            AiRebindOldCodeBox.Password = "";
+            AiActivationStatusText.Text = AppLocalization.T(
+                "设备码恢复成功，AI 权益已迁移到当前设备");
+        }
+        catch (Exception error)
+        {
+            AiActivationStatusText.Text = AppLocalization.T(
+                $"设备码恢复失败：{error.Message}");
+        }
+        finally
+        {
+            AiRebindButton.IsEnabled = true;
+            AiRebindButton.Content = AppLocalization.T("恢复到当前设备");
+        }
+    }
+
+    private static async Task<byte[]> ReadLimitedResponseAsync(
+        HttpContent content,
+        int maximumBytes)
+    {
+        if (content.Headers.ContentLength is long length
+            && length > maximumBytes)
+        {
+            throw new InvalidOperationException("设备码恢复响应过大");
+        }
+        await using var stream = await content.ReadAsStreamAsync();
+        using var buffer = new MemoryStream();
+        var chunk = new byte[4096];
+        while (true)
+        {
+            var read = await stream.ReadAsync(chunk);
+            if (read == 0) break;
+            if (buffer.Length + read > maximumBytes)
+            {
+                throw new InvalidOperationException("设备码恢复响应过大");
+            }
+            buffer.Write(chunk, 0, read);
+        }
+        return buffer.ToArray();
     }
 
     private void AiCopyDeviceId_Click(object sender, RoutedEventArgs e)

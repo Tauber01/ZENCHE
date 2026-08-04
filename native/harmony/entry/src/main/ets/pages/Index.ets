@@ -919,6 +919,9 @@ struct Index {
   @State private editorTabMode: string = 'pro'; // 'pro' | 'ai'
   @State private aiActivationInput: string = '';
   @State private aiActivationMsg: string = '';
+  @State private aiRebindOldDeviceId: string = '';
+  @State private aiRebindOldCode: string = '';
+  @State private aiRebindBusy: boolean = false;
   @State private editorAIIntensity: number = 72;
   @State private editorAISummary: string = '等待分析当前照片';
   @State private editorAICanUndo: boolean = false;
@@ -2925,9 +2928,10 @@ struct Index {
     }
   }
 
-  private verifyActivationCode(code: string): boolean {
+  private verifyActivationCodeForDevice(code: string, deviceId: string): boolean {
     const trimmed: string = code.trim();
-    if (trimmed.length === 0) {
+    const targetDeviceId: string = deviceId.trim();
+    if (trimmed.length === 0 || targetDeviceId.length === 0) {
       return false;
     }
     const parts: Array<string> = trimmed.split('-');
@@ -2957,8 +2961,7 @@ struct Index {
       expiryDate < now) {
       return false;
     }
-    const deviceId: string = this.getDeviceId();
-    const payload: string = `${deviceId}:${expiryPart}:a1b2c3d4e5f6`;
+    const payload: string = `${targetDeviceId}:${expiryPart}:a1b2c3d4e5f6`;
     const signaturePart: string = parts.slice(2, parts.length - 1).join('-');
     try {
       const base64Helper = new util.Base64Helper();
@@ -2981,16 +2984,104 @@ struct Index {
     } catch (_) {
       return false;
     }
+    return true;
+  }
+
+  private saveVerifiedActivation(code: string, remaining: number): void {
+    const bounded: number = Math.max(0, Math.min(100, remaining));
     const prefs = preferences.getPreferencesSync(
       getContext(this) as common.UIAbilityContext,
       { name: 'zenche_ai_settings' }
     );
-    prefs.putSync('ai_activated', true);
-    prefs.putSync('ai_activation_code', trimmed);
-    prefs.putSync('ai_usage_count', 0);
-    prefs.putSync('ai_device_id', deviceId);
+    prefs.putSync('ai_activation_code', code.trim());
+    prefs.putSync('ai_usage_count', 100 - bounded);
+    prefs.putSync('ai_device_id', this.getDeviceId());
+    prefs.putSync('ai_activated', bounded > 0);
     prefs.flushSync();
+  }
+
+  private verifyActivationCode(code: string): boolean {
+    const trimmed: string = code.trim();
+    if (!this.verifyActivationCodeForDevice(trimmed, this.getDeviceId())) {
+      return false;
+    }
+    this.saveVerifiedActivation(trimmed, 100);
     return true;
+  }
+
+  private async rebindAiActivation(): Promise<void> {
+    const oldDeviceId: string = this.aiRebindOldDeviceId.trim();
+    const oldCode: string = this.aiRebindOldCode.trim();
+    if (oldDeviceId.length === 0 || oldCode.length === 0) {
+      this.aiActivationMsg = '请输入旧设备 ID 和旧激活码';
+      return;
+    }
+    if (!this.verifyActivationCodeForDevice(oldCode, oldDeviceId)) {
+      this.aiActivationMsg = '旧设备 ID 与旧激活码不匹配或已过期';
+      return;
+    }
+
+    this.aiRebindBusy = true;
+    this.aiActivationMsg = '正在迁移…';
+    const request: http.HttpRequest = http.createHttp();
+    try {
+      const currentDeviceId: string = this.getDeviceId();
+      const body: Record<string, string> = {
+        'activationCode': oldCode,
+        'oldDeviceId': oldDeviceId,
+        'newDeviceId': currentDeviceId,
+      };
+      const response: http.HttpResponse = await request.request(
+        'https://zenche.top/api/v1/ai/rebind',
+        {
+          method: http.RequestMethod.POST,
+          header: { 'Content-Type': 'application/json' },
+          extraData: JSON.stringify(body),
+          connectTimeout: 15000,
+          readTimeout: 30000,
+        }
+      );
+      const responseText: string = response.result as string;
+      if (new util.TextEncoder().encode(responseText).byteLength > 64 * 1024) {
+        throw new Error('设备码恢复响应过大');
+      }
+      let result: Record<string, Object> = {};
+      if (responseText.length > 0) {
+        try {
+          result = JSON.parse(responseText) as Record<string, Object>;
+        } catch (_) {
+          throw new Error('设备码恢复响应无效');
+        }
+      }
+      if (response.responseCode < 200 || response.responseCode >= 300) {
+        const serverMessage: string = (result['error'] as string) || '';
+        throw new Error(
+          serverMessage || `设备码恢复服务返回错误 ${response.responseCode}`
+        );
+      }
+      const newCode: string = ((result['newCode'] as string) || '').trim();
+      const remainingValue: Object = result['remaining'];
+      if (newCode.length === 0 || typeof remainingValue !== 'number') {
+        throw new Error('设备码恢复响应无效');
+      }
+      const remaining: number = remainingValue as number;
+      if (!Number.isInteger(remaining) || remaining < 0 || remaining > 100) {
+        throw new Error('设备码恢复响应无效');
+      }
+      if (!this.verifyActivationCodeForDevice(newCode, currentDeviceId)) {
+        throw new Error('服务器返回的新激活码验证失败，未修改本机数据');
+      }
+      this.saveVerifiedActivation(newCode, remaining);
+      this.aiRebindOldDeviceId = '';
+      this.aiRebindOldCode = '';
+      this.aiActivationMsg = '设备码恢复成功，AI 权益已迁移到当前设备';
+    } catch (error) {
+      const failure = error as Error;
+      this.aiActivationMsg = `设备码恢复失败：${failure.message || '网络连接失败'}`;
+    } finally {
+      request.destroy();
+      this.aiRebindBusy = false;
+    }
   }
 
   private doAiActivate(): void {
@@ -6842,6 +6933,48 @@ struct Index {
               })
           }
           .width('100%')
+          Divider()
+            .color($r('app.color.rule'))
+          Text(this.tr('恢复设备码'))
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .width('100%')
+          TextInput({
+            placeholder: this.tr('旧设备 ID'),
+            text: this.aiRebindOldDeviceId,
+          })
+            .height(44)
+            .width('100%')
+            .onChange((value: string): void => {
+              this.aiRebindOldDeviceId = value;
+            })
+          TextInput({
+            placeholder: this.tr('旧激活码'),
+            text: this.aiRebindOldCode,
+          })
+            .height(44)
+            .width('100%')
+            .type(InputType.Password)
+            .onChange((value: string): void => {
+              this.aiRebindOldCode = value;
+            })
+          Text(this.tr('恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。'))
+            .fontSize(10)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Button(
+            this.tr(this.aiRebindBusy ? '正在迁移…' : '恢复到当前设备'),
+            { type: ButtonType.Normal }
+          )
+            .height(40)
+            .width('100%')
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .enabled(!this.aiRebindBusy)
+            .onClick((): void => {
+              this.rebindAiActivation();
+            })
           if (this.aiActivationMsg.length > 0) {
             Text(this.aiActivationMsg)
               .fontSize(11)

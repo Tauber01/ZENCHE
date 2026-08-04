@@ -737,6 +737,7 @@ final class ActivationManager {
     private static let ak = "ai_activated"; private static let dk = "ai_device_id"
     private static let usageCountKey = "ai_usage_count"
     private static let serverRemainingKey = "ai_server_remaining"
+    private static let activationStateKey = "ai_verified_activation_state"
     private static let maxUsage = 100
     private static let deviceIdKeychainService = "com.tauber.nikonlink.ai-device-id"
     private static let deviceIdKeychainAccount = "ai_device_id"
@@ -755,17 +756,34 @@ final class ActivationManager {
         return id
     }()
     static var isActivated: Bool {
-        UserDefaults.standard.bool(forKey: ak) && remainingUsage > 0
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let remaining = state["remaining"] as? Int,
+           let code = state["code"] as? String,
+           let boundDeviceId = state["deviceId"] as? String {
+            return !code.isEmpty && boundDeviceId == deviceId && remaining > 0
+        }
+        return UserDefaults.standard.bool(forKey: ak) && remainingUsage > 0
     }
     static var remainingUsage: Int {
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let remaining = state["remaining"] as? Int {
+            return max(0, min(maxUsage, remaining))
+        }
         if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
             return max(0, min(maxUsage, server))
         }
         return max(0, maxUsage - UserDefaults.standard.integer(forKey: usageCountKey))
     }
     static func updateServerRemaining(_ remaining: Int) {
-        UserDefaults.standard.set(max(0, min(maxUsage, remaining)), forKey: serverRemainingKey)
-        if remaining <= 0 { UserDefaults.standard.set(false, forKey: ak) }
+        let bounded = max(0, min(maxUsage, remaining))
+        let defaults = UserDefaults.standard
+        if var state = defaults.dictionary(forKey: activationStateKey) {
+            state["remaining"] = bounded
+            state["activated"] = bounded > 0
+            defaults.set(state, forKey: activationStateKey)
+        }
+        defaults.set(bounded, forKey: serverRemainingKey)
+        if bounded <= 0 { defaults.set(false, forKey: ak) }
     }
     static func recordUsageFallback() {
         let count = UserDefaults.standard.integer(forKey: usageCountKey) + 1
@@ -778,9 +796,10 @@ final class ActivationManager {
     static var deviceId: String {
         stableDeviceId
     }
-    static func verifyAndActivate(code: String) -> Bool {
+    static func verify(code: String, deviceId: String) -> Bool {
         let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return false }
+        let did = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !did.isEmpty else { return false }
         let p = t.components(separatedBy: "-")
         guard p.count >= 4, p[0] == "ZENCHE", p[1] == "AI" else { return false }
         let exp = p.last ?? "19700101"
@@ -793,24 +812,50 @@ final class ActivationManager {
               df.string(from: ed) == exp,
               Calendar.current.startOfDay(for: ed) >= Calendar.current.startOfDay(for: Date())
         else { return false }
-        let did = deviceId
         let sigPart = p[2..<(p.count - 1)].joined(separator: "-")
         guard let sig = Data(base64Encoded: sigPart), let pk = publicKey else { return false }
         let payload = "\(did):\(exp):a1b2c3d4e5f6"
         guard let pd = payload.data(using: .utf8) else { return false }
         var err: Unmanaged<CFError>?
-        let ok = SecKeyVerifySignature(pk, .rsaSignatureMessagePKCS1v15SHA256, pd as CFData, sig as CFData, &err)
-        if ok {
-            UserDefaults.standard.set(true, forKey: ak)
-            UserDefaults.standard.removeObject(forKey: usageCountKey)
-            UserDefaults.standard.removeObject(forKey: serverRemainingKey)
-            UserDefaults.standard.set(did, forKey: dk)
-            UserDefaults.standard.set(t, forKey: "ai_activation_code")
-        }
-        return ok
+        return SecKeyVerifySignature(
+            pk,
+            .rsaSignatureMessagePKCS1v15SHA256,
+            pd as CFData,
+            sig as CFData,
+            &err
+        )
+    }
+    static func verifyAndActivate(code: String) -> Bool {
+        let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard verify(code: t, deviceId: deviceId) else { return false }
+        storeVerifiedActivation(code: t, remaining: maxUsage)
+        return true
+    }
+    static func storeVerifiedActivation(code: String, remaining: Int) {
+        let bounded = max(0, min(maxUsage, remaining))
+        let defaults = UserDefaults.standard
+        // This property-list dictionary is the authoritative activation state
+        // and is replaced with one UserDefaults write. Legacy keys are mirrored
+        // afterward for compatibility with earlier releases.
+        defaults.set([
+            "code": code.trimmingCharacters(in: .whitespacesAndNewlines),
+            "deviceId": deviceId,
+            "remaining": bounded,
+            "activated": bounded > 0
+        ], forKey: activationStateKey)
+        defaults.set(code.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "ai_activation_code")
+        defaults.set(deviceId, forKey: dk)
+        defaults.set(maxUsage - bounded, forKey: usageCountKey)
+        defaults.set(bounded, forKey: serverRemainingKey)
+        defaults.set(bounded > 0, forKey: ak)
     }
     static var savedCode: String? {
-        UserDefaults.standard.string(forKey: "ai_activation_code")
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let code = state["code"] as? String,
+           !code.isEmpty {
+            return code
+        }
+        return UserDefaults.standard.string(forKey: "ai_activation_code")
     }
     private static func loadDeviceIdFromKeychain() -> String? {
         let query: [String: Any] = [
@@ -848,6 +893,83 @@ final class ActivationManager {
         let k = ["MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB","FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL","32JhFf+8+a28DjIp7RMv962m1qXJLtcdFbiBjWGDWF+itDJGUgR5OQbxV8xDd/kj","c1ZT5ft7r2KwECUvwjKr9SAOWGJPK9oNmo9u2kW/6PbjpSEIhDH88FYloNWxpmdW","XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap","bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI","3wIDAQAB"].joined()
         guard let d = Data(base64Encoded: k) else { return nil }
         return SecKeyCreateWithData(d as CFData, [kSecAttrKeyClass as String: kSecAttrKeyClassPublic, kSecAttrKeyType as String: kSecAttrKeyTypeRSA, kSecAttrKeySizeInBits as String: 2048] as CFDictionary, nil)
+    }
+}
+
+enum AiRebindError: LocalizedError {
+    case invalidEndpoint
+    case responseTooLarge
+    case malformedResponse
+    case server(Int, String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidEndpoint:
+            return "设备码恢复地址无效"
+        case .responseTooLarge:
+            return "设备码恢复响应过大"
+        case .malformedResponse:
+            return "设备码恢复响应无效"
+        case .server(let status, let message):
+            if let message, !message.isEmpty { return message }
+            return "设备码恢复服务返回错误（\(status)）"
+        }
+    }
+}
+
+enum AiRebindService {
+    private static let endpoint = URL(string: "https://zenche.top/api/v1/ai/rebind")
+    private static let maximumResponseBytes = 64 * 1024
+
+    struct Result {
+        let newCode: String
+        let remaining: Int
+    }
+
+    static func rebind(
+        oldCode: String,
+        oldDeviceId: String,
+        newDeviceId: String
+    ) async throws -> Result {
+        guard let endpoint else { throw AiRebindError.invalidEndpoint }
+        let payload: [String: String] = [
+            "activationCode": oldCode,
+            "oldDeviceId": oldDeviceId,
+            "newDeviceId": newDeviceId
+        ]
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        var data = Data()
+        data.reserveCapacity(4096)
+        for try await byte in bytes {
+            guard data.count < maximumResponseBytes else {
+                throw AiRebindError.responseTooLarge
+            }
+            data.append(byte)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw AiRebindError.malformedResponse
+        }
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard (200..<300).contains(http.statusCode) else {
+            throw AiRebindError.server(http.statusCode, object?["error"] as? String)
+        }
+        guard let newCode = object?["newCode"] as? String,
+              !newCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let remaining = object?["remaining"] as? Int,
+              (0...100).contains(remaining)
+        else {
+            throw AiRebindError.malformedResponse
+        }
+        return Result(
+            newCode: newCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            remaining: remaining
+        )
     }
 }
 
@@ -7711,6 +7833,9 @@ private struct AppSettingsSheet: View {
     @State private var showingDonation = false
     @State private var activationCode = ""
     @State private var activationStatus = ""
+    @State private var oldDeviceId = ""
+    @State private var oldActivationCode = ""
+    @State private var isRebindingActivation = false
 
     var body: some View {
         NavigationStack {
@@ -7934,6 +8059,29 @@ private struct AppSettingsSheet: View {
                                 if activationStatus.hasPrefix("激活成功") { activationCode = "" }
                             }.buttonStyle(.borderedProminent)
                         }
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("恢复设备码")
+                                .font(.system(size: 13, weight: .semibold))
+                            TextField("旧设备 ID", text: $oldDeviceId)
+                                .textFieldStyle(.roundedBorder)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            SecureField("旧激活码", text: $oldActivationCode)
+                                .textFieldStyle(.roundedBorder)
+                            Text("恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。")
+                                .font(.caption2)
+                                .foregroundStyle(IPalette.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Button {
+                                Task { await restoreDeviceBinding() }
+                            } label: {
+                                Text(isRebindingActivation ? "正在迁移…" : "恢复到当前设备")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(isRebindingActivation)
+                        }
                     }
 
                     SettingsCard {
@@ -7985,6 +8133,60 @@ private struct AppSettingsSheet: View {
         .sheet(isPresented: $showingDonation) {
             DonationSheet()
                 .presentationCornerRadius(28)
+        }
+    }
+
+    @MainActor
+    private func restoreDeviceBinding() async {
+        let oldId = oldDeviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let oldCode = oldActivationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !oldId.isEmpty, !oldCode.isEmpty else {
+            activationStatus = RuntimeLocalization.text(
+                "请输入旧设备 ID 和旧激活码",
+                locale: locale
+            )
+            return
+        }
+        guard ActivationManager.verify(code: oldCode, deviceId: oldId) else {
+            activationStatus = RuntimeLocalization.text(
+                "旧设备 ID 与旧激活码不匹配或已过期",
+                locale: locale
+            )
+            return
+        }
+
+        isRebindingActivation = true
+        activationStatus = RuntimeLocalization.text("正在迁移…", locale: locale)
+        defer { isRebindingActivation = false }
+        do {
+            let result = try await AiRebindService.rebind(
+                oldCode: oldCode,
+                oldDeviceId: oldId,
+                newDeviceId: ActivationManager.deviceId
+            )
+            guard ActivationManager.verify(
+                code: result.newCode,
+                deviceId: ActivationManager.deviceId
+            ) else {
+                activationStatus = RuntimeLocalization.text(
+                    "服务器返回的新激活码验证失败，未修改本机数据",
+                    locale: locale
+                )
+                return
+            }
+            ActivationManager.storeVerifiedActivation(
+                code: result.newCode,
+                remaining: result.remaining
+            )
+            oldDeviceId = ""
+            oldActivationCode = ""
+            activationStatus = RuntimeLocalization.text(
+                "设备码恢复成功，AI 权益已迁移到当前设备",
+                locale: locale
+            )
+        } catch {
+            let prefix = RuntimeLocalization.text("设备码恢复失败：", locale: locale)
+            activationStatus = prefix + error.localizedDescription
         }
     }
 

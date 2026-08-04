@@ -226,6 +226,41 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     'Each activation key is bound to this device. Copy the device ID above and redeem it on the official website.',
     '各アクティベーションキーはこのデバイスに紐づきます。上のデバイス ID をコピーして公式サイトで交換してください。'
   ),
+  new TranslationEntry('恢复设备码', 'Restore Device Binding', 'デバイス紐付けを復元'),
+  new TranslationEntry('旧设备 ID', 'Previous Device ID', '以前のデバイス ID'),
+  new TranslationEntry('旧激活码', 'Previous Activation Key', '以前のアクティベーションキー'),
+  new TranslationEntry(
+    '恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。',
+    'A successful restore moves the AI entitlement and remaining uses to this device. The previous device binding will be permanently disabled.',
+    '復元に成功すると、AI 利用権と残り回数がこのデバイスへ移行し、以前のデバイス紐付けは永久に無効になります。'
+  ),
+  new TranslationEntry('恢复到当前设备', 'Restore to This Device', 'このデバイスへ復元'),
+  new TranslationEntry('正在迁移…', 'Migrating…', '移行中…'),
+  new TranslationEntry(
+    '请输入旧设备 ID 和旧激活码',
+    'Enter the previous device ID and activation key.',
+    '以前のデバイス ID とアクティベーションキーを入力してください。'
+  ),
+  new TranslationEntry(
+    '旧设备 ID 与旧激活码不匹配或已过期',
+    'The previous device ID and activation key do not match or have expired.',
+    '以前のデバイス ID とアクティベーションキーが一致しないか、有効期限が切れています。'
+  ),
+  new TranslationEntry(
+    '服务器返回的新激活码验证失败，未修改本机数据',
+    'The new activation key returned by the server failed verification. Local data was not changed.',
+    'サーバーから返された新しいキーを検証できませんでした。ローカルデータは変更していません。'
+  ),
+  new TranslationEntry(
+    '设备码恢复成功，AI 权益已迁移到当前设备',
+    'Device binding restored. The AI entitlement is now on this device.',
+    'デバイス紐付けを復元し、AI 利用権をこのデバイスへ移行しました。'
+  ),
+  new TranslationEntry('设备码恢复失败：', 'Device binding restore failed: ', 'デバイス紐付けの復元に失敗しました：'),
+  new TranslationEntry('设备码恢复地址无效', 'The device binding restore endpoint is invalid.', 'デバイス紐付け復元先が無効です。'),
+  new TranslationEntry('设备码恢复响应过大', 'The device binding restore response is too large.', 'デバイス紐付け復元の応答が大きすぎます。'),
+  new TranslationEntry('设备码恢复响应无效', 'The device binding restore response is invalid.', 'デバイス紐付け復元の応答が無効です。'),
+  new TranslationEntry('网络连接失败', 'Network connection failed.', 'ネットワーク接続に失敗しました。'),
   new TranslationEntry(
     '拍前会话与交付',
     'Session & Delivery',

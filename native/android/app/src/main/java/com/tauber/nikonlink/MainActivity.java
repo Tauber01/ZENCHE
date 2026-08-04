@@ -1224,6 +1224,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService editorExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService activationExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
     private final AtomicBoolean previewWorkerRunning = new AtomicBoolean();
@@ -1469,11 +1470,21 @@ public final class MainActivity extends Activity {
             "XoQ2YYAfd5sKc0CNcBFdu2oEFGFHeUufbhgkZWtDPCS299W4TuWyTDfWPx4+Raap" +
             "bcVF9RfFPa1uI7MpyrOqrGgSnuSC7HxY/B+NXm5rt4p3ZRaOzyKBiZEQ8Sg0XpKI" +
             "3wIDAQAB";
+    private static final String AI_REBIND_URL =
+            "https://zenche.top/api/v1/ai/rebind";
+    private static final int AI_REBIND_RESPONSE_LIMIT = 64 * 1024;
 
     private boolean verifyActivationCode(String code) {
+        String trimmed = code == null ? "" : code.trim();
+        if (!verifyActivationCodeForDevice(trimmed, aiDeviceId())) return false;
+        return saveVerifiedActivation(trimmed, AI_MAX_USAGE);
+    }
+
+    private boolean verifyActivationCodeForDevice(String code, String deviceId) {
         if (code == null) return false;
         String trimmed = code.trim();
-        if (trimmed.isEmpty()) return false;
+        String targetDeviceId = deviceId == null ? "" : deviceId.trim();
+        if (trimmed.isEmpty() || targetDeviceId.isEmpty()) return false;
         try {
             String[] parts = trimmed.split("-");
             if (parts.length < 4 || !"ZENCHE".equals(parts[0])
@@ -1496,8 +1507,7 @@ public final class MainActivity extends Activity {
             }
             byte[] sigBytes = android.util.Base64.decode(
                     sigBuilder.toString(), android.util.Base64.DEFAULT);
-            String deviceId = aiDeviceId();
-            String payload = deviceId + ":" + expiryPart + ":a1b2c3d4e5f6";
+            String payload = targetDeviceId + ":" + expiryPart + ":a1b2c3d4e5f6";
             byte[] payloadBytes = payload.getBytes("UTF-8");
 
             java.security.spec.X509EncodedKeySpec keySpec =
@@ -1511,23 +1521,27 @@ public final class MainActivity extends Activity {
                     java.security.Signature.getInstance("SHA256withRSA");
             signature.initVerify(publicKey);
             signature.update(payloadBytes);
-            boolean valid = signature.verify(sigBytes);
-            if (valid) {
-                getSharedPreferences("nikon-link", MODE_PRIVATE)
-                        .edit()
-                        .putBoolean("ai_activated", true)
-                        .putString("ai_activated_code", trimmed)
-                        .putInt("ai_usage_count", 0)
-                        .putString("ai_device_id", deviceId)
-                        .apply();
-                aiActivated = true;
-                aiUsageCount = 0;
-                aiUsageLoaded = true;
-            }
-            return valid;
+            return signature.verify(sigBytes);
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    private boolean saveVerifiedActivation(String code, int remaining) {
+        int bounded = Math.max(0, Math.min(AI_MAX_USAGE, remaining));
+        boolean saved = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit()
+                .putString("ai_activated_code", code.trim())
+                .putString("ai_device_id", aiDeviceId())
+                .putInt("ai_usage_count", AI_MAX_USAGE - bounded)
+                .putBoolean("ai_activated", bounded > 0)
+                .commit();
+        if (saved) {
+            aiActivated = bounded > 0;
+            aiUsageCount = AI_MAX_USAGE - bounded;
+            aiUsageLoaded = true;
+        }
+        return saved;
     }
     private static final String[][] AI_RATIOS = {
             {"1:1", "1024x1024"},
@@ -1592,6 +1606,16 @@ public final class MainActivity extends Activity {
 
         AiImageResponse(byte[] image, Integer remaining) {
             this.image = image;
+            this.remaining = remaining;
+        }
+    }
+
+    private static final class AiRebindResponse {
+        final String newCode;
+        final int remaining;
+
+        AiRebindResponse(String newCode, int remaining) {
+            this.newCode = newCode;
             this.remaining = remaining;
         }
     }
@@ -7183,6 +7207,64 @@ public final class MainActivity extends Activity {
         throw new Exception("AI 未返回有效图片");
     }
 
+    private AiRebindResponse callAiRebind(
+            String oldCode,
+            String oldDeviceId,
+            String newDeviceId) throws Exception {
+        java.net.URL endpoint = new java.net.URL(AI_REBIND_URL);
+        if (!"https".equalsIgnoreCase(endpoint.getProtocol())) {
+            throw new Exception("设备码恢复地址无效");
+        }
+        java.net.HttpURLConnection connection =
+                (java.net.HttpURLConnection) endpoint.openConnection();
+        try {
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setConnectTimeout(15_000);
+            connection.setReadTimeout(30_000);
+            connection.setDoOutput(true);
+
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("activationCode", oldCode);
+            body.put("oldDeviceId", oldDeviceId);
+            body.put("newDeviceId", newDeviceId);
+            try (java.io.OutputStream output = connection.getOutputStream()) {
+                output.write(body.toString().getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8));
+            }
+
+            int status = connection.getResponseCode();
+            java.io.InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            byte[] bytes = stream == null
+                    ? new byte[0]
+                    : readLimitedBytes(stream, AI_REBIND_RESPONSE_LIMIT);
+            if (stream != null) stream.close();
+            org.json.JSONObject response = bytes.length == 0
+                    ? new org.json.JSONObject()
+                    : new org.json.JSONObject(new String(
+                            bytes,
+                            java.nio.charset.StandardCharsets.UTF_8));
+            if (status < 200 || status >= 300) {
+                String detail = response.optString("error", "").trim();
+                if (!detail.isEmpty()) throw new Exception(detail);
+                throw new Exception("设备码恢复服务返回错误 " + status);
+            }
+            String newCode = response.optString("newCode", "").trim();
+            if (newCode.isEmpty() || !response.has("remaining")) {
+                throw new Exception("设备码恢复响应无效");
+            }
+            int remaining = response.getInt("remaining");
+            if (remaining < 0 || remaining > AI_MAX_USAGE) {
+                throw new Exception("设备码恢复响应无效");
+            }
+            return new AiRebindResponse(newCode, remaining);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
     private static Integer parseAiRemaining(String value) {
         if (value == null) return null;
         try {
@@ -7245,6 +7327,23 @@ public final class MainActivity extends Activity {
         byte[] chunk = new byte[8192];
         int read;
         while ((read = input.read(chunk)) != -1) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
+    private static byte[] readLimitedBytes(
+            java.io.InputStream input,
+            int maximumBytes) throws Exception {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int total = 0;
+        int read;
+        while ((read = input.read(chunk)) != -1) {
+            total += read;
+            if (total > maximumBytes) {
+                throw new Exception("设备码恢复响应过大");
+            }
             buffer.write(chunk, 0, read);
         }
         return buffer.toByteArray();
@@ -9771,6 +9870,93 @@ public final class MainActivity extends Activity {
             }
         });
         aiPanel.addView(activateAiBtn,
+                marginParams(-1, dp(44), 0, 0, 0, 10));
+        aiPanel.addView(text("恢复设备码", 13, Typeface.BOLD, INK),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        EditText oldDeviceIdInput = new EditText(this);
+        oldDeviceIdInput.setHint(tr("旧设备 ID"));
+        oldDeviceIdInput.setSingleLine(true);
+        oldDeviceIdInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        oldDeviceIdInput.setBackground(rounded(PAPER_2, 8, RULE));
+        oldDeviceIdInput.setPadding(dp(12), 0, dp(12), 0);
+        aiPanel.addView(oldDeviceIdInput,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        EditText oldActivationCodeInput = new EditText(this);
+        oldActivationCodeInput.setHint(tr("旧激活码"));
+        oldActivationCodeInput.setSingleLine(true);
+        oldActivationCodeInput.setInputType(
+                InputType.TYPE_CLASS_TEXT
+                        | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        oldActivationCodeInput.setBackground(rounded(PAPER_2, 8, RULE));
+        oldActivationCodeInput.setPadding(dp(12), 0, dp(12), 0);
+        aiPanel.addView(oldActivationCodeInput,
+                marginParams(-1, dp(44), 0, 0, 0, 6));
+        aiPanel.addView(text(
+                "恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。",
+                10,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 0, 0, 8));
+        Button rebindAiBtn = nativeButton("恢复到当前设备", false);
+        rebindAiBtn.setOnClickListener(view -> {
+            String oldDeviceId = oldDeviceIdInput.getText().toString().trim();
+            String oldCode = oldActivationCodeInput.getText().toString().trim();
+            if (oldDeviceId.isEmpty() || oldCode.isEmpty()) {
+                aiActivationStatus.setText(tr("请输入旧设备 ID 和旧激活码"));
+                return;
+            }
+            if (!verifyActivationCodeForDevice(oldCode, oldDeviceId)) {
+                aiActivationStatus.setText(
+                        tr("旧设备 ID 与旧激活码不匹配或已过期"));
+                return;
+            }
+            rebindAiBtn.setEnabled(false);
+            rebindAiBtn.setText(tr("正在迁移…"));
+            aiActivationStatus.setText(tr("正在迁移…"));
+            activationExecutor.execute(() -> {
+                String message;
+                boolean succeeded = false;
+                try {
+                    String currentDeviceId = aiDeviceId();
+                    AiRebindResponse response = callAiRebind(
+                            oldCode,
+                            oldDeviceId,
+                            currentDeviceId);
+                    if (!verifyActivationCodeForDevice(
+                            response.newCode,
+                            currentDeviceId)) {
+                        throw new Exception(
+                                "服务器返回的新激活码验证失败，未修改本机数据");
+                    }
+                    if (!saveVerifiedActivation(
+                            response.newCode,
+                            response.remaining)) {
+                        throw new Exception("无法保存迁移后的激活码");
+                    }
+                    message = "设备码恢复成功，AI 权益已迁移到当前设备";
+                    succeeded = true;
+                } catch (Exception error) {
+                    String detail = error.getMessage();
+                    message = "设备码恢复失败："
+                            + (detail == null || detail.trim().isEmpty()
+                                    ? "网络连接失败"
+                                    : detail);
+                }
+                boolean finishedSuccessfully = succeeded;
+                String finalMessage = message;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    rebindAiBtn.setEnabled(true);
+                    rebindAiBtn.setText(tr("恢复到当前设备"));
+                    aiActivationStatus.setText(tr(finalMessage));
+                    if (finishedSuccessfully) {
+                        oldDeviceIdInput.setText("");
+                        oldActivationCodeInput.setText("");
+                    }
+                });
+            });
+        });
+        aiPanel.addView(rebindAiBtn,
                 marginParams(-1, dp(44), 0, 0, 0, 0));
         content.addView(
                 aiPanel,
@@ -12437,6 +12623,7 @@ public final class MainActivity extends Activity {
         updateExecutor.shutdownNow();
         editorExecutor.shutdownNow();
         storageExecutor.shutdownNow();
+        activationExecutor.shutdownNow();
         super.onDestroy();
     }
 }

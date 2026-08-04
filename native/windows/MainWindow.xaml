@@ -1597,6 +1597,38 @@
                              FontSize="11"
                              Foreground="{StaticResource MutedBrush}"
                              TextWrapping="Wrap" />
+                  <Separator Margin="0,14,0,12" />
+                  <TextBlock Margin="0,0,0,8"
+                             FontWeight="SemiBold"
+                             Text="恢复设备码" />
+                  <TextBlock Margin="0,0,0,4"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             Text="旧设备 ID" />
+                  <TextBox x:Name="AiRebindOldDeviceIdBox"
+                           Height="38"
+                           Margin="0,0,0,8"
+                           Padding="10,7"
+                           ToolTip="旧设备 ID" />
+                  <TextBlock Margin="0,0,0,4"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             Text="旧激活码" />
+                  <PasswordBox x:Name="AiRebindOldCodeBox"
+                               Height="38"
+                               Margin="0,0,0,8"
+                               Padding="10,7"
+                               ToolTip="旧激活码" />
+                  <TextBlock Margin="0,0,0,8"
+                             FontSize="11"
+                             Foreground="{StaticResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。" />
+                  <Button x:Name="AiRebindButton"
+                          Height="38"
+                          Style="{StaticResource ButtonBase}"
+                          Content="恢复到当前设备"
+                          Click="AiRebind_Click" />
                 </StackPanel>
               </Border>
               <Border Margin="0,20,0,0" Style="{StaticResource PanelCard}">

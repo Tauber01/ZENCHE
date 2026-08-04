@@ -8060,6 +8060,7 @@ final class ActivationManager {
     private static let deviceIdKeychainAccount = "ai_device_id"
     private static let usageCountKey = "ai_usage_count"
     private static let serverRemainingKey = "ai_server_remaining"
+    private static let activationStateKey = "ai_verified_activation_state"
     private static let maxUsage = 100
     private static let stableDeviceId: String = {
         if let existing = UserDefaults.standard.string(forKey: deviceIdKey),
@@ -8089,11 +8090,21 @@ final class ActivationManager {
     }()
 
     static var isActivated: Bool {
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let remaining = state["remaining"] as? Int,
+           let code = state["code"] as? String,
+           let boundDeviceId = state["deviceId"] as? String {
+            return !code.isEmpty && boundDeviceId == deviceId && remaining > 0
+        }
         guard UserDefaults.standard.bool(forKey: activatedKey) else { return false }
         return remainingUsage > 0
     }
 
     static var remainingUsage: Int {
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let remaining = state["remaining"] as? Int {
+            return max(0, min(maxUsage, remaining))
+        }
         if let server = UserDefaults.standard.object(forKey: serverRemainingKey) as? Int {
             return max(0, min(maxUsage, server))
         }
@@ -8101,8 +8112,15 @@ final class ActivationManager {
     }
 
     static func updateServerRemaining(_ remaining: Int) {
-        UserDefaults.standard.set(max(0, min(maxUsage, remaining)), forKey: serverRemainingKey)
-        if remaining <= 0 { UserDefaults.standard.set(false, forKey: activatedKey) }
+        let bounded = max(0, min(maxUsage, remaining))
+        let defaults = UserDefaults.standard
+        if var state = defaults.dictionary(forKey: activationStateKey) {
+            state["remaining"] = bounded
+            state["activated"] = bounded > 0
+            defaults.set(state, forKey: activationStateKey)
+        }
+        defaults.set(bounded, forKey: serverRemainingKey)
+        if bounded <= 0 { defaults.set(false, forKey: activatedKey) }
     }
 
     static func recordUsageFallback() {
@@ -8118,9 +8136,10 @@ final class ActivationManager {
         stableDeviceId
     }
 
-    static func verifyAndActivate(code: String) -> Bool {
+    static func verify(code: String, deviceId: String) -> Bool {
         let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return false }
+        let did = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, !did.isEmpty else { return false }
         let parts = t.components(separatedBy: "-")
         guard parts.count >= 4, parts[0] == "ZENCHE", parts[1] == "AI" else { return false }
         let exp = parts.last ?? "19700101"
@@ -8133,26 +8152,53 @@ final class ActivationManager {
               df.string(from: ed) == exp,
               Calendar.current.startOfDay(for: ed) >= Calendar.current.startOfDay(for: Date())
         else { return false }
-        let did = deviceId
         let sigPart = parts[2..<(parts.count - 1)].joined(separator: "-")
         guard let sig = Data(base64Encoded: sigPart),
               let pk = publicKey else { return false }
         let payload = "\(did):\(exp):a1b2c3d4e5f6"
         guard let pdata = payload.data(using: .utf8) else { return false }
         var err: Unmanaged<CFError>?
-        let ok = SecKeyVerifySignature(pk, .rsaSignatureMessagePKCS1v15SHA256, pdata as CFData, sig as CFData, &err)
-        if ok {
-            UserDefaults.standard.set(true, forKey: activatedKey)
-            UserDefaults.standard.set(0, forKey: usageCountKey)
-            UserDefaults.standard.removeObject(forKey: serverRemainingKey)
-            UserDefaults.standard.set(did, forKey: deviceIdKey)
-            UserDefaults.standard.set(t, forKey: "ai_activation_code")
-        }
-        return ok
+        return SecKeyVerifySignature(
+            pk,
+            .rsaSignatureMessagePKCS1v15SHA256,
+            pdata as CFData,
+            sig as CFData,
+            &err
+        )
+    }
+
+    static func verifyAndActivate(code: String) -> Bool {
+        let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard verify(code: t, deviceId: deviceId) else { return false }
+        storeVerifiedActivation(code: t, remaining: maxUsage)
+        return true
+    }
+
+    static func storeVerifiedActivation(code: String, remaining: Int) {
+        let bounded = max(0, min(maxUsage, remaining))
+        let defaults = UserDefaults.standard
+        // Replace the authoritative state with one property-list write, then
+        // mirror legacy keys for compatibility with earlier releases.
+        defaults.set([
+            "code": code.trimmingCharacters(in: .whitespacesAndNewlines),
+            "deviceId": deviceId,
+            "remaining": bounded,
+            "activated": bounded > 0
+        ], forKey: activationStateKey)
+        defaults.set(code.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "ai_activation_code")
+        defaults.set(deviceId, forKey: deviceIdKey)
+        defaults.set(maxUsage - bounded, forKey: usageCountKey)
+        defaults.set(bounded, forKey: serverRemainingKey)
+        defaults.set(bounded > 0, forKey: activatedKey)
     }
 
     static var savedCode: String? {
-        UserDefaults.standard.string(forKey: "ai_activation_code")
+        if let state = UserDefaults.standard.dictionary(forKey: activationStateKey),
+           let code = state["code"] as? String,
+           !code.isEmpty {
+            return code
+        }
+        return UserDefaults.standard.string(forKey: "ai_activation_code")
     }
 
     private static func loadDeviceIdFromKeychain() -> String? {
@@ -8206,6 +8252,77 @@ final class ActivationManager {
             kSecAttrKeySizeInBits as String: 2048
         ]
         return SecKeyCreateWithData(d as CFData, a as CFDictionary, nil)
+    }
+}
+
+enum AiRebindError: LocalizedError {
+    case invalidEndpoint
+    case responseTooLarge
+    case malformedResponse
+    case server(Int, String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidEndpoint: return "设备码恢复地址无效"
+        case .responseTooLarge: return "设备码恢复响应过大"
+        case .malformedResponse: return "设备码恢复响应无效"
+        case .server(let status, let message):
+            if let message, !message.isEmpty { return message }
+            return "设备码恢复服务返回错误（\(status)）"
+        }
+    }
+}
+
+enum AiRebindService {
+    private static let endpoint = URL(string: "https://zenche.top/api/v1/ai/rebind")
+    private static let maximumResponseBytes = 64 * 1024
+
+    struct Result {
+        let newCode: String
+        let remaining: Int
+    }
+
+    static func rebind(
+        oldCode: String,
+        oldDeviceId: String,
+        newDeviceId: String
+    ) async throws -> Result {
+        guard let endpoint else { throw AiRebindError.invalidEndpoint }
+        let payload: [String: String] = [
+            "activationCode": oldCode,
+            "oldDeviceId": oldDeviceId,
+            "newDeviceId": newDeviceId
+        ]
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        var data = Data()
+        data.reserveCapacity(4096)
+        for try await byte in bytes {
+            guard data.count < maximumResponseBytes else {
+                throw AiRebindError.responseTooLarge
+            }
+            data.append(byte)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw AiRebindError.malformedResponse
+        }
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard (200..<300).contains(http.statusCode) else {
+            throw AiRebindError.server(http.statusCode, object?["error"] as? String)
+        }
+        guard let newCode = object?["newCode"] as? String,
+              !newCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let remaining = object?["remaining"] as? Int,
+              (0...100).contains(remaining)
+        else { throw AiRebindError.malformedResponse }
+        return Result(
+            newCode: newCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            remaining: remaining
+        )
     }
 }
 
