@@ -30,6 +30,8 @@ v1.5.2 Release 已公开 14 个附件：Android Debug 签名 APK、HarmonyOS 未
 
 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS / iPadOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
 
+本次文档同步将根目录 `README.md` 的简体中文、English、日本語三段统一到 v1.5.2：更新稳定版链接、交付包文件名与 SHA-256 示例，并补充全局状态条、设备码恢复、Android 传输降级和零依赖 AI 代理说明。三语内容保持实质等价；发布属性仍以 `docs/releases/v1.5.2.md` 为准。
+
 `NikonLink`、`com.tauber.nikonlink` 等名称是为升级、签名、偏好设置、应用数据和源码兼容保留的内部标识，不是需要继续替换的公开品牌文案。
 
 ## 2. 目标用户与核心场景
