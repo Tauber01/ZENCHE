@@ -790,6 +790,71 @@ private enum EditorAdjustmentSection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// fig2 工具条图标：16x16 视口线性单色描边几何，五端同一套坐标（与
+/// Windows XAML Geometry 逐点一致），仅描边；颜色由调用方注入，随按钮
+/// 选中态联动（未选中 EDITOR_LABEL 灰 / 选中 EDITOR_ACCENT 橙）。
+private enum EditorToolIcon {
+    case colorWheel, curve, mask, geometry, ai
+}
+
+private struct EditorToolIconShape: Shape {
+    let icon: EditorToolIcon
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        switch icon {
+        case .colorWheel:
+            path.addEllipse(in: CGRect(x: 1.5, y: 1.5, width: 13, height: 13))
+            path.move(to: CGPoint(x: 8, y: 8))
+            path.addLine(to: CGPoint(x: 14, y: 8))
+            path.move(to: CGPoint(x: 8, y: 8))
+            path.addLine(to: CGPoint(x: 5, y: 2.8))
+            path.move(to: CGPoint(x: 8, y: 8))
+            path.addLine(to: CGPoint(x: 5, y: 13.2))
+            path.addEllipse(in: CGRect(x: 7.3, y: 7.3, width: 1.4, height: 1.4))
+        case .curve:
+            path.move(to: CGPoint(x: 2, y: 13))
+            path.addCurve(
+                to: CGPoint(x: 9, y: 5),
+                control1: CGPoint(x: 4.5, y: 11.5),
+                control2: CGPoint(x: 5.5, y: 5.5)
+            )
+            path.addCurve(
+                to: CGPoint(x: 14, y: 3.5),
+                control1: CGPoint(x: 11.5, y: 4.6),
+                control2: CGPoint(x: 12.5, y: 6.5)
+            )
+            path.addRect(CGRect(x: 8.2, y: 4.6, width: 1.6, height: 1.6))
+            path.addRect(CGRect(x: 12.6, y: 6.6, width: 1.6, height: 1.6))
+        case .mask:
+            path.addRoundedRect(
+                in: CGRect(x: 2, y: 2, width: 12, height: 12),
+                cornerSize: CGSize(width: 1, height: 1)
+            )
+            path.addEllipse(in: CGRect(x: 5.5, y: 5.5, width: 5, height: 5))
+        case .geometry:
+            path.move(to: CGPoint(x: 3, y: 9.5))
+            path.addLine(to: CGPoint(x: 7, y: 4))
+            path.addLine(to: CGPoint(x: 11, y: 9.5))
+            path.closeSubpath()
+            path.addEllipse(in: CGRect(x: 10.5, y: 3.7, width: 3, height: 3))
+            path.addRect(CGRect(x: 3, y: 11.5, width: 10, height: 2.5))
+        case .ai:
+            path.move(to: CGPoint(x: 8, y: 2))
+            path.addLine(to: CGPoint(x: 9.3, y: 6.7))
+            path.addLine(to: CGPoint(x: 14, y: 8))
+            path.addLine(to: CGPoint(x: 9.3, y: 9.3))
+            path.addLine(to: CGPoint(x: 8, y: 14))
+            path.addLine(to: CGPoint(x: 6.7, y: 9.3))
+            path.addLine(to: CGPoint(x: 2, y: 8))
+            path.addLine(to: CGPoint(x: 6.7, y: 6.7))
+            path.closeSubpath()
+        }
+        let scale = min(rect.width, rect.height) / 16
+        return path.applying(CGAffineTransform(scaleX: scale, y: scale))
+    }
+}
+
 private enum AiImageMode: String, CaseIterable, Identifiable {
     case edit = "AI 修图"; case generate = "AI 生图"
     var id: String { rawValue }
@@ -1963,36 +2028,52 @@ private struct ImageEditorPage: View {
 
     private var editorToolStrip: some View {
         HStack(spacing: 8) {
-            editorToolButton(.wheels)
-            editorToolButton(.curves)
-            editorToolButton(.mask)
-            editorToolButton(.geometry)
-            editorToolButton(.aiTools)
+            editorToolButton(.wheels, icon: .colorWheel)
+            editorToolButton(.curves, icon: .curve)
+            editorToolButton(.mask, icon: .mask)
+            editorToolButton(.geometry, icon: .geometry)
+            editorToolButton(.aiTools, icon: .ai)
         }
         .padding(.horizontal, 8)
     }
 
     /// fig2 tool rail: five monochrome tools, brand orange marks the active
     /// one. Taps only route through the existing `selectedSection` state.
+    /// Icon sits above the label and shares its tint: inactive EDITOR_LABEL
+    /// gray, active EDITOR_ACCENT orange.
     private func editorToolButton(
-        _ section: EditorAdjustmentSection
+        _ section: EditorAdjustmentSection,
+        icon: EditorToolIcon
     ) -> some View {
         let active = selectedSection == section
+        let tint = active ? IPalette.editorAccent : IPalette.editorLabel
         return Button {
             selectedSection = section
         } label: {
-            Text(LocalizedStringKey(section.rawValue))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(active ? IPalette.editorAccent : IPalette.editorLabel)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(active ? IPalette.editorRaised : Color.clear)
-                .overlay {
-                    Rectangle()
-                        .stroke(
-                            active ? IPalette.editorAccent : Color.clear,
-                            lineWidth: 1
+            VStack(spacing: 3) {
+                EditorToolIconShape(icon: icon)
+                    .stroke(
+                        tint,
+                        style: StrokeStyle(
+                            lineWidth: 1.4,
+                            lineCap: .round,
+                            lineJoin: .round
                         )
-                }
+                    )
+                    .frame(width: 16, height: 16)
+                Text(LocalizedStringKey(section.rawValue))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(active ? IPalette.editorRaised : Color.clear)
+            .overlay {
+                Rectangle()
+                    .stroke(
+                        active ? IPalette.editorAccent : Color.clear,
+                        lineWidth: 1
+                    )
+            }
         }
         .buttonStyle(.plain)
     }
