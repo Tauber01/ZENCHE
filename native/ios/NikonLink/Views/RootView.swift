@@ -506,42 +506,13 @@ private struct BottomNavigation: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            ForEach(AppSection.allCases) { section in
-                let accent = controlSurface
-                    ? IPalette.uiBlue
-                    : section == .monitor
-                        ? (model.section == .monitor ? IPalette.cobalt : IPalette.video)
-                        : IPalette.cobalt
-                Button {
-                    model.section = section
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 18, weight: model.section == section ? .semibold : .medium))
-                        RuntimeLocalizedText(section.rawValue)
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(model.section == section ? accent : IPalette.muted)
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: 50)
-                    .background(
-                        model.section == section
-                            ? accent.opacity(0.09)
-                            : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-                    .overlay(alignment: .top) {
-                        Capsule()
-                            .fill(model.section == section ? accent : .clear)
-                            .frame(width: 22, height: 3)
-                            .offset(y: -3)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(
-                    model.section == section ? .isSelected : []
-                )
-            }
+            // v1.5.5 fig1: compact primary nav aligns with Android/Harmony —
+            // 单机/群组/已下载/设置. 视频 and 编辑 stay reachable through the
+            // control top-bar menu, and 编辑 additionally through the library.
+            navTab(.capture, title: "单机")
+            navTab(.devices, title: "群组")
+            navTab(.library, title: "已下载")
+            settingsTab()
         }
         .padding(.horizontal, 8)
         .padding(.top, 7)
@@ -553,6 +524,56 @@ private struct BottomNavigation: View {
             Rectangle()
                 .fill(controlSurface ? IPalette.uiSecondary : IPalette.rule)
                 .frame(height: 0.5)
+        }
+    }
+
+    private var accent: Color {
+        controlSurface ? IPalette.uiBlue : IPalette.cobalt
+    }
+
+    private func navTab(_ section: AppSection, title: String) -> some View {
+        let active = model.section == section
+        return Button {
+            model.section = section
+        } label: {
+            tabLabel(icon: section.icon, title: title, active: active)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+    }
+
+    private func settingsTab() -> some View {
+        Button {
+            model.showingSettings = true
+        } label: {
+            tabLabel(icon: "gearshape", title: "设置", active: false)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func tabLabel(
+        icon: String,
+        title: String,
+        active: Bool
+    ) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: active ? .semibold : .medium))
+            RuntimeLocalizedText(title)
+                .font(.caption2)
+        }
+        .foregroundStyle(active ? accent : IPalette.muted)
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 50)
+        .background(
+            active ? accent.opacity(0.09) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(active ? accent : .clear)
+                .frame(width: 22, height: 3)
+                .offset(y: -3)
         }
     }
 }
@@ -8563,6 +8584,7 @@ private struct CloudDriveGuideView: View {
 
 private struct LibraryLargePhotoView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var model: AppModel
     let item: LibraryItem
     @State private var player: AVPlayer?
 
@@ -8602,6 +8624,16 @@ private struct LibraryLargePhotoView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.black.opacity(0.65))
                     Spacer()
+                    if !item.isVideo {
+                        Button {
+                            player?.pause()
+                            dismiss()
+                            model.section = .editor
+                        } label: {
+                            Label("编辑", systemImage: AppSection.editor.icon)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                     ShareLink(item: item.url) {
                         Label("分享到社交平台", systemImage: "square.and.arrow.up")
                     }

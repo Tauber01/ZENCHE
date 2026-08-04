@@ -81,7 +81,11 @@ test('the iOS shell follows the in-app locale for navigation and monitor state',
   const ios = await read('native/ios/NikonLink/Views/RootView.swift');
 
   assert.match(ios, /private struct SideNavigation[\s\S]{0,2400}RuntimeLocalizedText\(section\.rawValue\)/);
-  assert.match(ios, /private struct BottomNavigation[\s\S]{0,1800}RuntimeLocalizedText\(section\.rawValue\)/);
+  // v1.5.5 fig1: compact primary nav aligns to 单机/群组/已下载/设置; editing
+  // stays reachable via the library and the control top-bar menu.
+  assert.match(ios, /private struct BottomNavigation[\s\S]*?RuntimeLocalizedText\(title\)/);
+  assert.match(ios, /navTab\(\.capture, title: "单机"\)/);
+  assert.match(ios, /navTab\(\.library, title: "已下载"\)/);
   assert.doesNotMatch(ios, /section == \.library\s*\?\s*"分支"/);
   assert.match(
     ios,
