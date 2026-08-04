@@ -48,6 +48,13 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - 拍摄与参数页以设备摘要、自适应参数卡和常驻拍摄操作区重新组织，连接、输出格式、曝光参数与文件库数量无需跨页面查找。
 - 编辑器采用媒体池、中央预览、工具检查器和分析示波器协作布局。所有调整继续写入高质量新副本，不覆盖原文件；ZENCHE 蓝、暖金与录制红分别承担主操作、参数读数与录制/危险状态。
 
+### v1.5.2 更新
+
+- 五端新增全局状态条，统一显示连接状态、当前操作和本地文件库计数。
+- 五端新增“恢复设备码”入口；换绑会先验证旧激活码与设备码，再验证服务端签发的新码，生产端点默认关闭。
+- Android USB/PTP 对已知异步传输失败提供同步 bulk 降级；仓库同时提供默认回环监听的零依赖 AI 代理。
+- 版本包、签名属性、验证结果和已知限制见 [v1.5.2 发布说明](docs/releases/v1.5.2.md)。
+
 <table>
   <tr>
     <td width="50%"><img src="docs/images/macos-monitor.png" alt="macOS 实时取景与参数控制"></td>
@@ -408,6 +415,13 @@ in a local library for review and export.
 - Capture and controls are reorganized around a device summary, adaptive parameter cards, and a persistent capture dock, keeping connection, output format, exposure settings, and library count visible without page hopping.
 - The editor coordinates a media pool, central preview, tool inspector, and analysis scopes. Adjustments still save to a high-quality new copy without overwriting the original; ZENCHE blue, warm gold, and recording red distinguish primary actions, parameter readouts, and recording or destructive states.
 
+### What's new in v1.5.2
+
+- A global status bar shows connection state, the current operation, and the local library count across all five native clients.
+- All five clients include device-code recovery. The old activation code and device ID are verified before migration, and the newly issued code is verified again; production rebind remains disabled by default.
+- Android USB/PTP can fall back to synchronous bulk transfer for known asynchronous failures. The repository also includes a dependency-free AI proxy that listens on loopback by default.
+- Package names, signing properties, validation results, and known limitations are documented in the [v1.5.2 release notes](docs/releases/v1.5.2.md).
+
 ### Complete workflow
 
 | Stage | Capabilities |
@@ -709,6 +723,13 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - フルスクリーンモニターを映像優先のプロ HUD へ刷新しました。上部には実際の接続・露出テレメトリ、画面にはフォーカスレティクルとツールレール、コーナーには実測 RGB スコープを配置。音声ソースがない場合は無音基準線を明示し、下部パラメータトレイは既存の制御経路を継続して使用します。
 - 撮影・設定画面をデバイス概要、可変パラメータカード、常設撮影ドックで再構成し、接続、出力形式、露出設定、ライブラリ件数を画面移動なしで確認できます。
 - エディタはメディアプール、中央プレビュー、ツールインスペクタ、解析スコープが連携する構成です。調整は高品質な新しいコピーへ保存され、元ファイルを上書きしません。ZENCHE ブルー、ウォームゴールド、収録レッドは主要操作、パラメータ値、収録・危険状態を区別します。
+
+### v1.5.2 の更新
+
+- 5 つのネイティブクライアントに、接続状態・現在の操作・ローカルライブラリ数を示すグローバルステータスバーを追加しました。
+- 5 クライアントにデバイスコード復元を追加しました。移行前に旧アクティベーションコードとデバイスコードを検証し、発行された新コードも再検証します。運用環境の再バインドはデフォルトで無効です。
+- Android USB/PTP は既知の非同期転送失敗時に同期 bulk 転送へフォールバックできます。リポジトリにはデフォルトでループバックのみを待ち受ける依存関係なしの AI プロキシも含まれます。
+- パッケージ名、署名属性、検証結果、既知の制限は [v1.5.2 リリースノート](docs/releases/v1.5.2.md)にまとめています。
 
 ### ワークフロー
 

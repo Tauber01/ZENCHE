@@ -406,3 +406,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 线上交付包 SHA-256：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
 - 签名与主机限制：Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 为 macOS 主机交叉构建且未使用受信任代码签名证书；真实 Windows 安装、驱动和 SmartScreen 仍未验收。GitHub stable 状态不改变这些附件属性。
 - macOS DMG 已通过 `codesign --verify --deep --strict` 与 `hdiutil verify`；Windows ZIP 已确认包含主程序、Nikon/Sony SDK 运行库和匹配的 `libusb-1.0.dll`，Setup 为 NSIS PE 安装器。仍需 Developer ID/公证、受信任 Windows 代码签名、真实 Windows 主机安装/驱动/SmartScreen，以及五端实机矩阵，才能闭环受信任签名与完整实机发布门禁。
+
+## 12.3 v1.5.2 README 发布信息同步（2026-08-04）
+
+- 根目录 `README.md` 已将简体中文、English、日本語三段的稳定版、源码版本、Release 链接、下载链接、交付包文件名和 SHA-256 校验示例从 v1.5.1 同步为已发布的 v1.5.2。
+- README 新增三语等价的 v1.5.2 更新摘要：五端全局状态条、设备码恢复与二次验签、Android 已知异步传输失败的同步 bulk 降级、默认回环监听的零依赖 AI 代理，以及发布说明链接。
+- 验证：`rg` 未发现 README 残留 v1.5.1 或“本地交付候选/未发布”表述；`git diff --check` 通过。未修改应用代码、版本号、Release 附件或生产服务。
+- 下一步：提交并推送本次 README 与三份长期文档同步；继续如实保留 v1.5.2 的签名、Windows 主机、实机矩阵和生产换绑限制。
