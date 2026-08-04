@@ -131,6 +131,16 @@ private enum IPalette {
     static let uiLabel = Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
     static let uiAccent = Color(red: 205 / 255, green: 220 / 255, blue: 57 / 255)
     static let uiBlue = Color(red: 10 / 255, green: 132 / 255, blue: 255 / 255)
+    // ZENCHE 1.5.5 fig2 editor tokens, shared verbatim with the other four
+    // platforms: a dark gray workbench, 1px hairline rules, and one brand
+    // orange reserved for the active tool/scope readouts. No gradients, no
+    // shadows, square corners.
+    static let editorBg = Color(red: 42 / 255, green: 42 / 255, blue: 46 / 255)
+    static let editorPanel = Color(red: 51 / 255, green: 51 / 255, blue: 56 / 255)
+    static let editorRaised = Color(red: 58 / 255, green: 58 / 255, blue: 64 / 255)
+    static let editorRule = Color(red: 27 / 255, green: 27 / 255, blue: 31 / 255)
+    static let editorAccent = Color(red: 232 / 255, green: 131 / 255, blue: 58 / 255)
+    static let editorLabel = Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
 }
 
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
@@ -1584,11 +1594,10 @@ private struct ResolveEditorWorkbench<
                 .frame(width: 334)
         }
         .padding(1)
-        .background(IPalette.studioRule)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(IPalette.editorRule)
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(IPalette.studioRule, lineWidth: 1)
+            Rectangle()
+                .stroke(IPalette.editorRule, lineWidth: 1)
         }
     }
 }
@@ -1605,13 +1614,13 @@ private struct EditorMediaRail<Content: View>: View {
             Label("媒体池", systemImage: "photo.stack")
                 .font(.caption.monospaced().weight(.bold))
                 .foregroundStyle(.white)
-            Rectangle().fill(IPalette.studioRule).frame(height: 1)
+            Rectangle().fill(IPalette.editorRule).frame(height: 1)
             content
             Spacer(minLength: 0)
         }
         .padding(12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(IPalette.studioPanel)
+        .background(IPalette.editorPanel)
         .foregroundStyle(.white)
     }
 }
@@ -1629,13 +1638,13 @@ private struct EditorToolRail<Content: View>: View {
                 Label("检查器", systemImage: "slider.horizontal.3")
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(.white)
-                Rectangle().fill(IPalette.studioRule).frame(height: 1)
+                Rectangle().fill(IPalette.editorRule).frame(height: 1)
                 content
             }
             .padding(12)
         }
         .frame(maxHeight: .infinity)
-        .background(IPalette.studioPanel)
+        .background(IPalette.editorPanel)
     }
 }
 
@@ -1655,7 +1664,7 @@ private struct EditorScopeDock: View {
                     ? (values.isEmpty ? "运行“分析画面”后显示实测范围" : "本地图像分析")
                     : "暂无图像源")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(values.isEmpty ? IPalette.muted : IPalette.studioGold)
+                    .foregroundStyle(values.isEmpty ? IPalette.editorLabel : IPalette.editorAccent)
             }
             .frame(width: 190, alignment: .leading)
 
@@ -1679,23 +1688,16 @@ private struct EditorScopeDock: View {
                     )
                     var bar = Path()
                     bar.addRect(rect)
-                    context.fill(
-                        bar,
-                        with: .linearGradient(
-                            Gradient(colors: [IPalette.cobalt, IPalette.studioGold]),
-                            startPoint: CGPoint(x: rect.midX, y: rect.maxY),
-                            endPoint: CGPoint(x: rect.midX, y: rect.minY)
-                        )
-                    )
+                    context.fill(bar, with: .color(IPalette.editorAccent))
                 }
             }
-            .background(IPalette.studioCanvas)
+            .background(IPalette.editorBg)
             .overlay {
-                Rectangle().stroke(IPalette.studioRule, lineWidth: 1)
+                Rectangle().stroke(IPalette.editorRule, lineWidth: 1)
             }
         }
         .padding(10)
-        .background(IPalette.studioPanel)
+        .background(IPalette.editorPanel)
     }
 }
 
@@ -1884,6 +1886,11 @@ private struct ImageEditorPage: View {
             nikonCloudPreviewNotice
         }
         preview
+        if selectedSection != .aiTools {
+            editorStatusLine
+            editorHairline
+            editorControlStrip
+        }
         sectionSelector
         if selectedSection == .aiTools {
             aiToolsPanel
@@ -1892,6 +1899,96 @@ private struct ImageEditorPage: View {
             adjustmentPanel
             editorFooter
         }
+    }
+
+    /// fig2 monitor status line: read-only mirror of the existing
+    /// `showingOriginal` state — no new state.
+    private var editorStatusLine: some View {
+        RuntimeLocalizedText(showingOriginal ? "正在查看原图" : "调整不会覆盖原文件")
+            .font(.caption.monospaced())
+            .foregroundStyle(IPalette.editorLabel)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var editorHairline: some View {
+        Rectangle().fill(IPalette.editorRule).frame(height: 1)
+    }
+
+    /// fig2 mobile degradation: the drawer control strip stacks the media
+    /// row, the five-tool rail, and the scope dock between 1px rules on the
+    /// shared editor background. No cards, no gradients, square corners.
+    private var editorControlStrip: some View {
+        VStack(spacing: 0) {
+            editorMediaRow
+                .frame(height: 52)
+            editorHairline
+            editorToolStrip
+                .frame(height: 52)
+            editorHairline
+            EditorScopeDock(
+                values: editorScopeValues,
+                hasSource: selectedItem != nil
+            )
+            .frame(height: 64)
+        }
+        .background(IPalette.editorBg)
+    }
+
+    private var editorMediaRow: some View {
+        HStack(spacing: 10) {
+            Text("媒体池 \(photos.count)")
+                .font(.caption.monospaced().weight(.semibold))
+                .foregroundStyle(.white)
+            if let selectedItem {
+                Text(selectedItem.filename)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(IPalette.editorLabel)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+            Text("调整始终写入新副本，原文件保持不变。")
+                .font(.caption2)
+                .foregroundStyle(IPalette.editorLabel)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var editorToolStrip: some View {
+        HStack(spacing: 8) {
+            editorToolButton(.wheels)
+            editorToolButton(.curves)
+            editorToolButton(.mask)
+            editorToolButton(.geometry)
+            editorToolButton(.aiTools)
+        }
+        .padding(.horizontal, 8)
+    }
+
+    /// fig2 tool rail: five monochrome tools, brand orange marks the active
+    /// one. Taps only route through the existing `selectedSection` state.
+    private func editorToolButton(
+        _ section: EditorAdjustmentSection
+    ) -> some View {
+        let active = selectedSection == section
+        return Button {
+            selectedSection = section
+        } label: {
+            Text(LocalizedStringKey(section.rawValue))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(active ? IPalette.editorAccent : IPalette.editorLabel)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(active ? IPalette.editorRaised : Color.clear)
+                .overlay {
+                    Rectangle()
+                        .stroke(
+                            active ? IPalette.editorAccent : Color.clear,
+                            lineWidth: 1
+                        )
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var resolveWorkbench: some View {
@@ -1927,7 +2024,7 @@ private struct ImageEditorPage: View {
                 sectionSelector
             }
             .padding(10)
-            .background(IPalette.studioCanvas)
+            .background(IPalette.editorBg)
         } toolRail: {
             EditorToolRail {
                 if selectedSection == .aiTools {
