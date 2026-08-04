@@ -367,4 +367,78 @@
     <Setter Property="BorderBrush" Value="{StaticResource EditorRuleBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
+
+  <!-- fig2 editor parameter sliders: thin dark track, brand-orange fill, flat thumb. -->
+  <Style x:Key="EditorSlider" TargetType="Slider">
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Track x:Name="PART_Track" Grid.Row="1">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="{x:Static Slider.DecreaseLarge}"
+                              Focusable="False"
+                              IsTabStop="False">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Border Height="4"
+                              CornerRadius="2"
+                              Background="{StaticResource EditorAccentBrush}" />
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
+              </Track.DecreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb x:Name="Thumb"
+                       Focusable="False"
+                       IsTabStop="False"
+                       Width="14"
+                       Height="14">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border x:Name="ThumbBorder"
+                              Width="14"
+                              Height="14"
+                              CornerRadius="3"
+                              Background="{StaticResource EditorAccentBrush}"
+                              BorderBrush="{StaticResource EditorBgBrush}"
+                              BorderThickness="1" />
+                      <ControlTemplate.Triggers>
+                        <!-- Hover/drag lighten variants of #E8833A. -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ThumbBorder" Property="Background" Value="#EFA866" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                          <Setter TargetName="ThumbBorder" Property="Background" Value="#F5BE85" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="{x:Static Slider.IncreaseLarge}"
+                              Focusable="False"
+                              IsTabStop="False">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Border Height="4"
+                              CornerRadius="2"
+                              Background="{StaticResource EditorRuleBrush}" />
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
+              </Track.IncreaseRepeatButton>
+            </Track>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
 </ResourceDictionary>

@@ -7340,7 +7340,7 @@ public partial class MainWindow : Window
         var heading = new DockPanel();
         heading.Children.Add(new TextBlock { Text = AppLocalization.T(label), FontWeight = FontWeights.SemiBold });
         DockPanel.SetDock(valueText, Dock.Right); heading.Children.Add(valueText);
-        var slider = new Slider { Tag = $"grade:{key}", Minimum = min, Maximum = max, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true };
+        var slider = new Slider { Tag = $"grade:{key}", Minimum = min, Maximum = max, TickFrequency = 1, SmallChange = 1, IsSnapToTickEnabled = true, Style = (Style)FindResource("EditorSlider") };
         _editorGradeSliders[key] = slider;
         slider.ValueChanged += (_, _) => { valueText.Text = $"{slider.Value:+0;-0;0}"; SetEditorAdjustment(key, slider.Value); if (!_initializing && !_updatingEditorControls) UpdateEditorPreview(); };
         var row = new StackPanel { Margin = new Thickness(0, 2, 0, 5), MinHeight = 45 };
@@ -7647,7 +7647,8 @@ public partial class MainWindow : Window
             TickFrequency = isExposure ? .05 : 1,
             SmallChange = isExposure ? .05 : 1,
             IsSnapToTickEnabled = true,
-            Value = EditorAdjustmentForKey(key)
+            Value = EditorAdjustmentForKey(key),
+            Style = (Style)FindResource("EditorSlider")
         };
         slider = createdSlider;
         _editorGradeSliders[key] = createdSlider;
@@ -7706,7 +7707,8 @@ public partial class MainWindow : Window
             Maximum = specification.Maximum,
             TickFrequency = specification.Exposure ? 0.05 : 1,
             SmallChange = specification.Exposure ? 0.05 : 1,
-            IsSnapToTickEnabled = true
+            IsSnapToTickEnabled = true,
+            Style = (Style)FindResource("EditorSlider")
         };
         _editorSliders[specification.Key] = slider;
         slider.ValueChanged += (_, _) =>

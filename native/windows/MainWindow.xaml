@@ -1396,6 +1396,7 @@
                                 Value="72"
                                 TickFrequency="5"
                                 IsSnapToTickEnabled="True"
+                                Style="{StaticResource EditorSlider}"
                                 ValueChanged="EditorAIIntensity_Changed" />
                         <UniformGrid Margin="0,8,0,0" Columns="3">
                           <Button Style="{StaticResource EditorToolButton}"
