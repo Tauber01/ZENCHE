@@ -47,6 +47,7 @@ import android.provider.OpenableColumns;
 import android.content.ContentUris;
 import android.text.InputType;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Base64;
 import android.util.Size;
@@ -2501,11 +2502,9 @@ public final class MainActivity extends Activity {
                 dp(compact ? 64 : 70)));
         View statusBar = buildStatusBar();
         applicationStatusBar = statusBar;
-        if (!compact) {
-            root.addView(statusBar, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    dp(30)));
-        }
+        root.addView(statusBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(30)));
         applySystemBarInsets(root, topBar, bottomNavigation, statusBar);
         return root;
     }
@@ -2525,13 +2524,8 @@ public final class MainActivity extends Activity {
         int statusPaddingTop = statusBar.getPaddingTop();
         int statusPaddingRight = statusBar.getPaddingRight();
         int statusPaddingBottom = statusBar.getPaddingBottom();
-        int navigationPaddingLeft = bottomNavigation.getPaddingLeft();
-        int navigationPaddingTop = bottomNavigation.getPaddingTop();
-        int navigationPaddingRight = bottomNavigation.getPaddingRight();
-        int navigationPaddingBottom = bottomNavigation.getPaddingBottom();
         int topBarHeight = dp(isCompactPhone() ? 64 : 72);
-        int statusBarHeight = isCompactPhone() ? 0 : dp(30);
-        int navigationHeight = dp(isCompactPhone() ? 64 : 70);
+        int statusBarHeight = dp(30);
 
         root.setOnApplyWindowInsetsListener((view, windowInsets) -> {
             int left;
@@ -2570,17 +2564,7 @@ public final class MainActivity extends Activity {
             topParams.height = topBarHeight + top;
             topBar.setLayoutParams(topParams);
             ViewGroup.LayoutParams statusParams = statusBar.getLayoutParams();
-            if (isCompactPhone()) {
-                bottomNavigation.setPadding(
-                        navigationPaddingLeft,
-                        navigationPaddingTop,
-                        navigationPaddingRight,
-                        navigationPaddingBottom + bottom);
-                ViewGroup.LayoutParams navigationParams =
-                        bottomNavigation.getLayoutParams();
-                navigationParams.height = navigationHeight + bottom;
-                bottomNavigation.setLayoutParams(navigationParams);
-            } else if (statusParams != null) {
+            if (statusParams != null) {
                 statusParams.height = statusBarHeight + bottom;
                 statusBar.setLayoutParams(statusParams);
             }
@@ -2732,7 +2716,12 @@ public final class MainActivity extends Activity {
         bar.setPadding(dp(14), 0, dp(14), 0);
         bar.setBackgroundColor(GRAPHITE);
         statusText = text("未连接", 11, Typeface.NORMAL, Color.rgb(185, 193, 208));
-        countText = text("0 张", 11, Typeface.BOLD, Color.rgb(185, 193, 208));
+        statusText.setSingleLine(true);
+        statusText.setEllipsize(TextUtils.TruncateAt.END);
+        countText = text(tr("文件库 · %lld 个文件").replace("%lld", "0"),
+                11, Typeface.BOLD, Color.rgb(185, 193, 208));
+        countText.setSingleLine(true);
+        countText.setPadding(dp(12), 0, 0, 0);
         bar.addView(statusText, new LinearLayout.LayoutParams(0, dp(30), 1f));
         bar.addView(countText);
         return bar;
@@ -2783,7 +2772,10 @@ public final class MainActivity extends Activity {
             applicationBottomNavigation.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
         }
         if (applicationStatusBar != null) {
-            applicationStatusBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
+            // Keep the global operation state reachable while monitoring. The
+            // graphite bar is part of the camera chrome and does not obscure
+            // the preview, unlike the full application header.
+            applicationStatusBar.setVisibility(View.VISIBLE);
         }
         getWindow().setStatusBarColor(darkMonitor ? Color.BLACK : PAPER);
         getWindow().getDecorView().setSystemUiVisibility(
@@ -11358,10 +11350,8 @@ public final class MainActivity extends Activity {
 
     private void updateFileCount() {
         if (countText == null) return;
-        String suffix = Localization.ENGLISH.equals(appLanguage)
-                ? " items"
-                : Localization.JAPANESE.equals(appLanguage) ? " 件" : " 张";
-        countText.setText(photoFiles().size() + suffix);
+        countText.setText(tr("文件库 · %lld 个文件")
+                .replace("%lld", Integer.toString(photoFiles().size())));
     }
 
     private List<File> photoFiles() {

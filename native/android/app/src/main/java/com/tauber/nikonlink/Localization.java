@@ -638,6 +638,7 @@ final class Localization {
         add("文件库中没有可编辑照片",
                 "There are no editable photos in the library",
                 "ライブラリに編集可能な写真がありません");
+        add("文件库 · %lld 个文件", "Library · %lld files", "ライブラリ · %lld 件");
         add("视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
                 "Videos and RAW files that cannot yet be decoded are excluded from the editor.",
                 "動画と、まだデコードできない RAW ファイルは編集リストに表示されません。");

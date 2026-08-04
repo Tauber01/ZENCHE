@@ -1200,6 +1200,7 @@ struct Index {
         } else {
           this.MainGrid()
         }
+        this.GlobalStatusBar()
       }
       .width('100%')
       .height('100%')
@@ -1239,6 +1240,39 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.paper'))
+  }
+
+  @Builder
+  private GlobalStatusBar() {
+    Row({ space: 8 }) {
+      Text('●')
+        .fontSize(10)
+        .fontColor(
+          this.connected || this.wifiConnected || this.localCameraSelected
+            ? $r('app.color.positive')
+            : $r('app.color.graphite_muted')
+        )
+      Text(this.tr(this.status))
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontColor($r('app.color.graphite_ink'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+      Text(
+        this.tr('文件库 · %lld 个文件')
+          .replace('%lld', this.photos.length.toString())
+      )
+        .fontSize(11)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Medium)
+        .fontColor($r('app.color.graphite_muted'))
+        .maxLines(1)
+    }
+    .width('100%')
+    .height(32)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor($r('app.color.graphite'))
   }
 
   @Builder

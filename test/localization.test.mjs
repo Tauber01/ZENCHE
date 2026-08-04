@@ -106,16 +106,17 @@ test("mobile navigation respects safe areas without duplicating phone status chr
   ]);
 
   assert.doesNotMatch(ios, /private struct StatusBar/);
-  assert.match(ios, /padding\(\.bottom, max\(7, bottomInset\)\)/);
+  assert.match(ios, /GlobalStatusBar\([\s\S]{0,160}safeAreaInsets\.bottom/);
   assert.match(android, /buildStatusBar|statusText|countText/);
   assert.match(
     android,
     /applySystemBarInsets\(root, topBar, bottomNavigation, statusBar\)/,
   );
-  assert.match(android, /navigationPaddingBottom \+ bottom/);
-  assert.match(android, /if \(!compact\) \{\s*root\.addView\(statusBar/);
+  assert.match(android, /statusParams\.height = statusBarHeight \+ bottom/);
+  assert.match(android, /root\.addView\(statusBar/);
   assert.doesNotMatch(harmony, /private StatusBar\(\)/);
   assert.match(harmony, /this\.CompactBottomNavigation\(\)/);
+  assert.match(harmony, /this\.GlobalStatusBar\(\)/);
 });
 
 test("fragment translators prefer longer phrases before short labels", async () => {

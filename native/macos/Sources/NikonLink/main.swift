@@ -11904,17 +11904,24 @@ private struct RootView: View {
                             : "link.badge.plus"
                     )
                     RuntimeLocalizedText(model.connectionTitle)
+                        .lineLimit(1)
                 }
                 Spacer()
                 RuntimeLocalizedText(model.connectionDetail)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity)
                 Spacer()
-                Text("本次照片 · \(model.photos.count) 张")
+                Text("文件库 · \(model.photos.count) 个文件")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .font(.system(size: 11, weight: .medium, design: .monospaced))
             .foregroundStyle(Color.white.opacity(0.72))
             .padding(.horizontal, 18)
             .frame(height: 32)
             .background(Palette.graphite)
+            .accessibilityElement(children: .combine)
         }
         .background(Palette.paper)
         .overlay {

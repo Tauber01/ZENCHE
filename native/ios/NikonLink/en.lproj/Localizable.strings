@@ -163,6 +163,7 @@
 "当前版本 %@ · 从 帧澈 ZENCHE 的 GitHub Releases 检查新版本。" = "Current version %@ · Check ZENCHE GitHub Releases for updates.";
 "本次 · %lld 张" = "This session · %lld items";
 "本次照片 · %lld 张" = "This session · %lld photos";
+"文件库 · %lld 个文件" = "Library · %lld files";
 "选择相机后即可开始" = "Choose a camera to begin";
 "检测相机" = "Detecting Camera";
 "未发现相机" = "No Camera Found";

@@ -1878,13 +1878,22 @@
             BorderBrush="{StaticResource GraphiteRuleBrush}"
             BorderThickness="0,1,0,0">
       <Grid Margin="16,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
         <TextBlock x:Name="OperationStatusText"
+                   Grid.Column="0"
+                   Margin="0,0,14,0"
                    VerticalAlignment="Center"
                    Foreground="{StaticResource GraphiteInkBrush}"
                    FontFamily="{StaticResource MonoFont}"
                    FontSize="11"
+                   TextTrimming="CharacterEllipsis"
+                   TextWrapping="NoWrap"
                    Text="就绪" />
         <TextBlock x:Name="PhotoCountText"
+                   Grid.Column="1"
                    HorizontalAlignment="Right"
                    VerticalAlignment="Center"
                    Foreground="{StaticResource GraphiteMutedBrush}"

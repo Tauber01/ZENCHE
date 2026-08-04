@@ -200,10 +200,14 @@ struct RootView: View {
                             Divider().overlay(IPalette.rule)
                             CurrentPage()
                         }
+                        GlobalStatusBar(
+                            bottomInset: proxy.safeAreaInsets.bottom
+                        )
                     } else {
                         CurrentPage()
                         Divider().overlay(IPalette.rule)
-                        BottomNavigation(
+                        BottomNavigation(bottomInset: 0)
+                        GlobalStatusBar(
                             bottomInset: proxy.safeAreaInsets.bottom
                         )
                     }
@@ -431,11 +435,7 @@ private struct SideNavigation: View {
             VStack(spacing: 7) {
                 Image(systemName: section.icon)
                     .font(.system(size: 20, weight: active ? .semibold : .medium))
-                Text(
-                    LocalizedStringKey(
-                        section == .library ? "分支" : section.rawValue
-                    )
-                )
+                RuntimeLocalizedText(section.rawValue)
                     .font(.caption.weight(active ? .semibold : .medium))
             }
             .foregroundStyle(active ? accent : IPalette.muted)
@@ -476,13 +476,7 @@ private struct BottomNavigation: View {
                     VStack(spacing: 4) {
                         Image(systemName: section.icon)
                             .font(.system(size: 18, weight: model.section == section ? .semibold : .medium))
-                        Text(
-                            LocalizedStringKey(
-                                section == .library
-                                    ? "分支"
-                                    : section.rawValue
-                            )
-                        )
+                        RuntimeLocalizedText(section.rawValue)
                             .font(.caption2)
                     }
                     .foregroundStyle(model.section == section ? accent : IPalette.muted)
@@ -514,6 +508,42 @@ private struct BottomNavigation: View {
         .overlay(alignment: .top) {
             Rectangle().fill(IPalette.rule).frame(height: 0.5)
         }
+    }
+}
+
+private struct GlobalStatusBar: View {
+    @EnvironmentObject private var model: AppModel
+    let bottomInset: CGFloat
+
+    private var connected: Bool {
+        model.camera.state == .ready || model.wifiCamera.isConnected
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: connected ? "link" : "info.circle")
+                .foregroundStyle(connected ? IPalette.positive : IPalette.muted)
+            RuntimeLocalizedText(model.statusMessage)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("文件库 · \(model.library.items.count) 个文件")
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(IPalette.muted)
+        }
+        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .foregroundStyle(IPalette.ink.opacity(0.8))
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+        .padding(.bottom, max(8, bottomInset))
+        // Keep the home indicator visible in the light capture shell while
+        // still following the monitor's forced dark appearance automatically.
+        .background(IPalette.surface)
+        .overlay(alignment: .top) {
+            Rectangle().fill(IPalette.rule).frame(height: 0.5)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -4584,6 +4614,7 @@ private struct CapabilityChip: View {
 
 private struct NikonCloudMonitorBar: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showingPresetPicker = false
 
     private var usesDarkSurface: Bool {
@@ -4605,9 +4636,8 @@ private struct NikonCloudMonitorBar: View {
                         .foregroundStyle(
                             usesDarkSurface ? Color.white : IPalette.ink
                         )
-                    Text(
-                        verbatim: model.monitorNikonCloudPreset?.name
-                            ?? String(localized: "已关闭")
+                    RuntimeLocalizedText(
+                        model.monitorNikonCloudPreset?.name ?? "已关闭"
                     )
                     .font(.caption)
                     .foregroundStyle(
@@ -4623,7 +4653,15 @@ private struct NikonCloudMonitorBar: View {
                 Button {
                     showingPresetPicker = true
                 } label: {
-                    Label("选择预设", systemImage: "slider.horizontal.3")
+                    Label {
+                        RuntimeLocalizedText(
+                            horizontalSizeClass == .compact
+                                ? "预设"
+                                : "选择预设"
+                        )
+                    } icon: {
+                        Image(systemName: "slider.horizontal.3")
+                    }
                         .lineLimit(1)
                 }
                 .buttonStyle(.borderedProminent)
