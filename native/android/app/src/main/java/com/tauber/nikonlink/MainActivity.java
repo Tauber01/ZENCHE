@@ -146,11 +146,21 @@ public final class MainActivity extends Activity {
     private static final int POSITIVE = Color.rgb(31, 168, 105);
     private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
     private static final int GRAPHITE = Color.rgb(10, 11, 13);
+    // 1.5.3 编辑器 token：保留以兼容 native-ui-1.5.3 token 契约断言；
+    // 编辑器实现已迁移至 EDITOR_*（图 2 系）。
     private static final int STUDIO_CANVAS = Color.rgb(6, 9, 13);
     private static final int STUDIO_PANEL = Color.rgb(21, 25, 31);
     private static final int STUDIO_RAISED = Color.rgb(32, 36, 43);
     private static final int STUDIO_RULE = Color.rgb(52, 58, 67);
     private static final int STUDIO_GOLD = Color.rgb(216, 182, 83);
+
+    // 图 2 系（1.5.5 阶段 2）：编辑器深灰平铺 + 品牌橙选中 + 1px 深色分隔
+    private static final int EDITOR_BG = Color.rgb(42, 42, 46);      // #2A2A2E
+    private static final int EDITOR_PANEL = Color.rgb(51, 51, 56);   // #333338
+    private static final int EDITOR_RAISED = Color.rgb(58, 58, 64);  // #3A3A40
+    private static final int EDITOR_RULE = Color.rgb(27, 27, 31);    // #1B1B1F
+    private static final int EDITOR_ACCENT = Color.rgb(232, 131, 58);// #E8833A
+    private static final int EDITOR_LABEL = Color.rgb(142, 142, 147);// #8E8E93
     // ── v1.5.5 fig1 control-surface tokens (params UI) ──
     private static final int UI_BG = Color.rgb(10, 11, 13);          // near-black canvas
     private static final int UI_CARD = Color.rgb(28, 28, 30);        // #1C1C1E card
@@ -6658,9 +6668,46 @@ public final class MainActivity extends Activity {
         content.addView(
                 buildEditorPhotoPicker(photos),
                 marginParams(-1, dp(64), 0, 0, 0, 12));
+
+        // 图 2 移动端降级：监视器固定顶部，控制面板（工具条/媒体/示波器/参数）位于其下
+        EditorMaskImageView preview = new EditorMaskImageView(editorAdjustments);
+        content.addView(
+                preview,
+                marginParams(-1, dp(360), 0, 0, 0, 14));
+
+        TextView status = text(
+                "调整不会覆盖原文件",
+                11,
+                Typeface.NORMAL,
+                MUTED);
+        Runnable refreshPreview = () -> {
+            File selected = new File(editorSelectedPath);
+            Bitmap rendered = renderEditedBitmap(
+                    selected,
+                    editorAdjustments,
+                    1600);
+            if (rendered == null) {
+                preview.clearPreview();
+                status.setText(tr("无法解码当前照片"));
+            } else {
+                preview.setPreviewBitmap(rendered);
+                status.setText(tr(
+                        editorAdjustments.showingOriginal
+                                ? "正在查看原图"
+                                : "调整不会覆盖原文件"));
+            }
+        };
+        preview.setMaskChangedListener(refreshPreview);
+
+        View editorDivider = new View(this);
+        editorDivider.setBackgroundColor(EDITOR_RULE);
+        content.addView(
+                editorDivider,
+                marginParams(-1, dp(1), 0, 0, 0, 12));
+
         content.addView(
                 buildResolveEditorWorkbench(photos),
-                marginParams(-1, dp(118), 0, 0, 0, 12));
+                marginParams(-1, -2, 0, 0, 0, 12));
 
         LinearLayout aiPanel = panel();
         aiPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -6864,35 +6911,6 @@ public final class MainActivity extends Activity {
         content.addView(
                 nikonCloudPanel,
                 marginParams(-1, -2, 0, 0, 0, 12));
-
-        EditorMaskImageView preview = new EditorMaskImageView(editorAdjustments);
-        content.addView(
-                preview,
-                marginParams(-1, dp(360), 0, 0, 0, 14));
-
-        TextView status = text(
-                "调整不会覆盖原文件",
-                11,
-                Typeface.NORMAL,
-                MUTED);
-        Runnable refreshPreview = () -> {
-            File selected = new File(editorSelectedPath);
-            Bitmap rendered = renderEditedBitmap(
-                    selected,
-                    editorAdjustments,
-                    1600);
-            if (rendered == null) {
-                preview.clearPreview();
-                status.setText(tr("无法解码当前照片"));
-            } else {
-                preview.setPreviewBitmap(rendered);
-                status.setText(tr(
-                        editorAdjustments.showingOriginal
-                                ? "正在查看原图"
-                                : "调整不会覆盖原文件"));
-            }
-        };
-        preview.setMaskChangedListener(refreshPreview);
 
         LinearLayout light = editorAdjustmentGroup();
         addEditorAdjustment(
@@ -7387,63 +7405,71 @@ public final class MainActivity extends Activity {
      * introducing a parallel editor state machine.
      */
     private View buildResolveEditorWorkbench(List<File> photos) {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setFillViewport(true);
-        scroll.setBackground(rounded(STUDIO_CANVAS, 7, STUDIO_RULE));
+        // 图 2 移动端降级：控制带（媒体行 + 工具条 + 示波器区）纵向堆叠，
+        // 作为监视器下方的「底部抽屉」顶部控制面板；1px 深色分隔。
         LinearLayout workbench = new LinearLayout(this);
-        workbench.setOrientation(LinearLayout.HORIZONTAL);
-        workbench.setPadding(dp(6), dp(6), dp(6), dp(6));
+        workbench.setOrientation(LinearLayout.VERTICAL);
+        workbench.setBackground(rounded(EDITOR_BG, 0, 0));
         workbench.addView(buildEditorMediaRail(photos),
-                new LinearLayout.LayoutParams(dp(220), dp(106)));
-        LinearLayout.LayoutParams toolParams =
-                new LinearLayout.LayoutParams(dp(330), dp(106));
-        toolParams.setMargins(dp(6), 0, 0, 0);
-        workbench.addView(buildEditorToolRail(), toolParams);
-        LinearLayout.LayoutParams scopeParams =
-                new LinearLayout.LayoutParams(dp(300), dp(106));
-        scopeParams.setMargins(dp(6), 0, 0, 0);
-        workbench.addView(buildEditorScopeDock(), scopeParams);
-        scroll.addView(workbench);
-        return scroll;
+                new LinearLayout.LayoutParams(-1, dp(52)));
+        View toolDivider = new View(this);
+        toolDivider.setBackgroundColor(EDITOR_RULE);
+        workbench.addView(toolDivider, new LinearLayout.LayoutParams(-1, dp(1)));
+        workbench.addView(buildEditorToolRail(),
+                new LinearLayout.LayoutParams(-1, dp(52)));
+        View scopeDivider = new View(this);
+        scopeDivider.setBackgroundColor(EDITOR_RULE);
+        workbench.addView(scopeDivider, new LinearLayout.LayoutParams(-1, dp(1)));
+        workbench.addView(buildEditorScopeDock(),
+                new LinearLayout.LayoutParams(-1, dp(64)));
+        return workbench;
     }
 
     private View buildEditorMediaRail(List<File> photos) {
+        // 媒体行：当前照片名 + 非破坏说明（图 2 顶部媒体信息）
         LinearLayout rail = new LinearLayout(this);
-        rail.setOrientation(LinearLayout.VERTICAL);
-        rail.setPadding(dp(10), dp(8), dp(10), dp(8));
-        rail.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setGravity(Gravity.CENTER_VERTICAL);
+        rail.setPadding(dp(12), 0, dp(12), 0);
+        rail.setBackground(rounded(EDITOR_PANEL, 0, 0));
         rail.addView(text(tr("媒体池") + " · " + photos.size(),
-                10, Typeface.BOLD, Color.WHITE));
+                10, Typeface.BOLD, EDITOR_LABEL));
         String selected = editorSelectedPath == null
                 ? tr("未选择照片")
                 : new File(editorSelectedPath).getName();
         TextView filename = text(selected, 12, Typeface.BOLD, Color.WHITE);
         filename.setSingleLine(true);
         filename.setEllipsize(TextUtils.TruncateAt.MIDDLE);
-        rail.addView(filename, marginParams(-1, dp(28), 0, 6, 0, 0));
+        LinearLayout.LayoutParams filenameParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        filenameParams.setMargins(dp(10), 0, 0, 0);
+        rail.addView(filename, filenameParams);
         rail.addView(text(tr("非破坏编辑 · 保存为高质量副本"),
-                9, Typeface.NORMAL, Color.rgb(168, 176, 188)));
+                9, Typeface.NORMAL, EDITOR_LABEL));
         return rail;
     }
 
     private View buildEditorToolRail() {
+        // 工具条：线性单色文字钮 + 品牌橙选中态（图 2 工具图标条语义）
         LinearLayout rail = new LinearLayout(this);
-        rail.setOrientation(LinearLayout.VERTICAL);
-        rail.setPadding(dp(10), dp(8), dp(10), dp(8));
-        rail.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
-        rail.addView(text(tr("工具轨"),
-                10, Typeface.BOLD, Color.rgb(168, 176, 188)));
-        LinearLayout tools = new LinearLayout(this);
-        tools.setOrientation(LinearLayout.HORIZONTAL);
-        String[] names = new String[]{"色轮", "曲线", "蒙版", "AI"};
-        String[] keys = new String[]{"editor-wheels", "editor-curves", "editor-mask", "ai"};
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setPadding(dp(2), dp(5), dp(2), dp(5));
+        rail.setBackground(rounded(EDITOR_PANEL, 0, 0));
+        String[] names = new String[]{"色轮", "曲线", "蒙版", "几何", "AI"};
+        String[] keys = new String[]{
+                "editor-wheels", "editor-curves", "editor-mask", "editor-geometry", "ai"};
         for (int index = 0; index < names.length; index++) {
             final String key = keys[index];
+            boolean active = "ai".equals(key)
+                    ? editorState == EditorState.AI
+                    : Boolean.TRUE.equals(disclosureStates.get(key));
             Button tool = nativeButton(names[index], false);
             tool.setTextSize(11);
-            tool.setTextColor(Color.WHITE);
-            tool.setBackground(rounded(STUDIO_RAISED, 5, STUDIO_RULE));
+            tool.setTextColor(active ? EDITOR_ACCENT : EDITOR_LABEL);
+            tool.setBackground(rounded(
+                    active ? EDITOR_RAISED : Color.TRANSPARENT,
+                    0,
+                    active ? EDITOR_ACCENT : 0));
             tool.setOnClickListener(view -> {
                 if ("ai".equals(key)) {
                     editorState = EditorState.AI;
@@ -7456,25 +7482,29 @@ public final class MainActivity extends Activity {
                 }
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, dp(52), 1f);
-            if (index > 0) params.setMargins(dp(5), 0, 0, 0);
-            tools.addView(tool, params);
+                    0, dp(44), 1f);
+            if (index > 0) params.setMargins(dp(4), 0, 0, 0);
+            rail.addView(tool, params);
         }
-        rail.addView(tools, marginParams(-1, dp(52), 0, 7, 0, 0));
         return rail;
     }
 
     private View buildEditorScopeDock() {
+        // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
         LinearLayout dock = new LinearLayout(this);
-        dock.setOrientation(LinearLayout.VERTICAL);
-        dock.setPadding(dp(10), dp(8), dp(10), dp(8));
-        dock.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        dock.setPadding(dp(12), 0, dp(12), 0);
+        dock.setBackground(rounded(EDITOR_PANEL, 0, 0));
         dock.addView(text(tr("编辑示波器"),
-                10, Typeface.BOLD, Color.rgb(168, 176, 188)));
+                10, Typeface.BOLD, EDITOR_LABEL));
         if (editorAIAnalysis == null) {
-            dock.addView(text(tr("运行“分析画面”后显示实测范围"),
-                    11, Typeface.NORMAL, MUTED),
-                    marginParams(-1, dp(48), 0, 10, 0, 0));
+            TextView empty = text(tr("运行“分析画面”后显示实测范围"),
+                    11, Typeface.NORMAL, EDITOR_LABEL);
+            LinearLayout.LayoutParams emptyParams =
+                    new LinearLayout.LayoutParams(0, -2, 1f);
+            emptyParams.setMargins(dp(10), 0, 0, 0);
+            dock.addView(empty, emptyParams);
             return dock;
         }
         String metrics = String.format(
@@ -7484,10 +7514,13 @@ public final class MainActivity extends Activity {
                 Math.round(editorAIAnalysis.contrast * 100),
                 Math.round(editorAIAnalysis.saturation * 100),
                 Math.round(editorAIAnalysis.detail * 100));
-        TextView values = text(metrics, 12, Typeface.BOLD, STUDIO_GOLD);
+        TextView values = text(metrics, 11, Typeface.BOLD, EDITOR_ACCENT);
         values.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         values.setGravity(Gravity.CENTER_VERTICAL);
-        dock.addView(values, marginParams(-1, dp(62), 0, 4, 0, 0));
+        LinearLayout.LayoutParams valuesParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        valuesParams.setMargins(dp(10), 0, 0, 0);
+        dock.addView(values, valuesParams);
         return dock;
     }
 
