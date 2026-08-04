@@ -4179,6 +4179,21 @@ private enum Palette {
         red: 52.0 / 255.0, green: 58.0 / 255.0, blue: 67.0 / 255.0)
     static let studioGold = Color(
         red: 216.0 / 255.0, green: 182.0 / 255.0, blue: 83.0 / 255.0)
+    // fig2 编辑器 token（五端 1.5.5 统一常量，同名同值）：深灰工作台 /
+    // 面板 / 浮层面 / 1px 分隔线 / 品牌橙（仅选中工具与示波器读数）/
+    // 灰标签。固定深色，不随主题变化；无渐变无投影，直角平铺。
+    static let editorBg = Color(
+        red: 42.0 / 255.0, green: 42.0 / 255.0, blue: 46.0 / 255.0)
+    static let editorPanel = Color(
+        red: 51.0 / 255.0, green: 51.0 / 255.0, blue: 56.0 / 255.0)
+    static let editorRaised = Color(
+        red: 58.0 / 255.0, green: 58.0 / 255.0, blue: 64.0 / 255.0)
+    static let editorRule = Color(
+        red: 27.0 / 255.0, green: 27.0 / 255.0, blue: 31.0 / 255.0)
+    static let editorAccent = Color(
+        red: 232.0 / 255.0, green: 131.0 / 255.0, blue: 58.0 / 255.0)
+    static let editorLabel = Color(
+        red: 142.0 / 255.0, green: 142.0 / 255.0, blue: 147.0 / 255.0)
     // fig1 控制面 token（五端 1.5.5 统一常量）：近黑底 / 卡片 / 次级面 /
     // 灰标签 / 单一点亮黄绿 / 系统蓝。固定深色，不随主题变化。
     static let uiBackground = Color(
@@ -9481,14 +9496,13 @@ private struct ResolveEditorWorkbench<
         HStack(spacing: 1) {
             media.frame(width: 220)
             canvasArea.frame(maxWidth: .infinity)
-            tools.frame(width: 390)
+            tools.frame(width: 320)
         }
         .padding(1)
-        .background(Palette.studioRule)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .background(Palette.editorRule)
         .overlay {
-            RoundedRectangle(cornerRadius: 7)
-                .stroke(Palette.studioRule, lineWidth: 1)
+            Rectangle()
+                .stroke(Palette.editorRule, lineWidth: 1)
         }
     }
 }
@@ -9508,14 +9522,14 @@ private struct EditorMediaRail<Content: View>: View {
                 Image(systemName: "photo.stack")
             }
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-            Divider().overlay(Palette.studioRule)
+            Divider().overlay(Palette.editorRule)
             content
             Spacer(minLength: 0)
         }
         .padding(12)
         .frame(maxHeight: .infinity, alignment: .top)
         .foregroundStyle(.white)
-        .background(Palette.studioPanel)
+        .background(Palette.editorPanel)
     }
 }
 
@@ -9527,21 +9541,9 @@ private struct EditorToolRail<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label {
-                RuntimeLocalizedText("检查器")
-            } icon: {
-                Image(systemName: "slider.horizontal.3")
-            }
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-            Divider().overlay(Palette.studioRule)
-            content
-        }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(Palette.studioPanel)
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Palette.editorPanel)
     }
 }
 
@@ -9554,7 +9556,7 @@ private struct EditorScopeDock: View {
             VStack(alignment: .leading, spacing: 4) {
                 RuntimeLocalizedText("编辑示波器")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.48))
+                    .foregroundStyle(Palette.editorLabel)
                 RuntimeLocalizedText(
                     hasSource
                         ? values.isEmpty
@@ -9563,7 +9565,7 @@ private struct EditorScopeDock: View {
                         : "暂无图像源"
                 )
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(values.isEmpty ? Palette.muted : Palette.studioGold)
+                    .foregroundStyle(values.isEmpty ? Palette.editorLabel : Palette.editorAccent)
             }
             .frame(width: 190, alignment: .leading)
             Canvas { context, size in
@@ -9586,14 +9588,14 @@ private struct EditorScopeDock: View {
                     )
                     var bar = Path()
                     bar.addRect(rect)
-                    context.fill(bar, with: .color(Palette.studioGold.opacity(0.82)))
+                    context.fill(bar, with: .color(Palette.editorAccent.opacity(0.82)))
                 }
             }
-            .background(Palette.studioCanvas)
-            .overlay { Rectangle().stroke(Palette.studioRule) }
+            .background(Palette.editorBg)
+            .overlay { Rectangle().stroke(Palette.editorRule) }
         }
         .padding(10)
-        .background(Palette.studioPanel)
+        .background(Palette.editorPanel)
     }
 }
 
@@ -9778,69 +9780,63 @@ private struct ImageEditorView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            WorkspaceHeading(
-                title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
-                subtitle: selectedSection == .aiTools
-                    ? "基于 nano-banana-2 模型的 AI 修图与生图"
-                    : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
-            )
-            if selectedSection == .aiTools {
-                aiToolsToolbar
-            } else {
-                editorToolbar
+        VStack(spacing: 0) {
+            editorHeader
+            if selectedSection != .aiTools {
                 nikonCloudPreviewNotice
             }
-
             GeometryReader { geometry in
-                ResolveEditorWorkbench {
-                    EditorMediaRail {
-                        editorPhotoPicker
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        RuntimeLocalizedText("可编辑照片")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .foregroundStyle(Color.white.opacity(0.46))
-                        Text("\(photos.count)")
-                            .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                        if let selectedPhoto {
-                            Text(selectedPhoto.name)
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(Color.white.opacity(0.62))
-                                .lineLimit(4)
+                VStack(spacing: 1) {
+                    ResolveEditorWorkbench {
+                        EditorMediaRail {
+                            editorPhotoPicker
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            RuntimeLocalizedText("可编辑照片")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Color.white.opacity(0.46))
+                            Text("\(photos.count)")
+                                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                            if let selectedPhoto {
+                                Text(selectedPhoto.name)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(Color.white.opacity(0.62))
+                                    .lineLimit(4)
+                            }
+                            RuntimeLocalizedText("非破坏编辑 · 保存为高质量副本")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.white.opacity(0.44))
                         }
-                        RuntimeLocalizedText("非破坏编辑 · 保存为高质量副本")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color.white.opacity(0.44))
-                    }
-                } canvasArea: {
-                    VStack(spacing: 1) {
+                    } canvasArea: {
                         preview
+                            .background(Palette.editorBg)
+                    } tools: {
+                        editorSummaryRail
+                    }
+                    .frame(maxHeight: .infinity)
+                    HStack(spacing: 1) {
+                        EditorToolRail {
+                            editorColorPanel
+                        }
                         EditorScopeDock(
                             values: editorScopeValues,
                             hasSource: selectedPhoto != nil
                         )
-                        .frame(height: 116)
+                        .frame(width: 320)
                     }
-                    .background(Palette.studioCanvas)
-                } tools: {
-                    EditorToolRail {
-                        if selectedSection == .aiTools {
-                            aiToolsPanel
-                        } else {
-                            adjustmentSidebar
-                        }
-                    }
+                    .frame(height: 320)
                 }
+                .background(Palette.editorRule)
                 .frame(
                     width: geometry.size.width,
                     height: geometry.size.height,
                     alignment: .topLeading
                 )
             }
-            .frame(minHeight: 360, idealHeight: 520)
+            .frame(minHeight: 560, idealHeight: 760)
         }
-        .padding(24)
-        .background(Palette.paper)
+        .background(Palette.editorBg)
+        // fig2 编辑器恒为深色；强制深色让沿用的动态 Palette 控件解析暗色变体。
+        .preferredColorScheme(.dark)
         .onAppear {
             selectInitialPhoto()
         }
@@ -9853,6 +9849,35 @@ private struct ImageEditorView: View {
         }
     }
 
+    /// fig2 上带：深底标题栏，标题 + 副标题，1px 分隔底边。
+    private var editorHeader: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    RuntimeLocalizedText(
+                        selectedSection == .aiTools ? "AI 工具" : "专业显影"
+                    )
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                    RuntimeLocalizedText(
+                        selectedSection == .aiTools
+                            ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                            : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
+                    )
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.editorLabel)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            Rectangle()
+                .fill(Palette.editorRule)
+                .frame(height: 1)
+        }
+        .background(Palette.editorBg)
+    }
+
     private var editorScopeValues: [Double] {
         guard let aiAnalysis else { return [] }
         return [
@@ -9861,18 +9886,6 @@ private struct ImageEditorView: View {
             aiAnalysis.saturation,
             aiAnalysis.detail
         ]
-    }
-
-    private var aiToolsToolbar: some View {
-        HStack(spacing: 10) {
-            editorPhotoPicker.frame(maxWidth: 400, alignment: .leading)
-            Spacer()
-            if aiResultImage != nil {
-                Button { aiResultImage = nil } label: {
-                    Label("清除结果", systemImage: "xmark.circle")
-                }.buttonStyle(NativeButtonStyle())
-            }
-        }
     }
 
     private var aiToolsPanel: some View {
@@ -10009,12 +10022,9 @@ private struct ImageEditorView: View {
                     .lineLimit(2)
             }
             .padding(14)
-            .background(Palette.surface)
+            .background(Palette.editorBg)
         }
-        .frame(width: 390).frame(maxHeight: .infinity)
-        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay { RoundedRectangle(cornerRadius: 16).stroke(Palette.rule) }
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var aiModules: [(String, [String])] {
@@ -10050,97 +10060,94 @@ private struct ImageEditorView: View {
         aiPrompt = parts.joined(separator: "。")
     }
 
-    private var editorToolbar: some View {
-        HStack(spacing: 10) {
-            editorPhotoPicker.frame(maxWidth: 400, alignment: .leading)
-
-            Picker("预设", selection: $selectedPreset) {
-                ForEach(EditorPreset.allCases) { preset in
-                    Text(preset.rawValue).tag(preset)
+    /// fig2 中带右栏：照片编辑无节点图，落预设 / 尼康云创 / AI 摘要
+    ///（同 Windows fbc74f2 右栏口径）。控件与回调原位搬迁，无逻辑改动。
+    private var editorSummaryRail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("预设", selection: $selectedPreset) {
+                    ForEach(EditorPreset.allCases) { preset in
+                        Text(preset.rawValue).tag(preset)
+                    }
                 }
-            }
-            .frame(width: 170)
-            .onChange(of: selectedPreset) {
-                guard !suppressPresetApply else { return }
-                selectedNikonCloudPresetID = nil
-                settings.apply(selectedPreset)
-                settingsBeforeAI = nil
-                aiSummaryKey = "等待分析当前照片"
-                showingOriginal = false
-                status = "已应用预设 · \(selectedPreset.rawValue)"
-            }
-
-            Menu {
-                Button {
-                    suppressPresetApply = true
+                .onChange(of: selectedPreset) {
+                    guard !suppressPresetApply else { return }
                     selectedNikonCloudPresetID = nil
-                    settings.apply(.original)
-                    selectedPreset = .original
+                    settings.apply(selectedPreset)
+                    settingsBeforeAI = nil
+                    aiSummaryKey = "等待分析当前照片"
                     showingOriginal = false
-                    status = "尼康云创预览已关闭"
-                    DispatchQueue.main.async { suppressPresetApply = false }
-                } label: {
-                    Label("关闭云创预览", systemImage: "xmark.circle")
+                    status = "已应用预设 · \(selectedPreset.rawValue)"
                 }
-                Divider()
-                ForEach(NikonCloudPresetLibrary.groups) { group in
-                    Menu(group.title) {
-                        ForEach(group.presets) { preset in
-                            Button {
-                                applyNikonCloudPreset(preset)
-                            } label: {
-                                HStack {
-                                    Text(preset.name)
-                                    if selectedNikonCloudPresetID == preset.id {
-                                        Image(systemName: "checkmark")
+
+                Menu {
+                    Button {
+                        suppressPresetApply = true
+                        selectedNikonCloudPresetID = nil
+                        settings.apply(.original)
+                        selectedPreset = .original
+                        showingOriginal = false
+                        status = "尼康云创预览已关闭"
+                        DispatchQueue.main.async { suppressPresetApply = false }
+                    } label: {
+                        Label("关闭云创预览", systemImage: "xmark.circle")
+                    }
+                    Divider()
+                    ForEach(NikonCloudPresetLibrary.groups) { group in
+                        Menu(group.title) {
+                            ForEach(group.presets) { preset in
+                                Button {
+                                    applyNikonCloudPreset(preset)
+                                } label: {
+                                    HStack {
+                                        Text(preset.name)
+                                        if selectedNikonCloudPresetID == preset.id {
+                                            Image(systemName: "checkmark")
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } label: {
+                    Label(
+                        selectedNikonCloudPreset?.name ?? "尼康云创",
+                        systemImage: "cloud.sun"
+                    )
+                    .lineLimit(1)
                 }
-            } label: {
-                Label(
-                    selectedNikonCloudPreset?.name ?? "尼康云创",
-                    systemImage: "cloud.sun"
-                )
-                .lineLimit(1)
-            }
-            .buttonStyle(NativeButtonStyle(primary: true))
-            .disabled(NikonCloudPresetLibrary.presets.isEmpty)
+                .buttonStyle(NativeButtonStyle(primary: true))
+                .disabled(NikonCloudPresetLibrary.presets.isEmpty)
 
-            Button {
-                showingOriginal.toggle()
-            } label: {
-                Label(
-                    showingOriginal ? "返回调整" : "查看原图",
-                    systemImage: "circle.lefthalf.filled"
-                )
+                aiWorkbench
             }
-            .buttonStyle(NativeButtonStyle())
-            Spacer()
+            .padding(12)
         }
+        .frame(maxHeight: .infinity)
+        .background(Palette.editorPanel)
     }
 
     private var nikonCloudPreviewNotice: some View {
-        HStack(spacing: 10) {
-            Label("尼康云创预览", systemImage: "camera.filters")
-                .font(.system(size: 12, weight: .semibold))
-            Text("内置 \(NikonCloudPresetLibrary.presets.count) 款 NP3")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Palette.muted)
-            Spacer()
-            Text("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同")
-                .font(.system(size: 11))
-                .foregroundStyle(Palette.muted)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Label("尼康云创预览", systemImage: "camera.filters")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("内置 \(NikonCloudPresetLibrary.presets.count) 款 NP3")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Palette.editorLabel)
+                Spacer()
+                Text("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.editorLabel)
+            }
+            .padding(.horizontal, 16)
+            .frame(minHeight: 36)
+            Rectangle()
+                .fill(Palette.editorRule)
+                .frame(height: 1)
         }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 40)
-        .background(Palette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Palette.cobalt.opacity(0.28))
-        }
+        .background(Palette.editorRaised)
     }
 
     private var preview: some View {
@@ -10153,7 +10160,7 @@ private struct ImageEditorView: View {
                 imageSize: image?.size
             )
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16)
+                Rectangle()
                     .fill(Palette.graphite)
                 if let image {
                     Image(nsImage: image)
@@ -10315,25 +10322,114 @@ private struct ImageEditorView: View {
         status = "已取样 \(settings.pickedColorHex) · 已微调色温/色调"
     }
 
-    private var adjustmentSidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            aiWorkbench
-            sectionSelector
-            ScrollView {
-                adjustmentPanel
+    /// fig2 下带左栏：调色面板 —— 工具条五钮 + 参数区 + 状态行 + 操作行，
+    /// 1px 分隔，直角平铺，无卡片包装。
+    private var editorColorPanel: some View {
+        VStack(spacing: 0) {
+            editorToolStrip
+            Rectangle()
+                .fill(Palette.editorRule)
+                .frame(height: 1)
+            if selectedSection == .aiTools {
+                aiToolsPanel
+            } else {
+                sectionSelector
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                ScrollView {
+                    adjustmentPanel
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
+                }
             }
-            Divider()
-            HStack {
-                Button("全部重置") {
-                    resetAdjustments()
+            Rectangle()
+                .fill(Palette.editorRule)
+                .frame(height: 1)
+            editorStatusRow
+            editorActionRow
+        }
+    }
+
+    /// fig2 工具图标条：五枚单色文字钮（图标化列入集成轮），品牌橙标记
+    /// 当前工具；点击只路由既有 selectedSection，无新增状态。
+    private var editorToolStrip: some View {
+        HStack(spacing: 8) {
+            editorToolButton(.wheels)
+            editorToolButton(.curves)
+            editorToolButton(.masks)
+            editorToolButton(.geometry)
+            editorToolButton(.aiTools)
+            Spacer(minLength: 0)
+            if selectedSection == .aiTools, aiResultImage != nil {
+                Button { aiResultImage = nil } label: {
+                    Label("清除结果", systemImage: "xmark.circle")
                 }
                 .buttonStyle(NativeButtonStyle())
-                Spacer()
-                Text(status)
-                    .lineLimit(2)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Palette.muted)
             }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func editorToolButton(
+        _ section: EditorAdjustmentSection
+    ) -> some View {
+        let active = selectedSection == section
+        return Button {
+            selectedSection = section
+        } label: {
+            Text(LocalizedStringKey(section.rawValue))
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(active ? Palette.editorAccent : Palette.editorLabel)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 30)
+                .background(active ? Palette.editorRaised : Color.clear)
+                .overlay {
+                    Rectangle()
+                        .stroke(
+                            active ? Palette.editorAccent : Color.clear,
+                            lineWidth: 1
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// fig2 状态行：只读镜像既有 showingOriginal / status 状态，无新增状态。
+    private var editorStatusRow: some View {
+        HStack(spacing: 10) {
+            RuntimeLocalizedText(
+                showingOriginal ? "正在查看原图" : "调整不会覆盖原文件"
+            )
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Palette.editorLabel)
+            Spacer()
+            Text(status)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Palette.editorLabel)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+    }
+
+    private var editorActionRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                showingOriginal.toggle()
+            } label: {
+                Label(
+                    showingOriginal ? "返回调整" : "查看原图",
+                    systemImage: "circle.lefthalf.filled"
+                )
+            }
+            .buttonStyle(NativeButtonStyle())
+            Button("全部重置") {
+                resetAdjustments()
+            }
+            .buttonStyle(NativeButtonStyle())
+            Spacer()
             Button {
                 saveCopy()
             } label: {
@@ -10341,22 +10437,12 @@ private struct ImageEditorView: View {
                     isSaving ? "正在保存…" : "保存高质量副本",
                     systemImage: "square.and.arrow.down"
                 )
-                .frame(maxWidth: .infinity)
             }
             .buttonStyle(NativeButtonStyle(primary: true))
             .disabled(selectedPhoto == nil || isSaving)
         }
-        .padding(16)
-        .frame(width: 390)
-        .frame(maxHeight: .infinity)
-        .background(
-            Palette.surface,
-            in: RoundedRectangle(cornerRadius: 16)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Palette.rule)
-        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var aiWorkbench: some View {
@@ -10366,10 +10452,14 @@ private struct ImageEditorView: View {
                     .font(.system(size: 13, weight: .semibold))
                 Text("设备端 · 照片不会上传")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Palette.cobalt)
+                    .foregroundStyle(Palette.editorAccent)
                     .padding(.horizontal, 7)
                     .frame(minHeight: 22)
-                    .background(Palette.cobaltSoft, in: Capsule())
+                    .background(Palette.editorBg)
+                    .overlay {
+                        Rectangle()
+                            .stroke(Palette.editorAccent.opacity(0.5), lineWidth: 1)
+                    }
                 Spacer()
                 Text("\(Int(aiIntensity * 100))%")
                     .font(.system(size: 10, design: .monospaced))
@@ -10437,10 +10527,10 @@ private struct ImageEditorView: View {
             }
         }
         .padding(12)
-        .background(Palette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+        .background(Palette.editorRaised)
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Palette.cobalt.opacity(0.3))
+            Rectangle()
+                .stroke(Palette.editorRule, lineWidth: 1)
         }
     }
 
@@ -10456,7 +10546,7 @@ private struct ImageEditorView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 7)
         .frame(minHeight: 36)
-        .background(Palette.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 7))
+        .background(Palette.editorBg)
     }
 
     private var sectionSelector: some View {
@@ -11812,13 +11902,17 @@ private struct EditorSectionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(selected ? .white : Palette.ink)
+            .foregroundStyle(selected ? Palette.editorAccent : Palette.editorLabel)
             .padding(.horizontal, 10)
-            .frame(minHeight: 34)
-            .background(
-                selected ? Palette.cobalt : Palette.paperSecondary,
-                in: Capsule()
-            )
+            .frame(minHeight: 30)
+            .background(selected ? Palette.editorRaised : Color.clear)
+            .overlay {
+                Rectangle()
+                    .stroke(
+                        selected ? Palette.editorAccent : Color.clear,
+                        lineWidth: 1
+                    )
+            }
             .opacity(configuration.isPressed ? 0.72 : 1)
     }
 }
