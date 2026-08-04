@@ -791,6 +791,7 @@
 "色轮" = "Color Wheels";
 "曲线" = "Curves";
 "媒体池" = "Media Pool";
+"媒体池 %lld" = "Media Pool %lld";
 "检查器" = "Inspector";
 "可编辑照片" = "Editable Photos";
 "非破坏编辑 · 保存为高质量副本" = "Non-destructive editing · Save a high-quality copy";

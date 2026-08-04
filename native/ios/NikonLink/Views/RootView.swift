@@ -1936,7 +1936,13 @@ private struct ImageEditorPage: View {
 
     private var editorMediaRow: some View {
         HStack(spacing: 10) {
-            Text("媒体池 \(photos.count)")
+            Text(
+                RuntimeLocalization.format(
+                    "媒体池 %lld",
+                    locale: locale,
+                    Int64(photos.count)
+                )
+            )
                 .font(.caption.monospaced().weight(.semibold))
                 .foregroundStyle(.white)
             if let selectedItem {
