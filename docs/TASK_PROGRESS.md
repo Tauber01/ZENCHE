@@ -389,3 +389,5 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 回环 redeem `/issue-migrated` 签发端、五端恢复 UI、旧码预验签、新码二次验签及本地耐久替换已并入集成分支；恢复端点固定为 HTTPS。Nginx 精确反代、DNS 切换、关闭公网 8787、生产秘密注入、灰度与回滚仍未实施，没有生产服务器改动。
 - 自动化基线：core `87cb78c` 为 `225/225`；redeem `3745eda` 为 `237/237`；五端客户端切片在 UI 分支为 `138/138`。独立审查 `87cb78c` 无 P0，发现的唯一 P1 是迁移链尾退款缺少测试；集成分支已补等价的 in-flight 退款与链尾解析覆盖，合并态完整 `npm test` 为 **248/248** 通过。
 - 发布状态：已集成并升到 1.5.2 / build 27，正在同步三语文档和生成五端本地候选包。尚未上传 GitHub、未打 `v1.5.2` 标签、未创建 Release、未部署生产；签名、Windows 主机、相机真机等门禁必须随交付包精确披露。
+- 交付结果：Android APK、HarmonyOS HAP、iOS unsigned IPA 与精确源码 ZIP 已生成并通过同名 SHA-256 回验；完整清单、哈希和签名状态见 `docs/releases/v1.5.2.md`。Android 为 Debug 证书，HarmonyOS 未签名，iOS 未签名。
+- macOS / Windows 包未生成：工作区缺少 Nikon Image/Remote SDK 与 Sony Camera Remote SDK 压缩包；Windows 还缺匹配的 `libusb-1.0.dll` 和 Windows 主机。macOS 全 Swift 类型检查及 Windows .NET Release 交叉编译均已通过，但不得据此声称正式安装验证。

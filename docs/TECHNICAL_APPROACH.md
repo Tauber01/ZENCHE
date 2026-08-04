@@ -36,6 +36,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 五端“恢复设备码”固定请求 `https://zenche.top/api/v1/ai/rebind`：发送前用旧设备码本地验签旧激活码，响应后用当前设备码本地验签新码，验证完成后再持久化。迁移保留服务端剩余次数并永久冻结旧绑定；404 必须提示服务暂未开放。
 - `ai-server/redeem-rebind.mjs` 只在回环地址提供 `POST /issue-migrated`，Bearer 共享密钥、RSA 私钥和监听端口均由运行时注入；请求体有 16 KiB 上限，日志仅记录短指纹。AI 代理通过回环调用它，私钥不得进入代理进程或仓库。
 - 客户端、代理和签发端代码可以随本地候选包交付，但生产换绑保持默认关闭；DNS/HTTPS、Nginx 精确反代、秘密注入、公网 8787 关闭、灰度与回滚未闭环前不得上线。
+- 本地交付候选的产物、SHA-256、签名状态和未生成平台原因以 `docs/releases/v1.5.2.md` 为准。Android Debug APK、HarmonyOS unsigned HAP 与 iOS unsigned IPA 可作为编译证据；它们不能替代正式证书签名、商店分发或实机验收。
 
 ## 1. 总体原则
 
