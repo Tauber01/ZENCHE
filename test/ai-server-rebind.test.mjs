@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import http from "node:http";
-import { createApp } from "../ai-server/app.mjs";
+import { createApp, resolveMigrationTail } from "../ai-server/app.mjs";
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const TEST_PUBLIC_KEY = publicKey.export({ type: "pkcs1", format: "pem" });
@@ -383,6 +383,40 @@ test("T24: migration remains blocked until both concurrent AI requests finish", 
   gates[1].resolve("SECOND");
   assert.equal((await second).status, 200);
   assert.equal((await postRebind(app.port, code, "two-ai", "two-ai-new")).status, 200);
+});
+
+test("T25: failed in-flight work refunds once and migration-tail resolution reaches the live binding", async (t) => {
+  const expiry = dateStr(120);
+  const code = makeCode("rollback-old", expiry);
+  const gate = deferred();
+  let started = false;
+  const app = await startRebind({
+    devices: { "rollback-old": record(code, expiry, 9) },
+    drawImageImpl: async () => {
+      started = true;
+      return gate.promise;
+    },
+  });
+  t.after(() => closeApp(app));
+
+  const aiPromise = postAi(app.port, code, "rollback-old");
+  await waitUntil(() => started);
+  assert.equal(app.snapshot().devices["rollback-old"].used, 10);
+  assert.equal(
+    (await postRebind(app.port, code, "rollback-old", "rollback-new")).status,
+    409,
+  );
+  gate.reject(new Error("injected upstream failure"));
+  assert.equal((await aiPromise).status, 502);
+  assert.equal(app.snapshot().devices["rollback-old"].used, 9);
+  assert.equal(app.snapshot().devices["rollback-old"].migrated_to, undefined);
+
+  const chain = {
+    "rollback-old": { migrated_to: "rollback-mid" },
+    "rollback-mid": { migrated_to: "rollback-new" },
+    "rollback-new": { used: 9 },
+  };
+  assert.equal(resolveMigrationTail(chain, "rollback-old"), "rollback-new");
 });
 
 test("T30: the rebind write lock blocks new AI consumption during slow signing", async (t) => {

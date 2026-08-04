@@ -116,8 +116,13 @@ export function createRedeemServer(opts = {}) {
   }
 
   function reply(res, status, obj, headers = {}) {
-    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
-    res.end(JSON.stringify(obj));
+    const body = JSON.stringify(obj);
+    res.writeHead(status, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": Buffer.byteLength(body),
+      ...headers,
+    });
+    res.end(body);
   }
 
   function handle(req, res) {
@@ -201,13 +206,18 @@ export function createRedeemServer(opts = {}) {
 
   const server = http.createServer(handle);
 
-  return new Promise((resolve) => {
-    server.listen(port, host, () => resolve({
-      server,
-      port: server.address().port,
-      host: server.address().address,
-      signCode,
-    }));
+  return new Promise((resolve, reject) => {
+    const onListenError = (error) => reject(error);
+    server.once("error", onListenError);
+    server.listen(port, host, () => {
+      server.off("error", onListenError);
+      resolve({
+        server,
+        port: server.address().port,
+        host: server.address().address,
+        signCode,
+      });
+    });
   });
 }
 
@@ -225,12 +235,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error("[ZENCHE-REDEEM] 错误：未设置 ZENCHE_REBIND_KEY_FILE 环境变量。");
     process.exit(1);
   }
-  const { server } = await createRedeemServer({
-    secret,
-    privateKeyFile: keyFile,
-    port: Number(process.env.ZENCHE_REDEEM_PORT || 8899),
-    host: process.env.ZENCHE_REDEEM_HOST || "127.0.0.1", // loopback default; keep behind the TLS reverse proxy
-  });
-  server.on("error", (e) => { console.error("[ZENCHE-REDEEM] server error:", e.message); process.exit(1); });
-  console.log(`[ZENCHE-REDEEM] listening on ${server.address().address}:${server.address().port}`);
+  try {
+    const { server } = await createRedeemServer({
+      secret,
+      privateKeyFile: keyFile,
+      port: Number(process.env.ZENCHE_REDEEM_PORT || 8899),
+      host: process.env.ZENCHE_REDEEM_HOST || "127.0.0.1", // loopback default; keep behind the TLS reverse proxy
+    });
+    server.on("error", () => {
+      console.error("[ZENCHE-REDEEM] 服务运行失败。");
+      process.exit(1);
+    });
+    console.log(`[ZENCHE-REDEEM] listening on ${server.address().address}:${server.address().port}`);
+  } catch {
+    // Do not reveal the configured key path or runtime details on startup.
+    console.error("[ZENCHE-REDEEM] 服务启动失败。");
+    process.exit(1);
+  }
 }

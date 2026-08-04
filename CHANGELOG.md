@@ -3,6 +3,39 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.5.2] - 2026-08-04
+
+### Added
+
+- Added a global status bar across iOS / iPadOS, Android, HarmonyOS, macOS,
+  and Windows for connection state, current operations, and the total local
+  library count.
+- Added a five-platform Restore Device Code flow that verifies the old proof
+  locally, requests a server migration, verifies the replacement code locally,
+  and preserves the server-authoritative remaining AI quota.
+- Added a loopback-only, zero-dependency redeem signer for migrated activation
+  codes. The private key and shared secret are injected at runtime and are not
+  stored in the repository.
+
+### Changed
+
+- Hardened the AI proxy with bounded request/upstream/image payloads, UTF-8-safe
+  streaming, durable quota persistence, automatic refunds, and fail-stop
+  behavior after uncertain storage failures.
+- Android USB/PTP now falls back only for known asynchronous transport failures
+  and reuses the synchronous path for the current connection after a successful
+  fallback, avoiding repeated 10–12 second waits.
+- Raised native release metadata to version `1.5.2` / build `27` and synchronized
+  launch announcements and localization across all five clients.
+
+### Limitations
+
+- Device migration remains server-disabled until the production DNS/HTTPS,
+  reverse-proxy, secret/key injection, and public-port closure gates are met.
+- The local candidate packages are not a GitHub stable release. Platform signing,
+  notarization, Windows-host validation, and camera-device validation are reported
+  separately with the delivered artifacts.
+
 ## [1.5.0] - 2026-08-03
 
 ### Added

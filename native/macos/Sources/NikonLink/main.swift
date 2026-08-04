@@ -11994,7 +11994,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.1"
+        ) as? String ?? "1.5.2"
     }
 
     var body: some View {

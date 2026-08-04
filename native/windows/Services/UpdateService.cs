@@ -32,7 +32,7 @@ public sealed class UpdateService
         "mirrorchyan-cdk.dat");
 
     public string CurrentVersion { get; } =
-        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.5.1";
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.5.2";
 
     public string MirrorChyanWebsiteUrl
     {
@@ -341,7 +341,7 @@ public sealed class UpdateService
         };
         client.DefaultRequestHeaders.Accept.ParseAdd(
             "application/json");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.1");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.2");
         return client;
     }
 

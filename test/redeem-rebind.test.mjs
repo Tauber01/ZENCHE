@@ -64,6 +64,7 @@ test("successful issuance signs a code that verifies with the public key", async
   const expiry = dateStr(120);
   const res = await post(app.port, "/issue-migrated", { newDeviceId: "new-device-0001", expiry });
   assert.equal(res.status, 200);
+  assert.ok(Number(res.headers.get("content-length")) > 0);
   const body = await res.json();
   assert.equal(typeof body.code, "string");
   assert.match(body.code, /^ZENCHE-AI-[A-Za-z0-9+/=]+-\d{8}$/);
@@ -203,6 +204,21 @@ test("the default host is loopback-only", async (t) => {
   const app = await startServer({ port: 0 }); // no host override => factory default
   t.after(() => stopServer(app));
   assert.ok(app.host === "127.0.0.1" || app.host === "::1", `loopback expected, got ${app.host}`);
+});
+
+test("a listen failure rejects instead of leaving startup pending", async (t) => {
+  const first = await startServer();
+  t.after(() => stopServer(first));
+  await assert.rejects(
+    createRedeemServer({
+      secret: "test-shared-secret",
+      privateKeyPem: PRIVATE_KEY_PEM,
+      host: first.host,
+      port: first.port,
+      logImpl: () => {},
+    }),
+    (error) => error?.code === "EADDRINUSE",
+  );
 });
 
 test("audit logs carry fingerprints only, never secrets", async (t) => {

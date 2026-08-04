@@ -28,7 +28,7 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - 最新正式版：**v1.5.1**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1)）
-- 当前源码版本：**1.5.1**
+- 当前源码版本：**1.5.2**（本地交付候选，尚未发布到 GitHub）
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
@@ -381,7 +381,7 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - Latest stable release: **v1.5.1** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1))
-- Source version: **1.5.1**
+- Source version: **1.5.2** (local delivery candidate; not yet published on GitHub)
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
@@ -677,7 +677,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - 最新安定版：**v1.5.1**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1)）
-- 現在のソースバージョン：**1.5.1**
+- 現在のソースバージョン：**1.5.2**（ローカル配布候補。GitHub では未公開）
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）

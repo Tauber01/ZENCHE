@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-03（Asia/Shanghai）
+> 最近核对：2026-08-04（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -28,6 +28,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 标准 PTP 实时取景不提供音频，以上 AVI 明确为无声视频；不得生成伪造音轨。iOS / iPadOS 本机与 UVC 视频源继续使用 AVFoundation MOV。
 - 外录可与机身存储卡录制并行；机身拒绝开始录制但实时取景可用时，设备外录继续运行并明确提示。
 - 停止录制、相机断开或帧写入失败必须尝试完成已有 AVI/MOV，再刷新文件库；只有没有收到任何有效帧时才删除空文件。
+
+## 0.3. 1.5.2 状态、连接与 AI 恢复约定
+
+- 五端全局状态条统一显示连接状态、当前操作和本地文件库总数；紧凑布局也不得隐藏关键状态，长状态必须截断而不能挤压计数。
+- Android USB/PTP 只对已知异步传输失败降级到同步 bulk 传输；首次成功后仅在当前连接会话复用同步路径，重连或关闭必须重置。
+- 五端“恢复设备码”固定请求 `https://zenche.top/api/v1/ai/rebind`：发送前用旧设备码本地验签旧激活码，响应后用当前设备码本地验签新码，验证完成后再持久化。迁移保留服务端剩余次数并永久冻结旧绑定；404 必须提示服务暂未开放。
+- `ai-server/redeem-rebind.mjs` 只在回环地址提供 `POST /issue-migrated`，Bearer 共享密钥、RSA 私钥和监听端口均由运行时注入；请求体有 16 KiB 上限，日志仅记录短指纹。AI 代理通过回环调用它，私钥不得进入代理进程或仓库。
+- 客户端、代理和签发端代码可以随本地候选包交付，但生产换绑保持默认关闭；DNS/HTTPS、Nginx 精确反代、秘密注入、公网 8787 关闭、灰度与回滚未闭环前不得上线。
 
 ## 1. 总体原则
 
@@ -163,6 +171,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **授权与计数**：激活码为 RSA 离线签名，绑定设备 ID、每码 100 次；次数在服务器端 JSON 存储中按设备累计，失败（上游异常）自动回滚扣减。客户端本地只保存激活码文本，不再计数。
 - **服务器**：仓库内候选实现为 `ai-server/app.mjs`，采用纯 Node 零依赖 HTTP 代理和可注入 `createApp` 工厂；默认仅监听 `127.0.0.1`，正式 CLI 端点为 `POST /v1/ai`。上游 grsai 走 JSON `POST /v1/api/generate`，请求使用 `model`、`prompt`、`images`、`aspectRatio`、`imageSize` 与 `replyType`，异步结果经 `/v1/api/result` 轮询后限流下载。请求体、上游 JSON 和图片响应均有流式大小上限；消费提交与失败退款共用 `tmp → 文件 fsync → rename → 目录 fsync` 耐久写盘和 fail-stop 恢复。生产 `/opt/ai-server/server.js` 尚未由该候选替换。
 - **设备码换绑**：`POST /v1/ai/rebind` 默认关闭，只有显式设置 `ZENCHE_AI_ENABLE_REBIND=1` 且注入 `ZENCHE_REBIND_SECRET`（或测试签发器）时才注册。服务端先校验旧码与旧设备绑定，再通过回环 redeem 服务签发绑定新设备的新码并本地二次验签，最后单次耐久事务冻结旧记录、创建新记录并原样继承 `used`/`expiry`。in-flight 计数 Map 与 rebind 写锁阻断 AI 请求、退款和迁移交错；IP 与激活码指纹双桶限流，审计只记录 SHA-256 短指纹。公网只允许经 `https://zenche.top/api/v1/ai/rebind` 精确反代，DNS 未切换或公网 8787 未关闭时禁止启用。
+- **客户端恢复**：五端只在本地旧码验签通过后提交 `activationCode`、`oldDeviceId`、`newDeviceId`，并在服务端成功响应后对 `newCode` 做当前设备二次验签，再以各平台的耐久存储能力替换激活状态。网络与响应体均设上限，日志不得输出旧码、新码或完整设备码。
 - 服务器地址由五端内置代理配置统一提供，默认 `http://101.34.255.115:8787`；设置面板不再提供可编辑入口。为兼容升级，客户端仍会读取历史保存的 `aiServerURL`、`ai_server_url` 或 `ai-server-url.txt` 值。
 
 ## 7. 本地化、更新与诊断

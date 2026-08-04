@@ -14,6 +14,16 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
+export function resolveMigrationTail(devices, deviceId) {
+  let current = deviceId;
+  const seen = new Set();
+  while (devices[current] && devices[current].migrated_to && !seen.has(current)) {
+    seen.add(current);
+    current = devices[current].migrated_to;
+  }
+  return current;
+}
+
 // Strict yyyyMMdd validity: rejects impossible dates (20260231) that JS Date
 // would silently normalize (rollover), and treats the expiry day as valid for
 // the whole day (expired only when strictly before today's start).
@@ -516,16 +526,6 @@ export function createApp(opts = {}) {
     return remote;
   }
 
-  function resolveTail(deviceId) {
-    let current = deviceId;
-    const seen = new Set();
-    while (devices[current] && devices[current].migrated_to && !seen.has(current)) {
-      seen.add(current);
-      current = devices[current].migrated_to;
-    }
-    return current;
-  }
-
   function beginInflight(deviceId) {
     inflight.set(deviceId, (inflight.get(deviceId) || 0) + 1);
   }
@@ -735,7 +735,7 @@ export function createApp(opts = {}) {
         // used-1 takes its own full snapshot and goes through the same
         // persistDurably + recoverPersistFailure path as the consume commit (R6).
         console.error("[ai-server] 上游转发失败:", err.message);
-        const rollbackDeviceId = resolveTail(deviceId);
+        const rollbackDeviceId = resolveMigrationTail(devices, deviceId);
         if (devices[rollbackDeviceId]) {
           const failure = durableWrite(() => { devices[rollbackDeviceId].used -= 1; });
           if (failure) return reply(res, failure.status, failure.body);

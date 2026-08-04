@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.1 launch announcements describe AI and mask fixes on every target', async () => {
+test('version 1.5.2 launch announcements describe status, recovery, and reliability on every target', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,9 +95,10 @@ test('version 1.5.1 launch announcements describe AI and mask fixes on every tar
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /新增“智能移除”/);
-    assert.match(announcement, /重做蒙版预览/);
-    assert.match(announcement, /延长移动端 AI 请求等待时间/);
+    assert.match(announcement, /新增五端全局状态条/);
+    assert.match(announcement, /新增“恢复设备码”入口（服务端启用后可用）/);
+    assert.match(announcement, /Android USB\/PTP 遇到已知异步传输故障/);
+    assert.match(announcement, /强化 AI 代理与签发服务/);
     assert.match(announcement, /五端同步更新/);
   }
 });

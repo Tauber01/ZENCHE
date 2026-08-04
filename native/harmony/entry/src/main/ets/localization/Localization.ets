@@ -390,23 +390,20 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   ),
   new TranslationEntry('已选择原图', 'Original selected', '元画像を選択済み'),
   new TranslationEntry(
-    '• 修复 AI 修图原图选择：进入修图即可预览当前原图，切换照片会清除旧 AI 结果。\n' +
-      '• 新增“智能移除”：支持去路人并自然补全背景，以及去除摄影器材、工作人员、反光和杂物等穿帮元素。\n' +
-      '• 重做蒙版预览：智能蒙版和画笔蒙版以真实蓝色覆盖显示，橡皮擦除蓝色区域，不再绘制白色。\n' +
-      '• 修复蒙版删除与局部调整合成，曝光、对比度、色彩、细节只作用于对应蒙版区域。\n' +
-      '• 延长移动端 AI 请求等待时间，并展示服务端错误详情，减少长任务被误判失败。\n' +
+    '• 新增五端全局状态条：统一显示相机连接、当前操作和 ZENCHE 文件库总数。\n' +
+      '• 新增“恢复设备码”入口（服务端启用后可用）：使用旧设备码与旧激活码迁移剩余 AI 次数；成功后旧绑定永久失效。\n' +
+      '• Android USB/PTP 遇到已知异步传输故障时会自动降级，并在本次连接中复用稳定通道，减少重复等待。\n' +
+      '• 强化 AI 代理与签发服务：限制请求和响应大小、耐久保存次数、失败自动退款，并在存储异常时停止继续写入。\n' +
       '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。',
-    '• Fixed original selection in AI retouching: the selected photo is immediately previewed, and switching photos clears the previous AI result.\n' +
-      '• Added Smart Removal for passersby and natural background reconstruction, plus equipment, crew, reflections, and other production artifacts.\n' +
-      '• Rebuilt mask previews: smart and brush masks now use a true blue overlay, and the eraser removes blue coverage instead of painting white.\n' +
-      '• Fixed mask deletion and local-adjustment compositing so exposure, contrast, color, and detail affect only the corresponding mask.\n' +
-      '• Extended mobile AI request timeouts and surfaced server error details to avoid treating long-running jobs as failures.\n' +
+    '• Added a global status bar on all five clients for camera connection, current operation, and total ZENCHE library count.\n' +
+      '• Added Restore Device Code (available after the server is enabled): migrate remaining AI uses with the old device ID and activation code; the old binding is permanently invalidated after success.\n' +
+      '• Android USB/PTP now falls back on known asynchronous transfer failures and reuses the stable path for the current connection to avoid repeated waits.\n' +
+      '• Hardened the AI proxy and signing service with bounded payloads, durable quota writes, automatic refunds, and fail-stop behavior after storage faults.\n' +
       '• Synchronized the update across iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.',
-    '• AI 写真編集の元画像選択を修正。編集画面ですぐ元画像を確認でき、写真を切り替えると以前の AI 結果を消去します。\n' +
-      '• 通行人の削除と自然な背景補完、撮影機材、スタッフ、反射、不要物などの写り込みを除去する「スマート除去」を追加しました。\n' +
-      '• マスクプレビューを再構築。スマート／ブラシマスクを実際の青いオーバーレイで表示し、消しゴムは白を描かず青い範囲を消去します。\n' +
-      '• マスク削除と部分調整の合成を修正し、露出、コントラスト、色、ディテールが対応するマスク範囲だけに適用されます。\n' +
-      '• モバイル AI の待機時間を延長し、サーバーのエラー詳細を表示して長時間処理の誤判定を減らしました。\n' +
+    '• 5 つのクライアントに共通ステータスバーを追加し、カメラ接続、現在の操作、ZENCHE ライブラリ総数を表示します。\n' +
+      '• 「デバイスコードを復元」を追加（サーバー有効化後に利用可能）。旧デバイス ID と旧アクティベーションコードで AI 残回数を移行し、成功後は旧紐付けを永久に無効化します。\n' +
+      '• Android USB/PTP は既知の非同期転送障害時に自動フォールバックし、現在の接続では安定した経路を再利用して待ち時間の繰り返しを抑えます。\n' +
+      '• AI プロキシと署名サービスを強化し、データ量制限、回数の永続保存、失敗時の自動返却、ストレージ異常後の停止動作を追加しました。\n' +
       '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新。'
   ),
   new TranslationEntry(
