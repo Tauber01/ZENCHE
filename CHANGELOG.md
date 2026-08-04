@@ -3,6 +3,46 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
+## [1.5.3] - Unreleased
+
+### Added
+
+- Added an image-first full-screen monitoring HUD across iOS / iPadOS,
+  Android, HarmonyOS, macOS, and Windows with connection/exposure telemetry,
+  focus reticles, tool rails, real RGB scope data, an explicit silent-audio
+  baseline, and a bottom parameter tray.
+- Added device-summary cards, adaptive parameter cards, and a persistent
+  capture dock to the five native capture workspaces.
+- Added coordinated media-pool, preview, inspector, and analysis-scope regions
+  to every native editor while preserving the existing editing and AI actions.
+
+### Changed
+
+- Unified the five native workspaces around a dark studio palette: ZENCHE blue
+  identifies primary actions, warm gold is reserved for active parameter
+  readouts, and red remains limited to recording and destructive states.
+- Expanded Simplified Chinese, English, and Japanese localization for the new
+  studio surfaces and synchronized the five-platform launch announcement.
+- Raised native metadata and package scripts to version `1.5.3` / build `28`.
+
+### Fixed
+
+- Restored the iOS capture-session controls after the capture workspace redesign.
+- Prevented disconnected full-screen HUDs, capture summaries, parameter trays,
+  and output readouts from showing initialized camera values as live telemetry.
+- Made Android editor rail shortcuts navigate to the existing wheels, curves,
+  masks, and AI workspaces instead of showing a placeholder message.
+- Added a compact Windows editor breakpoint and completed Simplified Chinese,
+  English, and Japanese strings for the new workbench labels and empty states.
+
+### Compatibility
+
+- Camera connection, capture, external recording, file transfer, non-destructive
+  editing, AI activation, and device-binding behavior are unchanged. Scope
+  panels render measured camera/editor data and never invent telemetry.
+- This source state is a local development candidate. It has not been pushed,
+  tagged, published as a GitHub Release, or deployed to production.
+
 ## [1.5.2] - 2026-08-04
 
 ### Added

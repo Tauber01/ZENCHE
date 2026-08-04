@@ -37,6 +37,18 @@ private enum RuntimeLocalization {
             }
     }
 
+    static func format(
+        _ source: String,
+        locale: Locale,
+        _ arguments: CVarArg...
+    ) -> String {
+        String(
+            format: text(source, locale: locale),
+            locale: locale,
+            arguments: arguments
+        )
+    }
+
     private static func loadTable(language: String) -> [String: String] {
         guard
             let path = Bundle.main.path(forResource: language, ofType: "lproj"),
@@ -97,6 +109,14 @@ private enum IPalette {
     static let video = dynamic(light: 0xD8323A, dark: 0xFF5257)
     static let videoSoft = dynamic(light: 0xFBE2E3, dark: 0x3A1B1E)
     static let positive = dynamic(light: 0x1FA869, dark: 0x35C97B)
+    // ZENCHE 1.5.3 studio tokens: cobalt stays the product accent, warm gold
+    // marks the parameter currently being read or adjusted, and red is kept
+    // exclusively for recording and destructive states.
+    static let studioCanvas = Color(red: 6 / 255, green: 9 / 255, blue: 13 / 255)
+    static let studioPanel = Color(red: 21 / 255, green: 25 / 255, blue: 31 / 255)
+    static let studioRaised = Color(red: 32 / 255, green: 36 / 255, blue: 43 / 255)
+    static let studioRule = Color(red: 52 / 255, green: 58 / 255, blue: 67 / 255)
+    static let studioGold = Color(red: 216 / 255, green: 182 / 255, blue: 83 / 255)
     static let graphite = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let monitorBackground = Color(red: 4 / 255, green: 12 / 255, blue: 22 / 255)
     static let readoutGlow = Color(red: 107 / 255, green: 174 / 255, blue: 255 / 255)
@@ -174,7 +194,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.2"
+        ) as? String ?? "1.5.3"
     }
 
     var body: some View {
@@ -1477,8 +1497,164 @@ private struct ProfessionalEditSettings {
     }
 }
 
+/// Dense, Resolve-inspired shell used on regular-width editor surfaces. The
+/// children remain the existing native editor controls, so every established
+/// adjustment, mask, AI action, and save path stays intact.
+private struct ResolveEditorWorkbench<
+    MediaRail: View,
+    CanvasArea: View,
+    ToolRail: View,
+    ScopeDock: View
+>: View {
+    let mediaRail: MediaRail
+    let canvasArea: CanvasArea
+    let toolRail: ToolRail
+    let scopeDock: ScopeDock
+
+    init(
+        @ViewBuilder mediaRail: () -> MediaRail,
+        @ViewBuilder canvasArea: () -> CanvasArea,
+        @ViewBuilder toolRail: () -> ToolRail,
+        @ViewBuilder scopeDock: () -> ScopeDock
+    ) {
+        self.mediaRail = mediaRail()
+        self.canvasArea = canvasArea()
+        self.toolRail = toolRail()
+        self.scopeDock = scopeDock()
+    }
+
+    var body: some View {
+        HStack(spacing: 1) {
+            mediaRail
+                .frame(width: 224)
+            VStack(spacing: 1) {
+                canvasArea
+                scopeDock
+                    .frame(height: 126)
+            }
+            .frame(maxWidth: .infinity)
+            toolRail
+                .frame(width: 334)
+        }
+        .padding(1)
+        .background(IPalette.studioRule)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(IPalette.studioRule, lineWidth: 1)
+        }
+    }
+}
+
+private struct EditorMediaRail<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("媒体池", systemImage: "photo.stack")
+                .font(.caption.monospaced().weight(.bold))
+                .foregroundStyle(.white)
+            Rectangle().fill(IPalette.studioRule).frame(height: 1)
+            content
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(IPalette.studioPanel)
+        .foregroundStyle(.white)
+    }
+}
+
+private struct EditorToolRail<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("检查器", systemImage: "slider.horizontal.3")
+                    .font(.caption.monospaced().weight(.bold))
+                    .foregroundStyle(.white)
+                Rectangle().fill(IPalette.studioRule).frame(height: 1)
+                content
+            }
+            .padding(12)
+        }
+        .frame(maxHeight: .infinity)
+        .background(IPalette.studioPanel)
+    }
+}
+
+/// The editor scope shows only values returned by the real local image
+/// analysis. Before analysis it presents an explicit no-data grid.
+private struct EditorScopeDock: View {
+    let values: [Double]
+    let hasSource: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("编辑示波器")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.52))
+                Text(hasSource
+                    ? (values.isEmpty ? "运行“分析画面”后显示实测范围" : "本地图像分析")
+                    : "暂无图像源")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(values.isEmpty ? IPalette.muted : IPalette.studioGold)
+            }
+            .frame(width: 190, alignment: .leading)
+
+            Canvas { context, size in
+                var grid = Path()
+                for fraction in [0.25, 0.5, 0.75] {
+                    let y = size.height * fraction
+                    grid.move(to: CGPoint(x: 0, y: y))
+                    grid.addLine(to: CGPoint(x: size.width, y: y))
+                }
+                context.stroke(grid, with: .color(.white.opacity(0.12)), lineWidth: 1)
+                guard !values.isEmpty else { return }
+                let width = size.width / CGFloat(max(values.count, 1))
+                for (index, raw) in values.enumerated() {
+                    let value = min(max(raw, 0), 1)
+                    let rect = CGRect(
+                        x: CGFloat(index) * width + 4,
+                        y: size.height * (1 - value),
+                        width: max(3, width - 8),
+                        height: size.height * value
+                    )
+                    var bar = Path()
+                    bar.addRect(rect)
+                    context.fill(
+                        bar,
+                        with: .linearGradient(
+                            Gradient(colors: [IPalette.cobalt, IPalette.studioGold]),
+                            startPoint: CGPoint(x: rect.midX, y: rect.maxY),
+                            endPoint: CGPoint(x: rect.midX, y: rect.minY)
+                        )
+                    )
+                }
+            }
+            .background(IPalette.studioCanvas)
+            .overlay {
+                Rectangle().stroke(IPalette.studioRule, lineWidth: 1)
+            }
+        }
+        .padding(10)
+        .background(IPalette.studioPanel)
+    }
+}
+
 private struct ImageEditorPage: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.locale) private var locale
     @StateObject private var branchStore = LibraryBranchStore()
     @State private var selectedItemID: LibraryItem.ID?
     @State private var selectedSection = EditorAdjustmentSection.light
@@ -1565,8 +1741,11 @@ private struct ImageEditorPage: View {
                 } else {
                     Image(systemName: "photo.on.rectangle")
                 }
-                Text(selectedItem?.filename ?? "选择照片")
-                    .lineLimit(1)
+                if let filename = selectedItem?.filename {
+                    Text(filename).lineLimit(1)
+                } else {
+                    RuntimeLocalizedText("选择照片").lineLimit(1)
+                }
             }
         }
         .menuStyle(.automatic)
@@ -1618,31 +1797,24 @@ private struct ImageEditorPage: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageTitle(
-                    title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
-                    subtitle: selectedSection == .aiTools
-                        ? "基于 nano-banana-2 模型的 AI 修图与生图"
-                        : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
-                )
-                if selectedSection == .aiTools {
-                    aiToolsToolbar
-                } else {
-                    editorToolbar
-                    nikonCloudPreviewNotice
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    PageTitle(
+                        title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
+                        subtitle: selectedSection == .aiTools
+                            ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                            : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
+                    )
+
+                    if proxy.size.width >= 1100 {
+                        resolveWorkbench
+                    } else {
+                        compactEditorFlow
+                    }
                 }
-                preview
-                sectionSelector
-                if selectedSection == .aiTools {
-                    aiToolsPanel
-                } else {
-                    aiWorkbench
-                    adjustmentPanel
-                }
-                if selectedSection != .aiTools { editorFooter }
+                .padding(20)
             }
-            .padding(20)
         }
         .onAppear {
             selectInitialPhoto()
@@ -1654,6 +1826,87 @@ private struct ImageEditorPage: View {
                 ? "请选择文件库中的照片"
                 : "调整不会覆盖原文件"
         }
+    }
+
+    @ViewBuilder
+    private var compactEditorFlow: some View {
+        if selectedSection == .aiTools {
+            aiToolsToolbar
+        } else {
+            editorToolbar
+            nikonCloudPreviewNotice
+        }
+        preview
+        sectionSelector
+        if selectedSection == .aiTools {
+            aiToolsPanel
+        } else {
+            aiWorkbench
+            adjustmentPanel
+            editorFooter
+        }
+    }
+
+    private var resolveWorkbench: some View {
+        ResolveEditorWorkbench {
+            EditorMediaRail {
+                editorPhotoPicker
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("可编辑照片")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.46))
+                Text("\(photos.count)")
+                    .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white)
+                if let selectedItem {
+                    Text(selectedItem.filename)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Color.white.opacity(0.64))
+                        .lineLimit(3)
+                }
+                Text("调整始终写入新副本，原文件保持不变。")
+                    .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.48))
+            }
+        } canvasArea: {
+            VStack(spacing: 10) {
+                if selectedSection == .aiTools {
+                    aiToolsToolbar
+                } else {
+                    editorToolbar
+                    nikonCloudPreviewNotice
+                }
+                preview
+                sectionSelector
+            }
+            .padding(10)
+            .background(IPalette.studioCanvas)
+        } toolRail: {
+            EditorToolRail {
+                if selectedSection == .aiTools {
+                    aiToolsPanel
+                } else {
+                    aiWorkbench
+                    adjustmentPanel
+                    editorFooter
+                }
+            }
+        } scopeDock: {
+            EditorScopeDock(
+                values: editorScopeValues,
+                hasSource: selectedItem != nil
+            )
+        }
+    }
+
+    private var editorScopeValues: [Double] {
+        guard let aiAnalysis else { return [] }
+        return [
+            aiAnalysis.meanLuma,
+            aiAnalysis.contrast,
+            aiAnalysis.saturation,
+            aiAnalysis.detail
+        ]
     }
 
     private var aiToolsToolbar: some View {
@@ -1953,7 +2206,11 @@ private struct ImageEditorPage: View {
                     }
                 }
             } label: {
-                Label(selectedPreset.rawValue, systemImage: "camera.filters")
+                Label {
+                    RuntimeLocalizedText(selectedPreset.rawValue)
+                } icon: {
+                    Image(systemName: "camera.filters")
+                }
             }
             .buttonStyle(.bordered)
 
@@ -1985,10 +2242,15 @@ private struct ImageEditorPage: View {
                     }
                 }
             } label: {
-                Label(
-                    selectedNikonCloudPreset?.name ?? "尼康云创",
-                    systemImage: "cloud.sun"
-                )
+                Label {
+                    if let name = selectedNikonCloudPreset?.name {
+                        Text(name)
+                    } else {
+                        RuntimeLocalizedText("尼康云创")
+                    }
+                } icon: {
+                    Image(systemName: "cloud.sun")
+                }
                 .lineLimit(1)
             }
             .buttonStyle(.borderedProminent)
@@ -2012,7 +2274,13 @@ private struct ImageEditorPage: View {
         HStack(spacing: 10) {
             Label("尼康云创预览", systemImage: "camera.filters")
                 .font(.subheadline.weight(.semibold))
-            Text("内置 \(NikonCloudPresetLibrary.presets.count) 款 NP3")
+            Text(
+                RuntimeLocalization.format(
+                    "内置 %lld 款 NP3",
+                    locale: locale,
+                    Int64(NikonCloudPresetLibrary.presets.count)
+                )
+            )
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(IPalette.muted)
             Spacer()
@@ -3573,18 +3841,14 @@ private struct CapturePage: View {
                     subtitle: "会话、曝光、对焦与交付按拍摄流程组织。"
                 )
 
-                if horizontalSizeClass != .compact {
-                    CaptureSessionCard()
-                }
+                CaptureDeviceSummary()
                 CameraStage {
                     showingFullscreen = true
                 }
                 NikonCloudMonitorBar()
-                ExposureReadoutRail()
-                CaptureActionBar()
-                if horizontalSizeClass == .compact {
-                    CaptureSessionCard()
-                }
+                CaptureParameterCardGrid()
+                CaptureDock()
+                CaptureSessionCard()
                 CaptureParameterDeck()
                 ShootingTaskCard()
             }
@@ -3593,6 +3857,178 @@ private struct CapturePage: View {
         .fullScreenCover(isPresented: $showingFullscreen) {
             ImmersiveCameraView(mode: .photo)
         }
+    }
+}
+
+/// Figure-2 inspired device summary. Every value is sourced from the active
+/// CameraService or LibraryStore; the card never invents lens or storage data.
+private struct CaptureDeviceSummary: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 1) { summaryCells }
+            VStack(spacing: 1) { summaryCells }
+        }
+        .background(IPalette.studioRule)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(IPalette.studioRule, lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder
+    private var summaryCells: some View {
+        summaryCell(
+            icon: "camera.fill",
+            label: "相机",
+            value: model.camera.state == .ready
+                ? model.camera.deviceName
+                : "—",
+            active: model.camera.state == .ready
+        )
+        summaryCell(
+            icon: "dot.radiowaves.left.and.right",
+            label: "连接",
+            value: model.camera.state == .ready
+                ? (model.camera.isExternalCamera ? "UVC" : "SYSTEM")
+                : "OFFLINE",
+            active: model.camera.state == .ready
+        )
+        summaryCell(
+            icon: "rectangle.stack",
+            label: "输出",
+            value: model.camera.state == .ready
+                ? model.camera.activeVideoSpecLabel
+                : "—",
+            active: model.camera.state == .ready
+        )
+        summaryCell(
+            icon: "externaldrive.fill",
+            label: "文件库",
+            value: RuntimeLocalization.format(
+                "%lld 个文件",
+                locale: locale,
+                Int64(model.library.items.count)
+            ),
+            active: true
+        )
+    }
+
+    private func summaryCell(
+        icon: String,
+        label: String,
+        value: String,
+        active: Bool
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(active ? IPalette.cobalt : IPalette.muted)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(LocalizedStringKey(label))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(IPalette.muted)
+                Text(value)
+                    .font(.caption.monospaced().weight(.semibold))
+                    .foregroundStyle(IPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            Spacer(minLength: 4)
+        }
+        .padding(.horizontal, 13)
+        .frame(maxWidth: .infinity, minHeight: 68)
+        .background(IPalette.surface)
+    }
+}
+
+/// Adaptive, camera-backed parameter cards. Gold outlines the selected/manual
+/// exposure domain while blue continues to communicate product state.
+private struct CaptureParameterCardGrid: View {
+    @EnvironmentObject private var model: AppModel
+
+    private var connected: Bool { model.camera.state == .ready }
+
+    var body: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.adaptive(minimum: 132), spacing: 8)
+            ],
+            spacing: 8
+        ) {
+            parameterCard("模式", value: connected
+                ? (model.camera.exposureModeIsCustom ? "M" : "AUTO")
+                : "—", symbol: "dial.medium")
+            parameterCard("快门", value: connected
+                ? String(format: "%.1f°", model.camera.shutterAngle)
+                : "—", symbol: "timer")
+            parameterCard("光圈", value: connected && model.camera.lensAperture > 0
+                ? String(format: "F%.1f", model.camera.lensAperture)
+                : "—", symbol: "camera.aperture")
+            parameterCard("ISO", value: connected
+                ? "\(Int(model.camera.exposureISO.rounded()))"
+                : "—", symbol: "circle.lefthalf.filled")
+            parameterCard("曝光", value: connected
+                ? String(format: "%+.1f EV", model.camera.exposureBias)
+                : "—", symbol: "plusminus")
+            parameterCard("变焦", value: connected
+                ? String(format: "%.1f×", model.camera.zoomFactor)
+                : "—", symbol: "magnifyingglass")
+        }
+        .padding(8)
+        .background(IPalette.studioPanel, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func parameterCard(
+        _ label: String,
+        value: String,
+        symbol: String
+    ) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: symbol)
+                .foregroundStyle(connected ? IPalette.studioGold : IPalette.muted)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(LocalizedStringKey(label))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.52))
+                Text(value)
+                    .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 2)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .background(IPalette.studioRaised)
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(
+                    connected ? IPalette.studioGold.opacity(0.58) : IPalette.studioRule,
+                    lineWidth: 1
+                )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// Persistent capture dock built on the existing camera actions so the visual
+/// redesign does not fork capture, AF, grid, or safe-guide behavior.
+private struct CaptureDock: View {
+    var body: some View {
+        CaptureActionBar()
+            .padding(10)
+            .background(IPalette.studioPanel, in: RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(IPalette.studioRule, lineWidth: 1)
+            }
     }
 }
 
@@ -3826,6 +4262,8 @@ private struct ImmersiveCameraView: View {
     @State private var sensorLandscape: Bool?
     let mode: ImmersiveCameraMode
 
+    private var cameraReady: Bool { model.camera.state == .ready }
+
     var body: some View {
         GeometryReader { proxy in
             let landscape =
@@ -3878,6 +4316,7 @@ private struct ImmersiveCameraView: View {
                 if landscape {
                     VStack {
                         topBar
+                        immersiveTelemetryHUD
                         Spacer()
                         parameterBar
                         exposureReadout
@@ -3891,9 +4330,20 @@ private struct ImmersiveCameraView: View {
                         rightRail
                     }
                     .padding(.horizontal, 18)
+
+                    VStack {
+                        Spacer()
+                        HStack {
+                            immersiveScopeDock
+                            Spacer()
+                        }
+                        .padding(.leading, 18)
+                        .padding(.bottom, 184)
+                    }
                 } else {
                     VStack {
                         portraitTopBar
+                        immersiveTelemetryHUD
                         Spacer()
                         parameterBar
                         exposureReadout
@@ -3941,9 +4391,9 @@ private struct ImmersiveCameraView: View {
 
             HStack(spacing: 7) {
                 Circle()
-                    .fill(model.camera.state == .ready ? Color.green : Color.red)
+                    .fill(cameraReady ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                RuntimeLocalizedText(model.camera.deviceName)
+                RuntimeLocalizedText(cameraReady ? model.camera.deviceName : "OFFLINE")
                     .lineLimit(1)
             }
             .font(.caption.monospaced().weight(.semibold))
@@ -3954,9 +4404,11 @@ private struct ImmersiveCameraView: View {
             Spacer()
 
             RuntimeLocalizedText(
-                mode == .video
-                    ? "\(model.camera.isRecording ? "● REC" : "系统视频") · \(model.camera.activeVideoSpecLabel)"
-                    : "照片实时取景 · JPEG"
+                cameraReady
+                    ? mode == .video
+                        ? "\(model.camera.isRecording ? "● REC" : "系统视频") · \(model.camera.activeVideoSpecLabel)"
+                        : "照片实时取景 · JPEG"
+                    : "暂无图像源"
             )
                 .font(.caption2.monospaced().weight(.semibold))
                 .padding(.horizontal, 12)
@@ -3978,9 +4430,9 @@ private struct ImmersiveCameraView: View {
 
             HStack(spacing: 7) {
                 Circle()
-                    .fill(model.camera.state == .ready ? Color.green : Color.red)
+                    .fill(cameraReady ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                RuntimeLocalizedText(model.camera.deviceName)
+                RuntimeLocalizedText(cameraReady ? model.camera.deviceName : "OFFLINE")
                     .lineLimit(1)
             }
             .font(.caption2.monospaced().weight(.semibold))
@@ -3990,7 +4442,9 @@ private struct ImmersiveCameraView: View {
 
             Spacer()
 
-            Text(mode == .video ? model.camera.activeVideoSpecLabel : "JPEG")
+            Text(cameraReady
+                ? mode == .video ? model.camera.activeVideoSpecLabel : "JPEG"
+                : "—")
                 .font(.caption2.monospaced().weight(.bold))
                 .padding(.horizontal, 10)
                 .frame(height: 44)
@@ -4000,7 +4454,9 @@ private struct ImmersiveCameraView: View {
 
     private var leftRail: some View {
         VStack(spacing: 12) {
-            Text(mode == .photo ? "M" : "\(Int(model.camera.activeFrameRate))P")
+            Text(cameraReady
+                ? mode == .photo ? "M" : "\(Int(model.camera.activeFrameRate))P"
+                : "—")
                 .font(.title2.weight(.bold))
                 .frame(width: 52, height: 52)
                 .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
@@ -4012,9 +4468,9 @@ private struct ImmersiveCameraView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(ImmersiveControlStyle())
-            .disabled(model.camera.maxZoomFactor <= 1)
+            .disabled(!cameraReady || model.camera.maxZoomFactor <= 1)
 
-            Text(String(format: "%.1f×", model.camera.zoomFactor))
+            Text(cameraReady ? String(format: "%.1f×", model.camera.zoomFactor) : "—")
                 .font(.body.monospacedDigit())
                 .frame(width: 58, height: 44)
                 .background(.black.opacity(0.58), in: Capsule())
@@ -4028,7 +4484,7 @@ private struct ImmersiveCameraView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(ImmersiveControlStyle())
-            .disabled(model.camera.maxZoomFactor <= 1)
+            .disabled(!cameraReady || model.camera.maxZoomFactor <= 1)
         }
         .foregroundStyle(.white)
     }
@@ -4039,7 +4495,105 @@ private struct ImmersiveCameraView: View {
                 .font(.headline)
                 .foregroundStyle(mode.accent)
             captureButton
+            immersiveToolRail
+        }
+    }
 
+    /// Camera-console telemetry patterned after the first reference image.
+    /// It is intentionally read-only and reflects the live CameraService.
+    private var immersiveTelemetryHUD: some View {
+        let connected = cameraReady
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 1) {
+                telemetryCell(
+                    "SOURCE",
+                    connected
+                        ? (model.camera.isExternalCamera ? "UVC" : "SYSTEM")
+                        : "OFFLINE"
+                )
+                telemetryCell(
+                    "FORMAT",
+                    connected
+                        ? (mode == .video ? model.camera.activeVideoSpecLabel : "PHOTO")
+                        : "—"
+                )
+                telemetryCell(
+                    "SHUTTER",
+                    connected ? String(format: "%.1f°", model.camera.shutterAngle) : "—"
+                )
+                telemetryCell(
+                    "IRIS",
+                    connected && model.camera.lensAperture > 0
+                        ? String(format: "F%.1f", model.camera.lensAperture)
+                        : "—"
+                )
+                telemetryCell(
+                    "ISO",
+                    connected ? "\(Int(model.camera.exposureISO.rounded()))" : "—"
+                )
+                telemetryCell(
+                    "EV",
+                    connected ? String(format: "%+.1f", model.camera.exposureBias) : "—"
+                )
+                telemetryCell(
+                    "ZOOM",
+                    connected ? String(format: "%.1f×", model.camera.zoomFactor) : "—"
+                )
+            }
+            .background(IPalette.studioRule.opacity(0.82))
+        }
+        .frame(height: 50)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .opacity(connected ? 1 : 0.55)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func telemetryCell(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.48))
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .padding(.horizontal, 10)
+        .frame(minWidth: 88, maxHeight: .infinity, alignment: .leading)
+        .background(IPalette.studioPanel.opacity(0.86))
+    }
+
+    /// Compact real-data scope dock; histogram traces are sourced from the
+    /// active camera and audio truthfully remains a silent baseline.
+    private var immersiveScopeDock: some View {
+        HStack(spacing: 6) {
+            ScopePlot(
+                label: "RGB",
+                traces: [
+                    ScopeTrace(value: model.camera.redHistogram, color: .red),
+                    ScopeTrace(value: model.camera.greenHistogram, color: .green),
+                    ScopeTrace(value: model.camera.blueHistogram, color: .blue)
+                ],
+                parade: true
+            )
+            .frame(width: 172, height: 78)
+            AudioScopePlot(label: "AUDIO")
+                .frame(width: 86, height: 78)
+        }
+        .padding(5)
+        .background(IPalette.studioCanvas.opacity(0.86))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .allowsHitTesting(false)
+    }
+
+    /// Right-side tools stay separate from the red record/shutter action.
+    private var immersiveToolRail: some View {
+        VStack(spacing: 7) {
             Button {
                 model.showGrid.toggle()
             } label: {
@@ -4055,7 +4609,41 @@ private struct ImmersiveCameraView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(ImmersiveControlStyle(active: model.showSafeGuide))
+
+            Button {
+                model.camera.triggerAutoFocus()
+            } label: {
+                Text("AF")
+                    .font(.caption.monospaced().weight(.bold))
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(ImmersiveControlStyle())
+            .disabled(model.camera.state != .ready)
+            .accessibilityLabel("自动对焦")
+            .accessibilityHint(
+                model.camera.state == .ready ? "" : "连接相机后可用"
+            )
+
+            if mode == .video {
+                Button {
+                    model.camera.setFocusPeakingEnabled(
+                        !model.camera.focusPeakingEnabled
+                    )
+                } label: {
+                    Image(systemName: "scope")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(
+                    ImmersiveControlStyle(
+                        active: model.camera.focusPeakingEnabled
+                    )
+                )
+                .accessibilityLabel("峰值对焦")
+            }
         }
+        .padding(5)
+        .background(IPalette.studioPanel.opacity(0.78))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var portraitCaptureShelf: some View {
@@ -4128,15 +4716,22 @@ private struct ImmersiveCameraView: View {
     }
 
     private var exposureReadout: some View {
-        HStack(spacing: 18) {
-            Text(mode == .video
-                 ? String(format: "%.1f°", model.camera.shutterAngle)
-                 : "EV")
-            Text(mode == .video
-                 ? "ISO \(Int(model.camera.exposureISO.rounded()))"
-                 : String(format: "%+.1f", model.camera.exposureBias))
-            if model.camera.lensAperture > 0 {
+        let connected = model.camera.state == .ready
+        return HStack(spacing: 18) {
+            Text(connected
+                 ? (mode == .video
+                    ? String(format: "%.1f°", model.camera.shutterAngle)
+                    : "EV")
+                 : "—")
+            Text(connected
+                 ? (mode == .video
+                    ? "ISO \(Int(model.camera.exposureISO.rounded()))"
+                    : String(format: "%+.1f", model.camera.exposureBias))
+                 : "—")
+            if connected && model.camera.lensAperture > 0 {
                 Text(String(format: "F%.1f", model.camera.lensAperture))
+            } else {
+                Text("—")
             }
         }
         .font(.body.monospaced().weight(.semibold))
@@ -4194,7 +4789,7 @@ private struct ImmersiveCameraView: View {
                 }
             }
         }
-        .disabled(model.camera.state != .ready)
+        .disabled(!cameraReady)
         .padding(.bottom, 10)
     }
 
@@ -4210,9 +4805,11 @@ private struct ImmersiveCameraView: View {
                 .frame(width: 150)
                 ImmersiveParameterStepper(
                     title: videoShutterMode == "angle" ? "快门角度" : "快门速度",
-                    value: videoShutterMode == "angle"
-                        ? String(format: "%.1f°", model.camera.shutterAngle)
-                        : videoShutterSpeed,
+                    value: cameraReady
+                        ? videoShutterMode == "angle"
+                            ? String(format: "%.1f°", model.camera.shutterAngle)
+                            : videoShutterSpeed
+                        : "—",
                     enabled: model.camera.supportsCustomExposure,
                     lockedReason: "当前设备不支持自定义曝光",
                     decrease: {
@@ -4227,7 +4824,9 @@ private struct ImmersiveCameraView: View {
             } else {
                 ImmersiveParameterStepper(
                     title: "曝光补偿",
-                    value: String(format: "%+.1f EV", model.camera.exposureBias),
+                    value: cameraReady
+                        ? String(format: "%+.1f EV", model.camera.exposureBias)
+                        : "—",
                     enabled: model.camera.supportsExposureBias,
                     lockedReason: "当前设备未开放曝光补偿",
                     decrease: { adjustExposureBias(-1) },
@@ -4236,7 +4835,9 @@ private struct ImmersiveCameraView: View {
             }
             ImmersiveParameterStepper(
                 title: "ISO",
-                value: "\(Int(model.camera.exposureISO.rounded()))",
+                value: cameraReady
+                    ? "\(Int(model.camera.exposureISO.rounded()))"
+                    : "—",
                 enabled: model.camera.supportsCustomExposure,
                 lockedReason: "当前设备未开放自定义 ISO",
                 decrease: { adjustVideoISO(-1) },
@@ -4244,7 +4845,7 @@ private struct ImmersiveCameraView: View {
             )
             ImmersiveParameterStepper(
                 title: "光圈",
-                value: model.camera.lensAperture > 0
+                value: cameraReady && model.camera.lensAperture > 0
                     ? String(format: "F%.1f", model.camera.lensAperture)
                     : "—",
                 enabled: false,
@@ -4283,8 +4884,8 @@ private struct ImmersiveCameraView: View {
             .disabled(model.camera.state != .ready)
             ImmersiveParameterStepper(
                 title: "焦点位置",
-                value: "微调",
-                enabled: model.camera.state == .ready,
+                value: cameraReady ? "微调" : "—",
+                enabled: cameraReady,
                 lockedReason: "当前设备不支持焦点步进",
                 decrease: { model.camera.moveFocus(-1) },
                 increase: { model.camera.moveFocus(1) }
@@ -4302,8 +4903,10 @@ private struct ImmersiveCameraView: View {
             }
             ImmersiveParameterStepper(
                 title: "变焦",
-                value: String(format: "%.1f×", model.camera.zoomFactor),
-                enabled: model.camera.maxZoomFactor > 1,
+                value: cameraReady
+                    ? String(format: "%.1f×", model.camera.zoomFactor)
+                    : "—",
+                enabled: cameraReady && model.camera.maxZoomFactor > 1,
                 lockedReason: "当前设备没有可调变焦范围",
                 decrease: { adjustZoom(-1) },
                 increase: { adjustZoom(1) }
@@ -4311,32 +4914,34 @@ private struct ImmersiveCameraView: View {
             if mode == .video {
                 ImmersiveParameterStepper(
                     title: "尺寸/帧率",
-                    value: model.camera.activeVideoSpecLabel,
-                    enabled: model.camera.state == .ready,
+                    value: cameraReady ? model.camera.activeVideoSpecLabel : "—",
+                    enabled: cameraReady,
                     lockedReason: "当前设备没有可切换的视频规格",
                     decrease: { adjustVideoSpec(-1) },
                     increase: { adjustVideoSpec(1) }
                 )
                 ImmersiveParameterStepper(
                     title: "视频编码",
-                    value: model.monitorVideoCodec.label,
-                    enabled: model.camera.availableVideoCodecs.count > 1,
+                    value: cameraReady ? model.monitorVideoCodec.label : "—",
+                    enabled: cameraReady && model.camera.availableVideoCodecs.count > 1,
                     lockedReason: "当前视频来源没有可切换的录制编码",
                     decrease: { adjustVideoCodec(-1) },
                     increase: { adjustVideoCodec(1) }
                 )
                 ImmersiveParameterStepper(
                     title: "Log",
-                    value: model.monitorVideoLog.label,
-                    enabled: model.availableVideoLogs.count > 1,
+                    value: cameraReady ? model.monitorVideoLog.label : "—",
+                    enabled: cameraReady && model.availableVideoLogs.count > 1,
                     lockedReason: "当前视频来源没有可切换的 Log 曲线",
                     decrease: { adjustVideoLog(-1) },
                     increase: { adjustVideoLog(1) }
                 )
                 ImmersiveParameterStepper(
                     title: "峰值对焦",
-                    value: model.camera.focusPeakingEnabled ? "开启" : "关闭",
-                    enabled: true,
+                    value: cameraReady
+                        ? model.camera.focusPeakingEnabled ? "开启" : "关闭"
+                        : "—",
+                    enabled: cameraReady,
                     decrease: {
                         model.camera.setFocusPeakingEnabled(false)
                     },
@@ -4346,8 +4951,10 @@ private struct ImmersiveCameraView: View {
                 )
                 ImmersiveParameterStepper(
                     title: "假色曝光",
-                    value: model.camera.falseColorEnabled ? "开启" : "关闭",
-                    enabled: true,
+                    value: cameraReady
+                        ? model.camera.falseColorEnabled ? "开启" : "关闭"
+                        : "—",
+                    enabled: cameraReady,
                     decrease: {
                         model.camera.setFalseColorEnabled(false)
                     },
@@ -4483,7 +5090,7 @@ private struct ImmersiveParameterStepper: View {
                     .foregroundStyle(.white.opacity(0.64))
                 Text(value)
                     .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(enabled ? IPalette.studioGold : .white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -4495,7 +5102,14 @@ private struct ImmersiveParameterStepper: View {
         }
         .buttonStyle(ImmersiveControlStyle())
         .padding(2)
-        .background(.black.opacity(0.54), in: RoundedRectangle(cornerRadius: 10))
+        .background(IPalette.studioPanel.opacity(0.88), in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(
+                    enabled ? IPalette.studioGold.opacity(0.48) : IPalette.studioRule,
+                    lineWidth: 1
+                )
+        }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.48)
         .accessibilityHint(enabled ? "" : (lockedReason ?? "当前不可调整"))
@@ -8457,7 +9071,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 新增五端全局状态条：统一显示相机连接、当前操作和 ZENCHE 文件库总数。\n• 新增“恢复设备码”入口（服务端启用后可用）：使用旧设备码与旧激活码迁移剩余 AI 次数；成功后旧绑定永久失效。\n• Android USB/PTP 遇到已知异步传输故障时会自动降级，并在本次连接中复用稳定通道，减少重复等待。\n• 强化 AI 代理与签发服务：限制请求和响应大小、耐久保存次数、失败自动退款，并在存储异常时停止继续写入。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。")
+                    Text("• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。")
                     .font(.subheadline)
                     .lineSpacing(5)
 

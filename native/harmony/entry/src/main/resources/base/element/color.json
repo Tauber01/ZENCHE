@@ -24,6 +24,11 @@
     { "name": "graphite_rule", "value": "#414856" },
     { "name": "graphite_muted", "value": "#ADB5C1" },
     { "name": "graphite_ink", "value": "#F0F3F8" },
+    { "name": "studio_canvas", "value": "#06090D" },
+    { "name": "studio_panel", "value": "#15191F" },
+    { "name": "studio_raised", "value": "#20242B" },
+    { "name": "studio_rule", "value": "#343A43" },
+    { "name": "studio_gold", "value": "#D8B653" },
     { "name": "error", "value": "#B4232D" },
     { "name": "success", "value": "#247A53" }
   ]

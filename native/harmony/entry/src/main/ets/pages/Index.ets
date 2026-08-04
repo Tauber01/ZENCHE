@@ -63,6 +63,12 @@ import {
   translate
 } from '../localization/Localization';
 
+const STUDIO_CANVAS: string = '#06090D';
+const STUDIO_PANEL: string = '#15191F';
+const STUDIO_RAISED: string = '#20242B';
+const STUDIO_RULE: string = '#343A43';
+const STUDIO_GOLD: string = '#D8B653';
+
 function filenameFromPath(path: string): string {
   const index: number = path.lastIndexOf('/');
   return index >= 0 ? path.substring(index + 1) : path;
@@ -452,7 +458,7 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.5.2';
+const CURRENT_VERSION: string = '1.5.3';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -778,6 +784,10 @@ struct Index {
   private readonly monitorAudioScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   private readonly professionalScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly immersiveRgbScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly immersiveAudioScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   @State private sessionName: string = '未命名会话';
   @State private sessionNamingTemplate: string =
@@ -1502,7 +1512,7 @@ struct Index {
       this.NavButton('我的设备', 'devices')
       this.NavButton('分支文件库', 'library')
       Blank()
-      Text('ZENCHE 1.5.2')
+      Text('ZENCHE 1.5.3')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
@@ -1747,12 +1757,150 @@ struct Index {
   private ImageEditorWorkspace() {
     Column({ space: 12 }) {
       this.EditorModeSwitcher()
+      this.ResolveEditorWorkbench()
       if (this.editorTabMode === 'ai') {
         this.AiToolsWorkspace();
       } else {
         this.ProEditorWorkspace();
       }
     }
+  }
+
+  @Builder
+  private ResolveEditorWorkbench() {
+    Scroll() {
+      Row({ space: 6 }) {
+        this.EditorMediaRail()
+        this.EditorToolRail()
+        this.EditorScopeDock()
+      }
+      .padding(6)
+    }
+    .width('100%')
+    .height(118)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .backgroundColor(STUDIO_CANVAS)
+    .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+  }
+
+  @Builder
+  private EditorMediaRail() {
+    Column({ space: 5 }) {
+      Text(`${this.tr('媒体池')} · ${this.editablePhotos().length}`)
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#A8B0BC')
+        .width('100%')
+      Text(
+        this.editorSelectedPath.length > 0
+          ? filenameFromPath(this.editorSelectedPath)
+          : this.tr('未选择照片')
+      )
+        .fontSize(12)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+      Text(this.tr('非破坏编辑 · 保存为高质量副本'))
+        .fontSize(9)
+        .fontColor('#7E8794')
+        .width('100%')
+    }
+    .width(220)
+    .height(106)
+    .padding(10)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+  }
+
+  @Builder
+  private EditorToolRail() {
+    Column({ space: 7 }) {
+      Text(this.tr('工具轨'))
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#A8B0BC')
+        .width('100%')
+      Row({ space: 5 }) {
+        this.EditorWorkbenchTool('色轮', 'wheels')
+        this.EditorWorkbenchTool('曲线', 'curves')
+        this.EditorWorkbenchTool('蒙版', 'mask')
+        this.EditorWorkbenchTool('AI', 'ai')
+      }
+      .width('100%')
+    }
+    .width(330)
+    .height(106)
+    .padding(10)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+  }
+
+  @Builder
+  private EditorWorkbenchTool(label: string, panel: string) {
+    Button(this.tr(label), { type: ButtonType.Normal })
+      .height(52)
+      .layoutWeight(1)
+      .fontSize(11)
+      .fontColor(Color.White)
+      .backgroundColor(
+        panel === 'ai'
+          ? (this.editorTabMode === 'ai' ? $r('app.color.accent') : STUDIO_RAISED)
+          : (this.editorPanel === panel ? $r('app.color.accent') : STUDIO_RAISED)
+      )
+      .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+      .onClick((): void => {
+        if (panel === 'ai') {
+          this.editorTabMode = 'ai';
+          this.aiResultPath = '';
+        } else {
+          this.editorTabMode = 'pro';
+          this.editorPanel = panel;
+        }
+      })
+  }
+
+  @Builder
+  private EditorScopeDock() {
+    Column({ space: 6 }) {
+      Text(this.tr('编辑示波器'))
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#A8B0BC')
+        .width('100%')
+      if (this.editorAIAnalysis === undefined) {
+        Text(this.tr('运行“分析画面”后显示实测范围'))
+          .fontSize(11)
+          .fontColor('#7E8794')
+          .width('100%')
+      } else {
+        Text(
+          `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
+          `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}\n` +
+          `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
+          `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
+        )
+          .fontSize(12)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(STUDIO_GOLD)
+          .width('100%')
+      }
+    }
+    .width(300)
+    .height(106)
+    .padding(10)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
   }
 
   @Builder
@@ -3710,8 +3858,8 @@ struct Index {
   @Builder
   private CameraWorkspace() {
     Column({ space: 16 }) {
-      if (this.section === 'capture' && !this.isCompact()) {
-        this.CaptureSessionPanel()
+      if (this.section === 'capture') {
+        this.CaptureDeviceSummary()
       } else {
         Text('00:00:00:00')
           .fontSize(38)
@@ -3804,11 +3952,15 @@ struct Index {
         this.MonitorParameterControls()
         this.MonitorToolRail()
         this.MonitorStorageCard()
+        this.ExposureReadoutRail()
+      } else {
+        this.CaptureParameterCardGrid()
       }
 
-      this.ExposureReadoutRail()
-
-      Row({ space: 8 }) {
+      if (this.section === 'capture') {
+        this.CaptureDock()
+      } else {
+        Row({ space: 8 }) {
         Text(this.tr(
           this.section === 'monitor'
             ? '相机原生 JPEG · 监看输出 · 不修改原片'
@@ -3871,12 +4023,11 @@ struct Index {
               this.triggerAutoFocusOn();
             })
         }
-      }
-      .width('100%')
-      if (this.section === 'capture') {
-        if (this.isCompact()) {
-          this.CaptureSessionPanel()
         }
+        .width('100%')
+      }
+      if (this.section === 'capture') {
+        this.CaptureSessionPanel()
         this.ShootingTaskPanel()
       }
     }
@@ -3888,6 +4039,151 @@ struct Index {
         ? '#040A12'
         : $r('app.color.paper')
     )
+  }
+
+  @Builder
+  private CaptureDeviceSummary() {
+    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+      this.CaptureSummaryCell(
+        'CAMERA',
+        this.cameraName.length > 0 ? this.cameraName : '—',
+        this.connected || this.wifiConnected || this.localCameraSelected
+      )
+      this.CaptureSummaryCell(
+        'LINK',
+        this.connected ? 'USB/PTP' : this.wifiConnected ? 'PTP-IP'
+          : this.localCameraSelected ? 'SYSTEM' : 'OFFLINE',
+        this.connected || this.wifiConnected || this.localCameraSelected
+      )
+      this.CaptureSummaryCell(
+        'OUTPUT',
+        (this.connected || this.localCameraSelected)
+          ? `${this.videoFrameRate}P · ${this.videoCodecLabel()}`
+          : '—',
+        this.connected || this.localCameraSelected
+      )
+      this.CaptureSummaryCell(
+        'LIBRARY',
+        `${this.photos.length} ${this.tr('个文件')}`,
+        true
+      )
+    }
+    .width('100%')
+    .padding(1)
+    .backgroundColor(STUDIO_RULE)
+    .borderRadius(10)
+  }
+
+  @Builder
+  private CaptureSummaryCell(label: string, value: string, active: boolean) {
+    Column({ space: 4 }) {
+      Text(label)
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#7E8794')
+        .width('100%')
+      Text(value)
+        .fontSize(13)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(active ? $r('app.color.ink') : $r('app.color.muted'))
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+    }
+    .width(this.isCompact() ? '49.5%' : '24.7%')
+    .height(64)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor($r('app.color.surface'))
+  }
+
+  @Builder
+  private CaptureParameterCardGrid() {
+    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
+      this.CaptureParameterCard('模式', this.connected ? this.exposureMode.toUpperCase() : '—')
+      this.CaptureParameterCard('快门', this.connected ? this.shutterDisplay() : '—')
+      this.CaptureParameterCard('光圈', this.connected ? `F${this.currentAperture.toFixed(1)}` : '—')
+      this.CaptureParameterCard('ISO', this.connected ? `${this.currentIso}` : '—')
+      this.CaptureParameterCard(
+        '曝光',
+        this.connected ? `${this.currentCompensation >= 0 ? '+' : ''}${this.currentCompensation.toFixed(1)} EV` : '—'
+      )
+      this.CaptureParameterCard('对焦', this.connected ? this.currentFocusMode.toUpperCase() : '—')
+    }
+    .width('100%')
+    .padding(8)
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 10 })
+  }
+
+  @Builder
+  private CaptureParameterCard(label: string, value: string) {
+    Column({ space: 4 }) {
+      Text(this.tr(label).toUpperCase())
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#7E8794')
+        .width('100%')
+      Text(value)
+        .fontSize(17)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.connected ? STUDIO_GOLD : Color.White)
+        .width('100%')
+    }
+    .width(this.isCompact() ? '49%' : '32.6%')
+    .height(62)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 12, right: 12 })
+    .margin({ bottom: 7 })
+    .backgroundColor(STUDIO_RAISED)
+    .border({
+      width: 1,
+      color: this.connected ? STUDIO_GOLD : STUDIO_RULE,
+      radius: 6
+    })
+  }
+
+  @Builder
+  private CaptureDock() {
+    Row({ space: 8 }) {
+      Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
+        type: ButtonType.Normal
+      })
+        .height(48)
+        .layoutWeight(1)
+        .fontColor(Color.White)
+        .backgroundColor(STUDIO_RAISED)
+        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+        .enabled(this.connected && !this.busy)
+        .onClick((): void => { this.toggleLiveView(); })
+      Button(this.tr('拍摄照片'), { type: ButtonType.Normal })
+        .height(48)
+        .layoutWeight(1)
+        .fontColor(Color.White)
+        .backgroundColor($r('app.color.accent'))
+        .borderRadius(7)
+        .enabled(
+          (this.connected || this.wifiConnected || this.localCameraSelected) && !this.busy
+        )
+        .onClick((): void => { this.capturePhoto(); })
+      Button('AF-ON', { type: ButtonType.Normal })
+        .height(48)
+        .fontColor(Color.White)
+        .backgroundColor(STUDIO_RAISED)
+        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+        .enabled(this.connected && this.liveView && !this.busy)
+        .onClick((): void => { this.triggerAutoFocusOn(); })
+    }
+    .width('100%')
+    .padding(8)
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 10 })
   }
 
   @Builder
@@ -4017,16 +4313,18 @@ struct Index {
   private MonitorParameterControls() {
     Scroll() {
       Row({ space: 8 }) {
-        this.ImmersiveParameterControl('帧率', `${this.videoFrameRate}p`, 'videoFrameRate')
+        this.ImmersiveParameterControl('帧率', this.connected ? `${this.videoFrameRate}p` : '—', 'videoFrameRate')
         this.ImmersiveParameterControl(
           this.videoShutterMode === 'angle' ? '快门角度' : '快门速度',
-          this.videoShutterMode === 'angle'
-            ? `${this.videoShutterAngle.toFixed(1)}°`
-            : this.shutterDisplay(),
+          this.connected
+            ? (this.videoShutterMode === 'angle'
+                ? `${this.videoShutterAngle.toFixed(1)}°`
+                : this.shutterDisplay())
+            : '—',
           'videoShutter'
         )
-        this.ImmersiveParameterControl('ISO', `${this.currentIso}`, 'iso')
-        this.ImmersiveParameterControl('光圈', `f/${this.currentAperture.toFixed(1)}`, 'aperture')
+        this.ImmersiveParameterControl('ISO', this.connected ? `${this.currentIso}` : '—', 'iso')
+        this.ImmersiveParameterControl('光圈', this.connected ? `f/${this.currentAperture.toFixed(1)}` : '—', 'aperture')
       }
       .padding({ left: 2, right: 2 })
     }
@@ -5933,11 +6231,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增五端全局状态条：统一显示相机连接、当前操作和 ZENCHE 文件库总数。\n' +
-                '• 新增“恢复设备码”入口（服务端启用后可用）：使用旧设备码与旧激活码迁移剩余 AI 次数；成功后旧绑定永久失效。\n' +
-                '• Android USB/PTP 遇到已知异步传输故障时会自动降级，并在本次连接中复用稳定通道，减少重复等待。\n' +
-                '• 强化 AI 代理与签发服务：限制请求和响应大小、耐久保存次数、失败自动退款，并在存储异常时停止继续写入。\n' +
-                '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。'
+                '• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n' +
+                '• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n' +
+                '• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n' +
+                '• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n' +
+                '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。'
               ))
                 .fontSize(14)
                 .lineHeight(23)
@@ -6244,10 +6542,12 @@ struct Index {
         .width('100%')
         Blank()
         Text(
-          this.immersiveMonitoring
-            ? `${this.videoShutterAngle.toFixed(1)}°   ` +
-              `${this.videoFrameRate} fps   JPEG`
-            : `${this.exposureMode.toUpperCase()}   JPEG   帧澈 ZENCHE`
+          (this.connected || this.localCameraSelected)
+            ? (this.immersiveMonitoring
+                ? `${this.videoShutterAngle.toFixed(1)}°   ` +
+                  `${this.videoFrameRate} fps   JPEG`
+                : `${this.exposureMode.toUpperCase()}   JPEG   帧澈 ZENCHE`)
+            : '—'
         )
           .fontSize(13)
           .fontFamily('monospace')
@@ -6268,7 +6568,11 @@ struct Index {
       .width('100%')
       .height('100%')
       .padding(20)
-      this.ImmersiveParameterBar()
+      this.ImmersiveTelemetryHud()
+      if (this.isImmersiveLandscape()) {
+        this.ImmersiveScopeDock()
+      }
+      this.ImmersiveParameterTray()
       if (this.isImmersiveLandscape()) {
         Row() {
           this.ImmersiveToolRail()
@@ -6287,12 +6591,115 @@ struct Index {
   }
 
   @Builder
+  private ImmersiveTelemetryHud() {
+    Scroll() {
+      Row() {
+        this.ImmersiveTelemetryCell(
+          'SOURCE',
+          this.connected ? 'USB/PTP' : this.wifiConnected ? 'PTP-IP'
+            : this.localCameraSelected ? 'SYSTEM' : 'OFFLINE'
+        )
+        this.ImmersiveTelemetryCell(
+          'FORMAT',
+          (this.connected || this.localCameraSelected)
+            ? (this.immersiveMonitoring
+                ? `${this.videoFrameRate}P · ${this.videoCodecLabel()}`
+                : 'PHOTO · JPEG')
+            : '—'
+        )
+        this.ImmersiveTelemetryCell(
+          'SHUTTER',
+          (this.connected || this.localCameraSelected) ? this.shutterDisplay() : '—'
+        )
+        this.ImmersiveTelemetryCell(
+          'IRIS',
+          (this.connected || this.localCameraSelected) ? `F${this.currentAperture.toFixed(1)}` : '—'
+        )
+        this.ImmersiveTelemetryCell(
+          'ISO',
+          (this.connected || this.localCameraSelected) ? `${this.currentIso}` : '—'
+        )
+        this.ImmersiveTelemetryCell(
+          'EV',
+          (this.connected || this.localCameraSelected)
+            ? `${this.currentCompensation >= 0 ? '+' : ''}${this.currentCompensation.toFixed(1)}`
+            : '—'
+        )
+        this.ImmersiveTelemetryCell(
+          'STATE',
+          this.videoRecording ? 'REC' : this.liveView ? 'LIVE' : 'STBY'
+        )
+      }
+      .backgroundColor(STUDIO_PANEL)
+    }
+    .width('76%')
+    .height(52)
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .align(Alignment.Top)
+    .margin({ top: 76 })
+    .backgroundColor(STUDIO_PANEL)
+    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+  }
+
+  @Builder
+  private ImmersiveTelemetryCell(label: string, value: string) {
+    Column({ space: 2 }) {
+      Text(label)
+        .fontSize(8)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#7E8794')
+        .width('100%')
+      Text(value)
+        .fontSize(12)
+        .fontFamily('monospace')
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+    }
+    .width(104)
+    .height(52)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+    .padding({ left: 10, right: 10 })
+    .border({ width: { right: 1 }, color: STUDIO_RULE })
+  }
+
+  @Builder
+  private ImmersiveScopeDock() {
+    Row({ space: 5 }) {
+      Canvas(this.immersiveRgbScopeContext)
+        .width(176)
+        .height(76)
+        .onReady((): void => { this.drawImmersiveRgbScope(); })
+        .backgroundColor(STUDIO_CANVAS)
+      Canvas(this.immersiveAudioScopeContext)
+        .width(88)
+        .height(76)
+        .onReady((): void => { this.drawImmersiveAudioScope(); })
+        .backgroundColor(STUDIO_CANVAS)
+    }
+    .width(276)
+    .height(86)
+    .padding(5)
+    .align(Alignment.BottomStart)
+    .margin({ left: 18, bottom: 170 })
+    .backgroundColor(STUDIO_CANVAS)
+    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+  }
+
+  @Builder
   private ImmersiveToolRail() {
     Column({ space: 12 }) {
       Text(
-        this.immersiveMonitoring
-          ? `${this.videoFrameRate}P`
-          : this.exposureMode.toUpperCase()
+        (this.connected || this.localCameraSelected)
+          ? (this.immersiveMonitoring
+              ? `${this.videoFrameRate}P`
+              : this.exposureMode.toUpperCase())
+          : '—'
       )
         .fontSize(19)
         .fontWeight(FontWeight.Bold)
@@ -6316,6 +6723,37 @@ struct Index {
         .onClick((): void => {
           this.toggleLiveView();
         })
+      if (this.immersiveMonitoring) {
+        Button(this.tr('峰值'), { type: ButtonType.Normal })
+          .width(64)
+          .height(48)
+          .fontSize(11)
+          .fontColor(Color.White)
+          .backgroundColor(this.focusPeakingEnabled ? $r('app.color.accent') : STUDIO_PANEL)
+          .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+          .onClick((): void => {
+            this.focusPeakingEnabled = !this.focusPeakingEnabled;
+          })
+        Button(this.tr('假色'), { type: ButtonType.Normal })
+          .width(64)
+          .height(48)
+          .fontSize(11)
+          .fontColor(Color.White)
+          .backgroundColor(this.falseColorEnabled ? $r('app.color.accent') : STUDIO_PANEL)
+          .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+          .onClick((): void => {
+            this.falseColorEnabled = !this.falseColorEnabled;
+          })
+      }
+      Button('AF', { type: ButtonType.Normal })
+        .width(64)
+        .height(48)
+        .fontSize(11)
+        .fontColor(Color.White)
+        .backgroundColor(STUDIO_PANEL)
+        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+        .enabled(this.connected && this.liveView && !this.busy)
+        .onClick((): void => { this.triggerAutoFocusOn(); })
     }
   }
 
@@ -6411,7 +6849,7 @@ struct Index {
   }
 
   @Builder
-  private ImmersiveParameterBar() {
+  private ImmersiveParameterTray() {
     Column({ space: 6 }) {
       Row({ space: 8 }) {
         Button(
@@ -6456,20 +6894,32 @@ struct Index {
           Row({ space: 8 }) {
             this.ImmersiveParameterControl(
               this.immersiveMonitoring ? '快门角度' : '快门',
-              this.immersiveMonitoring
-                ? `${this.videoShutterAngle.toFixed(1)}°`
-                : this.shutterDisplay(),
+              (this.connected || this.localCameraSelected)
+                ? (this.immersiveMonitoring
+                    ? `${this.videoShutterAngle.toFixed(1)}°`
+                    : this.shutterDisplay())
+                : '—',
               this.immersiveMonitoring ? 'videoShutter' : 'photoShutter'
             )
             this.ImmersiveParameterControl(
               '光圈',
-              `f/${this.currentAperture}`,
+              (this.connected || this.localCameraSelected)
+                ? `f/${this.currentAperture}`
+                : '—',
               'aperture'
             )
-            this.ImmersiveParameterControl('ISO', `${this.currentIso}`, 'iso')
+            this.ImmersiveParameterControl(
+              'ISO',
+              (this.connected || this.localCameraSelected)
+                ? `${this.currentIso}`
+                : '—',
+              'iso'
+            )
             this.ImmersiveParameterControl(
               '曝光补偿',
-              `${this.currentCompensation.toFixed(1)} EV`,
+              (this.connected || this.localCameraSelected)
+                ? `${this.currentCompensation.toFixed(1)} EV`
+                : '—',
               'exposureCompensation'
             )
           }
@@ -6483,7 +6933,9 @@ struct Index {
               if (this.immersiveMonitoring) {
                 this.ImmersiveParameterControl(
                   '视频帧率',
-                  `${this.videoFrameRate}p`,
+                  (this.connected || this.localCameraSelected)
+                    ? `${this.videoFrameRate}p`
+                    : '—',
                   'videoFrameRate'
                 )
                 Button(
@@ -6503,39 +6955,53 @@ struct Index {
                   })
                 this.ImmersiveParameterControl(
                   '拍摄模式',
-                  this.exposureMode.toUpperCase(),
+                  (this.connected || this.localCameraSelected)
+                    ? this.exposureMode.toUpperCase()
+                    : '—',
                   'exposureMode'
                 )
                 this.ImmersiveParameterControl(
                   '视频录制规格',
-                  this.videoCodecLabel(),
+                  (this.connected || this.localCameraSelected)
+                    ? this.videoCodecLabel()
+                    : '—',
                   'videoCodec'
                 )
                 this.ImmersiveParameterControl(
                   'Log',
-                  this.videoLogLabel(),
+                  (this.connected || this.localCameraSelected)
+                    ? this.videoLogLabel()
+                    : '—',
                   'videoLog'
                 )
               } else {
                 this.ImmersiveParameterControl(
                   '拍摄模式',
-                  this.exposureMode.toUpperCase(),
+                  (this.connected || this.localCameraSelected)
+                    ? this.exposureMode.toUpperCase()
+                    : '—',
                   'exposureMode'
                 )
               }
               this.ImmersiveParameterControl(
                 '对焦模式',
-                this.currentFocusMode === 'continuous' ? 'AF-C' : 'AF-S',
+                (this.connected || this.localCameraSelected)
+                  ? (this.currentFocusMode === 'continuous' ? 'AF-C' : 'AF-S')
+                  : '—',
                 'focusMode'
               )
               this.ImmersiveParameterControl(
                 '白平衡',
-                this.currentWhiteBalance === 'continuous' ? '自动' : '保留',
+                (this.connected || this.localCameraSelected)
+                  ? (this.currentWhiteBalance === 'continuous' ? '自动' : '保留')
+                  : '—',
                 'whiteBalanceMode'
               )
               this.ImmersiveParameterControl(
                 '优化校准',
-                this.currentPictureControl === 'neutral' ? '自然' : '标准',
+                (this.connected || this.localCameraSelected)
+                  ? (this.currentPictureControl === 'neutral' ? '自然' : '标准')
+                  : '—',
                 'pictureControl'
               )
             }
@@ -6580,7 +7046,12 @@ struct Index {
           .fontSize(12)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
+          .fontColor(
+            this.connected &&
+            this.camera.canAdjustParameter(this.cameraParameter(parameter))
+              ? STUDIO_GOLD
+              : Color.White
+          )
       }
       .width(52)
       Button('+', { type: ButtonType.Normal })
@@ -6598,8 +7069,15 @@ struct Index {
     }
     .height(48)
     .padding(2)
-    .backgroundColor('#99000000')
-    .borderRadius(10)
+    .backgroundColor(STUDIO_PANEL)
+    .border({
+      width: 1,
+      color: this.connected &&
+        this.camera.canAdjustParameter(this.cameraParameter(parameter))
+          ? STUDIO_GOLD
+          : STUDIO_RULE,
+      radius: 7
+    })
   }
 
   @Builder
@@ -7723,6 +8201,50 @@ struct Index {
     context.stroke();
     context.globalAlpha = 0.92;
     context.lineWidth = 1;
+    context.stroke();
+    context.globalAlpha = 1;
+  }
+
+  private drawImmersiveRgbScope(): void {
+    const context: CanvasRenderingContext2D = this.immersiveRgbScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    this.drawScopePanel(
+      context,
+      0,
+      0,
+      context.width,
+      context.height,
+      '',
+      [this.redHistogram, this.greenHistogram, this.blueHistogram],
+      ['#FF302A', '#28FF69', '#2240FF'],
+      true
+    );
+  }
+
+  private drawImmersiveAudioScope(): void {
+    const context: CanvasRenderingContext2D = this.immersiveAudioScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    this.drawScopePanel(
+      context,
+      0,
+      0,
+      context.width,
+      context.height,
+      'AUDIO',
+      [],
+      [],
+      false
+    );
+    const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
+    const plotHeight: number = context.height - footerHeight;
+    context.strokeStyle = '#4CC7E8';
+    context.globalAlpha = 0.86;
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(4, plotHeight / 2);
+    context.lineTo(context.width - 4, plotHeight / 2);
     context.stroke();
     context.globalAlpha = 1;
   }
@@ -11409,6 +11931,8 @@ struct Index {
       this.peakingCoverage = result.peakingCoverage;
       this.drawMonitorRgbScope();
       this.drawProfessionalScope();
+      this.drawImmersiveRgbScope();
+      this.drawImmersiveAudioScope();
       if (pixelMap !== sourceMap) {
         sourceMap.release();
       }

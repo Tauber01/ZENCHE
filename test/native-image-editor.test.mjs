@@ -37,7 +37,7 @@ test("macOS editor isolates the workspace and bounds its preview", async () => {
   assert.match(macos, /currentWorkspace\s*\.id\(model\.section\)/);
   assert.match(
     macos,
-    /GeometryReader \{ geometry in[\s\S]*?preview[\s\S]*?frame\(width: previewWidth, height: geometry\.size\.height\)/,
+    /GeometryReader \{ geometry in[\s\S]*?ResolveEditorWorkbench[\s\S]*?preview[\s\S]*?frame\(\s*width: geometry\.size\.width,\s*height: geometry\.size\.height/,
   );
   assert.match(macos, /\.clipped\(\)\s*\.contentShape\(Rectangle\(\)\)/);
   assert.match(

@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-04（Asia/Shanghai）
-> 基线分支：`main`；1.5.2 在独立集成 worktree 收口
-> 当前版本：1.5.2 / build 27；已发布为 GitHub 最新稳定版
+> 基线分支：`main@378ef1f`；1.5.3 在 `agent/1.5.3-ui` / `ZENCHE-wt-ui-1.5.3` 独立 worktree 收口
+> 当前版本：1.5.3 / build 28 本地开发候选；GitHub 最新稳定版仍为 v1.5.2
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,7 +18,9 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码版本为 **1.5.2 / build 27**，已于 2026-08-04 发布为 [GitHub 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)；标签落点 `7376cf102ec5ab14208d047f60f28941843fe1c2`。生产服务未变更。四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
+- 当前源码版本为 **1.5.3 / build 28** 本地开发候选；五端工作台界面正在 `agent/1.5.3-ui` 收口，尚未推送、打标签、发布或部署。GitHub 最新稳定版仍为 [v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)，标签落点 `7376cf102ec5ab14208d047f60f28941843fe1c2`；生产服务未变更。
+- v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、真实 RGB 示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
+- 当前门禁证据：`git diff --check`、1.5.3 专项回归 8/8、完整 `npm test` 256/256 均通过；iOS Simulator 无签名 Release、Android Debug、HarmonyOS release HAP、macOS 全 Swift 类型检查、Windows Release XAML/C# 均通过。两轮独立复核已关闭全部 P1；最终增量代码审查和 AI 痕迹审查正在进行，版本化五端打包与 SHA-256 待候选提交固定后生成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
 - v1.5.0 已作为历史 GitHub Release 保留；生产下载服务器仍保留既有 v1.4.1 六包。当前公开稳定版与交付哈希以 v1.5.2 Release 和 `docs/releases/v1.5.2.md` 为准。
 - AI 全链路已通过端到端验证：激活码验签 → 服务器计数 → 转发 grsai → 返回图片，计数递减正常。
@@ -57,7 +59,15 @@
 
 ## 4. 当前工作区进行中事项
 
-### 4.0 服务器端自动更新系统（本轮）
+### 4.0 1.5.3 五端工作台（本轮）
+
+- **实现**：全屏 HUD、设备摘要/参数卡/拍摄操作区、编辑媒体池/预览/检查器/分析示波器已同步五端；iOS 拍摄会话入口保持可达，Android 编辑快捷入口指向真实控件，Windows 窄窗会收起媒体栏并保留中央预览。
+- **状态真实性**：五端新增遥测、输出摘要、底部读数和参数托盘均受连接状态门控；无源时显示 `—`、`OFFLINE` 或明确空态，不显示初始化默认值。RGB 示波器只读取真实直方图/分析值，音频无输入时只显示静音基线。
+- **本地化**：新增工作台标签、空态和 iOS 辅助功能提示已覆盖简体中文、英文、日文；Android/HarmonyOS 的媒体池、工具轨和编辑示波器标签已转入运行时本地化。
+- **验证**：`git diff --check`、专项 8/8、完整 256/256 通过；iOS、Android、HarmonyOS、macOS、Windows 编译门禁通过。独立审查已确认 P1 清零，最终增量复核和 AI 痕迹审查进行中。
+- **剩余**：固定候选提交后生成 APK、HAP、unsigned IPA、DMG、Windows Setup/ZIP、源码 ZIP及 `.sha256`；随后核对签名状态、产物容器和工作树一致性。未经 Tauber 另行授权，不推送、打标签、创建 GitHub Release 或修改生产环境。
+
+### 4.1 服务器端自动更新系统
 
 - **源码**：已实现 `server.mjs` 的 `/api/update`、`/api/updates`、`/healthz`，包含 GitHub Release 资产选择、SHA-256、公告、最低支持版本、版本比较、缓存/stale 回退、ETag、CORS 与安全响应头。
 - **五端接入**：iOS、Android、HarmonyOS、macOS、Windows 默认请求 `https://zenche.top/api/update`，校验 `schema_version/product` 后使用结果；不可用时仍按 MirrorChyan → GitHub 回退。
@@ -69,25 +79,25 @@
 
 以下内容来自 2026-08-01 的 `git status` 与 diff，只表示当前本地工作现场，不等同于已经提交或发布：
 
-### 4.1 AI 功能（已提交并发布）
+### 4.2 AI 功能（已提交并发布）
 
 - AI 修图与生图、12 个快捷预设、激活码授权、代理服务器架构已完成，已在 `claude/modest-albattani-34402d` 分支提交（35 文件，+2627/-110）并推送。
 - 四端（macOS/iOS/Android/HarmonyOS）1.3.0 产物已上传 GitHub Release `v1.3.0`。
 - Windows 1.3.0 EXE 安装包待 Windows 主机生成。
 - 分支尚未合并回 `main`。
 
-### 4.2 相机兼容与测试调整
+### 4.3 相机兼容与测试调整
 
 - Android、HarmonyOS、iOS、Windows 的相机或 PTP 相关文件存在未提交修改。
 - `test/camera-profiles.test.mjs` 与 `test/localization.test.mjs` 已修改，当前 37 项测试全部通过。
 - 修改目的需以最终 diff 为准；提交前必须确认没有误删机型档案、错误缩小参数范围或破坏设备 fallback。
 
-### 4.3 设计与宣传素材
+### 4.4 设计与宣传素材
 
 - `design.md`、`PV/README.md`、PV V2 构建/预览脚本和 AI 图片素材存在修改或未跟踪文件。
 - 这些素材不属于原生应用交付包，但发布前应确认品牌标识、标准标语、版权和输出清单。
 
-### 4.4 工作区卫生
+### 4.5 工作区卫生
 
 - Android 源码目录存在未跟踪 `.bak`/`.bak2`/`.bak3` 文件。
 - 不得在未确认内容前删除；确认无追溯价值后，应在独立清理步骤中处理并避免进入提交。

@@ -123,7 +123,7 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.5.2" />
+            <TextBlock Style="{StaticResource MetaText}" Text="ZENCHE 1.5.3" />
             <TextBlock Margin="0,4,0,0"
                        Foreground="{StaticResource MutedBrush}"
                        FontSize="12"
@@ -408,13 +408,42 @@
                       Style="{StaticResource ButtonBase}"
                       Content="全屏"
                       Click="FullscreenPreviewButton_Click" />
+              <Border x:Name="CaptureDeviceSummary"
+                      Margin="16"
+                      Padding="1"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Bottom"
+                      Background="#DC15191F"
+                      BorderBrush="{StaticResource StudioRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="7">
+                <UniformGrid Columns="4">
+                  <StackPanel Margin="12,8">
+                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="CAMERA" />
+                    <TextBlock x:Name="CaptureDeviceNameText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="—" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <StackPanel Margin="12,8">
+                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="LINK" />
+                    <TextBlock x:Name="CaptureLinkText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="OFFLINE" />
+                  </StackPanel>
+                  <StackPanel Margin="12,8">
+                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="OUTPUT" />
+                    <TextBlock x:Name="CaptureOutputText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="—" />
+                  </StackPanel>
+                  <StackPanel Margin="12,8">
+                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="LIBRARY" />
+                    <TextBlock x:Name="CaptureLibraryText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontWeight="SemiBold" Foreground="White" Text="0 个文件" />
+                  </StackPanel>
+                </UniformGrid>
+              </Border>
             </Grid>
           </Border>
-          <Border Grid.Row="1"
+          <Border x:Name="ParameterCardDeck"
+                  Grid.Row="1"
                   Height="82"
                   Margin="0,14,0,0"
-                  Background="{StaticResource GraphiteBrush}"
-                  BorderBrush="{StaticResource GraphiteRuleBrush}"
+                  Background="{StaticResource StudioPanelBrush}"
+                  BorderBrush="{StaticResource StudioRuleBrush}"
                   BorderThickness="1"
                   CornerRadius="14">
             <ScrollViewer HorizontalScrollBarVisibility="Hidden"
@@ -427,32 +456,35 @@
                 <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
                 <StackPanel Width="82" Margin="12,13">
                   <TextBlock Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="模式" />
-                  <TextBlock x:Name="ModeReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                  <TextBlock x:Name="ModeReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
                 </StackPanel>
                 <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
                 <StackPanel Width="116" Margin="12,13">
                   <TextBlock x:Name="ShutterReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="快门" />
-                  <TextBlock x:Name="ShutterReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                  <TextBlock x:Name="ShutterReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
                 </StackPanel>
                 <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
                 <StackPanel Width="104" Margin="12,13">
                   <TextBlock x:Name="ApertureReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="光圈" />
-                  <TextBlock x:Name="ApertureReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                  <TextBlock x:Name="ApertureReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
                 </StackPanel>
                 <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
                 <StackPanel Width="96" Margin="12,13">
                   <TextBlock x:Name="IsoReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="ISO" />
-                  <TextBlock x:Name="IsoReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                  <TextBlock x:Name="IsoReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
                 </StackPanel>
                 <Border Width="1" Height="42" VerticalAlignment="Center" Background="#1FFFFFFF" />
                 <StackPanel Width="132" Margin="12,13">
                   <TextBlock x:Name="CompensationReadoutLabel" Style="{StaticResource MetaText}" Foreground="{StaticResource GraphiteMutedBrush}" Text="曝光补偿" />
-                  <TextBlock x:Name="CompensationReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource GraphiteInkBrush}" Text="—" />
+                  <TextBlock x:Name="CompensationReadoutText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource StudioGoldBrush}" Text="—" />
                 </StackPanel>
               </StackPanel>
             </ScrollViewer>
           </Border>
-          <Grid Grid.Row="2" Margin="0,14,0,0">
+          <Grid x:Name="CaptureDock"
+                Grid.Row="2"
+                Margin="0,14,0,0"
+                Background="{StaticResource StudioPanelBrush}">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
@@ -945,10 +977,49 @@
           </Border>
           <Grid x:Name="EditorProGrid" Grid.Row="1" Margin="0,18,0,0">
             <Grid.ColumnDefinitions>
+              <ColumnDefinition x:Name="EditorMediaColumn" Width="220" />
               <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="320" />
+              <ColumnDefinition x:Name="EditorToolsColumn" Width="320" />
             </Grid.ColumnDefinitions>
-            <Border Margin="0,0,18,0"
+            <Grid x:Name="EditorResolveWorkbench"
+                  Grid.ColumnSpan="3"
+                  Background="{StaticResource StudioCanvasBrush}"
+                  IsHitTestVisible="False" />
+            <Border x:Name="EditorMediaRail"
+                    Grid.Column="0"
+                    Margin="1,1,0,1"
+                    Padding="12"
+                    Background="{StaticResource StudioPanelBrush}"
+                    BorderBrush="{StaticResource StudioRuleBrush}"
+                    BorderThickness="1">
+              <Grid>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="*" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontFamily="{StaticResource MonoFont}"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           Text="媒体池" />
+                <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                  <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="可编辑照片" />
+                  <TextBlock x:Name="EditorMediaCountText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontSize="24" FontWeight="SemiBold" Foreground="White" Text="0" />
+                  <TextBlock x:Name="EditorMediaSelectionText" Margin="0,10,0,0" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#A8B0BC" Text="未选择照片" TextWrapping="Wrap" />
+                </StackPanel>
+                <UniformGrid Grid.Row="2" Margin="0,18,0,0" Columns="2" VerticalAlignment="Top">
+                  <Button Margin="2" Tag="wheels" Style="{StaticResource ButtonBase}" Content="色轮" Click="EditorWorkbenchTool_Click" />
+                  <Button Margin="2" Tag="curves" Style="{StaticResource ButtonBase}" Content="曲线" Click="EditorWorkbenchTool_Click" />
+                  <Button Margin="2" Tag="mask" Style="{StaticResource ButtonBase}" Content="蒙版" Click="EditorWorkbenchTool_Click" />
+                  <Button Margin="2" Tag="ai" Style="{StaticResource ButtonBase}" Content="AI" Click="EditorWorkbenchTool_Click" />
+                </UniformGrid>
+                <TextBlock Grid.Row="3" FontSize="10" Foreground="#7E8794" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
+              </Grid>
+            </Border>
+            <Border Grid.Column="1"
+                    Margin="1,1,1,1"
                     Padding="14"
                     Background="{StaticResource GraphiteBrush}"
                     BorderBrush="{StaticResource GraphiteRuleBrush}"
@@ -969,9 +1040,38 @@
                            Foreground="{StaticResource GraphiteMutedBrush}"
                            FontSize="16"
                            Text="选择一张照片开始编辑" />
+                <Border x:Name="EditorScopeDock"
+                        Height="84"
+                        Margin="12"
+                        Padding="10"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Bottom"
+                        Background="#E615191F"
+                        BorderBrush="{StaticResource StudioRuleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="5">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="150" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" FontWeight="Bold" Foreground="#A8B0BC" Text="编辑示波器" />
+                      <TextBlock x:Name="EditorScopeText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource StudioGoldBrush}" Text="分析后显示实测范围" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Border Grid.Column="1" Margin="10,0,0,0" Background="{StaticResource StudioCanvasBrush}" BorderBrush="{StaticResource StudioRuleBrush}" BorderThickness="1">
+                      <Grid>
+                        <Border Height="1" VerticalAlignment="Center" Background="#334F5966" />
+                        <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="#334F5966" />
+                        <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="#334F5966" />
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </Border>
               </Grid>
             </Border>
-            <Border Grid.Column="1"
+            <Border x:Name="EditorToolRail"
+                    Grid.Column="2"
                     Padding="18"
                     Style="{StaticResource PanelCard}">
               <Grid>

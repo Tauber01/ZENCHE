@@ -146,6 +146,11 @@ public final class MainActivity extends Activity {
     private static final int POSITIVE = Color.rgb(31, 168, 105);
     private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
     private static final int GRAPHITE = Color.rgb(10, 11, 13);
+    private static final int STUDIO_CANVAS = Color.rgb(6, 9, 13);
+    private static final int STUDIO_PANEL = Color.rgb(21, 25, 31);
+    private static final int STUDIO_RAISED = Color.rgb(32, 36, 43);
+    private static final int STUDIO_RULE = Color.rgb(52, 58, 67);
+    private static final int STUDIO_GOLD = Color.rgb(216, 182, 83);
     private static final int RULE = Color.rgb(207, 214, 223);
     private static final int RULE_STRONG = Color.rgb(174, 184, 199);
     private static final String LATEST_RELEASE_API =
@@ -1233,6 +1238,7 @@ public final class MainActivity extends Activity {
     private final Map<String, View> parameterControls = new HashMap<>();
     private final Map<String, TextView> parameterLabels = new HashMap<>();
     private final Map<String, Boolean> disclosureStates = new HashMap<>();
+    private volatile String pendingEditorScrollKey;
     private final List<LibraryBranch> userLibraryBranches = new ArrayList<>();
     private final Map<String, String> libraryFileAssignments = new HashMap<>();
     private final List<RememberedDevice> rememberedDevices = new ArrayList<>();
@@ -1271,6 +1277,7 @@ public final class MainActivity extends Activity {
     private TextView updateStatusText;
     private WaveformScopeView monitorRgbScopeView;
     private WaveformScopeView professionalScopeView;
+    private WaveformScopeView immersiveScopeView;
     private TextView peakingCoverageText;
     private Button checkUpdateButton;
     private Button openUpdateButton;
@@ -2823,6 +2830,27 @@ public final class MainActivity extends Activity {
             button.setElevation(active ? dp(2) : 0);
         }
         updateCameraControls();
+        final String pendingKey = pendingEditorScrollKey;
+        pendingEditorScrollKey = null;
+        if (pendingKey != null) {
+            contentHost.post(() -> scrollEditorGroupIntoView(pendingKey));
+        }
+    }
+
+    private void scrollEditorGroupIntoView(String key) {
+        View target = contentHost.findViewWithTag(key);
+        if (target == null || contentHost.getChildCount() == 0) return;
+        View scroller = contentHost.getChildAt(0);
+        if (!(scroller instanceof ScrollView)) return;
+        View content = ((ScrollView) scroller).getChildAt(0);
+        if (content == null) return;
+        int top = 0;
+        View cursor = target;
+        while (cursor != null && cursor != content) {
+            top += cursor.getTop();
+            cursor = (View) cursor.getParent();
+        }
+        ((ScrollView) scroller).smoothScrollTo(0, Math.max(0, top - dp(16)));
     }
 
     private View buildCaptureView() {
@@ -2838,14 +2866,140 @@ public final class MainActivity extends Activity {
                 "照片拍摄",
                 "会话、曝光、对焦与交付按拍摄流程组织",
                 COBALT));
+        content.addView(buildCaptureDeviceSummary());
         content.addView(buildPreviewStage(false));
         content.addView(buildNikonCloudMonitorPanel());
-        content.addView(buildExposureReadoutRail());
+        content.addView(buildParameterCardGrid());
+        content.addView(buildCaptureDock());
 
+        content.addView(buildCaptureSessionPanel());
+        content.addView(buildProfessionalControls());
+        content.addView(buildShootingTaskPanel());
+        scroll.addView(content);
+        return scroll;
+    }
+
+    /** Figure-2 device summary populated only from active camera and storage state. */
+    private View buildCaptureDeviceSummary() {
+        LinearLayout summary = new LinearLayout(this);
+        summary.setOrientation(isCompactPhone()
+                ? LinearLayout.VERTICAL
+                : LinearLayout.HORIZONTAL);
+        summary.setPadding(dp(1), dp(1), dp(1), dp(1));
+        summary.setBackground(rounded(STUDIO_RULE, 10, STUDIO_RULE));
+        addCaptureSummaryCell(
+                summary,
+                "CAMERA",
+                connectedCameraName == null ? "—" : connectedCameraName,
+                connected || localCameraConnected);
+        addCaptureSummaryCell(
+                summary,
+                "LINK",
+                connected ? "USB/PTP" : wifiConnected ? "Wi‑Fi/PTP‑IP"
+                        : localCameraConnected ? "SYSTEM" : "OFFLINE",
+                connected || wifiConnected || localCameraConnected);
+        addCaptureSummaryCell(
+                summary,
+                "OUTPUT",
+                (connected || localCameraConnected)
+                        ? monitorProfileLabel() + " · " + monitorFrameRate + "p"
+                        : "—",
+                connected || localCameraConnected);
+        addCaptureSummaryCell(
+                summary,
+                "LIBRARY",
+                photoFiles().size() + " " + tr("个文件"),
+                true);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, dp(12), 0, dp(10));
+        summary.setLayoutParams(params);
+        return summary;
+    }
+
+    private void addCaptureSummaryCell(
+            LinearLayout parent,
+            String label,
+            String value,
+            boolean active) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setPadding(dp(12), dp(10), dp(12), dp(10));
+        cell.setBackgroundColor(SURFACE);
+        TextView title = text(label, 9, Typeface.BOLD, MUTED);
+        title.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        TextView readout = text(value, 13, Typeface.BOLD, active ? INK : MUTED);
+        readout.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        readout.setSingleLine(true);
+        readout.setEllipsize(TextUtils.TruncateAt.END);
+        cell.addView(title);
+        cell.addView(readout, marginParams(-1, dp(24), 0, 3, 0, 0));
+        if (parent.getOrientation() == LinearLayout.HORIZONTAL) {
+            parent.addView(cell, new LinearLayout.LayoutParams(0, dp(66), 1f));
+        } else {
+            parent.addView(cell, new LinearLayout.LayoutParams(-1, dp(58)));
+        }
+    }
+
+    /** Adaptive camera parameter deck; warm gold is reserved for live values. */
+    private View buildParameterCardGrid() {
+        LinearLayout deck = new LinearLayout(this);
+        deck.setOrientation(LinearLayout.VERTICAL);
+        deck.setPadding(dp(8), dp(8), dp(8), dp(8));
+        deck.setBackground(rounded(STUDIO_PANEL, 10, STUDIO_RULE));
+        String[][] values = new String[][]{
+                {"模式", connected ? exposureModeCode() : "—"},
+                {"快门", connected ? shutterDisplayValue() : "—"},
+                {"光圈", connected
+                        ? String.format(Locale.CHINA, "F%.1f", currentAperture)
+                        : "—"},
+                {"ISO", connected ? String.valueOf(currentIso) : "—"},
+                {"曝光", connected
+                        ? String.format(Locale.CHINA, "%+.1f EV", currentCompensation)
+                        : "—"},
+                {"传输", connected ? "PTP" : wifiConnected ? "PTP-IP" : "—"}
+        };
+        for (int start = 0; start < values.length; start += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            for (int index = start; index < Math.min(start + 2, values.length); index++) {
+                TextView card = parameterCard(values[index][0], values[index][1]);
+                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                        0,
+                        dp(62),
+                        1f);
+                if (index > start) cardParams.setMargins(dp(8), 0, 0, 0);
+                row.addView(card, cardParams);
+            }
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(62));
+            if (start > 0) rowParams.setMargins(0, dp(8), 0, 0);
+            deck.addView(row, rowParams);
+        }
+        return deck;
+    }
+
+    private TextView parameterCard(String label, String value) {
+        TextView card = text(tr(label).toUpperCase(Locale.ROOT) + "\n" + value,
+                12,
+                Typeface.BOLD,
+                Color.WHITE);
+        card.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(12), 0, dp(12), 0);
+        card.setLineSpacing(dp(3), 1f);
+        card.setBackground(rounded(
+                STUDIO_RAISED,
+                6,
+                connected ? Color.argb(145, 216, 182, 83) : STUDIO_RULE));
+        return card;
+    }
+
+    /** Persistent capture dock reuses the original capture/AF/live-view actions. */
+    private View buildCaptureDock() {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(16), 0, dp(8));
+        actions.setPadding(dp(10), dp(10), dp(10), dp(10));
+        actions.setBackground(rounded(STUDIO_PANEL, 10, STUDIO_RULE));
         liveViewButton = nativeButton("实时取景", false);
         liveViewButton.setOnClickListener(view -> toggleLiveView());
         shutterButton = nativeButton("拍摄", true);
@@ -2857,18 +3011,15 @@ public final class MainActivity extends Activity {
         cameraControls.add(shutterButton);
         actions.addView(liveViewButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
         LinearLayout.LayoutParams shutterParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        shutterParams.setMargins(dp(12), 0, 0, 0);
+        shutterParams.setMargins(dp(10), 0, 0, 0);
         actions.addView(shutterButton, shutterParams);
         LinearLayout.LayoutParams afParams = new LinearLayout.LayoutParams(dp(96), dp(48));
-        afParams.setMargins(dp(12), 0, 0, 0);
+        afParams.setMargins(dp(10), 0, 0, 0);
         actions.addView(afOnButton, afParams);
-        content.addView(actions);
-
-        content.addView(buildCaptureSessionPanel());
-        content.addView(buildProfessionalControls());
-        content.addView(buildShootingTaskPanel());
-        scroll.addView(content);
-        return scroll;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, dp(10), 0, dp(8));
+        actions.setLayoutParams(params);
+        return actions;
     }
 
     private View buildExposureReadoutRail() {
@@ -3510,6 +3661,7 @@ public final class MainActivity extends Activity {
                 immersiveZebraImage = null;
                 immersiveRecordButton = null;
                 immersiveExposureText = null;
+                immersiveScopeView = null;
             }
         });
         dialog.setOnShowListener(ignored -> {
@@ -3579,6 +3731,24 @@ public final class MainActivity extends Activity {
         transportParams.setMargins(0, dp(22), dp(16), 0);
         chrome.addView(transport, transportParams);
 
+        HorizontalScrollView telemetry = immersiveTelemetryHud();
+        FrameLayout.LayoutParams telemetryParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52),
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        telemetryParams.setMargins(dp(82), dp(76), dp(82), 0);
+        chrome.addView(telemetry, telemetryParams);
+
+        if (immersiveLandscape) {
+            View scopes = immersiveScopeDock();
+            FrameLayout.LayoutParams scopeParams = new FrameLayout.LayoutParams(
+                    dp(270),
+                    dp(86),
+                    Gravity.BOTTOM | Gravity.START);
+            scopeParams.setMargins(dp(18), 0, 0, dp(170));
+            chrome.addView(scopes, scopeParams);
+        }
+
         if (immersiveLandscape) {
             addLandscapeImmersiveControls(chrome);
         } else {
@@ -3632,9 +3802,11 @@ public final class MainActivity extends Activity {
         rail.setGravity(Gravity.CENTER);
         rail.addView(
                 immersiveReadout(
-                        immersiveMonitoring
-                                ? monitorFrameRate + "P"
-                                : exposureMode.toUpperCase(Locale.ROOT),
+                        (connected || localCameraConnected)
+                                ? (immersiveMonitoring
+                                        ? monitorFrameRate + "P"
+                                        : exposureMode.toUpperCase(Locale.ROOT))
+                                : "—",
                         64,
                         56));
 
@@ -3671,6 +3843,87 @@ public final class MainActivity extends Activity {
             rail.addView(peaking, peakingParams);
         }
         return rail;
+    }
+
+    /** Figure-1 read-only telemetry HUD backed by the active camera state. */
+    private HorizontalScrollView immersiveTelemetryHud() {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFillViewport(true);
+        scroll.setBackground(rounded(Color.argb(220, 21, 25, 31), 5, STUDIO_RULE));
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        String source = connected ? "USB/PTP"
+                : wifiConnected ? "PTP-IP"
+                : localCameraConnected ? "SYSTEM" : "OFFLINE";
+        boolean liveTelemetry = connected || localCameraConnected;
+        String format = liveTelemetry
+                ? (immersiveMonitoring
+                        ? monitorProfileLabel() + " " + monitorFrameRate + "P"
+                        : "PHOTO JPEG")
+                : "—";
+        addImmersiveTelemetryCell(row, "SOURCE", source);
+        addImmersiveTelemetryCell(row, "FORMAT", format);
+        addImmersiveTelemetryCell(
+                row,
+                "SHUTTER",
+                liveTelemetry ? shutterDisplayValue() : "—");
+        addImmersiveTelemetryCell(
+                row,
+                "IRIS",
+                liveTelemetry
+                        ? String.format(Locale.CHINA, "F%.1f", currentAperture)
+                        : "—");
+        addImmersiveTelemetryCell(
+                row,
+                "ISO",
+                liveTelemetry ? String.valueOf(currentIso) : "—");
+        addImmersiveTelemetryCell(
+                row,
+                "EV",
+                liveTelemetry
+                        ? String.format(Locale.CHINA, "%+.1f", currentCompensation)
+                        : "—");
+        addImmersiveTelemetryCell(
+                row,
+                "STATE",
+                videoRecording ? "REC" : liveViewEnabled ? "LIVE" : "STBY");
+        scroll.addView(row);
+        return scroll;
+    }
+
+    private void addImmersiveTelemetryCell(
+            LinearLayout parent,
+            String label,
+            String value) {
+        TextView cell = text(label + "\n" + value, 11, Typeface.BOLD, Color.WHITE);
+        cell.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        cell.setGravity(Gravity.CENTER_VERTICAL);
+        cell.setPadding(dp(10), 0, dp(10), 0);
+        cell.setLineSpacing(dp(2), 1f);
+        cell.setBackground(rounded(Color.argb(225, 21, 25, 31), 0, STUDIO_RULE));
+        parent.addView(cell, new LinearLayout.LayoutParams(dp(102), dp(52)));
+    }
+
+    /** Compact real-data RGB scope plus an explicit silent audio baseline. */
+    private View immersiveScopeDock() {
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setPadding(dp(5), dp(5), dp(5), dp(5));
+        dock.setBackground(rounded(Color.argb(225, 6, 9, 13), 5, STUDIO_RULE));
+        immersiveScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
+        immersiveScopeView.setData(
+                redHistogram,
+                greenHistogram,
+                blueHistogram,
+                waveform,
+                vectorscope);
+        dock.addView(immersiveScopeView, new LinearLayout.LayoutParams(0, -1, 2f));
+        WaveformScopeView audio = new WaveformScopeView(WaveformScopeView.AUDIO);
+        LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(0, -1, 1f);
+        audioParams.setMargins(dp(5), 0, 0, 0);
+        dock.addView(audio, audioParams);
+        return dock;
     }
 
     private LinearLayout immersiveCaptureRail(boolean vertical) {
@@ -4073,6 +4326,7 @@ public final class MainActivity extends Activity {
         exposureParams.setMargins(0, 0, 0, dp(24));
         root.addView(exposure, exposureParams);
         immersiveExposureText = exposure;
+        updateImmersiveExposureText();
 
         LinearLayout parameterBar = new LinearLayout(this);
         parameterBar.setOrientation(LinearLayout.HORIZONTAL);
@@ -4203,6 +4457,9 @@ public final class MainActivity extends Activity {
     }
 
     private String immersiveParameterValue(String parameter) {
+        if (!(connected || localCameraConnected)) {
+            return "—";
+        }
         switch (parameter) {
             case "角度":
                 return String.format(Locale.CHINA, "角度\n%.1f°", monitorShutterAngle);
@@ -4408,20 +4665,23 @@ public final class MainActivity extends Activity {
 
     private void updateImmersiveExposureText() {
         if (immersiveExposureText == null) return;
+        boolean live = connected || localCameraConnected;
         immersiveExposureText.setText(
-                immersiveMonitoring
-                        ? String.format(
-                                Locale.CHINA,
-                                "%.1f°   %d fps   ISO %d",
-                                monitorShutterAngle,
-                                monitorFrameRate,
-                                currentIso)
-                        : String.format(
-                                Locale.CHINA,
-                                "%s   F%.1f   ISO %d",
-                                exposureMode.toUpperCase(Locale.ROOT),
-                                currentAperture,
-                                currentIso));
+                live
+                        ? (immersiveMonitoring
+                                ? String.format(
+                                        Locale.CHINA,
+                                        "%.1f°   %d fps   ISO %d",
+                                        monitorShutterAngle,
+                                        monitorFrameRate,
+                                        currentIso)
+                                : String.format(
+                                        Locale.CHINA,
+                                        "%s   F%.1f   ISO %d",
+                                        exposureMode.toUpperCase(Locale.ROOT),
+                                        currentAperture,
+                                        currentIso))
+                        : "—");
     }
 
     private View buildMonitorParameterControls() {
@@ -5850,6 +6110,9 @@ public final class MainActivity extends Activity {
         content.addView(
                 buildEditorPhotoPicker(photos),
                 marginParams(-1, dp(64), 0, 0, 0, 12));
+        content.addView(
+                buildResolveEditorWorkbench(photos),
+                marginParams(-1, dp(118), 0, 0, 0, 12));
 
         LinearLayout aiPanel = panel();
         aiPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -6570,6 +6833,116 @@ public final class MainActivity extends Activity {
         return scroll;
     }
 
+    /**
+     * Resolve-inspired editor command strip. It exposes the actual media
+     * selection, inspector groups, AI analysis, and save workflow without
+     * introducing a parallel editor state machine.
+     */
+    private View buildResolveEditorWorkbench(List<File> photos) {
+        HorizontalScrollView scroll = new HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        scroll.setFillViewport(true);
+        scroll.setBackground(rounded(STUDIO_CANVAS, 7, STUDIO_RULE));
+        LinearLayout workbench = new LinearLayout(this);
+        workbench.setOrientation(LinearLayout.HORIZONTAL);
+        workbench.setPadding(dp(6), dp(6), dp(6), dp(6));
+        workbench.addView(buildEditorMediaRail(photos),
+                new LinearLayout.LayoutParams(dp(220), dp(106)));
+        LinearLayout.LayoutParams toolParams =
+                new LinearLayout.LayoutParams(dp(330), dp(106));
+        toolParams.setMargins(dp(6), 0, 0, 0);
+        workbench.addView(buildEditorToolRail(), toolParams);
+        LinearLayout.LayoutParams scopeParams =
+                new LinearLayout.LayoutParams(dp(300), dp(106));
+        scopeParams.setMargins(dp(6), 0, 0, 0);
+        workbench.addView(buildEditorScopeDock(), scopeParams);
+        scroll.addView(workbench);
+        return scroll;
+    }
+
+    private View buildEditorMediaRail(List<File> photos) {
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setPadding(dp(10), dp(8), dp(10), dp(8));
+        rail.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
+        rail.addView(text(tr("媒体池") + " · " + photos.size(),
+                10, Typeface.BOLD, Color.WHITE));
+        String selected = editorSelectedPath == null
+                ? tr("未选择照片")
+                : new File(editorSelectedPath).getName();
+        TextView filename = text(selected, 12, Typeface.BOLD, Color.WHITE);
+        filename.setSingleLine(true);
+        filename.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+        rail.addView(filename, marginParams(-1, dp(28), 0, 6, 0, 0));
+        rail.addView(text(tr("非破坏编辑 · 保存为高质量副本"),
+                9, Typeface.NORMAL, Color.rgb(168, 176, 188)));
+        return rail;
+    }
+
+    private View buildEditorToolRail() {
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.VERTICAL);
+        rail.setPadding(dp(10), dp(8), dp(10), dp(8));
+        rail.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
+        rail.addView(text(tr("工具轨"),
+                10, Typeface.BOLD, Color.rgb(168, 176, 188)));
+        LinearLayout tools = new LinearLayout(this);
+        tools.setOrientation(LinearLayout.HORIZONTAL);
+        String[] names = new String[]{"色轮", "曲线", "蒙版", "AI"};
+        String[] keys = new String[]{"editor-wheels", "editor-curves", "editor-mask", "ai"};
+        for (int index = 0; index < names.length; index++) {
+            final String key = keys[index];
+            Button tool = nativeButton(names[index], false);
+            tool.setTextSize(11);
+            tool.setTextColor(Color.WHITE);
+            tool.setBackground(rounded(STUDIO_RAISED, 5, STUDIO_RULE));
+            tool.setOnClickListener(view -> {
+                if ("ai".equals(key)) {
+                    editorState = EditorState.AI;
+                    aiResultBitmap = null;
+                    showSection("editor");
+                } else {
+                    disclosureStates.put(key, true);
+                    pendingEditorScrollKey = key;
+                    showSection("editor");
+                }
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, dp(52), 1f);
+            if (index > 0) params.setMargins(dp(5), 0, 0, 0);
+            tools.addView(tool, params);
+        }
+        rail.addView(tools, marginParams(-1, dp(52), 0, 7, 0, 0));
+        return rail;
+    }
+
+    private View buildEditorScopeDock() {
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.VERTICAL);
+        dock.setPadding(dp(10), dp(8), dp(10), dp(8));
+        dock.setBackground(rounded(STUDIO_PANEL, 5, STUDIO_RULE));
+        dock.addView(text(tr("编辑示波器"),
+                10, Typeface.BOLD, Color.rgb(168, 176, 188)));
+        if (editorAIAnalysis == null) {
+            dock.addView(text(tr("运行“分析画面”后显示实测范围"),
+                    11, Typeface.NORMAL, MUTED),
+                    marginParams(-1, dp(48), 0, 10, 0, 0));
+            return dock;
+        }
+        String metrics = String.format(
+                Locale.CHINA,
+                "LUMA %d  RANGE %d\nCOLOR %d  DETAIL %d",
+                Math.round(editorAIAnalysis.meanLuma * 100),
+                Math.round(editorAIAnalysis.contrast * 100),
+                Math.round(editorAIAnalysis.saturation * 100),
+                Math.round(editorAIAnalysis.detail * 100));
+        TextView values = text(metrics, 12, Typeface.BOLD, STUDIO_GOLD);
+        values.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        values.setGravity(Gravity.CENTER_VERTICAL);
+        dock.addView(values, marginParams(-1, dp(62), 0, 4, 0, 0));
+        return dock;
+    }
+
     private View buildAiToolsView(ScrollView scroll, LinearLayout content) {
         List<File> photos = new ArrayList<>();
         for (File file : photoFiles()) {
@@ -6580,6 +6953,10 @@ public final class MainActivity extends Activity {
         if (aiMode == 0 && photos.isEmpty()) {
             aiMode = 1;
         }
+
+        content.addView(
+                buildResolveEditorWorkbench(photos),
+                marginParams(-1, dp(118), 0, 0, 0, 12));
 
         LinearLayout aiIntro = new LinearLayout(this);
         aiIntro.setOrientation(LinearLayout.VERTICAL);
@@ -8804,6 +9181,7 @@ public final class MainActivity extends Activity {
             View body,
             boolean initiallyExpanded) {
         LinearLayout group = panel();
+        if (key != null) group.setTag(key);
         boolean expanded = disclosureStates.containsKey(key)
                 ? Boolean.TRUE.equals(disclosureStates.get(key))
                 : initiallyExpanded;
@@ -11311,6 +11689,10 @@ public final class MainActivity extends Activity {
             professionalScopeView.setData(
                     redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
         }
+        if (immersiveScopeView != null) {
+            immersiveScopeView.setData(
+                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+        }
         if (peakingCoverageText != null) {
             peakingCoverageText.setText(
                     tr("峰值覆盖") + " · " + peakingCoverage + "%");
@@ -12244,9 +12626,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.2" : version;
+            return version == null || version.isEmpty() ? "1.5.3" : version;
         } catch (Exception error) {
-            return "1.5.2";
+            return "1.5.3";
         }
     }
 
@@ -12394,11 +12776,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• 新增五端全局状态条：统一显示相机连接、当前操作和 ZENCHE 文件库总数。\n"
-                                + "• 新增“恢复设备码”入口（服务端启用后可用）：使用旧设备码与旧激活码迁移剩余 AI 次数；成功后旧绑定永久失效。\n"
-                                + "• Android USB/PTP 遇到已知异步传输故障时会自动降级，并在本次连接中复用稳定通道，减少重复等待。\n"
-                                + "• 强化 AI 代理与签发服务：限制请求和响应大小、耐久保存次数、失败自动退款，并在存储异常时停止继续写入。\n"
-                                + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。",
+                        "• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n"
+                                + "• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n"
+                                + "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n"
+                                + "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n"
+                                + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。",
                         14,
                         Typeface.NORMAL,
                         INK),

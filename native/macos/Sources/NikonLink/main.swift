@@ -4169,6 +4169,16 @@ private enum Palette {
     // 实时画面井：两模式恒石墨黑
     static let graphite = dynamic(
         light: (0.039, 0.043, 0.051), dark: (0.039, 0.043, 0.051))
+    static let studioCanvas = Color(
+        red: 6.0 / 255.0, green: 9.0 / 255.0, blue: 13.0 / 255.0)
+    static let studioPanel = Color(
+        red: 21.0 / 255.0, green: 25.0 / 255.0, blue: 31.0 / 255.0)
+    static let studioRaised = Color(
+        red: 32.0 / 255.0, green: 36.0 / 255.0, blue: 43.0 / 255.0)
+    static let studioRule = Color(
+        red: 52.0 / 255.0, green: 58.0 / 255.0, blue: 67.0 / 255.0)
+    static let studioGold = Color(
+        red: 216.0 / 255.0, green: 182.0 / 255.0, blue: 83.0 / 255.0)
     // 分隔线与投影：随主题切换明度
     static let rule = Color(nsColor: NSColor(name: nil) { appearance in
         let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
@@ -4550,19 +4560,32 @@ private struct ImmersiveMacCameraView: View {
                     .frame(height: 44)
                     .background(.black.opacity(0.58), in: Capsule())
                     Spacer()
-                    Text("\(model.cameraName ?? "未连接") · USB/PTP")
+                    Text(
+                        model.connected
+                            ? "\(model.cameraName ?? "相机") · USB/PTP"
+                            : model.localCameraConnected
+                                ? "\(model.localCamera.deviceName) · SYSTEM"
+                                : model.wifiCamera.isConnected
+                                    ? "Wi‑Fi 相机 · PTP-IP"
+                                    : "— · OFFLINE"
+                    )
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 14)
                         .frame(height: 44)
                         .background(.black.opacity(0.58), in: Capsule())
                 }
+                immersiveTelemetryHUD
                 Spacer()
                 immersiveParameterBar
                 HStack(spacing: 20) {
-                    RuntimeLocalizedText(shutterLabel)
-                    Text("F\(model.aperture, specifier: "%.1f")")
-                    Text("ISO \(model.iso)")
-                    Text(monitoring ? "\(Int(model.videoFrameRate))P" : "JPEG")
+                    RuntimeLocalizedText(model.connected ? shutterLabel : "—")
+                    Text(model.connected
+                        ? String(format: "F%.1f", model.aperture)
+                        : "—")
+                    Text(model.connected ? "ISO \(model.iso)" : "—")
+                    Text(model.hasAnyCameraConnection
+                        ? (monitoring ? "\(Int(model.videoFrameRate))P" : "JPEG")
+                        : "—")
                 }
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.88))
@@ -4572,18 +4595,20 @@ private struct ImmersiveMacCameraView: View {
             }
             .padding(20)
 
-            edgeLayout {
-                VStack(spacing: 12) {
-                    Text(model.exposureMode.uppercased())
-                        .font(.system(size: 22, weight: .bold))
-                        .frame(width: 64, height: 56)
-                        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
-                    Text("USB\nPTP")
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .multilineTextAlignment(.center)
-                        .frame(width: 64, height: 56)
-                        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+            if proxy.size.width > proxy.size.height {
+                VStack {
+                    Spacer()
+                    HStack {
+                        immersiveScopeDock
+                        Spacer()
+                    }
+                    .padding(.leading, 20)
+                    .padding(.bottom, 174)
                 }
+            }
+
+            edgeLayout {
+                immersiveToolRail
                 Spacer()
                 VStack(spacing: 12) {
                     Text(
@@ -4665,6 +4690,125 @@ private struct ImmersiveMacCameraView: View {
         .onExitCommand(perform: close)
     }
 
+    private var immersiveTelemetryHUD: some View {
+        let connected = model.hasAnyCameraConnection
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 1) {
+                telemetryCell(
+                    "SOURCE",
+                    model.connected
+                        ? "USB/PTP"
+                        : model.localCameraConnected ? "SYSTEM" : "OFFLINE"
+                )
+                telemetryCell(
+                    "FORMAT",
+                    connected
+                        ? (monitoring ? "\(Int(model.videoFrameRate))P · VIDEO" : "PHOTO · JPEG")
+                        : "—"
+                )
+                telemetryCell("SHUTTER", model.connected ? shutterLabel : "—")
+                telemetryCell(
+                    "IRIS",
+                    model.connected ? String(format: "F%.1f", model.aperture) : "—"
+                )
+                telemetryCell("ISO", model.connected ? "\(model.iso)" : "—")
+                telemetryCell(
+                    "EV",
+                    model.connected ? String(format: "%+.1f", model.compensation) : "—"
+                )
+                telemetryCell(
+                    "STATE",
+                    connected
+                        ? (model.videoRecording ? "REC" : model.liveViewEnabled ? "LIVE" : "STBY")
+                        : "OFFLINE"
+                )
+            }
+            .background(Palette.studioRule)
+        }
+        .frame(height: 52)
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func telemetryCell(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.46))
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .frame(minWidth: 100, maxHeight: .infinity, alignment: .leading)
+        .background(Palette.studioPanel.opacity(0.9))
+    }
+
+    private var immersiveScopeDock: some View {
+        HStack(spacing: 6) {
+            MacScopePlot(
+                label: "RGB",
+                traces: [
+                    MacScopeTrace(value: model.redHistogram, color: .red),
+                    MacScopeTrace(value: model.greenHistogram, color: .green),
+                    MacScopeTrace(value: model.blueHistogram, color: .blue)
+                ],
+                parade: true
+            )
+            .frame(width: 180, height: 80)
+            MacAudioScopePlot(label: "AUDIO")
+                .frame(width: 92, height: 80)
+        }
+        .padding(5)
+        .background(Palette.studioCanvas.opacity(0.9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(Palette.studioRule, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .allowsHitTesting(false)
+    }
+
+    private var immersiveToolRail: some View {
+        VStack(spacing: 8) {
+            Text(model.connected ? model.exposureMode.uppercased() : "—")
+                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .frame(width: 64, height: 52)
+                .background(Palette.studioPanel.opacity(0.9))
+            Text(model.connected ? "USB\nPTP" : "OFFLINE")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .multilineTextAlignment(.center)
+                .frame(width: 64, height: 48)
+                .background(Palette.studioPanel.opacity(0.9))
+            if monitoring {
+                Button {
+                    model.setFocusPeakingEnabled(!model.focusPeakingEnabled)
+                } label: {
+                    Label("峰值", systemImage: "scope")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(
+                    ImmersiveMacButtonStyle(active: model.focusPeakingEnabled)
+                )
+                .disabled(!model.connected)
+                Button {
+                    model.setFalseColorEnabled(!model.falseColorEnabled)
+                } label: {
+                    Image(systemName: "circle.lefthalf.filled")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(
+                    ImmersiveMacButtonStyle(active: model.falseColorEnabled)
+                )
+                .disabled(!model.connected)
+            }
+        }
+        .padding(6)
+        .background(Palette.studioPanel.opacity(0.68))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+
     @ViewBuilder
     private var immersiveParameterBar: some View {
         VStack(spacing: 8) {
@@ -4681,10 +4825,13 @@ private struct ImmersiveMacCameraView: View {
                     Button {
                         showsMoreParameters.toggle()
                     } label: {
-                        Label(
-                            showsMoreParameters ? "收起更多" : "更多参数",
-                            systemImage: "slider.horizontal.3"
-                        )
+                        Label {
+                            RuntimeLocalizedText(
+                                showsMoreParameters ? "收起更多" : "更多参数"
+                            )
+                        } icon: {
+                            Image(systemName: "slider.horizontal.3")
+                        }
                     }
                     .buttonStyle(ImmersiveMacButtonStyle())
                     .tint(showsMoreParameters ? Palette.cobalt : nil)
@@ -4699,6 +4846,7 @@ private struct ImmersiveMacCameraView: View {
                                 Text("速度").tag("speed")
                             }
                             .pickerStyle(.segmented)
+                            .disabled(!model.connected)
                             parameterControl(
                                 videoShutterMode == "angle" ? "快门角度" : "快门速度",
                                 videoShutterMode == "angle"
@@ -4753,7 +4901,11 @@ private struct ImmersiveMacCameraView: View {
                             if monitoring {
                                 ImmersiveMacParameterControl(
                                     title: "视频帧率",
-                                    value: "\(Int(model.videoFrameRate)) fps",
+                                    value: model.connected
+                                        ? "\(Int(model.videoFrameRate)) fps"
+                                        : "—",
+                                    enabled: model.connected,
+                                    lockedReason: model.connected ? nil : "请先连接相机",
                                     decrease: { adjustVideoFrameRate(-1) },
                                     increase: { adjustVideoFrameRate(1) }
                                 )
@@ -4766,7 +4918,9 @@ private struct ImmersiveMacCameraView: View {
                                 )
                                 ImmersiveMacParameterControl(
                                     title: "视频录制规格",
-                                    value: model.monitorVideoCodec.label,
+                                    value: model.connected
+                                        ? model.monitorVideoCodec.label
+                                        : "—",
                                     enabled: model.connected,
                                     lockedReason: model.connected ? nil : "请先连接相机",
                                     decrease: { model.stepMonitorVideoCodec(-1) },
@@ -4774,7 +4928,9 @@ private struct ImmersiveMacCameraView: View {
                                 )
                                 ImmersiveMacParameterControl(
                                     title: "Log",
-                                    value: model.monitorVideoLog.shortLabel,
+                                    value: model.connected
+                                        ? model.monitorVideoLog.shortLabel
+                                        : "—",
                                     enabled: model.connected,
                                     lockedReason: model.connected ? nil : "请先连接相机",
                                     decrease: { model.stepMonitorVideoLog(-1) },
@@ -4848,8 +5004,8 @@ private struct ImmersiveMacCameraView: View {
     ) -> some View {
         ImmersiveMacParameterControl(
             title: title,
-            value: value,
-            enabled: model.canAdjustExposureParameter(parameter),
+            value: model.connected ? value : "—",
+            enabled: model.connected && model.canAdjustExposureParameter(parameter),
             lockedReason: model.exposureLockReason(parameter),
             decrease: decrease,
             increase: increase
@@ -5040,6 +5196,7 @@ private struct ImmersiveMacParameterControl: View {
                 }
                 Text(value)
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(enabled ? Palette.studioGold : .white)
                     .frame(minWidth: 72)
                 Button(action: increase) {
                     Image(systemName: "plus")
@@ -5051,7 +5208,14 @@ private struct ImmersiveMacParameterControl: View {
         .foregroundStyle(.white)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(.black.opacity(0.64), in: RoundedRectangle(cornerRadius: 12))
+        .background(Palette.studioPanel.opacity(0.9), in: RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(
+                    enabled ? Palette.studioGold.opacity(0.48) : Palette.studioRule,
+                    lineWidth: 1
+                )
+        }
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.48)
         .help(enabled ? title : (lockedReason ?? "\(title)当前不可调整"))
@@ -5156,13 +5320,22 @@ private func showMacImmersiveWindow(
 }
 
 private struct ImmersiveMacButtonStyle: ButtonStyle {
+    var active = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
-            .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+            .background(
+                active ? Palette.cobalt.opacity(0.82) : Palette.studioPanel.opacity(0.88),
+                in: RoundedRectangle(cornerRadius: 7)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(Palette.studioRule, lineWidth: 1)
+            }
             .opacity(configuration.isPressed ? 0.68 : 1)
     }
 }
@@ -5339,6 +5512,147 @@ private struct WorkspaceHeading: View {
     }
 }
 
+private struct CaptureDeviceSummary: View {
+    @ObservedObject var model: CameraModel
+
+    var body: some View {
+        HStack(spacing: 1) {
+            cell("CAMERA", model.cameraName ?? "—", active: model.hasAnyCameraConnection)
+            cell(
+                "LINK",
+                model.connected ? "USB/PTP" : model.localCameraConnected ? "SYSTEM" : "OFFLINE",
+                active: model.hasAnyCameraConnection
+            )
+            cell(
+                "OUTPUT",
+                model.hasAnyCameraConnection ? "\(Int(model.videoFrameRate))P · JPEG" : "—",
+                active: model.hasAnyCameraConnection
+            )
+            cell("LIBRARY", "\(model.photos.count) 个文件", active: true)
+        }
+        .padding(1)
+        .background(Palette.studioRule)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Palette.studioRule, lineWidth: 1)
+        }
+    }
+
+    private func cell(_ label: String, _ value: String, active: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundStyle(active ? Palette.ink : Palette.muted)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .background(Palette.surface)
+    }
+}
+
+private struct ParameterCardGrid: View {
+    @ObservedObject var model: CameraModel
+
+    private var shutter: String {
+        guard model.connected else { return "—" }
+        return model.shutter < 1
+            ? "1/\(Int((1 / model.shutter).rounded()))"
+            : String(format: "%.1fs", model.shutter)
+    }
+
+    var body: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 136), spacing: 8)],
+            spacing: 8
+        ) {
+            card("模式", model.connected ? model.exposureMode.uppercased() : "—")
+            card("快门", shutter)
+            card("光圈", model.connected ? String(format: "F%.1f", model.aperture) : "—")
+            card("ISO", model.connected ? "\(model.iso)" : "—")
+            card("曝光", model.connected ? String(format: "%+.1f EV", model.compensation) : "—")
+            card("对焦", model.connected ? model.focusMode.uppercased() : "—")
+        }
+        .padding(8)
+        .background(Palette.studioPanel)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Palette.studioRule, lineWidth: 1)
+        }
+    }
+
+    private func card(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(LocalizedStringKey(label))
+                .textCase(.uppercase)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.46))
+            Text(value)
+                .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                .foregroundStyle(model.connected ? Palette.studioGold : .white)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+        .background(Palette.studioRaised)
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(
+                    model.connected ? Palette.studioGold.opacity(0.55) : Palette.studioRule,
+                    lineWidth: 1
+                )
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+    }
+}
+
+private struct CaptureDock: View {
+    @ObservedObject var model: CameraModel
+    let showConnection: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button {
+                model.toggleLiveView()
+            } label: {
+                RuntimeLocalizedText(
+                    model.liveViewEnabled ? "停止实时取景" : "开启实时取景"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NativeButtonStyle())
+            Button {
+                if model.hasAnyCameraConnection { model.capture() }
+                else { showConnection() }
+            } label: {
+                Label(model.capturing ? "拍摄中…" : "拍摄", systemImage: "camera.fill")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(NativeButtonStyle(primary: true))
+            .disabled(model.capturing)
+            Button {
+                model.triggerAutoFocus()
+            } label: {
+                Text("AF-ON")
+            }
+            .buttonStyle(NativeButtonStyle())
+            .disabled(!model.connected || !model.liveViewEnabled)
+        }
+        .padding(9)
+        .background(Palette.studioPanel)
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Palette.studioRule, lineWidth: 1)
+        }
+    }
+}
+
 private struct CaptureView: View {
     @ObservedObject var model: CameraModel
     @Binding var showConnection: Bool
@@ -5351,6 +5665,7 @@ private struct CaptureView: View {
                         title: "照片拍摄",
                         subtitle: "会话、曝光、对焦与交付按拍摄流程组织。"
                     )
+                    CaptureDeviceSummary(model: model)
                     PreviewStage(model: model) {
                         showMacImmersiveWindow(model: model, monitoring: false)
                     }
@@ -5358,41 +5673,8 @@ private struct CaptureView: View {
                         model: model,
                         darkAppearance: false
                     )
-                    ExposureReadoutRail(model: model)
-                    HStack {
-                        Button {
-                            model.toggleLiveView()
-                        } label: {
-                            RuntimeLocalizedText(
-                                model.liveViewEnabled
-                                    ? "停止实时取景"
-                                    : "开启实时取景"
-                            )
-                        }
-                        .buttonStyle(NativeButtonStyle())
-                        Spacer()
-                        Button {
-                            if model.hasAnyCameraConnection { model.capture() }
-                            else { showConnection = true }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "camera.shutter.button.fill")
-                                RuntimeLocalizedText(
-                                    model.capturing ? "拍摄中…" : "拍摄"
-                                )
-                            }
-                            .frame(minWidth: 120)
-                        }
-                        .buttonStyle(NativeButtonStyle(primary: true))
-                        .disabled(model.capturing)
-                        Button {
-                            model.triggerAutoFocus()
-                        } label: {
-                            Label("AF-ON", systemImage: "viewfinder.circle")
-                        }
-                        .buttonStyle(NativeButtonStyle())
-                        .disabled(!model.connected || !model.liveViewEnabled)
-                    }
+                    ParameterCardGrid(model: model)
+                    CaptureDock(model: model) { showConnection = true }
                     CaptureSessionPanel(workflow: model.captureWorkflow)
                     ShootingTaskPanel(model: model)
                 }
@@ -8825,6 +9107,145 @@ private struct ProfessionalEditSettings {
     }
 }
 
+private struct ResolveEditorWorkbench<
+    Media: View,
+    CanvasArea: View,
+    Tools: View
+>: View {
+    let media: Media
+    let canvasArea: CanvasArea
+    let tools: Tools
+
+    init(
+        @ViewBuilder media: () -> Media,
+        @ViewBuilder canvasArea: () -> CanvasArea,
+        @ViewBuilder tools: () -> Tools
+    ) {
+        self.media = media()
+        self.canvasArea = canvasArea()
+        self.tools = tools()
+    }
+
+    var body: some View {
+        HStack(spacing: 1) {
+            media.frame(width: 220)
+            canvasArea.frame(maxWidth: .infinity)
+            tools.frame(width: 390)
+        }
+        .padding(1)
+        .background(Palette.studioRule)
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .overlay {
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(Palette.studioRule, lineWidth: 1)
+        }
+    }
+}
+
+private struct EditorMediaRail<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                RuntimeLocalizedText("媒体池")
+            } icon: {
+                Image(systemName: "photo.stack")
+            }
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+            Divider().overlay(Palette.studioRule)
+            content
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .foregroundStyle(.white)
+        .background(Palette.studioPanel)
+    }
+}
+
+private struct EditorToolRail<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                RuntimeLocalizedText("检查器")
+            } icon: {
+                Image(systemName: "slider.horizontal.3")
+            }
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+            Divider().overlay(Palette.studioRule)
+            content
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Palette.studioPanel)
+    }
+}
+
+private struct EditorScopeDock: View {
+    let values: [Double]
+    let hasSource: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                RuntimeLocalizedText("编辑示波器")
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Color.white.opacity(0.48))
+                RuntimeLocalizedText(
+                    hasSource
+                        ? values.isEmpty
+                            ? "运行“分析画面”后显示实测范围"
+                            : "本地图像分析"
+                        : "暂无图像源"
+                )
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(values.isEmpty ? Palette.muted : Palette.studioGold)
+            }
+            .frame(width: 190, alignment: .leading)
+            Canvas { context, size in
+                var guides = Path()
+                for fraction in [0.25, 0.5, 0.75] {
+                    let y = size.height * fraction
+                    guides.move(to: CGPoint(x: 0, y: y))
+                    guides.addLine(to: CGPoint(x: size.width, y: y))
+                }
+                context.stroke(guides, with: .color(.white.opacity(0.12)))
+                guard !values.isEmpty else { return }
+                let width = size.width / CGFloat(values.count)
+                for (index, raw) in values.enumerated() {
+                    let value = min(max(raw, 0), 1)
+                    let rect = CGRect(
+                        x: CGFloat(index) * width + 4,
+                        y: size.height * (1 - value),
+                        width: max(3, width - 8),
+                        height: size.height * value
+                    )
+                    var bar = Path()
+                    bar.addRect(rect)
+                    context.fill(bar, with: .color(Palette.studioGold.opacity(0.82)))
+                }
+            }
+            .background(Palette.studioCanvas)
+            .overlay { Rectangle().stroke(Palette.studioRule) }
+        }
+        .padding(10)
+        .background(Palette.studioPanel)
+    }
+}
+
 private struct ImageEditorView: View {
     @ObservedObject var model: CameraModel
     @StateObject private var branchStore = MacLibraryBranchStore()
@@ -9021,30 +9442,42 @@ private struct ImageEditorView: View {
             }
 
             GeometryReader { geometry in
-                let panelWidth: CGFloat = 390
-                let layoutSpacing: CGFloat = 18
-                let previewWidth = max(
-                    0,
-                    geometry.size.width - panelWidth - layoutSpacing
-                )
-
-                HStack(alignment: .top, spacing: layoutSpacing) {
-                    preview
-                        .frame(width: previewWidth, height: geometry.size.height)
-                    if selectedSection == .aiTools {
-                        aiToolsPanel
-                            .frame(
-                                width: panelWidth,
-                                height: geometry.size.height,
-                                alignment: .top
-                            )
-                    } else {
-                        adjustmentSidebar
-                            .frame(
-                                width: panelWidth,
-                                height: geometry.size.height,
-                                alignment: .top
-                            )
+                ResolveEditorWorkbench {
+                    EditorMediaRail {
+                        editorPhotoPicker
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        RuntimeLocalizedText("可编辑照片")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundStyle(Color.white.opacity(0.46))
+                        Text("\(photos.count)")
+                            .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                        if let selectedPhoto {
+                            Text(selectedPhoto.name)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(Color.white.opacity(0.62))
+                                .lineLimit(4)
+                        }
+                        RuntimeLocalizedText("非破坏编辑 · 保存为高质量副本")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.44))
+                    }
+                } canvasArea: {
+                    VStack(spacing: 1) {
+                        preview
+                        EditorScopeDock(
+                            values: editorScopeValues,
+                            hasSource: selectedPhoto != nil
+                        )
+                        .frame(height: 116)
+                    }
+                    .background(Palette.studioCanvas)
+                } tools: {
+                    EditorToolRail {
+                        if selectedSection == .aiTools {
+                            aiToolsPanel
+                        } else {
+                            adjustmentSidebar
+                        }
                     }
                 }
                 .frame(
@@ -9067,6 +9500,16 @@ private struct ImageEditorView: View {
                 ? "请选择文件库中的照片"
                 : "调整不会覆盖原文件"
         }
+    }
+
+    private var editorScopeValues: [Double] {
+        guard let aiAnalysis else { return [] }
+        return [
+            aiAnalysis.meanLuma,
+            aiAnalysis.contrast,
+            aiAnalysis.saturation,
+            aiAnalysis.detail
+        ]
     }
 
     private var aiToolsToolbar: some View {
@@ -11994,7 +12437,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.2"
+        ) as? String ?? "1.5.3"
     }
 
     var body: some View {

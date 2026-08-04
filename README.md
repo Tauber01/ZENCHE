@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- 最新正式版：**v1.5.1**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1)）
-- 当前源码版本：**1.5.2**（本地交付候选，尚未发布到 GitHub）
+- 最新正式版：**v1.5.2**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)）
+- 当前源码版本：**1.5.3 / build 28**（本地开发候选，尚未发布到 GitHub）
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[v1.5.1 最新版本](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[v1.5.2 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -41,6 +41,12 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > 已发布版本和实际可下载文件以 GitHub Releases 为准。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### 1.5.3 工作台界面
+
+- 全屏监看采用影像优先的专业 HUD：顶部显示真实连接与曝光遥测，画面保留焦点十字和工具轨，角落示波器读取实际 RGB 数据；没有音频源时明确显示静音基线，底部参数托盘继续调用原有控制链路。
+- 拍摄与参数页以设备摘要、自适应参数卡和常驻拍摄操作区重新组织，连接、输出格式、曝光参数与文件库数量无需跨页面查找。
+- 编辑器采用媒体池、中央预览、工具检查器和分析示波器协作布局。所有调整继续写入高质量新副本，不覆盖原文件；ZENCHE 蓝、暖金与录制红分别承担主操作、参数读数与录制/危险状态。
 
 <table>
   <tr>
@@ -380,12 +386,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Latest stable release: **v1.5.1** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1))
-- Source version: **1.5.2** (local delivery candidate; not yet published on GitHub)
+- Latest stable release: **v1.5.2** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2))
+- Source version: **1.5.3 / build 28** (local development candidate; not yet published on GitHub)
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
-- Downloads: [latest v1.5.1 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [latest stable v1.5.2 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -395,6 +401,12 @@ in a local library for review and export.
 > Published versions and downloadable files are defined by GitHub Releases.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### 1.5.3 Studio Interface
+
+- Full-screen monitoring now uses an image-first professional HUD. The top rail shows real connection and exposure telemetry, the image keeps the focus reticle and tool rail, and corner scopes use measured RGB data. An explicit silent baseline is shown when no audio source exists, while the bottom parameter tray continues to use the existing control path.
+- Capture and controls are reorganized around a device summary, adaptive parameter cards, and a persistent capture dock, keeping connection, output format, exposure settings, and library count visible without page hopping.
+- The editor coordinates a media pool, central preview, tool inspector, and analysis scopes. Adjustments still save to a high-quality new copy without overwriting the original; ZENCHE blue, warm gold, and recording red distinguish primary actions, parameter readouts, and recording or destructive states.
 
 ### Complete workflow
 
@@ -676,12 +688,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- 最新安定版：**v1.5.1**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1)）
-- 現在のソースバージョン：**1.5.2**（ローカル配布候補。GitHub では未公開）
+- 最新安定版：**v1.5.2**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)）
+- 現在のソースバージョン：**1.5.3 / build 28**（ローカル開発候補。GitHub では未公開）
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
-- ダウンロード：[最新の v1.5.1](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[最新安定版 v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -691,6 +703,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > 公開済みバージョンと実際にダウンロードできるファイルは GitHub Releases を
 > 正とします。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### 1.5.3 スタジオインターフェース
+
+- フルスクリーンモニターを映像優先のプロ HUD へ刷新しました。上部には実際の接続・露出テレメトリ、画面にはフォーカスレティクルとツールレール、コーナーには実測 RGB スコープを配置。音声ソースがない場合は無音基準線を明示し、下部パラメータトレイは既存の制御経路を継続して使用します。
+- 撮影・設定画面をデバイス概要、可変パラメータカード、常設撮影ドックで再構成し、接続、出力形式、露出設定、ライブラリ件数を画面移動なしで確認できます。
+- エディタはメディアプール、中央プレビュー、ツールインスペクタ、解析スコープが連携する構成です。調整は高品質な新しいコピーへ保存され、元ファイルを上書きしません。ZENCHE ブルー、ウォームゴールド、収録レッドは主要操作、パラメータ値、収録・危険状態を区別します。
 
 ### ワークフロー
 

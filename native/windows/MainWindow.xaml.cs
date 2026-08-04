@@ -752,6 +752,7 @@ public partial class MainWindow : Window
     private Window? _immersivePreviewWindow;
     private Image? _immersivePreviewImage;
     private Button? _immersiveRecordButton;
+    private WaveformScope? _immersiveScope;
     private Point _libraryDragStart;
     private bool _libraryDragInProgress;
     private TreeViewItem? _libraryDropTarget;
@@ -1358,6 +1359,24 @@ public partial class MainWindow : Window
         Closing += Window_Closing;
         Loaded += MainWindow_Loaded;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
+        SizeChanged += (_, _) => ApplyResponsiveEditorLayout();
+        ApplyResponsiveEditorLayout();
+    }
+
+    private void ApplyResponsiveEditorLayout()
+    {
+        if (EditorMediaColumn is null || EditorToolsColumn is null)
+        {
+            return;
+        }
+        var compact = ActualWidth > 0 && ActualWidth < 1120;
+        EditorMediaColumn.Width = compact
+            ? new GridLength(0)
+            : new GridLength(220);
+        EditorMediaRail.Visibility = compact
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        EditorToolsColumn.Width = new GridLength(compact ? 280 : 320);
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -2186,17 +2205,13 @@ public partial class MainWindow : Window
         top.Children.Add(status);
         root.Children.Add(top);
 
-        var leftRail = new StackPanel
-        {
-            Width = 76,
-            Margin = new Thickness(20, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Left
-        };
-        leftRail.Children.Add(ImmersiveReadout(
-            _videoMode ? $"{_videoFrameRate:0}P" : ExposureModeText()));
-        leftRail.Children.Add(ImmersiveReadout("USB\nPTP"));
+        root.Children.Add(ImmersiveTelemetryHud());
+
+        var leftRail = ImmersiveToolRail();
         root.Children.Add(leftRail);
+
+        var scopeDock = ImmersiveScopeDock();
+        root.Children.Add(scopeDock);
 
         var rightRail = new StackPanel
         {
@@ -2252,9 +2267,11 @@ public partial class MainWindow : Window
 
         var exposure = new TextBlock
         {
-            Text = _videoMode
-                ? $"{_videoShutterAngle:0.#}°   {_videoFrameRate:0} fps   {VideoCodecShortLabel()}   {VideoLogShortLabel()}"
-                : $"{ExposureModeText()}   JPEG   帧澈 ZENCHE",
+            Text = _camera.IsConnected
+                ? _videoMode
+                    ? $"{_videoShutterAngle:0.#}°   {_videoFrameRate:0} fps   {VideoCodecShortLabel()}   {VideoLogShortLabel()}"
+                    : $"{ExposureModeText()}   JPEG   帧澈 ZENCHE"
+                : "—",
             Foreground = Brushes.White,
             FontFamily = (FontFamily)FindResource("MonoFont"),
             FontWeight = FontWeights.SemiBold,
@@ -2336,18 +2353,7 @@ public partial class MainWindow : Window
         var parameterContent = new StackPanel();
         parameterContent.Children.Add(parameterScroller);
         parameterContent.Children.Add(moreParameterTray);
-        var parameterTray = new Expander
-        {
-            Header = "参数",
-            IsExpanded = true,
-            Content = parameterContent,
-            Foreground = Brushes.White,
-            Background = new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)),
-            Padding = new Thickness(8),
-            Margin = new Thickness(112, 0, 124, 78),
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Bottom
-        };
+        var parameterTray = ImmersiveParameterTray(parameterContent);
         root.Children.Add(parameterTray);
         void ApplyImmersiveLayout()
         {
@@ -2387,6 +2393,9 @@ public partial class MainWindow : Window
             exposure.Margin = landscape
                 ? new Thickness(0, 0, 0, 24)
                 : new Thickness(0, 0, 0, 122);
+            scopeDock.Visibility = landscape
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
         viewer.SizeChanged += (_, _) => ApplyImmersiveLayout();
         viewer.Content = root;
@@ -2404,10 +2413,195 @@ public partial class MainWindow : Window
                 _immersivePreviewWindow = null;
                 _immersivePreviewImage = null;
                 _immersiveRecordButton = null;
+                _immersiveScope = null;
             }
         };
         viewer.Show();
         viewer.Dispatcher.BeginInvoke(ApplyImmersiveLayout);
+    }
+
+    private Border ImmersiveTelemetryHud()
+    {
+        var connected = _camera.IsConnected;
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Background = (Brush)FindResource("StudioPanelBrush")
+        };
+        void AddCell(string label, string value)
+        {
+            row.Children.Add(new Border
+            {
+                Width = 106,
+                Height = 52,
+                Padding = new Thickness(10, 5, 10, 5),
+                Background = (Brush)FindResource("StudioPanelBrush"),
+                BorderBrush = (Brush)FindResource("StudioRuleBrush"),
+                BorderThickness = new Thickness(0, 0, 1, 0),
+                Child = new StackPanel
+                {
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = label,
+                            FontFamily = (FontFamily)FindResource("MonoFont"),
+                            FontSize = 8,
+                            FontWeight = FontWeights.Bold,
+                            Foreground = new SolidColorBrush(Color.FromRgb(126, 135, 148))
+                        },
+                        new TextBlock
+                        {
+                            Text = value,
+                            FontFamily = (FontFamily)FindResource("MonoFont"),
+                            FontSize = 12,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = Brushes.White,
+                            TextTrimming = TextTrimming.CharacterEllipsis
+                        }
+                    }
+                }
+            });
+        }
+        AddCell("SOURCE", connected ? "USB/PTP" : "OFFLINE");
+        AddCell("FORMAT", connected
+            ? _videoMode
+                ? $"{_videoFrameRate:0}P · {VideoCodecShortLabel()}"
+                : "PHOTO · JPEG"
+            : "—");
+        AddCell("SHUTTER", connected ? SelectedContent(ShutterBox, "—") : "—");
+        AddCell("IRIS", connected ? SelectedContent(ApertureBox, "—") : "—");
+        AddCell("ISO", connected
+            ? SelectedContent(IsoBox, "—").Replace("ISO ", "")
+            : "—");
+        AddCell("EV", connected
+            ? SelectedContent(ExposureCompensationBox, "—")
+            : "—");
+        AddCell("STATE", connected
+            ? _videoRecording ? "REC" : _camera.IsLiveView ? "LIVE" : "STBY"
+            : "OFFLINE");
+        return new Border
+        {
+            Height = 52,
+            Margin = new Thickness(170, 76, 170, 0),
+            VerticalAlignment = VerticalAlignment.Top,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Background = (Brush)FindResource("StudioPanelBrush"),
+            BorderBrush = (Brush)FindResource("StudioRuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            ClipToBounds = true,
+            Child = new ScrollViewer
+            {
+                Content = row,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+            }
+        };
+    }
+
+    private StackPanel ImmersiveToolRail()
+    {
+        var rail = new StackPanel
+        {
+            Width = 76,
+            Margin = new Thickness(20, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = new SolidColorBrush(Color.FromArgb(165, 21, 25, 31))
+        };
+        rail.Children.Add(ImmersiveReadout(
+            _camera.IsConnected
+                ? _videoMode ? $"{_videoFrameRate:0}P" : ExposureModeText()
+                : "—"));
+        rail.Children.Add(ImmersiveReadout(
+            _camera.IsConnected ? "USB\nPTP" : "OFFLINE"));
+        if (_videoMode)
+        {
+            var peaking = new Button
+            {
+                Content = "峰值",
+                Height = 44,
+                Margin = new Thickness(6, 0, 6, 6),
+                Style = (Style)FindResource("ButtonBase")
+            };
+            peaking.Click += MonitorFocusButton_Click;
+            rail.Children.Add(peaking);
+            var falseColor = new Button
+            {
+                Content = "假色",
+                Height = 44,
+                Margin = new Thickness(6, 0, 6, 6),
+                Style = (Style)FindResource("ButtonBase")
+            };
+            falseColor.Click += MonitorFalseColorButton_Click;
+            rail.Children.Add(falseColor);
+        }
+        var autoFocus = new Button
+        {
+            Content = "AF",
+            Height = 44,
+            Margin = new Thickness(6, 0, 6, 6),
+            Style = (Style)FindResource("ButtonBase"),
+            IsEnabled = _camera.IsConnected && _camera.IsLiveView
+        };
+        autoFocus.Click += CaptureAutoFocusButton_Click;
+        rail.Children.Add(autoFocus);
+        return rail;
+    }
+
+    private Border ImmersiveScopeDock()
+    {
+        _immersiveScope = new WaveformScope
+        {
+            Mode = WaveformScopeMode.RgbParade,
+            Width = 180,
+            Height = 76
+        };
+        var audio = new WaveformScope
+        {
+            Mode = WaveformScopeMode.Audio,
+            Width = 88,
+            Height = 76,
+            Margin = new Thickness(5, 0, 0, 0)
+        };
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { _immersiveScope, audio }
+        };
+        return new Border
+        {
+            Width = 284,
+            Height = 86,
+            Margin = new Thickness(20, 0, 0, 174),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Padding = new Thickness(5),
+            Background = (Brush)FindResource("StudioCanvasBrush"),
+            BorderBrush = (Brush)FindResource("StudioRuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            Child = row
+        };
+    }
+
+    private Expander ImmersiveParameterTray(FrameworkElement content)
+    {
+        return new Expander
+        {
+            Header = "参数",
+            IsExpanded = true,
+            Content = content,
+            Foreground = Brushes.White,
+            Background = (Brush)FindResource("StudioPanelBrush"),
+            BorderBrush = (Brush)FindResource("StudioRuleBrush"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8),
+            Margin = new Thickness(112, 0, 124, 78),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
     }
 
     private Border ImmersiveParameterControl(
@@ -2416,8 +2610,10 @@ public partial class MainWindow : Window
     {
         var value = new TextBlock
         {
-            Text = SelectedParameterLabel(source),
-            Foreground = Brushes.White,
+            Text = ImmersiveParameterLabel(source),
+            Foreground = source.IsEnabled
+                ? (Brush)FindResource("StudioGoldBrush")
+                : Brushes.White,
             FontFamily = (FontFamily)FindResource("MonoFont"),
             FontWeight = FontWeights.SemiBold,
             Width = 104,
@@ -2467,8 +2663,12 @@ public partial class MainWindow : Window
         row.Children.Add(plus);
         var control = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(165, 0, 0, 0)),
-            CornerRadius = new CornerRadius(10),
+            Background = (Brush)FindResource("StudioPanelBrush"),
+            BorderBrush = source.IsEnabled
+                ? (Brush)FindResource("StudioGoldBrush")
+                : (Brush)FindResource("StudioRuleBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
             Padding = new Thickness(4),
             Margin = new Thickness(4, 0, 4, 0),
             Child = row
@@ -2489,7 +2689,14 @@ public partial class MainWindow : Window
         return Convert.ToString(item.Content) ?? "—";
     }
 
-    private static void AdjustParameterSelection(
+    private string ImmersiveParameterLabel(ComboBox source)
+    {
+        return _camera.IsConnected
+            ? SelectedParameterLabel(source)
+            : "—";
+    }
+
+    private void AdjustParameterSelection(
         ComboBox source,
         int direction,
         TextBlock value)
@@ -2502,7 +2709,7 @@ public partial class MainWindow : Window
             source.SelectedIndex + direction,
             0,
             source.Items.Count - 1);
-        value.Text = SelectedParameterLabel(source);
+        value.Text = ImmersiveParameterLabel(source);
     }
 
     private void CloseImmersivePreview(Window viewer)
@@ -2513,6 +2720,7 @@ public partial class MainWindow : Window
         }
         _immersivePreviewImage = null;
         _immersiveRecordButton = null;
+        _immersiveScope = null;
         _immersivePreviewWindow = null;
         viewer.Dispatcher.BeginInvoke(viewer.Close);
     }
@@ -4487,11 +4695,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 新增五端全局状态条：统一显示相机连接、当前操作和 ZENCHE 文件库总数。\n" +
-                "• 新增“恢复设备码”入口（服务端启用后可用）：使用旧设备码与旧激活码迁移剩余 AI 次数；成功后旧绑定永久失效。\n" +
-                "• Android USB/PTP 遇到已知异步传输故障时会自动降级，并在本次连接中复用稳定通道，减少重复等待。\n" +
-                "• 强化 AI 代理与签发服务：限制请求和响应大小、耐久保存次数、失败自动退款，并在存储异常时停止继续写入。\n" +
-                "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新。"),
+                "• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n" +
+                "• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n" +
+                "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n" +
+                "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n" +
+                "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。"),
             FontSize = 14,
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -5669,6 +5877,22 @@ public partial class MainWindow : Window
                 : _wifiCamera.IsConnected
                     ? $"{_wifiConnectionMode.ToUpperInvariant()} · WI‑FI/PTP‑IP"
                     : "—";
+        CaptureDeviceNameText.Text = _camera.IsConnected
+            ? _camera.Profile?.Name ?? "Nikon 相机"
+            : _localCamera.IsConnected
+                ? "本机摄像头"
+                : _wifiCamera.IsConnected ? "Wi‑Fi 相机" : "—";
+        CaptureLinkText.Text = _camera.IsConnected
+            ? "USB/PTP"
+            : _localCamera.IsConnected
+                ? "SYSTEM"
+                : _wifiCamera.IsConnected ? "PTP-IP" : "OFFLINE";
+        CaptureOutputText.Text = _camera.IsConnected ||
+            _localCamera.IsConnected || _wifiCamera.IsConnected
+                ? _videoMode
+                    ? $"{_videoFrameRate:0}P · {VideoCodecShortLabel()}"
+                    : "PHOTO · JPEG"
+                : "—";
         ModeReadoutText.Text = connected ? ExposureModeText() : "—";
         ShutterReadoutText.Text = connected
             ? SelectedContent(ShutterBox, "—")
@@ -5833,6 +6057,12 @@ public partial class MainWindow : Window
         MonitorPreviewEmpty.Visibility = Visibility.Collapsed;
         MonitorCameraOverlay.Text = $"{(_camera.Profile?.Name ?? "未连接")} · USB/PTP";
         MonitorRgbScope.SetData(
+            prepared.Monitor.RedHistogram,
+            prepared.Monitor.GreenHistogram,
+            prepared.Monitor.BlueHistogram,
+            prepared.Monitor.Waveform,
+            prepared.Monitor.Vectorscope);
+        _immersiveScope?.SetData(
             prepared.Monitor.RedHistogram,
             prepared.Monitor.GreenHistogram,
             prepared.Monitor.BlueHistogram,
@@ -6132,6 +6362,8 @@ public partial class MainWindow : Window
         PhotoTree.ItemsSource = roots;
         PhotoCountText.Text = AppLocalization.T(
             $"{libraryItems.Count} 个本地文件 · {systemItems.Count} 个系统相册项目");
+        CaptureLibraryText.Text = AppLocalization.T(
+            $"{libraryItems.Count} 个文件");
         DeletePhotoButton.IsEnabled = false;
         DeleteBranchButton.IsEnabled = false;
         SharePhotoButton.IsEnabled = false;
@@ -6303,6 +6535,9 @@ public partial class MainWindow : Window
         EditorPhotoPickerButton.Content = selected is null
             ? "选择照片"
             : $"▧  {selected.Item.Name}";
+        EditorMediaCountText.Text = choices.Count.ToString(CultureInfo.InvariantCulture);
+        EditorMediaSelectionText.Text = selected?.Item.Name
+            ?? AppLocalization.T("未选择照片");
         AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
         _updatingEditorControls = false;
         if (!string.Equals(
@@ -7882,6 +8117,38 @@ public partial class MainWindow : Window
         EditorStatusText.Text = AppLocalization.T("画面分析完成 · 可应用 AI 建议");
     }
 
+    private void EditorWorkbenchTool_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string tool)
+        {
+            return;
+        }
+        if (tool == "ai")
+        {
+            _editorInAiMode = true;
+            RefreshAiEditor();
+            return;
+        }
+        _editorInAiMode = false;
+        EditorProGrid.Visibility = Visibility.Visible;
+        EditorAiGrid.Visibility = Visibility.Collapsed;
+        EditorHeaderTitle.Text = AppLocalization.T("专业显影");
+        EditorHeaderSubtitle.Text = AppLocalization.T(
+            "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
+        var index = tool switch
+        {
+            "wheels" => 4,
+            "curves" => 5,
+            "mask" => 7,
+            _ => -1
+        };
+        if (index >= 0 && index < EditorAdjustmentHost.Children.Count &&
+            EditorAdjustmentHost.Children[index] is FrameworkElement target)
+        {
+            target.BringIntoView();
+        }
+    }
+
     private void CopyEditorAI_Click(object sender, RoutedEventArgs e)
     {
         _editorAICopiedSettings = _editorAdjustments.Copy();
@@ -7907,12 +8174,16 @@ public partial class MainWindow : Window
         if (_editorAIAnalysis is null)
         {
             EditorAIMetricsText.Text = AppLocalization.T("等待分析");
+            EditorScopeText.Text = AppLocalization.T("分析后显示实测范围");
             return;
         }
         var analysis = _editorAIAnalysis;
         EditorAIMetricsText.Text = AppLocalization.T(
             $"曝光 {analysis.MeanLuma:P0}  动态范围 {analysis.Contrast:P0}  " +
             $"色彩 {analysis.Saturation:P0}  细节 {analysis.Detail:P0}");
+        EditorScopeText.Text = AppLocalization.T(
+            $"LUMA {analysis.MeanLuma:P0}  RANGE {analysis.Contrast:P0}\n" +
+            $"COLOR {analysis.Saturation:P0}  DETAIL {analysis.Detail:P0}");
     }
 
     private void UndoEditorAI_Click(

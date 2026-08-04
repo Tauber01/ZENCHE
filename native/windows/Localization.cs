@@ -534,7 +534,6 @@ internal static class AppLocalization
             ["色彩"] = new("Color", "カラー"),
             ["色轮"] = new("Color Wheels", "カラーホイール"),
             ["曲线"] = new("Curves", "カーブ"),
-            ["蒙版"] = new("Masks", "マスク"),
             ["阴影曲线"] = new("Shadow Curve", "シャドウカーブ"),
             ["中间调曲线"] = new("Midtone Curve", "中間調カーブ"),
             ["高光曲线"] = new("Highlight Curve", "ハイライトカーブ"),
@@ -835,7 +834,52 @@ internal static class AppLocalization
             ["配置并开始"] = new("Configure and Start", "設定して開始"),
             ["尚未开始拍摄会话"] = new("No capture session started", "撮影セッションは未開始です"),
             ["会话进行中"] = new("Session Active", "セッション実行中"),
-            ["拍摄会话已结束"] = new("Capture session ended", "撮影セッションを終了しました")
+            ["拍摄会话已结束"] = new("Capture session ended", "撮影セッションを終了しました"),
+            ["传输"] = new("Transfer", "転送"),
+            ["对焦"] = new("Focus", "フォーカス"),
+            ["峰值"] = new("Peaking", "ピーキング"),
+            ["假色"] = new("False Color", "フォルスカラー"),
+            ["本机摄像头"] = new("Local Camera", "内蔵カメラ"),
+            ["Wi‑Fi 相机"] = new("Wi‑Fi Camera", "Wi‑Fi カメラ"),
+            ["媒体池"] = new("Media Pool", "メディアプール"),
+            ["检查器"] = new("Inspector", "インスペクタ"),
+            ["可编辑照片"] = new("Editable Photos", "編集可能な写真"),
+            ["未选择照片"] = new("No photo selected", "写真が選択されていません"),
+            ["非破坏编辑 · 保存为高质量副本"] =
+                new(
+                    "Non-destructive editing · Save a high-quality copy",
+                    "非破壊編集 · 高品質コピーとして保存"),
+            ["运行“分析画面”后显示实测范围"] =
+                new(
+                    "Run Analyze Image to show measured ranges",
+                    "「画像を解析」を実行すると実測範囲を表示"),
+            ["分析后显示实测范围"] =
+                new(
+                    "Analyze to show measured ranges",
+                    "解析後に実測範囲を表示"),
+            ["编辑示波器"] = new("Editor Scopes", "編集スコープ"),
+            ["本地图像分析"] = new("Local Image Analysis", "ローカル画像解析"),
+            ["暂无图像源"] = new("No Image Source", "画像ソースがありません"),
+            ["调整始终写入新副本，原文件保持不变。"] =
+                new(
+                    "Adjustments are always written to a new copy; the original stays untouched.",
+                    "調整は常に新しいコピーへ保存され、元のファイルは変更されません。"),
+            ["• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n" +
+             "• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n" +
+             "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n" +
+             "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n" +
+             "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。"] =
+                new(
+                    "• Full-screen monitoring now uses an image-first professional HUD with top telemetry, a focus reticle, tool rail, real RGB scopes, an explicit silent-audio baseline, and a bottom parameter tray.\n" +
+                    "• Capture and controls now combine a device summary, adaptive parameter cards, and a persistent capture dock so connection, output, and library state stay visible.\n" +
+                    "• The editor now coordinates a media pool, central preview, tool inspector, and analysis scopes; every adjustment still saves non-destructively as a new copy.\n" +
+                    "• A unified dark studio system spans all five clients: ZENCHE blue marks primary actions, warm gold is reserved for parameter readouts, and red is reserved for recording and destructive actions.\n" +
+                    "• iOS / iPadOS, Android, HarmonyOS, macOS, and Windows are updated together while camera, AI, and transfer capabilities remain compatible.",
+                    "• フルスクリーンモニターを映像優先のプロ HUD へ刷新。上部テレメトリ、フォーカスレティクル、ツールレール、実測 RGB スコープ、無音オーディオ基準線、下部パラメータトレイを配置しました。\n" +
+                    "• 撮影・設定画面をデバイス概要、可変パラメータカード、常設撮影ドックで再構成し、接続、出力、ライブラリ状態を一画面で確認できます。\n" +
+                    "• エディタはメディアプール、中央プレビュー、ツールインスペクタ、解析スコープが連携する構成へ刷新。すべての調整は引き続き非破壊で新しいコピーへ保存します。\n" +
+                    "• 5 クライアントで共通のダークスタジオ表現を採用。ZENCHE ブルーは主要操作、ウォームゴールドはパラメータ値、赤は収録と危険操作に限定します。\n" +
+                    "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新し、カメラ、AI、転送機能の互換性を維持します。")
         };
 
     private static readonly Dictionary<DependencyObject, string> OriginalText = [];

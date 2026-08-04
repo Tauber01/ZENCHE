@@ -162,7 +162,7 @@ final class UpdateController: ObservableObject {
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "1.5.2"
+            ?? "1.5.3"
     }
 
     init() {

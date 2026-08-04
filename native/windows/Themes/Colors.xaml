@@ -28,6 +28,11 @@
   <Color x:Key="ColorGraphiteRule">#414856</Color>
   <Color x:Key="ColorGraphiteMuted">#ADB5C1</Color>
   <Color x:Key="ColorGraphiteInk">#F0F3F8</Color>
+  <Color x:Key="ColorStudioCanvas">#06090D</Color>
+  <Color x:Key="ColorStudioPanel">#15191F</Color>
+  <Color x:Key="ColorStudioRaised">#20242B</Color>
+  <Color x:Key="ColorStudioRule">#343A43</Color>
+  <Color x:Key="ColorStudioGold">#D8B653</Color>
   <Color x:Key="ColorError">#B4232D</Color>
   <Color x:Key="ColorErrorSoft">#FCE9EA</Color>
   <Color x:Key="ColorSuccess">#247A53</Color>
@@ -58,6 +63,11 @@
   <SolidColorBrush x:Key="GraphiteRuleBrush" Color="{StaticResource ColorGraphiteRule}" />
   <SolidColorBrush x:Key="GraphiteMutedBrush" Color="{StaticResource ColorGraphiteMuted}" />
   <SolidColorBrush x:Key="GraphiteInkBrush" Color="{StaticResource ColorGraphiteInk}" />
+  <SolidColorBrush x:Key="StudioCanvasBrush" Color="{StaticResource ColorStudioCanvas}" />
+  <SolidColorBrush x:Key="StudioPanelBrush" Color="{StaticResource ColorStudioPanel}" />
+  <SolidColorBrush x:Key="StudioRaisedBrush" Color="{StaticResource ColorStudioRaised}" />
+  <SolidColorBrush x:Key="StudioRuleBrush" Color="{StaticResource ColorStudioRule}" />
+  <SolidColorBrush x:Key="StudioGoldBrush" Color="{StaticResource ColorStudioGold}" />
   <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
   <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ColorErrorSoft}" />
   <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource ColorSuccess}" />
