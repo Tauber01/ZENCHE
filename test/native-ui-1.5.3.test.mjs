@@ -37,7 +37,7 @@ test('1.5.3 capture controls use device summaries, adaptive parameter cards, and
   const contracts = [
     [sources.ios, /CaptureDeviceSummary/, /CaptureParameterCardGrid/, /CaptureDock/],
     [sources.android, /buildControlStatusRow/, /buildStatusCardGrid/, /buildControlParameterGrid/, /buildControlCaptureDock/],
-    [sources.harmony, /CaptureDeviceSummary/, /CaptureParameterCardGrid/, /CaptureDock/],
+    [sources.harmony, /ControlStatusRow/, /ControlStatusGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
     [sources.macos, /CaptureDeviceSummary/, /ParameterCardGrid/, /CaptureDock/],
     [sources.windows, /CaptureDeviceSummary/, /ParameterCardDeck/, /CaptureDock/],
   ];
@@ -103,8 +103,9 @@ test('1.5.3 telemetry degrades to —/OFFLINE without a live source on Android a
   assert.match(harmony, /'FORMAT',\s*\n\s*\(this\.connected \|\| this\.localCameraSelected\)\s*\n\s*\?/);
   assert.match(harmony, /'SHUTTER',\s*\n\s*\(this\.connected \|\| this\.localCameraSelected\) \? this\.shutterDisplay\(\) : '—'/);
   assert.match(harmony, /'ISO',\s*\n\s*\(this\.connected \|\| this\.localCameraSelected\) \? `\$\{this\.currentIso\}` : '—'/);
-  // HarmonyOS capture device summary OUTPUT and bottom readout must be gated.
-  assert.match(harmony, /'OUTPUT',\s*\n\s*\(this\.connected \|\| this\.localCameraSelected\)\s*\n\s*\?/);
+  // HarmonyOS fig1 control-page transport capsule must be gated by connection state
+  // (mirrors the Android controlStatusRate.setText assertion above).
+  assert.match(harmony, /return this\.connected \? 'USB\/PTP'\s*\n\s*: this\.wifiConnected \? 'Wi‑Fi\/PTP‑IP' : 'SYSTEM';/);
   assert.match(harmony, /\(this\.connected \|\| this\.localCameraSelected\)\s*\n\s*\? \(this\.immersiveMonitoring\s*\n\s*\? `\$\{this\.videoShutterAngle\.toFixed\(1\)\}°   `/);
   // HarmonyOS parameter tray values must degrade too.
   assert.match(harmony, /'快门角度' : '快门',\s*\n\s*\(this\.connected \|\| this\.localCameraSelected\)\s*\n\s*\?/);

@@ -29,7 +29,8 @@ import {
 import { PhotoItem, PhotoLibrary } from '../storage/PhotoLibrary';
 import {
   CameraStorageItem,
-  CameraStorageSnapshot
+  CameraStorageSnapshot,
+  CameraStorageVolume
 } from '../storage/CameraStorage';
 import {
   ExternalRecordingResult,
@@ -68,6 +69,27 @@ const STUDIO_PANEL: string = '#15191F';
 const STUDIO_RAISED: string = '#20242B';
 const STUDIO_RULE: string = '#343A43';
 const STUDIO_GOLD: string = '#D8B653';
+
+// v1.5.5 fig1 control-page tokens: near-black canvas, one lime accent,
+// flat cards, no gradients or shadows. Shared with the monitor and
+// immersive surfaces so the whole capture surface reads as one system.
+const UI_BG: string = '#0A0B0D';
+const UI_CARD: string = '#1C1C1E';
+const UI_SECONDARY: string = '#2C2C2E';
+const UI_LABEL: string = '#8E8E93';
+const UI_ACCENT: string = '#CDDC39';
+const UI_BLUE: string = '#0A84FF';
+const UI_VIDEO: string = '#D8323A';
+
+class ControlTile {
+  readonly label: string;
+  readonly value: string;
+
+  constructor(label: string, value: string) {
+    this.label = label;
+    this.value = value;
+  }
+}
 
 function filenameFromPath(path: string): string {
   const index: number = path.lastIndexOf('/');
@@ -742,6 +764,12 @@ struct Index {
   @State private rememberedDevices: Array<RememberedCameraDevice> = [];
   @State private cameraVendor: string = 'Nikon';
   @State private status: string = '就绪';
+  // v1.5.5 fig1 control page: transport-capsule failure state and grid edit
+  // mode are pure UI state; lastConnectionError only drives the status row.
+  @State private lastConnectionError: string = '';
+  @State private gridEditMode: boolean = false;
+  @State private gridHiddenTiles: Array<boolean> = [];
+  private readonly gridScroller: Scroller = new Scroller();
   @State private preview: image.PixelMap | undefined = undefined;
   @State private monitorNikonCloudPresetId: string = '';
   @State private monitorFocusPointX: number = -1;
@@ -1199,11 +1227,13 @@ struct Index {
   build() {
     Stack({ alignContent: Alignment.Center }) {
       Column() {
-        if (this.section !== 'monitor') {
+        if (this.section === 'capture') {
+          this.ControlTopBar()
+        } else if (this.section !== 'monitor') {
           this.TopBar()
         }
         if (this.isCompact()) {
-          Scroll() {
+          Scroll(this.gridScroller) {
             this.MainGrid()
           }
           .width('100%')
@@ -1218,8 +1248,8 @@ struct Index {
       .width('100%')
       .height('100%')
       .backgroundColor(
-        this.section === 'monitor'
-          ? '#040A12'
+        this.isCameraSection()
+          ? UI_BG
           : $r('app.color.paper')
       )
       if (this.largePreviewVisible) {
@@ -1285,7 +1315,7 @@ struct Index {
     .width('100%')
     .height(32)
     .padding({ left: 14, right: 14 })
-    .backgroundColor($r('app.color.graphite'))
+    .backgroundColor(UI_BG)
   }
 
   @Builder
@@ -1374,10 +1404,110 @@ struct Index {
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
     .layoutWeight(this.isCompact() ? 0 : 1)
-    .backgroundColor($r('app.color.paper'))
+    .backgroundColor(
+      this.isCameraSection()
+        ? UI_BG
+        : $r('app.color.paper')
+    )
     .onBreakpointChange((breakpoint: string): void => {
       this.currentBreakpoint = breakpoint;
     })
+  }
+
+  @Builder
+  private ControlTopBar() {
+    Row() {
+      Button('☰', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontSize(20)
+        .fontColor(Color.White)
+        .backgroundColor(UI_SECONDARY)
+        .borderRadius(14)
+        .onClick((): void => {
+          this.showControlMenuDialog();
+        })
+      Text(this.tr('控制'))
+        .fontSize(this.isCompact() ? 17 : 19)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .textAlign(TextAlign.Center)
+        .layoutWeight(1)
+      Button('◉', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontSize(18)
+        .fontColor(Color.White)
+        .backgroundColor(UI_SECONDARY)
+        .borderRadius(14)
+        .margin({ right: 8 })
+        .onClick((): void => {
+          this.section = 'monitor';
+        })
+      Button('⋯', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontSize(18)
+        .fontColor(Color.White)
+        .backgroundColor(UI_SECONDARY)
+        .borderRadius(14)
+        .onClick((): void => {
+          this.showControlMenuDialog();
+        })
+    }
+    .width('100%')
+    .height(this.isCompact() ? 60 : 64)
+    .padding({
+      left: this.isCompact() ? 10 : 12,
+      right: this.isCompact() ? 10 : 12
+    })
+    .backgroundColor(UI_BG)
+    .border({
+      width: { bottom: 1 },
+      color: UI_SECONDARY
+    })
+  }
+
+  /** v1.5.5 fig1 menu: keeps every section reachable from the control page. */
+  private showControlMenuDialog(): void {
+    promptAction.showActionMenu({
+      title: this.tr('菜单'),
+      buttons: [
+        { text: this.tr('连接 / 断开相机'), color: '#FFFFFF' },
+        { text: this.tr('视频监看'), color: '#FFFFFF' },
+        { text: this.tr('编辑'), color: '#FFFFFF' },
+        { text: this.tr('设备'), color: '#FFFFFF' },
+        { text: this.tr('文件库'), color: '#FFFFFF' },
+        { text: this.tr('设置'), color: '#FFFFFF' }
+      ]
+    }).then((response: promptAction.ActionMenuSuccessResponse): void => {
+      const targets: Array<string> = [
+        'connect', 'monitor', 'editor', 'devices', 'library', 'settings'
+      ];
+      const target: string = targets[response.index];
+      if (target === 'connect') {
+        if (this.connected || this.wifiConnected || this.localCameraSelected) {
+          this.disconnectFromControlMenu();
+        } else {
+          this.connectionPanelVisible = true;
+        }
+        return;
+      }
+      this.section = target;
+    }).catch((): void => {
+    });
+  }
+
+  private async disconnectFromControlMenu(): Promise<void> {
+    if (this.connected) {
+      await this.toggleCameraConnection();
+    } else if (this.wifiConnected) {
+      await this.disconnectWifiCamera();
+    } else if (this.localCameraSelected) {
+      this.localCameraSelected = false;
+      this.status = '本机摄像头已断开';
+    }
+    this.lastConnectionError = '';
   }
 
   @Builder
@@ -1530,60 +1660,37 @@ struct Index {
   @Builder
   private CompactBottomNavigation() {
     Row() {
-      this.NavButton('照片', 'capture')
-      this.NavButton('视频', 'monitor')
-      this.NavButton('编辑', 'editor')
-      this.NavButton('设备', 'devices')
-      this.NavButton('分支', 'library')
+      // v1.5.5 fig1 tab bar: 单机 / 群组 / 已下载 / 设置. The editor stays
+      // reachable from the control-page menu and the desktop navigation rail;
+      // the video monitor from the control page's viewfinder button.
+      this.NavButton('单机', 'capture')
+      this.NavButton('群组', 'devices')
+      this.NavButton('已下载', 'library')
+      this.NavButton('设置', 'settings')
     }
     .width('100%')
     .height(64)
     .padding({ left: 6, right: 6, top: 6, bottom: 4 })
-    .backgroundColor(
-      this.section === 'monitor'
-        ? Color.Black
-        : $r('app.color.paper_2')
-    )
+    .backgroundColor(UI_BG)
     .border({
       width: { top: 1 },
-      color: $r('app.color.rule')
+      color: UI_SECONDARY
     })
   }
 
   @Builder
   private NavButton(label: string, target: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
-      .width(this.isCompact() ? '20%' : '100%')
+      .width(this.isCompact() ? '25%' : '100%')
       .height(this.isCompact() ? 52 : 44)
       .fontSize(this.isCompact() ? 11 : 14)
       .fontWeight(
         this.section === target ? FontWeight.Bold : FontWeight.Normal
       )
-      .fontColor(
-        this.section === target
-          ? (target === 'monitor' || this.section === 'monitor'
-            ? '#258AF0'
-            : $r('app.color.accent'))
-          : this.section === 'monitor'
-            ? '#AAB5C5'
-            : $r('app.color.muted')
-      )
+      .fontColor(this.section === target ? UI_BLUE : UI_LABEL)
       .backgroundColor(
-        this.section === target
-          ? this.section === 'monitor'
-            ? '#061A35'
-            : target === 'monitor'
-              ? $r('app.color.video_soft')
-              : $r('app.color.surface_raised')
-          : this.section === 'monitor' ? '#000000' : Color.Transparent
+        this.section === target ? '#140A84FF' : Color.Transparent
       )
-      .border({
-        width: this.section === target && !this.isCompact() ? 1 : 0,
-        color: target === 'monitor'
-          ? $r('app.color.video')
-          : $r('app.color.accent'),
-        radius: 12
-      })
       .borderRadius(12)
       .flexShrink(0)
       .onClick((): void => {
@@ -3859,7 +3966,13 @@ struct Index {
   private CameraWorkspace() {
     Column({ space: 16 }) {
       if (this.section === 'capture') {
-        this.CaptureDeviceSummary()
+        // v1.5.5 fig1 control page: status row → 2×2 status cards → parameter
+        // grid → capture dock. The preview stage and session/task panels stay
+        // below, exactly like the Android fig1 capture surface.
+        this.ControlStatusRow()
+        this.ControlStatusGrid()
+        this.ControlParameterGrid()
+        this.ControlCaptureDock()
       } else {
         Text('00:00:00:00')
           .fontSize(38)
@@ -3953,76 +4066,72 @@ struct Index {
         this.MonitorToolRail()
         this.MonitorStorageCard()
         this.ExposureReadoutRail()
-      } else {
-        this.CaptureParameterCardGrid()
       }
 
-      if (this.section === 'capture') {
-        this.CaptureDock()
-      } else {
+      if (this.section !== 'capture') {
         Row({ space: 8 }) {
-        Text(this.tr(
-          this.section === 'monitor'
-            ? '相机原生 JPEG · 监看输出 · 不修改原片'
-            : '相机原生 JPEG · 本地预览'
-        ))
-          .fontSize(12)
-          .fontColor($r('app.color.muted'))
-          .layoutWeight(1)
-        Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
-          type: ButtonType.Normal
-        })
-          .height(44)
-          .fontColor($r('app.color.ink'))
-          .backgroundColor($r('app.color.surface'))
-          .border({
-            width: 1,
-            color: $r('app.color.rule_strong'),
-            radius: 12
-          })
-          .enabled(this.connected && !this.busy)
-          .onClick((): void => {
-            this.toggleLiveView();
-          })
-        Button(
-          this.tr(
+          Text(this.tr(
             this.section === 'monitor'
-              ? (this.videoRecording ? '停止录制' : '开始录制')
-              : '拍摄照片'
-          ),
-          { type: ButtonType.Normal }
-        )
-          .height(44)
-          .fontColor($r('app.color.accent_ink'))
-          .backgroundColor(
-            this.section === 'monitor'
-              ? $r('app.color.video')
-              : $r('app.color.accent')
-          )
-          .borderRadius(12)
-          .enabled(
-            (this.section === 'monitor'
-              ? this.connected
-              : (this.connected || this.wifiConnected || this.localCameraSelected)) && !this.busy
-          )
-          .onClick((): void => {
-            if (this.section === 'monitor') {
-              this.toggleVideoRecording();
-            } else {
-              this.capturePhoto();
-            }
+              ? '相机原生 JPEG · 监看输出 · 不修改原片'
+              : '相机原生 JPEG · 本地预览'
+          ))
+            .fontSize(12)
+            .fontColor(UI_LABEL)
+            .layoutWeight(1)
+          Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
+            type: ButtonType.Normal
           })
-        if (this.section === 'capture' || this.section === 'monitor') {
-          Button('AF-ON', { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
-            .backgroundColor('#334A5F')
-            .borderRadius(12)
-            .enabled(this.connected && this.liveView && !this.busy)
-            .onClick((): void => {
-              this.triggerAutoFocusOn();
+            .backgroundColor(UI_SECONDARY)
+            .border({
+              width: 1,
+              color: UI_SECONDARY,
+              radius: 12
             })
-        }
+            .enabled(this.connected && !this.busy)
+            .onClick((): void => {
+              this.toggleLiveView();
+            })
+          Button(
+            this.tr(
+              this.section === 'monitor'
+                ? (this.videoRecording ? '停止录制' : '开始录制')
+                : '拍摄照片'
+            ),
+            { type: ButtonType.Normal }
+          )
+            .height(44)
+            .fontColor(Color.White)
+            .backgroundColor(
+              this.section === 'monitor'
+                ? UI_VIDEO
+                : UI_ACCENT
+            )
+            .borderRadius(12)
+            .enabled(
+              (this.section === 'monitor'
+                ? this.connected
+                : (this.connected || this.wifiConnected || this.localCameraSelected)) && !this.busy
+            )
+            .onClick((): void => {
+              if (this.section === 'monitor') {
+                this.toggleVideoRecording();
+              } else {
+                this.capturePhoto();
+              }
+            })
+          if (this.section === 'monitor') {
+            Button('AF-ON', { type: ButtonType.Normal })
+              .height(44)
+              .fontColor(Color.White)
+              .backgroundColor(UI_SECONDARY)
+              .borderRadius(12)
+              .enabled(this.connected && this.liveView && !this.busy)
+              .onClick((): void => {
+                this.triggerAutoFocusOn();
+              })
+          }
         }
         .width('100%')
       }
@@ -4035,155 +4144,575 @@ struct Index {
     .height(this.isCompact() ? 'auto' : '100%')
     .padding(16)
     .backgroundColor(
-      this.section === 'monitor'
-        ? '#040A12'
+      this.isCameraSection()
+        ? UI_BG
         : $r('app.color.paper')
     )
   }
 
-  @Builder
-  private CaptureDeviceSummary() {
-    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-      this.CaptureSummaryCell(
-        'CAMERA',
-        this.cameraName.length > 0 ? this.cameraName : '—',
-        this.connected || this.wifiConnected || this.localCameraSelected
-      )
-      this.CaptureSummaryCell(
-        'LINK',
-        this.connected ? 'USB/PTP' : this.wifiConnected ? 'PTP-IP'
-          : this.localCameraSelected ? 'SYSTEM' : 'OFFLINE',
-        this.connected || this.wifiConnected || this.localCameraSelected
-      )
-      this.CaptureSummaryCell(
-        'OUTPUT',
-        (this.connected || this.localCameraSelected)
-          ? `${this.videoFrameRate}P · ${this.videoCodecLabel()}`
-          : '—',
-        this.connected || this.localCameraSelected
-      )
-      this.CaptureSummaryCell(
-        'LIBRARY',
-        `${this.photos.length} ${this.tr('个文件')}`,
-        true
-      )
+  // ── v1.5.5 fig1 control page: status row / 2×2 cards / parameter grid / dock ──
+  // Pure-UI state mirrors Android's fig1 surface; nothing here touches the
+  // connection state machine or device I/O.
+
+  private controlAnyCamera(): boolean {
+    return this.connected || this.wifiConnected || this.localCameraSelected;
+  }
+
+  private controlStatusLoading(): boolean {
+    // Wi‑Fi connect carries its own flag; USB connect runs inside runBusy with
+    // a '正在连接…' status line, so busy+status is the honest loading signal.
+    return this.wifiConnecting ||
+      (this.busy && this.status.indexOf('正在连接') === 0);
+  }
+
+  private controlStatusFailed(): boolean {
+    return this.lastConnectionError.length > 0 &&
+      !this.controlAnyCamera() &&
+      !this.controlStatusLoading();
+  }
+
+  private controlStatusDotColor(): string {
+    if (this.controlStatusLoading() || this.controlAnyCamera()) {
+      return UI_ACCENT;
     }
-    .width('100%')
-    .padding(1)
-    .backgroundColor(STUDIO_RULE)
-    .borderRadius(10)
+    return this.controlStatusFailed() ? UI_VIDEO : UI_LABEL;
+  }
+
+  private controlStatusTextValue(): string {
+    if (this.controlStatusLoading()) {
+      return this.wifiConnecting ? '正在连接 Wi‑Fi 相机…' : '正在连接…';
+    }
+    if (this.controlAnyCamera()) {
+      return '就绪';
+    }
+    return this.controlStatusFailed() ? '连接失败' : '未连接';
+  }
+
+  private controlStatusRateValue(): string {
+    if (this.controlStatusLoading()) {
+      return '连接中';
+    }
+    if (this.controlAnyCamera()) {
+      return this.connected ? 'USB/PTP'
+        : this.wifiConnected ? 'Wi‑Fi/PTP‑IP' : 'SYSTEM';
+    }
+    return this.controlStatusFailed() ? '重试' : '待连接';
   }
 
   @Builder
-  private CaptureSummaryCell(label: string, value: string, active: boolean) {
+  private ControlStatusRow() {
     Column({ space: 4 }) {
-      Text(label)
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#7E8794')
-        .width('100%')
+      Row({ space: 8 }) {
+        Text('●')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.controlStatusDotColor())
+          .width(22)
+          .textAlign(TextAlign.Center)
+        Text(this.tr(this.controlStatusTextValue()))
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
+        Text(this.tr(this.controlStatusRateValue()))
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor(UI_SECONDARY)
+          .borderRadius(15)
+          .onClick((): void => {
+            // fig1: tapping the transport capsule opens the connection panel
+            // whenever no camera is live (covers both 待连接 and 重试 states).
+            if (!this.controlAnyCamera() && !this.controlStatusLoading()) {
+              this.connectionPanelVisible = true;
+            }
+          })
+      }
+      .width('100%')
+      .height(36)
+      if (this.controlStatusFailed()) {
+        Text(this.lastConnectionError)
+          .fontSize(12)
+          .fontColor(UI_VIDEO)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+      }
+    }
+    .width('100%')
+  }
+
+  private bodyModelName(): string {
+    if (this.connected || this.localCameraSelected) {
+      return this.cameraName.length > 0 ? this.cameraName : '—';
+    }
+    if (this.wifiConnected) {
+      return this.wifiCameraName.length > 0 ? this.wifiCameraName : '—';
+    }
+    return '—';
+  }
+
+  @Builder
+  private ControlStatusGrid() {
+    if (this.isCompact()) {
+      Column({ space: 10 }) {
+        Row({ space: 10 }) {
+          this.ControlStatusCard(
+            '▣', this.tr('机身'), this.bodyModelName(), '—',
+            this.controlAnyCamera()
+          )
+          this.ControlStatusCard(
+            '◎', this.tr('镜头'), '—', this.tr('镜头数据未提供'), false
+          )
+        }
+        Row({ space: 10 }) {
+          this.ControlStorageStatusCard()
+          this.ControlStatusCard(
+            '▤', this.tr('格式'), 'JPEG', this.tr('照片输出'), false
+          )
+        }
+      }
+      .width('100%')
+    } else {
+      Row({ space: 10 }) {
+        this.ControlStatusCard(
+          '▣', this.tr('机身'), this.bodyModelName(), '—',
+          this.controlAnyCamera()
+        )
+        this.ControlStatusCard(
+          '◎', this.tr('镜头'), '—', this.tr('镜头数据未提供'), false
+        )
+        this.ControlStorageStatusCard()
+        this.ControlStatusCard(
+          '▤', this.tr('格式'), 'JPEG', this.tr('照片输出'), false
+        )
+      }
+      .width('100%')
+    }
+  }
+
+  @Builder
+  private ControlStatusCard(
+    icon: string,
+    label: string,
+    value: string,
+    sub: string,
+    active: boolean
+  ) {
+    Column({ space: 4 }) {
+      Row({ space: 6 }) {
+        Text(icon)
+          .fontSize(16)
+          .fontColor(UI_LABEL)
+          .width(24)
+          .height(24)
+        Text(label)
+          .fontSize(12)
+          .fontColor(UI_LABEL)
+      }
+      .width('100%')
       Text(value)
-        .fontSize(13)
-        .fontFamily('monospace')
+        .fontSize(20)
         .fontWeight(FontWeight.Bold)
-        .fontColor(active ? $r('app.color.ink') : $r('app.color.muted'))
+        .fontColor(Color.White)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
+        .margin({ top: 6 })
+      Text(sub.length > 0 ? sub : ' ')
+        .fontSize(12)
+        .fontColor(UI_LABEL)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 1 })
     }
-    .width(this.isCompact() ? '49.5%' : '24.7%')
-    .height(64)
+    .height(104)
+    .layoutWeight(1)
+    .padding(12)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Start)
-    .padding({ left: 12, right: 12 })
-    .backgroundColor($r('app.color.surface'))
+    .backgroundColor(UI_CARD)
+    .borderRadius(15)
+    .border({ width: active ? 1 : 0, color: UI_ACCENT })
   }
 
-  @Builder
-  private CaptureParameterCardGrid() {
-    Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.SpaceBetween }) {
-      this.CaptureParameterCard('模式', this.connected ? this.exposureMode.toUpperCase() : '—')
-      this.CaptureParameterCard('快门', this.connected ? this.shutterDisplay() : '—')
-      this.CaptureParameterCard('光圈', this.connected ? `F${this.currentAperture.toFixed(1)}` : '—')
-      this.CaptureParameterCard('ISO', this.connected ? `${this.currentIso}` : '—')
-      this.CaptureParameterCard(
-        '曝光',
-        this.connected ? `${this.currentCompensation >= 0 ? '+' : ''}${this.currentCompensation.toFixed(1)} EV` : '—'
-      )
-      this.CaptureParameterCard('对焦', this.connected ? this.currentFocusMode.toUpperCase() : '—')
+  private storageHasVolumes(): boolean {
+    return (this.connected || this.wifiConnected) &&
+      this.cameraStorageSnapshot.volumes.length > 0;
+  }
+
+  private storageUsedBytes(): number {
+    return Math.max(
+      0,
+      this.cameraStorageSnapshot.capacityBytes -
+        this.cameraStorageSnapshot.freeBytes
+    );
+  }
+
+  private storageUsedPercent(): number {
+    const capacity: number = this.cameraStorageSnapshot.capacityBytes;
+    return capacity > 0
+      ? Math.max(0, Math.min(100, Math.round(
+          this.storageUsedBytes() * 100 / capacity
+        )))
+      : 0;
+  }
+
+  private storageFreeImages(): number {
+    let total: number = 0;
+    this.cameraStorageSnapshot.volumes.forEach(
+      (volume: CameraStorageVolume): void => {
+        total += volume.freeImages;
+      }
+    );
+    return total;
+  }
+
+  private formatStorageBytes(bytes: number): string {
+    if (bytes < 0) {
+      return '—';
     }
-    .width('100%')
-    .padding(8)
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 10 })
+    const units: Array<string> = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let value: number = bytes;
+    let index: number = 0;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index++;
+    }
+    return index === 0
+      ? `${Math.round(value)} ${units[index]}`
+      : `${value.toFixed(1)} ${units[index]}`;
   }
 
+  /** v1.5.5 fig1 storage card with accent progress bar, honest 无卡 state. */
   @Builder
-  private CaptureParameterCard(label: string, value: string) {
+  private ControlStorageStatusCard() {
     Column({ space: 4 }) {
-      Text(this.tr(label).toUpperCase())
-        .fontSize(9)
-        .fontFamily('monospace')
+      Row({ space: 6 }) {
+        Text('▯')
+          .fontSize(16)
+          .fontColor(UI_LABEL)
+          .width(24)
+          .height(24)
+        Text(this.tr('存储'))
+          .fontSize(12)
+          .fontColor(UI_LABEL)
+      }
+      .width('100%')
+      Text(this.storageHasVolumes()
+        ? `${this.formatStorageBytes(this.storageUsedBytes())}/` +
+          `${this.formatStorageBytes(this.cameraStorageSnapshot.capacityBytes)} · ` +
+          `${this.storageUsedPercent()}%`
+        : '—')
+        .fontSize(16)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#7E8794')
+        .fontColor(Color.White)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
-      Text(value)
-        .fontSize(17)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor(this.connected ? STUDIO_GOLD : Color.White)
+        .margin({ top: 6 })
+      if (this.storageHasVolumes()) {
+        Row() {
+          Row()
+            .width(`${this.storageUsedPercent()}%`)
+            .height(4)
+            .backgroundColor(UI_ACCENT)
+            .borderRadius(2)
+          if (this.storageUsedPercent() < 100) {
+            Row()
+              .layoutWeight(1)
+              .height(4)
+              .backgroundColor(UI_SECONDARY)
+              .borderRadius(2)
+          }
+        }
         .width('100%')
+        .margin({ top: 2 })
+      } else {
+        Row()
+          .width('100%')
+          .height(4)
+          .backgroundColor(UI_SECONDARY)
+          .borderRadius(2)
+          .margin({ top: 2 })
+      }
+      Text(this.storageHasVolumes()
+        ? (this.storageFreeImages() > 0
+            ? `可拍 ${this.storageFreeImages()} 张`
+            : this.tr('存储卡已满'))
+        : (this.connected || this.wifiConnected) ? this.tr('无卡') : '—')
+        .fontSize(12)
+        .fontColor(UI_LABEL)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+        .margin({ top: 1 })
     }
-    .width(this.isCompact() ? '49%' : '32.6%')
-    .height(62)
+    .height(104)
+    .layoutWeight(1)
+    .padding(12)
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Start)
-    .padding({ left: 12, right: 12 })
-    .margin({ bottom: 7 })
-    .backgroundColor(STUDIO_RAISED)
-    .border({
-      width: 1,
-      color: this.connected ? STUDIO_GOLD : STUDIO_RULE,
-      radius: 6
-    })
+    .backgroundColor(UI_CARD)
+    .borderRadius(15)
+  }
+
+  /** v1.5.5 fig1 parameter grid: 3-column tiles (4 on wide screens) + 全部/编辑. */
+  private controlTiles(): Array<ControlTile> {
+    const live: boolean = this.connected || this.localCameraSelected;
+    return [
+      new ControlTile('模式', live ? this.exposureModeCode() : '—'),
+      new ControlTile('快门', this.connected ? this.shutterDisplay() : '—'),
+      new ControlTile('光圈', this.connected
+        ? `F${this.currentAperture.toFixed(1)}` : '—'),
+      new ControlTile('ISO', this.connected ? `${this.currentIso}` : '—'),
+      new ControlTile('EV', this.connected
+        ? `${this.currentCompensation >= 0 ? '+' : ''}` +
+          `${this.currentCompensation.toFixed(1)}`
+        : '—'),
+      new ControlTile('传输', this.connected ? 'PTP'
+        : this.wifiConnected ? 'PTP-IP' : '—'),
+      new ControlTile('白平衡', this.connected
+        ? (this.currentWhiteBalance === 'continuous' ? '自动' : '预设') : '—'),
+      new ControlTile('对焦', this.connected
+        ? (this.currentFocusMode === 'continuous' ? 'AF-C' : 'AF-S') : '—')
+    ];
+  }
+
+  private controlTileHidden(index: number): boolean {
+    return this.gridHiddenTiles[index] === true;
+  }
+
+  private hideControlTile(index: number): void {
+    const next: Array<boolean> = this.gridHiddenTiles.slice();
+    next[index] = true;
+    this.gridHiddenTiles = next;
+  }
+
+  /** Visible tile indices grouped into rows of 3 (compact) or 4 (desktop). */
+  private controlTileRows(): Array<Array<number>> {
+    const columns: number = this.isCompact() ? 3 : 4;
+    const rows: Array<Array<number>> = [];
+    let row: Array<number> = [];
+    for (let index: number = 0; index < 8; index++) {
+      if (this.controlTileHidden(index)) {
+        continue;
+      }
+      row.push(index);
+      if (row.length === columns) {
+        rows.push(row);
+        row = [];
+      }
+    }
+    if (row.length > 0) {
+      rows.push(row);
+    }
+    return rows;
   }
 
   @Builder
-  private CaptureDock() {
-    Row({ space: 8 }) {
-      Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
-        type: ButtonType.Normal
-      })
-        .height(48)
-        .layoutWeight(1)
-        .fontColor(Color.White)
-        .backgroundColor(STUDIO_RAISED)
-        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
-        .enabled(this.connected && !this.busy)
-        .onClick((): void => { this.toggleLiveView(); })
-      Button(this.tr('拍摄照片'), { type: ButtonType.Normal })
-        .height(48)
-        .layoutWeight(1)
-        .fontColor(Color.White)
-        .backgroundColor($r('app.color.accent'))
-        .borderRadius(7)
-        .enabled(
-          (this.connected || this.wifiConnected || this.localCameraSelected) && !this.busy
-        )
-        .onClick((): void => { this.capturePhoto(); })
-      Button('AF-ON', { type: ButtonType.Normal })
-        .height(48)
-        .fontColor(Color.White)
-        .backgroundColor(STUDIO_RAISED)
-        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
-        .enabled(this.connected && this.liveView && !this.busy)
-        .onClick((): void => { this.triggerAutoFocusOn(); })
+  private ControlParameterGrid() {
+    Column({ space: 8 }) {
+      Row() {
+        Text(this.tr('参数'))
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .layoutWeight(1)
+        Button(this.tr('全部'), { type: ButtonType.Normal })
+          .width(68)
+          .height(32)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.gridEditMode ? Color.White : $r('app.color.ink'))
+          .backgroundColor(this.gridEditMode ? UI_SECONDARY : UI_ACCENT)
+          .borderRadius(16)
+          .onClick((): void => {
+            this.gridEditMode = false;
+            this.gridHiddenTiles = new Array<boolean>(8).fill(false);
+          })
+        Button(this.tr('编辑'), { type: ButtonType.Normal })
+          .width(68)
+          .height(32)
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.gridEditMode ? $r('app.color.ink') : Color.White)
+          .backgroundColor(this.gridEditMode ? UI_ACCENT : UI_SECONDARY)
+          .borderRadius(16)
+          .margin({ left: 8 })
+          .onClick((): void => {
+            this.gridEditMode = true;
+          })
+      }
+      .width('100%')
+      .height(34)
+      if (this.controlTileRows().length === 0) {
+        Text(this.tr('参数已全部隐藏'))
+          .fontSize(12)
+          .fontColor(UI_LABEL)
+          .width('100%')
+          .height(44)
+          .margin({ top: 12 })
+      } else {
+        this.ControlTileRowsLoop(this.controlTiles())
+      }
     }
     .width('100%')
-    .padding(8)
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 10 })
+  }
+
+
+  @Builder
+  private ControlTileRowsLoop(tiles: Array<ControlTile>) {
+    ForEach(this.controlTileRows(), (row: Array<number>, rowIndex: number) => {
+      Row({ space: 8 }) {
+        ForEach(row, (index: number): void => {
+          this.ControlParameterTile(
+            index,
+            tiles[index].label,
+            tiles[index].value
+          )
+        }, (index: number): string => index.toString())
+      }
+      .width('100%')
+      .margin({ top: rowIndex === 0 ? 0 : 8 })
+    }, (row: Array<number>): string => row.join('-'))
+  }
+
+  @Builder
+  private ControlParameterTile(index: number, label: string, value: string) {
+    Stack({ alignContent: Alignment.TopEnd }) {
+      Column({ space: 4 }) {
+        Text(this.tr(label))
+          .fontSize(12)
+          .fontColor(UI_LABEL)
+          .width('100%')
+        Text(value)
+          .fontSize(28)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width('100%')
+      }
+      .width('100%')
+      .height(84)
+      .padding(12)
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Start)
+      .backgroundColor(UI_CARD)
+      .borderRadius(15)
+      if (this.gridEditMode) {
+        Button('×', { type: ButtonType.Normal })
+          .width(22)
+          .height(22)
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+          .backgroundColor(UI_SECONDARY)
+          .borderRadius(11)
+          .onClick((): void => {
+            this.hideControlTile(index);
+          })
+      }
+    }
+    .layoutWeight(1)
+  }
+
+  private firstPhotoFile(): PhotoItem | undefined {
+    for (const item of this.photos) {
+      if (!item.isVideo) {
+        return item;
+      }
+    }
+    return undefined;
+  }
+
+  /** v1.5.5 fig1 capture bar: gallery, AF-ON, round shutter, INT, camera switch. */
+  @Builder
+  private ControlCaptureDock() {
+    Row() {
+      Stack({ alignContent: Alignment.Center }) {
+        if (this.firstPhotoFile() !== undefined) {
+          Image(`file://${this.firstPhotoFile()!.path}`)
+            .width('100%')
+            .height('100%')
+            .objectFit(ImageFit.Cover)
+        } else {
+          Text('▢')
+            .fontSize(20)
+            .fontColor(UI_LABEL)
+        }
+      }
+      .width(56)
+      .height(56)
+      .backgroundColor(UI_SECONDARY)
+      .borderRadius(10)
+      .onClick((): void => {
+        this.section = 'library';
+      })
+      Button(this.tr('AF-ON'), { type: ButtonType.Normal })
+        .width(76)
+        .height(44)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Color.White)
+        .backgroundColor(UI_SECONDARY)
+        .borderRadius(16)
+        .margin({ left: 8 })
+        .onClick((): void => {
+          this.triggerAutoFocusOn();
+        })
+      Button('●', { type: ButtonType.Normal })
+        .width(74)
+        .height(74)
+        .fontSize(24)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(UI_ACCENT)
+        .backgroundColor(UI_CARD)
+        .border({ width: 3, color: UI_ACCENT, radius: 37 })
+        .margin({ left: 10, right: 10 })
+        .enabled(
+          (this.connected || this.wifiConnected || this.localCameraSelected) &&
+            !this.busy
+        )
+        .onClick((): void => {
+          this.capturePhoto();
+        })
+      Button('INT', { type: ButtonType.Normal })
+        .width(64)
+        .height(44)
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.shootingTaskRunning ? $r('app.color.ink') : Color.White)
+        .backgroundColor(this.shootingTaskRunning ? UI_ACCENT : UI_SECONDARY)
+        .borderRadius(16)
+        .onClick((): void => {
+          // fig1: INT scrolls the shooting-task panel into view (compact page).
+          if (this.isCompact()) {
+            this.gridScroller.scrollEdge(Edge.Bottom);
+          }
+        })
+      Button('⇄', { type: ButtonType.Normal })
+        .width(44)
+        .height(44)
+        .fontSize(18)
+        .fontColor(Color.White)
+        .backgroundColor(UI_SECONDARY)
+        .borderRadius(14)
+        .margin({ left: 8 })
+        .accessibilityText(this.tr('切换相机'))
+        .onClick((): void => {
+          this.section = 'devices';
+        })
+    }
+    .width('100%')
+    .padding(10)
+    .backgroundColor(UI_CARD)
+    .borderRadius(16)
   }
 
   @Builder
@@ -4340,7 +4869,7 @@ struct Index {
       Text(this.tr(label))
         .fontSize(10)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#A6B0BF')
+        .fontColor(UI_LABEL)
       Text(value)
         .fontSize(17)
         .fontFamily('monospace')
@@ -4462,7 +4991,7 @@ struct Index {
           .fontColor(Color.White)
         Text(this.librarySizeText())
           .fontSize(14)
-          .fontColor('#389BEF')
+          .fontColor(UI_BLUE)
         Row() {
           Text('图库占用 · 本地缓存')
             .fontSize(11)
@@ -4481,8 +5010,8 @@ struct Index {
     .width('100%')
     .height(88)
     .padding(14)
-    .backgroundColor('#1D2635')
-    .borderRadius(10)
+    .backgroundColor(UI_CARD)
+    .borderRadius(15)
   }
 
   private librarySizeText(): string {
@@ -6630,7 +7159,7 @@ struct Index {
           this.videoRecording ? 'REC' : this.liveView ? 'LIVE' : 'STBY'
         )
       }
-      .backgroundColor(STUDIO_PANEL)
+      .backgroundColor(UI_CARD)
     }
     .width('76%')
     .height(52)
@@ -6638,8 +7167,8 @@ struct Index {
     .scrollBar(BarState.Off)
     .align(Alignment.Top)
     .margin({ top: 76 })
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+    .backgroundColor(UI_CARD)
+    .border({ width: 1, color: UI_SECONDARY, radius: 5 })
   }
 
   @Builder
@@ -6649,7 +7178,7 @@ struct Index {
         .fontSize(8)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
-        .fontColor('#7E8794')
+        .fontColor(UI_LABEL)
         .width('100%')
       Text(value)
         .fontSize(12)
@@ -6665,7 +7194,7 @@ struct Index {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 10, right: 10 })
-    .border({ width: { right: 1 }, color: STUDIO_RULE })
+    .border({ width: { right: 1 }, color: UI_SECONDARY })
   }
 
   @Builder
@@ -6687,8 +7216,8 @@ struct Index {
     .padding(5)
     .align(Alignment.BottomStart)
     .margin({ left: 18, bottom: 170 })
-    .backgroundColor(STUDIO_CANVAS)
-    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+    .backgroundColor(UI_BG)
+    .border({ width: 1, color: UI_SECONDARY, radius: 5 })
   }
 
   @Builder
@@ -6717,8 +7246,8 @@ struct Index {
         .height(52)
         .fontSize(11)
         .fontWeight(FontWeight.Bold)
-        .fontColor(Color.White)
-        .backgroundColor(this.liveView ? '#B8991020' : '#AA000000')
+        .fontColor(this.liveView ? Color.Black : Color.White)
+        .backgroundColor(this.liveView ? UI_ACCENT : '#AA000000')
         .borderRadius(10)
         .onClick((): void => {
           this.toggleLiveView();
@@ -6728,9 +7257,9 @@ struct Index {
           .width(64)
           .height(48)
           .fontSize(11)
-          .fontColor(Color.White)
-          .backgroundColor(this.focusPeakingEnabled ? $r('app.color.accent') : STUDIO_PANEL)
-          .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+          .fontColor(this.focusPeakingEnabled ? Color.Black : Color.White)
+          .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : '#AA000000')
+          .borderRadius(10)
           .onClick((): void => {
             this.focusPeakingEnabled = !this.focusPeakingEnabled;
           })
@@ -6738,9 +7267,9 @@ struct Index {
           .width(64)
           .height(48)
           .fontSize(11)
-          .fontColor(Color.White)
-          .backgroundColor(this.falseColorEnabled ? $r('app.color.accent') : STUDIO_PANEL)
-          .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+          .fontColor(this.falseColorEnabled ? Color.Black : Color.White)
+          .backgroundColor(this.falseColorEnabled ? UI_ACCENT : '#AA000000')
+          .borderRadius(10)
           .onClick((): void => {
             this.falseColorEnabled = !this.falseColorEnabled;
           })
@@ -6750,8 +7279,8 @@ struct Index {
         .height(48)
         .fontSize(11)
         .fontColor(Color.White)
-        .backgroundColor(STUDIO_PANEL)
-        .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+        .backgroundColor('#AA000000')
+        .borderRadius(10)
         .enabled(this.connected && this.liveView && !this.busy)
         .onClick((): void => { this.triggerAutoFocusOn(); })
     }
@@ -6765,8 +7294,8 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(
           this.immersiveMonitoring
-            ? $r('app.color.video')
-            : $r('app.color.accent')
+            ? UI_VIDEO
+            : UI_ACCENT
         )
       this.ImmersiveCaptureButton()
       Text(this.immersiveMonitoring
@@ -6794,11 +7323,11 @@ struct Index {
       .height(96)
       .fontSize(this.videoRecording ? 26 : 34)
       .fontWeight(FontWeight.Bold)
-      .fontColor(Color.White)
+      .fontColor(this.videoRecording ? Color.White : Color.Black)
       .backgroundColor(
         this.immersiveMonitoring
-          ? $r('app.color.video')
-          : $r('app.color.accent')
+          ? UI_VIDEO
+          : UI_ACCENT
       )
       .borderRadius(48)
       .enabled(
@@ -6828,8 +7357,8 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.immersiveMonitoring
-                ? $r('app.color.video')
-                : $r('app.color.accent')
+                ? UI_VIDEO
+                : UI_ACCENT
             )
           Text(this.immersiveMonitoring
             ? (this.videoRecording ? 'REC' : this.tr('待机'))
@@ -6944,7 +7473,7 @@ struct Index {
                 )
                   .height(44)
                   .fontColor(Color.White)
-                  .backgroundColor('#334A5F')
+                  .backgroundColor(UI_SECONDARY)
                   .borderRadius(10)
                   .onClick((): void => {
                     this.videoShutterMode =
@@ -7049,7 +7578,7 @@ struct Index {
           .fontColor(
             this.connected &&
             this.camera.canAdjustParameter(this.cameraParameter(parameter))
-              ? STUDIO_GOLD
+              ? UI_ACCENT
               : Color.White
           )
       }
@@ -7069,13 +7598,13 @@ struct Index {
     }
     .height(48)
     .padding(2)
-    .backgroundColor(STUDIO_PANEL)
+    .backgroundColor(UI_CARD)
     .border({
       width: 1,
       color: this.connected &&
         this.camera.canAdjustParameter(this.cameraParameter(parameter))
-          ? STUDIO_GOLD
-          : STUDIO_RULE,
+          ? UI_ACCENT
+          : UI_SECONDARY,
       radius: 7
     })
   }
@@ -8446,20 +8975,29 @@ struct Index {
           this.preview = undefined;
         }
         this.status = '相机已断开';
+        this.lastConnectionError = '';
       });
       return;
     }
 
     await this.runBusy('正在连接相机…', async (): Promise<void> => {
       this.localCameraSelected = false;
-      const profile: CameraProfile = await this.camera.connect();
-      this.connected = true;
-      this.cameraName = profile.name;
-      this.cameraVendor = profile.vendorName;
-      this.rememberConnectedDevice(profile);
-      this.videoCodecIndex();
-      this.videoLogIndex();
-      this.status = `${profile.name} 已连接`;
+      try {
+        const profile: CameraProfile = await this.camera.connect();
+        this.connected = true;
+        this.cameraName = profile.name;
+        this.cameraVendor = profile.vendorName;
+        this.rememberConnectedDevice(profile);
+        this.videoCodecIndex();
+        this.videoLogIndex();
+        this.status = `${profile.name} 已连接`;
+        this.lastConnectionError = '';
+      } catch (error) {
+        this.lastConnectionError = (error as Error).message !== undefined
+          ? (error as Error).message
+          : this.tr('连接失败');
+        throw (error as Error);
+      }
     });
   }
 
@@ -8470,7 +9008,8 @@ struct Index {
     ]);
     if (!granted) {
       this.localCameraSelected = false;
-      this.status = '未获得相机权限，无法使用本机摄像头';
+      this.lastConnectionError = '未获得相机权限，无法使用本机摄像头';
+      this.status = this.lastConnectionError;
       return;
     }
     if (this.connected) {
@@ -8489,6 +9028,7 @@ struct Index {
     this.cameraName = 'HarmonyOS 本机摄像头';
     this.cameraVendor = 'System';
     this.status = '本机摄像头已就绪 · 拍摄时打开系统取景器';
+    this.lastConnectionError = '';
     this.connectionPanelVisible = false;
   }
 
@@ -8515,8 +9055,12 @@ struct Index {
       this.wifiConnected = true;
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已通过 PTP/IP 连接`;
       this.status = this.wifiStatus;
+      this.lastConnectionError = '';
     } catch (error) {
       this.wifiConnected = false;
+      this.lastConnectionError = (error as Error).message !== undefined
+        ? (error as Error).message
+        : this.tr('连接失败');
       this.wifiStatus = `Wi‑Fi 连接失败：${(error as Error).message}`;
       this.status = this.wifiStatus;
     } finally {
@@ -8530,6 +9074,7 @@ struct Index {
     this.wifiCameraName = 'PTP/IP Camera';
     this.wifiStatus = 'Wi‑Fi 相机未连接';
     this.status = 'Wi‑Fi 相机已断开';
+    this.lastConnectionError = '';
   }
 
   private async persistWifiConnectionSettings(): Promise<void> {
