@@ -69,6 +69,14 @@ const STUDIO_PANEL: string = '#15191F';
 const STUDIO_RAISED: string = '#20242B';
 const STUDIO_RULE: string = '#343A43';
 const STUDIO_GOLD: string = '#D8B653';
+// 图 2 系（1.5.5 阶段 2）：编辑器深灰平铺 + 品牌橙选中 + 1px 深色分隔。
+// STUDIO_* 常量保留定义以兼容 native-ui-1.5.3 token 契约断言（L80-81）。
+const EDITOR_BG: string = '#2A2A2E';
+const EDITOR_PANEL: string = '#333338';
+const EDITOR_RAISED: string = '#3A3A40';
+const EDITOR_RULE: string = '#1B1B1F';
+const EDITOR_ACCENT: string = '#E8833A';
+const EDITOR_LABEL: string = '#8E8E93';
 
 // v1.5.5 fig1 control-page tokens: near-black canvas, one lime accent,
 // flat cards, no gradients or shadows. Shared with the monitor and
@@ -1864,7 +1872,6 @@ struct Index {
   private ImageEditorWorkspace() {
     Column({ space: 12 }) {
       this.EditorModeSwitcher()
-      this.ResolveEditorWorkbench()
       if (this.editorTabMode === 'ai') {
         this.AiToolsWorkspace();
       } else {
@@ -1875,31 +1882,32 @@ struct Index {
 
   @Builder
   private ResolveEditorWorkbench() {
-    Scroll() {
-      Row({ space: 6 }) {
-        this.EditorMediaRail()
-        this.EditorToolRail()
-        this.EditorScopeDock()
-      }
-      .padding(6)
+    // 图 2 移动端降级：控制带（媒体行 + 工具条 + 示波器区）纵向堆叠，
+    // 作为监视器下方的「底部抽屉」顶部控制面板；1px 深色分隔。
+    Column() {
+      this.EditorMediaRail()
+      Divider()
+        .strokeWidth(1)
+        .color(EDITOR_RULE)
+      this.EditorToolRail()
+      Divider()
+        .strokeWidth(1)
+        .color(EDITOR_RULE)
+      this.EditorScopeDock()
     }
     .width('100%')
-    .height(118)
-    .scrollable(ScrollDirection.Horizontal)
-    .scrollBar(BarState.Off)
-    .backgroundColor(STUDIO_CANVAS)
-    .border({ width: 1, color: STUDIO_RULE, radius: 7 })
+    .backgroundColor(EDITOR_BG)
   }
 
   @Builder
   private EditorMediaRail() {
-    Column({ space: 5 }) {
+    // 媒体行：媒体池计数 + 当前照片名 + 非破坏说明（图 2 顶部媒体信息，横向单行）
+    Row({ space: 6 }) {
       Text(`${this.tr('媒体池')} · ${this.editablePhotos().length}`)
-        .fontSize(9)
+        .fontSize(10)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
-        .fontColor('#A8B0BC')
-        .width('100%')
+        .fontColor(EDITOR_LABEL)
       Text(
         this.editorSelectedPath.length > 0
           ? filenameFromPath(this.editorSelectedPath)
@@ -1909,60 +1917,50 @@ struct Index {
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
-        .maxLines(2)
+        .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
-        .width('100%')
+        .layoutWeight(1)
       Text(this.tr('非破坏编辑 · 保存为高质量副本'))
         .fontSize(9)
-        .fontColor('#7E8794')
-        .width('100%')
+        .fontColor(EDITOR_LABEL)
     }
-    .width(220)
-    .height(106)
-    .padding(10)
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+    .width('100%')
+    .height(52)
+    .padding({ left: 12, right: 12 })
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(EDITOR_PANEL)
   }
 
   @Builder
   private EditorToolRail() {
-    Column({ space: 7 }) {
-      Text(this.tr('工具轨'))
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#A8B0BC')
-        .width('100%')
-      Row({ space: 5 }) {
-        this.EditorWorkbenchTool('色轮', 'wheels')
-        this.EditorWorkbenchTool('曲线', 'curves')
-        this.EditorWorkbenchTool('蒙版', 'mask')
-        this.EditorWorkbenchTool('AI', 'ai')
-      }
-      .width('100%')
+    // 工具条：线性单色文字钮 + 品牌橙选中态（图 2 工具图标条语义）
+    Row({ space: 4 }) {
+      this.EditorWorkbenchTool('色轮', 'wheels')
+      this.EditorWorkbenchTool('曲线', 'curves')
+      this.EditorWorkbenchTool('蒙版', 'mask')
+      this.EditorWorkbenchTool('几何', 'geometry')
+      this.EditorWorkbenchTool('AI', 'ai')
     }
-    .width(330)
-    .height(106)
-    .padding(10)
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+    .width('100%')
+    .height(52)
+    .padding({ left: 2, right: 2, top: 5, bottom: 5 })
+    .backgroundColor(EDITOR_PANEL)
   }
 
   @Builder
   private EditorWorkbenchTool(label: string, panel: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
-      .height(52)
+      .height(42)
       .layoutWeight(1)
       .fontSize(11)
-      .fontColor(Color.White)
-      .backgroundColor(
-        panel === 'ai'
-          ? (this.editorTabMode === 'ai' ? $r('app.color.accent') : STUDIO_RAISED)
-          : (this.editorPanel === panel ? $r('app.color.accent') : STUDIO_RAISED)
-      )
-      .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+      .fontWeight(FontWeight.Bold)
+      .fontColor(this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_LABEL)
+      .backgroundColor(this.editorWorkbenchToolActive(panel) ? EDITOR_RAISED : Color.Transparent)
+      .border({
+        width: this.editorWorkbenchToolActive(panel) ? 1 : 0,
+        color: this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_RULE,
+        radius: 0
+      })
       .onClick((): void => {
         if (panel === 'ai') {
           this.editorTabMode = 'ai';
@@ -1974,40 +1972,45 @@ struct Index {
       })
   }
 
+  private editorWorkbenchToolActive(panel: string): boolean {
+    return panel === 'ai'
+      ? this.editorTabMode === 'ai'
+      : this.editorPanel === panel;
+  }
+
   @Builder
   private EditorScopeDock() {
-    Column({ space: 6 }) {
+    // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
+    Row({ space: 10 }) {
       Text(this.tr('编辑示波器'))
-        .fontSize(9)
+        .fontSize(10)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
-        .fontColor('#A8B0BC')
-        .width('100%')
+        .fontColor(EDITOR_LABEL)
       if (this.editorAIAnalysis === undefined) {
         Text(this.tr('运行“分析画面”后显示实测范围'))
           .fontSize(11)
-          .fontColor('#7E8794')
-          .width('100%')
+          .fontColor(EDITOR_LABEL)
+          .layoutWeight(1)
       } else {
         Text(
           `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
-          `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}\n` +
+          `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}  ` +
           `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
           `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
         )
-          .fontSize(12)
+          .fontSize(11)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
-          .fontColor(STUDIO_GOLD)
-          .width('100%')
+          .fontColor(EDITOR_ACCENT)
+          .layoutWeight(1)
       }
     }
-    .width(300)
-    .height(106)
-    .padding(10)
-    .alignItems(HorizontalAlign.Start)
-    .backgroundColor(STUDIO_PANEL)
-    .border({ width: 1, color: STUDIO_RULE, radius: 5 })
+    .width('100%')
+    .height(64)
+    .padding({ left: 12, right: 12 })
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(EDITOR_PANEL)
   }
 
   @Builder
@@ -2072,6 +2075,113 @@ struct Index {
         })
       } else {
         this.EditorPhotoPicker()
+        // 图 2 移动端降级：监视器固定顶部，控制面板（工具条/媒体/示波器/参数）位于其下
+        Stack({ alignContent: Alignment.Center }) {
+          if (
+            (this.editorMaskEnabled ||
+              this.editorNikonCloudPresetId.length > 0) &&
+            this.editorRenderedPreview !== undefined
+          ) {
+            Image(this.editorRenderedPreview)
+              .width('100%')
+              .height('100%')
+              .padding(12)
+              .objectFit(ImageFit.Contain)
+          } else if (this.editorSelectedPath.length > 0) {
+            Image(`file://${this.editorSelectedPath}`)
+              .width('100%')
+              .height('100%')
+              .padding(12)
+              .objectFit(ImageFit.Contain)
+              .brightness(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.pow(2, this.editorExposure / 100
+                    + this.editorWheelLift / 520
+                    + this.editorWheelGain / 700)
+              )
+              .contrast(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.max(
+                    0,
+                    1 + this.editorContrast / 100
+                      + this.editorCurveContrast / 180
+                      + this.editorDehaze / 250
+                      + this.editorClarity / 400
+                  )
+              )
+              .saturate(
+                this.editorShowingOriginal
+                  ? 1
+                  : Math.max(
+                    0,
+                    1 + this.editorSaturation / 100
+                      + this.editorVibrance / 180
+                      + this.editorWheelGamma / 900
+                      + this.editorDehaze / 500
+                  )
+              )
+              .rotate({
+                angle: this.editorShowingOriginal
+                  ? 0
+                  : this.editorRotation
+              })
+              .scale({
+                x: this.editorShowingOriginal
+                  ? 1
+                  : (this.editorFlipHorizontal ? -1 : 1),
+                y: this.editorShowingOriginal
+                  ? 1
+                  : (this.editorFlipVertical ? -1 : 1)
+              })
+          }
+          if (
+            this.editorPanel === 'mask' &&
+            this.editorMaskEnabled &&
+            this.activeEditorMaskLayerVisible() &&
+            !this.editorShowingOriginal &&
+            this.editorMaskOverlay !== undefined
+          ) {
+            Image(this.editorMaskOverlay)
+              .width('100%')
+              .height('100%')
+              .padding(12)
+              .objectFit(ImageFit.Contain)
+          }
+          Text(this.tr(
+            this.editorShowingOriginal ? '原图' : '调整后'
+          ))
+            .fontSize(11)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
+            .backgroundColor($r('app.color.graphite'))
+            .borderRadius(14)
+            .position({ x: 12, y: 12 })
+        }
+        .width('100%')
+        .height(this.isCompact() ? 320 : 460)
+        .backgroundColor($r('app.color.graphite'))
+        .borderRadius(14)
+        .onAreaChange((_oldArea: Area, newArea: Area): void => {
+          this.editorPreviewWidth = Math.max(1, Number(newArea.width));
+          this.editorPreviewHeight = Math.max(1, Number(newArea.height));
+          this.refreshEditorImageMetrics();
+        })
+        .onTouch((event: TouchEvent): void => {
+          this.handleEditorMaskTouch(event);
+        })
+        Text(this.tr(
+          this.editorShowingOriginal ? '正在查看原图' : '调整不会覆盖原文件'
+        ))
+          .fontSize(11)
+          .fontColor(EDITOR_LABEL)
+          .width('100%')
+        Divider()
+          .strokeWidth(1)
+          .color(EDITOR_RULE)
+        this.ResolveEditorWorkbench()
         Column({ space: 10 }) {
           Scroll() {
             Row({ space: 8 }) {
@@ -2232,102 +2342,7 @@ struct Index {
           .fontSize(11)
           .fontColor($r('app.color.muted'))
           .width('100%')
-        Stack({ alignContent: Alignment.Center }) {
-          if (
-            (this.editorMaskEnabled ||
-              this.editorNikonCloudPresetId.length > 0) &&
-            this.editorRenderedPreview !== undefined
-          ) {
-            Image(this.editorRenderedPreview)
-              .width('100%')
-              .height('100%')
-              .padding(12)
-              .objectFit(ImageFit.Contain)
-          } else if (this.editorSelectedPath.length > 0) {
-            Image(`file://${this.editorSelectedPath}`)
-              .width('100%')
-              .height('100%')
-              .padding(12)
-              .objectFit(ImageFit.Contain)
-              .brightness(
-                this.editorShowingOriginal
-                  ? 1
-                  : Math.pow(2, this.editorExposure / 100
-                    + this.editorWheelLift / 520
-                    + this.editorWheelGain / 700)
-              )
-              .contrast(
-                this.editorShowingOriginal
-                  ? 1
-                  : Math.max(
-                    0,
-                    1 + this.editorContrast / 100
-                      + this.editorCurveContrast / 180
-                      + this.editorDehaze / 250
-                      + this.editorClarity / 400
-                  )
-              )
-              .saturate(
-                this.editorShowingOriginal
-                  ? 1
-                  : Math.max(
-                    0,
-                    1 + this.editorSaturation / 100
-                      + this.editorVibrance / 180
-                      + this.editorWheelGamma / 900
-                      + this.editorDehaze / 500
-                  )
-              )
-              .rotate({
-                angle: this.editorShowingOriginal
-                  ? 0
-                  : this.editorRotation
-              })
-              .scale({
-                x: this.editorShowingOriginal
-                  ? 1
-                  : (this.editorFlipHorizontal ? -1 : 1),
-                y: this.editorShowingOriginal
-                  ? 1
-                  : (this.editorFlipVertical ? -1 : 1)
-              })
-          }
-          if (
-            this.editorPanel === 'mask' &&
-            this.editorMaskEnabled &&
-            this.activeEditorMaskLayerVisible() &&
-            !this.editorShowingOriginal &&
-            this.editorMaskOverlay !== undefined
-          ) {
-            Image(this.editorMaskOverlay)
-              .width('100%')
-              .height('100%')
-              .padding(12)
-              .objectFit(ImageFit.Contain)
-          }
-          Text(this.tr(
-            this.editorShowingOriginal ? '原图' : '调整后'
-          ))
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor($r('app.color.graphite'))
-            .borderRadius(14)
-            .position({ x: 12, y: 12 })
-        }
-        .width('100%')
-        .height(this.isCompact() ? 320 : 460)
-        .backgroundColor($r('app.color.graphite'))
-        .borderRadius(14)
-        .onAreaChange((_oldArea: Area, newArea: Area): void => {
-          this.editorPreviewWidth = Math.max(1, Number(newArea.width));
-          this.editorPreviewHeight = Math.max(1, Number(newArea.height));
-          this.refreshEditorImageMetrics();
-        })
-        .onTouch((event: TouchEvent): void => {
-          this.handleEditorMaskTouch(event);
-        })
+        // 图 2 移动端降级：监视器 Stack 已上移至照片选择下方（见上方新位置）
 
         Scroll() {
           Row({ space: 8 }) {
