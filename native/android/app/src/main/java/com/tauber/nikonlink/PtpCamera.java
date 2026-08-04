@@ -147,6 +147,12 @@ final class PtpCamera {
     private UsbInterface cameraInterface;
     private UsbEndpoint bulkIn;
     private UsbEndpoint bulkOut;
+    // Sticky synchronous mode: after one successful UsbRequest→bulkTransfer
+    // fallback, every later request in this session goes straight to
+    // bulkTransfer so a flaky device never waits out the async timeout again
+    // (the recurring pattern in #33/#37/#39/#40). Cleared whenever a fresh
+    // transport is opened or the connection closes.
+    private boolean syncTransport;
     private int transaction = 0;
     private boolean liveView;
     private boolean movieRecording;
@@ -1256,6 +1262,7 @@ final class PtpCamera {
     }
 
     private void closeConnectionOnly() {
+        syncTransport = false;
         if (connection != null) {
             if (cameraInterface != null) {
                 try {
@@ -1276,6 +1283,7 @@ final class PtpCamera {
 
     private void openFreshTransport(UsbDevice device) throws Exception {
         closeConnectionOnly();
+        syncTransport = false;
         if (usbManager == null
                 || (!usbManager.hasPermission(device)
                 && !activity.ensureUsbPermission(usbManager, device))) {
@@ -1629,17 +1637,25 @@ final class PtpCamera {
         }
 
         boolean input = endpoint.getDirection() == UsbConstants.USB_DIR_IN;
+        if (syncTransport) {
+            // This session already latched synchronous mode after a successful
+            // UsbRequest→bulkTransfer fallback; skip the async probe entirely.
+            // No halt-clear on this path: that would add a USB control
+            // transfer on every request. A real stall is handled by the
+            // existing error-recovery path.
+            return transferViaBulkTransfer(
+                    activeConnection, endpoint, bytes,
+                    offset, length, timeout, input);
+        }
         try {
             return transferViaUsbRequest(
                     activeConnection, endpoint, bytes,
                     offset, length, timeout, input);
         } catch (Exception asyncError) {
-            boolean isTimeout = asyncError.getMessage() != null
-                    && asyncError.getMessage().contains("超时");
-            if (!isTimeout) throw asyncError;
+            if (!isAsyncDegradable(asyncError)) throw asyncError;
             diagnostics.warning(
                     "usb",
-                    "UsbRequest 超时，降级为同步 bulkTransfer；"
+                    "UsbRequest 超时/未返回完成结果/无法初始化或提交异步请求，降级为同步 bulkTransfer；"
                             + "端点=0x"
                             + Integer.toHexString(endpoint.getAddress()));
             try {
@@ -1652,11 +1668,35 @@ final class PtpCamera {
                         "bulkTransfer 降级成功；端点=0x"
                                 + Integer.toHexString(endpoint.getAddress())
                                 + "；传输=" + result + " 字节");
+                // Sticky: a working synchronous fallback must not pay the
+                // async timeout again on the next request in this session.
+                syncTransport = true;
                 return result;
             } catch (Exception syncError) {
+                // The fallback itself failed: do NOT latch sticky mode so a
+                // future attempt may still probe async or rebuild the session.
                 throw asyncError;
             }
         }
+    }
+
+    /**
+     * Whether an async UsbRequest failure is safe to retry as a synchronous
+     * bulkTransfer. Only four known conditions qualify: the request timed out
+     * (per-transfer async timeout, 10-12s), the completion was never returned
+     * (#21's "未返回有效的完成结果" — the device dropped the completion), or
+     * the async request could not be initialized / submitted (#40's "无法初始
+     * 化异步 USB 请求" / "无法提交异步 USB 请求"). Any other async failure
+     * (device error, parameter error, arbitrary message) must surface to the
+     * caller unchanged instead of being swallowed into bulk mode.
+     */
+    private boolean isAsyncDegradable(Exception error) {
+        if (error == null || error.getMessage() == null) return false;
+        String message = error.getMessage();
+        return message.contains("超时")
+                || message.contains("未返回有效的完成结果")
+                || message.contains("无法初始化异步 USB 请求")
+                || message.contains("无法提交异步 USB 请求");
     }
 
     private int transferViaUsbRequest(
