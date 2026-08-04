@@ -151,6 +151,13 @@ public final class MainActivity extends Activity {
     private static final int STUDIO_RAISED = Color.rgb(32, 36, 43);
     private static final int STUDIO_RULE = Color.rgb(52, 58, 67);
     private static final int STUDIO_GOLD = Color.rgb(216, 182, 83);
+    // ── v1.5.5 fig1 control-surface tokens (params UI) ──
+    private static final int UI_BG = Color.rgb(10, 11, 13);          // near-black canvas
+    private static final int UI_CARD = Color.rgb(28, 28, 30);        // #1C1C1E card
+    private static final int UI_SECONDARY = Color.rgb(44, 44, 46);   // #2C2C2E divider/secondary
+    private static final int UI_LABEL = Color.rgb(142, 142, 147);    // #8E8E93 labels
+    private static final int UI_ACCENT = Color.rgb(205, 220, 57);    // #CDDC39 single accent
+    private static final int UI_BLUE = Color.rgb(10, 132, 255);      // system blue (selected tab / auto)
     private static final int RULE = Color.rgb(207, 214, 223);
     private static final int RULE_STRONG = Color.rgb(174, 184, 199);
     private static final String LATEST_RELEASE_API =
@@ -1261,6 +1268,16 @@ public final class MainActivity extends Activity {
     private View applicationTopBar;
     private View applicationBottomNavigation;
     private View applicationStatusBar;
+    // ── v1.5.5 fig1 control-page chrome state ──
+    private boolean controlTopBarActive;
+    private TextView controlStatusDot;
+    private TextView controlStatusText;
+    private TextView controlStatusRate;
+    private TextView controlStatusError;
+    private boolean gridEditMode;
+    private boolean[] gridHiddenTiles;
+    private LinearLayout controlParameterTilesHost;
+    private String lastConnectionError;
     private TextView statusText;
     private TextView countText;
     private Button connectButton;
@@ -2616,7 +2633,13 @@ public final class MainActivity extends Activity {
                 dp(8));
         top.setBackgroundColor(SURFACE);
         top.setElevation(dp(6));
+        fillStandardTopBar(top, compact);
+        return top;
+    }
 
+    /** v1.5.5 fig1 standard app bar content (light, logo + connect + settings). */
+    private void fillStandardTopBar(LinearLayout top, boolean compact) {
+        top.removeAllViews();
         TextView logo = text("Z", 20, Typeface.BOLD, Color.WHITE);
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(brandGradient(13));
@@ -2670,8 +2693,110 @@ public final class MainActivity extends Activity {
                 dp(44));
         settingsParams.setMargins(dp(6), 0, 0, 0);
         top.addView(settingsButton, settingsParams);
-        return top;
     }
+
+    /**
+     * v1.5.5 fig1 control-page top bar: menu, centered title "控制", two round
+     * icon buttons. Flat, dark, no gradient, no shadow.
+     */
+    private void fillControlTopBar(LinearLayout top) {
+        boolean compact = isCompactPhone();
+        top.removeAllViews();
+        top.setPadding(
+                dp(compact ? 10 : 12),
+                dp(8),
+                dp(compact ? 10 : 12),
+                dp(8));
+
+        Button menu = new Button(this);
+        menu.setText("☰");
+        menu.setTextSize(20);
+        menu.setTextColor(Color.WHITE);
+        menu.setGravity(Gravity.CENTER);
+        menu.setAllCaps(false);
+        menu.setPadding(0, 0, 0, 0);
+        menu.setBackground(rounded(UI_SECONDARY, 14, 0));
+        menu.setStateListAnimator(null);
+        menu.setContentDescription(tr("菜单"));
+        menu.setOnClickListener(view -> showControlMenuDialog());
+        top.addView(menu, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+        TextView title = text("控制", compact ? 17 : 19, Typeface.BOLD, Color.WHITE);
+        title.setGravity(Gravity.CENTER);
+        top.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1f));
+
+        Button viewfinder = new Button(this);
+        viewfinder.setText("◉");
+        viewfinder.setTextSize(18);
+        viewfinder.setTextColor(Color.WHITE);
+        viewfinder.setGravity(Gravity.CENTER);
+        viewfinder.setAllCaps(false);
+        viewfinder.setPadding(0, 0, 0, 0);
+        viewfinder.setBackground(rounded(UI_SECONDARY, 14, 0));
+        viewfinder.setStateListAnimator(null);
+        viewfinder.setContentDescription(tr("取景"));
+        viewfinder.setOnClickListener(view -> showSection("monitor"));
+        LinearLayout.LayoutParams viewfinderParams =
+                new LinearLayout.LayoutParams(dp(44), dp(44));
+        viewfinderParams.setMargins(0, 0, dp(8), 0);
+        top.addView(viewfinder, viewfinderParams);
+
+        Button more = new Button(this);
+        more.setText("⋯");
+        more.setTextSize(18);
+        more.setTextColor(Color.WHITE);
+        more.setGravity(Gravity.CENTER);
+        more.setAllCaps(false);
+        more.setPadding(0, 0, 0, 0);
+        more.setBackground(rounded(UI_SECONDARY, 14, 0));
+        more.setStateListAnimator(null);
+        more.setContentDescription(tr("更多"));
+        more.setOnClickListener(view -> showControlMenuDialog());
+        top.addView(more, new LinearLayout.LayoutParams(dp(44), dp(44)));
+    }
+
+    /** v1.5.5 fig1 menu: keeps every section reachable from the control page. */
+    private void showControlMenuDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        String[] entries = new String[]{
+                tr("连接 / 断开相机"),
+                tr("视频监看"),
+                tr("编辑"),
+                tr("设备"),
+                tr("文件库"),
+                tr("设置")
+        };
+        final String[] sections = new String[]{
+                "connect",
+                "monitor",
+                "editor",
+                "devices",
+                "library",
+                "settings"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(tr("菜单"))
+                .setItems(entries, (dialog, which) -> {
+                    String target = sections[which];
+                    if ("connect".equals(target)) {
+                        if (connected || wifiConnected || localCameraConnected) {
+                            if (connected) disconnectCamera();
+                            if (wifiConnected) disconnectWifiCamera();
+                            if (localCameraConnected) disconnectLocalCamera();
+                        } else {
+                            showConnectionDialog();
+                        }
+                    } else if ("editor".equals(target)) {
+                        editorState = EditorState.PRO;
+                        aiResultBitmap = null;
+                        showSection(target);
+                    } else {
+                        showSection(target);
+                    }
+                })
+                .show();
+    }
+
 
     private View buildBottomNavigation() {
         boolean compact = isCompactPhone();
@@ -2683,13 +2808,15 @@ public final class MainActivity extends Activity {
                 dp(compact ? 5 : 7),
                 dp(6),
                 dp(compact ? 5 : 7));
-        navigation.setBackgroundColor(SURFACE);
-        navigation.setElevation(dp(8));
-        navigation.addView(navButton("照片", "capture"));
-        navigation.addView(navButton("视频", "monitor"));
-        navigation.addView(navButton("编辑", "editor"));
-        navigation.addView(navButton("设备", "devices"));
-        navigation.addView(navButton("分支", "library"));
+        navigation.setBackgroundColor(UI_BG);
+        navigation.setElevation(0);
+        // v1.5.5 fig1 tab bar: 单机 / 群组 / 已下载 / 设置. The editor stays
+        // reachable from the library (open a photo) and the video monitor from
+        // the control page's viewfinder button; routing is unchanged.
+        navigation.addView(navButton("单机", "capture"));
+        navigation.addView(navButton("群组", "devices"));
+        navigation.addView(navButton("已下载", "library"));
+        navigation.addView(navButton("设置", "settings"));
         return navigation;
     }
 
@@ -2702,14 +2829,11 @@ public final class MainActivity extends Activity {
         button.setPadding(dp(8), dp(6), dp(8), dp(5));
         int iconResource;
         switch (section) {
-            case "monitor":
-                iconResource = R.drawable.ic_nav_video;
-                break;
             case "library":
                 iconResource = R.drawable.ic_nav_library;
                 break;
-            case "editor":
-                iconResource = R.drawable.ic_nav_library;
+            case "settings":
+                iconResource = R.drawable.ic_settings_gear;
                 break;
             case "devices":
                 iconResource = R.drawable.ic_nav_camera;
@@ -2719,7 +2843,7 @@ public final class MainActivity extends Activity {
                 break;
         }
         Drawable icon = getDrawable(iconResource);
-        icon.setTint(MUTED);
+        icon.setTint(UI_LABEL);
         icon.setBounds(0, 0, dp(20), dp(20));
         button.setCompoundDrawables(null, icon, null, null);
         button.setOnClickListener(view -> {
@@ -2792,15 +2916,28 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         boolean darkMonitor = "monitor".equals(section);
+        boolean controlPage = "capture".equals(section);
         if (applicationRoot != null) applicationRoot.setBackgroundColor(
-                darkMonitor ? Color.rgb(4, 10, 18) : PAPER);
+                (darkMonitor || controlPage) ? UI_BG : PAPER);
         if (applicationTopBar != null) {
+            if (controlPage != controlTopBarActive) {
+                controlTopBarActive = controlPage;
+                LinearLayout bar = (LinearLayout) applicationTopBar;
+                bar.removeAllViews();
+                if (controlPage) {
+                    fillControlTopBar(bar);
+                } else {
+                    fillStandardTopBar(bar, isCompactPhone());
+                }
+            }
             applicationTopBar.setVisibility(darkMonitor ? View.GONE : View.VISIBLE);
-            applicationTopBar.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
-            applicationTopBar.setElevation(darkMonitor ? 0 : dp(6));
+            applicationTopBar.setBackgroundColor(
+                    darkMonitor ? Color.BLACK
+                            : controlPage ? UI_BG : SURFACE);
+            applicationTopBar.setElevation(controlPage ? 0 : darkMonitor ? 0 : dp(6));
         }
         if (applicationBottomNavigation != null) {
-            applicationBottomNavigation.setBackgroundColor(darkMonitor ? Color.BLACK : SURFACE);
+            applicationBottomNavigation.setBackgroundColor(UI_BG);
         }
         if (applicationStatusBar != null) {
             // Keep the global operation state reachable while monitoring. The
@@ -2808,28 +2945,29 @@ public final class MainActivity extends Activity {
             // the preview, unlike the full application header.
             applicationStatusBar.setVisibility(View.VISIBLE);
         }
-        getWindow().setStatusBarColor(darkMonitor ? Color.BLACK : PAPER);
+        boolean darkChrome = darkMonitor || controlPage;
+        getWindow().setStatusBarColor(darkChrome ? Color.BLACK : PAPER);
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | (darkMonitor ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+                        | (darkChrome ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
         if (darkMonitor) {
             mainHandler.removeCallbacks(monitorTimerTicker);
             mainHandler.post(monitorTimerTicker);
         }
         for (Button button : navigationButtons) {
             boolean active = section.equals(button.getTag());
-            boolean videoSection = "monitor".equals(section);
-            int activeColor = videoSection ? VIDEO : COBALT;
-            int activeBackground = videoSection ? VIDEO_SOFT : COBALT_SOFT;
-            button.setTextColor(active ? activeColor : MUTED);
-            button.setBackground(rounded(active ? activeBackground : SURFACE, 14, 0));
+            // v1.5.5 fig1: selected tab highlighted with system blue, flat.
+            button.setTextColor(active ? UI_BLUE : UI_LABEL);
+            button.setBackground(rounded(
+                    active ? Color.argb(24, 10, 132, 255) : Color.TRANSPARENT, 14, 0));
             Drawable icon = button.getCompoundDrawables()[1];
-            if (icon != null) icon.mutate().setTint(active ? activeColor : MUTED);
-            button.setElevation(active ? dp(2) : 0);
+            if (icon != null) icon.mutate().setTint(active ? UI_BLUE : UI_LABEL);
+            button.setElevation(0);
         }
         updateCameraControls();
+        updateConnectionUi();
         final String pendingKey = pendingEditorScrollKey;
         pendingEditorScrollKey = null;
         if (pendingKey != null) {
@@ -2856,170 +2994,577 @@ public final class MainActivity extends Activity {
     private View buildCaptureView() {
         boolean compact = isCompactPhone();
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(UI_BG);
+        scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content = verticalContainer();
         content.setPadding(
-                dp(compact ? 16 : 20),
-                dp(compact ? 16 : 22),
-                dp(compact ? 16 : 20),
+                dp(compact ? 14 : 20),
+                dp(compact ? 12 : 18),
+                dp(compact ? 14 : 20),
                 dp(28));
-        content.addView(sectionHeader(
-                "照片拍摄",
-                "会话、曝光、对焦与交付按拍摄流程组织",
-                COBALT));
-        content.addView(buildCaptureDeviceSummary());
+        content.addView(buildControlStatusRow());
+        controlStatusError = text("", 12, Typeface.NORMAL, VIDEO);
+        controlStatusError.setSingleLine(true);
+        controlStatusError.setEllipsize(TextUtils.TruncateAt.END);
+        controlStatusError.setPadding(dp(2), 0, dp(2), 0);
+        controlStatusError.setVisibility(View.GONE);
+        content.addView(controlStatusError, marginParams(-1, dp(18), 0, 0, 0, 4));
+        content.addView(buildStatusCardGrid());
+        content.addView(buildControlParameterGrid());
+        content.addView(buildControlCaptureDock());
         content.addView(buildPreviewStage(false));
         content.addView(buildNikonCloudMonitorPanel());
-        content.addView(buildParameterCardGrid());
-        content.addView(buildCaptureDock());
-
         content.addView(buildCaptureSessionPanel());
         content.addView(buildProfessionalControls());
         content.addView(buildShootingTaskPanel());
         scroll.addView(content);
+        refreshControlStatusRow();
         return scroll;
     }
 
-    /** Figure-2 device summary populated only from active camera and storage state. */
-    private View buildCaptureDeviceSummary() {
-        LinearLayout summary = new LinearLayout(this);
-        summary.setOrientation(isCompactPhone()
-                ? LinearLayout.VERTICAL
-                : LinearLayout.HORIZONTAL);
-        summary.setPadding(dp(1), dp(1), dp(1), dp(1));
-        summary.setBackground(rounded(STUDIO_RULE, 10, STUDIO_RULE));
-        addCaptureSummaryCell(
-                summary,
-                "CAMERA",
-                connectedCameraName == null ? "—" : connectedCameraName,
-                connected || localCameraConnected);
-        addCaptureSummaryCell(
-                summary,
-                "LINK",
-                connected ? "USB/PTP" : wifiConnected ? "Wi‑Fi/PTP‑IP"
-                        : localCameraConnected ? "SYSTEM" : "OFFLINE",
-                connected || wifiConnected || localCameraConnected);
-        addCaptureSummaryCell(
-                summary,
-                "OUTPUT",
-                (connected || localCameraConnected)
-                        ? monitorProfileLabel() + " · " + monitorFrameRate + "p"
-                        : "—",
-                connected || localCameraConnected);
-        addCaptureSummaryCell(
-                summary,
-                "LIBRARY",
-                photoFiles().size() + " " + tr("个文件"),
-                true);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, dp(12), 0, dp(10));
-        summary.setLayoutParams(params);
-        return summary;
+    /** v1.5.5 fig1 status row: ● state + transport capsule, tap to connect. */
+    private View buildControlStatusRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(marginParams(-1, dp(36), 0, 0, 0, 8));
+
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.HORIZONTAL);
+        left.setGravity(Gravity.CENTER_VERTICAL);
+        controlStatusDot = text("●", 12, Typeface.BOLD, UI_LABEL);
+        controlStatusDot.setGravity(Gravity.CENTER);
+        left.addView(controlStatusDot, new LinearLayout.LayoutParams(dp(22), dp(30)));
+        controlStatusText = text("未连接", 13, Typeface.BOLD, Color.WHITE);
+        controlStatusText.setSingleLine(true);
+        controlStatusText.setEllipsize(TextUtils.TruncateAt.END);
+        left.addView(controlStatusText, new LinearLayout.LayoutParams(0, dp(30), 1f));
+        left.setOnClickListener(view -> {
+            if (!(connected || wifiConnected || localCameraConnected)) {
+                showConnectionDialog();
+            }
+        });
+        left.setContentDescription(tr("连接状态"));
+        row.addView(left, new LinearLayout.LayoutParams(0, dp(36), 1f));
+
+        controlStatusRate = text("待连接", 12, Typeface.BOLD, Color.WHITE);
+        controlStatusRate.setGravity(Gravity.CENTER);
+        controlStatusRate.setSingleLine(true);
+        controlStatusRate.setPadding(dp(12), 0, dp(12), 0);
+        controlStatusRate.setBackground(rounded(UI_SECONDARY, 15, 0));
+        controlStatusRate.setContentDescription(tr("连接状态"));
+        controlStatusRate.setOnClickListener(view -> {
+            // fig1: tapping the transport capsule opens the connection dialog
+            // whenever no camera is live (covers both 待连接 and 重试 states).
+            if (!(connected || wifiConnected || localCameraConnected)
+                    && !(connecting || wifiConnecting || localCameraConnecting)) {
+                showConnectionDialog();
+            }
+        });
+        row.addView(controlStatusRate, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(30)));
+        return row;
     }
 
-    private void addCaptureSummaryCell(
-            LinearLayout parent,
+    /** v1.5.5 fig1 status row sync; keeps the empty/loading/error wording terse. */
+    private void refreshControlStatusRow() {
+        if (controlStatusDot == null
+                || controlStatusText == null
+                || controlStatusRate == null) {
+            return;
+        }
+        boolean anyCamera = connected || wifiConnected || localCameraConnected;
+        boolean loading = connecting || wifiConnecting || localCameraConnecting;
+        boolean failed = lastConnectionError != null && !anyCamera && !loading;
+        controlStatusRate.setBackground(rounded(UI_SECONDARY, 15, 0));
+        controlStatusRate.setTextColor(Color.WHITE);
+        if (loading) {
+            controlStatusDot.setTextColor(UI_ACCENT);
+            controlStatusText.setText(tr(connecting
+                    ? "正在连接…"
+                    : wifiConnecting
+                            ? "正在连接 Wi‑Fi 相机…"
+                            : "正在打开本机摄像头…"));
+            controlStatusRate.setText(tr("连接中"));
+        } else if (anyCamera) {
+            controlStatusDot.setTextColor(UI_ACCENT);
+            controlStatusText.setText(tr("就绪"));
+            controlStatusRate.setText(connected
+                    ? "USB/PTP"
+                    : wifiConnected ? "Wi‑Fi/PTP‑IP" : "SYSTEM");
+        } else {
+            controlStatusDot.setTextColor(failed ? VIDEO : UI_LABEL);
+            controlStatusText.setText(tr(failed ? "连接失败" : "未连接"));
+            controlStatusRate.setText(tr(failed ? "重试" : "待连接"));
+        }
+        if (controlStatusError != null) {
+            boolean showError = failed && lastConnectionError != null;
+            controlStatusError.setVisibility(showError ? View.VISIBLE : View.GONE);
+            controlStatusError.setText(showError ? lastConnectionError : "");
+        }
+    }
+
+    /** v1.5.5 fig1 status cards: 2×2 on phones, 4-across on wide screens. */
+    private View buildStatusCardGrid() {
+        boolean compact = isCompactPhone();
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(compact ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
+        grid.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 12));
+
+        View body = buildStatusCard(
+                "▣",
+                "机身",
+                bodyModelName(),
+                bodySerialLine(),
+                connected || wifiConnected || localCameraConnected);
+        View lens = buildStatusCard(
+                "◎",
+                "镜头",
+                "—",
+                "镜头数据未提供",
+                false);
+        View storage = buildStorageStatusCard();
+        View format = buildStatusCard(
+                "▤",
+                "格式",
+                "JPEG",
+                "照片输出",
+                false);
+
+        if (compact) {
+            LinearLayout topRow = new LinearLayout(this);
+            topRow.setOrientation(LinearLayout.HORIZONTAL);
+            topRow.addView(body, new LinearLayout.LayoutParams(0, dp(104), 1f));
+            LinearLayout.LayoutParams lensParams =
+                    new LinearLayout.LayoutParams(0, dp(104), 1f);
+            lensParams.setMargins(dp(10), 0, 0, 0);
+            topRow.addView(lens, lensParams);
+            grid.addView(topRow);
+            LinearLayout bottomRow = new LinearLayout(this);
+            bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+            bottomRow.addView(storage, new LinearLayout.LayoutParams(0, dp(104), 1f));
+            LinearLayout.LayoutParams formatParams =
+                    new LinearLayout.LayoutParams(0, dp(104), 1f);
+            formatParams.setMargins(dp(10), 0, 0, 0);
+            bottomRow.addView(format, formatParams);
+            grid.addView(bottomRow, new LinearLayout.LayoutParams(-1, -2));
+        } else {
+            grid.addView(body, new LinearLayout.LayoutParams(0, dp(104), 1f));
+            LinearLayout.LayoutParams lensParams =
+                    new LinearLayout.LayoutParams(0, dp(104), 1f);
+            lensParams.setMargins(dp(10), 0, 0, 0);
+            grid.addView(lens, lensParams);
+            LinearLayout.LayoutParams storageParams =
+                    new LinearLayout.LayoutParams(0, dp(104), 1f);
+            storageParams.setMargins(dp(10), 0, 0, 0);
+            grid.addView(storage, storageParams);
+            LinearLayout.LayoutParams formatParams =
+                    new LinearLayout.LayoutParams(0, dp(104), 1f);
+            formatParams.setMargins(dp(10), 0, 0, 0);
+            grid.addView(format, formatParams);
+        }
+        return grid;
+    }
+
+    private String bodyModelName() {
+        if (connected) return connectedCameraName == null ? "—" : connectedCameraName;
+        if (localCameraConnected) return localCamera.getCameraName();
+        if (wifiConnected) return wifiCameraName == null ? "—" : wifiCameraName;
+        return "—";
+    }
+
+    private String bodySerialLine() {
+        if (connected && camera != null && camera.isConnected()) {
+            return "SN " + camera.getConnectedDeviceId();
+        }
+        return "—";
+    }
+
+    private View buildStatusCard(
+            String icon,
             String label,
             String value,
+            String sub,
             boolean active) {
-        LinearLayout cell = new LinearLayout(this);
-        cell.setOrientation(LinearLayout.VERTICAL);
-        cell.setPadding(dp(12), dp(10), dp(12), dp(10));
-        cell.setBackgroundColor(SURFACE);
-        TextView title = text(label, 9, Typeface.BOLD, MUTED);
-        title.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        TextView readout = text(value, 13, Typeface.BOLD, active ? INK : MUTED);
-        readout.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        readout.setSingleLine(true);
-        readout.setEllipsize(TextUtils.TruncateAt.END);
-        cell.addView(title);
-        cell.addView(readout, marginParams(-1, dp(24), 0, 3, 0, 0));
-        if (parent.getOrientation() == LinearLayout.HORIZONTAL) {
-            parent.addView(cell, new LinearLayout.LayoutParams(0, dp(66), 1f));
-        } else {
-            parent.addView(cell, new LinearLayout.LayoutParams(-1, dp(58)));
-        }
-    }
-
-    /** Adaptive camera parameter deck; warm gold is reserved for live values. */
-    private View buildParameterCardGrid() {
-        LinearLayout deck = new LinearLayout(this);
-        deck.setOrientation(LinearLayout.VERTICAL);
-        deck.setPadding(dp(8), dp(8), dp(8), dp(8));
-        deck.setBackground(rounded(STUDIO_PANEL, 10, STUDIO_RULE));
-        String[][] values = new String[][]{
-                {"模式", connected ? exposureModeCode() : "—"},
-                {"快门", connected ? shutterDisplayValue() : "—"},
-                {"光圈", connected
-                        ? String.format(Locale.CHINA, "F%.1f", currentAperture)
-                        : "—"},
-                {"ISO", connected ? String.valueOf(currentIso) : "—"},
-                {"曝光", connected
-                        ? String.format(Locale.CHINA, "%+.1f EV", currentCompensation)
-                        : "—"},
-                {"传输", connected ? "PTP" : wifiConnected ? "PTP-IP" : "—"}
-        };
-        for (int start = 0; start < values.length; start += 2) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            for (int index = start; index < Math.min(start + 2, values.length); index++) {
-                TextView card = parameterCard(values[index][0], values[index][1]);
-                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                        0,
-                        dp(62),
-                        1f);
-                if (index > start) cardParams.setMargins(dp(8), 0, 0, 0);
-                row.addView(card, cardParams);
-            }
-            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(62));
-            if (start > 0) rowParams.setMargins(0, dp(8), 0, 0);
-            deck.addView(row, rowParams);
-        }
-        return deck;
-    }
-
-    private TextView parameterCard(String label, String value) {
-        TextView card = text(tr(label).toUpperCase(Locale.ROOT) + "\n" + value,
+        LinearLayout card = verticalContainer();
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setBackground(rounded(UI_CARD, 15, active ? UI_ACCENT : 0));
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView iconView = text(icon, 16, Typeface.NORMAL, UI_LABEL);
+        iconView.setGravity(Gravity.CENTER);
+        header.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView labelView = text(label, 12, Typeface.NORMAL, UI_LABEL);
+        labelView.setPadding(dp(6), 0, 0, 0);
+        header.addView(labelView);
+        card.addView(header);
+        TextView valueView = text(value, 20, Typeface.BOLD, Color.WHITE);
+        valueView.setSingleLine(true);
+        valueView.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(valueView, marginParams(-1, dp(28), 0, 6, 0, 0));
+        TextView subView = text(sub == null || sub.isEmpty() ? " " : sub,
                 12,
-                Typeface.BOLD,
-                Color.WHITE);
-        card.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(12), 0, dp(12), 0);
-        card.setLineSpacing(dp(3), 1f);
-        card.setBackground(rounded(
-                STUDIO_RAISED,
-                6,
-                connected ? Color.argb(145, 216, 182, 83) : STUDIO_RULE));
+                Typeface.NORMAL,
+                UI_LABEL);
+        subView.setSingleLine(true);
+        subView.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(subView, marginParams(-1, dp(18), 0, 1, 0, 0));
         return card;
     }
 
-    /** Persistent capture dock reuses the original capture/AF/live-view actions. */
-    private View buildCaptureDock() {
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        actions.setPadding(dp(10), dp(10), dp(10), dp(10));
-        actions.setBackground(rounded(STUDIO_PANEL, 10, STUDIO_RULE));
-        liveViewButton = nativeButton("实时取景", false);
-        liveViewButton.setOnClickListener(view -> toggleLiveView());
-        shutterButton = nativeButton("拍摄", true);
+    /** v1.5.5 fig1 storage card with accent progress bar, honest 无卡 state. */
+    private View buildStorageStatusCard() {
+        LinearLayout card = verticalContainer();
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        boolean anyCamera = connected || wifiConnected;
+        boolean hasVolumes = anyCamera && !cameraStorageSnapshot.volumes.isEmpty();
+        card.setBackground(rounded(UI_CARD, 15, 0));
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView iconView = text("▯", 16, Typeface.NORMAL, UI_LABEL);
+        iconView.setGravity(Gravity.CENTER);
+        header.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView labelView = text("存储", 12, Typeface.NORMAL, UI_LABEL);
+        labelView.setPadding(dp(6), 0, 0, 0);
+        header.addView(labelView);
+        card.addView(header);
+
+        long capacity = cameraStorageSnapshot.capacityBytes();
+        long free = cameraStorageSnapshot.freeBytes();
+        long used = Math.max(0, capacity - free);
+        int percent = capacity > 0
+                ? (int) Math.max(0, Math.min(100, Math.round(used * 100.0 / capacity)))
+                : 0;
+        String valueText = hasVolumes
+                ? formatStorageBytes(used) + "/" + formatStorageBytes(capacity)
+                        + " · " + percent + "%"
+                : "—";
+        TextView valueView = text(valueText, 16, Typeface.BOLD, Color.WHITE);
+        valueView.setSingleLine(true);
+        valueView.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(valueView, marginParams(-1, dp(26), 0, 6, 0, 0));
+
+        if (hasVolumes) {
+            LinearLayout track = new LinearLayout(this);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            View fill = new View(this);
+            fill.setBackground(rounded(UI_ACCENT, 2, 0));
+            track.addView(fill, new LinearLayout.LayoutParams(0, dp(4), percent));
+            if (percent < 100) {
+                track.addView(
+                        new View(this),
+                        new LinearLayout.LayoutParams(0, dp(4), 100 - percent));
+            }
+            card.addView(track, marginParams(-1, dp(4), 0, 2, 0, 0));
+        } else {
+            View track = new View(this);
+            track.setBackground(rounded(UI_SECONDARY, 2, 0));
+            card.addView(track, marginParams(-1, dp(4), 0, 2, 0, 0));
+        }
+
+        long freeImages = 0;
+        for (CameraStorage.Volume volume : cameraStorageSnapshot.volumes) {
+            freeImages += volume.freeImages;
+        }
+        String sub = hasVolumes
+                ? (freeImages > 0 ? "可拍 " + freeImages + " 张" : "存储卡已满")
+                : anyCamera ? "无卡" : "—";
+        TextView subView = text(sub, 12, Typeface.NORMAL, UI_LABEL);
+        subView.setSingleLine(true);
+        subView.setEllipsize(TextUtils.TruncateAt.END);
+        card.addView(subView, marginParams(-1, dp(18), 0, 1, 0, 0));
+        return card;
+    }
+
+    /** v1.5.5 fig1 parameter grid: 3-column tiles (4-6 on wide screens) + 全部/编辑. */
+    private View buildControlParameterGrid() {
+        LinearLayout wrap = verticalContainer();
+        wrap.setLayoutParams(marginParams(-1, -2, 0, 2, 0, 12));
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("参数", 15, Typeface.BOLD, Color.WHITE);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(34), 1f));
+        final Button all = controlCapsule("全部", true);
+        final Button edit = controlCapsule("编辑", false);
+        all.setOnClickListener(view -> {
+            gridEditMode = false;
+            if (gridHiddenTiles != null) Arrays.fill(gridHiddenTiles, false);
+            refreshControlCapsules(all, edit);
+            rebuildControlParameterTiles();
+        });
+        edit.setOnClickListener(view -> {
+            gridEditMode = true;
+            refreshControlCapsules(all, edit);
+            rebuildControlParameterTiles();
+        });
+        LinearLayout.LayoutParams allParams = new LinearLayout.LayoutParams(dp(68), dp(32));
+        header.addView(all, allParams);
+        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(dp(68), dp(32));
+        editParams.setMargins(dp(8), 0, 0, 0);
+        header.addView(edit, editParams);
+        // Header spans full width so the weighted 参数 title cannot collapse.
+        wrap.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        controlParameterTilesHost = verticalContainer();
+        wrap.addView(controlParameterTilesHost);
+        if (gridHiddenTiles == null) gridHiddenTiles = new boolean[8];
+        gridEditMode = false;
+        rebuildControlParameterTiles();
+        return wrap;
+    }
+
+    private Button controlCapsule(String label, boolean active) {
+        Button capsule = new Button(this);
+        capsule.setText(tr(label));
+        capsule.setTextSize(12);
+        capsule.setTypeface(Typeface.create("sans", Typeface.BOLD));
+        capsule.setAllCaps(false);
+        capsule.setGravity(Gravity.CENTER);
+        capsule.setPadding(dp(10), 0, dp(10), 0);
+        capsule.setMinHeight(0);
+        capsule.setStateListAnimator(null);
+        capsule.setBackground(rounded(active ? UI_ACCENT : UI_SECONDARY, 16, 0));
+        capsule.setTextColor(active ? INK : Color.WHITE);
+        return capsule;
+    }
+
+    private void refreshControlCapsules(Button all, Button edit) {
+        all.setBackground(rounded(
+                gridEditMode ? UI_SECONDARY : UI_ACCENT, 16, 0));
+        all.setTextColor(gridEditMode ? Color.WHITE : INK);
+        edit.setBackground(rounded(
+                gridEditMode ? UI_ACCENT : UI_SECONDARY, 16, 0));
+        edit.setTextColor(gridEditMode ? INK : Color.WHITE);
+    }
+
+    /** Grid rebuild driven purely by local UI state (gridEditMode / hidden tiles). */
+    private void rebuildControlParameterTiles() {
+        if (controlParameterTilesHost == null) return;
+        controlParameterTilesHost.removeAllViews();
+        boolean compact = isCompactPhone();
+        int columns = compact ? 3 : 4;
+        String[][] tiles = controlParameterTiles();
+        int shown = 0;
+        for (int index = 0; index < tiles.length; index++) {
+            if (gridHiddenTiles != null && index < gridHiddenTiles.length
+                    && gridHiddenTiles[index]) {
+                continue;
+            }
+            shown++;
+        }
+        if (shown == 0) {
+            controlParameterTilesHost.addView(
+                    text("参数已全部隐藏", 12, Typeface.NORMAL, UI_LABEL),
+                    marginParams(-1, dp(44), 0, 12, 0, 0));
+            return;
+        }
+        int rowCount = (shown + columns - 1) / columns;
+        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            int inRow = 0;
+            for (int index = 0; index < tiles.length && inRow < columns; index++) {
+                if (gridHiddenTiles != null && index < gridHiddenTiles.length
+                        && gridHiddenTiles[index]) {
+                    continue;
+                }
+                final int tileIndex = index;
+                View tile = controlParameterTile(
+                        tileIndex,
+                        tiles[index][0],
+                        tiles[index][1],
+                        gridEditMode);
+                LinearLayout.LayoutParams tileParams =
+                        new LinearLayout.LayoutParams(0, dp(84), 1f);
+                if (inRow > 0) tileParams.setMargins(dp(8), 0, 0, 0);
+                row.addView(tile, tileParams);
+                inRow++;
+            }
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(-1, dp(84));
+            if (rowIndex > 0) rowParams.setMargins(0, dp(8), 0, 0);
+            controlParameterTilesHost.addView(row, rowParams);
+        }
+    }
+
+    private String[][] controlParameterTiles() {
+        boolean live = connected || localCameraConnected;
+        return new String[][]{
+                {"模式", live ? exposureModeCode() : "—"},
+                {"快门", connected ? shutterDisplayValue() : "—"},
+                {"光圈", connected
+                        ? String.format(Locale.CHINA, "f/%.1f", currentAperture)
+                        : "—"},
+                {"ISO", connected ? String.valueOf(currentIso) : "—"},
+                {"EV", connected
+                        ? String.format(Locale.CHINA, "%+.1f", currentCompensation)
+                        : "—"},
+                {"传输", connected ? "PTP" : wifiConnected ? "PTP-IP" : "—"},
+                {"白平衡", connected
+                        ? ("continuous".equals(currentWhiteBalance) ? "自动" : "预设")
+                        : "—"},
+                {"对焦", connected
+                        ? ("continuous".equals(currentFocusMode) ? "AF-C" : "AF-S")
+                        : "—"}
+        };
+    }
+
+    private View controlParameterTile(
+            int index,
+            String label,
+            String value,
+            boolean editing) {
+        FrameLayout frame = new FrameLayout(this);
+        LinearLayout tile = verticalContainer();
+        tile.setPadding(dp(12), dp(10), dp(12), dp(10));
+        tile.setBackground(rounded(UI_CARD, 15, 0));
+        TextView labelView = text(label, 12, Typeface.NORMAL, UI_LABEL);
+        labelView.setSingleLine(true);
+        tile.addView(labelView, new LinearLayout.LayoutParams(-1, dp(20)));
+        TextView valueView = text(value, 28, Typeface.BOLD, Color.WHITE);
+        valueView.setSingleLine(true);
+        valueView.setEllipsize(TextUtils.TruncateAt.END);
+        tile.addView(valueView, marginParams(-1, dp(36), 0, 4, 0, 0));
+        frame.addView(tile, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        if (editing) {
+            TextView remove = text("×", 15, Typeface.BOLD, Color.WHITE);
+            remove.setGravity(Gravity.CENTER);
+            remove.setBackground(rounded(UI_SECONDARY, 11, 0));
+            remove.setContentDescription(tr("隐藏") + " " + tr(label));
+            remove.setOnClickListener(view -> {
+                if (gridHiddenTiles != null && index < gridHiddenTiles.length) {
+                    gridHiddenTiles[index] = true;
+                    rebuildControlParameterTiles();
+                }
+            });
+            FrameLayout.LayoutParams removeParams =
+                    new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP | Gravity.END);
+            frame.addView(remove, removeParams);
+        }
+        return frame;
+    }
+
+    /** v1.5.5 fig1 capture bar: gallery, AF-ON, round shutter, INT, camera switch. */
+    private View buildControlCaptureDock() {
+        LinearLayout dock = new LinearLayout(this);
+        dock.setOrientation(LinearLayout.HORIZONTAL);
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        dock.setPadding(dp(10), dp(10), dp(10), dp(10));
+        dock.setBackground(rounded(UI_CARD, 16, 0));
+        dock.setLayoutParams(marginParams(-1, -2, 0, 4, 0, 12));
+
+        FrameLayout gallery = new FrameLayout(this);
+        gallery.setBackground(rounded(UI_SECONDARY, 10, 0));
+        File first = firstPhotoFile();
+        if (first != null) {
+            ImageView thumb = new ImageView(this);
+            thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            thumb.setImageBitmap(loadThumbnail(first));
+            gallery.addView(thumb, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+        } else {
+            TextView placeholder = text("▢", 20, Typeface.NORMAL, UI_LABEL);
+            placeholder.setGravity(Gravity.CENTER);
+            gallery.addView(placeholder, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+        gallery.setContentDescription(tr("文件库"));
+        gallery.setOnClickListener(view -> showSection("library"));
+        dock.addView(gallery, new LinearLayout.LayoutParams(dp(56), dp(56)));
+
+        Button afOn = controlCapsule("AF-ON", false);
+        afOn.setOnClickListener(view -> requestAutoFocusOn());
+        cameraControls.add(afOn);
+        LinearLayout.LayoutParams afParams = new LinearLayout.LayoutParams(dp(76), dp(44));
+        afParams.setMargins(dp(8), 0, 0, 0);
+        dock.addView(afOn, afParams);
+
+        shutterButton = new Button(this);
+        shutterButton.setText("●");
+        shutterButton.setTextSize(24);
+        shutterButton.setTextColor(UI_ACCENT);
+        GradientDrawable shutterBackground = new GradientDrawable();
+        shutterBackground.setShape(GradientDrawable.OVAL);
+        shutterBackground.setColor(UI_CARD);
+        shutterBackground.setStroke(dp(3), UI_ACCENT);
+        shutterButton.setBackground(shutterBackground);
+        shutterButton.setStateListAnimator(null);
+        shutterButton.setContentDescription(tr("拍摄"));
         shutterButton.setOnClickListener(view -> capturePhoto());
-        Button afOnButton = nativeButton("AF-ON", false);
-        afOnButton.setOnClickListener(view -> requestAutoFocusOn());
-        cameraControls.add(afOnButton);
-        cameraControls.add(liveViewButton);
         cameraControls.add(shutterButton);
-        actions.addView(liveViewButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        LinearLayout.LayoutParams shutterParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        shutterParams.setMargins(dp(10), 0, 0, 0);
-        actions.addView(shutterButton, shutterParams);
-        LinearLayout.LayoutParams afParams = new LinearLayout.LayoutParams(dp(96), dp(48));
-        afParams.setMargins(dp(10), 0, 0, 0);
-        actions.addView(afOnButton, afParams);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, dp(10), 0, dp(8));
-        actions.setLayoutParams(params);
-        return actions;
+        LinearLayout.LayoutParams shutterParams =
+                new LinearLayout.LayoutParams(dp(76), dp(76));
+        shutterParams.setMargins(dp(10), 0, dp(10), 0);
+        dock.addView(shutterButton, shutterParams);
+
+        Button interval = controlCapsule("INT", false);
+        interval.setBackground(rounded(
+                shootingTaskRunning ? UI_ACCENT : UI_SECONDARY, 18, 0));
+        interval.setTextColor(shootingTaskRunning ? INK : Color.WHITE);
+        interval.setContentDescription(tr("间隔拍摄"));
+        interval.setOnClickListener(view -> scrollTagIntoView("shootingTaskPanel"));
+        dock.addView(interval, new LinearLayout.LayoutParams(dp(64), dp(44)));
+
+        ImageButton switchCamera = new ImageButton(this);
+        switchCamera.setImageResource(R.drawable.ic_nav_camera);
+        switchCamera.setColorFilter(Color.WHITE);
+        switchCamera.setScaleType(ImageView.ScaleType.CENTER);
+        switchCamera.setPadding(dp(10), dp(10), dp(10), dp(10));
+        switchCamera.setBackground(rounded(UI_SECONDARY, 14, 0));
+        switchCamera.setStateListAnimator(null);
+        switchCamera.setContentDescription(tr("切换相机"));
+        switchCamera.setOnClickListener(view -> showSection("devices"));
+        LinearLayout.LayoutParams switchParams =
+                new LinearLayout.LayoutParams(dp(44), dp(44));
+        switchParams.setMargins(dp(8), 0, 0, 0);
+        dock.addView(switchCamera, switchParams);
+        return dock;
+    }
+
+    private File firstPhotoFile() {
+        for (File file : photoFiles()) {
+            if (!isVideoFile(file)) return file;
+        }
+        return null;
+    }
+
+    private Bitmap loadThumbnail(File file) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        int sample = 1;
+        while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 384) {
+            sample *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+    }
+
+    private void scrollTagIntoView(String tag) {
+        View target = contentHost.findViewWithTag(tag);
+        if (target == null || contentHost.getChildCount() == 0) return;
+        View scroller = contentHost.getChildAt(0);
+        if (!(scroller instanceof ScrollView)) return;
+        View content = ((ScrollView) scroller).getChildAt(0);
+        if (content == null) return;
+        int top = 0;
+        View cursor = target;
+        while (cursor != null && cursor != content) {
+            top += cursor.getTop();
+            cursor = (View) cursor.getParent();
+        }
+        ((ScrollView) scroller).smoothScrollTo(0, Math.max(0, top - dp(16)));
     }
 
     private View buildExposureReadoutRail() {
@@ -3128,6 +3673,8 @@ public final class MainActivity extends Activity {
 
     private View buildShootingTaskPanel() {
         LinearLayout panel = panel();
+        // fig1: INT dock capsule scrolls here via scrollTagIntoView.
+        panel.setTag("shootingTaskPanel");
         panel.addView(text("拍摄自动化", 18, Typeface.BOLD, INK));
         panel.addView(
                 text(
@@ -3228,11 +3775,11 @@ public final class MainActivity extends Activity {
     private View buildMonitorView() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.rgb(4, 10, 18));
+        scroll.setBackgroundColor(UI_BG);
         scroll.setVerticalScrollBarEnabled(false);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(16), dp(10), dp(16), dp(24));
-        content.setBackgroundColor(Color.rgb(4, 10, 18));
+        content.setBackgroundColor(UI_BG);
 
         monitorTimerText = text("00:00:00:00", 38, Typeface.BOLD, Color.WHITE);
         monitorTimerText.setGravity(Gravity.CENTER);
@@ -3323,7 +3870,7 @@ public final class MainActivity extends Activity {
         LinearLayout cell = verticalContainer();
         cell.setGravity(Gravity.CENTER);
         cell.setPadding(dp(7), 0, dp(7), 0);
-        TextView title = text(label, 10, Typeface.BOLD, Color.rgb(166, 176, 191));
+        TextView title = text(label, 10, Typeface.BOLD, UI_LABEL);
         title.setGravity(Gravity.CENTER);
         TextView reading = text(value, 17, Typeface.BOLD, Color.WHITE);
         reading.setGravity(Gravity.CENTER);
@@ -3394,20 +3941,20 @@ public final class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(16), dp(12), dp(16), dp(12));
-        card.setBackground(rounded(Color.rgb(29, 38, 53), 10, 0));
-        TextView icon = text("▯", 38, Typeface.NORMAL, Color.WHITE);
+        card.setBackground(rounded(UI_CARD, 14, 0));
+        TextView icon = text("▯", 38, Typeface.NORMAL, UI_LABEL);
         icon.setGravity(Gravity.CENTER);
         card.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(70)));
         LinearLayout copy = verticalContainer();
         TextView capacity = text("—", 22, Typeface.BOLD, Color.WHITE);
         capacity.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         copy.addView(capacity);
-        TextView barLabel = text(freeSpace, 15, Typeface.BOLD, Color.rgb(56, 155, 239));
+        TextView barLabel = text(freeSpace, 15, Typeface.BOLD, Color.WHITE);
         copy.addView(barLabel, new LinearLayout.LayoutParams(-1, dp(22)));
         LinearLayout detail = new LinearLayout(this);
         detail.setGravity(Gravity.CENTER_VERTICAL);
-        detail.addView(text(usage, 11, Typeface.BOLD, Color.WHITE), new LinearLayout.LayoutParams(0, dp(18), 1f));
-        TextView space = text("可用空间", 11, Typeface.BOLD, Color.WHITE);
+        detail.addView(text(usage, 11, Typeface.BOLD, UI_LABEL), new LinearLayout.LayoutParams(0, dp(18), 1f));
+        TextView space = text("可用空间", 11, Typeface.BOLD, UI_LABEL);
         space.setGravity(Gravity.RIGHT);
         detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
         copy.addView(detail);
@@ -3432,8 +3979,9 @@ public final class MainActivity extends Activity {
     private Button monitorActionButton(String label, boolean primary) {
         Button button = nativeButton(label, primary);
         button.setTextSize(12);
-        button.setTextColor(Color.WHITE);
-        button.setBackground(rounded(primary ? Color.rgb(163, 28, 35) : Color.rgb(30, 40, 55), 8, primary ? 0 : Color.rgb(67, 80, 101)));
+        // fig1 capsule tokens: accent for the record shutter, secondary for actions.
+        button.setTextColor(primary ? INK : Color.WHITE);
+        button.setBackground(rounded(primary ? UI_ACCENT : UI_SECONDARY, 14, 0));
         return button;
     }
 
@@ -3811,10 +4359,10 @@ public final class MainActivity extends Activity {
                         56));
 
         Button live = nativeButton(liveViewEnabled ? "LIVE" : "取景", false);
-        live.setTextColor(Color.WHITE);
+        live.setTextColor(liveViewEnabled ? INK : Color.WHITE);
         live.setBackground(rounded(
                 liveViewEnabled
-                        ? Color.argb(185, 150, 16, 28)
+                        ? UI_ACCENT
                         : Color.argb(175, 0, 0, 0),
                 12,
                 0));
@@ -3826,10 +4374,10 @@ public final class MainActivity extends Activity {
 
         if (immersiveMonitoring) {
             Button peaking = nativeButton("峰值", false);
-            peaking.setTextColor(Color.WHITE);
+            peaking.setTextColor(focusPeakingEnabled ? INK : Color.WHITE);
             peaking.setBackground(rounded(
                     focusPeakingEnabled
-                            ? Color.argb(200, 5, 90, 210)
+                            ? UI_ACCENT
                             : Color.argb(175, 0, 0, 0),
                     12,
                     0));
@@ -3850,7 +4398,7 @@ public final class MainActivity extends Activity {
         HorizontalScrollView scroll = new HorizontalScrollView(this);
         scroll.setHorizontalScrollBarEnabled(false);
         scroll.setFillViewport(true);
-        scroll.setBackground(rounded(Color.argb(220, 21, 25, 31), 5, STUDIO_RULE));
+        scroll.setBackground(rounded(Color.argb(230, 28, 28, 30), 5, UI_SECONDARY));
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         String source = connected ? "USB/PTP"
@@ -3901,7 +4449,7 @@ public final class MainActivity extends Activity {
         cell.setGravity(Gravity.CENTER_VERTICAL);
         cell.setPadding(dp(10), 0, dp(10), 0);
         cell.setLineSpacing(dp(2), 1f);
-        cell.setBackground(rounded(Color.argb(225, 21, 25, 31), 0, STUDIO_RULE));
+        cell.setBackground(rounded(Color.argb(230, 28, 28, 30), 0, UI_SECONDARY));
         parent.addView(cell, new LinearLayout.LayoutParams(dp(102), dp(52)));
     }
 
@@ -3910,7 +4458,7 @@ public final class MainActivity extends Activity {
         LinearLayout dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setPadding(dp(5), dp(5), dp(5), dp(5));
-        dock.setBackground(rounded(Color.argb(225, 6, 9, 13), 5, STUDIO_RULE));
+        dock.setBackground(rounded(Color.argb(225, 10, 11, 13), 5, UI_SECONDARY));
         immersiveScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
         immersiveScopeView.setData(
                 redHistogram,
@@ -3934,9 +4482,7 @@ public final class MainActivity extends Activity {
                 immersiveMonitoring ? "视频" : "照片",
                 17,
                 Typeface.BOLD,
-                immersiveMonitoring
-                        ? Color.rgb(245, 52, 65)
-                        : Color.rgb(85, 155, 255));
+                UI_ACCENT);
         section.setGravity(Gravity.CENTER);
         rail.addView(section, new LinearLayout.LayoutParams(
                 vertical ? dp(104) : dp(72),
@@ -3948,13 +4494,14 @@ public final class MainActivity extends Activity {
                         : "●",
                 true);
         capture.setTextSize(videoRecording ? 26 : 34);
-        capture.setTextColor(Color.WHITE);
+        capture.setTextColor(
+                immersiveMonitoring && videoRecording ? Color.WHITE : INK);
         capture.setContentDescription(tr(
                 immersiveMonitoring
                         ? (videoRecording ? "停止录制" : "开始录制")
                         : "拍摄"));
         capture.setBackground(rounded(
-                immersiveMonitoring ? VIDEO : COBALT,
+                immersiveMonitoring && videoRecording ? VIDEO : UI_ACCENT,
                 48,
                 0));
         capture.setEnabled((connected || localCameraConnected) && !capturing);
@@ -4057,10 +4604,10 @@ public final class MainActivity extends Activity {
         Button more = nativeButton(
                 immersiveMoreParametersExpanded ? "收起更多" : "更多参数",
                 false);
-        more.setTextColor(Color.WHITE);
+        more.setTextColor(immersiveMoreParametersExpanded ? INK : Color.WHITE);
         more.setBackground(rounded(
                 immersiveMoreParametersExpanded
-                        ? Color.argb(205, 5, 90, 210)
+                        ? UI_ACCENT
                         : Color.argb(175, 0, 0, 0),
                 10,
                 0));
@@ -4076,9 +4623,10 @@ public final class MainActivity extends Activity {
                     immersiveMoreParametersExpanded
                             ? "收起更多"
                             : "更多参数"));
+            more.setTextColor(immersiveMoreParametersExpanded ? INK : Color.WHITE);
             more.setBackground(rounded(
                     immersiveMoreParametersExpanded
-                            ? Color.argb(205, 5, 90, 210)
+                            ? UI_ACCENT
                             : Color.argb(175, 0, 0, 0),
                     10,
                     0));
@@ -4418,7 +4966,7 @@ public final class MainActivity extends Activity {
         group.setOrientation(LinearLayout.HORIZONTAL);
         group.setGravity(Gravity.CENTER);
         group.setPadding(dp(4), dp(4), dp(4), dp(4));
-        group.setBackground(rounded(Color.argb(165, 0, 0, 0), 10, 0));
+        group.setBackground(rounded(Color.argb(170, 44, 44, 46), 10, 0));
         Button minus = nativeButton("−", false);
         TextView value = text(
                 immersiveParameterValue(parameter),
@@ -10809,6 +11357,7 @@ public final class MainActivity extends Activity {
                     wifiCameraName = name;
                     wifiConnected = true;
                     wifiConnecting = false;
+                    lastConnectionError = null;
                     updateConnectionUi();
                     if ("library".equals(currentSection)) showSection("library");
                     showToast(
@@ -10820,6 +11369,9 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     wifiConnected = false;
                     wifiConnecting = false;
+                    lastConnectionError = error.getMessage() != null
+                            ? error.getMessage()
+                            : tr("连接失败");
                     updateConnectionUi();
                     if ("library".equals(currentSection)) showSection("library");
                     showError(error.getMessage());
@@ -10855,6 +11407,7 @@ public final class MainActivity extends Activity {
                     localCameraConnected = true;
                     connectedCameraName = name;
                     connectedCameraVendor = "System";
+                    lastConnectionError = null;
                     liveViewEnabled = false;
                     rememberConnectedDevice(
                             "android-local-camera",
@@ -10871,6 +11424,9 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     localCameraConnecting = false;
                     localCameraConnected = false;
+                    lastConnectionError = error.getMessage() != null
+                            ? error.getMessage()
+                            : tr("连接失败");
                     updateConnectionUi();
                     showError(error.getMessage());
                 });
@@ -10883,6 +11439,7 @@ public final class MainActivity extends Activity {
         previewGeneration++;
         pendingPreview.set(null);
         localCameraConnected = false;
+        lastConnectionError = null;
         localCameraConnecting = false;
         liveViewEnabled = false;
         videoRecording = false;
@@ -10902,6 +11459,7 @@ public final class MainActivity extends Activity {
     private void disconnectWifiCamera() {
         wifiCamera.close();
         wifiConnected = false;
+        lastConnectionError = null;
         wifiConnecting = false;
         wifiCameraName = "PTP/IP Camera";
         updateConnectionUi();
@@ -10989,6 +11547,7 @@ public final class MainActivity extends Activity {
                     connecting = false;
                     liveViewEnabled = false;
                     previewFailureCount = 0;
+                    lastConnectionError = null;
                     showSection(currentSection);
                     updateConnectionUi();
                     showToast(
@@ -11001,6 +11560,9 @@ public final class MainActivity extends Activity {
                     connected = false;
                     connecting = false;
                     liveViewEnabled = false;
+                    lastConnectionError = error.getMessage() != null
+                            ? error.getMessage()
+                            : tr("连接失败");
                     updateConnectionUi();
                     showError(error.getMessage());
                 });
@@ -11013,6 +11575,7 @@ public final class MainActivity extends Activity {
         previewGeneration++;
         pendingPreview.set(null);
         connected = false;
+        lastConnectionError = null;
         liveViewEnabled = false;
         videoRecording = false;
         cameraExecutor.submit(() -> {
@@ -11566,7 +12129,9 @@ public final class MainActivity extends Activity {
                     capturing
                             ? "处理中…"
                             : videoRecording ? "停止录制" : "开始录制"));
-            shutterButton.setBackground(rounded(VIDEO, 9, 0));
+            // fig1: accent when idle (快门大圆), safety red only while recording.
+            shutterButton.setBackground(rounded(videoRecording ? VIDEO : UI_ACCENT, 14, 0));
+            shutterButton.setTextColor(videoRecording ? Color.WHITE : INK);
             shutterButton.setEnabled((connected || localCameraConnected) && !capturing);
         }
         if (immersiveRecordButton != null) {
@@ -11574,6 +12139,7 @@ public final class MainActivity extends Activity {
                     capturing
                             ? "…"
                             : videoRecording ? "■\n停止" : "●\n录制"));
+            immersiveRecordButton.setTextColor(videoRecording ? Color.WHITE : INK);
             immersiveRecordButton.setEnabled(
                     (connected || localCameraConnected) && !capturing);
         }
@@ -11858,6 +12424,9 @@ public final class MainActivity extends Activity {
         updateCameraControls();
         updateRecordingButtons();
         updateFileCount();
+        // fig1: keep the capture-page status row in sync with connection state
+        // changes that don't rebuild the page (no-op when capture UI absent).
+        refreshControlStatusRow();
     }
 
     private void updateCameraControls() {

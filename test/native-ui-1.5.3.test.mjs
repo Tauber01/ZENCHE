@@ -36,7 +36,7 @@ test('1.5.3 capture controls use device summaries, adaptive parameter cards, and
   const sources = await nativeSources();
   const contracts = [
     [sources.ios, /CaptureDeviceSummary/, /CaptureParameterCardGrid/, /CaptureDock/],
-    [sources.android, /buildCaptureDeviceSummary/, /buildParameterCardGrid/, /buildCaptureDock/],
+    [sources.android, /buildControlStatusRow/, /buildStatusCardGrid/, /buildControlParameterGrid/, /buildControlCaptureDock/],
     [sources.harmony, /CaptureDeviceSummary/, /CaptureParameterCardGrid/, /CaptureDock/],
     [sources.macos, /CaptureDeviceSummary/, /ParameterCardGrid/, /CaptureDock/],
     [sources.windows, /CaptureDeviceSummary/, /ParameterCardDeck/, /CaptureDock/],
@@ -93,8 +93,8 @@ test('1.5.3 telemetry degrades to —/OFFLINE without a live source on Android a
   assert.match(android, /liveTelemetry \? shutterDisplayValue\(\) : "—"/);
   assert.match(android, /liveTelemetry\s*\n\s*\? String\.format\(Locale\.CHINA, "F%\.1f", currentAperture\)\s*\n\s*: "—"/);
   assert.match(android, /liveTelemetry \? String\.valueOf\(currentIso\) : "—"/);
-  // Android capture device summary OUTPUT must be gated.
-  assert.match(android, /\(connected \|\| localCameraConnected\)\s*\n\s*\? monitorProfileLabel\(\) \+ " · " \+ monitorFrameRate \+ "p"\s*\n\s*: "—"/);
+  // Android fig1 capture transport capsule must be gated (set only when a camera is live).
+  assert.match(android, /controlStatusRate\.setText\(connected\s*\n\s*\? "USB\/PTP"/);
   // Android fullscreen bottom exposure readout and parameter steppers must be gated.
   assert.match(android, /boolean live = connected \|\| localCameraConnected;/);
   assert.match(android, /if \(!\(connected \|\| localCameraConnected\)\) \{\s*\n\s*return "—";/);

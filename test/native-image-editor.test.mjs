@@ -19,7 +19,11 @@ test("all native targets expose image editing in primary navigation", async () =
 
   assert.match(iosModel, /case editor = "编辑"/);
   assert.match(iosView, /case \.editor:[\s\S]*ImageEditorPage/);
-  assert.match(android, /navButton\("编辑", "editor"\)/);
+  // v1.5.5 fig1: Android primary nav is 单机/群组/已下载/设置; editing stays
+  // reachable via the library and the editor route (no dedicated primary tab).
+  assert.doesNotMatch(android, /navButton\("编辑", "editor"\)/);
+  assert.match(android, /navButton\("单机", "capture"\)/);
+  assert.match(android, /navButton\("已下载", "library"\)/);
   assert.match(android, /case "editor":[\s\S]*buildImageEditorView/);
   assert.match(harmony, /NavButton\('图像编辑', 'editor'\)/);
   assert.match(harmony, /this\.ImageEditorWorkspace\(\)/);
