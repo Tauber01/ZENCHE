@@ -24,9 +24,9 @@ v1.4.1 聚焦五端原生监看体验：RGB/音频波形卡、Android 波形间�
 
 v1.5.0 新增五端原生外录：照片直接写入当前智能设备，PTP 视频可在机身录制同时将实时取景流式封装到 ZENCHE 文件库；Android、HarmonyOS、macOS、Windows 使用无声 Motion-JPEG AVI，iOS / iPadOS 本机与 UVC 源使用 MOV。外录接入会话命名、备份、SHA-256 和断开安全收尾，包与签名状态详见 `docs/releases/v1.5.0.md`。
 
-v1.5.2 已进入本地集成交付候选：五端全局状态条、五端“恢复设备码”入口、Android USB/PTP 会话降级、仓库内零依赖 AI 代理、设备码换绑协议和回环签发端已经合并。换绑只证明“旧激活码 + 当前绑定的旧设备码”凭据，成功后签发绑定新设备码的新码、继承次数与到期日并冻结旧记录；它不保证 HarmonyOS 卸载重装后的设备码本体连续。客户端入口固定使用 HTTPS，并在请求前验证旧凭据、响应后验证新码；服务端仍默认关闭，不得绕过 DNS、HTTPS、8787 明文端口收口、灰度和回滚门禁。当前未推送、未打标签、未创建 GitHub Release、未部署生产。
+v1.5.2 已进入本地集成交付候选：五端全局状态条、五端“恢复设备码”入口、Android USB/PTP 会话降级、仓库内零依赖 AI 代理、设备码换绑协议和回环签发端已经合并。换绑只证明“旧激活码 + 当前绑定的旧设备码”凭据，成功后签发绑定新设备码的新码、继承次数与到期日并冻结旧记录；它不保证 HarmonyOS 卸载重装后的设备码本体连续。客户端入口固定使用 HTTPS，并在请求前验证旧凭据、响应后验证新码；服务端仍默认关闭，不得绕过 DNS、HTTPS、8787 明文端口收口、灰度和回滚门禁。最终独立发布审查以代码提交 `dce831d` 和文档提交 `315809b` 为对象，结论为无 P0、无 P1，5 项 P2 均不阻塞，本地候选交付门禁通过。当前未推送、未打标签、未创建 GitHub Release、未部署生产。
 
-本地候选已生成 Android Debug 签名 APK、HarmonyOS 未签名 HAP、iOS / iPadOS unsigned IPA 与精确源码 ZIP，SHA-256、大小和安装限制见 `docs/releases/v1.5.2.md`。macOS / Windows 源码编译验证通过，但因专有 Nikon/Sony SDK 压缩包、Windows `libusb-1.0.dll`、Windows 主机及正式签名身份缺失，未伪造对应安装包。
+本地候选已生成 Android Debug 签名 APK、HarmonyOS 未签名 HAP、iOS / iPadOS unsigned IPA、macOS arm64 ad-hoc DMG、Windows x64 Setup/ZIP 与精确源码 ZIP，全部提供 SHA-256；大小、签名和安装限制见 `docs/releases/v1.5.2.md`。macOS 包未使用 Developer ID、未公证；Windows 包在 macOS 交叉构建，尚未在真实 Windows 主机验证安装、驱动和 SmartScreen，因此都不能冒充正式签名发布包。
 
 `NikonLink`、`com.tauber.nikonlink` 等名称是为升级、签名、偏好设置、应用数据和源码兼容保留的内部标识，不是需要继续替换的公开品牌文案。
 

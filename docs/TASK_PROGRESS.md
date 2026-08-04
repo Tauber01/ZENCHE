@@ -388,6 +388,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - Tauber 在 Buzz 事件 `ea6ca27e…d525c` 明确允许“旧激活码 + 当前绑定旧设备码”迁移。服务端候选 `POST /v1/ai/rebind` 默认关闭，迁移时先通过回环 redeem 签发新码并本地验签，再单次耐久事务继承 `used`/`expiry`、冻结旧记录；支持幂等、链式迁移、目标占用保护、IP/激活码指纹限流、脱敏审计、AI in-flight 计数和换绑写锁。
 - 回环 redeem `/issue-migrated` 签发端、五端恢复 UI、旧码预验签、新码二次验签及本地耐久替换已并入集成分支；恢复端点固定为 HTTPS。Nginx 精确反代、DNS 切换、关闭公网 8787、生产秘密注入、灰度与回滚仍未实施，没有生产服务器改动。
 - 自动化基线：core `87cb78c` 为 `225/225`；redeem `3745eda` 为 `237/237`；五端客户端切片在 UI 分支为 `138/138`。独立审查 `87cb78c` 无 P0，发现的唯一 P1 是迁移链尾退款缺少测试；集成分支已补等价的 in-flight 退款与链尾解析覆盖，合并态完整 `npm test` 为 **248/248** 通过。
-- 发布状态：已集成并升到 1.5.2 / build 27，正在同步三语文档和生成五端本地候选包。尚未上传 GitHub、未打 `v1.5.2` 标签、未创建 Release、未部署生产；签名、Windows 主机、相机真机等门禁必须随交付包精确披露。
-- 交付结果：Android APK、HarmonyOS HAP、iOS unsigned IPA 与精确源码 ZIP 已生成并通过同名 SHA-256 回验；完整清单、哈希和签名状态见 `docs/releases/v1.5.2.md`。Android 为 Debug 证书，HarmonyOS 未签名，iOS 未签名。
-- macOS / Windows 包未生成：工作区缺少 Nikon Image/Remote SDK 与 Sony Camera Remote SDK 压缩包；Windows 还缺匹配的 `libusb-1.0.dll` 和 Windows 主机。macOS 全 Swift 类型检查及 Windows .NET Release 交叉编译均已通过，但不得据此声称正式安装验证。
+- 最终独立发布审查核对代码提交 `dce831d`、文档提交 `315809b`、完整测试、diff、秘密扫描、当时已有的四个本地产物及源码 ZIP 树，结论为无 P0、无 P1、5 项 P2 均不阻塞。此前 P1 已闭环，本地候选交付门禁通过；该结论不放行 GitHub 稳定版或生产换绑。随后补生成的 macOS/Windows 包另按平台工具完成签名、镜像、容器和 SHA-256 验证。
+- 发布状态：已集成并升到 1.5.2 / build 27，三语文档和五端本地候选包已经收口。尚未上传 GitHub、未打 `v1.5.2` 标签、未创建 Release、未部署生产；签名、Windows 主机、相机真机等门禁必须随交付包精确披露。
+- 交付结果：Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS arm64 DMG、Windows x64 Setup/ZIP 与精确源码 ZIP 已生成并通过同名 SHA-256 回验；完整清单、哈希和签名状态见 `docs/releases/v1.5.2.md`。Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 为 macOS 主机交叉构建且未使用受信任代码签名证书。
+- macOS DMG 已通过 `codesign --verify --deep --strict` 与 `hdiutil verify`；Windows ZIP 已确认包含主程序、Nikon/Sony SDK 运行库和匹配的 `libusb-1.0.dll`，Setup 为 NSIS PE 安装器。仍需 Developer ID/公证、受信任 Windows 代码签名、真实 Windows 主机安装/驱动/SmartScreen，以及五端实机矩阵，才能升级为正式发布。
