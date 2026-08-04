@@ -3,7 +3,7 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 
-## [1.5.3] - Unreleased
+## [1.5.3] - 2026-08-04
 
 ### Added
 
@@ -40,8 +40,7 @@ the project uses semantic versioning.
 - Camera connection, capture, external recording, file transfer, non-destructive
   editing, AI activation, and device-binding behavior are unchanged. Scope
   panels render measured camera/editor data and never invent telemetry.
-- This source state is a local development candidate. It has not been pushed,
-  tagged, published as a GitHub Release, or deployed to production.
+- GitHub Release 中的 1.5.3 附件保留各自已有的验证属性：Android 为 Debug 证书，HarmonyOS 与 iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 无 Authenticode 且尚未完成真实 Windows 主机验收。
 
 ## [1.5.2] - 2026-08-04
 

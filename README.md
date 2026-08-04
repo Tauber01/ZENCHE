@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- 最新正式版：**v1.5.2**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)）
-- 当前源码版本：**1.5.3 / build 28**（本地开发候选，尚未发布到 GitHub）
+- 最新正式版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
+- 当前源码版本：**1.5.3 / build 28**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[v1.5.2 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[v1.5.3 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -177,17 +177,17 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [v1.5.1 最新正式版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1)
+前往 [v1.5.3 最新正式版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.1-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.5.1-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.5.1-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.5.1-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.5.1-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.5.1-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.5.3-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.5.3-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.5.3-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.5.3-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.5.3-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.5.3-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -198,13 +198,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.5.1-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.3-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.5.1-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.3-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -393,12 +393,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Latest stable release: **v1.5.2** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2))
-- Source version: **1.5.3 / build 28** (local development candidate; not yet published on GitHub)
+- Latest stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
+- Source version: **1.5.3 / build 28**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
-- Downloads: [latest stable v1.5.2 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [latest stable v1.5.3 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -540,17 +540,17 @@ completed hardware validation.
 ### Download and install
 
 Download packages and their matching `.sha256` files from the
-[latest stable v1.5.1 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1).
+[latest stable v1.5.3 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3).
 The delivery names are:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.1-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.5.1-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.5.1-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.5.1-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.5.1-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.5.1-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.5.3-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.5.3-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.5.3-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.5.3-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.5.3-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.5.3-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -702,12 +702,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- 最新安定版：**v1.5.2**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)）
-- 現在のソースバージョン：**1.5.3 / build 28**（ローカル開発候補。GitHub では未公開）
+- 最新安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
+- 現在のソースバージョン：**1.5.3 / build 28**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
-- ダウンロード：[最新安定版 v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[最新安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -844,18 +844,18 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[最新安定版 v1.5.1](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.1) から
+[最新安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.1-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.5.1-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.5.1-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.5.1-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.5.1-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.5.1-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.5.3-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.5.3-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.5.3-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.5.3-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.5.3-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.5.3-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
