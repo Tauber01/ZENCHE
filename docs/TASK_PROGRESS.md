@@ -2,7 +2,7 @@
 
 > 快照时间：2026-08-04（Asia/Shanghai）
 > 基线分支：`main`；1.5.2 在独立集成 worktree 收口
-> 当前版本：1.5.2 / build 27；GitHub 最新稳定版发布已获授权并正在上传
+> 当前版本：1.5.2 / build 27；已发布为 GitHub 最新稳定版
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,9 +18,9 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前集成源码版本为 **1.5.2 / build 27**。Tauber 已在 Buzz 事件 `e32e0706…f12b` 明确授权将其推送为 GitHub 最新稳定版；上传完成前线上 latest 仍为 **v1.5.1 / build 26**。生产服务未变更。四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
+- 当前源码版本为 **1.5.2 / build 27**，已于 2026-08-04 发布为 [GitHub 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)；标签落点 `7376cf102ec5ab14208d047f60f28941843fe1c2`。生产服务未变更。四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- `dist/` 中已生成 1.5.0 的 Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS DMG、Windows x64 Setup.exe/ZIP 及 SHA-256；v1.5.0 尚未上传 GitHub 或生产下载服务器。既有官方 v1.4.1 Release 六包仍保留在服务器下载目录。
+- v1.5.0 已作为历史 GitHub Release 保留；生产下载服务器仍保留既有 v1.4.1 六包。当前公开稳定版与交付哈希以 v1.5.2 Release 和 `docs/releases/v1.5.2.md` 为准。
 - AI 全链路已通过端到端验证：激活码验签 → 服务器计数 → 转发 grsai → 返回图片，计数递减正常。
 - 最大未闭环风险仍是跨 42 款相机的系统实机矩阵、生产签名、公证与商店级分发；Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -380,7 +380,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 提交：见本次提交（`docs: 恢复 AGENTS.md 权威版并纳入版本控制`），未推送远端。
 - 工作区存档：`GUIDES/ZENCHE_AGENTS.md`（含 frontmatter 的来源注记）与 `GUIDES/ZENCHE_START_PROMPT.md`。
 
-## 12.2 v1.5.2 连接、AI 服务与设备码迁移候选（2026-08-04）
+## 12.2 v1.5.2 连接、AI 服务与设备码迁移发布（2026-08-04）
 
 - Git 身份已按仓库本地配置固定为 `Tauber <2642079880@qq.com>`；UI 基线提交 `be8290b`，core 可靠性基线提交 `668bfe4`，均含相同的 `Co-authored-by` 与 `Signed-off-by` trailer，尚未推送。
 - Android USB/PTP 只对四类已知异步失败启用 `UsbRequest → bulkTransfer` 降级；首次同步降级成功后本会话粘滞走同步传输，重连与关闭重置，其他错误不吞掉。
@@ -389,6 +389,8 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 回环 redeem `/issue-migrated` 签发端、五端恢复 UI、旧码预验签、新码二次验签及本地耐久替换已并入集成分支；恢复端点固定为 HTTPS。Nginx 精确反代、DNS 切换、关闭公网 8787、生产秘密注入、灰度与回滚仍未实施，没有生产服务器改动。
 - 自动化基线：core `87cb78c` 为 `225/225`；redeem `3745eda` 为 `237/237`；五端客户端切片在 UI 分支为 `138/138`。独立审查 `87cb78c` 无 P0，发现的唯一 P1 是迁移链尾退款缺少测试；集成分支已补等价的 in-flight 退款与链尾解析覆盖，合并态完整 `npm test` 为 **248/248** 通过。
 - 最终独立发布审查核对代码提交 `dce831d`、文档提交 `315809b`、完整测试、diff、秘密扫描、当时已有的四个本地产物及源码 ZIP 树，结论为无 P0、无 P1、5 项 P2 均不阻塞。此前 P1 已闭环，本地候选交付门禁通过；随后补生成的 macOS/Windows 包另按平台工具完成签名、镜像、容器和 SHA-256 验证。Tauber 在完整风险披露后明确决定将其发布为 GitHub stable；该决定不放行生产换绑。
-- 发布状态：已集成并升到 1.5.2 / build 27，三语文档和五端包已经收口，正在推送 `main`、`v1.5.2` 标签和 GitHub 最新稳定版 Release；生产未部署。签名、Windows 主机、相机真机等限制必须继续随附件精确披露。
-- 交付结果：Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS arm64 DMG、Windows x64 Setup/ZIP 与精确源码 ZIP 已生成并通过同名 SHA-256 回验；完整清单、哈希和签名状态见 `docs/releases/v1.5.2.md`。Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 为 macOS 主机交叉构建且未使用受信任代码签名证书。
-- macOS DMG 已通过 `codesign --verify --deep --strict` 与 `hdiutil verify`；Windows ZIP 已确认包含主程序、Nikon/Sony SDK 运行库和匹配的 `libusb-1.0.dll`，Setup 为 NSIS PE 安装器。仍需 Developer ID/公证、受信任 Windows 代码签名、真实 Windows 主机安装/驱动/SmartScreen，以及五端实机矩阵，才能升级为正式发布。
+- 发布状态：`main` 已快进到 `7376cf102ec5ab14208d047f60f28941843fe1c2`，注释标签 `v1.5.2` 指向同一提交，[GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2) 已于 `2026-08-04T01:33:54Z` 发布为 Latest，且为非草稿、非预发布；生产未部署。
+- 交付结果：Release 共 14 个附件，包含 Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS arm64 DMG、Windows x64 Setup/ZIP、精确源码 ZIP 与七份同名 `.sha256`。发布前完整 `npm test` **248/248**、`git diff --check` 和本地七包校验均通过；发布后已把 14 个线上附件的字节数与 GitHub SHA-256 摘要逐项对照本地文件，14/14 一致、零差异。完整清单、哈希和签名状态见 `docs/releases/v1.5.2.md`。
+- 线上交付包 SHA-256：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
+- 签名与主机限制：Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 为 macOS 主机交叉构建且未使用受信任代码签名证书；真实 Windows 安装、驱动和 SmartScreen 仍未验收。GitHub stable 状态不改变这些附件属性。
+- macOS DMG 已通过 `codesign --verify --deep --strict` 与 `hdiutil verify`；Windows ZIP 已确认包含主程序、Nikon/Sony SDK 运行库和匹配的 `libusb-1.0.dll`，Setup 为 NSIS PE 安装器。仍需 Developer ID/公证、受信任 Windows 代码签名、真实 Windows 主机安装/驱动/SmartScreen，以及五端实机矩阵，才能闭环受信任签名与完整实机发布门禁。

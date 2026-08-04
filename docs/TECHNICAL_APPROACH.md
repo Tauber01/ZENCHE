@@ -37,6 +37,8 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - `ai-server/redeem-rebind.mjs` 只在回环地址提供 `POST /issue-migrated`，Bearer 共享密钥、RSA 私钥和监听端口均由运行时注入；请求体有 16 KiB 上限，日志仅记录短指纹。AI 代理通过回环调用它，私钥不得进入代理进程或仓库。
 - 客户端、代理和签发端代码随 v1.5.2 GitHub 稳定版源码交付，但生产换绑保持默认关闭；DNS/HTTPS、Nginx 精确反代、秘密注入、公网 8787 关闭、灰度与回滚未闭环前不得上线。
 - v1.5.2 GitHub 附件的产物、SHA-256 与签名状态以 `docs/releases/v1.5.2.md` 为准。Android Debug APK、HarmonyOS unsigned HAP、iOS unsigned IPA、macOS arm64 ad-hoc DMG 和 macOS 主机交叉生成的 Windows x64 Setup/ZIP 延续 v1.5.1 的公开附件属性；GitHub stable 标识不能替代正式证书签名、商店分发、Windows 主机验证或五端实机验收。
+- v1.5.2 已于 2026-08-04 发布为 [GitHub Latest](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)，注释标签解析到 `7376cf102ec5ab14208d047f60f28941843fe1c2`。Release 为非草稿、非预发布，共 14 个附件；七个交付包和七份 `.sha256` 的线上字节数及 GitHub SHA-256 摘要已与本地逐项比对，零差异。
+- 线上交付包 SHA-256：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
 - 最终独立发布审查以代码提交 `dce831d`、文档提交 `315809b` 和当时已有的四个本地产物为范围，完整测试 248/248、diff 检查、产物哈希/大小、源码 ZIP 树和秘密扫描均通过；结论无 P0/P1，5 项 P2 为非阻塞观察。随后补生成的 macOS/Windows 包另按平台工具完成签名、镜像、容器和 SHA-256 验证。独立审查只放行本地候选；Tauber 在完整风险披露后另行明确授权 GitHub stable 发布，该授权仍不放行生产换绑。
 
 ## 1. 总体原则
