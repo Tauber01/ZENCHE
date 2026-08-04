@@ -38,7 +38,7 @@ test('1.5.3 capture controls use device summaries, adaptive parameter cards, and
     [sources.ios, /ControlStatusRow/, /ControlStatusCardGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
     [sources.android, /buildControlStatusRow/, /buildStatusCardGrid/, /buildControlParameterGrid/, /buildControlCaptureDock/],
     [sources.harmony, /ControlStatusRow/, /ControlStatusGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
-    [sources.macos, /CaptureDeviceSummary/, /ParameterCardGrid/, /CaptureDock/],
+    [sources.macos, /ControlStatusRow/, /ControlStatusCardGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
     [sources.windows, /ControlStatusRow/, /ControlStatusGrid/, /ControlParameterGrid/, /ControlCaptureDock/],
   ];
   for (const [source, ...patterns] of contracts) {
