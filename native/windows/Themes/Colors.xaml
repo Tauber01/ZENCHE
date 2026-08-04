@@ -38,6 +38,12 @@
   <Color x:Key="ColorStudioRaised">#20242B</Color>
   <Color x:Key="ColorStudioRule">#343A43</Color>
   <Color x:Key="ColorStudioGold">#D8B653</Color>
+  <Color x:Key="ColorEditorBg">#2A2A2E</Color>
+  <Color x:Key="ColorEditorPanel">#333338</Color>
+  <Color x:Key="ColorEditorRaised">#3A3A40</Color>
+  <Color x:Key="ColorEditorRule">#1B1B1F</Color>
+  <Color x:Key="ColorEditorAccent">#E8833A</Color>
+  <Color x:Key="ColorEditorLabel">#8E8E93</Color>
   <Color x:Key="ColorError">#B4232D</Color>
   <Color x:Key="ColorErrorSoft">#FCE9EA</Color>
   <Color x:Key="ColorSuccess">#247A53</Color>
@@ -78,6 +84,12 @@
   <SolidColorBrush x:Key="StudioRaisedBrush" Color="{StaticResource ColorStudioRaised}" />
   <SolidColorBrush x:Key="StudioRuleBrush" Color="{StaticResource ColorStudioRule}" />
   <SolidColorBrush x:Key="StudioGoldBrush" Color="{StaticResource ColorStudioGold}" />
+  <SolidColorBrush x:Key="EditorBgBrush" Color="{StaticResource ColorEditorBg}" />
+  <SolidColorBrush x:Key="EditorPanelBrush" Color="{StaticResource ColorEditorPanel}" />
+  <SolidColorBrush x:Key="EditorRaisedBrush" Color="{StaticResource ColorEditorRaised}" />
+  <SolidColorBrush x:Key="EditorRuleBrush" Color="{StaticResource ColorEditorRule}" />
+  <SolidColorBrush x:Key="EditorAccentBrush" Color="{StaticResource ColorEditorAccent}" />
+  <SolidColorBrush x:Key="EditorLabelBrush" Color="{StaticResource ColorEditorLabel}" />
   <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
   <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ColorErrorSoft}" />
   <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource ColorSuccess}" />

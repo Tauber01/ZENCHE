@@ -251,4 +251,120 @@
       </Setter.Value>
     </Setter>
   </Style>
+
+  <!-- fig2 editor workbench: flat dark tool tiles, orange selected state. -->
+  <Style x:Key="EditorToolButton" TargetType="Button">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="10,4" />
+    <Setter Property="Foreground" Value="{StaticResource EditorLabelBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{StaticResource EditorRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Border"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="0"
+                  SnapsToDevicePixels="True">
+            <ContentPresenter
+                Margin="{TemplateBinding Padding}"
+                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="{StaticResource EditorRaisedBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Border" Property="Background" Value="{StaticResource EditorRaisedBrush}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Border" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="EditorToolActive" TargetType="Button" BasedOn="{StaticResource EditorToolButton}">
+    <Setter Property="Foreground" Value="{StaticResource EditorAccentBrush}" />
+    <Setter Property="Background" Value="{StaticResource EditorRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource EditorAccentBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <!-- fig2 editor parameter groups: flat dark expander (no white card). -->
+  <Style x:Key="EditorExpander" TargetType="Expander">
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Expander">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ToggleButton x:Name="HeaderSite"
+                          Content="{TemplateBinding Header}"
+                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                          ClickMode="Press"
+                          HorizontalContentAlignment="Stretch"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Cursor="Hand">
+              <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                  <Border Background="Transparent" Padding="2,7">
+                    <DockPanel>
+                      <TextBlock x:Name="Arrow"
+                                 DockPanel.Dock="Right"
+                                 FontFamily="{StaticResource MonoFont}"
+                                 FontSize="10"
+                                 Text="▾"
+                                 Foreground="{StaticResource EditorAccentBrush}" />
+                      <ContentPresenter />
+                    </DockPanel>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsChecked" Value="False">
+                      <Setter TargetName="Arrow" Property="Text" Value="▸" />
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </ToggleButton.Template>
+            </ToggleButton>
+            <ContentPresenter x:Name="ExpandSite"
+                              Grid.Row="1"
+                              Visibility="Collapsed"
+                              Margin="4,0,0,0" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsExpanded" Value="True">
+              <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- fig2 editor combo boxes: dark flat field (dropdown chrome stays system). -->
+  <Style x:Key="EditorComboBox" TargetType="ComboBox">
+    <Setter Property="MinHeight" Value="42" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="Margin" Value="0,4,0,12" />
+    <Setter Property="Background" Value="{StaticResource EditorRaisedBrush}" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="{StaticResource EditorRuleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
 </ResourceDictionary>

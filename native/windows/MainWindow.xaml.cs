@@ -7266,7 +7266,8 @@ public partial class MainWindow : Window
         {
             Header = AppLocalization.T("色轮"),
             Content = content,
-            Margin = new Thickness(0, 0, 0, 6)
+            Margin = new Thickness(0, 0, 0, 6),
+            Style = (Style)FindResource("EditorExpander")
         };
     }
 
@@ -7330,7 +7331,7 @@ public partial class MainWindow : Window
             FontSize = 11,
             Margin = new Thickness(0, 6, 0, 0)
         });
-        return new Expander { Header = AppLocalization.T("曲线"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+        return new Expander { Header = AppLocalization.T("曲线"), Content = content, Margin = new Thickness(0, 0, 0, 6), Style = (Style)FindResource("EditorExpander") };
     }
 
     private FrameworkElement CreateEditorGradeSlider(string key, string label, double min, double max)
@@ -7351,12 +7352,12 @@ public partial class MainWindow : Window
         var content = new StackPanel { Margin = new Thickness(8, 6, 8, 10) };
         _editorPickedColorText = new TextBlock { Text = AppLocalization.T("未取样"), Foreground = (Brush)FindResource("MutedBrush"), FontFamily = (FontFamily)FindResource("MonoFont"), Margin = new Thickness(0, 0, 0, 8) };
         content.Children.Add(new TextBlock { Text = AppLocalization.T("在预览画面点击取样色彩，自动微调色温与色调"), Foreground = (Brush)FindResource("MutedBrush"), FontSize = 11, Margin = new Thickness(0, 0, 0, 6) });
-        var arm = new Button { Content = AppLocalization.T("取色器"), Style = (Style)FindResource("ButtonBase") };
+        var arm = new Button { Content = AppLocalization.T("取色器"), Style = (Style)FindResource("EditorToolButton") };
         arm.Click += (_, _) => { _editorPickerArmed = !_editorPickerArmed; _editorAdjustments.PickerEnabled = _editorPickerArmed; arm.Content = AppLocalization.T(_editorPickerArmed ? "点击预览取色 · 再次关闭" : "取色器"); EditorStatusText.Text = AppLocalization.T(_editorPickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭"); };
-        var center = new Button { Content = AppLocalization.T("取样画面中心"), Style = (Style)FindResource("ButtonBase"), Margin = new Thickness(0, 6, 0, 0) };
+        var center = new Button { Content = AppLocalization.T("取样画面中心"), Style = (Style)FindResource("EditorToolButton"), Margin = new Thickness(0, 6, 0, 0) };
         center.Click += (_, _) => SampleEditorPixelAtCenter();
         content.Children.Add(arm); content.Children.Add(center); content.Children.Add(_editorPickedColorText);
-        return new Expander { Header = AppLocalization.T("取色器"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+        return new Expander { Header = AppLocalization.T("取色器"), Content = content, Margin = new Thickness(0, 0, 0, 6), Style = (Style)FindResource("EditorExpander") };
     }
 
     private Expander CreateEditorMaskGroup()
@@ -7394,7 +7395,7 @@ public partial class MainWindow : Window
             Content = AppLocalization.T("删除蒙版"),
             Height = 44,
             Margin = new Thickness(8, 0, 0, 0),
-            Style = (Style)FindResource("ButtonBase")
+            Style = (Style)FindResource("EditorToolButton")
         };
         delete.Click += (_, _) =>
         {
@@ -7414,7 +7415,7 @@ public partial class MainWindow : Window
         {
             Content = AppLocalization.T("添加蒙版（画笔）"),
             Height = 44,
-            Style = (Style)FindResource("ButtonBase")
+            Style = (Style)FindResource("EditorToolButton")
         };
         addBrush.Click += (_, _) =>
         {
@@ -7429,7 +7430,7 @@ public partial class MainWindow : Window
             Content = AppLocalization.T("减去蒙版（画笔）"),
             Height = 44,
             Margin = new Thickness(8, 0, 0, 0),
-            Style = (Style)FindResource("ButtonBase")
+            Style = (Style)FindResource("EditorToolButton")
         };
         subtractBrush.Click += (_, _) =>
         {
@@ -7461,7 +7462,7 @@ public partial class MainWindow : Window
                 Content = AppLocalization.T(type),
                 MinHeight = 42,
                 Margin = new Thickness(0, 0, 7, 7),
-                Style = (Style)FindResource("ButtonBase")
+                Style = (Style)FindResource("EditorToolButton")
             };
             smart.Click += (_, _) =>
             {
@@ -7480,7 +7481,7 @@ public partial class MainWindow : Window
         }
         content.Children.Add(smartMasks);
 
-        _editorMaskBox = new ComboBox { ItemsSource = new[] { "无", "画笔", "线性渐变", "径向渐变", "智能主体", "智能天空", "智能背景", "智能人物", "智能亮部", "智能暗部" }.Select(AppLocalization.T).ToList(), SelectedIndex = 0 };
+        _editorMaskBox = new ComboBox { ItemsSource = new[] { "无", "画笔", "线性渐变", "径向渐变", "智能主体", "智能天空", "智能背景", "智能人物", "智能亮部", "智能暗部" }.Select(AppLocalization.T).ToList(), SelectedIndex = 0, Style = (Style)FindResource("EditorComboBox") };
         _editorMaskBox.SelectionChanged += (_, _) => { if (!_updatingEditorControls) { if (_editorMaskBox.SelectedIndex > 0) _editorAdjustments.EnsureMaskLayer(); _editorAdjustments.MaskType = _editorMaskBox.SelectedIndex switch { 1 => "画笔", 2 => "线性渐变", 3 => "径向渐变", 4 => "智能主体", 5 => "智能天空", 6 => "智能背景", 7 => "智能人物", 8 => "智能亮部", 9 => "智能暗部", _ => "无" }; if (_editorAdjustments.MaskType != "无" && _editorAdjustments.MaskAmount == 0) _editorAdjustments.MaskAmount = 100; RefreshEditorMaskList(); UpdateEditorPreview(); } };
         content.Children.Add(new TextBlock { Text = AppLocalization.T("蒙版类型"), FontWeight = FontWeights.SemiBold });
         content.Children.Add(_editorMaskBox);
@@ -7542,7 +7543,7 @@ public partial class MainWindow : Window
             FontSize = 11,
             TextWrapping = TextWrapping.Wrap
         });
-        return new Expander { Header = AppLocalization.T("蒙版"), Content = content, Margin = new Thickness(0, 0, 0, 6) };
+        return new Expander { Header = AppLocalization.T("蒙版"), Content = content, Margin = new Thickness(0, 0, 0, 6), Style = (Style)FindResource("EditorExpander") };
     }
 
     private void RefreshEditorMaskList()
@@ -7575,6 +7576,9 @@ public partial class MainWindow : Window
                 CornerRadius = new CornerRadius(8),
                 Margin = new Thickness(0, 0, 0, 6)
             };
+            // Light selection chips keep dark text despite the dark rail.
+            System.Windows.Documents.TextElement.SetForeground(
+                row, (Brush)FindResource("InkBrush"));
             var layout = new DockPanel { LastChildFill = true };
             var visibility = new CheckBox
             {
@@ -7671,7 +7675,8 @@ public partial class MainWindow : Window
             Header = AppLocalization.T(title),
             IsExpanded = expanded,
             Content = content,
-            Margin = new Thickness(0, 0, 0, 6)
+            Margin = new Thickness(0, 0, 0, 6),
+            Style = (Style)FindResource("EditorExpander")
         };
     }
 
@@ -7733,7 +7738,8 @@ public partial class MainWindow : Window
         {
             ItemsSource = ratios.Select(AppLocalization.T).ToList(),
             SelectedIndex = 0,
-            Margin = new Thickness(0, 4, 0, 10)
+            Margin = new Thickness(0, 4, 0, 10),
+            Style = (Style)FindResource("EditorComboBox")
         };
         _editorCropBox.SelectionChanged += (_, _) =>
         {
@@ -7797,7 +7803,8 @@ public partial class MainWindow : Window
         {
             Header = AppLocalization.T("几何"),
             Content = content,
-            Margin = new Thickness(0, 0, 0, 6)
+            Margin = new Thickness(0, 0, 0, 6),
+            Style = (Style)FindResource("EditorExpander")
         };
     }
 
@@ -7806,7 +7813,7 @@ public partial class MainWindow : Window
         Content = AppLocalization.T(label),
         MinHeight = 42,
         Margin = new Thickness(2),
-        Style = (Style)FindResource("ButtonBase")
+        Style = (Style)FindResource("EditorToolButton")
     };
 
     private static string EditorAdjustmentValue(
@@ -8283,11 +8290,13 @@ public partial class MainWindow : Window
         EditorHeaderTitle.Text = AppLocalization.T("专业显影");
         EditorHeaderSubtitle.Text = AppLocalization.T(
             "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
+        UpdateEditorToolStrip(tool);
         var index = tool switch
         {
             "wheels" => 4,
             "curves" => 5,
             "mask" => 7,
+            "geometry" => 8,
             _ => -1
         };
         if (index >= 0 && index < EditorAdjustmentHost.Children.Count &&
@@ -8295,6 +8304,22 @@ public partial class MainWindow : Window
         {
             target.BringIntoView();
         }
+    }
+
+    private void UpdateEditorToolStrip(string tool)
+    {
+        // fig2 tool strip selection indicator (pure UI; no editor state machine).
+        SetEditorToolActive(EditorToolWheels, tool == "wheels");
+        SetEditorToolActive(EditorToolCurves, tool == "curves");
+        SetEditorToolActive(EditorToolMask, tool == "mask");
+        SetEditorToolActive(EditorToolGeometry, tool == "geometry");
+        SetEditorToolActive(EditorToolAi, tool == "ai");
+    }
+
+    private void SetEditorToolActive(Button button, bool active)
+    {
+        button.Style = (Style)FindResource(
+            active ? "EditorToolActive" : "EditorToolButton");
     }
 
     private void CopyEditorAI_Click(object sender, RoutedEventArgs e)

@@ -1150,350 +1150,377 @@
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <Border x:Name="EditorHeader" Padding="18"
-                  Background="{StaticResource AccentSoftBrush}"
-                  BorderBrush="{StaticResource AccentBrush}"
-                  BorderThickness="1"
-                  CornerRadius="14">
+                  Background="{StaticResource EditorBgBrush}"
+                  BorderBrush="{StaticResource EditorRuleBrush}"
+                  BorderThickness="0,0,0,1"
+                  CornerRadius="0">
             <StackPanel>
               <TextBlock x:Name="EditorHeaderTitle"
-                         Foreground="{StaticResource AccentBrush}"
+                         Foreground="White"
                          FontFamily="{StaticResource DisplayFont}"
                          FontSize="24"
                          FontWeight="Bold"
                          Text="专业显影" />
               <TextBlock x:Name="EditorHeaderSubtitle"
                          Margin="0,4,0,0"
-                         Foreground="{StaticResource MutedBrush}"
-                         Text="调色台 · 色轮 · 曲线 · 取色器 · 蒙版 · 始终保留原文件。" />
+                         Foreground="{StaticResource EditorLabelBrush}"
+                         Text="分组调整光线、色彩、细节、效果与几何；始终保留原文件。" />
             </StackPanel>
           </Border>
           <Grid x:Name="EditorProGrid" Grid.Row="1" Margin="0,18,0,0">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition x:Name="EditorMediaColumn" Width="220" />
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition x:Name="EditorToolsColumn" Width="320" />
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="2*" />
+              <RowDefinition Height="3*" />
+            </Grid.RowDefinitions>
             <Grid x:Name="EditorResolveWorkbench"
-                  Grid.ColumnSpan="3"
-                  Background="{StaticResource StudioCanvasBrush}"
+                  Grid.RowSpan="2"
+                  Background="{StaticResource EditorBgBrush}"
                   IsHitTestVisible="False" />
-            <Border x:Name="EditorMediaRail"
-                    Grid.Column="0"
-                    Margin="1,1,0,1"
-                    Padding="12"
-                    Background="{StaticResource StudioPanelBrush}"
-                    BorderBrush="{StaticResource StudioRuleBrush}"
-                    BorderThickness="1">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="*" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock FontFamily="{StaticResource MonoFont}"
-                           FontSize="11"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           Text="媒体池" />
-                <StackPanel Grid.Row="1" Margin="0,14,0,0">
-                  <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="#A8B0BC" Text="可编辑照片" />
-                  <TextBlock x:Name="EditorMediaCountText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontSize="24" FontWeight="SemiBold" Foreground="White" Text="0" />
-                  <TextBlock x:Name="EditorMediaSelectionText" Margin="0,10,0,0" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="#A8B0BC" Text="未选择照片" TextWrapping="Wrap" />
-                </StackPanel>
-                <UniformGrid Grid.Row="2" Margin="0,18,0,0" Columns="2" VerticalAlignment="Top">
-                  <Button Margin="2" Tag="wheels" Style="{StaticResource ButtonBase}" Content="色轮" Click="EditorWorkbenchTool_Click" />
-                  <Button Margin="2" Tag="curves" Style="{StaticResource ButtonBase}" Content="曲线" Click="EditorWorkbenchTool_Click" />
-                  <Button Margin="2" Tag="mask" Style="{StaticResource ButtonBase}" Content="蒙版" Click="EditorWorkbenchTool_Click" />
-                  <Button Margin="2" Tag="ai" Style="{StaticResource ButtonBase}" Content="AI" Click="EditorWorkbenchTool_Click" />
-                </UniformGrid>
-                <TextBlock Grid.Row="3" FontSize="10" Foreground="#7E8794" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
-              </Grid>
-            </Border>
-            <Border Grid.Column="1"
-                    Margin="1,1,1,1"
-                    Padding="14"
-                    Background="{StaticResource GraphiteBrush}"
-                    BorderBrush="{StaticResource GraphiteRuleBrush}"
-                    BorderThickness="1"
-                    CornerRadius="16">
-              <Grid>
-                <Image x:Name="EditorPreviewImage"
-                       Stretch="Uniform"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <Canvas x:Name="EditorMaskCanvas"
-                        Background="Transparent"
-                        MouseLeftButtonDown="EditorMaskCanvas_MouseLeftButtonDown"
-                        MouseMove="EditorMaskCanvas_MouseMove"
-                        MouseLeftButtonUp="EditorMaskCanvas_MouseLeftButtonUp" />
-                <TextBlock x:Name="EditorPreviewEmpty"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           Foreground="{StaticResource GraphiteMutedBrush}"
-                           FontSize="16"
-                           Text="选择一张照片开始编辑" />
-                <Border x:Name="EditorScopeDock"
-                        Height="84"
-                        Margin="12"
-                        Padding="10"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Bottom"
-                        Background="#E615191F"
-                        BorderBrush="{StaticResource StudioRuleBrush}"
-                        BorderThickness="1"
-                        CornerRadius="5">
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="150" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                      <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" FontWeight="Bold" Foreground="#A8B0BC" Text="编辑示波器" />
-                      <TextBlock x:Name="EditorScopeText" Margin="0,5,0,0" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource StudioGoldBrush}" Text="分析后显示实测范围" TextWrapping="Wrap" />
-                    </StackPanel>
-                    <Border Grid.Column="1" Margin="10,0,0,0" Background="{StaticResource StudioCanvasBrush}" BorderBrush="{StaticResource StudioRuleBrush}" BorderThickness="1">
-                      <Grid>
-                        <Border Height="1" VerticalAlignment="Center" Background="#334F5966" />
-                        <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="#334F5966" />
-                        <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="#334F5966" />
-                      </Grid>
-                    </Border>
-                  </Grid>
-                </Border>
-              </Grid>
-            </Border>
-            <Border x:Name="EditorToolRail"
-                    Grid.Column="2"
-                    Padding="18"
-                    Style="{StaticResource PanelCard}">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="*" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <TextBlock FontWeight="SemiBold" Text="编辑照片" />
-                <Grid Grid.Row="1" Margin="0,8,0,10">
-                  <Button x:Name="EditorPhotoPickerButton"
-                          HorizontalContentAlignment="Left"
-                          Padding="10,6"
-                          Click="EditorPhotoPickerButton_Click"
-                          Content="选择照片" />
-                  <ComboBox x:Name="EditorPhotoBox"
-                            Visibility="Collapsed"
-                            SelectionChanged="EditorPhotoBox_SelectionChanged" />
-                  <Popup x:Name="EditorPhotoPickerPopup"
-                         PlacementTarget="{Binding ElementName=EditorPhotoPickerButton}"
-                         Placement="Bottom"
-                         StaysOpen="False"
-                         AllowsTransparency="True">
-                    <Border Width="420"
-                            MaxHeight="520"
-                            Padding="8"
-                            Background="{StaticResource SurfaceBrush}"
-                            BorderBrush="{StaticResource RuleBrush}"
-                            BorderThickness="1"
-                            CornerRadius="10">
-                      <TreeView x:Name="EditorPhotoTree"
-                                SelectedItemChanged="EditorPhotoTree_SelectedItemChanged">
-                        <TreeView.ItemContainerStyle>
-                          <Style TargetType="{x:Type TreeViewItem}">
-                            <Setter Property="IsExpanded"
-                                    Value="{Binding IsExpanded, Mode=TwoWay}" />
-                            <Setter Property="Padding" Value="4" />
-                          </Style>
-                        </TreeView.ItemContainerStyle>
-                        <TreeView.ItemTemplate>
-                          <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                            <Grid Margin="4,3">
-                              <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="64" />
-                                <ColumnDefinition Width="*" />
-                              </Grid.ColumnDefinitions>
-                              <Grid Width="56" Height="42">
-                                <Image x:Name="EditorNodeThumbnail"
-                                       Source="{Binding Thumbnail}"
-                                       Stretch="UniformToFill" />
-                                <TextBlock x:Name="EditorNodeIcon"
-                                           Visibility="Collapsed"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           FontSize="15"
-                                           Text="{Binding Icon}" />
-                              </Grid>
-                              <StackPanel Grid.Column="1">
-                                <TextBlock FontWeight="SemiBold"
-                                           Text="{Binding Name}" />
-                                <TextBlock Margin="0,2,0,0"
-                                           Style="{StaticResource MetaText}"
-                                           Text="{Binding Detail}" />
-                              </StackPanel>
-                            </Grid>
-                            <HierarchicalDataTemplate.Triggers>
-                              <DataTrigger Binding="{Binding Thumbnail}"
-                                           Value="{x:Null}">
-                                <Setter TargetName="EditorNodeThumbnail"
-                                        Property="Visibility"
-                                        Value="Collapsed" />
-                                <Setter TargetName="EditorNodeIcon"
-                                        Property="Visibility"
-                                        Value="Visible" />
-                              </DataTrigger>
-                            </HierarchicalDataTemplate.Triggers>
-                          </HierarchicalDataTemplate>
-                        </TreeView.ItemTemplate>
-                      </TreeView>
-                    </Border>
-                  </Popup>
-                </Grid>
-                <StackPanel Grid.Row="2" Margin="0,0,0,10">
-                  <DockPanel>
-                    <TextBlock VerticalAlignment="Center"
-                               FontWeight="SemiBold"
-                               Text="预设" />
-                    <ComboBox x:Name="EditorPresetBox"
-                              Width="190"
-                              Margin="10,0,0,0"
-                              SelectionChanged="EditorPresetBox_SelectionChanged">
-                      <ComboBoxItem Tag="original" Content="原始" />
-                      <ComboBoxItem Tag="natural" Content="自然增强" />
-                      <ComboBoxItem Tag="portrait" Content="人像柔和" />
-                      <ComboBoxItem Tag="landscape" Content="风光通透" />
-                      <ComboBoxItem Tag="monochrome" Content="高反差黑白" />
-                    </ComboBox>
-                  </DockPanel>
-                  <DockPanel Margin="0,10,0,0">
-                    <TextBlock VerticalAlignment="Center"
-                               FontWeight="SemiBold"
-                               Text="尼康云创" />
-                    <ComboBox x:Name="NikonCloudPresetBox"
-                              Width="190"
-                              Margin="10,0,0,0"
-                              SelectionChanged="NikonCloudPresetBox_SelectionChanged" />
-                  </DockPanel>
-                  <TextBlock Margin="0,7,0,0"
-                             Foreground="{StaticResource MutedBrush}"
-                             FontSize="10"
-                             TextWrapping="Wrap"
-                             Text="设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同" />
-                </StackPanel>
-                <Border Grid.Row="3"
-                        Margin="0,0,0,12"
-                        Padding="12"
-                        Background="{StaticResource AccentSoftBrush}"
-                        BorderBrush="{StaticResource AccentBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                  <StackPanel>
-                    <DockPanel>
-                      <TextBlock FontWeight="SemiBold" Text="AI 智能修图 · 工作台" />
-                      <TextBlock DockPanel.Dock="Right"
-                                 Foreground="{StaticResource AccentBrush}"
-                                 FontSize="11"
-                                 FontWeight="SemiBold"
-                                 Text="设备端" />
-                    </DockPanel>
-                    <TextBlock x:Name="EditorAIMetricsText"
-                               Margin="0,0,0,8"
-                               Foreground="{StaticResource InkBrush}"
-                               FontFamily="{StaticResource MonoFont}"
-                               FontSize="10"
-                               Text="等待分析 · 曝光 --  动态范围 --  色彩 --  细节 --" />
-                    <TextBlock x:Name="EditorAISummaryText"
-                               Margin="0,6,0,8"
-                               Foreground="{StaticResource MutedBrush}"
-                               FontSize="12"
-                               Text="等待分析当前照片"
-                               TextWrapping="Wrap" />
-                    <TextBlock Margin="0,0,0,8"
-                               Foreground="{StaticResource AccentBrush}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Text="设备端处理 · 照片不会上传" />
-                    <DockPanel>
-                      <TextBlock Text="AI 强度" />
-                      <TextBlock x:Name="EditorAIIntensityText"
-                                 DockPanel.Dock="Right"
-                                 Foreground="{StaticResource MutedBrush}"
-                                 FontFamily="{StaticResource MonoFont}"
-                                 Text="72%" />
-                    </DockPanel>
-                    <Slider x:Name="EditorAIIntensitySlider"
-                            Minimum="35"
-                            Maximum="100"
-                            Value="72"
-                            TickFrequency="5"
-                            IsSnapToTickEnabled="True"
-                            ValueChanged="EditorAIIntensity_Changed" />
-                    <UniformGrid Margin="0,8,0,0" Columns="3">
-                      <Button Style="{StaticResource ButtonBase}"
-                              Content="分析画面"
-                              Click="AnalyzeEditorAI_Click" />
-                      <Button Style="{StaticResource PrimaryButton}"
-                              Content="智能优化"
-                              Click="ApplyEditorAI_Click" />
-                      <Button x:Name="UndoEditorAIButton"
-                              Margin="8,0,0,0"
-                              Style="{StaticResource ButtonBase}"
-                              Content="撤销 AI"
-                              IsEnabled="False"
-                              Click="UndoEditorAI_Click" />
-                    </UniformGrid>
-                    <UniformGrid Margin="0,8,0,0" Columns="2">
-                      <Button x:Name="CopyEditorAIButton"
-                              Style="{StaticResource ButtonBase}"
-                              Content="复制 AI"
-                              IsEnabled="False"
-                              Click="CopyEditorAI_Click" />
-                      <Button x:Name="PasteEditorAIButton"
-                              Margin="8,0,0,0"
-                              Style="{StaticResource ButtonBase}"
-                              Content="粘贴 AI"
-                              IsEnabled="False"
-                              Click="PasteEditorAI_Click" />
-                    </UniformGrid>
+
+            <!-- 中带三栏：媒体池 / 主监视器 / AI 摘要 -->
+            <Grid Grid.Row="0" Margin="0,0,0,1">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="EditorMediaColumn" Width="220" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="EditorToolsColumn" Width="320" />
+              </Grid.ColumnDefinitions>
+              <Border x:Name="EditorMediaRail"
+                      Grid.Column="0"
+                      Margin="0,0,1,0"
+                      Padding="12"
+                      Background="{StaticResource EditorPanelBrush}"
+                      BorderBrush="{StaticResource EditorRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="0">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <TextBlock FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             FontWeight="Bold"
+                             Foreground="White"
+                             Text="媒体池" />
+                  <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                    <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="9" Foreground="{StaticResource EditorLabelBrush}" Text="可编辑照片" />
+                    <TextBlock x:Name="EditorMediaCountText" Margin="0,3,0,0" FontFamily="{StaticResource MonoFont}" FontSize="24" FontWeight="SemiBold" Foreground="White" Text="0" />
+                    <TextBlock x:Name="EditorMediaSelectionText" Margin="0,10,0,0" FontFamily="{StaticResource MonoFont}" FontSize="11" Foreground="{StaticResource EditorLabelBrush}" Text="未选择照片" TextWrapping="Wrap" />
                   </StackPanel>
-                </Border>
-                <ScrollViewer Grid.Row="4"
-                              VerticalScrollBarVisibility="Auto">
-                  <StackPanel x:Name="EditorAdjustmentHost" />
+                  <StackPanel Grid.Row="2" Margin="0,14,0,0" VerticalAlignment="Top">
+                    <Button x:Name="EditorPhotoPickerButton"
+                            HorizontalContentAlignment="Left"
+                            Padding="10,6"
+                            Style="{StaticResource EditorToolButton}"
+                            Click="EditorPhotoPickerButton_Click"
+                            Content="选择照片" />
+                    <ComboBox x:Name="EditorPhotoBox"
+                              Visibility="Collapsed"
+                              SelectionChanged="EditorPhotoBox_SelectionChanged" />
+                    <Popup x:Name="EditorPhotoPickerPopup"
+                           PlacementTarget="{Binding ElementName=EditorPhotoPickerButton}"
+                           Placement="Bottom"
+                           StaysOpen="False"
+                           AllowsTransparency="True">
+                      <Border Width="420"
+                              MaxHeight="520"
+                              Padding="8"
+                              Background="{StaticResource SurfaceBrush}"
+                              BorderBrush="{StaticResource RuleBrush}"
+                              BorderThickness="1"
+                              CornerRadius="10">
+                        <TreeView x:Name="EditorPhotoTree"
+                                  SelectedItemChanged="EditorPhotoTree_SelectedItemChanged">
+                          <TreeView.ItemContainerStyle>
+                            <Style TargetType="{x:Type TreeViewItem}">
+                              <Setter Property="IsExpanded"
+                                      Value="{Binding IsExpanded, Mode=TwoWay}" />
+                              <Setter Property="Padding" Value="4" />
+                            </Style>
+                          </TreeView.ItemContainerStyle>
+                          <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                              <Grid Margin="4,3">
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="64" />
+                                  <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid Width="56" Height="42">
+                                  <Image x:Name="EditorNodeThumbnail"
+                                         Source="{Binding Thumbnail}"
+                                         Stretch="UniformToFill" />
+                                  <TextBlock x:Name="EditorNodeIcon"
+                                             Visibility="Collapsed"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             FontSize="15"
+                                             Text="{Binding Icon}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1">
+                                  <TextBlock FontWeight="SemiBold"
+                                             Text="{Binding Name}" />
+                                  <TextBlock Margin="0,2,0,0"
+                                             Style="{StaticResource MetaText}"
+                                             Text="{Binding Detail}" />
+                                </StackPanel>
+                              </Grid>
+                              <HierarchicalDataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Thumbnail}"
+                                             Value="{x:Null}">
+                                  <Setter TargetName="EditorNodeThumbnail"
+                                          Property="Visibility"
+                                          Value="Collapsed" />
+                                  <Setter TargetName="EditorNodeIcon"
+                                          Property="Visibility"
+                                          Value="Visible" />
+                                </DataTrigger>
+                              </HierarchicalDataTemplate.Triggers>
+                            </HierarchicalDataTemplate>
+                          </TreeView.ItemTemplate>
+                        </TreeView>
+                      </Border>
+                    </Popup>
+                  </StackPanel>
+                  <TextBlock Grid.Row="3" FontSize="10" Foreground="{StaticResource EditorLabelBrush}" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
+                </Grid>
+              </Border>
+              <Border Grid.Column="1"
+                      Margin="1,0,1,0"
+                      Background="{StaticResource GraphiteBrush}"
+                      BorderBrush="{StaticResource EditorRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="0">
+                <Grid>
+                  <Image x:Name="EditorPreviewImage"
+                         Stretch="Uniform"
+                         RenderOptions.BitmapScalingMode="HighQuality" />
+                  <Canvas x:Name="EditorMaskCanvas"
+                          Background="Transparent"
+                          MouseLeftButtonDown="EditorMaskCanvas_MouseLeftButtonDown"
+                          MouseMove="EditorMaskCanvas_MouseMove"
+                          MouseLeftButtonUp="EditorMaskCanvas_MouseLeftButtonUp" />
+                  <TextBlock x:Name="EditorPreviewEmpty"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             Foreground="{StaticResource GraphiteMutedBrush}"
+                             FontSize="16"
+                             Text="选择一张照片开始编辑" />
+                </Grid>
+              </Border>
+              <Border Grid.Column="2"
+                      Margin="1,0,0,0"
+                      Padding="14"
+                      Background="{StaticResource EditorPanelBrush}"
+                      BorderBrush="{StaticResource EditorRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                  <StackPanel>
+                    <StackPanel Margin="0,0,0,12">
+                      <DockPanel>
+                        <TextBlock VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   Text="预设" />
+                        <ComboBox x:Name="EditorPresetBox"
+                                  Width="190"
+                                  Margin="10,0,0,0"
+                                  Style="{StaticResource EditorComboBox}"
+                                  SelectionChanged="EditorPresetBox_SelectionChanged">
+                          <ComboBoxItem Tag="original" Content="原始" />
+                          <ComboBoxItem Tag="natural" Content="自然增强" />
+                          <ComboBoxItem Tag="portrait" Content="人像柔和" />
+                          <ComboBoxItem Tag="landscape" Content="风光通透" />
+                          <ComboBoxItem Tag="monochrome" Content="高反差黑白" />
+                        </ComboBox>
+                      </DockPanel>
+                      <DockPanel Margin="0,10,0,0">
+                        <TextBlock VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   Text="尼康云创" />
+                        <ComboBox x:Name="NikonCloudPresetBox"
+                                  Width="190"
+                                  Margin="10,0,0,0"
+                                  Style="{StaticResource EditorComboBox}"
+                                  SelectionChanged="NikonCloudPresetBox_SelectionChanged" />
+                      </DockPanel>
+                      <TextBlock Margin="0,7,0,0"
+                                 Foreground="{StaticResource EditorLabelBrush}"
+                                 FontSize="10"
+                                 TextWrapping="Wrap"
+                                 Text="设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同" />
+                    </StackPanel>
+                    <Border Padding="12"
+                            Background="{StaticResource EditorRaisedBrush}"
+                            BorderBrush="{StaticResource EditorRuleBrush}"
+                            BorderThickness="1"
+                            CornerRadius="0">
+                      <StackPanel>
+                        <DockPanel>
+                          <TextBlock FontWeight="SemiBold" Text="AI 智能修图 · 工作台" />
+                          <TextBlock DockPanel.Dock="Right"
+                                     Foreground="{StaticResource EditorAccentBrush}"
+                                     FontSize="11"
+                                     FontWeight="SemiBold"
+                                     Text="设备端" />
+                        </DockPanel>
+                        <TextBlock x:Name="EditorAIMetricsText"
+                                   Margin="0,0,0,8"
+                                   Foreground="White"
+                                   FontFamily="{StaticResource MonoFont}"
+                                   FontSize="10"
+                                   Text="等待分析 · 曝光 --  动态范围 --  色彩 --  细节 --" />
+                        <TextBlock x:Name="EditorAISummaryText"
+                                   Margin="0,6,0,8"
+                                   Foreground="{StaticResource EditorLabelBrush}"
+                                   FontSize="12"
+                                   Text="等待分析当前照片"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,0,0,8"
+                                   Foreground="{StaticResource EditorAccentBrush}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Text="设备端处理 · 照片不会上传" />
+                        <DockPanel>
+                          <TextBlock Text="AI 强度" />
+                          <TextBlock x:Name="EditorAIIntensityText"
+                                     DockPanel.Dock="Right"
+                                     Foreground="{StaticResource EditorLabelBrush}"
+                                     FontFamily="{StaticResource MonoFont}"
+                                     Text="72%" />
+                        </DockPanel>
+                        <Slider x:Name="EditorAIIntensitySlider"
+                                Minimum="35"
+                                Maximum="100"
+                                Value="72"
+                                TickFrequency="5"
+                                IsSnapToTickEnabled="True"
+                                ValueChanged="EditorAIIntensity_Changed" />
+                        <UniformGrid Margin="0,8,0,0" Columns="3">
+                          <Button Style="{StaticResource EditorToolButton}"
+                                  Content="分析画面"
+                                  Click="AnalyzeEditorAI_Click" />
+                          <Button Style="{StaticResource PrimaryButton}"
+                                  Content="智能优化"
+                                  Click="ApplyEditorAI_Click" />
+                          <Button x:Name="UndoEditorAIButton"
+                                  Margin="8,0,0,0"
+                                  Style="{StaticResource EditorToolButton}"
+                                  Content="撤销 AI"
+                                  IsEnabled="False"
+                                  Click="UndoEditorAI_Click" />
+                        </UniformGrid>
+                        <UniformGrid Margin="0,8,0,0" Columns="2">
+                          <Button x:Name="CopyEditorAIButton"
+                                  Style="{StaticResource EditorToolButton}"
+                                  Content="复制 AI"
+                                  IsEnabled="False"
+                                  Click="CopyEditorAI_Click" />
+                          <Button x:Name="PasteEditorAIButton"
+                                  Margin="8,0,0,0"
+                                  Style="{StaticResource EditorToolButton}"
+                                  Content="粘贴 AI"
+                                  IsEnabled="False"
+                                  Click="PasteEditorAI_Click" />
+                        </UniformGrid>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
                 </ScrollViewer>
-                <TextBlock x:Name="EditorStatusText"
-                           Grid.Row="5"
-                           Margin="0,12,0,10"
-                           FontFamily="{StaticResource MonoFont}"
-                           FontSize="11"
-                           Foreground="{StaticResource MutedBrush}"
-                           Text="调整不会覆盖原文件"
-                           TextWrapping="Wrap" />
-                <StackPanel Grid.Row="6"
-                            Margin="0,0,0,8"
-                            Orientation="Horizontal">
-                  <Button x:Name="CompareEditorPhotoButton"
-                          Width="132"
-                          Style="{StaticResource ButtonBase}"
-                          Content="查看原图"
-                          Click="CompareEditorPhoto_Click" />
-                  <Button Width="132"
-                          Margin="8,0,0,0"
-                          Style="{StaticResource ButtonBase}"
-                          Content="全部重置"
-                          Click="ResetEditor_Click" />
-                </StackPanel>
-                <Button x:Name="SaveEditedPhotoButton"
-                        Grid.Row="7"
-                        Height="46"
-                        Style="{StaticResource PrimaryButton}"
-                        Content="保存高质量副本"
-                        IsEnabled="False"
-                        Click="SaveEditedPhoto_Click" />
-              </Grid>
-            </Border>
+              </Border>
+            </Grid>
+
+            <!-- 下带两栏：调色面板 / 示波器 -->
+            <Grid Grid.Row="1" Margin="0,1,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="300" />
+              </Grid.ColumnDefinitions>
+              <Border x:Name="EditorToolRail"
+                      Grid.Column="0"
+                      Margin="0,0,1,0"
+                      Padding="14"
+                      Background="{StaticResource EditorPanelBrush}"
+                      BorderBrush="{StaticResource EditorRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="0">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                  </Grid.RowDefinitions>
+                  <UniformGrid Columns="5">
+                    <Button x:Name="EditorToolWheels" Margin="2" Tag="wheels" Style="{StaticResource EditorToolActive}" Content="色轮" Click="EditorWorkbenchTool_Click" />
+                    <Button x:Name="EditorToolCurves" Margin="2" Tag="curves" Style="{StaticResource EditorToolButton}" Content="曲线" Click="EditorWorkbenchTool_Click" />
+                    <Button x:Name="EditorToolMask" Margin="2" Tag="mask" Style="{StaticResource EditorToolButton}" Content="蒙版" Click="EditorWorkbenchTool_Click" />
+                    <Button x:Name="EditorToolGeometry" Margin="2" Tag="geometry" Style="{StaticResource EditorToolButton}" Content="几何" Click="EditorWorkbenchTool_Click" />
+                    <Button x:Name="EditorToolAi" Margin="2" Tag="ai" Style="{StaticResource EditorToolButton}" Content="AI" Click="EditorWorkbenchTool_Click" />
+                  </UniformGrid>
+                  <ScrollViewer Grid.Row="1" Margin="0,10,0,0" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="EditorAdjustmentHost" />
+                  </ScrollViewer>
+                  <TextBlock x:Name="EditorStatusText"
+                             Grid.Row="2"
+                             Margin="0,10,0,8"
+                             FontFamily="{StaticResource MonoFont}"
+                             FontSize="11"
+                             Foreground="{StaticResource EditorLabelBrush}"
+                             Text="调整不会覆盖原文件"
+                             TextWrapping="Wrap" />
+                  <StackPanel Grid.Row="3"
+                              Margin="0,0,0,8"
+                              Orientation="Horizontal">
+                    <Button x:Name="CompareEditorPhotoButton"
+                            Width="132"
+                            Style="{StaticResource EditorToolButton}"
+                            Content="查看原图"
+                            Click="CompareEditorPhoto_Click" />
+                    <Button Width="132"
+                            Margin="8,0,0,0"
+                            Style="{StaticResource EditorToolButton}"
+                            Content="全部重置"
+                            Click="ResetEditor_Click" />
+                  </StackPanel>
+                  <Button x:Name="SaveEditedPhotoButton"
+                          Grid.Row="4"
+                          Height="46"
+                          Style="{StaticResource PrimaryButton}"
+                          Effect="{x:Null}"
+                          Content="保存高质量副本"
+                          IsEnabled="False"
+                          Click="SaveEditedPhoto_Click" />
+                </Grid>
+              </Border>
+              <Border x:Name="EditorScopeDock"
+                      Grid.Column="1"
+                      Margin="1,0,0,0"
+                      Padding="12"
+                      Background="{StaticResource EditorPanelBrush}"
+                      BorderBrush="{StaticResource EditorRuleBrush}"
+                      BorderThickness="1"
+                      CornerRadius="0">
+                <Grid>
+                  <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                  </Grid.RowDefinitions>
+                  <TextBlock FontFamily="{StaticResource MonoFont}" FontSize="11" FontWeight="Bold" Foreground="White" Text="编辑示波器" />
+                  <TextBlock x:Name="EditorScopeText" Grid.Row="1" Margin="0,6,0,0" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource EditorAccentBrush}" Text="分析后显示实测范围" TextWrapping="Wrap" />
+                  <Border Grid.Row="2" Margin="0,12,0,0" Background="{StaticResource EditorBgBrush}" BorderBrush="{StaticResource EditorRuleBrush}" BorderThickness="1">
+                    <Grid>
+                      <Border Height="1" VerticalAlignment="Center" Background="#334F5966" />
+                      <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="#334F5966" />
+                      <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="#334F5966" />
+                    </Grid>
+                  </Border>
+                </Grid>
+              </Border>
+            </Grid>
           </Grid>
 
           <Grid x:Name="EditorAiGrid" Grid.Row="1" Margin="0,18,0,0" Visibility="Collapsed">
