@@ -16,7 +16,7 @@
 - 标准标语：连接相机，也连接完整工作流
 - 当前源码版本：1.5.3
 - 当前原生构建号：28
-- 发布状态：v1.5.3 是 `agent/1.5.3-ui` 本地开发候选，尚未推送、打标签或发布；GitHub 最新稳定版仍为 [v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)，标签落点为 `7376cf102ec5ab14208d047f60f28941843fe1c2`
+- 发布状态：v1.5.3 是 `agent/1.5.3-ui` 本地交付候选，尚未推送、打标签或发布；GitHub 最新稳定版仍为 [v1.5.2](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.2)，标签落点为 `7376cf102ec5ab14208d047f60f28941843fe1c2`
 
 v1.4.0 已完成 AI 原图上传、服务器次数扣减/失败回滚、修图覆盖原图与生图另存的五端行为对齐；包与签名状态详见 `docs/releases/v1.4.0.md`。发布提交为 `8a13c0b`，标签为 `v1.4.0`，Release 为 [GitHub v1.4.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。
 
@@ -30,7 +30,9 @@ v1.5.2 Release 已公开 14 个附件：Android Debug 签名 APK、HarmonyOS 未
 
 v1.5.3 聚焦五端原生工作台界面：全屏监看采用影像优先的遥测 HUD、焦点十字、工具轨、真实 RGB 示波器、静音音频基线和参数托盘；拍摄页使用设备摘要、自适应参数卡与常驻拍摄操作区；编辑器使用媒体池、中央预览、工具检查器和分析示波器协作布局。新界面只复用既有真实相机、图库与编辑状态；无连接或无画面时显示 `—`、`OFFLINE` 或明确空态，不把初始化默认值当作实时遥测。iOS 拍摄会话入口、Android 编辑快捷入口和 Windows 窄窗中央预览均已纳入回归门禁；相机连接、拍摄、外录、传输、AI 激活与设备码恢复协议保持兼容。五端共享 ZENCHE 蓝、参数暖金和录制/危险红的角色约定，不复制参考产品的商标或专有图标。
 
-线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS / iPadOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
+v1.5.3 本地交付候选固定于代码提交 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`：完整 `npm test` 256/256 通过，APK、HAP、unsigned IPA、macOS arm64 DMG、Windows x64 Setup/便携 ZIP 与源码 ZIP 共七包及同名 `.sha256` 已生成并逐个回验。它们不是商店或受信任签名包：Android 使用 Debug 证书，HarmonyOS 与 iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 未做 Authenticode 且仍需真实 Windows 主机验收。文件名、字节数、SHA-256、源码快照和版本资源边界见 `docs/releases/v1.5.3.md`；该候选尚未推送、打标签、发布或部署。
+
+v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8b15a36e41932ab3a6f563f43fdbb6b6c96f87a9`；HarmonyOS `da67a6373ad4faaf64e19f512e93206f7218068b6ccd2c68d262dcc77760370f`；iOS / iPadOS `97976caca49bd9d00cdfa38f86be0615d7139952e424ffe8f6b3da7ab96712cc`；macOS `37d02a5c5f0a2220dcd9e9ccc93abd9f7e4c859be9ee26c45c587b5cec62d2c0`；Windows Setup `145fa25551ee14bd39bf84f0266aaff069625ba26e47ed38895b651f6ed276af`；Windows ZIP `04ebe53602db9ba7a8e77ed2b51ced917a982aeec379ab62c013a764ae04b57c`；源码 ZIP `676d8a2e7bf3b20c3a316cdff035bd9d48ef22d38b4b62a24232f131a5836a25`。
 
 `NikonLink`、`com.tauber.nikonlink` 等名称是为升级、签名、偏好设置、应用数据和源码兼容保留的内部标识，不是需要继续替换的公开品牌文案。
 
