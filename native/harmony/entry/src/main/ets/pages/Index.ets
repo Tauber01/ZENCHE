@@ -1949,12 +1949,27 @@ struct Index {
 
   @Builder
   private EditorWorkbenchTool(label: string, panel: string) {
-    Button(this.tr(label), { type: ButtonType.Normal })
+    Button({ type: ButtonType.Normal }) {
+      Row({ space: 5 }) {
+        Path()
+          .width(16)
+          .height(16)
+          .commands(this.editorToolIconCommands(panel))
+          .fillOpacity(0)
+          .stroke(this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_LABEL)
+          .strokeWidth(1.4)
+          .strokeLineJoin(LineJoinStyle.Round)
+          .strokeLineCap(LineCapStyle.Round)
+        Text(this.tr(label))
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_LABEL)
+      }
+      .justifyContent(FlexAlign.Center)
+      .alignItems(VerticalAlign.Center)
+    }
       .height(42)
       .layoutWeight(1)
-      .fontSize(11)
-      .fontWeight(FontWeight.Bold)
-      .fontColor(this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_LABEL)
       .backgroundColor(this.editorWorkbenchToolActive(panel) ? EDITOR_RAISED : Color.Transparent)
       .border({
         width: this.editorWorkbenchToolActive(panel) ? 1 : 0,
@@ -1970,6 +1985,22 @@ struct Index {
           this.editorPanel = panel;
         }
       })
+  }
+
+  private editorToolIconCommands(panel: string): string {
+    // fig2 工具条线性单色图标（16x16，五端同几何，P2-2 集成轮）
+    switch (panel) {
+      case 'wheels':
+        return 'M8,1.5 A6.5,6.5 0 1,0 8,14.5 A6.5,6.5 0 1,0 8,1.5 M8,8 L14,8 M8,8 L5,2.8 M8,8 L5,13.2 M8,7.3 A0.7,0.7 0 1,0 8,8.7 A0.7,0.7 0 1,0 8,7.3';
+      case 'curves':
+        return 'M2,13 C4.5,11.5 5.5,5.5 9,5 C11.5,4.6 12.5,6.5 14,3.5 M8.2,4.6 L9.8,4.6 L9.8,6.2 L8.2,6.2 Z M12.6,6.6 L14.2,6.6 L14.2,8.2 L12.6,8.2 Z';
+      case 'mask':
+        return 'M3,2 H13 A1,1 0 0,1 14,3 V13 A1,1 0 0,1 13,14 H3 A1,1 0 0,1 2,13 V3 A1,1 0 0,1 3,2 Z M8,8 m-2.5,0 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0';
+      case 'geometry':
+        return 'M3,9.5 L7,4 L11,9.5 Z M12,5.2 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0 M3,11.5 H13 V14 H3 Z';
+      default:
+        return 'M8,2 L9.3,6.7 L14,8 L9.3,9.3 L8,14 L6.7,9.3 L2,8 L6.7,6.7 Z';
+    }
   }
 
   private editorWorkbenchToolActive(panel: string): boolean {
