@@ -7470,6 +7470,11 @@ public final class MainActivity extends Activity {
                     active ? EDITOR_RAISED : Color.TRANSPARENT,
                     0,
                     active ? EDITOR_ACCENT : 0));
+            // fig2 线性单色图标：五端同几何，颜色跟随文字选中态（P2-2 集成轮）
+            Drawable icon = getDrawable(editorToolIcon(key)).mutate();
+            icon.setTint(active ? EDITOR_ACCENT : EDITOR_LABEL);
+            tool.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null);
+            tool.setCompoundDrawablePadding(dp(5));
             tool.setOnClickListener(view -> {
                 if ("ai".equals(key)) {
                     editorState = EditorState.AI;
@@ -7487,6 +7492,24 @@ public final class MainActivity extends Activity {
             rail.addView(tool, params);
         }
         return rail;
+    }
+
+    private int editorToolIcon(String key) {
+        // fig2 工具条线性单色图标（16x16，五端同几何，P2-2 集成轮）
+        switch (key) {
+            case "editor-wheels":
+                return R.drawable.editor_icon_wheels;
+            case "editor-curves":
+                return R.drawable.editor_icon_curves;
+            case "editor-mask":
+                return R.drawable.editor_icon_mask;
+            case "editor-geometry":
+                return R.drawable.editor_icon_geometry;
+            case "ai":
+                return R.drawable.editor_icon_ai;
+            default:
+                return R.drawable.editor_icon_ai;
+        }
     }
 
     private View buildEditorScopeDock() {
