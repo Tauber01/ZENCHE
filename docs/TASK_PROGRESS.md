@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-03（Asia/Shanghai）
-> 基线分支：`main`
-> 当前版本：1.5.0 / build 25
+> 快照时间：2026-08-04（Asia/Shanghai）
+> 基线分支：`main`；1.5.2 在独立 worktree 开发
+> 当前版本：1.5.1 / build 26；1.5.2 / build 27 尚未集成或发布
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,7 +18,7 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码版本为 **1.5.0 / build 25**；四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
+- 当前正式源码版本为 **1.5.1 / build 26**；1.5.2 / build 27 仍是本地开发候选。四个直接 PTP 平台已恢复并自动核对 20 款 Nikon、12 款 Sony α 与 10 款 Canon EOS R 档案。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
 - `dist/` 中已生成 1.5.0 的 Android APK、HarmonyOS HAP、iOS unsigned IPA、macOS DMG、Windows x64 Setup.exe/ZIP 及 SHA-256；v1.5.0 尚未上传 GitHub 或生产下载服务器。既有官方 v1.4.1 Release 六包仍保留在服务器下载目录。
 - AI 全链路已通过端到端验证：激活码验签 → 服务器计数 → 转发 grsai → 返回图片，计数递减正常。
@@ -379,3 +379,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 操作：将权威版原样放入仓库根目录 `AGENTS.md`（SHA-256 与媒体哈希一致）；同步更新 `docs/PROJECT_OUTLINE.md` §7 与 `docs/TECHNICAL_APPROACH.md` 前置阅读注记。
 - 提交：见本次提交（`docs: 恢复 AGENTS.md 权威版并纳入版本控制`），未推送远端。
 - 工作区存档：`GUIDES/ZENCHE_AGENTS.md`（含 frontmatter 的来源注记）与 `GUIDES/ZENCHE_START_PROMPT.md`。
+
+## 12.2 v1.5.2 连接、AI 服务与设备码迁移候选（2026-08-04）
+
+- Git 身份已按仓库本地配置固定为 `Tauber <2642079880@qq.com>`；UI 基线提交 `be8290b`，core 可靠性基线提交 `668bfe4`，均含相同的 `Co-authored-by` 与 `Signed-off-by` trailer，尚未推送。
+- Android USB/PTP 只对四类已知异步失败启用 `UsbRequest → bulkTransfer` 降级；首次同步降级成功后本会话粘滞走同步传输，重连与关闭重置，其他错误不吞掉。
+- `ai-server/app.mjs` 是仓库内零依赖候选代理：默认回环监听，真实 generate→poll→download 链路有流式大小上限，参考图先校验再扣次，失败退款；计数写盘使用文件与目录双 fsync、三态恢复和存储异常 fail-stop。
+- Tauber 在 Buzz 事件 `ea6ca27e…d525c` 明确允许“旧激活码 + 当前绑定旧设备码”迁移。服务端候选 `POST /v1/ai/rebind` 默认关闭，迁移时先通过回环 redeem 签发新码并本地验签，再单次耐久事务继承 `used`/`expiry`、冻结旧记录；支持幂等、链式迁移、目标占用保护、IP/激活码指纹限流、脱敏审计、AI in-flight 计数和换绑写锁。
+- 当前只完成本地服务端协议与调用 redeem 的签发客户端；生产 redeem 的 `/issue-migrated` 端点、五端恢复 UI、本地原子替换、Nginx 精确反代、DNS 切换、关闭公网 8787、灰度与回滚仍未实施。没有生产服务器改动。
+- 自动化：core 基线在 `668bfe4` 为 `200/200`；新增 25 项换绑切片测试覆盖有效迁移、新码续计数、无效/过期/错设备码、幂等重放、链式迁移、占用保护、签发失败零副作用、旧码冻结、限流、代理 IP、双并发 AI、慢签发写锁、持久化失败回滚、回环 signer 鉴权与审计脱敏；本次候选完整 `npm test` 为 `225/225` 通过。
+- 发布状态：未集成、未升版、未生成五端版本化包、未上传 GitHub、未打 `v1.5.2` 标签。后续顺序为：独立审查换绑切片 → 实现/审查 redeem 与五端恢复入口 → 集成 UI/core → 升版和三语文档 → 全量测试、五端构建/实机/签名门禁 → 包与 SHA-256 → 发布。

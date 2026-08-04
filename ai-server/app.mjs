@@ -3,12 +3,11 @@
 // which was derived read-only from production /opt/ai-server/server.js
 // (SHA-256 746589b7275936982ec140e0672f81cfd81aad6cda5c6ae27afda1ccf3832631).
 //
-// Scope of this ticket: createApp factory, all-injectable config, loopback-only
-// default, strict yyyyMMdd expiry semantics, corrupt-DB fail-loud, consume
-// persistence with upstream rollback. NO rebind endpoint, NO production API
-// key, NO production data, NO deploy. The RSA verification key is injected via
-// publicKeyPem (tests generate their own keypair at runtime — no key material
-// is committed anywhere in this repo).
+// Scope: createApp factory, all-injectable config, loopback-only default,
+// strict yyyyMMdd expiry semantics, corrupt-DB fail-loud, durable consumption,
+// and an opt-in device-rebind route. NO production API key, signing key,
+// production data, or deployment material is embedded. RSA keys and the
+// internal redeem signer are injected; tests generate their keys at runtime.
 import http from "node:http";
 import https from "node:https";
 import fs from "node:fs";
@@ -213,6 +212,38 @@ function makeUpstreamDraw({ endpoint, model, replyType, maxUpstreamJsonBytes = 2
   };
 }
 
+function makeRedeemSigner({ endpoint, secret, timeoutMs = 5_000, maxBytes = 16 * 1024 }) {
+  return async function signNewCode(newDeviceId, expiry) {
+    const url = new URL(endpoint);
+    const body = JSON.stringify({ newDeviceId, expiry });
+    try {
+      const resp = await httpRequestJson(
+        url.protocol,
+        url.hostname,
+        Number(url.port) || (url.protocol === "https:" ? 443 : 80),
+        url.pathname + url.search,
+        "POST",
+        {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          Authorization: `Bearer ${secret}`,
+          Accept: "application/json",
+        },
+        body,
+        timeoutMs,
+        maxBytes,
+      );
+      if (resp.status < 200 || resp.status >= 300) return { ok: false };
+      const parsed = JSON.parse(resp.body.toString("utf8"));
+      return typeof parsed.code === "string" && parsed.code
+        ? { ok: true, code: parsed.code }
+        : { ok: false };
+    } catch {
+      return { ok: false };
+    }
+  };
+}
+
 export function createApp(opts = {}) {
   const {
     dbDir = null,
@@ -229,11 +260,24 @@ export function createApp(opts = {}) {
     publicKeyPem = null, // required; tests inject a runtime-generated test key
     verifyActivationImpl = null, // optional override for unit tests
     drawImageImpl = null, // optional injectable upstream; defaults to the real zero-dep chain
+    enableRebind = false, // production must opt in only after HTTPS and port-closure gates pass
+    signNewCodeImpl = null, // tests inject a signer; production calls the loopback redeem service
+    redeemEndpoint = "http://127.0.0.1:8899/issue-migrated",
+    rebindSecret = "",
+    rebindTimeoutMs = 5_000,
+    rebindWindowMs = 60_000,
+    rebindIpLimit = 10,
+    rebindActivationLimit = 3,
+    rebindLimiterMaxKeys = 10_000,
+    auditLogImpl = (line) => console.log(line),
     fsAdapter = null, // injectable fs adapter (R6 fault injection; tests only)
     onUnrecoverableStorage = null, // injectable fail-stop policy; CLI supplies the exit strategy
   } = opts;
 
   if (!publicKeyPem) throw new Error("createApp requires publicKeyPem (test key or production key)");
+  if (enableRebind && !signNewCodeImpl && !rebindSecret) {
+    throw new Error("rebind requires signNewCodeImpl or ZENCHE_REBIND_SECRET");
+  }
 
   // All storage access goes through the injectable adapter so R6 can fault
   // every step (open/write/fsync/close/rename) deterministically in tests.
@@ -245,6 +289,10 @@ export function createApp(opts = {}) {
 
   let devices = {};
   let storageUnhealthy = false;
+  const inflight = new Map();
+  const rebinding = new Set();
+  const rebindIpAttempts = new Map();
+  const rebindActivationAttempts = new Map();
   if (F.existsSync(DB_FILE)) {
     // Fail-loud: a corrupt devices.json must NOT be silently reset to {} —
     // that would zero every device's count without warning (production P1).
@@ -386,6 +434,9 @@ export function createApp(opts = {}) {
   function consume(deviceId, activation, expiry) {
     if (storageUnhealthy) return { status: 503, body: { error: "存储异常，服务暂不可用" } };
     const dev = devices[deviceId];
+    if (dev && dev.migrated_to) {
+      return { status: 409, body: { error: "该激活码已迁移，请使用新设备激活码" } };
+    }
     if (!dev || dev.activation !== activation) {
       const failure = durableWrite(() => {
         devices[deviceId] = { activation, expiry, used: 1, last_seen: Date.now() };
@@ -423,22 +474,185 @@ export function createApp(opts = {}) {
     } catch { return { ok: false, reason: "激活码无效" }; }
   }
 
-  function reply(res, status, obj) {
-    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  function fingerprint(value) {
+    return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex").slice(0, 12);
+  }
+
+  function auditRebind(oldDeviceId, newDeviceId, activation, ip, result) {
+    try {
+      auditLogImpl(
+        `[ZENCHE-AI][REBIND] from=${fingerprint(oldDeviceId)} to=${fingerprint(newDeviceId)} ` +
+        `activation=${fingerprint(activation)} ip=${fingerprint(ip)} result=${result} ts=${new Date().toISOString()}`,
+      );
+    } catch (err) {
+      console.error("[ZENCHE-AI][REBIND] 审计日志写入失败", err);
+    }
+  }
+
+  function rateLimited(bucket, key, limit, now = Date.now()) {
+    const recent = (bucket.get(key) || []).filter((ts) => now - ts < rebindWindowMs);
+    if (recent.length >= limit) {
+      bucket.set(key, recent);
+      return true;
+    }
+    if (!bucket.has(key) && bucket.size >= rebindLimiterMaxKeys) {
+      for (const [candidate, timestamps] of bucket) {
+        if (timestamps.every((ts) => now - ts >= rebindWindowMs)) bucket.delete(candidate);
+      }
+      if (bucket.size >= rebindLimiterMaxKeys) return true;
+    }
+    recent.push(now);
+    bucket.set(key, recent);
+    return false;
+  }
+
+  function clientIp(req) {
+    const remote = req.socket.remoteAddress || "unknown";
+    const fromLoopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+    const forwarded = req.headers["x-forwarded-for"];
+    if (fromLoopback && typeof forwarded === "string" && forwarded.trim()) {
+      return forwarded.split(",", 1)[0].trim().slice(0, 128);
+    }
+    return remote;
+  }
+
+  function resolveTail(deviceId) {
+    let current = deviceId;
+    const seen = new Set();
+    while (devices[current] && devices[current].migrated_to && !seen.has(current)) {
+      seen.add(current);
+      current = devices[current].migrated_to;
+    }
+    return current;
+  }
+
+  function beginInflight(deviceId) {
+    inflight.set(deviceId, (inflight.get(deviceId) || 0) + 1);
+  }
+
+  function endInflight(deviceId) {
+    const next = (inflight.get(deviceId) || 1) - 1;
+    if (next <= 0) inflight.delete(deviceId);
+    else inflight.set(deviceId, next);
+  }
+
+  function currentRebindState(oldDeviceId, newDeviceId) {
+    const dev = devices[newDeviceId];
+    const used = Number(dev && dev.used) || 0;
+    return {
+      ok: true,
+      oldDeviceId,
+      newDeviceId,
+      used,
+      remaining: Math.max(0, maxUsage - used),
+      newCode: dev && dev.activation,
+    };
+  }
+
+  const signNewCode = signNewCodeImpl || makeRedeemSigner({
+    endpoint: redeemEndpoint,
+    secret: rebindSecret,
+    timeoutMs: rebindTimeoutMs,
+  });
+
+  async function rebind(activationCode, oldDeviceId, newDeviceId, ip) {
+    const activation = String(activationCode).trim();
+    const verifier = verifyActivationImpl || verifyActivation;
+    const check = verifier(activation, oldDeviceId);
+    if (!check.ok) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "invalid-activation");
+      return { status: 401, body: { error: check.reason } };
+    }
+
+    const old = devices[oldDeviceId];
+    if (!old || old.activation !== activation) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "binding-not-found");
+      return { status: 403, body: { error: "设备码与激活码未绑定，无法迁移" } };
+    }
+    if (oldDeviceId === newDeviceId) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "idempotent-same-device");
+      return { status: 200, body: currentRebindState(oldDeviceId, newDeviceId) };
+    }
+    if (old.migrated_to) {
+      if (old.migrated_to === newDeviceId && devices[newDeviceId]) {
+        auditRebind(oldDeviceId, newDeviceId, activation, ip, "idempotent-replay");
+        return { status: 200, body: currentRebindState(oldDeviceId, newDeviceId) };
+      }
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "already-migrated");
+      return { status: 409, body: { error: "该激活码已迁移至其他设备" } };
+    }
+    if (devices[newDeviceId]) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "target-occupied");
+      return { status: 409, body: { error: "新设备码已有激活记录" } };
+    }
+    if ((inflight.get(oldDeviceId) || 0) > 0 || (inflight.get(newDeviceId) || 0) > 0) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "request-inflight");
+      return { status: 409, body: { error: "设备有进行中的 AI 请求，请稍后重试" } };
+    }
+    if (rebinding.has(oldDeviceId) || rebinding.has(newDeviceId)) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "rebind-inflight");
+      return { status: 409, body: { error: "设备正在换绑，请稍后重试" } };
+    }
+
+    rebinding.add(oldDeviceId);
+    rebinding.add(newDeviceId);
+    try {
+      let signed;
+      try { signed = await signNewCode(newDeviceId, check.expiry); }
+      catch { signed = { ok: false }; }
+      if (!signed || !signed.ok || !signed.code) {
+        auditRebind(oldDeviceId, newDeviceId, activation, ip, "signer-failed");
+        return { status: 502, body: { error: "签发失败请重试" } };
+      }
+      const signedCheck = verifyActivation(signed.code, newDeviceId);
+      if (!signedCheck.ok || signedCheck.expiry !== check.expiry) {
+        auditRebind(oldDeviceId, newDeviceId, activation, ip, "signed-code-invalid");
+        return { status: 502, body: { error: "签发失败请重试" } };
+      }
+
+      const used = Number(old.used) || 0;
+      const now = Date.now();
+      const failure = durableWrite(() => {
+        devices[oldDeviceId].migrated_to = newDeviceId;
+        devices[oldDeviceId].migrated_at = now;
+        devices[newDeviceId] = {
+          activation: signed.code,
+          expiry: check.expiry,
+          used,
+          last_seen: now,
+          migrated_from: oldDeviceId,
+        };
+      });
+      if (failure) {
+        auditRebind(oldDeviceId, newDeviceId, activation, ip, `persist-${failure.status}`);
+        return failure;
+      }
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "ok");
+      return { status: 200, body: currentRebindState(oldDeviceId, newDeviceId) };
+    } finally {
+      rebinding.delete(oldDeviceId);
+      rebinding.delete(newDeviceId);
+    }
+  }
+
+  function reply(res, status, obj, headers = {}) {
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", ...headers });
     res.end(JSON.stringify(obj));
   }
 
   const draw = drawImageImpl || makeUpstreamDraw({ endpoint, model, replyType, maxUpstreamJsonBytes, maxImageBytes });
 
   function handle(req, res) {
-    // Mirror production routing (POST /v1/ai only) — NO rebind endpoint yet.
     const doHandle = async () => {
       // R6 fail-stop gate: once storage is unhealthy every request returns 503
       // before any read/write — the service never resumes normal writes.
       if (storageUnhealthy) {
         return reply(res, 503, { error: "存储异常，服务暂不可用" });
       }
-      if (req.method !== "POST" || req.url.split("?")[0] !== "/v1/ai") {
+      const route = req.url.split("?")[0];
+      const isAi = route === "/v1/ai";
+      const isRebind = enableRebind && route === "/v1/ai/rebind";
+      if (req.method !== "POST" || (!isAi && !isRebind)) {
         return reply(res, 404, { error: "Not found" });
       }
       // Bounded body: stream-accumulate Buffers up to maxBodyBytes, then stop
@@ -467,6 +681,27 @@ export function createApp(opts = {}) {
       let body;
       try { body = JSON.parse(raw); } catch { return reply(res, 400, { error: "无效的 JSON" }); }
 
+      if (isRebind) {
+        const { activationCode, oldDeviceId, newDeviceId } = body || {};
+        if (!activationCode || !oldDeviceId || !newDeviceId) {
+          return reply(res, 400, { error: "缺少 activationCode / oldDeviceId / newDeviceId" });
+        }
+        if ([activationCode, oldDeviceId, newDeviceId].some((value) => typeof value !== "string" || !value.trim() || value.length > 4096)) {
+          return reply(res, 400, { error: "activationCode / oldDeviceId / newDeviceId 格式无效" });
+        }
+        const activation = activationCode.trim();
+        const ip = clientIp(req);
+        const now = Date.now();
+        const ipBlocked = rateLimited(rebindIpAttempts, fingerprint(ip), rebindIpLimit, now);
+        const activationBlocked = rateLimited(rebindActivationAttempts, fingerprint(activation), rebindActivationLimit, now);
+        if (ipBlocked || activationBlocked) {
+          auditRebind(oldDeviceId.trim(), newDeviceId.trim(), activation, ip, "rate-limited");
+          return reply(res, 429, { error: "请求过于频繁" }, { "Retry-After": String(Math.ceil(rebindWindowMs / 1000)) });
+        }
+        const result = await rebind(activation, oldDeviceId.trim(), newDeviceId.trim(), ip);
+        return reply(res, result.status, result.body);
+      }
+
       const { activationCode, deviceId, prompt, size = "1024x1024", image } = body || {};
       if (!activationCode || !deviceId || !prompt) {
         return reply(res, 400, { error: "缺少 activationCode / deviceId / prompt" });
@@ -482,10 +717,15 @@ export function createApp(opts = {}) {
       const check = (verifyActivationImpl || verifyActivation)(activationCode, deviceId);
       if (!check.ok) return reply(res, 403, { error: check.reason });
 
+      if (rebinding.has(deviceId)) {
+        return reply(res, 409, { error: "设备正在换绑，请稍后重试" });
+      }
+
       const use = consume(deviceId, String(activationCode).trim(), check.expiry);
       if (use.status) return reply(res, use.status, use.body);  // R6: persist failure response (500/503)
       if (!use.allowed) return reply(res, 403, { error: "该激活码次数已用完", used: use.used, remaining: 0 });
 
+      beginInflight(deviceId);
       try {
         const imageBase64 = await draw(apiKey, prompt, size, reference);
         res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "X-ZENCHE-Remaining": String(use.remaining) });
@@ -495,11 +735,14 @@ export function createApp(opts = {}) {
         // used-1 takes its own full snapshot and goes through the same
         // persistDurably + recoverPersistFailure path as the consume commit (R6).
         console.error("[ai-server] 上游转发失败:", err.message);
-        if (devices[deviceId]) {
-          const failure = durableWrite(() => { devices[deviceId].used -= 1; });
+        const rollbackDeviceId = resolveTail(deviceId);
+        if (devices[rollbackDeviceId]) {
+          const failure = durableWrite(() => { devices[rollbackDeviceId].used -= 1; });
           if (failure) return reply(res, failure.status, failure.body);
         }
         reply(res, 502, { error: "AI 服务暂时不可用，请稍后重试" });
+      } finally {
+        endInflight(deviceId);
       }
     };
     doHandle().catch((err) => {
@@ -524,14 +767,14 @@ export function createApp(opts = {}) {
       persistDurably,
       recoverPersistFailure,
       isStorageUnhealthy: () => storageUnhealthy,
+      concurrencySnapshot: () => ({ inflight: new Map(inflight), rebinding: new Set(rebinding) }),
       handle,
     }));
   });
 }
 
-// Run as main: mirror production behavior (require apiKey; public key via env
-// file path — nothing is embedded). Deploy/rebind are OUT OF SCOPE for this
-// ticket and await the rebind-protocol review.
+// Run as main: production behavior remains secret-free. Rebind is opt-in and
+// calls the loopback redeem signer; no private key enters this process.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const apiKey = process.env.ZENCHE_AI_API_KEY || "";
   if (!apiKey) {
@@ -550,6 +793,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     maxUsage: Number(process.env.ZENCHE_AI_MAX_USAGE || 100),
     publicKeyPem: pem,
     dbDir: process.env.ZENCHE_AI_DB_DIR,
+    enableRebind: process.env.ZENCHE_AI_ENABLE_REBIND === "1",
+    redeemEndpoint: process.env.ZENCHE_REDEEM_ENDPOINT || "http://127.0.0.1:8899/issue-migrated",
+    rebindSecret: process.env.ZENCHE_REBIND_SECRET || "",
     // R6 fail-stop policy: on unrecoverable storage, shut the service down so
     // the supervisor (nohup wrapper / systemd) restarts it for operator review.
     onUnrecoverableStorage: (err) => {

@@ -161,7 +161,8 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 五端编辑器提供 AI 工具面板：AI 修图（基于当前照片）与 AI 生图（纯文本），含快捷预设、宽高比与分辨率选择。
 - **密钥架构**：开源客户端不内置任何模型 API 密钥。客户端把 `激活码 + 设备ID + 提示词 + 图片` 发送到作者私有代理服务器，由服务器用自有密钥转发 grsai（nano-banana-fast）并下载图片、以 `{data:[{b64_json}]}` 返回。修图模式的原图以完整 `data:image/...;base64,...` 数据 URL 传递，代理原样放入上游 `images` 数组。
 - **授权与计数**：激活码为 RSA 离线签名，绑定设备 ID、每码 100 次；次数在服务器端 JSON 存储中按设备累计，失败（上游异常）自动回滚扣减。客户端本地只保存激活码文本，不再计数。
-- **服务器**：`ai-server/server.js` 为纯 Node 零依赖 HTTP 代理，监听 `:8787`，端点 `POST /v1/ai`；上游 grsai 当前接口为 JSON `POST /v1/api/generate`，请求使用 `model`、`prompt`、`images`、`aspectRatio`、`imageSize` 与 `replyType:"json"`，返回 `results[].url` 后由代理下载。代理仍兼容旧 SSE 响应，便于平滑迁移。
+- **服务器**：仓库内候选实现为 `ai-server/app.mjs`，采用纯 Node 零依赖 HTTP 代理和可注入 `createApp` 工厂；默认仅监听 `127.0.0.1`，正式 CLI 端点为 `POST /v1/ai`。上游 grsai 走 JSON `POST /v1/api/generate`，请求使用 `model`、`prompt`、`images`、`aspectRatio`、`imageSize` 与 `replyType`，异步结果经 `/v1/api/result` 轮询后限流下载。请求体、上游 JSON 和图片响应均有流式大小上限；消费提交与失败退款共用 `tmp → 文件 fsync → rename → 目录 fsync` 耐久写盘和 fail-stop 恢复。生产 `/opt/ai-server/server.js` 尚未由该候选替换。
+- **设备码换绑**：`POST /v1/ai/rebind` 默认关闭，只有显式设置 `ZENCHE_AI_ENABLE_REBIND=1` 且注入 `ZENCHE_REBIND_SECRET`（或测试签发器）时才注册。服务端先校验旧码与旧设备绑定，再通过回环 redeem 服务签发绑定新设备的新码并本地二次验签，最后单次耐久事务冻结旧记录、创建新记录并原样继承 `used`/`expiry`。in-flight 计数 Map 与 rebind 写锁阻断 AI 请求、退款和迁移交错；IP 与激活码指纹双桶限流，审计只记录 SHA-256 短指纹。公网只允许经 `https://zenche.top/api/v1/ai/rebind` 精确反代，DNS 未切换或公网 8787 未关闭时禁止启用。
 - 服务器地址由五端内置代理配置统一提供，默认 `http://101.34.255.115:8787`；设置面板不再提供可编辑入口。为兼容升级，客户端仍会读取历史保存的 `aiServerURL`、`ai_server_url` 或 `ai-server-url.txt` 值。
 
 ## 7. 本地化、更新与诊断
@@ -226,6 +227,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 启动公告、防诈骗、MirrorChyan、安全存储和更新回退。
 - 图像编辑、素材树、沉浸参数、自动拍摄、会话与专业监看。
 - 版本号、构建号、Release 工作流和打包脚本一致性。
+- AI 代理真实 generate→poll→download、流式资源上限、耐久写盘故障注入，以及设备码换绑的验签、幂等、链式迁移、计数继承、限流、签发失败零副作用和并发写锁。
 
 这些测试不能替代实机。USB/PTP、相机固件、驱动、签名安装、网络中断、性能、内存、方向切换和窗口缩放必须另行验证。
 

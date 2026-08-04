@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 项目大纲
 
 > 文档状态：工作基线
-> 最近核对：2026-08-03（Asia/Shanghai）
+> 最近核对：2026-08-04（Asia/Shanghai）
 > 使用方式：开始产品、界面、技术或发布工作前，先阅读根目录 `AGENTS.md`，再阅读本文、`docs/TECHNICAL_APPROACH.md` 与 `docs/TASK_PROGRESS.md`。
 
 ## 1. 项目定位
@@ -14,14 +14,17 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.0
-- 当前原生构建号：25
+- 当前源码版本：1.5.1
+- 当前原生构建号：26
+- 开发候选：1.5.2 / build 27（尚未集成、打包或发布）
 
 v1.4.0 已完成 AI 原图上传、服务器次数扣减/失败回滚、修图覆盖原图与生图另存的五端行为对齐；包与签名状态详见 `docs/releases/v1.4.0.md`。发布提交为 `8a13c0b`，标签为 `v1.4.0`，Release 为 [GitHub v1.4.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。
 
 v1.4.1 聚焦五端原生监看体验：RGB/音频波形卡、Android 波形间录制键、监看参数调节、预览点按对焦，以及移除镜头读数和监看“曝光”入口。发布提交、标签、Release、包与 SHA-256 详见 `docs/releases/v1.4.1.md`。
 
 v1.5.0 新增五端原生外录：照片直接写入当前智能设备，PTP 视频可在机身录制同时将实时取景流式封装到 ZENCHE 文件库；Android、HarmonyOS、macOS、Windows 使用无声 Motion-JPEG AVI，iOS / iPadOS 本机与 UVC 源使用 MOV。外录接入会话命名、备份、SHA-256 和断开安全收尾，包与签名状态详见 `docs/releases/v1.5.0.md`。
+
+v1.5.2 正在独立工作树开发：五端全局状态条、Android USB/PTP 会话降级、仓库内零依赖 AI 代理及设备码换绑服务端协议已有本地实现与自动化证据，但尚未合并到发布分支。换绑只证明“旧激活码 + 当前绑定的旧设备码”凭据，成功后签发绑定新设备码的新码、继承次数与到期日并冻结旧记录；它不保证 HarmonyOS 卸载重装后的设备码本体连续，也不得绕过 HTTPS、DNS、8787 明文端口收口、灰度和回滚门禁。
 
 `NikonLink`、`com.tauber.nikonlink` 等名称是为升级、签名、偏好设置、应用数据和源码兼容保留的内部标识，不是需要继续替换的公开品牌文案。
 
