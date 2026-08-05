@@ -19,29 +19,35 @@ test('native monitor surfaces use framed scope plots instead of text sparklines'
   assert.match(ios, /ProfessionalScopeBoard/);
   assert.match(ios, /AudioScopePlot/);
   assert.doesNotMatch(ios, /struct MonitorSparkline/);
+  assert.doesNotMatch(ios, /label:\s*"Y"/);
+  assert.doesNotMatch(ios, /label:\s*"YUV"/);
 
   assert.match(android, /class WaveformScopeView extends View/);
   assert.match(android, /RGB_PARADE/);
-  assert.match(android, /PROFESSIONAL/);
+  assert.doesNotMatch(android, /PROFESSIONAL/);
 
   assert.match(harmony, /professionalScopeContext/);
   assert.match(harmony, /drawProfessionalScope/);
   assert.match(harmony, /drawAudioScope/);
+  assert.doesNotMatch(harmony, /'Y'/);
+  assert.doesNotMatch(harmony, /'YUV'/);
 
   assert.match(macos, /MacProfessionalScopeBoard/);
   assert.match(macos, /MacAudioScopePlot/);
+  assert.doesNotMatch(macos, /label:\s*"Y"/);
+  assert.doesNotMatch(macos, /label:\s*"YUV"/);
 
   assert.match(windowsXaml, /local:WaveformScope/);
-  assert.match(windowsXaml, /Mode="Professional"/);
+  assert.doesNotMatch(windowsXaml, /Mode="Professional"/);
   assert.match(windowsScope, /sealed class WaveformScope/);
   assert.match(windowsScope, /RgbParade/);
 });
 
-test('scope design standard requires Y, YUV, RGB and forbids watermarks', async () => {
+test('scope design standard requires RGB overlay and forbids watermarks', async () => {
   const design = await read('DESIGN.md');
 
   assert.match(design, /## Waveform scopes/);
-  assert.match(design, /Y, YUV, and RGB/);
+  assert.match(design, /RGB overlay/);
   assert.match(design, /no decorative signature, watermark/);
 });
 
@@ -88,7 +94,7 @@ test('all native analyzers produce spatial 64 by 48 density scopes', async () =>
   }
 });
 
-test('all native scope renderers parse real density payloads and split Cb Cr', async () => {
+test('all native scope renderers parse real density payloads and render RGB overlay', async () => {
   const [ios, android, harmony, macos, windows] = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -103,7 +109,7 @@ test('all native scope renderers parse real density payloads and split Cb Cr', a
   assert.match(macos, /MacScopeLevels\.density/);
   assert.match(windows, /ParseDensity/);
   for (const source of [ios, android, harmony, macos, windows]) {
-    assert.match(source, /split/iu);
-    assert.match(source, /chroma/iu);
+    assert.match(source, /parade:\s*false|SCOPE_R/u);
+    assert.match(source, /RGB/);
   }
 });

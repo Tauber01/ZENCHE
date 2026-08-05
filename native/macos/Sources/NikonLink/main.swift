@@ -4168,9 +4168,6 @@ private enum Palette {
     static let scopeG = Color(red: 0.16, green: 1, blue: 0.41)          // #28FF69
     static let scopeB = Color(red: 0.13, green: 0.25, blue: 1)          // #2240FF
     static let scopeAudio = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255) // #4CC7E8
-    static let scopeYuvY = Color(red: 0.08, green: 1, blue: 0.36)       // #14FF5C
-    static let scopeYuvU = Color(red: 0, green: 0.82, blue: 1)          // #00D2FF
-    static let scopeYuvV = Color(red: 1, green: 0.15, blue: 0.87)       // #FF26DE
     static let scopeBg = Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255) // #050A0F
     // 专属语义色
     static let videoIdle = Color(red: 0.55, green: 0.03, blue: 0.03)    // 录制按钮未激活深红（与 iOS 同值）
@@ -4681,11 +4678,11 @@ private struct ImmersiveMacCameraView: View {
             MacScopePlot(
                 label: "RGB",
                 traces: [
-                    MacScopeTrace(value: model.redHistogram, color: .red),
-                    MacScopeTrace(value: model.greenHistogram, color: .green),
-                    MacScopeTrace(value: model.blueHistogram, color: .blue)
+                    MacScopeTrace(value: model.redHistogram, color: Palette.scopeR),
+                    MacScopeTrace(value: model.greenHistogram, color: Palette.scopeG),
+                    MacScopeTrace(value: model.blueHistogram, color: Palette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
             .frame(width: 180, height: 80)
             MacAudioScopePlot(label: "AUDIO")
@@ -6698,7 +6695,7 @@ private struct MonitorView: View {
                 MacScopeTrace(value: model.greenHistogram, color: Palette.scopeG),
                 MacScopeTrace(value: model.blueHistogram, color: Palette.scopeB)
             ],
-            parade: true
+            parade: false
         )
         .frame(maxWidth: .infinity, minHeight: 86)
         .accessibilityLabel("RGB 波形")
@@ -7100,9 +7097,7 @@ private struct MonitorControlDeck: View {
                     MacProfessionalScopeBoard(
                         red: model.redHistogram,
                         green: model.greenHistogram,
-                        blue: model.blueHistogram,
-                        luma: model.waveform,
-                        chroma: model.vectorscope
+                        blue: model.blueHistogram
                     )
                     .frame(height: 210)
                     Text("峰值覆盖 · \(model.peakingCoverage)%")
@@ -7456,29 +7451,9 @@ private struct MacProfessionalScopeBoard: View {
     let red: String
     let green: String
     let blue: String
-    let luma: String
-    let chroma: String
 
     var body: some View {
-        let chromaParts = chroma.split(separator: "|", maxSplits: 1).map(String.init)
-        let cb = chromaParts.first ?? chroma
-        let cr = chromaParts.count > 1 ? chromaParts[1] : chroma
         VStack(spacing: 1) {
-            MacScopePlot(
-                label: "Y",
-                traces: [MacScopeTrace(value: luma, color: .white)]
-            )
-            MacScopePlot(
-                label: "YUV",
-                traces: [
-                    MacScopeTrace(value: luma, color: Palette.scopeYuvY),
-                    MacScopeTrace(value: cb, color: Palette.scopeYuvU),
-                    MacScopeTrace(
-                        value: cr,
-                        color: Palette.scopeYuvV
-                    )
-                ]
-            )
             MacScopePlot(
                 label: "RGB",
                 traces: [
@@ -7486,13 +7461,13 @@ private struct MacProfessionalScopeBoard: View {
                     MacScopeTrace(value: green, color: Palette.scopeG),
                     MacScopeTrace(value: blue, color: Palette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
         }
         .padding(4)
         .background(Color.black)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("专业波形图，亮度、YUV 与 RGB 分量")
+        .accessibilityLabel("专业波形图，RGB 三通道叠加")
     }
 }
 

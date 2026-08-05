@@ -2196,9 +2196,9 @@
                         Background="{DynamicResource ScopeBlackBrush}">
                   <StackPanel>
                     <local:WaveformScope x:Name="ProfessionalScope"
-                                         Mode="Professional"
+                                         Mode="RgbParade"
                                          Height="210"
-                                         AutomationProperties.Name="专业波形图，亮度、YUV 与 RGB 分量" />
+                                         AutomationProperties.Name="专业波形图，RGB 三通道叠加" />
                     <TextBlock x:Name="PeakingCoverageText"
                                Margin="0,6,0,0"
                                Foreground="{DynamicResource WhiteLoBrush}"

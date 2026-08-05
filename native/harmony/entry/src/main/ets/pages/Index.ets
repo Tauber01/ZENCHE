@@ -123,9 +123,6 @@ const SCOPE_R: string = '#FF302A';          // RGB parade R
 const SCOPE_G: string = '#28FF69';          // RGB parade G
 const SCOPE_B: string = '#2240FF';          // RGB parade B
 const SCOPE_AUDIO: string = '#4CC7E8';      // 音频缺失基线
-const SCOPE_YUV_Y: string = '#14FF5C';      // YUV Y
-const SCOPE_YUV_U: string = '#00D2FF';      // YUV U
-const SCOPE_YUV_V: string = '#FF26DE';      // YUV V
 const SCOPE_BG: string = '#050A0F';         // 示波器井背景
 
 // HUD 玻璃遮罩（对齐 Android HUD_* 语义）
@@ -8736,11 +8733,6 @@ struct Index {
     return new ScopeDensity(columns, rows, values);
   }
 
-  private chromaPart(value: string, index: number): string {
-    const parts: Array<string> = value.split('|');
-    return parts.length > index ? parts[index] : value;
-  }
-
   private scopeNoise(column: number, particle: number, seed: number): number {
     const value: number = Math.sin(
       ((column + 1) * 17 + (particle + 3) * 31 + seed * 47) * 12.9898
@@ -8807,7 +8799,7 @@ struct Index {
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
       [SCOPE_R, SCOPE_G, SCOPE_B],
-      true
+      false
     );
   }
 
@@ -8854,7 +8846,7 @@ struct Index {
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
       [SCOPE_R, SCOPE_G, SCOPE_B],
-      true
+      false
     );
   }
 
@@ -8889,22 +8881,10 @@ struct Index {
     const context: CanvasRenderingContext2D = this.professionalScopeContext;
     if (context.width <= 1 || context.height <= 1) return;
     context.clearRect(0, 0, context.width, context.height);
-    const gap: number = 1;
-    const panelHeight: number = (context.height - gap * 2) / 3;
     this.drawScopePanel(
-      context, 0, 0, context.width, panelHeight,
-      'Y', [this.waveform], [WHITE], false
-    );
-    this.drawScopePanel(
-      context, 0, panelHeight + gap, context.width, panelHeight,
-      'YUV', [this.waveform, this.chromaPart(this.vectorscope, 0),
-        this.chromaPart(this.vectorscope, 1)],
-      [SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V], false
-    );
-    this.drawScopePanel(
-      context, 0, (panelHeight + gap) * 2, context.width, panelHeight,
-      '', [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      [SCOPE_R, SCOPE_G, SCOPE_B], true
+      context, 0, 0, context.width, context.height,
+      'RGB', [this.redHistogram, this.greenHistogram, this.blueHistogram],
+      [SCOPE_R, SCOPE_G, SCOPE_B], false
     );
   }
 

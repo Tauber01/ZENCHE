@@ -188,9 +188,6 @@ public final class MainActivity extends Activity {
     private static final int SCOPE_G = Color.rgb(40, 255, 105);       // RGB parade G
     private static final int SCOPE_B = Color.rgb(34, 64, 255);        // RGB parade B
     private static final int SCOPE_AUDIO = Color.rgb(76, 199, 232);   // #4CC7E8 音频缺失基线
-    private static final int SCOPE_YUV_Y = Color.rgb(20, 255, 92);    // YUV Y
-    private static final int SCOPE_YUV_U = Color.rgb(0, 210, 255);    // YUV U
-    private static final int SCOPE_YUV_V = Color.rgb(255, 38, 222);   // YUV V
     // ── v1.5.6 高频内联色归一 ──
     private static int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
     private static int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
@@ -921,15 +918,12 @@ public final class MainActivity extends Activity {
     private final class WaveformScopeView extends View {
         static final int RGB_PARADE = 0;
         static final int AUDIO = 1;
-        static final int PROFESSIONAL = 2;
 
         private final int mode;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private String red = "—";
         private String green = "—";
         private String blue = "—";
-        private String luma = "—";
-        private String chroma = "—";
 
         WaveformScopeView(int mode) {
             super(MainActivity.this);
@@ -937,22 +931,16 @@ public final class MainActivity extends Activity {
             setBackgroundColor(Color.BLACK);
             setContentDescription(mode == AUDIO
                     ? tr("音频波形") + "，" + tr("无音频源")
-                    : mode == RGB_PARADE
-                            ? tr("RGB 波形")
-                            : tr("专业波形图"));
+                    : tr("RGB 波形"));
         }
 
         void setData(
                 String red,
                 String green,
-                String blue,
-                String luma,
-                String chroma) {
+                String blue) {
             this.red = red;
             this.green = green;
             this.blue = blue;
-            this.luma = luma;
-            this.chroma = chroma;
             invalidate();
         }
 
@@ -964,52 +952,13 @@ public final class MainActivity extends Activity {
                 drawAudio(canvas, bounds);
                 return;
             }
-            if (mode == RGB_PARADE) {
-                drawPanel(
-                        canvas,
-                        bounds,
-                        "RGB",
-                        new String[]{red, green, blue},
-                        new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
-                        true);
-                return;
-            }
-
-            float gap = dpf(1);
-            float panelHeight = (bounds.height() - gap * 2) / 3f;
-            RectF yBounds = new RectF(
-                    bounds.left, bounds.top, bounds.right, bounds.top + panelHeight);
-            RectF yuvBounds = new RectF(
-                    bounds.left,
-                    yBounds.bottom + gap,
-                    bounds.right,
-                    yBounds.bottom + gap + panelHeight);
-            RectF rgbBounds = new RectF(
-                    bounds.left,
-                    yuvBounds.bottom + gap,
-                    bounds.right,
-                    bounds.bottom);
             drawPanel(
                     canvas,
-                    yBounds,
-                    "Y",
-                    new String[]{luma},
-                    new int[]{Color.WHITE},
-                    false);
-            drawPanel(
-                    canvas,
-                    yuvBounds,
-                    "YUV",
-                    new String[]{luma, chromaPart(chroma, 0), chromaPart(chroma, 1)},
-                    new int[]{SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V},
-                    false);
-            drawPanel(
-                    canvas,
-                    rgbBounds,
+                    bounds,
                     "RGB",
                     new String[]{red, green, blue},
                     new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
-                    true);
+                    false);
         }
 
         private void drawPanel(
@@ -1247,11 +1196,6 @@ public final class MainActivity extends Activity {
             } catch (NumberFormatException error) {
                 return null;
             }
-        }
-
-        private String chromaPart(String value, int index) {
-            String[] parts = value.split("\\|", 2);
-            return parts.length > index ? parts[index] : value;
         }
 
         private final class ScopeDensity {
@@ -3867,7 +3811,7 @@ public final class MainActivity extends Activity {
         if (histogram) {
             monitorRgbScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
             monitorRgbScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
             card.addView(monitorRgbScopeView, new LinearLayout.LayoutParams(-1, -1));
         } else {
             card.addView(
@@ -4493,9 +4437,7 @@ public final class MainActivity extends Activity {
         immersiveScopeView.setData(
                 redHistogram,
                 greenHistogram,
-                blueHistogram,
-                waveform,
-                vectorscope);
+                blueHistogram);
         dock.addView(immersiveScopeView, new LinearLayout.LayoutParams(0, -1, 2f));
         WaveformScopeView audio = new WaveformScopeView(WaveformScopeView.AUDIO);
         LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(0, -1, 1f);
@@ -5476,9 +5418,9 @@ public final class MainActivity extends Activity {
         LinearLayout scopes = verticalContainer();
         scopes.setPadding(dp(4), dp(4), dp(4), dp(6));
         scopes.setBackgroundColor(Color.BLACK);
-        professionalScopeView = new WaveformScopeView(WaveformScopeView.PROFESSIONAL);
+        professionalScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
         professionalScopeView.setData(
-                redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                redHistogram, greenHistogram, blueHistogram);
         peakingCoverageText = text(
                 "峰值覆盖 · " + peakingCoverage + "%",
                 11,
@@ -12336,15 +12278,15 @@ public final class MainActivity extends Activity {
         }
         if (monitorRgbScopeView != null) {
             monitorRgbScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (professionalScopeView != null) {
             professionalScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (immersiveScopeView != null) {
             immersiveScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (peakingCoverageText != null) {
             peakingCoverageText.setText(

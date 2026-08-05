@@ -6208,15 +6208,11 @@ public partial class MainWindow : Window
         MonitorRgbScope.SetData(
             prepared.Monitor.RedHistogram,
             prepared.Monitor.GreenHistogram,
-            prepared.Monitor.BlueHistogram,
-            prepared.Monitor.Waveform,
-            prepared.Monitor.Vectorscope);
+            prepared.Monitor.BlueHistogram);
         _immersiveScope?.SetData(
             prepared.Monitor.RedHistogram,
             prepared.Monitor.GreenHistogram,
-            prepared.Monitor.BlueHistogram,
-            prepared.Monitor.Waveform,
-            prepared.Monitor.Vectorscope);
+            prepared.Monitor.BlueHistogram);
         if (_immersivePreviewImage is not null)
         {
             _immersivePreviewImage.Source = prepared.Display;
@@ -6224,9 +6220,7 @@ public partial class MainWindow : Window
         ProfessionalScope.SetData(
             prepared.Monitor.RedHistogram,
             prepared.Monitor.GreenHistogram,
-            prepared.Monitor.BlueHistogram,
-            prepared.Monitor.Waveform,
-            prepared.Monitor.Vectorscope);
+            prepared.Monitor.BlueHistogram);
         PeakingCoverageText.Text = AppLocalization.T(
             $"峰值覆盖 {prepared.Monitor.PeakingCoverage}%");
         PreviewEmpty.Visibility = Visibility.Collapsed;
