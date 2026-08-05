@@ -480,3 +480,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - AI 呈现差异保留：macOS/iOS 编辑页「AI 工具」为工具分组之一 vs Windows/Harmony/Android「AI」轨钮 + 独立工作台，既有设计差异，非红线违规。
 - design.md：本批为执行既有条款（fig2 恒深直角、只归档不改值），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过（Windows 组序调整后复跑）；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Android assembleDebug BUILD SUCCESSFUL（仅基线 deprecation 提示）；iOS xcodebuild 模拟器 BUILD SUCCEEDED；git diff --check 干净；macOS 编辑区（9483-9700）复核 0 字号字面量（基准端无需改动）。
+
+### 12.9 勘误（2026-08-05，pro 复审口径核对）
+
+- 样式数更正：新增 DynamicResource 样式实为 **17 个**（原报 14 漏 3：EditorHeaderTitle / EditorRailLabel / EditorMediaCount），MainWindow 移除 21 处 FontSize 不变。
+- EditorPanel 0 字面量口径更正：**EditorPanel 元素树（XML/ET 解析）内 0 字号字面量属实**（SettingsPanel 为兄弟面板、开于 L1703，不在 EditorPanel 元素树内）；但按行号区间口径（L1174 开标签起配对），区间内另有 8 处（L1839/1855/1880/1888/1897/1906=11、L1957=15、L1961=12）——ET 容器链证实全部位于 **SettingsPanel 元素树**（AI 激活/恢复设备码/快速反馈，对标 macOS SettingsSheet，属 P6 设置页内容），本批未动、归 P6 收口。原报告只给了元素树口径，未给行区间口径，表述不完整。
+- buildNikonCloudMonitorPanel 归属更正：审计文档（PAGE_AUDIT.md）**无该面板条目**，原报告「按审计列 P3 归档」不实；实际为拍摄/视频页共享面板的延伸归档（Android L8601 13→EDITOR_FS_SUB 等值，无行为改变），记 backlog：F3 批核对时避免重复处理。

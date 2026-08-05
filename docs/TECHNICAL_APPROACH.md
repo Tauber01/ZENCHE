@@ -84,8 +84,8 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 
 - 编辑页字号归档纪律（只归档不改值）：非 TypeScale 五档的既有值（9/10/13/14/16）以文件级命名常量保留原值（Harmony/Android `EDITOR_FS_TINY/SMALL/SUB/MEDIUM/HEAD`、iOS `EditorFontSize.tiny/small`），与 TS 五档重合值（11/12）直接映射 `TS_CAPTION`/`TS_BODY`；字号数值统一收口归 F5，本批不改任何显示值。
 - 十组工具契约（五端一致）：光线 / 色彩 / 色轮 / 曲线 / 取色器 / 蒙版 / 细节 / 效果 / 几何 / AI，命名以 macOS `EditorToolRail`（main.swift:9543，十组 8608-8618）为基准；Windows 工具组添加顺序已按基准拉齐（色轮/曲线/取色器/蒙版位于细节/效果之前）。渲染形态差异保留：macOS/iOS 用 `EditorAdjustmentSection.allCases` 枚举平铺，Windows/Harmony/Android 用 5 钮 EditorToolRail + 面板钮，属既有平台结构差异（守门测试只断言分组标签，不断言导航形态）。
-- Windows 归档边界：字号字面量归档以 EditorPanel 元素子树为界（XML 子树解析验证 0 残留）；SettingsPanel（含专业监看、AI 兑换/设备码）、快速反馈对话框、底部 AppBar 状态栏属 P6/全局 chrome，不并入本批。
-- 共享面板口径：`buildNikonCloudMonitorPanel`（capture/monitor/editor 共用）的字号按审计列 P3 处理（归档为 EDITOR_FS_SUB），保持无视觉变化。
+- Windows 归档边界（口径勘误 2026-08-05）：字号字面量归档以 **EditorPanel 元素树**为界（XML/ET 解析实测 EditorPanel 子树 FontSize=0 / FontFamily=0）；SettingsPanel 为兄弟面板（开于 L1703），其元素树内 8 处字号字面量（L1839/1855/1880/1888/1897/1906=11、L1957=15、L1961=12，AI 激活/恢复设备码/快速反馈区，对标 macOS SettingsSheet）属 **P6 设置页**，本批未动、归 P6 收口；快速反馈对话框与底部 AppBar 状态栏亦属 P6/全局 chrome。注：按行号区间口径（EditorPanel 开标签 L1174 起配对）该区间包含 SettingsPanel 行段，两种口径的差异源于 XAML 兄弟面板定义顺序。
+- 共享面板口径（勘误 2026-08-05）：审计文档无 `buildNikonCloudMonitorPanel` 条目，原「按审计列 P3」表述不实；实际为拍摄/视频页共享面板的延伸归档（Android L8601「尼康云创监看」13→EDITOR_FS_SUB，值等值、无行为改变），记 backlog：F3 批核对时避免重复处理。
 - AI 区差异：macOS/iOS 编辑页「AI 工具」为工具分组之一，Windows/Harmony/Android 以「AI」轨钮 + 独立工作台呈现——既有设计差异，不视为五端契约缺口，本批不合并形态。
 - 沉浸 overlay 四件套、RGB 波形渲染层、导航 chrome 不在本批（同 P2 红线，见 0.7）。
 
