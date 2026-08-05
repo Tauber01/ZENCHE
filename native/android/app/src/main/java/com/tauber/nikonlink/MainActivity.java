@@ -7519,38 +7519,78 @@ public final class MainActivity extends Activity {
     }
 
     private View buildEditorScopeDock() {
-        // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
+        // 示波器区：标题列 + RGB 三色叠加波形（复用视频页 WaveformScopeView 绘制，
+        // 数据契约 S64x48 与 ProfessionalMonitor 一致），AI 四项指标保留为文字。
         LinearLayout dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER_VERTICAL);
         dock.setPadding(dp(12), 0, dp(12), 0);
         dock.setBackground(rounded(EDITOR_PANEL, 0, 0));
-        dock.addView(text(tr("编辑示波器"),
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(text(tr("编辑示波器"),
                 EDITOR_FS_SMALL, Typeface.BOLD, EDITOR_LABEL));
-        if (editorAIAnalysis == null) {
-            TextView empty = text(tr("运行“分析画面”后显示实测范围"),
-                    TS_CAPTION, Typeface.NORMAL, EDITOR_LABEL);
-            LinearLayout.LayoutParams emptyParams =
-                    new LinearLayout.LayoutParams(0, -2, 1f);
-            emptyParams.setMargins(dp(10), 0, 0, 0);
-            dock.addView(empty, emptyParams);
-            return dock;
+        header.addView(text(
+                editorSelectedPath == null
+                        ? tr("暂无图像源")
+                        : tr("本地图像分析"),
+                EDITOR_FS_TINY, Typeface.BOLD,
+                editorSelectedPath == null ? EDITOR_LABEL : EDITOR_ACCENT));
+        if (editorAIAnalysis != null) {
+            String metrics = String.format(
+                    Locale.CHINA,
+                    "曝光 %d%% · 动态 %d%% · 色彩 %d%% · 细节 %d%%",
+                    Math.round(editorAIAnalysis.meanLuma * 100),
+                    Math.round(editorAIAnalysis.contrast * 100),
+                    Math.round(editorAIAnalysis.saturation * 100),
+                    Math.round(editorAIAnalysis.detail * 100));
+            TextView metricText = text(metrics, EDITOR_FS_TINY,
+                    Typeface.BOLD, EDITOR_LABEL);
+            metricText.setSingleLine(true);
+            metricText.setEllipsize(TextUtils.TruncateAt.END);
+            header.addView(metricText);
         }
-        String metrics = String.format(
-                Locale.CHINA,
-                "LUMA %d  RANGE %d\nCOLOR %d  DETAIL %d",
-                Math.round(editorAIAnalysis.meanLuma * 100),
-                Math.round(editorAIAnalysis.contrast * 100),
-                Math.round(editorAIAnalysis.saturation * 100),
-                Math.round(editorAIAnalysis.detail * 100));
-        TextView values = text(metrics, TS_CAPTION, Typeface.BOLD, EDITOR_ACCENT);
-        values.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        values.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams valuesParams =
+        dock.addView(header, new LinearLayout.LayoutParams(dp(190), -2));
+
+        WaveformScopeView scope = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
+        String[] densities = editorScopeDensities();
+        if (densities != null) {
+            scope.setData(densities[0], densities[1], densities[2]);
+        }
+        LinearLayout.LayoutParams scopeParams =
                 new LinearLayout.LayoutParams(0, -2, 1f);
-        valuesParams.setMargins(dp(10), 0, 0, 0);
-        dock.addView(values, valuesParams);
+        scopeParams.setMargins(dp(10), 0, 0, 0);
+        dock.addView(scope, scopeParams);
         return dock;
+    }
+
+    /**
+     * RGB density payloads for the editor scope, computed from the current
+     * editor image (same source the preview renders: AI tools surface the AI
+     * result or original, Pro editor the rendered edit). Mirrors the monitor
+     * contract by reusing ProfessionalMonitor's S64x48 density generation.
+     */
+    private String[] editorScopeDensities() {
+        if (editorSelectedPath == null) return null;
+        File file = new File(editorSelectedPath);
+        Bitmap source;
+        if (editorState == EditorState.AI) {
+            source = aiResultBitmap != null
+                    ? aiResultBitmap
+                    : renderEditorAnalysisBitmap(file, 320);
+        } else {
+            source = renderEditedBitmap(file, editorAdjustments, 320);
+        }
+        if (source == null) return null;
+        ProfessionalMonitor.Result result = ProfessionalMonitor.process(
+                source, false, false, null);
+        if (result == null) return null;
+        return new String[]{
+                result.redHistogram,
+                result.greenHistogram,
+                result.blueHistogram};
     }
 
     private View buildAiToolsView(ScrollView scroll, LinearLayout content) {

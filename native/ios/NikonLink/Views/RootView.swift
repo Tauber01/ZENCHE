@@ -1768,11 +1768,13 @@ private struct EditorToolRail<Content: View>: View {
     }
 }
 
-/// The editor scope shows only values returned by the real local image
-/// analysis. Before analysis it presents an explicit no-data grid.
+/// The editor scope shows the RGB waveform computed from the current editor
+/// image (same source as the preview). The AI four-metric text stays as a
+/// compact label under the header so no analysis functionality is lost.
 private struct EditorScopeDock: View {
-    let values: [Double]
+    let traces: [ScopeTrace]
     let hasSource: Bool
+    let metrics: String?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1780,44 +1782,90 @@ private struct EditorScopeDock: View {
                 Text("编辑示波器")
                     .font(.system(size: EditorFontSize.tiny, weight: .bold, design: .monospaced))
                     .foregroundStyle(IPalette.whiteFaint)
-                Text(hasSource
-                    ? (values.isEmpty ? "运行“分析画面”后显示实测范围" : "本地图像分析")
-                    : "暂无图像源")
+                Text(hasSource ? "本地图像分析" : "暂无图像源")
                     .font(.system(size: EditorFontSize.small, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(values.isEmpty ? IPalette.editorLabel : IPalette.editorAccent)
+                    .foregroundStyle(hasSource ? IPalette.editorAccent : IPalette.editorLabel)
+                if let metrics {
+                    Text(metrics)
+                        .font(.system(size: EditorFontSize.tiny, weight: .medium, design: .monospaced))
+                        .foregroundStyle(IPalette.editorLabel)
+                }
             }
             .frame(width: 190, alignment: .leading)
 
-            Canvas { context, size in
-                var grid = Path()
-                for fraction in [0.25, 0.5, 0.75] {
-                    let y = size.height * fraction
-                    grid.move(to: CGPoint(x: 0, y: y))
-                    grid.addLine(to: CGPoint(x: size.width, y: y))
-                }
-                context.stroke(grid, with: .color(IPalette.whiteWash), lineWidth: 1)
-                guard !values.isEmpty else { return }
-                let width = size.width / CGFloat(max(values.count, 1))
-                for (index, raw) in values.enumerated() {
-                    let value = min(max(raw, 0), 1)
-                    let rect = CGRect(
-                        x: CGFloat(index) * width + 4,
-                        y: size.height * (1 - value),
-                        width: max(3, width - 8),
-                        height: size.height * value
-                    )
-                    var bar = Path()
-                    bar.addRect(rect)
-                    context.fill(bar, with: .color(IPalette.editorAccent))
-                }
-            }
-            .background(IPalette.editorBg)
-            .overlay {
-                Rectangle().stroke(IPalette.editorRule, lineWidth: 1)
-            }
+            ScopePlot(label: "RGB", traces: traces)
         }
         .padding(10)
         .background(IPalette.editorPanel)
+    }
+}
+
+/// Computes the same `S64x48:hex` RGB density payloads the monitor page uses,
+/// from the current editor image (downsampled to ≤320 px wide). Mirrors
+/// ProfessionalMonitor's accumulate + log1p normalization so the editor
+/// waveform matches the video-page rendering contract exactly.
+private enum EditorRGBDensity {
+    static let columns = 64
+    static let rows = 48
+
+    static func compute(from image: UIImage) -> (red: String, green: String, blue: String)? {
+        guard let cgImage = image.cgImage else { return nil }
+        let sourceWidth = cgImage.width
+        let sourceHeight = cgImage.height
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+        let width = min(320, sourceWidth)
+        let height = max(1, width * sourceHeight / max(1, sourceWidth))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue
+            | CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var red = [Int](repeating: 0, count: columns * rows)
+        var green = [Int](repeating: 0, count: columns * rows)
+        var blue = [Int](repeating: 0, count: columns * rows)
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = (y * width + x) * 4
+                let r = Int(pixels[offset])
+                let g = Int(pixels[offset + 1])
+                let b = Int(pixels[offset + 2])
+                let column = min(columns - 1, x * columns / max(1, width))
+                accumulate(&red, column: column, value: r)
+                accumulate(&green, column: column, value: g)
+                accumulate(&blue, column: column, value: b)
+            }
+        }
+        return (densityMap(red), densityMap(green), densityMap(blue))
+    }
+
+    private static func accumulate(_ buffer: inout [Int], column: Int, value: Int) {
+        let row = rows - 1 - clamp8(value) * (rows - 1) / 255
+        buffer[row * columns + column] += 1
+    }
+
+    private static func clamp8(_ value: Int) -> Int {
+        min(255, max(0, value))
+    }
+
+    private static func densityMap(_ values: [Int]) -> String {
+        let digits = Array("0123456789ABCDEF")
+        let maximum = max(1, values.max() ?? 1)
+        let divisor = log1p(Double(maximum))
+        let payload = values.map { value -> Character in
+            let level = Int((log1p(Double(value)) / divisor * 15).rounded())
+            return digits[min(15, max(0, level))]
+        }
+        return "S\(columns)x\(rows):" + String(payload)
     }
 }
 
@@ -2046,8 +2094,9 @@ private struct ImageEditorPage: View {
                 .frame(height: 52)
             editorHairline
             EditorScopeDock(
-                values: editorScopeValues,
-                hasSource: selectedItem != nil
+                traces: editorScopeTraces,
+                hasSource: selectedItem != nil,
+                metrics: editorScopeMetrics
             )
             .frame(height: 64)
         }
@@ -2179,20 +2228,41 @@ private struct ImageEditorPage: View {
             }
         } scopeDock: {
             EditorScopeDock(
-                values: editorScopeValues,
-                hasSource: selectedItem != nil
+                traces: editorScopeTraces,
+                hasSource: selectedItem != nil,
+                metrics: editorScopeMetrics
             )
         }
     }
 
-    private var editorScopeValues: [Double] {
-        guard let aiAnalysis else { return [] }
+    /// RGB density traces computed from the current editor image — the same
+    /// source the preview renders (aiTools surfaces the AI result or original,
+    /// every other section the rendered edit). Empty when no image is selected.
+    private var editorScopeTraces: [ScopeTrace] {
+        let image: UIImage?
+        if selectedSection == .aiTools {
+            image = aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil)
+        } else {
+            image = renderedImage
+        }
+        guard let image,
+              let densities = EditorRGBDensity.compute(from: image) else { return [] }
         return [
-            aiAnalysis.meanLuma,
-            aiAnalysis.contrast,
-            aiAnalysis.saturation,
-            aiAnalysis.detail
+            ScopeTrace(value: densities.red, color: IPalette.scopeR),
+            ScopeTrace(value: densities.green, color: IPalette.scopeG),
+            ScopeTrace(value: densities.blue, color: IPalette.scopeB)
         ]
+    }
+
+    /// Compact text form of the AI four metrics (mean luma / contrast /
+    /// saturation / detail), kept beside the RGB waveform so the analysis
+    /// readouts remain available on the editor page.
+    private var editorScopeMetrics: String? {
+        guard let aiAnalysis else { return nil }
+        func percent(_ value: Double) -> String {
+            "\(Int(max(0, min(1, value)) * 100))%"
+        }
+        return "曝光 \(percent(aiAnalysis.meanLuma)) · 动态 \(percent(aiAnalysis.contrast)) · 色彩 \(percent(aiAnalysis.saturation)) · 细节 \(percent(aiAnalysis.detail))"
     }
 
     private var aiToolsToolbar: some View {

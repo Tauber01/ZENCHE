@@ -8567,6 +8567,7 @@ public partial class MainWindow : Window
 
     private void UpdateEditorPreview()
     {
+        UpdateEditorScopeWaveform();
         if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
             !File.Exists(_editorSelectedPath))
         {
@@ -8593,6 +8594,35 @@ public partial class MainWindow : Window
             SaveEditedPhotoButton.IsEnabled = false;
             EditorStatusText.Text =
                 AppLocalization.T($"无法预览：{error.Message}");
+        }
+    }
+
+    private void UpdateEditorScopeWaveform()
+    {
+        // 编辑页波形：从当前编辑图（预览同图源）计算 RGB 密度，
+        // 复用视频页 ProfessionalMonitor 的 S64x48 契约与 WaveformScope 绘制。
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            EditorScopeWaveform.SetData("—", "—", "—");
+            return;
+        }
+        try
+        {
+            var bitmap = RenderEditedBitmap(
+                _editorSelectedPath,
+                _editorAdjustments,
+                _selectedNikonCloudPreset,
+                320);
+            var monitor = ProfessionalMonitor.Process(bitmap, false, false);
+            EditorScopeWaveform.SetData(
+                monitor.RedHistogram,
+                monitor.GreenHistogram,
+                monitor.BlueHistogram);
+        }
+        catch
+        {
+            EditorScopeWaveform.SetData("—", "—", "—");
         }
     }
 

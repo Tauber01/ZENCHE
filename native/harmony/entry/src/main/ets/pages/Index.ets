@@ -905,6 +905,9 @@ struct Index {
   @State private waveform: string = '—';
   @State private vectorscope: string = '—';
   @State private peakingCoverage: number = 0;
+  @State private editorRedHistogram: string = '—';
+  @State private editorGreenHistogram: string = '—';
+  @State private editorBlueHistogram: string = '—';
   private readonly scopeRenderingSettings: RenderingContextSettings =
     new RenderingContextSettings(true);
   private readonly monitorRgbScopeContext: CanvasRenderingContext2D =
@@ -916,6 +919,8 @@ struct Index {
   private readonly immersiveRgbScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   private readonly immersiveAudioScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly editorScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   @State private sessionName: string = '未命名会话';
   @State private sessionNamingTemplate: string =
@@ -2074,9 +2079,11 @@ struct Index {
         if (panel === 'ai') {
           this.editorTabMode = 'ai';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         } else {
           this.editorTabMode = 'pro';
           this.editorPanel = panel;
+          this.refreshEditorScopeDensities();
         }
       })
   }
@@ -2105,31 +2112,59 @@ struct Index {
 
   @Builder
   private EditorScopeDock() {
-    // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
+    // 示波器区：标题列 + RGB 三色叠加波形（复用视频页 drawScopePanel 绘制，
+    // 数据契约 S64x48 与 processProfessionalMonitor 一致），AI 四项指标保留为文字。
     Row({ space: 10 }) {
-      Text(this.tr('编辑示波器'))
-        .fontSize(EDITOR_FS_SMALL)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor(EDITOR_LABEL)
-      if (this.editorAIAnalysis === undefined) {
-        Text(this.tr('运行“分析画面”后显示实测范围'))
-          .fontSize(TS_CAPTION)
-          .fontColor(EDITOR_LABEL)
-          .layoutWeight(1)
-      } else {
-        Text(
-          `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
-          `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}  ` +
-          `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
-          `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
-        )
-          .fontSize(TS_CAPTION)
+      Column({ space: 2 }) {
+        Text(this.tr('编辑示波器'))
+          .fontSize(EDITOR_FS_SMALL)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
-          .fontColor(EDITOR_ACCENT)
-          .layoutWeight(1)
+          .fontColor(EDITOR_LABEL)
+        Text(
+          this.editorSelectedPath.length > 0
+            ? this.tr('本地图像分析')
+            : this.tr('暂无图像源')
+        )
+          .fontSize(EDITOR_FS_TINY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(
+            this.editorSelectedPath.length > 0
+              ? EDITOR_ACCENT
+              : EDITOR_LABEL
+          )
+        if (this.editorAIAnalysis === undefined) {
+          Text(this.tr('运行“分析画面”后显示实测范围'))
+            .fontSize(TS_CAPTION)
+            .fontColor(EDITOR_LABEL)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        } else {
+          Text(
+            `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
+            `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}  ` +
+            `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
+            `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
+          )
+            .fontSize(TS_CAPTION)
+            .fontFamily('monospace')
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EDITOR_ACCENT)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
       }
+      .width(190)
+      .alignItems(HorizontalAlign.Start)
+      Canvas(this.editorScopeContext)
+        .layoutWeight(1)
+        .height(64)
+        .padding(3)
+        .backgroundColor(BLACK)
+        .onReady((): void => {
+          this.drawEditorScope();
+          this.refreshEditorScopeDensities();
+        })
     }
     .width('100%')
     .height(64)
@@ -2149,6 +2184,7 @@ struct Index {
         .onClick((): void => {
           this.editorTabMode = 'pro';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         })
       Button(this.editorTabMode === 'ai' ? '● AI 工具' : '○ AI 工具', { type: ButtonType.Normal })
         .height(44)
@@ -2158,6 +2194,7 @@ struct Index {
         .onClick((): void => {
           this.editorTabMode = 'ai';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         })
     }
     .width('100%')
@@ -3133,6 +3170,7 @@ struct Index {
       this.aiResultPath = tempPath;
       this.aiStatus = '生成完成';
       this.aiGenerating = false;
+      this.refreshEditorScopeDensities();
     } catch (err) {
       this.aiGenerating = false;
       const rawMessage: string = (err as Error).message || 'AI 生成失败';
@@ -8938,6 +8976,84 @@ struct Index {
     );
   }
 
+  private drawEditorScope(): void {
+    const context: CanvasRenderingContext2D = this.editorScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    if (this.editorSelectedPath.length === 0) {
+      // 无图空态：黑井 + 白网格 + RGB 标签，无轨迹（视频页同契约）
+      this.drawScopePanel(
+        context, 0, 0, context.width, context.height,
+        'RGB', [], [], false
+      );
+      return;
+    }
+    this.drawScopePanel(
+      context, 0, 0, context.width, context.height,
+      'RGB',
+      [this.editorRedHistogram, this.editorGreenHistogram, this.editorBlueHistogram],
+      [SCOPE_R, SCOPE_G, SCOPE_B], false
+    );
+  }
+
+  private async refreshEditorScopeDensities(): Promise<void> {
+    // 编辑页波形数据：从当前编辑图（预览同图源）计算 RGB 直方图，复用视频页
+    // processProfessionalMonitor 的 S64x48 密度契约；AI 模式取 AI 结果或原图，
+    // Pro 模式取渲染编辑图（遮罩/云预设）或原图。
+    if (this.editorSelectedPath.length === 0) {
+      this.editorRedHistogram = '—';
+      this.editorGreenHistogram = '—';
+      this.editorBlueHistogram = '—';
+      this.drawEditorScope();
+      return;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let loadedMap: image.PixelMap | undefined = undefined;
+    try {
+      let map: image.PixelMap | undefined = undefined;
+      if (this.editorTabMode === 'ai' && this.aiResultPath.length > 0) {
+        source = image.createImageSource(`file://${this.aiResultPath}`);
+      } else if (this.editorRenderedPreview !== undefined) {
+        map = this.editorRenderedPreview;
+      } else {
+        source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      }
+      if (map === undefined && source !== undefined) {
+        const info: image.ImageInfo = await source.getImageInfo();
+        const scale: number = Math.min(
+          1,
+          320 / Math.max(info.size.width, info.size.height)
+        );
+        map = await source.createPixelMap({
+          editable: false,
+          desiredSize: {
+            width: Math.max(1, Math.round(info.size.width * scale)),
+            height: Math.max(1, Math.round(info.size.height * scale))
+          },
+          desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+        });
+        loadedMap = map;
+      }
+      if (map === undefined) return;
+      const result: ProfessionalMonitorResult =
+        await processProfessionalMonitor(map, false, false, undefined);
+      this.editorRedHistogram = result.redHistogram;
+      this.editorGreenHistogram = result.greenHistogram;
+      this.editorBlueHistogram = result.blueHistogram;
+      this.drawEditorScope();
+    } catch (_) {
+      this.editorRedHistogram = '—';
+      this.editorGreenHistogram = '—';
+      this.editorBlueHistogram = '—';
+      this.drawEditorScope();
+    } finally {
+      if (loadedMap !== undefined) {
+        loadedMap.release();
+      }
+      source?.release();
+    }
+  }
+
   @Builder
   private ParameterSelect(
     label: string,
@@ -11595,6 +11711,7 @@ struct Index {
       if (this.editorMaskEnabled) {
         this.refreshEditorRenderedPreview();
       }
+      this.refreshEditorScopeDensities();
     } catch (_) {
     } finally {
       source?.release();
@@ -12404,6 +12521,7 @@ struct Index {
       this.editorMaskOverlay = overlayPixelMap;
       this.editorImageWidth = finalInfo.size.width;
       this.editorImageHeight = finalInfo.size.height;
+      this.refreshEditorScopeDensities();
       pixelMap = undefined;
       overlayPixelMap = undefined;
       if (previous !== undefined) {

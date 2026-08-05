@@ -1525,12 +1525,11 @@
                   </Grid.RowDefinitions>
                   <TextBlock Style="{DynamicResource EditorRailTitle}" Text="编辑示波器" />
                   <TextBlock x:Name="EditorScopeText" Grid.Row="1" Margin="0,6,0,0" Style="{DynamicResource EditorScopeHint}" Text="分析后显示实测范围" TextWrapping="Wrap" />
-                  <Border Grid.Row="2" Margin="0,12,0,0" Background="{DynamicResource EditorBgBrush}" BorderBrush="{DynamicResource EditorRuleBrush}" BorderThickness="1">
-                    <Grid>
-                      <Border Height="1" VerticalAlignment="Center" Background="{DynamicResource GuideBrush}" />
-                      <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="{DynamicResource GuideBrush}" />
-                      <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="{DynamicResource GuideBrush}" />
-                    </Grid>
+                  <Border Grid.Row="2" Margin="0,12,0,0" Background="{DynamicResource ScopeBlackBrush}" BorderBrush="{DynamicResource EditorRuleBrush}" BorderThickness="1" Padding="3">
+                    <local:WaveformScope x:Name="EditorScopeWaveform"
+                                         Mode="RgbParade"
+                                         MinHeight="72"
+                                         AutomationProperties.Name="编辑页 RGB 波形，三通道叠加" />
                   </Border>
                 </Grid>
               </Border>
