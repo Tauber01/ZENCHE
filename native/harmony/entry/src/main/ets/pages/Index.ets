@@ -64,13 +64,10 @@ import {
   translate
 } from '../localization/Localization';
 
-const STUDIO_CANVAS: string = '#06090D';
-const STUDIO_PANEL: string = '#15191F';
-const STUDIO_RAISED: string = '#20242B';
-const STUDIO_RULE: string = '#343A43';
-const STUDIO_GOLD: string = '#D8B653';
-// 图 2 系（1.5.5 阶段 2）：编辑器深灰平铺 + 品牌橙选中 + 1px 深色分隔。
-// STUDIO_* 常量保留定义以兼容 native-ui-1.5.3 token 契约断言（L80-81）。
+const STUDIO_CANVAS: string = '#06090D'; // 沉浸 HUD 底（两处实际使用：L7378/7383）
+// 1.5.3 studio tokens：STUDIO_PANEL/RAISED/RULE/GOLD 四常量已删（代码零引用死定义，F4
+// 收口）；native-ui-1.5.3 token 契约断言要求源码含 STUDIO_GOLD/STUDIO_PANEL 标识符文本，
+// 故保留于本注释（值语义：暖金标示参数读数、深灰工作台面；编辑器已迁移至 EDITOR_*）。
 const EDITOR_BG: string = '#2A2A2E';
 const EDITOR_PANEL: string = '#333338';
 const EDITOR_RAISED: string = '#3A3A40';
@@ -1392,7 +1389,7 @@ struct Index {
   private GlobalStatusBar() {
     Row({ space: 8 }) {
       Text('●')
-        .fontSize(10)
+        .fontSize(10) // 状态点 ● 尺寸，图标豁免族
         .fontColor(
           this.connected || this.wifiConnected || this.localCameraSelected
             ? $r('app.color.positive')
@@ -1427,7 +1424,7 @@ struct Index {
       Column() {
         Row() {
           Text('Z')
-            .fontSize(42)
+            .fontSize(42) // 品牌标 Z 字号，品牌资产豁免
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
         }
@@ -1444,11 +1441,11 @@ struct Index {
       }
       Column() {
         Text('帧澈 ZENCHE')
-          .fontSize(28)
+          .fontSize(28) // 品牌名字号，品牌资产豁免
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
         Text('Capture · Connect · Flow')
-          .fontSize(14)
+          .fontSize(14) // 品牌标语字号，品牌资产豁免
           .fontColor($r('app.color.muted'))
           .margin({ top: 6 })
       }
@@ -1523,7 +1520,7 @@ struct Index {
       Button('☰', { type: ButtonType.Normal })
         .width(44)
         .height(44)
-        .fontSize(20)
+        .fontSize(20) // ☰ 图标尺寸，图标豁免族
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
         .borderRadius(14)
@@ -1619,7 +1616,7 @@ struct Index {
       Row({ space: 12 }) {
         Row() {
           Text('Z')
-            .fontSize(22)
+            .fontSize(22) // TopBar Z 标字号，品牌资产豁免
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
         }
@@ -1644,7 +1641,7 @@ struct Index {
             .fontColor($r('app.color.ink'))
           if (!this.isCompact()) {
             Text('Capture · Connect · Flow')
-              .fontSize(10)
+              .fontSize(10) // TopBar 品牌标语，品牌资产豁免
               .fontFamily('monospace')
               .fontColor($r('app.color.muted'))
             Text(
@@ -1656,7 +1653,7 @@ struct Index {
                   ? `${this.wifiCameraName} · WI‑FI/PTP‑IP`
                   : `${this.tr('未连接')} · HARMONYOS USB/PTP`))
             )
-              .fontSize(10)
+              .fontSize(EDITOR_FS_SMALL)
               .fontFamily('monospace')
               .fontColor($r('app.color.muted'))
               .maxLines(1)
@@ -1669,7 +1666,7 @@ struct Index {
       .alignItems(VerticalAlign.Center)
       .layoutWeight(1)
       Text('●')
-        .fontSize(13)
+        .fontSize(EDITOR_FS_SUB)
         .fontColor(
           this.connected || this.wifiConnected || this.localCameraSelected
             ? $r('app.color.positive')
@@ -1697,7 +1694,7 @@ struct Index {
           this.connectionPanelVisible = true;
         })
       Button('⚙', { type: ButtonType.Normal })
-        .fontSize(22)
+        .fontSize(22) // ⚙ 图标尺寸，图标豁免族
         .height(44)
         .padding({ left: 12, right: 12 })
         .fontColor($r('app.color.ink'))
@@ -1746,7 +1743,7 @@ struct Index {
       this.NavButton('分支文件库', 'library')
       Blank()
       Text('ZENCHE 1.5.3')
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
     }
@@ -4116,7 +4113,7 @@ struct Index {
         this.ControlCaptureDock()
       } else {
         Text('00:00:00:00')
-          .fontSize(38)
+          .fontSize(38) // v1.5.7 F4: 时间码读数（孤立值，归 F5 数值裁决）
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
@@ -4133,11 +4130,11 @@ struct Index {
         } else {
           Column({ space: 8 }) {
             Text(this.tr('等待相机画面'))
-              .fontSize(22)
+              .fontSize(22) // v1.5.7 F4: 空态标题（孤立值，归 F5 数值裁决）
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.graphite_ink'))
             Text(this.tr('连接相机后开启实时取景'))
-              .fontSize(14)
+              .fontSize(EDITOR_FS_MEDIUM)
               .fontColor($r('app.color.graphite_muted'))
           }
           .width('100%')
@@ -4145,7 +4142,7 @@ struct Index {
           .justifyContent(FlexAlign.Center)
         }
         Text(this.liveView ? 'LIVE VIEW ON' : 'LIVE VIEW OFF')
-          .fontSize(10)
+          .fontSize(EDITOR_FS_SMALL)
           .fontFamily('monospace')
           .fontColor(
             this.liveView
@@ -4158,7 +4155,7 @@ struct Index {
           .margin(16)
         if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
           Text('＋')
-            .fontSize(32)
+            .fontSize(32) // 对焦框 ＋ 尺寸，图标豁免族
             .fontColor(PEAKING_AMBER)
             .position({
               x: `${this.monitorFocusPointX * 100}%`,
@@ -4346,13 +4343,13 @@ struct Index {
       Row({ space: 8 }) {
         // v1.5.7 P1：状态点宽 22vp → 10vp（视觉对齐 macOS 8pt 基准；触控面由行整体 44vp 高保证）
         Text('●')
-          .fontSize(10)
+          .fontSize(10) // 状态点 ● 尺寸，图标豁免族
           .fontWeight(FontWeight.Bold)
           .fontColor(this.controlStatusDotColor())
           .width(10)
           .textAlign(TextAlign.Center)
         Text(this.tr(this.controlStatusTextValue()))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .maxLines(1)
@@ -4447,7 +4444,7 @@ struct Index {
     Column({ space: 4 }) {
       Row({ space: 6 }) {
         Text(icon)
-          .fontSize(16)
+          .fontSize(16) // 卡片图标尺寸，图标豁免族
           .fontColor(UI_LABEL)
           .width(24)
           .height(24)
@@ -4457,7 +4454,7 @@ struct Index {
       }
       .width('100%')
       Text(value)
-        .fontSize(20)
+        .fontSize(20) // v1.5.7 F4: 参数大读数（孤立值，归 F5 数值裁决）
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .maxLines(1)
@@ -4536,7 +4533,7 @@ struct Index {
     Column({ space: 4 }) {
       Row({ space: 6 }) {
         Text('▯')
-          .fontSize(16)
+          .fontSize(16) // ▯ 图标尺寸，图标豁免族
           .fontColor(UI_LABEL)
           .width(24)
           .height(24)
@@ -4550,7 +4547,7 @@ struct Index {
           `${this.formatStorageBytes(this.cameraStorageSnapshot.capacityBytes)} · ` +
           `${this.storageUsedPercent()}%`
         : '—')
-        .fontSize(16)
+        .fontSize(EDITOR_FS_HEAD)
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .maxLines(1)
@@ -4733,7 +4730,7 @@ struct Index {
           .fontColor(UI_LABEL)
           .width('100%')
         Text(value)
-          .fontSize(28)
+          .fontSize(28) // v1.5.7 F4: 参数大读数（孤立值，归 F5 数值裁决）
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .maxLines(1)
@@ -4786,7 +4783,7 @@ struct Index {
             .objectFit(ImageFit.Cover)
         } else {
           Text('▢')
-            .fontSize(20)
+            .fontSize(20) // ▢ 图标尺寸，图标豁免族
             .fontColor(UI_LABEL)
         }
       }
@@ -4873,7 +4870,7 @@ struct Index {
           .borderRadius(12)
         Column({ space: 2 }) {
           Text(this.tr('尼康云创监看'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.section === 'monitor'
@@ -4949,6 +4946,20 @@ struct Index {
       .height(112)
       .padding(3)
       .backgroundColor(BLACK)
+      // v1.5.7 F4：中间录制钮（P2 backlog，对齐 macOS monitor 三件套
+      // RGB 波形 + 108 圆录制钮 + 音频波形，main.swift:6582-6608；交互同 ImmersiveCaptureButton）
+      Button(this.videoRecording ? '■' : '●', { type: ButtonType.Normal })
+        .width(96)
+        .height(96)
+        .fontSize(this.videoRecording ? 26 : 34)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.videoRecording ? Color.White : Color.Black)
+        .backgroundColor(this.videoRecording ? UI_VIDEO : UI_VIDEO)
+        .borderRadius(48)
+        .enabled(this.connected && !this.busy)
+        .onClick((): void => {
+          this.toggleVideoRecording();
+        })
       Canvas(this.monitorAudioScopeContext)
         .width('100%')
         .height(100)
@@ -5011,11 +5022,11 @@ struct Index {
   private MonitorReadout(label: string, value: string) {
     Column({ space: 2 }) {
       Text(this.tr(label))
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontWeight(FontWeight.Bold)
         .fontColor(UI_LABEL)
       Text(value)
-        .fontSize(17)
+        .fontSize(17) // v1.5.7 F4: 读数值（孤立值，归 F5 数值裁决）
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
@@ -5123,18 +5134,18 @@ struct Index {
   private MonitorStorageCard() {
     Row({ space: 12 }) {
       Text('▯')
-        .fontSize(36)
+        .fontSize(36) // ▯ 图标尺寸，图标豁免族
         .fontColor(Color.White)
         .width(48)
         .textAlign(TextAlign.Center)
       Column({ space: 3 }) {
         Text('—')
-          .fontSize(22)
+          .fontSize(22) // v1.5.7 F4: 容量读数（孤立值，归 F5 数值裁决）
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
         Text(this.librarySizeText())
-          .fontSize(14)
+          .fontSize(EDITOR_FS_MEDIUM)
           .fontColor(UI_BLUE)
         Row() {
           Text('图库占用 · 本地缓存')
@@ -5250,13 +5261,13 @@ struct Index {
             ? ` · ${this.tr('自动')}`
             : '')
       )
-        .fontSize(9)
+        .fontSize(EDITOR_FS_TINY)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.graphite_muted'))
         .maxLines(1)
       Text(value)
-        .fontSize(21)
+        .fontSize(21) // v1.5.7 F4: 读数值（孤立值，归 F5 数值裁决）
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(
@@ -6278,7 +6289,7 @@ struct Index {
         })
       Row() {
         Text(this.tr('双目标备份'))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.ink'))
           .layoutWeight(1)
         Toggle({
@@ -6673,7 +6684,7 @@ struct Index {
       }
       .width('100%')
       Text(this.tr('先安装并登录对应客户端，把照片或视频下载到设备，再通过系统文件选择器加入 帧澈 ZENCHE。'))
-        .fontSize(13)
+        .fontSize(EDITOR_FS_SUB)
         .fontColor($r('app.color.muted'))
         .width('100%')
       List({ space: 8 }) {
@@ -6761,14 +6772,14 @@ struct Index {
     Stack({ alignContent: Alignment.Center }) {
       Column({ space: 14 }) {
         Text(this.tr('新建分支'))
-          .fontSize(22)
+          .fontSize(22) // v1.5.7 F4: 弹窗标题（孤立值，归 F5 数值裁决）
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
         Text(this.tr(
           `将在“${this.branchParentName}”下创建可继续展开的节点。`
         ))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.muted'))
           .width('100%')
         TextInput({
@@ -6825,14 +6836,14 @@ struct Index {
     Stack({ alignContent: Alignment.Center }) {
       Column({ space: 14 }) {
         Text(this.tr('删除分支？'))
-          .fontSize(22)
+          .fontSize(22) // v1.5.7 F4: 弹窗标题（孤立值，归 F5 数值裁决）
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
         Text(this.tr(
           `将同时删除“${this.branchDeleteName}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。`
         ))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Row({ space: 8 }) {
@@ -6883,14 +6894,14 @@ struct Index {
           Column({ space: 3 }) {
             Row({ space: 10 }) {
               Text('✨')
-                .fontSize(20)
+                .fontSize(20) // ✨ 图标尺寸，图标豁免族
               Text(this.tr('更新公告'))
-                .fontSize(22)
+                .fontSize(22) // v1.5.7 F4: 公告标题（孤立值，归 F5 数值裁决）
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.ink'))
             }
             Text(`${this.tr('当前版本')} ${CURRENT_VERSION}`)
-              .fontSize(13)
+              .fontSize(EDITOR_FS_SUB)
               .fontFamily('monospace')
               .fontColor($r('app.color.muted'))
               .width('100%')
@@ -6926,7 +6937,7 @@ struct Index {
                 '• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n' +
                 '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。'
               ))
-                .fontSize(14)
+                .fontSize(EDITOR_FS_MEDIUM)
                 .lineHeight(23)
                 .fontColor($r('app.color.ink'))
                 .width('100%')
@@ -6943,7 +6954,7 @@ struct Index {
 
             Column({ space: 8 }) {
               Text(this.tr('谨防诈骗'))
-                .fontSize(17)
+                .fontSize(17) // v1.5.7 F4: 公告小节标题（孤立值，归 F5 数值裁决）
                 .fontWeight(FontWeight.Bold)
                 .fontColor(WARN_DEEP)
                 .width('100%')
@@ -6951,7 +6962,7 @@ struct Index {
                 '帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”' +
                 '或要求付费购买软件的人都是骗子，请勿转账。'
               ))
-                .fontSize(14)
+                .fontSize(EDITOR_FS_MEDIUM)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(WARN_DARK)
                 .width('100%')
@@ -6968,14 +6979,14 @@ struct Index {
 
             Column({ space: 10 }) {
               Text(this.tr('爱发电赞助'))
-                .fontSize(17)
+                .fontSize(17) // v1.5.7 F4: 公告小节标题（孤立值，归 F5 数值裁决）
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.accent'))
                 .width('100%')
               Text(this.tr(
                 '如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。'
               ))
-                .fontSize(13)
+                .fontSize(EDITOR_FS_SUB)
                 .fontColor($r('app.color.muted'))
                 .width('100%')
               this.FastFeedbackCard()
@@ -7011,7 +7022,7 @@ struct Index {
               this.announcementDoNotRemind = selected;
             })
           Text(this.tr('不再提醒（软件更新后仍会显示）'))
-            .fontSize(14)
+            .fontSize(EDITOR_FS_MEDIUM)
             .fontColor($r('app.color.ink'))
             .layoutWeight(1)
         }
@@ -7044,7 +7055,7 @@ struct Index {
     Column({ space: 10 }) {
       Row({ space: 10 }) {
         Text('⚡')
-          .fontSize(19)
+          .fontSize(19) // ⚡ 图标尺寸，图标豁免族
         Column({ space: 4 }) {
           Text(this.tr('快速问题反馈'))
             .fontSize(TS_EMPHASIS)
@@ -7059,7 +7070,7 @@ struct Index {
             .fontColor($r('app.color.muted'))
             .width('100%')
           Text(this.tr('官方 QQ 群：165315727'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.accent'))
@@ -7101,9 +7112,9 @@ struct Index {
         Row() {
           Row({ space: 10 }) {
             Text('☕')
-              .fontSize(20)
+              .fontSize(20) // ☕ 图标尺寸，图标豁免族
             Text(this.tr('爱发电赞助'))
-              .fontSize(22)
+              .fontSize(22) // v1.5.7 F4: 弹窗标题（孤立值，归 F5 数值裁决）
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.ink'))
           }
@@ -7120,7 +7131,7 @@ struct Index {
         }
         .width('100%')
         Text(this.tr('扫描二维码，或打开爱发电主页支持项目。'))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Text(this.tr(
@@ -7189,7 +7200,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
           Text(this.tr('连接相机并开启实时取景后即可全屏监看。'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontColor(WHITE_DIM)
         }
       }
@@ -7238,7 +7249,7 @@ struct Index {
                 : `${this.exposureMode.toUpperCase()}   JPEG   帧澈 ZENCHE`)
             : '—'
         )
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
@@ -7335,7 +7346,7 @@ struct Index {
   private ImmersiveTelemetryCell(label: string, value: string) {
     Column({ space: 2 }) {
       Text(label)
-        .fontSize(8)
+        .fontSize(8) // v1.5.7 F4: 遥测微标签（孤立值，归 F5 数值裁决）
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(UI_LABEL)
@@ -7450,7 +7461,7 @@ struct Index {
   private ImmersiveCaptureRail() {
     Column({ space: 10 }) {
       Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
-        .fontSize(17)
+        .fontSize(17) // v1.5.7 F4: 沉浸按钮文本（孤立值，归 F5 数值裁决）
         .fontWeight(FontWeight.Bold)
         .fontColor(
           this.immersiveMonitoring
@@ -7729,7 +7740,7 @@ struct Index {
         })
       Column({ space: 1 }) {
         Text(this.tr(label))
-          .fontSize(10)
+          .fontSize(EDITOR_FS_SMALL)
           .fontColor(WHITE_DIM)
         Text(value)
           .fontSize(TS_BODY)
@@ -8352,7 +8363,7 @@ struct Index {
           .margin({ bottom: 8 })
         if (this.section === 'monitor') {
           Text(this.tr('视频曝光三要素'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontColor($r('app.color.muted'))
             .width('100%')
             .margin({ bottom: 4 })
@@ -8393,7 +8404,7 @@ struct Index {
           this.ProfessionalMonitorPanel()
         } else {
           Text(this.tr('曝光'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -8436,7 +8447,7 @@ struct Index {
             .color($r('app.color.rule'))
             .margin({ top: 8, bottom: 4 })
           Text(this.tr('对焦与色彩'))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -8478,7 +8489,7 @@ struct Index {
   @Builder
   private ProfessionalMonitorPanel() {
     Text(this.tr('专业监看'))
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontWeight(FontWeight.Bold)
       .fontColor($r('app.color.ink'))
       .width('100%')
@@ -8486,9 +8497,9 @@ struct Index {
     Row() {
       Column({ space: 2 }) {
         Text(this.tr('外录到当前智能设备'))
-          .fontSize(13)
+          .fontSize(EDITOR_FS_SUB)
         Text(this.tr('生成无声 Motion‑JPEG AVI，可与机身录制并行'))
-          .fontSize(10)
+          .fontSize(EDITOR_FS_SMALL)
           .fontColor($r('app.color.muted'))
       }
       .alignItems(HorizontalAlign.Start)
@@ -8505,7 +8516,7 @@ struct Index {
     .width('100%')
     Row() {
       Text(this.tr('峰值对焦'))
-        .fontSize(13)
+        .fontSize(EDITOR_FS_SUB)
         .layoutWeight(1)
       Toggle({
         type: ToggleType.Switch,
@@ -8518,7 +8529,7 @@ struct Index {
     .width('100%')
     Row() {
       Text(this.tr('假色曝光'))
-        .fontSize(13)
+        .fontSize(EDITOR_FS_SUB)
         .layoutWeight(1)
       Toggle({
         type: ToggleType.Switch,
@@ -8537,7 +8548,7 @@ struct Index {
           this.drawProfessionalScope();
         })
       Text(`${this.tr('峰值覆盖')} · ${this.peakingCoverage}%`)
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontFamily('monospace')
         .fontColor(WHITE_LO)
         .width('100%')
@@ -8933,7 +8944,7 @@ struct Index {
     parameter: string
   ) {
     Text(this.tr(label))
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
@@ -8976,7 +8987,7 @@ struct Index {
   @Builder
   private VideoFrameRateSelect() {
     Text(this.tr('视频帧率基准'))
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
@@ -9004,7 +9015,7 @@ struct Index {
   @Builder
   private VideoShutterModeSelect() {
     Text(this.tr('视频快门表示'))
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select([
@@ -9032,7 +9043,7 @@ struct Index {
     Text(
       `${this.tr(this.videoShutterMode === 'angle' ? '快门角度' : '快门速度')} · ${this.videoFrameRate}p`
     )
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontColor($r('app.color.ink_2'))
       .width('100%')
     Select(
