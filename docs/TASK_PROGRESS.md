@@ -425,3 +425,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 线上交付包 SHA-256：Android `3c79546bb80ea1d1043aae06fc4d5b848d661b72f871f646b3a4c4db8379b182`；HarmonyOS `9dc53cce4375714bfedaac0f7df76e6d225cdeb6fa86f556c6aadc5c30bbd328`；iOS unsigned `9ddff92fc0cfc8a98d56edef017a475241ae1f8b4911b84cb559ddba0cd215dd`；macOS `b921f2c3573891fc340e1fac627aa663fa74c7bf28f4ea62a161b8b2eb5e81a5`；Windows Setup `24769cf08627890ee6d67a23aa0567b92b3b9de5c1e0e08d5485a9ec1f7b631c`；Windows ZIP `fd9dbcba313d04180b5561e9e3bc96097247c931dc4558305a547f77e10470dc`；源码 ZIP `686c318574b78186e8cd80bb41c01130bb18b988ff3c7344fa253a330825e382`。
 - 签名与主机限制保持披露：Android Debug 证书，HarmonyOS/iOS 未签名，macOS ad-hoc 未公证，Windows 为 macOS 交叉构建且无 Authenticode、未完成真实 Windows 主机验收；GitHub stable 标识不改变这些附件属性。生产下载服务器与生产换绑均未变更。
 - 下一步：继续推进 1.5.4 文件库管理（先完成 `agent/1.5.4-file-core` 第四轮改动的验证收口，再评估集成）。
+
+## 12.5 RGB 三色波形五端改造合入（2026-08-05）
+
+- 指令：Tauber 09:56 指示「修改所有的示波器为 RGB 三色波形图」；实现分支 `agent/rgb-waveform`（基线 `425ed09`），pro 独立复审 `36785c8` 无 P0/P1 通过后，kimi 指示收尾清理并合入整合分支 `agent/1.5.6-ui`。
+- 功能提交 `36785c8`：五端视频波形示波器统一为 RGB 三色叠加——iOS/macOS ProfessionalScopeBoard 移除 Y/YUV 面板改单 RGB 叠加、Android WaveformScopeView 删 PROFESSIONAL 模式、Harmony drawProfessionalScope 三面板收敛、Windows WaveformScopeMode 删 Professional；守门测试/design.md/docs 三件套同步。数据契约（S64x48 + ProfessionalMonitor 六份密度图）零改动。
+- 收尾提交 `372468f`（pro 复审残留清理）：Android/Windows setData 删 luma/chroma 尾参与字段（拉齐 iOS/macOS 已删参口径）、四端 YUV 死常量删除（iOS/macOS Palette.scopeYuvY/U/V、Android/Harmony SCOPE_YUV_Y/U/V）、守门测试补 iOS/macOS/Harmony Y/YUV 面板反向断言。
+- 合并提交 `b96f63f`（`--no-ff`，信息注明「RGB 三色波形图 + 复审通过」）：`agent/rgb-waveform` 合入 `agent/1.5.6-ui`，12 文件 +75/-247，合并态工作树干净（仅 `.scratch/` 未跟踪）。
+- 验收：收尾提交后与合并后各跑一次完整 `npm test`，均 **256/256** 全绿（含 native-waveform-scopes 5/5）。
+- 编译验证：macOS swiftc -typecheck 0 错误、Android javac 通过、Windows dotnet build 成功、Harmony assembleHap BUILD SUCCESSFUL（iOS 本轮未重跑，改动仅为 3 处死常量删除，首轮 BUILD SUCCEEDED）。
+- 打包暂不启动：等 v1.5.7 UI 轮定版后统一打。
