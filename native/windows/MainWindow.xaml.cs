@@ -4026,6 +4026,8 @@ public partial class MainWindow : Window
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
         ParameterColumn.Width =
             cameraWorkspace ? new GridLength(320) : new GridLength(0);
+        // v1.5.7 issue 655a0a14: 视频页右侧参数面板强制恒深白字，拍照页仍随主题
+        ApplyParameterPanelMonitorTheme(destination == "monitor");
         if (destination == "library")
         {
             RefreshPhotoList();
@@ -4066,6 +4068,41 @@ public partial class MainWindow : Window
             destination == "monitor"
                 ? (_videoRecording ? "停止录制" : "开始录制")
                 : "拍摄照片");
+    }
+
+    /// <summary>
+    /// v1.5.7 issue 655a0a14: 视频页右侧参数面板强制恒深白字（对齐 Android/Harmony
+    /// 视频页参数面板恒深口径）；拍照页与其余页面仍随主题。通过子树 DynamicResource
+    /// 覆盖实现，不改全局资源；离开视频页时恢复。
+    /// </summary>
+    private void ApplyParameterPanelMonitorTheme(bool monitor)
+    {
+        if (monitor)
+        {
+            ParameterPanelShell.Background =
+                (Brush)FindResource("MonitorWellCardBrush");
+            ParameterPanelShell.BorderBrush =
+                (Brush)FindResource("MonitorWellSecondaryBrush");
+            System.Windows.Documents.TextElement.SetForeground(
+                ParameterPanelShell,
+                (Brush)FindResource("MonitorWellTextBrush"));
+            ParameterPanelShell.Resources["MutedBrush"] =
+                (Brush)FindResource("MonitorWellTextBrush");
+            ParameterPanelShell.Resources["SurfaceBrush"] =
+                (Brush)FindResource("MonitorWellSecondaryBrush");
+            ParameterPanelShell.Resources["RuleStrongBrush"] =
+                (Brush)FindResource("MonitorWellSecondaryBrush");
+        }
+        else
+        {
+            ParameterPanelShell.Background =
+                (Brush)FindResource("Paper2Brush");
+            ParameterPanelShell.BorderBrush =
+                (Brush)FindResource("RuleBrush");
+            ParameterPanelShell.ClearValue(
+                System.Windows.Documents.TextElement.ForegroundProperty);
+            ParameterPanelShell.Resources.Clear();
+        }
     }
 
     private async void VideoFrameRateBox_SelectionChanged(
@@ -6113,9 +6150,9 @@ public partial class MainWindow : Window
         if (MonitorLiveStatusText is not null)
         {
             MonitorLiveStatusText.Text = live ? "LIVE" : "NO SOURCE";
-            MonitorLiveStatusText.Foreground = live
-                ? (Brush)FindResource("PositiveBrush")
-                : (Brush)FindResource("GraphiteMutedBrush");
+            // v1.5.7 issue 655a0a14: LIVE/NO SOURCE 绿/灰状态字改纯白（视频井恒深）
+            MonitorLiveStatusText.Foreground =
+                (Brush)FindResource("MonitorWellTextBrush");
             MonitorPreviewEmpty.Visibility = live || MonitorPreviewImage.Source is not null
                 ? Visibility.Collapsed
                 : Visibility.Visible;

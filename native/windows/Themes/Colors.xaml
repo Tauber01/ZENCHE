@@ -163,11 +163,11 @@
   <Color x:Key="ColorMonitorWell">#0A0B0D</Color>
   <Color x:Key="ColorMonitorWell2">#171B24</Color>
   <Color x:Key="ColorMonitorWellRule">#414856</Color>
-  <Color x:Key="ColorMonitorWellMuted">#ADB5C1</Color>
+  <Color x:Key="ColorMonitorWellMuted">#FFFFFF</Color>
   <Color x:Key="ColorMonitorWellInk">#F0F3F8</Color>
   <Color x:Key="ColorMonitorWellCard">#1C1C1E</Color>
   <Color x:Key="ColorMonitorWellSecondary">#2C2C2E</Color>
-  <Color x:Key="ColorMonitorWellLabel">#8E8E93</Color>
+  <Color x:Key="ColorMonitorWellLabel">#FFFFFF</Color>
   <Color x:Key="ColorMonitorWellText">#FFFFFF</Color>
   <Color x:Key="ColorEditorInk">#FFFFFF</Color>
   <Color x:Key="ColorEditorAccentHover">#EFA866</Color>

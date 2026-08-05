@@ -3860,7 +3860,7 @@ public final class MainActivity extends Activity {
         LinearLayout cell = verticalContainer();
         cell.setGravity(Gravity.CENTER);
         cell.setPadding(dp(7), 0, dp(7), 0);
-        TextView title = text(label, 10, Typeface.BOLD, UI_LABEL);
+        TextView title = text(label, 10, Typeface.BOLD, Color.WHITE); // v1.5.7 issue 655a0a14: 视频页标签改纯白
         title.setGravity(Gravity.CENTER);
         TextView reading = text(value, 17, Typeface.BOLD, Color.WHITE);
         reading.setGravity(Gravity.CENTER);
@@ -3932,7 +3932,7 @@ public final class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(16), dp(12), dp(16), dp(12));
         card.setBackground(rounded(UI_CARD, 14, 0));
-        TextView icon = text("▯", 38, Typeface.NORMAL, UI_LABEL);
+        TextView icon = text("▯", 38, Typeface.NORMAL, Color.WHITE); // v1.5.7 issue 655a0a14: 视频页角标改纯白
         icon.setGravity(Gravity.CENTER);
         card.addView(icon, new LinearLayout.LayoutParams(dp(52), dp(70)));
         LinearLayout copy = verticalContainer();
@@ -3943,8 +3943,8 @@ public final class MainActivity extends Activity {
         copy.addView(barLabel, new LinearLayout.LayoutParams(-1, dp(22)));
         LinearLayout detail = new LinearLayout(this);
         detail.setGravity(Gravity.CENTER_VERTICAL);
-        detail.addView(text(usage, TS_CAPTION, Typeface.BOLD, UI_LABEL), new LinearLayout.LayoutParams(0, dp(18), 1f));
-        TextView space = text("可用空间", TS_CAPTION, Typeface.BOLD, UI_LABEL);
+        detail.addView(text(usage, TS_CAPTION, Typeface.BOLD, Color.WHITE), new LinearLayout.LayoutParams(0, dp(18), 1f)); // v1.5.7 issue 655a0a14: 视频页说明改纯白
+        TextView space = text("可用空间", TS_CAPTION, Typeface.BOLD, Color.WHITE); // v1.5.7 issue 655a0a14: 视频页说明改纯白
         space.setGravity(Gravity.RIGHT);
         detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
         copy.addView(detail);
@@ -3970,7 +3970,8 @@ public final class MainActivity extends Activity {
         Button button = nativeButton(label, primary);
         button.setTextSize(TS_BODY);
         // fig1 capsule tokens: accent for the record shutter, secondary for actions.
-        button.setTextColor(primary ? INK : Color.WHITE);
+        // v1.5.7 issue 655a0a14: 黄绿底录制钮黑字改白字（激活态不再用深色字）
+        button.setTextColor(Color.WHITE);
         button.setBackground(rounded(primary ? UI_ACCENT : UI_SECONDARY, 14, 0));
         return button;
     }
@@ -4024,7 +4025,7 @@ public final class MainActivity extends Activity {
                         : "连接外接相机或本机摄像头后开启实时取景",
                 TS_EMPHASIS,
                 Typeface.NORMAL,
-                Color.rgb(132, 140, 153));
+                Color.WHITE); // v1.5.7 issue 655a0a14: 视频页空态文字改纯白（取景井恒深 GRAPHITE）
         previewPlaceholder.setGravity(Gravity.CENTER);
         previewPlaceholder.setVisibility(latestFrame == null ? View.VISIBLE : View.GONE);
         stage.addView(previewPlaceholder, new FrameLayout.LayoutParams(
@@ -4035,7 +4036,7 @@ public final class MainActivity extends Activity {
                 liveViewEnabled ? "● LIVE" : "● NO SOURCE",
                 TS_CAPTION,
                 Typeface.BOLD,
-                liveViewEnabled ? Color.RED : Color.rgb(140, 148, 160));
+                Color.WHITE); // v1.5.7 issue 655a0a14: LIVE/NO SOURCE 状态字改纯白
         FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(32),
@@ -4059,7 +4060,7 @@ public final class MainActivity extends Activity {
                         : "照片实时取景 · JPEG",
                 TS_CAPTION,
                 Typeface.BOLD,
-                Color.rgb(194, 200, 211));
+                Color.WHITE); // v1.5.7 issue 655a0a14: 视频页输出角标改纯白
         outputBadge.setContentDescription(
                 monitoring
                         ? "实时取景格式 JPEG，监看显示尺寸 " + monitorProfileLabel()
@@ -5222,14 +5223,14 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorParameterControls() {
         LinearLayout panel = panel();
-        panel.addView(text("参数调节", TS_TITLE, Typeface.BOLD, INK));
+        panel.addView(text("参数调节", TS_TITLE, Typeface.BOLD, Color.WHITE)); // v1.5.7 issue 655a0a14: 视频页面板标题改纯白
         panel.addView(text(
                 connected
                         ? "曝光三要素通过 USB/PTP 写入 " + connectedCameraName
                         : "连接 Nikon 相机后启用参数控制",
                 13,
                 Typeface.NORMAL,
-                MUTED),
+                Color.WHITE), // v1.5.7 issue 655a0a14: 视频页说明改纯白
                 marginParams(-1, -2, 0, 3, 0, 14));
 
         addVideoFrameRateControl(panel);
@@ -5240,7 +5241,7 @@ public final class MainActivity extends Activity {
                 new Object[]{"program", "shutterPriority", "aperturePriority", "manual"},
                 exposureModeIndex(),
                 "exposureMode");
-        panel.addView(text("视频快门表示", 13, Typeface.NORMAL, MUTED));
+        panel.addView(text("视频快门表示", 13, Typeface.NORMAL, Color.WHITE)); // v1.5.7 issue 655a0a14: 视频页标签改纯白
         Spinner representation = monitorSpinner(new String[]{"快门角度", "快门速度"});
         representation.setSelection(monitorShutterAngleMode ? 0 : 1, false);
         representation.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -5290,7 +5291,7 @@ public final class MainActivity extends Activity {
                 0,
                 "whiteBalanceMode");
 
-        TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, MUTED);
+        TextView compensationLabel = text("曝光补偿 · 0.0 EV", 13, Typeface.BOLD, Color.WHITE); // v1.5.7 issue 655a0a14: 视频页读数改纯白
         compensationLabel.setTag("曝光补偿");
         panel.addView(compensationLabel, marginParams(-1, -2, 0, 12, 0, 2));
         SeekBar compensation = new SeekBar(this);
@@ -5323,12 +5324,12 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorOutputControls() {
         LinearLayout panel = panel();
-        panel.addView(text("监看输出", TS_TITLE, Typeface.BOLD, INK));
+        panel.addView(text("监看输出", TS_TITLE, Typeface.BOLD, Color.WHITE)); // v1.5.7 issue 655a0a14: 视频页面板标题改纯白
         panel.addView(text(
                 "本地显示处理不改变相机的视频录制设定。",
                 13,
                 Typeface.NORMAL,
-                MUTED),
+                Color.WHITE), // v1.5.7 issue 655a0a14: 视频页说明改纯白
                 marginParams(-1, -2, 0, 3, 0, 12));
 
         Switch externalRecording = new Switch(this);
@@ -5350,11 +5351,11 @@ public final class MainActivity extends Activity {
                 "外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。",
                 TS_BODY,
                 Typeface.NORMAL,
-                MUTED),
+                Color.WHITE), // v1.5.7 issue 655a0a14: 视频页说明改纯白
                 marginParams(-1, -2, 0, 4, 0, 10));
 
         panel.addView(
-                text("实时取景格式", 13, Typeface.BOLD, MUTED),
+                text("实时取景格式", 13, Typeface.BOLD, Color.WHITE), // v1.5.7 issue 655a0a14: 视频页标签改纯白
                 marginParams(-1, -2, 0, 12, 0, 4));
         Spinner codec = monitorSpinner(new String[]{"JPEG（相机输出）"});
         codec.setEnabled(false);
@@ -5364,7 +5365,7 @@ public final class MainActivity extends Activity {
                 dp(48)));
 
         panel.addView(
-                text("监看显示尺寸", 13, Typeface.BOLD, MUTED),
+                text("监看显示尺寸", 13, Typeface.BOLD, Color.WHITE), // v1.5.7 issue 655a0a14: 视频页标签改纯白
                 marginParams(-1, -2, 0, 12, 0, 4));
         String[] profileValues = new String[]{"source", "hd720", "hd1080"};
         Spinner profile = monitorSpinner(new String[]{
@@ -5404,7 +5405,7 @@ public final class MainActivity extends Activity {
                 "Nikon PTP 返回 JPEG 实时取景帧。显示尺寸仅处理监看画面，不等同于机身的“视频文件类型”或“画面尺寸/帧频”。",
                 TS_BODY,
                 Typeface.NORMAL,
-                MUTED),
+                Color.WHITE), // v1.5.7 issue 655a0a14: 视频页说明改纯白
                 marginParams(-1, -2, 0, 10, 0, 0));
         addProfessionalMonitorControls(panel);
         addZebraControls(panel);
@@ -5415,6 +5416,7 @@ public final class MainActivity extends Activity {
     private void addProfessionalMonitorControls(LinearLayout panel) {
         Switch peaking = new Switch(this);
         peaking.setText(tr("峰值对焦"));
+        peaking.setTextColor(Color.WHITE); // v1.5.7 issue 655a0a14: 视频页面板开关文字改纯白
         peaking.setChecked(focusPeakingEnabled);
         peaking.setOnCheckedChangeListener((button, enabled) -> {
             focusPeakingEnabled = enabled;
@@ -5424,6 +5426,7 @@ public final class MainActivity extends Activity {
 
         Switch falseColor = new Switch(this);
         falseColor.setText(tr("假色曝光"));
+        falseColor.setTextColor(Color.WHITE); // v1.5.7 issue 655a0a14: 视频页面板开关文字改纯白
         falseColor.setChecked(falseColorEnabled);
         falseColor.setOnCheckedChangeListener((button, enabled) -> {
             falseColorEnabled = enabled;
@@ -5560,7 +5563,7 @@ public final class MainActivity extends Activity {
 
     private void addVideoFrameRateControl(LinearLayout parent) {
         parent.addView(
-                text("视频帧率基准", 13, Typeface.BOLD, MUTED),
+                text("视频帧率基准", 13, Typeface.BOLD, Color.WHITE), // v1.5.7 issue 655a0a14: 视频页标签改纯白
                 marginParams(-1, -2, 0, 12, 0, 4));
         Integer[] rates = new Integer[]{24, 25, 30, 50, 60};
         String[] labels = new String[]{"24p", "25p", "30p", "50p", "60p"};
@@ -5600,7 +5603,7 @@ public final class MainActivity extends Activity {
                         + monitorFrameRate + "p",
                 13,
                 Typeface.BOLD,
-                MUTED);
+                Color.WHITE); // v1.5.7 issue 655a0a14: 视频页标签改纯白
         label.setTag("快门角度");
         parent.addView(label, marginParams(-1, -2, 0, 12, 0, 4));
         Double[] angles = new Double[]{45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0};
@@ -6017,7 +6020,9 @@ public final class MainActivity extends Activity {
             Object[] values,
             int selected,
             String parameter) {
-        TextView labelView = text(label, 13, Typeface.BOLD, MUTED);
+        // v1.5.7 issue 655a0a14: 视频页参数面板标签恒白字；拍照页仍用 MUTED
+        int labelColor = "monitor".equals(currentSection) ? Color.WHITE : MUTED;
+        TextView labelView = text(label, 13, Typeface.BOLD, labelColor);
         labelView.setTag(label);
         parent.addView(labelView, marginParams(-1, -2, 0, 12, 0, 4));
         Spinner spinner = new Spinner(this);
@@ -6067,12 +6072,12 @@ public final class MainActivity extends Activity {
     }
 
     private void addZebraControls(LinearLayout parent) {
-        TextView title = text("条纹图案（本地）", 13, Typeface.BOLD, MUTED);
+        TextView title = text("条纹图案（本地）", 13, Typeface.BOLD, Color.WHITE); // v1.5.7 issue 655a0a14: 视频页标签改纯白
         parent.addView(title, marginParams(-1, -2, 0, 12, 0, 4));
 
         Switch enabled = new Switch(this);
         enabled.setText(tr("加亮显示"));
-        enabled.setTextColor(INK);
+        enabled.setTextColor(Color.WHITE); // v1.5.7 issue 655a0a14: 视频页面板开关文字改纯白
         enabled.setChecked(zebraEnabled);
         enabled.setOnCheckedChangeListener((button, checked) -> {
             zebraEnabled = checked;
@@ -6089,7 +6094,7 @@ public final class MainActivity extends Activity {
                 "加亮显示阈值 · " + zebraThreshold + " IRE",
                 TS_BODY,
                 Typeface.NORMAL,
-                MUTED);
+                Color.WHITE); // v1.5.7 issue 655a0a14: 视频页读数改纯白
         parent.addView(thresholdLabel, marginParams(-1, -2, 0, 5, 0, 0));
         zebraThresholdControl = new SeekBar(this);
         zebraThresholdControl.setMax(30);
@@ -6115,12 +6120,12 @@ public final class MainActivity extends Activity {
 
     private void addLutControls(LinearLayout parent) {
         parent.addView(
-                text("监看 LUT（本地）", 13, Typeface.BOLD, MUTED),
+                text("监看 LUT（本地）", 13, Typeface.BOLD, Color.WHITE), // v1.5.7 issue 655a0a14: 视频页标签改纯白
                 marginParams(-1, -2, 0, 12, 0, 4));
 
         lutSwitch = new Switch(this);
         lutSwitch.setText(tr("应用到实时取景"));
-        lutSwitch.setTextColor(INK);
+        lutSwitch.setTextColor(Color.WHITE); // v1.5.7 issue 655a0a14: 视频页面板开关文字改纯白
         lutSwitch.setChecked(lutEnabled && previewLut != null);
         lutSwitch.setEnabled(previewLut != null);
         lutSwitch.setOnCheckedChangeListener((button, checked) -> {
@@ -6159,7 +6164,7 @@ public final class MainActivity extends Activity {
                         : "已载入 · " + previewLut.getTitle(),
                 TS_BODY,
                 Typeface.NORMAL,
-                MUTED);
+                Color.WHITE); // v1.5.7 issue 655a0a14: 视频页说明改纯白
         lutStatusText.setMaxLines(2);
         parent.addView(lutStatusText, marginParams(-1, -2, 0, 5, 0, 2));
     }
@@ -8592,7 +8597,7 @@ public final class MainActivity extends Activity {
         int cardColor = darkSurface ? Color.rgb(24, 36, 52) : COBALT_SOFT;
         int borderColor = darkSurface ? Color.rgb(48, 78, 112) : COBALT;
         int primaryText = darkSurface ? Color.WHITE : INK;
-        int secondaryText = darkSurface ? Color.rgb(202, 211, 224) : MUTED;
+        int secondaryText = darkSurface ? Color.WHITE : MUTED; // v1.5.7 issue 655a0a14: 视频页云创卡近白灰改纯白
         card.setBackground(rounded(cardColor, 14, borderColor));
 
         LinearLayout header = new LinearLayout(this);
@@ -12670,7 +12675,9 @@ public final class MainActivity extends Activity {
     private LinearLayout panel() {
         LinearLayout panel = verticalContainer();
         panel.setPadding(dp(18), dp(18), dp(18), dp(18));
-        panel.setBackground(rounded(SURFACE, 16, RULE));
+        // v1.5.7 issue 655a0a14: 视频页参数/输出面板强制恒深（UI_CARD 井）+ 白字，其他页仍随主题
+        boolean monitor = "monitor".equals(currentSection);
+        panel.setBackground(rounded(monitor ? UI_CARD : SURFACE, 16, monitor ? UI_SECONDARY : RULE));
         panel.setElevation(dp(2));
         LinearLayout.LayoutParams params = marginParams(-1, -2, 0, 12, 0, 0);
         panel.setLayoutParams(params);
