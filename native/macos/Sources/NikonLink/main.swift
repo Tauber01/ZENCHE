@@ -9825,7 +9825,7 @@ private struct ImageEditorView: View {
                                 .font(.system(size: TypeScale.emphasis, weight: .semibold))
                             Text("修图覆盖原图 · 生图保存新文件")
                                 .font(.system(size: TypeScale.caption))
-                                .foregroundStyle(Palette.muted)
+                                .foregroundStyle(Palette.editorLabel)
                         }
                         Spacer()
                         Text(ActivationManager.isActivated ? "已解锁 · 剩余 \(ActivationManager.remainingUsage) 次" : "需要激活")
@@ -9857,7 +9857,7 @@ private struct ImageEditorView: View {
                             if aiManualPrompt.isEmpty {
                                 Text(aiMode == .edit ? "输入修图描述…（可补充）" : "输入生图描述…（可补充）")
                                     .font(.system(size: TypeScale.body))
-                                    .foregroundStyle(Palette.muted)
+                                    .foregroundStyle(Palette.editorLabel)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 8)
                             }
@@ -9883,7 +9883,7 @@ private struct ImageEditorView: View {
                             }.buttonStyle(NativeButtonStyle())
                         }
                         ForEach(aiModules, id: \.0) { module in
-                            Text(module.0).font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.muted)
+                            Text(module.0).font(.system(size: 10, weight: .semibold)).foregroundStyle(Palette.editorLabel)
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(module.1, id: \.self) { value in
@@ -9902,18 +9902,18 @@ private struct ImageEditorView: View {
                         }
                         Text("最终提示词：\(aiPrompt.isEmpty ? "—" : aiPrompt)")
                             .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Palette.muted)
+                            .foregroundStyle(Palette.editorLabel)
                             .lineLimit(3)
                     }
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("宽高比").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            Text("宽高比").font(.system(size: 10)).foregroundStyle(Palette.editorLabel)
                             Picker("宽高比", selection: $aiRatio) {
                                 ForEach(AiAspectRatio.allCases) { r in Text(r.rawValue).tag(r) }
                             }.pickerStyle(.menu).frame(width: 110)
                         }
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("分辨率").font(.system(size: 10)).foregroundStyle(Palette.muted)
+                            Text("分辨率").font(.system(size: 10)).foregroundStyle(Palette.editorLabel)
                             Picker("分辨率", selection: $aiResolution) {
                                 ForEach(AiResolution.allCases) { r in Text(r.rawValue).tag(r) }
                             }.pickerStyle(.menu).frame(width: 90)
@@ -9940,7 +9940,7 @@ private struct ImageEditorView: View {
                 }
                 Text(aiIsGenerating ? "正在调用 AI 模型…" : status)
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.editorLabel)
                     .lineLimit(2)
             }
             .padding(14)
@@ -10098,7 +10098,7 @@ private struct ImageEditorView: View {
                             "视频与暂不支持解码的 RAW 文件不会进入编辑列表。"
                         )
                     )
-                    .foregroundStyle(.white, Palette.muted)
+                    .foregroundStyle(.white, Palette.editorLabel)
                 }
                 if selectedSection == .masks,
                    settings.maskExists,
@@ -10399,11 +10399,11 @@ private struct ImageEditorView: View {
                 Spacer()
                 Text("\(Int(aiIntensity * 100))%")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.editorLabel)
             }
             Text(LocalizedStringKey(aiSummaryKey))
                 .font(.system(size: TypeScale.caption))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.editorLabel)
                 .fixedSize(horizontal: false, vertical: true)
             if let aiAnalysis {
                 HStack(spacing: 6) {
@@ -10475,7 +10475,7 @@ private struct ImageEditorView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(LocalizedStringKey(title))
                 .font(.system(size: 9))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.editorLabel)
             Text("\(Int(max(0, min(1, value)) * 100))%")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
                 .foregroundStyle(Palette.ink)
@@ -10563,13 +10563,13 @@ private struct ImageEditorView: View {
 
 private var colorWheelsControls: some View {
         VStack(spacing: 12) {
-            Text("Lift / Gamma / Gain · 三向色轮").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
+            Text("Lift / Gamma / Gain · 三向色轮").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.editorLabel)
             HStack(spacing: 8) {
                 colorWheel("阴影", color: .cyan, x: $settings.liftX, y: $settings.liftY)
                 colorWheel("中间调", color: .purple, x: $settings.gammaX, y: $settings.gammaY)
                 colorWheel("高光", color: .yellow, x: $settings.gainX, y: $settings.gainY)
             }
-            Text("在圆盘内拖动色点调整对应范围").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
+            Text("在圆盘内拖动色点调整对应范围").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.editorLabel)
         }
     }
 
@@ -10601,7 +10601,7 @@ private var colorWheelsControls: some View {
             }
                 .frame(width: 62, height: 62)
             Text(title).font(.system(size: 10, weight: .semibold))
-            Text(String(format: "%+.0f, %+.0f", x.wrappedValue, y.wrappedValue)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.muted)
+            Text(String(format: "%+.0f, %+.0f", x.wrappedValue, y.wrappedValue)).font(.system(size: 10, design: .monospaced)).foregroundStyle(Palette.editorLabel)
         }.frame(maxWidth: .infinity)
     }
 
@@ -10654,17 +10654,17 @@ private var curvesControls: some View {
             .frame(height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             Text("点击任意位置新增控制点，拖动控制点调整曲线")
-                .font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
+                .font(.system(size: TypeScale.caption)).foregroundStyle(Palette.editorLabel)
         }
     }
 
     private var pickerControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("在预览画面点击取样色彩，自动微调色温与色调").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
+            Text("在预览画面点击取样色彩，自动微调色温与色调").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.editorLabel)
             Button { pickerArmed.toggle(); status = pickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭" } label: {
                 Label(pickerArmed ? "点击预览取色 · 再次关闭" : "取色器", systemImage: "eyedropper")
             }.buttonStyle(NativeButtonStyle(primary: pickerArmed))
-            Text(settings.pickedColorHex).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(Palette.muted)
+            Text(settings.pickedColorHex).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(Palette.editorLabel)
         }
     }
 
@@ -10675,7 +10675,7 @@ private var curvesControls: some View {
             if settings.maskLayers.isEmpty {
                 Text("暂无蒙版")
                     .font(.system(size: TypeScale.caption))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.editorLabel)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             } else {
                 VStack(spacing: 6) {
@@ -10774,7 +10774,7 @@ private var curvesControls: some View {
             }
             Text("智能识别")
                 .font(.system(size: TypeScale.caption, weight: .semibold))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.editorLabel)
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 104), spacing: 8)],
                 spacing: 8
@@ -10839,7 +10839,7 @@ private var curvesControls: some View {
                 ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                 : "先创建蒙版，再选择添加或减去画笔。")
                 .font(.system(size: TypeScale.caption))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.editorLabel)
         }
     }
 
@@ -10883,7 +10883,7 @@ private var curvesControls: some View {
             .buttonStyle(NativeButtonStyle())
             Text("旋转 90° · 水平翻转 · 垂直翻转")
                 .font(.system(size: TypeScale.caption))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.editorLabel)
         }
     }
 
@@ -11557,7 +11557,7 @@ private var curvesControls: some View {
                 Spacer()
                 Text(formatter(value.wrappedValue))
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.editorLabel)
             }
             Slider(value: value, in: range, step: step)
                 .tint(Palette.editorAccent)
