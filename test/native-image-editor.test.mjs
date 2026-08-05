@@ -450,8 +450,14 @@ test("AI retouch previews its selected original and masks render real blue alpha
   );
   assert.match(harmony, /createEditorMaskOverlay[\s\S]*AlphaType\.UNPREMUL/);
 
-  assert.match(windowsXaml, /AiPhotoPickerPopup/);
-  assert.match(windowsXaml, /AiPhotoTree/);
+  // v1.5.6: AiPhotoPickerPopup/AiPhotoTree 镜像弹窗按审计删冗余计划删除，
+  // AI 区「选择照片」与编辑区共用 EditorPhotoPickerPopup/EditorPhotoTree。
+  assert.match(windowsXaml, /EditorPhotoPickerPopup/);
+  assert.match(windowsXaml, /EditorPhotoTree/);
+  assert.match(
+    windowsXaml,
+    /x:Name="AiPhotoPickerButton"[\s\S]*?Click="EditorPhotoPickerButton_Click"/,
+  );
   assert.match(
     windows,
     /var previewPath = _aiResultPath \?\?[\s\S]*_editorSelectedPath/,
