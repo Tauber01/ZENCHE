@@ -3,32 +3,41 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!-- Dark appearance overrides (v1.5.6 dual-theme).  Follows the Windows 11
-       system app theme.  Colour-stable wells (MonitorWell/Scope/Studio/Editor/
-       preview wells) are intentionally absent: they stay graphite in every
-       appearance (design.md 229455c graphite-well exception). -->
+       system app theme.  Values align to the design.md calibrated token table
+       Dark column (6450106): Workbench #131519 / secondary #23272E / Surface
+       #1B1E24 / raised #23272E / Ink #ECEEF2 / Muted #9AA1AD / Rule #1FFFFFFF
+       (white @ 31/255; design.md writes CSS-style #FFFFFF1F) / Photo accent
+       #2E86E0 / Photo soft #14293E / Video accent #FF5257 / Video soft #3A1B1E
+       / Positive #35C97B.  Colour-stable wells (MonitorWell/Scope/Studio/
+       Editor/preview wells) are intentionally absent: they stay graphite in
+       every appearance (design.md 229455c graphite-well exception). -->
 
-  <Color x:Key="ColorPaper">#161A21</Color>
-  <Color x:Key="ColorPaper2">#1C2129</Color>
-  <Color x:Key="ColorPaper3">#232932</Color>
-  <Color x:Key="ColorSurface">#1A1F27</Color>
-  <Color x:Key="ColorSurfaceRaised">#20262F</Color>
-  <Color x:Key="ColorSidebar">#12161C</Color>
-  <Color x:Key="ColorRule">#2A313C</Color>
-  <Color x:Key="ColorRuleStrong">#3A4350</Color>
+  <Color x:Key="ColorPaper">#131519</Color>
+  <Color x:Key="ColorPaper2">#23272E</Color>
+  <Color x:Key="ColorPaper3">#1B1E24</Color>
+  <Color x:Key="ColorSurface">#1B1E24</Color>
+  <Color x:Key="ColorSurfaceRaised">#23272E</Color>
+  <Color x:Key="ColorSidebar">#23272E</Color>
+  <Color x:Key="ColorRule">#1FFFFFFF</Color>
+  <Color x:Key="ColorRuleStrong">#33FFFFFF</Color>
   <Color x:Key="ColorNeutral">#8E97A3</Color>
-  <Color x:Key="ColorMuted">#9AA3B0</Color>
+  <Color x:Key="ColorMuted">#9AA1AD</Color>
   <Color x:Key="ColorInk2">#C3CBD6</Color>
-  <Color x:Key="ColorInk">#E8EDF3</Color>
+  <Color x:Key="ColorInk">#ECEEF2</Color>
   <Color x:Key="ColorFocus">#E0E6EF</Color>
+  <Color x:Key="ColorAccent">#2E86E0</Color>
   <Color x:Key="ColorAccentSoft">#14293E</Color>
+  <Color x:Key="ColorVideo">#FF5257</Color>
+  <Color x:Key="ColorVideoSoft">#3A1B1E</Color>
+  <Color x:Key="ColorPositive">#35C97B</Color>
   <Color x:Key="ColorUiCard">#1C1C1E</Color>
   <Color x:Key="ColorUiSecondary">#2C2C2E</Color>
   <Color x:Key="ColorUiLabel">#8E8E93</Color>
-  <Color x:Key="ColorUiCardInk">#F0F3F8</Color>
-  <Color x:Key="ColorAppBar">#0A0B0D</Color>
-  <Color x:Key="ColorAppBarRule">#414856</Color>
-  <Color x:Key="ColorAppBarMuted">#ADB5C1</Color>
-  <Color x:Key="ColorAppBarInk">#F0F3F8</Color>
+  <Color x:Key="ColorUiCardInk">#ECEEF2</Color>
+  <Color x:Key="ColorAppBar">#131519</Color>
+  <Color x:Key="ColorAppBarRule">#1FFFFFFF</Color>
+  <Color x:Key="ColorAppBarMuted">#9AA1AD</Color>
+  <Color x:Key="ColorAppBarInk">#ECEEF2</Color>
   <Color x:Key="ColorCapsulePressed">#3A3A3C</Color>
   <Color x:Key="ColorShutterHover">#262628</Color>
   <Color x:Key="ColorPhotoSoftBorder">#2E425E</Color>
