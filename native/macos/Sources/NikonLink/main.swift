@@ -6113,35 +6113,54 @@ private struct ShootingTaskPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("拍摄自动化")
                 .font(.system(size: TypeScale.title, weight: .bold))
+                .foregroundStyle(.white)
             Text("间隔、包围与 B 门任务集中管理")
                 .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.uiLabel)
-            Picker("任务类型", selection: $model.shootingTaskKind) {
+            Text("任务类型")
+                .font(.system(size: TypeScale.body, weight: .semibold))
+                .foregroundStyle(.white)
+            HStack(spacing: 6) {
                 ForEach(ShootingTaskKind.allCases) { kind in
-                    Text(kind.rawValue).tag(kind)
+                    Button {
+                        model.shootingTaskKind = kind
+                    } label: {
+                        Text(kind.rawValue)
+                            .font(.system(size: TypeScale.body, weight: .semibold))
+                            .foregroundStyle(
+                                model.shootingTaskKind == kind
+                                    ? Color.black : Color.white
+                            )
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .background(
+                                model.shootingTaskKind == kind
+                                    ? Palette.uiAccent : Palette.uiSecondary,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .pickerStyle(.segmented)
             HStack {
-                Stepper(
-                    "张数 \(model.shootingTaskCount)",
-                    value: $model.shootingTaskCount,
-                    in: 1...999
-                )
-                Stepper(
-                    model.shootingTaskKind == .bulb
-                        ? "曝光 \(model.shootingTaskInterval) 秒"
-                        : "间隔 \(model.shootingTaskInterval) 秒",
-                    value: $model.shootingTaskInterval,
-                    in: 1...3600
-                )
+                Stepper(value: $model.shootingTaskCount, in: 1...999) {
+                    Text("张数 \(model.shootingTaskCount)")
+                        .foregroundStyle(.white)
+                }
+                Stepper(value: $model.shootingTaskInterval, in: 1...3600) {
+                    Text(
+                        model.shootingTaskKind == .bulb
+                            ? "曝光 \(model.shootingTaskInterval) 秒"
+                            : "间隔 \(model.shootingTaskInterval) 秒"
+                    )
+                    .foregroundStyle(.white)
+                }
                 if model.shootingTaskKind == .exposureBracket
                     || model.shootingTaskKind == .focusBracket {
-                    Stepper(
-                        "步长 \(model.shootingTaskStep)",
-                        value: $model.shootingTaskStep,
-                        in: 1...3
-                    )
+                    Stepper(value: $model.shootingTaskStep, in: 1...3) {
+                        Text("步长 \(model.shootingTaskStep)")
+                            .foregroundStyle(.white)
+                    }
                 }
                 Spacer()
                 Button(
@@ -6731,102 +6750,173 @@ private struct MonitorControlDeck: View {
     private let frameRateOptions = [24.0, 25.0, 30.0, 50.0, 60.0]
     private let shutterAngleOptions = [45.0, 90.0, 144.0, 172.8, 180.0, 270.0, 360.0]
 
+    /// 恒深面上的下拉控件：系统 popup 跟随窗口浅色外观会渲染黑字，
+    /// 用 Menu 自绘，label 白字深底，与 fig1 恒深面一致。
+    private func deckMenuPicker<T: Hashable>(
+        current: T,
+        options: [T],
+        display: @escaping (T) -> String,
+        apply: @escaping (T) -> Void,
+        disabled: Bool = false
+    ) -> some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    apply(option)
+                } label: {
+                    Text(display(option))
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(display(current))
+                    .font(.system(size: TypeScale.body))
+                    .foregroundStyle(disabled ? Palette.uiLabel.opacity(0.55) : Color.white)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Palette.uiLabel)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Palette.uiSecondary, in: RoundedRectangle(cornerRadius: 7))
+        }
+        .menuStyle(.borderlessButton)
+        .disabled(disabled)
+    }
+
+    /// P/S/A/M 模式短标签：嵌套三元表达式提取为方法，
+    /// 避免巨型 body 内联推断触发编译器超时。
+    private func exposureModeLabel(_ mode: String) -> String {
+        switch mode {
+        case "program": return "P"
+        case "shutterPriority": return "S"
+        case "aperturePriority": return "A"
+        default: return "M"
+        }
+    }
+
+    /// 快门表示短标签：角度/速度 二选一文字。
+    private func shutterModeLabel(_ mode: String) -> String {
+        mode == "angle" ? "快门角度" : "快门速度"
+    }
+
+    /// 快门表示切换（角度/速度）胶囊按钮组。
+    @ViewBuilder
+    private var shutterModePicker: some View {
+        HStack(spacing: 6) {
+            ForEach(["angle", "speed"], id: \.self) { mode in
+                Button {
+                    videoShutterMode = mode
+                } label: {
+                    Text(shutterModeLabel(mode))
+                        .font(.system(size: TypeScale.body, weight: .semibold))
+                        .foregroundStyle(videoShutterMode == mode ? Color.black : Color.white)
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .background(
+                            videoShutterMode == mode ? Palette.uiAccent : Palette.uiSecondary,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// 快门速度/角度选择：包在独立 @ViewBuilder 里以缩短 body 的
+    /// 类型推断链（该闭包含三元表达式，混入巨型 body 会触发编译器超时）。
+    @ViewBuilder
+    private var shutterSection: some View {
+        if videoShutterMode == "angle" {
+            deckMenuPicker(
+                current: model.videoShutterAngle,
+                options: shutterAngleOptions,
+                display: { $0.formatted() + "°" },
+                apply: { model.setVideoShutterAngle($0) }
+            )
+        } else {
+            let speedOptions: [Double] = [
+                1.0 / 8000.0, 1.0 / 4000.0,
+                1.0 / 2000.0, 1.0 / 1000.0,
+                1.0 / 500.0, 1.0 / 250.0,
+                1.0 / 125.0, 1.0 / 60.0,
+                1.0 / 30.0, 1.0 / 15.0,
+                1.0 / 8.0, 1.0 / 4.0,
+                1.0 / 2.0, 1.0
+            ]
+            let speedDisplay: (Double) -> String = { value in
+                value < 1
+                    ? "1/\(Int((1 / value).rounded())) s"
+                    : String(format: "%.1f s", value)
+            }
+            deckMenuPicker(
+                current: model.shutter,
+                options: speedOptions,
+                display: speedDisplay,
+                apply: { model.applyParameter("videoExposureTime", value: $0, label: "快门速度") }
+            )
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("视频曝光三要素")
                     .font(.system(size: TypeScale.title, weight: .bold))
+                    .foregroundStyle(.white)
                 Text("优先使用快门角度；应用会按当前帧率换算为曝光时间并写入相机。")
                     .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.uiLabel)
 
-                Picker("拍摄模式", selection: Binding(get: { model.exposureMode }, set: { model.exposureMode = $0; model.applyParameter("exposureMode", value: $0, label: "拍摄模式") })) {
-                    Text("P").tag("program")
-                    Text("S").tag("shutterPriority")
-                    Text("A").tag("aperturePriority")
-                    Text("M").tag("manual")
-                }
-                .pickerStyle(.segmented)
-
-                Picker(
-                    "视频帧率",
-                    selection: Binding(
-                        get: { model.videoFrameRate },
-                        set: { model.setVideoFrameRate($0) }
-                    )
-                ) {
-                    ForEach(frameRateOptions, id: \.self) { value in
-                        Text("\(Int(value)) fps").tag(value)
+                HStack(spacing: 6) {
+                    ForEach(["program", "shutterPriority", "aperturePriority", "manual"], id: \.self) { mode in
+                        Button {
+                            model.exposureMode = mode
+                            model.applyParameter("exposureMode", value: mode, label: "拍摄模式")
+                        } label: {
+                            Text(exposureModeLabel(mode))
+                                .font(.system(size: TypeScale.body, weight: .semibold))
+                                .foregroundStyle(model.exposureMode == mode ? Color.black : Color.white)
+                                .frame(width: 34, height: 30)
+                                .background(
+                                    model.exposureMode == mode ? Palette.uiAccent : Palette.uiSecondary,
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
-                Picker("视频快门表示", selection: $videoShutterMode) {
-                    Text("快门角度").tag("angle")
-                    Text("快门速度").tag("speed")
-                }
-                .pickerStyle(.segmented)
-                Group {
-                    if videoShutterMode == "angle" {
-                        Picker(
-                            "快门角度",
-                            selection: Binding(
-                                get: { model.videoShutterAngle },
-                                set: { model.setVideoShutterAngle($0) }
-                            )
-                        ) {
-                            ForEach(shutterAngleOptions, id: \.self) { value in
-                                Text(value.formatted() + "°").tag(value)
-                            }
-                        }
-                    } else {
-                        let speedOptions: [Double] = [
-                            1.0 / 8000.0, 1.0 / 4000.0,
-                            1.0 / 2000.0, 1.0 / 1000.0,
-                            1.0 / 500.0, 1.0 / 250.0,
-                            1.0 / 125.0, 1.0 / 60.0,
-                            1.0 / 30.0, 1.0 / 15.0,
-                            1.0 / 8.0, 1.0 / 4.0,
-                            1.0 / 2.0, 1.0
-                        ]
-                        Picker("快门速度", selection: Binding(get: { model.shutter }, set: { model.applyParameter("videoExposureTime", value: $0, label: "快门速度") })) {
-                            ForEach(speedOptions, id: \.self) { value in
-                                Text(value < 1 ? "1/\(Int((1 / value).rounded())) s" : "\(value, specifier: "%.1f") s").tag(value)
-                            }
-                        }
-                    }
-                }
+                deckMenuPicker(
+                    current: model.videoFrameRate,
+                    options: frameRateOptions,
+                    display: { "\(Int($0)) fps" },
+                    apply: { model.setVideoFrameRate($0) }
+                )
+
+                shutterModePicker
+                shutterSection
                 .disabled(
                     model.connected
                         && !model.canAdjustExposureParameter("videoExposureTime")
                 )
 
-                Picker(
-                    "视频录制规格",
-                    selection: Binding(
-                        get: { model.monitorVideoCodec },
-                        set: { model.setMonitorVideoCodec($0) }
-                    )
-                ) {
-                    ForEach(model.availableVideoCodecs) { codec in
-                        Text(codec.label).tag(codec)
-                    }
-                }
-                .disabled(
-                    !model.connected || model.parameterWritable["videoCodec"] == false
+                deckMenuPicker(
+                    current: model.monitorVideoCodec,
+                    options: model.availableVideoCodecs,
+                    display: { $0.label },
+                    apply: { model.setMonitorVideoCodec($0) },
+                    disabled: !model.connected || model.parameterWritable["videoCodec"] == false
                 )
 
-                Picker(
-                    "Log / Picture Profile",
-                    selection: Binding(
-                        get: { model.monitorVideoLog },
-                        set: { model.setMonitorVideoLog($0) }
-                    )
-                ) {
-                    ForEach(model.availableVideoLogs) { log in
-                        Text(log.label).tag(log)
-                    }
-                }
-                .disabled(!model.connected)
+                deckMenuPicker(
+                    current: model.monitorVideoLog,
+                    options: model.availableVideoLogs,
+                    display: { $0.label },
+                    apply: { model.setMonitorVideoLog($0) },
+                    disabled: !model.connected
+                )
 
                 Text(
                     model.cameraVendor == "Canon"
@@ -6836,63 +6926,48 @@ private struct MonitorControlDeck: View {
                 .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.uiLabel)
 
-                Picker(
-                    "光圈",
-                    selection: Binding(
-                        get: { model.aperture },
-                        set: { value in
-                            model.aperture = value
-                            model.applyParameter("aperture", value: value, label: "光圈")
-                        }
-                    )
-                ) {
-                    ForEach(apertureOptions, id: \.self) { value in
-                        Text("F\(value, specifier: "%.1f")").tag(value)
-                    }
-                }
-                .disabled(
-                    !model.connected
+                deckMenuPicker(
+                    current: model.aperture,
+                    options: apertureOptions,
+                    display: { (v: Double) in String(format: "F%.1f", v) },
+                    apply: { value in
+                        model.aperture = value
+                        model.applyParameter("aperture", value: value, label: "光圈")
+                    },
+                    disabled: !model.connected
                         || !model.canAdjustExposureParameter("aperture")
                 )
 
-                Picker(
-                    "ISO感光度",
-                    selection: Binding(
-                        get: { model.iso },
-                        set: { value in
-                            model.iso = value
-                            model.applyParameter("iso", value: value, label: "ISO感光度")
-                        }
-                    )
-                ) {
-                    ForEach(isoOptions, id: \.self) { value in
-                        Text("\(value)").tag(value)
-                    }
-                }
-                .disabled(!model.connected)
+                deckMenuPicker(
+                    current: model.iso,
+                    options: isoOptions,
+                    display: { "\($0)" },
+                    apply: { value in
+                        model.iso = value
+                        model.applyParameter("iso", value: value, label: "ISO感光度")
+                    },
+                    disabled: !model.connected
+                )
 
-                Picker(
-                    "白平衡",
-                    selection: Binding(
-                        get: { model.whiteBalance },
-                        set: { value in
-                            model.whiteBalance = value
-                            model.applyParameter(
-                                "whiteBalanceMode",
-                                value: value,
-                                label: "白平衡"
-                            )
-                        }
-                    )
-                ) {
-                    Text("自动").tag("continuous")
-                    Text("手动预设").tag("manual")
-                }
-                .disabled(!model.connected)
+                deckMenuPicker(
+                    current: model.whiteBalance,
+                    options: ["continuous", "manual"],
+                    display: { $0 == "continuous" ? "自动" : "手动预设" },
+                    apply: { value in
+                        model.whiteBalance = value
+                        model.applyParameter(
+                            "whiteBalanceMode",
+                            value: value,
+                            label: "白平衡"
+                        )
+                    },
+                    disabled: !model.connected
+                )
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("曝光补偿")
+                            .foregroundStyle(.white)
                         Spacer()
                         Text("\(model.compensation, specifier: "%+.1f") EV")
                             .font(.system(size: TypeScale.body, design: .monospaced))
@@ -6924,31 +6999,33 @@ private struct MonitorControlDeck: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("监看输出")
                     .font(.system(size: TypeScale.title, weight: .bold))
+                    .foregroundStyle(.white)
 
-                Picker(
-                    "监看显示尺寸",
-                    selection: Binding(
-                        get: { model.monitorVideoProfile },
-                        set: { model.setMonitorVideoProfile($0) }
-                    )
-                ) {
-                    ForEach(MonitorVideoProfile.allCases) { profile in
-                        RuntimeLocalizedText(profile.label).tag(profile)
-                    }
-                }
+                deckMenuPicker(
+                    current: model.monitorVideoProfile,
+                    options: MonitorVideoProfile.allCases,
+                    display: { $0.label },
+                    apply: { model.setMonitorVideoProfile($0) }
+                )
 
-                Picker("实时取景格式", selection: .constant("jpeg")) {
-                    Text("JPEG（相机输出）").tag("jpeg")
+                HStack(spacing: 6) {
+                    Text("实时取景格式")
+                        .foregroundStyle(Palette.uiLabel)
+                    Spacer()
+                    Text("JPEG（相机输出）")
+                        .font(.system(size: TypeScale.body))
+                        .foregroundStyle(Palette.uiLabel.opacity(0.55))
                 }
-                .disabled(true)
 
                 Toggle(
-                    "外录到当前智能设备",
                     isOn: Binding(
                         get: { model.externalRecordToDevice },
                         set: { model.setExternalRecordToDevice($0) }
                     )
-                )
+                ) {
+                    Text("外录到当前智能设备")
+                        .foregroundStyle(.white)
+                }
                 .disabled(model.videoRecording)
 
                 Text("外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。")
@@ -6968,14 +7045,17 @@ private struct MonitorControlDeck: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("监看辅助")
                     .font(.system(size: TypeScale.title, weight: .bold))
+                    .foregroundStyle(.white)
 
                 Toggle(
-                    "加亮显示条纹图案",
                     isOn: Binding(
                         get: { model.zebraEnabled },
                         set: { model.setZebraEnabled($0) }
                     )
-                )
+                ) {
+                    Text("加亮显示条纹图案")
+                        .foregroundStyle(.white)
+                }
                 .toggleStyle(.switch)
 
                 HStack {
@@ -6989,26 +7069,31 @@ private struct MonitorControlDeck: View {
                     )
                     Text("\(Int(model.zebraThreshold)) IRE")
                         .font(.system(size: TypeScale.body, design: .monospaced))
+                        .foregroundStyle(Palette.uiLabel)
                         .frame(width: 58)
                 }
                 .disabled(!model.zebraEnabled)
 
                 Toggle(
-                    "峰值对焦",
                     isOn: Binding(
                         get: { model.focusPeakingEnabled },
                         set: { model.setFocusPeakingEnabled($0) }
                     )
-                )
+                ) {
+                    Text("峰值对焦")
+                        .foregroundStyle(.white)
+                }
                 .toggleStyle(.switch)
 
                 Toggle(
-                    "假色曝光",
                     isOn: Binding(
                         get: { model.falseColorEnabled },
                         set: { model.setFalseColorEnabled($0) }
                     )
-                )
+                ) {
+                    Text("假色曝光")
+                        .foregroundStyle(.white)
+                }
                 .toggleStyle(.switch)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -7029,12 +7114,14 @@ private struct MonitorControlDeck: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 Toggle(
-                    "应用本地 LUT",
                     isOn: Binding(
                         get: { model.lutEnabled },
                         set: { model.setLUTEnabled($0) }
                     )
-                )
+                ) {
+                    Text("应用本地 LUT")
+                        .foregroundStyle(.white)
+                }
                 .toggleStyle(.switch)
                 .disabled(model.lutName == nil)
 
@@ -9874,7 +9961,7 @@ private struct ImageEditorView: View {
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("可组合预设").font(.system(size: TypeScale.body, weight: .semibold))
+                            Text("可组合预设").font(.system(size: TypeScale.body, weight: .semibold)).foregroundStyle(Palette.editorLabel)
                             Spacer()
                             Button("清空") {
                                 aiSelectedPresets.removeAll()
@@ -9914,9 +10001,13 @@ private struct ImageEditorView: View {
                         }
                         VStack(alignment: .leading, spacing: 4) {
                             Text("分辨率").font(.system(size: 10)).foregroundStyle(Palette.editorLabel)
-                            Picker("分辨率", selection: $aiResolution) {
-                                ForEach(AiResolution.allCases) { r in Text(r.rawValue).tag(r) }
-                            }.pickerStyle(.menu).frame(width: 90)
+                            editorMenuPicker(
+                                current: aiResolution,
+                                options: AiResolution.allCases,
+                                display: { $0.rawValue },
+                                apply: { aiResolution = $0 }
+                            )
+                            .frame(width: 90)
                         }
                         Spacer()
                     }
@@ -9987,11 +10078,12 @@ private struct ImageEditorView: View {
     private var editorSummaryRail: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Picker("预设", selection: $selectedPreset) {
-                    ForEach(EditorPreset.allCases) { preset in
-                        Text(preset.rawValue).tag(preset)
-                    }
-                }
+                editorMenuPicker(
+                    current: selectedPreset,
+                    options: EditorPreset.allCases,
+                    display: { $0.rawValue },
+                    apply: { selectedPreset = $0 }
+                )
                 .onChange(of: selectedPreset) {
                     guard !suppressPresetApply else { return }
                     selectedNikonCloudPresetID = nil
@@ -10795,19 +10887,12 @@ private var curvesControls: some View {
                     .buttonStyle(NativeButtonStyle(primary: settings.maskType == type))
                 }
             }
-            Picker("蒙版类型", selection: $settings.maskType) {
-                Text("无").tag("无")
-                Text("画笔").tag("画笔")
-                Text("线性渐变").tag("线性渐变")
-                Text("径向渐变").tag("径向渐变")
-                Text("智能主体").tag("智能主体")
-                Text("智能天空").tag("智能天空")
-                Text("智能背景").tag("智能背景")
-                Text("智能人物").tag("智能人物")
-                Text("智能亮部").tag("智能亮部")
-                Text("智能暗部").tag("智能暗部")
-            }
-            .pickerStyle(.menu)
+            editorMenuPicker(
+                current: settings.maskType,
+                options: ["无", "画笔", "线性渐变", "径向渐变", "智能主体", "智能天空", "智能背景", "智能人物", "智能亮部", "智能暗部"],
+                display: { $0 },
+                apply: { settings.maskType = $0 }
+            )
             .onChange(of: settings.maskType) {
                 settings.maskExists = settings.maskType != "无"
                 if settings.maskExists && settings.maskAmount == 0 {
@@ -10826,6 +10911,7 @@ private var curvesControls: some View {
             .buttonStyle(NativeButtonStyle(primary: settings.maskInvert))
             Divider()
             Text("蒙版内调整")
+                .foregroundStyle(Palette.editorLabel)
                 .font(.system(size: TypeScale.body, weight: .semibold))
             editorSlider(title: "曝光", value: $settings.maskExposure, range: -2...2, step: 0.05, formatter: { String(format: "%+.2f EV", $0) })
             standardSlider("对比度", value: $settings.maskContrast)
@@ -10858,11 +10944,15 @@ private var curvesControls: some View {
 
     private var geometryControls: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("裁切比例", selection: $settings.cropRatio) {
-                ForEach(EditorCropRatio.allCases) { ratio in
-                    Text(ratio.rawValue).tag(ratio)
-                }
-            }
+            Text("裁切比例")
+                .font(.system(size: TypeScale.body, weight: .semibold))
+                .foregroundStyle(Palette.editorLabel)
+            editorMenuPicker(
+                current: settings.cropRatio,
+                options: EditorCropRatio.allCases,
+                display: { $0.rawValue },
+                apply: { settings.cropRatio = $0 }
+            )
             HStack(spacing: 6) {
                 Button {
                     settings.rotation = (settings.rotation + 90) % 360
@@ -11543,6 +11633,38 @@ private var curvesControls: some View {
         )
     }
 
+    /// fig2 恒深面上的下拉控件（同 MonitorControlDeck 机制）。
+    private func editorMenuPicker<T: Hashable>(
+        current: T,
+        options: [T],
+        display: @escaping (T) -> String,
+        apply: @escaping (T) -> Void
+    ) -> some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    apply(option)
+                } label: {
+                    Text(display(option))
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(display(current))
+                    .font(.system(size: TypeScale.body))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Palette.editorLabel)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Palette.editorRaised, in: RoundedRectangle(cornerRadius: 7))
+        }
+        .menuStyle(.borderlessButton)
+    }
+
     private func editorSlider(
         title: String,
         value: Binding<Double>,
@@ -11554,6 +11676,7 @@ private var curvesControls: some View {
             HStack {
                 Text(LocalizedStringKey(title))
                     .font(.system(size: TypeScale.body, weight: .semibold))
+                    .foregroundStyle(Palette.editorLabel)
                 Spacer()
                 Text(formatter(value.wrappedValue))
                     .font(.system(size: 10, design: .monospaced))
