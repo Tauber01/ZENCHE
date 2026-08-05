@@ -33,6 +33,14 @@
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
 
+  <!-- v1.5.7 P2: 监视读数数值——等宽 display 档（原 22pt 字面量归档，对齐 macOS 读数口径：等宽+大数字档）。 -->
+  <Style x:Key="MonitorReadout" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+
   <Style x:Key="ButtonBase" TargetType="Button">
     <Setter Property="MinHeight" Value="44" />
     <Setter Property="Padding" Value="16,8" />

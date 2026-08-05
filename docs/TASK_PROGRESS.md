@@ -455,3 +455,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - Windows：P1 结构已对齐 macOS fig1 基准（状态行/状态卡阵/参数格/拍摄坞/拍前会话/拍摄自动化面板均在），字号归档归 F5 批，本批无代码改动。
 - design.md：本批为执行既有条款（触控 ≥44×44、AUTO 口径对齐 F1 已文档化），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过；iOS xcodebuild Release（免签名）BUILD SUCCEEDED；Android `:app:compileDebugJavaWithJavac` 通过（仅基线 deprecation 提示）；Harmony assembleHap BUILD SUCCESSFUL（构建中间产物与 dist 已清理）；git diff --check 干净。
+
+## 12.8 v1.5.7 逐页批次 P2：视频页（monitor）四端对齐 macOS 基准（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P2（视频/monitor 四端对齐 macOS 基准，含沉浸监视 overlay 复核）；分支 `agent/1.5.7-p2-monitor`（worktree REPOS/ZENCHE-wt-1.5.7-p2-monitor），基线 `8138ed2`（P1 合入 + RGB 三色波形已合入）。
+- Windows（Controls.xaml / MainWindow.xaml）：监视读数 22pt 字面量 8 处（7 格读数 MonitorFrameRate/Shutter/Aperture/Iso/WhiteBalance/Codec/Tone + 存储读数 MonitorStorageFreeText）归档为 `MonitorReadout` 样式（MonoFont + Bold + 22pt + MonitorWellTextBrush，等宽 display 档），对齐 macOS monitorReadout 读数口径（等宽 + 大数字 display 档）；品牌 Z 标（L65/L478）与预览空态提示（L202，DisplayFont 22pt）上下文确认不属读数，保留原值待 F5 统一收口。
+- iOS（CameraService.swift / RootView.swift）：`MonitorVideoCodec` 新增 `shortLabel` 计算属性（逐值对齐 macOS shortLabel 映射，automatic→自动）；MonitorConsolePage 读数轨补「编码」格（白平衡与色调之间），对齐 macOS 7 格契约（帧率/快门/光圈/ISO/白平衡/编码/色调）。
+- Android（MainActivity.java）：新增 `videoCodecShortLabel()`（对齐 Windows `VideoCodecShortLabel` 口径，Android raw 值 prores422hq/nraw 等）；`buildMonitorParameterRail` 补「编码」格。
+- Harmony（Index.ets）：新增 `videoCodecShortLabel()`（缺省回落全标签）；`MonitorParameterRail` 补「编码」格（tr('编码') 词条已有）。
+- 沉浸 overlay：四端复核通过（native-ui-1.5.3 四件套 telemetryHUD/ScopeDock/ToolRail/ParameterTray 断言 + design.md 固定深色族条款 L67-76/369），本批未改动；RGB 三色波形渲染层（MacScopePlot/WaveformScope 等）未触及，仅测试验证不回退。
+- Harmony MonitorScopeRail 缺中间录制钮：与 macOS/Windows/Android/iOS 形态差异，但 Harmony 底部已有录制按钮覆盖交互且审计未列 → 记 backlog，本批不动。
+- design.md：本批为执行既有条款（读数 = 等宽 display 档，design.md Typography「display step reserved for large numerals/readouts」），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild Release（免签名）BUILD SUCCEEDED；Android `:app:compileDebugJavaWithJavac` 通过（仅基线 deprecation 提示）；Harmony assembleHap BUILD SUCCESSFUL（构建中间产物与 dist 已清理）；Windows dotnet build 通过；git diff --check 干净。

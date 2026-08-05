@@ -226,13 +226,13 @@
             </Border>
           </Grid>
           <UniformGrid Grid.Row="3" Columns="7" Margin="0,18,0,0">
-            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="编码" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorCodecText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="编码" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorCodecText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
           </UniformGrid>
           <StackPanel Grid.Row="4" Margin="0,16,0,4">
             <Border MaxWidth="720"
@@ -297,7 +297,7 @@
           <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="{DynamicResource MonitorWellCardBrush}" CornerRadius="10">
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="▯" FontSize="28" Foreground="{DynamicResource MonitorWellTextBrush}" VerticalAlignment="Center" />
-              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" FontFamily="{DynamicResource MonoFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource MonitorWellLabelBrush}" /></StackPanel>
+              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" Style="{DynamicResource MonitorReadout}" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource MonitorWellLabelBrush}" /></StackPanel>
             </StackPanel>
           </Border>
         </Grid>
