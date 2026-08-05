@@ -4179,6 +4179,21 @@ private enum Palette {
         red: 52.0 / 255.0, green: 58.0 / 255.0, blue: 67.0 / 255.0)
     static let studioGold = Color(
         red: 216.0 / 255.0, green: 182.0 / 255.0, blue: 83.0 / 255.0)
+    // ===== v1.5.6 token 层（对齐 Android/Harmony/iOS TypeScale·SCOPE_*）=====
+    // 示波器轨迹色（五端同名同值）
+    static let scopeR = Color(red: 1, green: 0.19, blue: 0.16)          // #FF302A
+    static let scopeG = Color(red: 0.16, green: 1, blue: 0.41)          // #28FF69
+    static let scopeB = Color(red: 0.13, green: 0.25, blue: 1)          // #2240FF
+    static let scopeAudio = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255) // #4CC7E8
+    static let scopeYuvY = Color(red: 0.08, green: 1, blue: 0.36)       // #14FF5C
+    static let scopeYuvU = Color(red: 0, green: 0.82, blue: 1)          // #00D2FF
+    static let scopeYuvV = Color(red: 1, green: 0.15, blue: 0.87)       // #FF26DE
+    static let scopeBg = Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255) // #050A0F
+    // 专属语义色
+    static let videoIdle = Color(red: 0.55, green: 0.03, blue: 0.03)    // 录制按钮未激活深红（与 iOS 同值）
+    // 尼康云创深色卡（fig1 恒深面上的深蓝面）
+    static let cloudBg = Color(red: 0.094, green: 0.141, blue: 0.204)
+    static let cloudStroke = Color(red: 0.188, green: 0.306, blue: 0.439)
     // fig2 编辑器 token（五端 1.5.5 统一常量，同名同值）：深灰工作台 /
     // 面板 / 浮层面 / 1px 分隔线 / 品牌橙（仅选中工具与示波器读数）/
     // 灰标签。固定深色，不随主题变化；无渐变无投影，直角平铺。
@@ -4219,13 +4234,22 @@ private enum Palette {
     static let shadow = dynamicWhite(light: (0.05, 0.12), dark: (0.0, 0.46))
 }
 
+// ===== v1.5.6 TypeScale（design.md §78-79：每屏 ≤5 档，与 Android/Harmony/iOS 同值）=====
+enum TypeScale {
+    static let caption: CGFloat = 11     // 辅助说明/状态
+    static let body: CGFloat = 12        // 正文/标签
+    static let emphasis: CGFloat = 15    // 强调/卡片标题
+    static let title: CGFloat = 18       // 区块标题
+    static let display: CGFloat = 24     // 大数字/读数
+}
+
 private struct NativeButtonStyle: ButtonStyle {
     var primary = false
     var accent = Palette.cobalt
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: TypeScale.emphasis, weight: .semibold))
             .foregroundStyle(primary ? Color.white : Palette.ink)
             .padding(.horizontal, 16)
             .frame(minHeight: 40)
@@ -4265,20 +4289,20 @@ private struct NikonCloudMacMonitorPicker: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 Text("NP3")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.white)
                     .frame(width: 40, height: 40)
                     .background(Palette.cobalt, in: RoundedRectangle(cornerRadius: 12))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("尼康云创监看")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         .foregroundStyle(darkAppearance ? Color.white : Palette.ink)
                     Text(
                         verbatim: model.monitorNikonCloudPreset?.name
                             ?? String(localized: "已关闭")
                     )
-                    .font(.system(size: 11))
+                    .font(.system(size: TypeScale.caption))
                     .foregroundStyle(
                         darkAppearance
                             ? Color.white.opacity(0.74)
@@ -4301,7 +4325,7 @@ private struct NikonCloudMacMonitorPicker: View {
             }
 
             Text("照片与视频实时生效 · SDR 近似 · 不写入原片")
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(
                     darkAppearance
                         ? Color.white.opacity(0.72)
@@ -4312,7 +4336,7 @@ private struct NikonCloudMacMonitorPicker: View {
         .frame(minHeight: 72)
         .background(
             darkAppearance
-                ? Color(red: 0.094, green: 0.141, blue: 0.204)
+                ? Palette.cloudBg
                 : Palette.cobaltSoft,
             in: RoundedRectangle(cornerRadius: 14)
         )
@@ -4320,7 +4344,7 @@ private struct NikonCloudMacMonitorPicker: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(
                     darkAppearance
-                        ? Color(red: 0.188, green: 0.306, blue: 0.439)
+                        ? Palette.cloudStroke
                         : Palette.cobalt.opacity(0.34)
                 )
         }
@@ -4461,7 +4485,7 @@ private struct ImmersiveMacCameraView: View {
                         model.liveViewEnabled ? "LIVE" : "NO SOURCE",
                         systemImage: "circle.fill"
                     )
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
                     .foregroundStyle(
                         model.liveViewEnabled ? Color.red : Color.white.opacity(0.58)
                     )
@@ -4478,7 +4502,7 @@ private struct ImmersiveMacCameraView: View {
                                     ? "Wi‑Fi 相机 · PTP-IP"
                                     : "— · OFFLINE"
                     )
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 14)
                         .frame(height: 44)
                         .background(.black.opacity(0.58), in: Capsule())
@@ -4496,7 +4520,7 @@ private struct ImmersiveMacCameraView: View {
                         ? (monitoring ? "\(Int(model.videoFrameRate))P" : "JPEG")
                         : "—")
                 }
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .font(.system(size: TypeScale.emphasis, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.88))
                 .padding(.horizontal, 18)
                 .frame(height: 44)
@@ -4525,7 +4549,7 @@ private struct ImmersiveMacCameraView: View {
                             ? "● REC"
                             : monitoring ? "视频" : "照片"
                     )
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: TypeScale.title, weight: .bold))
                         .foregroundStyle(monitoring ? Palette.video : Palette.uiAccent)
                     Button {
                         if monitoring {
@@ -4549,7 +4573,7 @@ private struct ImmersiveMacCameraView: View {
                                 .frame(width: 88, height: 88)
                             if !monitoring {
                                 Image(systemName: "camera.fill")
-                                    .font(.system(size: 23, weight: .bold))
+                                    .font(.system(size: TypeScale.title, weight: .bold))
                                     .foregroundStyle(.black)
                             }
                         }
@@ -4644,7 +4668,7 @@ private struct ImmersiveMacCameraView: View {
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundStyle(Color.white.opacity(0.46))
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(.system(size: TypeScale.body, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
                 .lineLimit(1)
         }
@@ -4681,7 +4705,7 @@ private struct ImmersiveMacCameraView: View {
     private var immersiveToolRail: some View {
         VStack(spacing: 8) {
             Text(model.connected ? model.exposureMode.uppercased() : "—")
-                .font(.system(size: 20, weight: .bold, design: .monospaced))
+                .font(.system(size: TypeScale.title, weight: .bold, design: .monospaced))
                 .frame(width: 64, height: 52)
                 .background(Palette.uiCard.opacity(0.9))
             Text(model.connected ? "USB\nPTP" : "OFFLINE")
@@ -5104,7 +5128,7 @@ private struct ImmersiveMacParameterControl: View {
                         .frame(width: 44, height: 44)
                 }
                 Text(value)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
                     .foregroundStyle(enabled ? Palette.uiAccent : .white)
                     .frame(minWidth: 72)
                 Button(action: increase) {
@@ -5233,7 +5257,7 @@ private struct ImmersiveMacButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: TypeScale.emphasis, weight: .semibold))
             .foregroundStyle(active ? Color.black : Color.white)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
@@ -5266,16 +5290,16 @@ private struct TopBar: View {
                         )
                     )
                     Text("Z")
-                        .font(.system(size: 20, weight: .heavy))
+                        .font(.system(size: TypeScale.title, weight: .heavy))
                         .foregroundStyle(.white)
                 }
                 .frame(width: 44, height: 44)
                 .shadow(color: Palette.cobalt.opacity(0.35), radius: 8, y: 4)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("帧澈 ZENCHE")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: TypeScale.title, weight: .bold))
                     Text("Capture · Connect · Flow")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: TypeScale.caption, weight: .medium))
                         .foregroundStyle(Palette.muted)
                 }
             }
@@ -5295,9 +5319,9 @@ private struct TopBar: View {
                         .foregroundStyle(model.hasAnyCameraConnection ? Palette.positive : Palette.cobalt)
                     VStack(alignment: .leading, spacing: 1) {
                         RuntimeLocalizedText(model.connectionTitle)
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: TypeScale.emphasis, weight: .bold))
                         RuntimeLocalizedText(model.connectionDetail)
-                            .font(.system(size: 11))
+                            .font(.system(size: TypeScale.caption))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(1)
                     }
@@ -5312,7 +5336,7 @@ private struct TopBar: View {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: TypeScale.title, weight: .semibold))
             }
             .buttonStyle(NativeButtonStyle())
             .help(Text("设置"))
@@ -5369,9 +5393,9 @@ private struct Sidebar: View {
         } label: {
             VStack(spacing: 6) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 19, weight: active ? .semibold : .regular))
+                    .font(.system(size: TypeScale.title, weight: active ? .semibold : .regular))
                 Text(LocalizedStringKey(section.rawValue))
-                    .font(.system(size: 12, weight: active ? .semibold : .medium))
+                    .font(.system(size: TypeScale.body, weight: active ? .semibold : .medium))
             }
             .foregroundStyle(active ? accent : Palette.muted)
             .frame(width: 80, height: 66)
@@ -5431,7 +5455,7 @@ private struct ControlPageHeader: View {
     var body: some View {
         HStack(spacing: 12) {
             Text("控制")
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: TypeScale.title, weight: .bold))
                 .foregroundStyle(.white)
             Spacer()
             Button {
@@ -5463,7 +5487,7 @@ private struct ControlPageHeader: View {
 
     private func controlBarButton(_ symbol: String) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: TypeScale.emphasis, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 40, height: 40)
             .background(Palette.uiSecondary, in: Circle())
@@ -5500,16 +5524,16 @@ private struct ControlStatusRow: View {
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
                 RuntimeLocalizedText(model.connectionTitle)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: TypeScale.emphasis, weight: .semibold))
                     .foregroundStyle(.white)
                 RuntimeLocalizedText(model.connectionDetail)
-                    .font(.system(size: 13))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.uiLabel)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Button(action: openConnection) {
                     RuntimeLocalizedText(transportTitle)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: TypeScale.body, weight: .semibold))
                         .foregroundStyle(capsuleTint)
                         .padding(.horizontal, 12)
                         .frame(height: 28)
@@ -5524,7 +5548,7 @@ private struct ControlStatusRow: View {
             }
             if let failureText {
                 RuntimeLocalizedText(failureText)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: TypeScale.body, weight: .medium))
                     .foregroundStyle(.red)
                     .lineLimit(2)
             }
@@ -5606,19 +5630,19 @@ private struct ControlStatusCardGrid: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                 Text(LocalizedStringKey(title))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: TypeScale.body, weight: .medium))
                 Spacer(minLength: 2)
             }
             .foregroundStyle(Palette.uiLabel)
             Text(value)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: TypeScale.emphasis, weight: .bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             RuntimeLocalizedText(subtitle)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: TypeScale.caption, weight: .medium))
                 .foregroundStyle(Palette.uiLabel)
                 .lineLimit(1)
         }
@@ -5632,23 +5656,23 @@ private struct ControlStatusCardGrid: View {
         return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: "externaldrive")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                     .foregroundStyle(Palette.uiAccent)
                 Text("存储")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: TypeScale.body, weight: .medium))
                     .foregroundStyle(Palette.uiLabel)
                 Spacer(minLength: 2)
                 Text("\(info.percentUsed)%")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Palette.uiLabel)
             }
             Text(info.freeDescription)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: TypeScale.emphasis, weight: .bold))
                 .foregroundStyle(.white)
             ProgressView(value: Double(info.percentUsed), total: 100)
                 .tint(Palette.uiAccent)
             Text("\(info.percentUsed)% 已用 · 本地缓存")
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: TypeScale.caption, weight: .medium))
                 .foregroundStyle(Palette.uiLabel)
                 .lineLimit(1)
         }
@@ -5676,6 +5700,16 @@ private struct ControlParameterGrid: View {
         let symbol: String
         let value: String
         let automatic: Bool
+        /// 可写值读数发光（Readout glow #6BAEFF，design.md 0e0ab21）；
+        /// 不可写/纯展示值用中性白。
+        var glow: Bool = false
+    }
+
+    private var sourceText: String {
+        if model.connected { return "USB/PTP" }
+        if model.localCameraConnected { return "SYSTEM" }
+        if model.wifiCamera.isConnected { return "Wi-Fi" }
+        return "—"
     }
 
     private var shutterText: String {
@@ -5689,17 +5723,26 @@ private struct ControlParameterGrid: View {
     private var tiles: [Tile] {
         [
             Tile(
+                id: "来源",
+                symbol: "cable.connector",
+                value: model.hasAnyCameraConnection ? sourceText : "—",
+                automatic: false
+            ),
+            Tile(
                 id: "模式",
                 symbol: "dial.medium",
                 value: model.connected ? model.exposureMode.uppercased() : "—",
-                automatic: false
+                automatic: false,
+                glow: true
             ),
             Tile(
                 id: "快门",
                 symbol: "timer",
                 value: shutterText,
                 automatic: model.connected
-                    && !model.canAdjustExposureParameter("exposureTime")
+                    && !model.canAdjustExposureParameter("exposureTime"),
+                glow: model.connected
+                    && model.canAdjustExposureParameter("exposureTime")
             ),
             Tile(
                 id: "光圈",
@@ -5708,14 +5751,18 @@ private struct ControlParameterGrid: View {
                     ? String(format: "F%.1f", model.aperture)
                     : "—",
                 automatic: model.connected
-                    && !model.canAdjustExposureParameter("aperture")
+                    && !model.canAdjustExposureParameter("aperture"),
+                glow: model.connected
+                    && model.canAdjustExposureParameter("aperture")
             ),
             Tile(
                 id: "ISO",
                 symbol: "circle.lefthalf.filled",
                 value: model.connected ? "\(model.iso)" : "—",
                 automatic: model.connected
-                    && !model.canAdjustExposureParameter("iso")
+                    && !model.canAdjustExposureParameter("iso"),
+                glow: model.connected
+                    && model.canAdjustExposureParameter("iso")
             ),
             Tile(
                 id: "曝光",
@@ -5724,7 +5771,9 @@ private struct ControlParameterGrid: View {
                     ? String(format: "%+.1f EV", model.compensation)
                     : "—",
                 automatic: model.connected
-                    && !model.canAdjustExposureParameter("exposureCompensation")
+                    && !model.canAdjustExposureParameter("exposureCompensation"),
+                glow: model.connected
+                    && model.canAdjustExposureParameter("exposureCompensation")
             ),
             Tile(
                 id: "对焦",
@@ -5732,7 +5781,8 @@ private struct ControlParameterGrid: View {
                 value: model.connected
                     ? (model.focusMode == "continuous" ? "AF-C" : "AF-S")
                     : "—",
-                automatic: false
+                automatic: false,
+                glow: true
             )
         ]
     }
@@ -5745,7 +5795,7 @@ private struct ControlParameterGrid: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("拍摄参数")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: TypeScale.emphasis, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
                 capsuleButton("全部", active: !editing) {
@@ -5774,7 +5824,7 @@ private struct ControlParameterGrid: View {
     ) -> some View {
         Button(action: action) {
             Text(LocalizedStringKey(title))
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: TypeScale.body, weight: .semibold))
                 .foregroundStyle(active ? Color.black : Color.white)
                 .padding(.horizontal, 14)
                 .frame(height: 30)
@@ -5791,9 +5841,9 @@ private struct ControlParameterGrid: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: tile.symbol)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: TypeScale.body, weight: .medium))
                 Text(LocalizedStringKey(tile.id))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: TypeScale.body, weight: .medium))
                 Spacer(minLength: 2)
                 if editing {
                     Image(
@@ -5801,7 +5851,7 @@ private struct ControlParameterGrid: View {
                             ? "plus.circle.fill"
                             : "minus.circle.fill"
                     )
-                    .font(.system(size: 15))
+                    .font(.system(size: TypeScale.emphasis))
                     .foregroundStyle(
                         hidden ? Palette.uiAccent : Palette.uiLabel
                     )
@@ -5816,7 +5866,7 @@ private struct ControlParameterGrid: View {
             .foregroundStyle(Palette.uiLabel)
             Text(tile.value)
                 .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(model.connected ? Color.white : Palette.uiLabel)
+                .foregroundStyle(tileValueColor(tile))
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
         }
@@ -5833,6 +5883,14 @@ private struct ControlParameterGrid: View {
                 hiddenTiles.insert(tile.id)
             }
         }
+    }
+
+    /// 读数值用色：可写值 Readout glow（#6BAEFF，0e0ab21 条款）；
+    /// 相机接管值中性高对比白；未连接灰。
+    private func tileValueColor(_ tile: Tile) -> Color {
+        guard model.connected else { return Palette.uiLabel }
+        if tile.glow { return Palette.readoutGlow }
+        return .white.opacity(0.85)
     }
 }
 
@@ -5884,7 +5942,7 @@ private struct ControlCaptureDock: View {
             model.triggerAutoFocus()
         } label: {
             Text("AF-ON")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: TypeScale.emphasis, weight: .bold))
                 .foregroundStyle(
                     model.connected && model.liveViewEnabled
                         ? Palette.uiAccent
@@ -5931,9 +5989,9 @@ private struct ControlCaptureDock: View {
         Button(action: scrollToTasks) {
             HStack(spacing: 5) {
                 Image(systemName: "timer")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                 Text("INT")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: TypeScale.emphasis, weight: .bold))
             }
             .foregroundStyle(Palette.uiAccent)
             .padding(.horizontal, 12)
@@ -6049,192 +6107,15 @@ private struct CaptureView: View {
     }
 }
 
-/// 签名元素：曝光读数轨。像相机顶盖 LCD 的等宽表格数字，
-/// 恒在石墨井上呈现快门/光圈/ISO/EV；由用户主导的参数发蓝光，
-/// 相机自动接管的参数变暗并标记 AUTO，直接把 P/S/A/M/B 门可视化。
-private struct ExposureReadoutRail: View {
-    @ObservedObject var model: CameraModel
-
-    private var shutterText: String {
-        guard model.connected else { return "—" }
-        let v = model.shutter
-        guard v > 0 else { return "—" }
-        if v < 1 { return "1/\(Int((1.0 / v).rounded()))" }
-        return String(format: "%g\"", v)
-    }
-    private var apertureText: String {
-        model.connected ? String(format: "f/%.1f", model.aperture) : "—"
-    }
-    private var isoText: String { model.connected ? "\(model.iso)" : "—" }
-    private var evText: String {
-        model.connected ? String(format: "%+.1f", model.compensation) : "—"
-    }
-    private var modeText: String {
-        guard model.connected else { return "—" }
-        switch model.exposureMode {
-        case "shutterPriority": return "S"
-        case "aperturePriority": return "A"
-        case "manual": return "M"
-        case "bulb": return "B"
-        default: return "P"
-        }
-    }
-    private var shutterDriven: Bool {
-        model.connected && model.canAdjustExposureParameter("exposureTime")
-    }
-    private var apertureDriven: Bool {
-        model.connected && model.canAdjustExposureParameter("aperture")
-    }
-    private var isoDriven: Bool {
-        model.connected && model.canAdjustExposureParameter("iso")
-    }
-    private var compensationDriven: Bool {
-        model.connected && model.canAdjustExposureParameter("exposureCompensation")
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            modeBadge
-            divider
-            readout("快门", shutterText, driven: shutterDriven)
-            divider
-            readout("光圈", apertureText, driven: apertureDriven)
-            divider
-            readout("ISO", isoText, driven: isoDriven)
-            divider
-            evMeter
-        }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 6)
-        .background(Palette.graphite)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.07), lineWidth: 1)
-        }
-        .shadow(color: Palette.shadow, radius: 14, y: 8)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var modeBadge: some View {
-        VStack(spacing: 5) {
-            Text(LocalizedStringKey("模式"))
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .tracking(1.5)
-                .foregroundStyle(Color.white.opacity(0.4))
-            Text(modeText)
-                .font(.system(size: 26, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-        }
-        .frame(width: 60)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.08))
-            .frame(width: 1, height: 42)
-    }
-
-    private func readout(_ key: String, _ value: String, driven: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Text(LocalizedStringKey(key))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(Color.white.opacity(0.45))
-                if model.connected && !driven {
-                    Text(LocalizedStringKey("自动"))
-                        .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                        .tracking(0.8)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 1)
-                        .background(Color.white.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                }
-            }
-            Text(value)
-                .font(.system(size: 25, weight: .semibold, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(
-                    driven ? Palette.readoutGlow : Color.white.opacity(0.85)
-                )
-                .shadow(
-                    color: driven ? Palette.readoutGlow.opacity(0.55) : .clear,
-                    radius: driven ? 8 : 0
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-    }
-
-    private var evMeter: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(LocalizedStringKey("曝光"))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundStyle(Color.white.opacity(0.45))
-                Spacer()
-                Text("\(evText) EV")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .monospacedDigit()
-                    .foregroundStyle(
-                        compensationDriven
-                            ? Palette.readoutGlow : Color.white.opacity(0.9)
-                    )
-            }
-            GeometryReader { geo in
-                let w = geo.size.width
-                let range = 5.0
-                let clamped = min(max(model.compensation, -range), range)
-                let frac = CGFloat((clamped + range) / (range * 2))
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(height: 2)
-                    HStack(spacing: 0) {
-                        ForEach(0..<11) { i in
-                            Rectangle()
-                                .fill(Color.white.opacity(i == 5 ? 0.5 : 0.18))
-                                .frame(width: 1, height: i == 5 ? 13 : 7)
-                            if i < 10 { Spacer() }
-                        }
-                    }
-                    if model.connected {
-                        Circle()
-                            .fill(
-                                compensationDriven
-                                    ? Palette.readoutGlow : Color.white.opacity(0.82)
-                            )
-                            .frame(width: 9, height: 9)
-                            .shadow(
-                                color: compensationDriven
-                                    ? Palette.readoutGlow.opacity(0.8) : .clear,
-                                radius: 6
-                            )
-                            .offset(x: frac * (w - 9))
-                    }
-                }
-            }
-            .frame(height: 14)
-        }
-        .frame(minWidth: 150)
-        .padding(.horizontal, 16)
-    }
-}
-
 private struct ShootingTaskPanel: View {
     @ObservedObject var model: CameraModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("拍摄自动化")
-                .font(.system(size: 19, weight: .bold))
+                .font(.system(size: TypeScale.title, weight: .bold))
             Text("间隔、包围与 B 门任务集中管理")
-                .font(.system(size: 12))
+                .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.muted)
             Picker("任务类型", selection: $model.shootingTaskKind) {
                 ForEach(ShootingTaskKind.allCases) { kind in
@@ -6282,7 +6163,7 @@ private struct ShootingTaskPanel: View {
                 .disabled(!model.connected && !model.shootingTaskRunning)
             }
             RuntimeLocalizedText(model.shootingTaskProgress)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: TypeScale.body, design: .monospaced))
                 .foregroundStyle(Palette.muted)
         }
         .padding(18)
@@ -6312,10 +6193,10 @@ private struct ParameterInspector: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("拍摄控制")
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.system(size: TypeScale.title, weight: .bold))
 
                     Text("曝光")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: TypeScale.emphasis, weight: .bold))
                         .foregroundStyle(Palette.muted)
 
                     nativeControl("拍摄模式") {
@@ -6422,7 +6303,7 @@ private struct ParameterInspector: View {
                                 step: 1.0 / 3.0
                             )
                             Text("\(model.compensation, specifier: "%+.1f") EV")
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(.system(size: TypeScale.body, design: .monospaced))
                                 .frame(width: 62)
                         }
                         .disabled(
@@ -6458,7 +6339,7 @@ private struct ParameterInspector: View {
                     }
                     Divider()
                     Text("对焦与色彩")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: TypeScale.emphasis, weight: .bold))
                         .foregroundStyle(Palette.muted)
                     nativeControl("对焦模式") {
                         Picker(
@@ -6557,7 +6438,7 @@ private struct ParameterInspector: View {
                 }
                 Spacer()
             }
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: TypeScale.emphasis, weight: .semibold))
             .foregroundStyle(Palette.muted)
             content()
         }
@@ -6605,7 +6486,7 @@ private struct MonitorView: View {
                             .foregroundStyle(Color.white)
                         Spacer()
                         Label(model.liveViewEnabled ? "LIVE" : "NO SOURCE", systemImage: "circle.fill")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
                             .foregroundStyle(model.liveViewEnabled ? Palette.positive : Color.white.opacity(0.55))
                     }
                     .padding(.horizontal, 26)
@@ -6629,13 +6510,13 @@ private struct MonitorView: View {
                                 Image(systemName: "camera.viewfinder")
                                     .font(.system(size: 46, weight: .light))
                                 Text(model.connected ? "等待实时取景画面" : "连接相机后开启实时取景")
-                                    .font(.system(size: 15, weight: .medium))
+                                    .font(.system(size: TypeScale.emphasis, weight: .medium))
                             }
                             .foregroundStyle(Color.white.opacity(0.55))
                             .frame(maxWidth: .infinity, minHeight: 270)
                         }
                         Text("\(model.cameraName ?? "未连接") · USB/PTP")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color.white.opacity(0.72))
                             .padding(12)
                         if let focusPoint {
@@ -6680,7 +6561,7 @@ private struct MonitorView: View {
                             model.toggleMovieRecording()
                         } label: {
                             ZStack {
-                                Circle().fill(model.videoRecording ? Palette.video : Color(red: 0.45, green: 0.02, blue: 0.04))
+                                Circle().fill(model.videoRecording ? Palette.video : Palette.videoIdle)
                                 Circle().stroke(Color.white, lineWidth: 2)
                                 Circle().fill(Palette.video).frame(width: 56, height: 56)
                             }
@@ -6748,7 +6629,7 @@ private struct MonitorView: View {
                             )
                             .tint(Palette.uiAccent)
                             Text("\(MacMonitorStorageInfo.current.percentUsed)% 已用 · 本地缓存")
-                                .font(.system(size: 11, design: .monospaced))
+                                .font(.system(size: TypeScale.caption, design: .monospaced))
                                 .foregroundStyle(Color.white.opacity(0.55))
                         }
                         .foregroundStyle(Color.white.opacity(0.9))
@@ -6785,8 +6666,8 @@ private struct MonitorView: View {
 
     private func monitorReadout(_ title: String, _ value: String) -> some View {
         VStack(spacing: 6) {
-            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.white.opacity(0.58))
-            Text(value).font(.system(size: 22, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(.white)
+            Text(title).font(.system(size: TypeScale.caption, weight: .semibold)).foregroundStyle(Color.white.opacity(0.58))
+            Text(value).font(.system(size: TypeScale.title, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
     }
@@ -6795,9 +6676,9 @@ private struct MonitorView: View {
         MacScopePlot(
             label: "RGB",
             traces: [
-                MacScopeTrace(value: model.redHistogram, color: Color(red: 1, green: 0.19, blue: 0.16)),
-                MacScopeTrace(value: model.greenHistogram, color: Color(red: 0.16, green: 1, blue: 0.41)),
-                MacScopeTrace(value: model.blueHistogram, color: Color(red: 0.13, green: 0.25, blue: 1))
+                MacScopeTrace(value: model.redHistogram, color: Palette.scopeR),
+                MacScopeTrace(value: model.greenHistogram, color: Palette.scopeG),
+                MacScopeTrace(value: model.blueHistogram, color: Palette.scopeB)
             ],
             parade: true
         )
@@ -6831,7 +6712,7 @@ private struct MonitorMacStepper: View {
     var body: some View {
         HStack(spacing: 4) {
             Button("−", action: decrease).buttonStyle(.plain)
-            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.58)); Text(value).font(.system(size: 12, design: .monospaced)).foregroundStyle(.white) }
+            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.58)); Text(value).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(.white) }
             Button("+", action: increase).buttonStyle(.plain)
         }
         .padding(.horizontal, 7).frame(height: 40)
@@ -6855,9 +6736,9 @@ private struct MonitorControlDeck: View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("视频曝光三要素")
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: TypeScale.title, weight: .bold))
                 Text("优先使用快门角度；应用会按当前帧率换算为曝光时间并写入相机。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
 
                 Picker("拍摄模式", selection: Binding(get: { model.exposureMode }, set: { model.exposureMode = $0; model.applyParameter("exposureMode", value: $0, label: "拍摄模式") })) {
@@ -6953,7 +6834,7 @@ private struct MonitorControlDeck: View {
                         ? "显示 RAW、XF-HEVC S 与 XF-AVC S 官方规格；机身未报告可写格式属性时请在相机菜单中选择。Canon Log 会在固件开放配置项时写入。"
                         : "录制规格与 Log / Picture Profile 会按连接相机品牌写入；不支持的组合由机身明确拒绝。"
                 )
-                .font(.system(size: 12))
+                .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.muted)
 
                 Picker(
@@ -7015,7 +6896,7 @@ private struct MonitorControlDeck: View {
                         Text("曝光补偿")
                         Spacer()
                         Text("\(model.compensation, specifier: "%+.1f") EV")
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(.system(size: TypeScale.body, design: .monospaced))
                             .foregroundStyle(Palette.uiAccent)
                     }
                     Slider(
@@ -7043,7 +6924,7 @@ private struct MonitorControlDeck: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 Text("监看输出")
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: TypeScale.title, weight: .bold))
 
                 Picker(
                     "监看显示尺寸",
@@ -7072,12 +6953,12 @@ private struct MonitorControlDeck: View {
                 .disabled(model.videoRecording)
 
                 Text("外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("Nikon PTP 返回 JPEG 实时取景帧。监看显示尺寸仅处理本地预览，不会改变机身的视频文件类型或画面尺寸。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -7087,7 +6968,7 @@ private struct MonitorControlDeck: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 Text("监看辅助")
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: TypeScale.title, weight: .bold))
 
                 Toggle(
                     "加亮显示条纹图案",
@@ -7108,7 +6989,7 @@ private struct MonitorControlDeck: View {
                         step: 1
                     )
                     Text("\(Int(model.zebraThreshold)) IRE")
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.system(size: TypeScale.body, design: .monospaced))
                         .frame(width: 58)
                 }
                 .disabled(!model.zebraEnabled)
@@ -7141,7 +7022,7 @@ private struct MonitorControlDeck: View {
                     )
                     .frame(height: 210)
                     Text("峰值覆盖 · \(model.peakingCoverage)%")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: TypeScale.caption, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.7))
                 }
                 .padding(8)
@@ -7174,7 +7055,7 @@ private struct MonitorControlDeck: View {
                     model.lutName
                         ?? "尚未导入；LUT 只影响视频监看，不写入原片。"
                 )
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -7227,7 +7108,7 @@ private struct MacScopePlot: View {
                 }
                 drawGrid(context: &context, size: size)
             }
-            .background(Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255))
+            .background(Palette.scopeBg)
 
             if parade {
                 HStack(spacing: 0) {
@@ -7433,7 +7314,7 @@ private struct MacAudioScopePlot: View {
                 var baseline = Path()
                 baseline.move(to: CGPoint(x: 4, y: size.height / 2))
                 baseline.addLine(to: CGPoint(x: size.width - 4, y: size.height / 2))
-                let cyan = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255)
+                let cyan = Palette.scopeAudio
                 context.stroke(baseline, with: .color(cyan.opacity(0.22)), lineWidth: 5)
                 context.stroke(baseline, with: .color(cyan.opacity(0.92)), lineWidth: 1)
                 context.stroke(guides, with: .color(.white.opacity(0.56)), lineWidth: 0.72)
@@ -7441,7 +7322,7 @@ private struct MacAudioScopePlot: View {
                 frame.addRect(CGRect(x: 0.75, y: 0.75, width: max(1, size.width - 1.5), height: max(1, size.height - 1.5)))
                 context.stroke(frame, with: .color(.white.opacity(0.94)), lineWidth: 1.1)
             }
-            .background(Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255))
+            .background(Palette.scopeBg)
             Text(label)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.86))
@@ -7504,20 +7385,20 @@ private struct MacProfessionalScopeBoard: View {
             MacScopePlot(
                 label: "YUV",
                 traces: [
-                    MacScopeTrace(value: luma, color: Color(red: 0.08, green: 1, blue: 0.36)),
-                    MacScopeTrace(value: cb, color: Color(red: 0, green: 0.82, blue: 1)),
+                    MacScopeTrace(value: luma, color: Palette.scopeYuvY),
+                    MacScopeTrace(value: cb, color: Palette.scopeYuvU),
                     MacScopeTrace(
                         value: cr,
-                        color: Color(red: 1, green: 0.15, blue: 0.87)
+                        color: Palette.scopeYuvV
                     )
                 ]
             )
             MacScopePlot(
                 label: "RGB",
                 traces: [
-                    MacScopeTrace(value: red, color: Color(red: 1, green: 0.19, blue: 0.16)),
-                    MacScopeTrace(value: green, color: Color(red: 0.16, green: 1, blue: 0.41)),
-                    MacScopeTrace(value: blue, color: Color(red: 0.13, green: 0.25, blue: 1))
+                    MacScopeTrace(value: red, color: Palette.scopeR),
+                    MacScopeTrace(value: green, color: Palette.scopeG),
+                    MacScopeTrace(value: blue, color: Palette.scopeB)
                 ],
                 parade: true
             )
@@ -7554,11 +7435,11 @@ private struct CaptureSessionPanel: View {
                     Toggle("双目标备份", isOn: $dualBackupEnabled)
                 }
                 Text("命名支持 {session}、{date}、{counter}、{camera}；RAW + JPEG 自动配对，并生成 XMP 与 SHA-256 清单。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
                 HStack {
                     RuntimeLocalizedText(workflow.status)
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(.system(size: TypeScale.body, design: .monospaced))
                         .foregroundStyle(Palette.muted)
                     Spacer()
                     Button(workflow.isActive ? "结束会话" : "开始会话") {
@@ -7569,7 +7450,7 @@ private struct CaptureSessionPanel: View {
             }
             .padding(.top, 10)
         }
-        .font(.system(size: 19, weight: .bold))
+        .font(.system(size: TypeScale.title, weight: .bold))
         .onAppear(perform: loadConfiguration)
     }
 
@@ -7783,11 +7664,11 @@ private struct MacLibraryBranchRow: View {
                         )
                         .frame(width: 24)
                         Label(branch.name, systemImage: "folder")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
                             .lineLimit(1)
                         Spacer()
                         Text("\(assignedPhotos.count) 文件")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: TypeScale.caption, design: .monospaced))
                             .foregroundStyle(Palette.muted)
                     }
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -7854,7 +7735,7 @@ private struct MacLibraryBranchRow: View {
                 }
                 if assignedPhotos.isEmpty && branch.children.isEmpty {
                     Text("拖动文件到这里")
-                        .font(.system(size: 11))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(Palette.muted)
                         .padding(.leading, CGFloat(depth + 1) * 16 + 42)
                         .frame(height: 28)
@@ -7913,7 +7794,7 @@ private struct MacLibraryBranchFileRow: View {
             .frame(width: 72, height: 48)
             .clipShape(RoundedRectangle(cornerRadius: 7))
             Text(photo.name)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: TypeScale.caption, design: .monospaced))
                 .lineLimit(1)
             Spacer()
             Image(systemName: "line.3.horizontal")
@@ -7943,7 +7824,7 @@ private struct MacLibraryBranchFileRow: View {
                 photo.name,
                 systemImage: "arrow.up.and.down.and.arrow.left.and.right"
             )
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: TypeScale.body, weight: .semibold))
             .padding(10)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9))
         }
@@ -7971,7 +7852,7 @@ private struct CameraStorageMacRow: View {
                         .scaledToFill()
                 } else {
                     Image(systemName: item.isVideo ? "video" : "photo")
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: TypeScale.title, weight: .medium))
                         .foregroundStyle(Palette.muted)
                 }
             }
@@ -7981,7 +7862,7 @@ private struct CameraStorageMacRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(item.filename)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         .lineLimit(1)
                     if item.isProtected {
                         Image(systemName: "lock.fill")
@@ -7992,7 +7873,7 @@ private struct CameraStorageMacRow: View {
                 Text(
                     "\(ByteCountFormatter.string(fromByteCount: Int64(clamping: item.sizeBytes), countStyle: .file)) · \(item.capturedAt)"
                 )
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 8)
@@ -8102,7 +7983,7 @@ private struct LibraryView: View {
                             }
                         }
                     }
-                    .font(.system(size: 19, weight: .bold))
+                    .font(.system(size: TypeScale.title, weight: .bold))
 
                 }
                 .padding(24)
@@ -8116,7 +7997,7 @@ private struct LibraryView: View {
                 ) {
                     TransferView(model: model)
                 }
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: TypeScale.title, weight: .bold))
                 .padding(18)
             }
             .frame(minWidth: 380, idealWidth: 440, maxWidth: 520)
@@ -8234,9 +8115,9 @@ private struct LibraryView: View {
                         .background(Palette.cobalt, in: RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(cameraStorageCapacitySummary)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         Text(cameraStorageStatus)
-                            .font(.system(size: 11))
+                            .font(.system(size: TypeScale.caption))
                             .foregroundStyle(Palette.muted)
                             .lineLimit(2)
                     }
@@ -8310,7 +8191,7 @@ private struct LibraryView: View {
             }
             .padding(.top, 12)
         }
-        .font(.system(size: 19, weight: .bold))
+        .font(.system(size: TypeScale.title, weight: .bold))
         .onChange(of: cameraStorageExpanded) { expanded in
             if expanded && cameraStorageSnapshot.items.isEmpty {
                 Task { await refreshCameraStorage() }
@@ -8431,9 +8312,9 @@ private struct LibraryView: View {
                     .background(Palette.cobalt, in: RoundedRectangle(cornerRadius: 14))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("分支工作台")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: TypeScale.title, weight: .bold))
                     Text("把文件拖到任意分支；拖回“未分类”即可移出分支。")
-                        .font(.system(size: 12))
+                        .font(.system(size: TypeScale.body))
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -8447,7 +8328,7 @@ private struct LibraryView: View {
 
             if branchStore.branches.isEmpty {
                 Text("先建立项目、客户或拍摄日分支，再把本地文件拖入；文件仍保留在原始存储位置。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(Palette.muted)
                     .padding(.vertical, 6)
             } else {
@@ -8502,7 +8383,7 @@ private struct LibraryView: View {
                     }
                 }
             }
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: TypeScale.emphasis, weight: .semibold))
             .padding(12)
             .background(
                 unclassifiedDropTargeted
@@ -8581,7 +8462,7 @@ private struct LibraryView: View {
                                 .frame(height: 132)
                         }
                         Text(photo.name)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: TypeScale.body, weight: .semibold))
                             .lineLimit(1)
                         Text(
                             photo.createdAt.formatted(
@@ -8589,7 +8470,7 @@ private struct LibraryView: View {
                                 time: .shortened
                             )
                         )
-                        .font(.system(size: 11))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(Palette.muted)
                     }
                     .padding(10)
@@ -8616,7 +8497,7 @@ private struct LibraryView: View {
                         photo.name,
                         systemImage: "arrow.up.and.down.and.arrow.left.and.right"
                     )
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                     .padding(10)
                     .background(
                         .regularMaterial,
@@ -9586,7 +9467,7 @@ private struct EditorMediaRail<Content: View>: View {
             } icon: {
                 Image(systemName: "photo.stack")
             }
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
             Divider().overlay(Palette.editorRule)
             content
             Spacer(minLength: 0)
@@ -9860,10 +9741,10 @@ private struct ImageEditorView: View {
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
                                 .foregroundStyle(Color.white.opacity(0.46))
                             Text("\(photos.count)")
-                                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                                .font(.system(size: TypeScale.display, weight: .semibold, design: .monospaced))
                             if let selectedPhoto {
                                 Text(selectedPhoto.name)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(.system(size: TypeScale.caption, design: .monospaced))
                                     .foregroundStyle(Color.white.opacity(0.62))
                                     .lineLimit(4)
                             }
@@ -9922,14 +9803,14 @@ private struct ImageEditorView: View {
                     RuntimeLocalizedText(
                         selectedSection == .aiTools ? "AI 工具" : "专业显影"
                     )
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: TypeScale.emphasis, weight: .bold))
                         .foregroundStyle(.white)
                     RuntimeLocalizedText(
                         selectedSection == .aiTools
                             ? "基于 nano-banana-2 模型的 AI 修图与生图"
                             : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
                     )
-                        .font(.system(size: 11))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(Palette.editorLabel)
                 }
                 Spacer()
@@ -9965,14 +9846,14 @@ private struct ImageEditorView: View {
                     HStack(alignment: .center, spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
                             Label("AI 创作", systemImage: "sparkles")
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.system(size: TypeScale.emphasis, weight: .semibold))
                             Text("修图覆盖原图 · 生图保存新文件")
-                                .font(.system(size: 11))
+                                .font(.system(size: TypeScale.caption))
                                 .foregroundStyle(Palette.muted)
                         }
                         Spacer()
                         Text(ActivationManager.isActivated ? "已解锁 · 剩余 \(ActivationManager.remainingUsage) 次" : "需要激活")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: TypeScale.caption, weight: .semibold))
                             .foregroundStyle(ActivationManager.isActivated ? Palette.positive : Palette.muted)
                             .padding(.horizontal, 10)
                             .frame(minHeight: 26)
@@ -9995,11 +9876,11 @@ private struct ImageEditorView: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("提示词").font(.system(size: 12, weight: .semibold))
+                        Text("提示词").font(.system(size: TypeScale.body, weight: .semibold))
                         ZStack(alignment: .topLeading) {
                             if aiManualPrompt.isEmpty {
                                 Text(aiMode == .edit ? "输入修图描述…（可补充）" : "输入生图描述…（可补充）")
-                                    .font(.system(size: 13))
+                                    .font(.system(size: TypeScale.body))
                                     .foregroundStyle(Palette.muted)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 8)
@@ -10008,7 +9889,7 @@ private struct ImageEditorView: View {
                                 get: { aiManualPrompt },
                                 set: { aiManualPrompt = $0; composeAiPrompt() }
                             ))
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .frame(height: 80)
                             .scrollContentBackground(.hidden)
                         }
@@ -10017,7 +9898,7 @@ private struct ImageEditorView: View {
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("可组合预设").font(.system(size: 12, weight: .semibold))
+                            Text("可组合预设").font(.system(size: TypeScale.body, weight: .semibold))
                             Spacer()
                             Button("清空") {
                                 aiSelectedPresets.removeAll()
@@ -10196,14 +10077,14 @@ private struct ImageEditorView: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Label("尼康云创预览", systemImage: "camera.filters")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                     .foregroundStyle(.white)
                 Text("内置 \(NikonCloudPresetLibrary.presets.count) 款 NP3")
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: TypeScale.caption, design: .monospaced))
                     .foregroundStyle(Palette.editorLabel)
                 Spacer()
                 Text("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同")
-                    .font(.system(size: 11))
+                    .font(.system(size: TypeScale.caption))
                     .foregroundStyle(Palette.editorLabel)
             }
             .padding(.horizontal, 16)
@@ -10251,7 +10132,7 @@ private struct ImageEditorView: View {
                 }
                 if selectedSection != .aiTools {
                     Text(showingOriginal ? "原图" : "调整后")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: TypeScale.caption, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 28)
@@ -10260,7 +10141,7 @@ private struct ImageEditorView: View {
                         .padding(12)
                 } else if image != nil {
                     Text(aiResultImage != nil ? "AI 生成" : "原图")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: TypeScale.caption, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 28)
@@ -10457,7 +10338,7 @@ private struct ImageEditorView: View {
                     )
                     .frame(width: 16, height: 16)
                 Text(LocalizedStringKey(section.rawValue))
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: TypeScale.caption, weight: .semibold))
                     .foregroundStyle(tint)
             }
             .padding(.horizontal, 12)
@@ -10528,7 +10409,7 @@ private struct ImageEditorView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("AI 智能修图 · 工作台", systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: TypeScale.emphasis, weight: .semibold))
                 Text("设备端 · 照片不会上传")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Palette.editorAccent)
@@ -10545,7 +10426,7 @@ private struct ImageEditorView: View {
                     .foregroundStyle(Palette.muted)
             }
             Text(LocalizedStringKey(aiSummaryKey))
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(Palette.muted)
                 .fixedSize(horizontal: false, vertical: true)
             if let aiAnalysis {
@@ -10706,13 +10587,13 @@ private struct ImageEditorView: View {
 
 private var colorWheelsControls: some View {
         VStack(spacing: 12) {
-            Text("Lift / Gamma / Gain · 三向色轮").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text("Lift / Gamma / Gain · 三向色轮").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
             HStack(spacing: 8) {
                 colorWheel("阴影", color: .cyan, x: $settings.liftX, y: $settings.liftY)
                 colorWheel("中间调", color: .purple, x: $settings.gammaX, y: $settings.gammaY)
                 colorWheel("高光", color: .yellow, x: $settings.gainX, y: $settings.gainY)
             }
-            Text("在圆盘内拖动色点调整对应范围").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text("在圆盘内拖动色点调整对应范围").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
         }
     }
 
@@ -10797,27 +10678,27 @@ private var curvesControls: some View {
             .frame(height: 150)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             Text("点击任意位置新增控制点，拖动控制点调整曲线")
-                .font(.system(size: 11)).foregroundStyle(Palette.muted)
+                .font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
         }
     }
 
     private var pickerControls: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("在预览画面点击取样色彩，自动微调色温与色调").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Text("在预览画面点击取样色彩，自动微调色温与色调").font(.system(size: TypeScale.caption)).foregroundStyle(Palette.muted)
             Button { pickerArmed.toggle(); status = pickerArmed ? "取色器已启用，请点击预览画面" : "取色器已关闭" } label: {
                 Label(pickerArmed ? "点击预览取色 · 再次关闭" : "取色器", systemImage: "eyedropper")
             }.buttonStyle(NativeButtonStyle(primary: pickerArmed))
-            Text(settings.pickedColorHex).font(.system(size: 12, design: .monospaced)).foregroundStyle(Palette.muted)
+            Text(settings.pickedColorHex).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(Palette.muted)
         }
     }
 
     private var maskControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("蒙版列表")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: TypeScale.body, weight: .semibold))
             if settings.maskLayers.isEmpty {
                 Text("暂无蒙版")
-                    .font(.system(size: 11))
+                    .font(.system(size: TypeScale.caption))
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             } else {
@@ -10832,7 +10713,7 @@ private var curvesControls: some View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(layer.name)
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(.system(size: TypeScale.body, weight: .semibold))
                                     Text(LocalizedStringKey(displayed.type))
                                         .font(.system(size: 10))
                                         .foregroundStyle(Palette.muted)
@@ -10916,7 +10797,7 @@ private var curvesControls: some View {
                 .buttonStyle(NativeButtonStyle(primary: settings.maskExists && settings.maskBrushMode == .subtract))
             }
             Text("智能识别")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: TypeScale.caption, weight: .semibold))
                 .foregroundStyle(Palette.muted)
             LazyVGrid(
                 columns: [GridItem(.adaptive(minimum: 104), spacing: 8)],
@@ -10969,7 +10850,7 @@ private var curvesControls: some View {
             .buttonStyle(NativeButtonStyle(primary: settings.maskInvert))
             Divider()
             Text("蒙版内调整")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: TypeScale.body, weight: .semibold))
             editorSlider(title: "曝光", value: $settings.maskExposure, range: -2...2, step: 0.05, formatter: { String(format: "%+.2f EV", $0) })
             standardSlider("对比度", value: $settings.maskContrast)
             standardSlider("高光", value: $settings.maskHighlights)
@@ -10981,7 +10862,7 @@ private var curvesControls: some View {
             Text(settings.maskExists
                 ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                 : "先创建蒙版，再选择添加或减去画笔。")
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(Palette.muted)
         }
     }
@@ -11025,7 +10906,7 @@ private var curvesControls: some View {
             }
             .buttonStyle(NativeButtonStyle())
             Text("旋转 90° · 水平翻转 · 垂直翻转")
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(Palette.muted)
         }
     }
@@ -11696,7 +11577,7 @@ private var curvesControls: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(LocalizedStringKey(title))
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: TypeScale.body, weight: .semibold))
                 Spacer()
                 Text(formatter(value.wrappedValue))
                     .font(.system(size: 10, design: .monospaced))
@@ -11982,7 +11863,7 @@ private struct EditorSectionButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: TypeScale.caption, weight: .semibold))
             .foregroundStyle(selected ? Palette.editorAccent : Palette.editorLabel)
             .padding(.horizontal, 10)
             .frame(minHeight: 30)
@@ -12040,12 +11921,12 @@ private struct SystemMacAlbumThumbnail: View {
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 10))
             Text(item.name)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: TypeScale.body, weight: .semibold))
                 .lineLimit(1)
             RuntimeLocalizedText(
                 item.isVideo ? "系统视频 · 双击播放" : "系统照片 · 双击查看"
             )
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(Palette.muted)
         }
         .padding(10)
@@ -12091,7 +11972,7 @@ private struct SystemMacAlbumPreview: View {
                 .buttonStyle(NativeButtonStyle())
                 Spacer()
                 Text("系统相册 · \(item.name)")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.system(size: TypeScale.body, design: .monospaced))
                     .lineLimit(1)
             }
             if item.isVideo {
@@ -12181,16 +12062,16 @@ private struct MacCloudDriveGuide: View {
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "externaldrive.connected.to.line.below")
-                                    .font(.system(size: 20))
+                                    .font(.system(size: TypeScale.title))
                                     .foregroundStyle(Palette.cobalt)
                                     .frame(width: 40, height: 40)
                                     .background(Palette.cobaltSoft)
                                     .clipShape(RoundedRectangle(cornerRadius: 9))
                                 VStack(alignment: .leading, spacing: 3) {
                                     RuntimeLocalizedText(provider.name)
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(size: TypeScale.emphasis, weight: .bold))
                                     RuntimeLocalizedText(provider.note)
-                                        .font(.system(size: 12))
+                                        .font(.system(size: TypeScale.body))
                                         .foregroundStyle(Palette.muted)
                                 }
                                 Spacer()
@@ -12210,7 +12091,7 @@ private struct MacCloudDriveGuide: View {
                 }
             }
             Text("步骤：安装并登录网盘客户端 → 下载/同步照片或视频 → 选择文件并加入 帧澈 ZENCHE 文件库。")
-                .font(.system(size: 12))
+                .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.muted)
             Button("选择文件并加入", action: chooseFiles)
                 .buttonStyle(NativeButtonStyle(primary: true))
@@ -12234,7 +12115,7 @@ private struct LargePhotoView: View {
                     .buttonStyle(NativeButtonStyle())
                 Spacer()
                 Text(photo.name)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.system(size: TypeScale.body, design: .monospaced))
                     .lineLimit(1)
                 Spacer()
                 ShareLink(item: photo.url) {
@@ -12354,7 +12235,7 @@ private struct TransferView: View {
                     )
 
                     RuntimeLocalizedText(wifiCamera.connectionMode.guidance)
-                        .font(.system(size: 12))
+                        .font(.system(size: TypeScale.body))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -12416,7 +12297,7 @@ private struct TransferView: View {
                     )
 
                     Text("相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。首次启动时请允许 macOS 接受传入网络连接。")
-                        .font(.system(size: 13))
+                        .font(.system(size: TypeScale.body))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -12444,7 +12325,7 @@ private struct TransferView: View {
                 .foregroundStyle(Palette.muted)
             Spacer()
             RuntimeLocalizedText(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(.system(size: TypeScale.emphasis, weight: .semibold, design: .monospaced))
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
@@ -12454,11 +12335,11 @@ private struct TransferView: View {
     private func statusCard(icon: String, title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 15) {
             Image(systemName: icon)
-                .font(.system(size: 24))
+                .font(.system(size: TypeScale.display))
                 .foregroundStyle(Palette.cobalt)
             Text(LocalizedStringKey(title)).font(.headline)
             RuntimeLocalizedText(value)
-                .font(.system(size: 13, design: .monospaced))
+                .font(.system(size: TypeScale.body, design: .monospaced))
                 .foregroundStyle(Palette.muted)
         }
         .padding(20)
@@ -12498,7 +12379,7 @@ private struct SplashView: View {
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Palette.ink)
                     Text("Capture · Connect · Flow")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: TypeScale.emphasis, weight: .medium))
                         .foregroundStyle(Palette.muted)
                 }
                 .opacity(textOpacity)
@@ -12541,7 +12422,7 @@ private struct MyDevicesView: View {
                             .font(.system(size: 46))
                             .foregroundStyle(Palette.cobalt)
                         RuntimeLocalizedText("尚未连接过设备")
-                            .font(.system(size: 21, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         RuntimeLocalizedText("成功连接相机后会自动保存在这里。")
                             .foregroundStyle(Palette.muted)
                     }
@@ -12610,12 +12491,12 @@ private struct RememberedDeviceCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(device.name)
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: TypeScale.title, weight: .bold))
                         .lineLimit(1)
                     Spacer()
                     if current {
                         Label("当前已连接", systemImage: "checkmark.circle.fill")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: TypeScale.caption, weight: .semibold))
                             .foregroundStyle(Palette.positive)
                     }
                 }
@@ -12623,7 +12504,7 @@ private struct RememberedDeviceCard: View {
                     "\(device.vendor) · \(device.transport)",
                     systemImage: "cable.connector"
                 )
-                .font(.system(size: 13))
+                .font(.system(size: TypeScale.body))
                 .foregroundStyle(Palette.muted)
                 HStack(spacing: 4) {
                     RuntimeLocalizedText("最近连接")
@@ -12635,7 +12516,7 @@ private struct RememberedDeviceCard: View {
                         )
                     )
                 }
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: TypeScale.body, design: .monospaced))
                 .foregroundStyle(Palette.muted)
 
                 HStack(spacing: 10) {
@@ -12690,7 +12571,7 @@ private struct ConnectionSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("相机连接")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: TypeScale.display, weight: .bold))
                     Text("本机摄像头、USB/PTP 与官方 SDK")
                         .foregroundStyle(Palette.muted)
                 }
@@ -12702,14 +12583,14 @@ private struct ConnectionSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 16) {
                         Image(systemName: "web.camera.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: TypeScale.display))
                             .foregroundStyle(Palette.cobalt)
                             .frame(width: 48, height: 48)
                             .background(Palette.cobaltSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         VStack(alignment: .leading, spacing: 3) {
                             Text("本机摄像头")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: TypeScale.title, weight: .bold))
                             Text(
                                 model.localCameraConnected
                                     ? "\(model.localCamera.deviceName) · 已连接"
@@ -12738,18 +12619,18 @@ private struct ConnectionSheet: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .top, spacing: 14) {
                             Image(systemName: "checkmark.seal.fill")
-                                .font(.system(size: 23))
+                                .font(.system(size: TypeScale.title))
                                 .foregroundStyle(Palette.cobalt)
                                 .frame(width: 48, height: 48)
                                 .background(Palette.cobaltSoft)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("尼康官方 SDK")
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: TypeScale.title, weight: .bold))
                                 RuntimeLocalizedText(
                                     nikonOfficialSDK.statusSummary
                                 )
-                                .font(.system(size: 12))
+                                .font(.system(size: TypeScale.body))
                                 .foregroundStyle(Palette.muted)
                             }
                             Spacer()
@@ -12807,7 +12688,7 @@ private struct ConnectionSheet: View {
                         )
                         ForEach(nikonOfficialSDK.devices, id: \.self) { device in
                             Label(device, systemImage: "camera.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: TypeScale.caption))
                                 .foregroundStyle(Palette.muted)
                         }
                     }
@@ -12818,18 +12699,18 @@ private struct ConnectionSheet: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .top, spacing: 14) {
                             Image(systemName: "camera.aperture")
-                                .font(.system(size: 23))
+                                .font(.system(size: TypeScale.title))
                                 .foregroundStyle(Palette.cobalt)
                                 .frame(width: 48, height: 48)
                                 .background(Palette.cobaltSoft)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("索尼官方 SDK")
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: TypeScale.title, weight: .bold))
                                 RuntimeLocalizedText(
                                     sonyOfficialSDK.statusSummary
                                 )
-                                .font(.system(size: 12))
+                                .font(.system(size: TypeScale.body))
                                 .foregroundStyle(Palette.muted)
                             }
                             Spacer()
@@ -12849,7 +12730,7 @@ private struct ConnectionSheet: View {
                         )
                         ForEach(sonyOfficialSDK.devices, id: \.self) { device in
                             Label(device, systemImage: "camera.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: TypeScale.caption))
                                 .foregroundStyle(Palette.muted)
                         }
                         Text("连接即表示同意索尼 SDK 使用限制；帧澈独立提供产品支持。")
@@ -12862,14 +12743,14 @@ private struct ConnectionSheet: View {
 
                     HStack(spacing: 16) {
                         Image(systemName: "cable.connector")
-                            .font(.system(size: 24))
+                            .font(.system(size: TypeScale.display))
                             .foregroundStyle(Palette.cobalt)
                             .frame(width: 48, height: 48)
                             .background(Palette.cobaltSoft)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         VStack(alignment: .leading, spacing: 3) {
                             Text("USB / PTP")
-                                .font(.system(size: 17, weight: .bold))
+                                .font(.system(size: TypeScale.title, weight: .bold))
                             Text(model.connected
                                 ? "\(model.activeCameraName) · 已连接"
                                 : "联机拍摄、参数控制、实时监看和文件传输")
@@ -12912,9 +12793,9 @@ private struct ConnectionSheet: View {
                 .foregroundStyle(ready ? Palette.positive : Palette.muted)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: TypeScale.emphasis, weight: .semibold))
                 RuntimeLocalizedText(detail)
-                    .font(.system(size: 11))
+                    .font(.system(size: TypeScale.caption))
                     .foregroundStyle(Palette.muted)
             }
         }
@@ -13006,7 +12887,7 @@ private struct RootView: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
             .foregroundStyle(Color.white.opacity(0.72))
             .padding(.horizontal, 18)
             .frame(height: 32)
