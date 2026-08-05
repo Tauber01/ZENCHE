@@ -182,6 +182,12 @@ enum FontToken {
     static let display: CGFloat = 24     // 大数字/读数
 }
 
+// v1.5.7 P3: 编辑页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+enum EditorFontSize {
+    static let tiny: CGFloat = 9     // 编辑页微标注（媒体池标签、示波器标题）
+    static let small: CGFloat = 10   // 编辑页小标签（示波器副文本）
+}
+
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
 private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
@@ -1759,12 +1765,12 @@ private struct EditorScopeDock: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 Text("编辑示波器")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(size: EditorFontSize.tiny, weight: .bold, design: .monospaced))
                     .foregroundStyle(IPalette.whiteFaint)
                 Text(hasSource
                     ? (values.isEmpty ? "运行“分析画面”后显示实测范围" : "本地图像分析")
                     : "暂无图像源")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(size: EditorFontSize.small, weight: .semibold, design: .monospaced))
                     .foregroundStyle(values.isEmpty ? IPalette.editorLabel : IPalette.editorAccent)
             }
             .frame(width: 190, alignment: .leading)
@@ -2120,7 +2126,7 @@ private struct ImageEditorPage: View {
                 editorPhotoPicker
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("可编辑照片")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(size: EditorFontSize.tiny, weight: .bold, design: .monospaced))
                     .foregroundStyle(IPalette.whiteGhost)
                 Text("\(photos.count)")
                     .font(.system(size: FontToken.display, weight: .semibold, design: .monospaced))
