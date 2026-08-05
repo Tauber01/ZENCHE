@@ -899,10 +899,7 @@
                   CornerRadius="14">
             <Grid>
               <StackPanel>
-                <TextBlock Foreground="{DynamicResource AccentBrush}"
-                           FontFamily="{DynamicResource DisplayFont}"
-                           FontSize="24"
-                           FontWeight="Bold"
+                <TextBlock Style="{DynamicResource LibraryHeaderTitle}"
                            Text="分支文件库" />
                 <TextBlock Margin="0,4,0,0"
                            Foreground="{DynamicResource MutedBrush}"
@@ -984,6 +981,7 @@
                           <Grid>
                             <Image Source="{Binding Thumbnail}"
                                    Stretch="UniformToFill" />
+                            <!-- 图标尺寸 16，豁免族（不受样式库约束） -->
                             <TextBlock HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource GraphiteInkBrush}"
@@ -1023,9 +1021,7 @@
                   </WrapPanel>
                   <TextBlock x:Name="CameraStorageStatusText"
                              VerticalAlignment="Center"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource MetaText}"
                              Text="请连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机" />
                 </DockPanel>
               </StackPanel>
@@ -1112,7 +1108,7 @@
                                Visibility="Collapsed"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Center"
-                               FontSize="15"
+                               Style="{DynamicResource LibraryNodeIcon}"
                                Text="{Binding Icon}" />
                   </Grid>
                   <StackPanel Grid.Column="1">

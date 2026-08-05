@@ -110,6 +110,12 @@ const DEVICE_FS_SUBTITLE: number = 14;    // 设备页副标题/空态说明
 const DEVICE_FS_EMPTY_TITLE: number = 21; // 设备页空态标题
 const DEVICE_FS_CARD_TITLE: number = 19;  // 设备卡名称
 const DEVICE_FS_SUB: number = 13;         // 设备卡 vendor · transport
+// ── v1.5.7 P5: 文件库页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+const LIBRARY_FS_TINY: number = 10;     // 文件库微标注（时长徽标、文件行 detail）
+const LIBRARY_FS_SUB: number = 13;      // 文件库次级文本（说明/容量摘要/空态/无线地址）
+const LIBRARY_FS_TITLE: number = 14;    // 文件库行标题（分支名/文件名/无线状态）
+const LIBRARY_FS_HEAD: number = 16;     // 文件库空态/区块标题（系统相册暂不可见、未分类已清空）
+const LIBRARY_FS_WORKBENCH: number = 20; // 分支工作台标题（hero）
 
 // Spacing（4pt 体系，与 Android 同值）
 const SPACE_4: number = 4;
@@ -5401,7 +5407,7 @@ struct Index {
         `${this.photos.length} 个 帧澈 ZENCHE 文件 · ` +
         `${this.systemMedia.length} 个系统相册项目 · 拖动整理`
       ))
-        .fontSize(14)
+        .fontSize(LIBRARY_FS_TITLE)
         .fontColor($r('app.color.muted'))
         .width('100%')
       this.BranchWorkspace()
@@ -5466,7 +5472,7 @@ struct Index {
       if (this.systemExpanded && this.systemMedia.length === 0) {
         Column({ space: 8 }) {
           Text(this.tr('系统相册暂不可见'))
-            .fontSize(16)
+            .fontSize(LIBRARY_FS_HEAD)
             .fontWeight(FontWeight.Bold)
           Text(this.tr('允许照片和视频访问后，最近媒体会直接显示在这里。'))
             .fontSize(TS_BODY)
@@ -5524,7 +5530,7 @@ struct Index {
                       .objectFit(ImageFit.Cover)
                     if (item.isVideo) {
                       Text(`▶ ${this.durationLabel(item.duration)}`)
-                        .fontSize(10)
+                        .fontSize(LIBRARY_FS_TINY)
                         .fontFamily('monospace')
                         .fontColor(Color.White)
                         .backgroundColor(HUD_BG_SOFT)
@@ -5610,7 +5616,7 @@ struct Index {
             )}`
             : this.tr(this.cameraStorageStatus)
         )
-          .fontSize(13)
+          .fontSize(LIBRARY_FS_SUB)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -5676,7 +5682,7 @@ struct Index {
         .width('100%')
         if (!this.connected && !this.wifiConnected) {
           Text(this.tr('请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机。系统摄像头不开放机内存储。'))
-            .fontSize(13)
+            .fontSize(LIBRARY_FS_SUB)
             .fontColor($r('app.color.muted'))
             .textAlign(TextAlign.Center)
             .width('100%')
@@ -5687,7 +5693,7 @@ struct Index {
               ? '正在读取存储卷与文件信息…'
               : '暂无机内文件。点击“刷新机内文件”读取相机存储卡。'
           ))
-            .fontSize(13)
+            .fontSize(LIBRARY_FS_SUB)
             .fontColor($r('app.color.muted'))
             .textAlign(TextAlign.Center)
             .width('100%')
@@ -5719,7 +5725,7 @@ struct Index {
                       .borderRadius(6)
                     Column({ space: 3 }) {
                       Text(item.filename)
-                        .fontSize(14)
+                        .fontSize(LIBRARY_FS_TITLE)
                         .fontWeight(FontWeight.Medium)
                         .fontColor($r('app.color.ink'))
                         .maxLines(1)
@@ -5818,7 +5824,7 @@ struct Index {
     Column({ space: 10 }) {
       Row({ space: 12 }) {
         Text('分支')
-          .fontSize(16)
+          .fontSize(16) // 徽标方块文字，图标豁免族（不受 TS/LIBRARY_FS 约束）
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .width(54)
@@ -5828,7 +5834,7 @@ struct Index {
           .borderRadius(14)
         Column({ space: 3 }) {
           Text(this.tr('分支工作台'))
-            .fontSize(20)
+            .fontSize(LIBRARY_FS_WORKBENCH)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('长按文件并拖到任意分支；拖回“未分类”即可移出分支。'))
@@ -5893,7 +5899,7 @@ struct Index {
       ) {
         Column({ space: 6 }) {
           Text(this.tr('未分类已清空'))
-            .fontSize(16)
+            .fontSize(LIBRARY_FS_HEAD)
             .fontWeight(FontWeight.Bold)
           Text(this.tr('拍摄、导入或无线接收的新文件会先显示在这里。'))
             .fontSize(TS_BODY)
@@ -5968,7 +5974,7 @@ struct Index {
       if (item.isVideo) {
         Stack({ alignContent: Alignment.Center }) {
           Text('▶')
-            .fontSize(20)
+            .fontSize(20) // ▶ 播放图标，图标豁免族（不受 TS/LIBRARY_FS 约束）
             .fontColor(Color.White)
         }
         .width(68)
@@ -5984,13 +5990,13 @@ struct Index {
       }
       Column({ space: 4 }) {
         Text(item.name)
-          .fontSize(14)
+          .fontSize(LIBRARY_FS_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(item.detail)
-          .fontSize(10)
+          .fontSize(LIBRARY_FS_TINY)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
       }
@@ -6100,7 +6106,7 @@ struct Index {
             this.toggleLibraryBranch(branch.id);
           })
         Text(`▱  ${branch.name}`)
-          .fontSize(14)
+          .fontSize(LIBRARY_FS_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .maxLines(1)
@@ -6420,11 +6426,11 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(this.wirelessStatus))
-            .fontSize(14)
+            .fontSize(LIBRARY_FS_TITLE)
             .fontWeight(FontWeight.Medium)
             .width('100%')
           Text(this.tr(this.wirelessAddress))
-            .fontSize(13)
+            .fontSize(LIBRARY_FS_SUB)
             .fontFamily('monospace')
             .fontColor($r('app.color.accent'))
             .width('100%')

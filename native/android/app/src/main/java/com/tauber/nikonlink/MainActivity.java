@@ -186,6 +186,10 @@ public final class MainActivity extends Activity {
     private static final int PAGE_FS_SUBTITLE = 14;        // 页面副标题（sectionHeader 共享组件）
     private static final int DEVICE_FS_EMPTY_TITLE = 20;   // 设备页空态标题
     private static final int DEVICE_FS_SUB = 13;           // 设备页次级文本（空态说明、卡 transport）
+    // ── v1.5.7 P5: 文件库页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+    private static final int LIBRARY_FS_WORKBENCH = 20; // 分支工作台标题（hero）
+    private static final int LIBRARY_FS_TITLE = 14;     // 行标题（分支名/文件名/提示文本）
+    private static final int LIBRARY_FS_SUB = 13;       // 次级文本（说明/摘要/空态/条目名）
     // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
     private static final int SPACE_4 = 4;
     private static final int SPACE_8 = 8;
@@ -6181,12 +6185,12 @@ public final class MainActivity extends Activity {
         branchHero.setBackground(rounded(COBALT_SOFT, 16, COBALT));
         branchHero.addView(text(
                 "分支工作台",
-                20,
+                LIBRARY_FS_WORKBENCH,
                 Typeface.BOLD,
                 INK));
         branchHero.addView(text(
                 "长按文件并拖到任意分支；拖回“未分类”即可移出分支。",
-                13,
+                LIBRARY_FS_SUB,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 0));
@@ -6230,7 +6234,7 @@ public final class MainActivity extends Activity {
         content.addView(
                 text(
                         "系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。",
-                        12,
+                        TS_BODY,
                         Typeface.NORMAL,
                         MUTED),
                 marginParams(-1, -2, 0, 0, 0, 16));
@@ -6238,7 +6242,7 @@ public final class MainActivity extends Activity {
         if (!hasAlbumAccess()) {
             TextView permission = text(
                     "允许照片和视频访问后，最近媒体会在这里直接显示，无需先导入。",
-                    14,
+                    LIBRARY_FS_TITLE,
                     Typeface.NORMAL,
                     MUTED);
             permission.setGravity(Gravity.CENTER);
@@ -6249,7 +6253,7 @@ public final class MainActivity extends Activity {
         } else if (systemMedia.isEmpty()) {
             TextView emptyAlbum = text(
                     "系统相册暂无可显示的照片或视频。",
-                    14,
+                    LIBRARY_FS_TITLE,
                     Typeface.NORMAL,
                     MUTED);
             emptyAlbum.setGravity(Gravity.CENTER);
@@ -6292,7 +6296,7 @@ public final class MainActivity extends Activity {
                 : cameraStorageStatus;
         TextView summary = text(
                 capacityText,
-                13,
+                LIBRARY_FS_SUB,
                 Typeface.BOLD,
                 available ? INK : MUTED);
         body.addView(summary, marginParams(-1, -2, 0, 2, 0, 10));
@@ -6364,7 +6368,7 @@ public final class MainActivity extends Activity {
     }
 
     private TextView emptyStorageText(String value) {
-        TextView empty = text(value, 13, Typeface.NORMAL, MUTED);
+        TextView empty = text(value, LIBRARY_FS_SUB, Typeface.NORMAL, MUTED);
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(dp(16), dp(24), dp(16), dp(24));
         return empty;
@@ -6395,13 +6399,13 @@ public final class MainActivity extends Activity {
 
         LinearLayout copy = verticalContainer();
         copy.setPadding(dp(12), 0, 0, 0);
-        copy.addView(text(item.filename, 14, Typeface.BOLD, INK));
+        copy.addView(text(item.filename, LIBRARY_FS_TITLE, Typeface.BOLD, INK));
         String detail = formatStorageBytes(item.sizeBytes)
                 + (item.width > 0 && item.height > 0
                         ? " · " + item.width + " × " + item.height : "")
                 + " · " + item.capturedAt
                 + (item.protectedObject ? " · 已保护" : "");
-        copy.addView(text(detail, 11, Typeface.NORMAL, MUTED));
+        copy.addView(text(detail, TS_CAPTION, Typeface.NORMAL, MUTED));
         row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
         if (requestThumbnail && !item.isVideo()) {
             storageExecutor.submit(() -> {
@@ -9744,7 +9748,7 @@ public final class MainActivity extends Activity {
         if (unclassified.isEmpty()) {
             TextView empty = text(
                     "未分类已清空\n拍摄、导入或无线接收的新文件会先显示在这里。",
-                    14,
+                    LIBRARY_FS_TITLE,
                     Typeface.NORMAL,
                     MUTED);
             empty.setGravity(Gravity.CENTER);
@@ -9834,7 +9838,7 @@ public final class MainActivity extends Activity {
             tree.addView(
                     text(
                             "可建立项目、客户或拍摄日等分支；媒体仍保留在原始存储位置。",
-                            12,
+                            TS_BODY,
                             Typeface.NORMAL,
                             MUTED),
                     marginParams(-1, -2, 0, 4, 0, 10));
@@ -9868,13 +9872,13 @@ public final class MainActivity extends Activity {
         Button toggle = nativeButton(expanded ? "⌄" : "›", false);
         TextView name = text(
                 "▱  " + branch.name,
-                14,
+                LIBRARY_FS_TITLE,
                 Typeface.BOLD,
                 INK);
         List<File> assignedFiles = filesAssignedToBranch(branch.id, files);
         TextView count = text(
                 assignedFiles.size() + " 文件",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED);
         count.setGravity(Gravity.CENTER);
@@ -9895,7 +9899,7 @@ public final class MainActivity extends Activity {
         if (assignedFiles.isEmpty() && branch.children.isEmpty()) {
             TextView empty = text(
                     "拖动文件到这里",
-                    12,
+                    TS_BODY,
                     Typeface.NORMAL,
                     MUTED);
             empty.setPadding(dp(54 + (depth + 1) * 14), 0, 0, 0);
@@ -10167,7 +10171,7 @@ public final class MainActivity extends Activity {
         if (count == 0) {
             body.addView(text(
                     "暂无" + title,
-                    13,
+                    LIBRARY_FS_SUB,
                     Typeface.NORMAL,
                     MUTED));
         }
@@ -10189,7 +10193,7 @@ public final class MainActivity extends Activity {
         if (count == 0) {
             body.addView(text(
                     "暂无" + title,
-                    13,
+                    LIBRARY_FS_SUB,
                     Typeface.NORMAL,
                     MUTED));
         }
@@ -10303,7 +10307,7 @@ public final class MainActivity extends Activity {
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
         details.setPadding(dp(12), 0, dp(8), 0);
-        details.addView(text(entry.name, 13, Typeface.BOLD, INK));
+        details.addView(text(entry.name, LIBRARY_FS_SUB, Typeface.BOLD, INK));
         String duration = entry.video
                 ? " · " + formatDuration(entry.durationMillis)
                 : "";
@@ -10312,12 +10316,12 @@ public final class MainActivity extends Activity {
                         + new SimpleDateFormat(
                                 "MM-dd HH:mm",
                                 Locale.CHINA).format(new Date(entry.dateMillis)),
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED));
         details.addView(text(
                 entry.video ? "双击播放视频" : "双击查看大图",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 COBALT));
         row.addView(details, new LinearLayout.LayoutParams(0, dp(76), 1f));
@@ -10374,17 +10378,17 @@ public final class MainActivity extends Activity {
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
         details.setPadding(dp(12), 0, dp(8), 0);
-        details.addView(text(file.getName(), 13, Typeface.BOLD, INK));
+        details.addView(text(file.getName(), LIBRARY_FS_SUB, Typeface.BOLD, INK));
         details.addView(text(
                 humanSize(file.length()) + " · " + new SimpleDateFormat(
                         "MM-dd HH:mm",
                         Locale.CHINA).format(new Date(file.lastModified())),
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED));
         details.addView(text(
                 isVideoFile(file) ? "双击播放视频" : "双击查看大图",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 COBALT));
         row.addView(details, new LinearLayout.LayoutParams(0, dp(140), 1f));
@@ -10451,14 +10455,14 @@ public final class MainActivity extends Activity {
         settings.addView(text("多协议无线图片收件箱", TS_TITLE, Typeface.BOLD, INK));
         settings.addView(text(
                 wirelessStatus,
-                13,
+                LIBRARY_FS_SUB,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 3, 0, 12));
 
         wirelessAddressText = text(
                 wirelessSettingsText(),
-                13,
+                LIBRARY_FS_SUB,
                 Typeface.NORMAL,
                 INK);
         wirelessAddressText.setTextIsSelectable(true);
@@ -10483,7 +10487,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(48), 0, 16, 0, 0));
         wirelessStatusText = text(
                 "相机可使用 FTP/PASV；手机、电脑和自动化工具可使用 HTTP 上传或 WebDAV PUT。接收完成后照片会直接进入文件库。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         settings.addView(
@@ -10499,7 +10503,7 @@ public final class MainActivity extends Activity {
         wifiCard.addView(text("Wi‑Fi 相机 · PTP/IP", TS_TITLE, Typeface.BOLD, INK));
         wifiCard.addView(text(
                 "先在相机中开启无线遥控/PTP‑IP，并让手机加入相机热点或同一局域网。默认端口为 15740。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
@@ -10522,7 +10526,7 @@ public final class MainActivity extends Activity {
                 "sta".equals(wifiConnectionMode)
                         ? "STA 模式：让相机与手机加入同一局域网，并输入路由器分配给相机的 IP 地址。"
                         : "AP 模式：让手机加入相机热点；相机地址通常为 192.168.1.1。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         wifiCard.addView(wifiModeHelp, marginParams(-1, -2, 0, 0, 0, 8));
@@ -10567,7 +10571,7 @@ public final class MainActivity extends Activity {
                         : wifiConnected
                                 ? "Wi‑Fi 已连接 · " + wifiCameraName
                                 : "Wi‑Fi 相机未连接",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 wifiConnected ? POSITIVE : MUTED),
                 marginParams(-1, -2, 0, 8, 0, 10));

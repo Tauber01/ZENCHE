@@ -98,7 +98,19 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 图标尺寸豁免：设备页空态/占位图标（◉ 46/48）不受 TypeScale 约束，保留原值并注释声明（同 F1 先例）。
 - 沉浸 overlay 四件套、RGB 波形渲染层、导航 chrome 不在本批；Windows EditorPanel 内 AI 激活区 8 处字面量归 P6；云创监看面板已归档（见 0.8 勘误）不重复处理。
 
+## 0.10. 1.5.7 逐页批次 P5：分支文件库页四端对齐约定
+
+- 分支页字号归档：非 TypeScale 五档的既有值以文件级命名常量保留原值（iOS `PageFontSize.titleCompact=25/titleRegular=29`；Android `LIBRARY_FS_WORKBENCH=20/TITLE=14/SUB=13`；Harmony `LIBRARY_FS_TINY=10/SUB=13/TITLE=14/HEAD=16/WORKBENCH=20`；Windows 样式 `LibraryHeaderTitle(24)/LibraryNodeIcon(15)`），与 TS 档重合值（12→TS_BODY、11→TS_CAPTION）直接映射既有 token；字号数值统一收口归 F5，本批不改任何显示值。
+- iOS `PageTitle` 为**共享组件**（3 调用方：1964/6088/7703），紧凑 25 / 常规 29 以中性名 `PageFontSize.*` 落位，影响全部调用方但值不变、零视觉变化；对齐 P4 Android `PAGE_FS_*`（sectionHeader 共享组件）先例。
+- **无线传输面板属分支页组成部分**（macOS 基准 LibraryView 右列即无线传输折叠组 TransferView，8066-8070，已 token 化）：Android `buildWirelessTransferPanel/buildWifiCameraPanel`、Harmony `WirelessTransferCard/WifiCameraTransferSection` 一并归档（差距分析初版遗漏，本批补录）；iOS `WirelessTransferCard` 全系统字体、Windows 无线传输 Expander 无字号字面量，无需处理。
+- Harmony `CaptureSessionPanel`（6201）属 P1 组件（仅 CameraWorkspace 4270 调用），不在本批范围；其内部 6277 的 13 保留字面量。
+- 双外观纪律（P5 为非恒深页）：四端分支页前景/背景按外观成对取 token（Android INK/MUTED/COBALT/COBALT_SOFT 经 applyAppearanceTokens、Harmony $r('app.color.*')、iOS IPalette、Windows DynamicResource），无硬编码单外观色值；恒深色块上的白字（iOS 28pt 图标、Windows 16 图标）属豁免族注释声明。
+- 信息项一致性以「存在等价操作」为判定（不强制五端布局相同、不改标签文案）：顶部工具条五端等价（刷新相册/链接网盘/分享/访达显示/移到废纸篓）；大图预览/文件行操作等价。标签文案（iOS「文件」/Android「已下载」/Harmony·Windows 侧栏长名）属 F6 词表裁定，本批不动。
+- 图标尺寸豁免：iOS 28pt 分支工作台图标、Harmony 徽标方块 16/播放 ▶ 20、Windows 相机存储行图标 16 保留原值并注释声明（同 F1 先例）。
+- 不在本批：导航 chrome/沉浸 overlay/波形层；Windows EditorPanel AI 激活区归 P6；云创监看面板已归档（见 0.8 勘误）。
+
 ## 1. 总体原则
+
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。
 
