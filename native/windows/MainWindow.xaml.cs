@@ -492,7 +492,7 @@ public partial class MainWindow : Window
             var radius = Math.Max(8, Math.Min(ActualWidth, ActualHeight) * 0.38);
             var colors = new[] { Colors.Red, Colors.Yellow, Colors.LimeGreen, Colors.Cyan, Colors.Blue, Colors.Magenta };
             for (var i = 0; i < colors.Length; i++) DrawWheelSegment(dc, center, radius, i * 60 - 90, (i + 1) * 60 - 90, new SolidColorBrush(colors[i]));
-            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(35, 42, 52)), _ringPen, center, radius - 6, radius - 6);
+            dc.DrawEllipse((Brush)FindResource("ScopeWellBrush"), _ringPen, center, radius - 6, radius - 6);
             var knobX = center.X + Math.Clamp(XValue / 100, -1, 1) * radius * .72;
             var knobY = center.Y - Math.Clamp(YValue / 100, -1, 1) * radius * .72;
             dc.DrawEllipse(Accent, null, new Point(knobX, knobY), 6, 6);
@@ -564,8 +564,8 @@ public partial class MainWindow : Window
             base.OnRender(dc);
             var w = Math.Max(1, ActualWidth);
             var h = Math.Max(1, ActualHeight);
-            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(35, 42, 52)), new Pen(new SolidColorBrush(Color.FromRgb(80, 90, 104)), 1), new Rect(0, 0, w, h), 8, 8);
-            var guide = new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1) { DashStyle = new DashStyle(new[] { 4d, 4d }, 0) };
+            dc.DrawRoundedRectangle((Brush)FindResource("ScopeWellBrush"), new Pen((Brush)FindResource("ScopeWellBorderBrush"), 1), new Rect(0, 0, w, h), 8, 8);
+            var guide = new Pen((Brush)FindResource("GuideWhiteBrush"), 1) { DashStyle = new DashStyle(new[] { 4d, 4d }, 0) };
             dc.DrawLine(guide, new Point(0, h), new Point(w, 0));
             var accent = (Brush)Application.Current.FindResource("AccentBrush");
             var curvePen = new Pen(accent, 2);
@@ -2173,7 +2173,7 @@ public partial class MainWindow : Window
             Height = 84,
             BorderThickness = new Thickness(2),
             BorderBrush = new SolidColorBrush(
-                Color.FromArgb(220, 255, 214, 70)),
+                (Color)FindResource("ColorAccentBorder")),
             CornerRadius = new CornerRadius(4),
             Background = Brushes.Transparent,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -2206,7 +2206,7 @@ public partial class MainWindow : Window
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)),
+            Background = (Brush)FindResource("ScrimMidBrush"),
             Padding = new Thickness(14, 8, 14, 8)
         };
         top.Children.Add(status);
@@ -2282,7 +2282,7 @@ public partial class MainWindow : Window
             Foreground = Brushes.White,
             FontFamily = (FontFamily)FindResource("MonoFont"),
             FontWeight = FontWeights.SemiBold,
-            Background = new SolidColorBrush(Color.FromArgb(155, 0, 0, 0)),
+            Background = (Brush)FindResource("ScrimStrongBrush"),
             Padding = new Thickness(18, 10, 18, 10),
             Margin = new Thickness(0, 0, 0, 24),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -2353,7 +2353,7 @@ public partial class MainWindow : Window
             IsExpanded = false,
             Content = moreParameterScroller,
             Foreground = Brushes.White,
-            Background = new SolidColorBrush(Color.FromArgb(105, 0, 0, 0)),
+            Background = (Brush)FindResource("ScrimSoftBrush"),
             Padding = new Thickness(6),
             Margin = new Thickness(0, 6, 0, 0)
         };
@@ -2455,7 +2455,7 @@ public partial class MainWindow : Window
                             FontFamily = (FontFamily)FindResource("MonoFont"),
                             FontSize = 8,
                             FontWeight = FontWeights.Bold,
-                            Foreground = new SolidColorBrush(Color.FromRgb(126, 135, 148))
+                            Foreground = (Brush)FindResource("TelemetryLabelBrush")
                         },
                         new TextBlock
                         {
@@ -2515,7 +2515,7 @@ public partial class MainWindow : Window
             Margin = new Thickness(20, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Background = new SolidColorBrush(Color.FromArgb(165, 21, 25, 31))
+            Background = (Brush)FindResource("StudioPanelScrimBrush")
         };
         rail.Children.Add(ImmersiveReadout(
             _camera.IsConnected
@@ -2660,7 +2660,7 @@ public partial class MainWindow : Window
                 {
                     Text = label,
                     Foreground = new SolidColorBrush(
-                        Color.FromArgb(170, 255, 255, 255)),
+                        (Color)FindResource("ColorWhiteDim")),
                     FontSize = 10,
                     TextAlignment = TextAlignment.Center
                 },
@@ -2736,7 +2736,7 @@ public partial class MainWindow : Window
     {
         return new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(155, 0, 0, 0)),
+            Background = (Brush)FindResource("ScrimStrongBrush"),
             CornerRadius = new CornerRadius(10),
             Margin = new Thickness(0, 0, 0, 12),
             Padding = new Thickness(8),
@@ -2772,7 +2772,7 @@ public partial class MainWindow : Window
         {
             Margin = new Thickness(4),
             Padding = new Thickness(10),
-            Background = new SolidColorBrush(Color.FromArgb(145, 20, 27, 36)),
+            Background = (Brush)FindResource("GraphiteScrimBrush"),
             CornerRadius = new CornerRadius(8),
             Child = new StackPanel
             {
@@ -2781,7 +2781,7 @@ public partial class MainWindow : Window
                     new TextBlock
                     {
                         Text = label,
-                        Foreground = new SolidColorBrush(Color.FromRgb(173, 181, 193)),
+                        Foreground = (Brush)FindResource("GraphiteMutedBrush"),
                         FontSize = 11
                     },
                     toggle
@@ -4053,7 +4053,8 @@ public partial class MainWindow : Window
         }
         if (destination == "editor")
         {
-            _editorInAiMode = !_editorInAiMode;
+            // 模式保持稳定：仅在 EditorWorkbenchTool_Click 显式设态，
+            // 进入编辑器不再翻转（修复 v1.5.5 每次进入 PRO↔AI 翻转 bug）。
             if (!_editorInAiMode)
             {
                 EditorProGrid.Visibility = Visibility.Visible;
@@ -4514,9 +4515,9 @@ public partial class MainWindow : Window
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Background = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(12, 15, 21)),
+                (Color)FindResource("ColorLogBg")),
             Foreground = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(222, 228, 237)),
+                (Color)FindResource("ColorLogText")),
             BorderBrush = (Brush)FindResource("RuleBrush"),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(14)
@@ -4721,7 +4722,7 @@ public partial class MainWindow : Window
         {
             Background = (Brush)FindResource("AccentSoftBrush"),
             BorderBrush = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(182, 207, 245)),
+                (Color)FindResource("ColorPhotoSoftBorder")),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14),
@@ -4809,7 +4810,7 @@ public partial class MainWindow : Window
             FontSize = 17,
             FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(178, 25, 35)),
+                (Color)FindResource("ColorWarnDeep")),
             Margin = new Thickness(0, 0, 0, 7)
         });
         warning.Children.Add(new TextBlock
@@ -4820,16 +4821,16 @@ public partial class MainWindow : Window
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(117, 20, 28)),
+                (Color)FindResource("ColorWarnDark")),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 21
         });
         body.Children.Add(new Border
         {
             Background = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(255, 238, 238)),
+                (Color)FindResource("ColorWarnBg")),
             BorderBrush = new SolidColorBrush(
-                System.Windows.Media.Color.FromRgb(244, 185, 185)),
+                (Color)FindResource("ColorWarnBgSoft")),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(16),
@@ -6686,7 +6687,6 @@ public partial class MainWindow : Window
         EditorMediaCountText.Text = choices.Count.ToString(CultureInfo.InvariantCulture);
         EditorMediaSelectionText.Text = selected?.Item.Name
             ?? AppLocalization.T("未选择照片");
-        AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
         _updatingEditorControls = false;
         if (!string.Equals(
                 previousPath,
@@ -6746,7 +6746,6 @@ public partial class MainWindow : Window
         {
             _editorSelectedPath = editablePhotos.FirstOrDefault()?.Path;
         }
-        AiPhotoTree.ItemsSource = BuildEditorPhotoTree(editablePhotos);
         var selectedPhoto = editablePhotos.FirstOrDefault(item => string.Equals(
             item.Path,
             _editorSelectedPath,
@@ -7163,11 +7162,6 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (ReferenceEquals(sender, AiPhotoPickerButton))
-        {
-            AiPhotoPickerPopup.IsOpen = true;
-            return;
-        }
         if (sender is FrameworkElement target)
         {
             EditorPhotoPickerPopup.PlacementTarget = target;
@@ -7197,9 +7191,7 @@ public partial class MainWindow : Window
         EditorPhotoBox.SelectedItem = choice;
         _updatingEditorControls = false;
         EditorPhotoPickerButton.Content = $"▧  {item.Name}";
-        AiPhotoPickerButton.Content = EditorPhotoPickerButton.Content;
         EditorPhotoPickerPopup.IsOpen = false;
-        AiPhotoPickerPopup.IsOpen = false;
         ResetEditorControls();
         if (_editorInAiMode)
             RefreshAiEditor();
@@ -7258,9 +7250,9 @@ public partial class MainWindow : Window
         };
         content.Children.Add(intro);
         var wheels = new UniformGrid { Columns = 3, Rows = 1 };
-        wheels.Children.Add(CreateColorWheel("lift", "阴影", "#43B7FF"));
-        wheels.Children.Add(CreateColorWheel("gamma", "中间调", "#C68CFF"));
-        wheels.Children.Add(CreateColorWheel("gain", "高光", "#FFD36A"));
+        wheels.Children.Add(CreateColorWheel("lift", "阴影", "WheelLiftBrush"));
+        wheels.Children.Add(CreateColorWheel("gamma", "中间调", "WheelGammaBrush"));
+        wheels.Children.Add(CreateColorWheel("gain", "高光", "WheelGainBrush"));
         content.Children.Add(wheels);
         return new Expander
         {
@@ -7282,7 +7274,7 @@ public partial class MainWindow : Window
         };
         var direct = new EditorWheelControl
         {
-            Accent = (Brush)new BrushConverter().ConvertFromString(color)!,
+            Accent = (Brush)FindResource(color),
             XValue = EditorWheelXForKey(key),
             YValue = EditorWheelYForKey(key),
             Width = 76,

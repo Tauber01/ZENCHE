@@ -189,7 +189,7 @@
             <Grid>
               <TextBlock x:Name="MonitorTimecodeText" Text="00:00:00:00" FontFamily="{StaticResource MonoFont}" FontSize="38" FontWeight="SemiBold" Foreground="White" />
               <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" Fill="#26D07C" />
+                <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{StaticResource ConnectedDotBrush}" />
                 <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" FontFamily="{StaticResource MonoFont}" FontSize="12" FontWeight="Bold" Foreground="{StaticResource UiLabelBrush}" />
               </StackPanel>
             </Grid>
@@ -197,7 +197,7 @@
           <Border Grid.Row="1" Background="{StaticResource GraphiteBrush}" BorderBrush="{StaticResource UiSecondaryBrush}" BorderThickness="1,0,1,0" ClipToBounds="True">
             <Grid>
               <Image x:Name="MonitorPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonUp="MonitorPreviewImage_MouseLeftButtonUp" />
-              <TextBlock x:Name="MonitorFocusReticle" Text="＋" Visibility="Collapsed" Foreground="#FFE45C" FontSize="38" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
+              <TextBlock x:Name="MonitorFocusReticle" Text="＋" Visibility="Collapsed" Foreground="{StaticResource PeakingBrush}" FontSize="38" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
               <StackPanel x:Name="MonitorPreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" FontFamily="{StaticResource DisplayFont}" FontSize="22" FontWeight="Bold" Foreground="White" />
                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="连接相机后开启实时取景" Foreground="{StaticResource UiLabelBrush}" />
@@ -207,7 +207,7 @@
           </Border>
           <Grid Grid.Row="2" Margin="0,14,0,0">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Margin="0,0,12,0" Padding="3" Background="#000000">
+            <Border Grid.Column="0" Margin="0,0,12,0" Padding="3" Background="{StaticResource ScopeBlackBrush}">
               <local:WaveformScope x:Name="MonitorRgbScope"
                                    Mode="RgbParade"
                                    Height="98"
@@ -219,7 +219,7 @@
                 <Ellipse Width="58" Height="58" Fill="{StaticResource VideoBrush}" />
               </Grid>
             </Button>
-            <Border Grid.Column="2" Margin="12,0,0,0" Padding="3" Background="#000000">
+            <Border Grid.Column="2" Margin="12,0,0,0" Padding="3" Background="{StaticResource ScopeBlackBrush}">
               <local:WaveformScope Mode="Audio"
                                    Height="98"
                                    AutomationProperties.Name="音频波形，无音频源，静音基线" />
@@ -1566,9 +1566,9 @@
                   <TextBlock x:Name="EditorScopeText" Grid.Row="1" Margin="0,6,0,0" FontFamily="{StaticResource MonoFont}" FontSize="10" Foreground="{StaticResource EditorAccentBrush}" Text="分析后显示实测范围" TextWrapping="Wrap" />
                   <Border Grid.Row="2" Margin="0,12,0,0" Background="{StaticResource EditorBgBrush}" BorderBrush="{StaticResource EditorRuleBrush}" BorderThickness="1">
                     <Grid>
-                      <Border Height="1" VerticalAlignment="Center" Background="#334F5966" />
-                      <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="#334F5966" />
-                      <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="#334F5966" />
+                      <Border Height="1" VerticalAlignment="Center" Background="{StaticResource GuideBrush}" />
+                      <Border Height="1" VerticalAlignment="Top" Margin="0,18,0,0" Background="{StaticResource GuideBrush}" />
+                      <Border Height="1" VerticalAlignment="Bottom" Margin="0,0,0,18" Background="{StaticResource GuideBrush}" />
                     </Grid>
                   </Border>
                 </Grid>
@@ -1599,7 +1599,7 @@
                            Text="选择原图或生成图像后将在这里显示" />
                 <StackPanel HorizontalAlignment="Left"
                             VerticalAlignment="Top">
-                  <Border Background="#99000000"
+                  <Border Background="{StaticResource EditorScrimBrush}"
                           CornerRadius="16"
                           Padding="10,6">
                     <TextBlock x:Name="AiPreviewBadge"
@@ -1628,69 +1628,6 @@
                         Padding="10,6"
                         Click="EditorPhotoPickerButton_Click"
                         Content="选择照片" />
-                <Popup x:Name="AiPhotoPickerPopup"
-                       PlacementTarget="{Binding ElementName=AiPhotoPickerButton}"
-                       Placement="Bottom"
-                       StaysOpen="False"
-                       AllowsTransparency="True">
-                  <Border Width="420"
-                          MaxHeight="520"
-                          Padding="8"
-                          Background="{StaticResource SurfaceBrush}"
-                          BorderBrush="{StaticResource RuleBrush}"
-                          BorderThickness="1"
-                          CornerRadius="10">
-                    <TreeView x:Name="AiPhotoTree"
-                              SelectedItemChanged="EditorPhotoTree_SelectedItemChanged">
-                      <TreeView.ItemContainerStyle>
-                        <Style TargetType="{x:Type TreeViewItem}">
-                          <Setter Property="IsExpanded"
-                                  Value="{Binding IsExpanded, Mode=TwoWay}" />
-                          <Setter Property="Padding" Value="4" />
-                        </Style>
-                      </TreeView.ItemContainerStyle>
-                      <TreeView.ItemTemplate>
-                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                          <Grid Margin="4,3">
-                            <Grid.ColumnDefinitions>
-                              <ColumnDefinition Width="64" />
-                              <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid Width="56" Height="42">
-                              <Image x:Name="AiNodeThumbnail"
-                                     Source="{Binding Thumbnail}"
-                                     Stretch="UniformToFill" />
-                              <TextBlock x:Name="AiNodeIcon"
-                                         Visibility="Collapsed"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center"
-                                         FontSize="15"
-                                         Text="{Binding Icon}" />
-                            </Grid>
-                            <StackPanel Grid.Column="1">
-                              <TextBlock FontWeight="SemiBold"
-                                         Text="{Binding Name}" />
-                              <TextBlock Margin="0,2,0,0"
-                                         Style="{StaticResource MetaText}"
-                                         Text="{Binding Detail}" />
-                            </StackPanel>
-                          </Grid>
-                          <HierarchicalDataTemplate.Triggers>
-                            <DataTrigger Binding="{Binding Thumbnail}"
-                                         Value="{x:Null}">
-                              <Setter TargetName="AiNodeThumbnail"
-                                      Property="Visibility"
-                                      Value="Collapsed" />
-                              <Setter TargetName="AiNodeIcon"
-                                      Property="Visibility"
-                                      Value="Visible" />
-                            </DataTrigger>
-                          </HierarchicalDataTemplate.Triggers>
-                        </HierarchicalDataTemplate>
-                      </TreeView.ItemTemplate>
-                    </TreeView>
-                  </Border>
-                </Popup>
                 <DockPanel>
                   <StackPanel>
                     <TextBlock FontWeight="SemiBold" Text="AI 创作" />
@@ -2034,7 +1971,7 @@
                   <Border Margin="0,14,0,0"
                           Padding="14"
                           Background="{StaticResource AccentSoftBrush}"
-                          BorderBrush="#B6CFF5"
+                          BorderBrush="{StaticResource PhotoSoftBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="12">
                     <Grid>
@@ -2256,7 +2193,7 @@
                           Click="FalseColorCheck_Click" />
                 <Border Margin="0,10,0,0"
                         Padding="4"
-                        Background="#000000">
+                        Background="{StaticResource ScopeBlackBrush}">
                   <StackPanel>
                     <local:WaveformScope x:Name="ProfessionalScope"
                                          Mode="Professional"
@@ -2264,7 +2201,7 @@
                                          AutomationProperties.Name="专业波形图，亮度、YUV 与 RGB 分量" />
                     <TextBlock x:Name="PeakingCoverageText"
                                Margin="0,6,0,0"
-                               Foreground="#BFFFFFFF"
+                               Foreground="{StaticResource WhiteLoBrush}"
                                FontFamily="{StaticResource MonoFont}"
                                FontSize="10"
                                Text="峰值覆盖 0%" />

@@ -48,6 +48,33 @@
   <Color x:Key="ColorErrorSoft">#FCE9EA</Color>
   <Color x:Key="ColorSuccess">#247A53</Color>
   <Color x:Key="ColorShadow">#2B17233A</Color>
+  <Color x:Key="ColorScopeWell">#232A34</Color>
+  <Color x:Key="ColorScopeWellBorder">#505A68</Color>
+  <Color x:Key="ColorGuideWhite">#5AFFFFFF</Color>
+  <Color x:Key="ColorAccentBorder">#DCFFD646</Color>
+  <Color x:Key="ColorScrimStrong">#9B000000</Color>
+  <Color x:Key="ColorScrimMid">#96000000</Color>
+  <Color x:Key="ColorScrimSoft">#69000000</Color>
+  <Color x:Key="ColorTelemetryLabel">#7E8794</Color>
+  <Color x:Key="ColorStudioPanelScrim">#A515191F</Color>
+  <Color x:Key="ColorWhiteDim">#AAFFFFFF</Color>
+  <Color x:Key="ColorWhiteLo">#BFFFFFFF</Color>
+  <Color x:Key="ColorGraphiteScrim">#91141B24</Color>
+  <Color x:Key="ColorLogBg">#0C0F15</Color>
+  <Color x:Key="ColorLogText">#DEE4ED</Color>
+  <Color x:Key="ColorPhotoSoftBorder">#B6CFF5</Color>
+  <Color x:Key="ColorWarnDeep">#B21923</Color>
+  <Color x:Key="ColorWarnDark">#75141C</Color>
+  <Color x:Key="ColorWarnBg">#FFEEEE</Color>
+  <Color x:Key="ColorWarnBgSoft">#F4B9B9</Color>
+  <Color x:Key="ColorConnectedDot">#26D07C</Color>
+  <Color x:Key="ColorPeaking">#FFE45C</Color>
+  <Color x:Key="ColorScopeBlack">#000000</Color>
+  <Color x:Key="ColorGuide">#334F5966</Color>
+  <Color x:Key="ColorEditorScrim">#99000000</Color>
+  <Color x:Key="ColorWheelLift">#43B7FF</Color>
+  <Color x:Key="ColorWheelGamma">#C68CFF</Color>
+  <Color x:Key="ColorWheelGain">#FFD36A</Color>
 
   <SolidColorBrush x:Key="PaperBrush" Color="{StaticResource ColorPaper}" />
   <SolidColorBrush x:Key="Paper2Brush" Color="{StaticResource ColorPaper2}" />
@@ -93,6 +120,33 @@
   <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
   <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ColorErrorSoft}" />
   <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource ColorSuccess}" />
+  <SolidColorBrush x:Key="ScopeWellBrush" Color="{StaticResource ColorScopeWell}" />
+  <SolidColorBrush x:Key="ScopeWellBorderBrush" Color="{StaticResource ColorScopeWellBorder}" />
+  <SolidColorBrush x:Key="GuideWhiteBrush" Color="{StaticResource ColorGuideWhite}" />
+  <SolidColorBrush x:Key="AccentBorderBrush" Color="{StaticResource ColorAccentBorder}" />
+  <SolidColorBrush x:Key="ScrimStrongBrush" Color="{StaticResource ColorScrimStrong}" />
+  <SolidColorBrush x:Key="ScrimMidBrush" Color="{StaticResource ColorScrimMid}" />
+  <SolidColorBrush x:Key="ScrimSoftBrush" Color="{StaticResource ColorScrimSoft}" />
+  <SolidColorBrush x:Key="TelemetryLabelBrush" Color="{StaticResource ColorTelemetryLabel}" />
+  <SolidColorBrush x:Key="StudioPanelScrimBrush" Color="{StaticResource ColorStudioPanelScrim}" />
+  <SolidColorBrush x:Key="WhiteDimBrush" Color="{StaticResource ColorWhiteDim}" />
+  <SolidColorBrush x:Key="WhiteLoBrush" Color="{StaticResource ColorWhiteLo}" />
+  <SolidColorBrush x:Key="GraphiteScrimBrush" Color="{StaticResource ColorGraphiteScrim}" />
+  <SolidColorBrush x:Key="LogBgBrush" Color="{StaticResource ColorLogBg}" />
+  <SolidColorBrush x:Key="LogTextBrush" Color="{StaticResource ColorLogText}" />
+  <SolidColorBrush x:Key="PhotoSoftBorderBrush" Color="{StaticResource ColorPhotoSoftBorder}" />
+  <SolidColorBrush x:Key="WarnDeepBrush" Color="{StaticResource ColorWarnDeep}" />
+  <SolidColorBrush x:Key="WarnDarkBrush" Color="{StaticResource ColorWarnDark}" />
+  <SolidColorBrush x:Key="WarnBgBrush" Color="{StaticResource ColorWarnBg}" />
+  <SolidColorBrush x:Key="WarnBgSoftBrush" Color="{StaticResource ColorWarnBgSoft}" />
+  <SolidColorBrush x:Key="ConnectedDotBrush" Color="{StaticResource ColorConnectedDot}" />
+  <SolidColorBrush x:Key="PeakingBrush" Color="{StaticResource ColorPeaking}" />
+  <SolidColorBrush x:Key="ScopeBlackBrush" Color="{StaticResource ColorScopeBlack}" />
+  <SolidColorBrush x:Key="GuideBrush" Color="{StaticResource ColorGuide}" />
+  <SolidColorBrush x:Key="EditorScrimBrush" Color="{StaticResource ColorEditorScrim}" />
+  <SolidColorBrush x:Key="WheelLiftBrush" Color="{StaticResource ColorWheelLift}" />
+  <SolidColorBrush x:Key="WheelGammaBrush" Color="{StaticResource ColorWheelGamma}" />
+  <SolidColorBrush x:Key="WheelGainBrush" Color="{StaticResource ColorWheelGain}" />
 
   <FontFamily x:Key="DisplayFont">Bahnschrift</FontFamily>
   <FontFamily x:Key="BodyFont">Segoe UI Variable Text</FontFamily>
