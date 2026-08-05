@@ -70,9 +70,10 @@ may expose equivalent dynamic colours for system dark appearance.
   states on capture control surfaces use UI accent, and photo actions keep
   Photo accent cobalt. Editor accent is confined to the image editor and
   scopes. Where Readout glow and Studio gold could overlap, the split is by
-  surface: user-writable values inside calibration readout surfaces use
-  Readout glow, while parameter readouts and adjusting-state markers on
-  control-surface tiles and inspectors use Studio gold.
+  presentation form: within the platform's calibration readout presentation
+  (rail or persistent inspector), user-writable values use Readout glow;
+  parameter readouts and adjusting-state markers on editing control tiles
+  use Studio gold.
 - Focus uses the platform accessibility focus colour with at least 3:1 contrast.
 - Preview wells stay graphite in every appearance so ambient UI colour never
   changes colour-critical image judgement.
@@ -126,8 +127,9 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 - Readouts use monospaced tabular numerals and expose the platform's real
   source, mode, shutter or shutter angle, aperture when available, ISO, and
   exposure compensation.
-- Values currently writable by the user use `Readout glow`; camera-controlled
-  values use high-contrast neutral text and an explicit `AUTO` label.
+- Within the calibration readout presentation, values currently writable by
+  the user use `Readout glow`; camera-controlled values use high-contrast
+  neutral text and an explicit `AUTO` label.
 - A disconnected camera or unavailable source shows em-dash placeholders and
   never presents model defaults as live camera values.
 - Readouts are informational. Existing native parameter controls remain the
