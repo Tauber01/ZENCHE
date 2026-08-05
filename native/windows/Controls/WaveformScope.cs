@@ -21,23 +21,17 @@ public sealed class WaveformScope : FrameworkElement
     private string _red = "—";
     private string _green = "—";
     private string _blue = "—";
-    private string _luma = "—";
-    private string _chroma = "—";
 
     public WaveformScopeMode Mode { get; set; } = WaveformScopeMode.RgbParade;
 
     public void SetData(
         string red,
         string green,
-        string blue,
-        string luma,
-        string chroma)
+        string blue)
     {
         _red = red;
         _green = green;
         _blue = blue;
-        _luma = luma;
-        _chroma = chroma;
         InvalidateVisual();
     }
 

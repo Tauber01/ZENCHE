@@ -188,9 +188,6 @@ public final class MainActivity extends Activity {
     private static final int SCOPE_G = Color.rgb(40, 255, 105);       // RGB parade G
     private static final int SCOPE_B = Color.rgb(34, 64, 255);        // RGB parade B
     private static final int SCOPE_AUDIO = Color.rgb(76, 199, 232);   // #4CC7E8 音频缺失基线
-    private static final int SCOPE_YUV_Y = Color.rgb(20, 255, 92);    // YUV Y
-    private static final int SCOPE_YUV_U = Color.rgb(0, 210, 255);    // YUV U
-    private static final int SCOPE_YUV_V = Color.rgb(255, 38, 222);   // YUV V
     // ── v1.5.6 高频内联色归一 ──
     private static int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
     private static int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
@@ -927,8 +924,6 @@ public final class MainActivity extends Activity {
         private String red = "—";
         private String green = "—";
         private String blue = "—";
-        private String luma = "—";
-        private String chroma = "—";
 
         WaveformScopeView(int mode) {
             super(MainActivity.this);
@@ -942,14 +937,10 @@ public final class MainActivity extends Activity {
         void setData(
                 String red,
                 String green,
-                String blue,
-                String luma,
-                String chroma) {
+                String blue) {
             this.red = red;
             this.green = green;
             this.blue = blue;
-            this.luma = luma;
-            this.chroma = chroma;
             invalidate();
         }
 
@@ -3820,7 +3811,7 @@ public final class MainActivity extends Activity {
         if (histogram) {
             monitorRgbScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
             monitorRgbScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
             card.addView(monitorRgbScopeView, new LinearLayout.LayoutParams(-1, -1));
         } else {
             card.addView(
@@ -4446,9 +4437,7 @@ public final class MainActivity extends Activity {
         immersiveScopeView.setData(
                 redHistogram,
                 greenHistogram,
-                blueHistogram,
-                waveform,
-                vectorscope);
+                blueHistogram);
         dock.addView(immersiveScopeView, new LinearLayout.LayoutParams(0, -1, 2f));
         WaveformScopeView audio = new WaveformScopeView(WaveformScopeView.AUDIO);
         LinearLayout.LayoutParams audioParams = new LinearLayout.LayoutParams(0, -1, 1f);
@@ -5431,7 +5420,7 @@ public final class MainActivity extends Activity {
         scopes.setBackgroundColor(Color.BLACK);
         professionalScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
         professionalScopeView.setData(
-                redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                redHistogram, greenHistogram, blueHistogram);
         peakingCoverageText = text(
                 "峰值覆盖 · " + peakingCoverage + "%",
                 11,
@@ -12289,15 +12278,15 @@ public final class MainActivity extends Activity {
         }
         if (monitorRgbScopeView != null) {
             monitorRgbScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (professionalScopeView != null) {
             professionalScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (immersiveScopeView != null) {
             immersiveScopeView.setData(
-                    redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
+                    redHistogram, greenHistogram, blueHistogram);
         }
         if (peakingCoverageText != null) {
             peakingCoverageText.setText(

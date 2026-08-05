@@ -19,6 +19,8 @@ test('native monitor surfaces use framed scope plots instead of text sparklines'
   assert.match(ios, /ProfessionalScopeBoard/);
   assert.match(ios, /AudioScopePlot/);
   assert.doesNotMatch(ios, /struct MonitorSparkline/);
+  assert.doesNotMatch(ios, /label:\s*"Y"/);
+  assert.doesNotMatch(ios, /label:\s*"YUV"/);
 
   assert.match(android, /class WaveformScopeView extends View/);
   assert.match(android, /RGB_PARADE/);
@@ -27,9 +29,13 @@ test('native monitor surfaces use framed scope plots instead of text sparklines'
   assert.match(harmony, /professionalScopeContext/);
   assert.match(harmony, /drawProfessionalScope/);
   assert.match(harmony, /drawAudioScope/);
+  assert.doesNotMatch(harmony, /'Y'/);
+  assert.doesNotMatch(harmony, /'YUV'/);
 
   assert.match(macos, /MacProfessionalScopeBoard/);
   assert.match(macos, /MacAudioScopePlot/);
+  assert.doesNotMatch(macos, /label:\s*"Y"/);
+  assert.doesNotMatch(macos, /label:\s*"YUV"/);
 
   assert.match(windowsXaml, /local:WaveformScope/);
   assert.doesNotMatch(windowsXaml, /Mode="Professional"/);

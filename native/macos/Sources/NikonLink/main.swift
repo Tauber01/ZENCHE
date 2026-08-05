@@ -4168,9 +4168,6 @@ private enum Palette {
     static let scopeG = Color(red: 0.16, green: 1, blue: 0.41)          // #28FF69
     static let scopeB = Color(red: 0.13, green: 0.25, blue: 1)          // #2240FF
     static let scopeAudio = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255) // #4CC7E8
-    static let scopeYuvY = Color(red: 0.08, green: 1, blue: 0.36)       // #14FF5C
-    static let scopeYuvU = Color(red: 0, green: 0.82, blue: 1)          // #00D2FF
-    static let scopeYuvV = Color(red: 1, green: 0.15, blue: 0.87)       // #FF26DE
     static let scopeBg = Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255) // #050A0F
     // 专属语义色
     static let videoIdle = Color(red: 0.55, green: 0.03, blue: 0.03)    // 录制按钮未激活深红（与 iOS 同值）

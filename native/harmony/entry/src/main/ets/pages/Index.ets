@@ -123,9 +123,6 @@ const SCOPE_R: string = '#FF302A';          // RGB parade R
 const SCOPE_G: string = '#28FF69';          // RGB parade G
 const SCOPE_B: string = '#2240FF';          // RGB parade B
 const SCOPE_AUDIO: string = '#4CC7E8';      // 音频缺失基线
-const SCOPE_YUV_Y: string = '#14FF5C';      // YUV Y
-const SCOPE_YUV_U: string = '#00D2FF';      // YUV U
-const SCOPE_YUV_V: string = '#FF26DE';      // YUV V
 const SCOPE_BG: string = '#050A0F';         // 示波器井背景
 
 // HUD 玻璃遮罩（对齐 Android HUD_* 语义）
