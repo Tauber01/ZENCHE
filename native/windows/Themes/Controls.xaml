@@ -548,4 +548,36 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- v1.5.7 P4: 设备页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <Style x:Key="DeviceHeaderTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <Style x:Key="DeviceEmptyTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="21" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+
+  <Style x:Key="DeviceBadgeText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource PositiveBrush}" />
+  </Style>
+
+  <Style x:Key="DeviceNameText" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+  </Style>
+
+  <Style x:Key="DeviceMetaText" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
 </ResourceDictionary>

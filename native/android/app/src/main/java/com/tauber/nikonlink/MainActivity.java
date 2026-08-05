@@ -144,6 +144,7 @@ public final class MainActivity extends Activity {
     private static int VIDEO = Color.rgb(216, 50, 58);
     private static int VIDEO_SOFT = Color.rgb(251, 226, 227);
     private static int POSITIVE = Color.rgb(31, 168, 105);
+    private static final int POSITIVE_SOFT = Color.rgb(228, 247, 238); // 成功徽标软底（对齐 Harmony POSITIVE_SOFT；P4 双外观去硬编码）
     private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
     private static final int GRAPHITE = Color.rgb(10, 11, 13);
     // 1.5.3 编辑器 token：保留以兼容 native-ui-1.5.3 token 契约断言；
@@ -179,6 +180,12 @@ public final class MainActivity extends Activity {
     private static final int EDITOR_FS_SUB = 13;     // 编辑页次级标题（云创监看、滑块标签）
     private static final int EDITOR_FS_MEDIUM = 14;  // 编辑页副标题（云创预览）
     private static final int EDITOR_FS_HEAD = 16;    // 编辑页小标题（AI 创作）
+    // ── v1.5.7 P4: 页面/设备页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+    private static final int PAGE_FS_HEADING = 30;         // 页面大标题（sectionHeader 共享组件，对标 macOS WorkspaceHeading；值不等 F1 heading 26）
+    private static final int PAGE_FS_HEADING_COMPACT = 25; // 页面大标题（紧凑形态）
+    private static final int PAGE_FS_SUBTITLE = 14;        // 页面副标题（sectionHeader 共享组件）
+    private static final int DEVICE_FS_EMPTY_TITLE = 20;   // 设备页空态标题
+    private static final int DEVICE_FS_SUB = 13;           // 设备页次级文本（空态说明、卡 transport）
     // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
     private static final int SPACE_4 = 4;
     private static final int SPACE_8 = 8;
@@ -11156,16 +11163,16 @@ public final class MainActivity extends Activity {
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(dp(24), dp(72), dp(24), dp(72));
             empty.setBackground(rounded(SURFACE, 20, RULE));
-            TextView icon = text("◉", 46, Typeface.BOLD, COBALT);
+            TextView icon = text("◉", 46, Typeface.BOLD, COBALT); // 图标尺寸，不受 TypeScale 约束（同 F1 先例）
             icon.setGravity(Gravity.CENTER);
             empty.addView(icon, marginParams(-1, -2, 0, 0, 0, 12));
             TextView title = text(
-                    tr("尚未连接过设备"), 20, Typeface.BOLD, INK);
+                    tr("尚未连接过设备"), DEVICE_FS_EMPTY_TITLE, Typeface.BOLD, INK);
             title.setGravity(Gravity.CENTER);
             empty.addView(title);
             TextView detail = text(
                     tr("成功连接相机后会自动保存在这里。"),
-                    13,
+                    DEVICE_FS_SUB,
                     Typeface.NORMAL,
                     MUTED);
             detail.setGravity(Gravity.CENTER);
@@ -11199,27 +11206,27 @@ public final class MainActivity extends Activity {
         heading.setOrientation(LinearLayout.HORIZONTAL);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.addView(
-                text(device.name, 18, Typeface.BOLD, INK),
+                text(device.name, TS_TITLE, Typeface.BOLD, INK),
                 new LinearLayout.LayoutParams(0, -2, 1f));
         boolean current = connected
                 && device.name.equals(connectedCameraName);
         if (current) {
             TextView badge = text(
-                    tr("当前已连接"), 11, Typeface.BOLD, POSITIVE);
+                    tr("当前已连接"), TS_CAPTION, Typeface.BOLD, POSITIVE);
             badge.setPadding(dp(9), dp(5), dp(9), dp(5));
-            badge.setBackground(rounded(Color.rgb(228, 247, 238), 14, 0));
+            badge.setBackground(rounded(POSITIVE_SOFT, 14, 0));
             heading.addView(badge);
         }
         body.addView(heading);
         body.addView(
-                text(device.transport, 13, Typeface.NORMAL, MUTED),
+                text(device.vendor + " · " + device.transport, DEVICE_FS_SUB, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 8, 0, 0));
         String timestamp = new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm",
                 Locale.getDefault()).format(new Date(device.lastConnectedAt));
         body.addView(text(
                 tr("最近连接") + " · " + timestamp,
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED));
 
@@ -12683,9 +12690,9 @@ public final class MainActivity extends Activity {
         header.addView(rail, railParams);
 
         LinearLayout copy = verticalContainer();
-        copy.addView(text(title, compact ? 25 : 30, Typeface.BOLD, INK));
+        copy.addView(text(title, compact ? PAGE_FS_HEADING_COMPACT : PAGE_FS_HEADING, Typeface.BOLD, INK));
         copy.addView(
-                text(subtitle, compact ? 12 : 14, Typeface.NORMAL, MUTED),
+                text(subtitle, compact ? TS_BODY : PAGE_FS_SUBTITLE, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 3, 0, 0));
         header.addView(copy, new LinearLayout.LayoutParams(
                 0,

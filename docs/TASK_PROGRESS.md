@@ -486,3 +486,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 样式数更正：新增 DynamicResource 样式实为 **17 个**（原报 14 漏 3：EditorHeaderTitle / EditorRailLabel / EditorMediaCount），MainWindow 移除 21 处 FontSize 不变。
 - EditorPanel 0 字面量口径更正：**EditorPanel 元素树（XML/ET 解析）内 0 字号字面量属实**（SettingsPanel 为兄弟面板、开于 L1703，不在 EditorPanel 元素树内）；但按行号区间口径（L1174 开标签起配对），区间内另有 8 处（L1839/1855/1880/1888/1897/1906=11、L1957=15、L1961=12）——ET 容器链证实全部位于 **SettingsPanel 元素树**（AI 激活/恢复设备码/快速反馈，对标 macOS SettingsSheet，属 P6 设置页内容），本批未动、归 P6 收口。原报告只给了元素树口径，未给行区间口径，表述不完整。
 - buildNikonCloudMonitorPanel 归属更正：审计文档（PAGE_AUDIT.md）**无该面板条目**，原报告「按审计列 P3 归档」不实；实际为拍摄/视频页共享面板的延伸归档（Android L8601 13→EDITOR_FS_SUB 等值，无行为改变），记 backlog：F3 批核对时避免重复处理。
+
+## 12.10 v1.5.7 逐页批次 P4：我的设备页（devices）四端对齐 macOS 基准（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P4（我的设备/devices 四端对齐 macOS 基准）；分支 `agent/1.5.7-p4-devices`（worktree REPOS/ZENCHE-wt-1.5.7-p4-devices），基线 `073d816`（P1-P3 合入后）。
+- iOS（RootView.swift）：新增 `DeviceFontSize.heading=30`（对标 macOS WorkspaceHeading，值不等 F1 heading 26，只归档不改值）；设备页大标题 1 处字面量替换；**卡信息行补 vendor**（`device.vendor · device.transport`，对齐 macOS 基准「vendor · transport」信息项，原仅有 transport）。
+- Android（MainActivity.java）：新增 `POSITIVE_SOFT` 常量（Color.rgb(228,247,238) 去硬编码，对齐 Harmony POSITIVE_SOFT——**去字面量，非双外观收口**：该值为单外观浅绿、不随 night 切换，亮暗对留 F 批，pro 复审记录）；新增 `PAGE_FS_HEADING=30/PAGE_FS_HEADING_COMPACT=25/PAGE_FS_SUBTITLE=14`（**sectionHeader 为共享组件，4 个调用方** 6167/6597/10640/11149，跨 P3/P5/P6 页，中性命名如实；compact 副标题 12 直接映射 TS_BODY）；设备页空态 `DEVICE_FS_EMPTY_TITLE=20`、`DEVICE_FS_SUB=13`；设备卡 18→TS_TITLE、11→TS_CAPTION、12→TS_BODY；**卡信息行补 vendor**（原仅 transport）。
+- Harmony（Index.ets）：新增 `DEVICE_FS_HEADING=30/SUBTITLE=14/EMPTY_TITLE=21/CARD_TITLE=19/SUB=13`；标题/副标题/空态/卡名/vendor·transport 7 处字面量替换。
+- Windows（Controls.xaml / MainWindow.xaml / MainWindow.xaml.cs）：新增 5 样式 `DeviceHeaderTitle(24)/DeviceEmptyTitle(21)/DeviceBadgeText(11)/DeviceNameText(18)/DeviceMetaText(11)`；DevicesPanel 头部标题与空态标题、cs 卡 badge/名称/最近连接全部样式化；占位图标 46 豁免注释。
+- 双外观核对（P4 审计点）：iOS/Harmony/Windows 设备页全部 token 引用（IPalette.*/$r('app.color.*')/DynamicResource）；Android POSITIVE_SOFT 已去字面量（亮暗对未完成，见上）；Windows 占位 ◉ 白字有 design.md graphite 恒深井依据，iOS vendor 徽标白字实为图片 HUD 叠加惯例（基线既有，非恒深例外族，pro 复审记录）。
+- 图标尺寸豁免：空态 ◉ 46/48、占位 ◉ 46（同 F1 先例，注释声明不受 TypeScale 约束）。
+- 设备卡信息项五端核对：名称/当前已连接徽标/vendor·transport/最近连接/快速连接+忘记设备按钮五端一致（本批补 iOS/Android vendor 信息项）。
+- design.md：本批为执行既有条款（双外观成对取 token、只归档不改值、图标豁免先例），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild 模拟器 BUILD SUCCEEDED；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期，构建中间产物已清理）；git diff --check 干净。

@@ -104,6 +104,12 @@ const EDITOR_FS_SMALL: number = 10;  // 编辑页小标签/读数（媒体计数
 const EDITOR_FS_SUB: number = 13;    // 编辑页次级说明（空态、AI 摘要、面板钮、取色采样）
 const EDITOR_FS_MEDIUM: number = 14; // 编辑页副标题/描述（页头副标题、云创预览、AI 工具描述、提示词输入）
 const EDITOR_FS_HEAD: number = 16;   // 编辑页小标题/强调（工作台标题、选中钩、AI 创作标题）
+// ── v1.5.7 P4: 设备页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+const DEVICE_FS_HEADING: number = 30;     // 设备页大标题（对标 macOS WorkspaceHeading；值不等 F1 heading 26）
+const DEVICE_FS_SUBTITLE: number = 14;    // 设备页副标题/空态说明
+const DEVICE_FS_EMPTY_TITLE: number = 21; // 设备页空态标题
+const DEVICE_FS_CARD_TITLE: number = 19;  // 设备卡名称
+const DEVICE_FS_SUB: number = 13;         // 设备卡 vendor · transport
 
 // Spacing（4pt 体系，与 Android 同值）
 const SPACE_4: number = 4;
@@ -1803,11 +1809,11 @@ struct Index {
       Column({ space: 16 }) {
         Column({ space: 6 }) {
           Text(this.tr('我的设备'))
-            .fontSize(30)
+            .fontSize(DEVICE_FS_HEADING)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('管理连接过的相机，轻触即可快速重连'))
-            .fontSize(14)
+            .fontSize(DEVICE_FS_SUBTITLE)
             .fontColor($r('app.color.muted'))
         }
         .width('100%')
@@ -1816,15 +1822,15 @@ struct Index {
         if (this.rememberedDevices.length === 0) {
           Column({ space: 12 }) {
             Text('◉')
-              .fontSize(48)
+              .fontSize(48) // 图标尺寸，不受 TypeScale 约束（同 F1 先例）
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.accent'))
             Text(this.tr('尚未连接过设备'))
-              .fontSize(21)
+              .fontSize(DEVICE_FS_EMPTY_TITLE)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.ink'))
             Text(this.tr('成功连接相机后会自动保存在这里。'))
-              .fontSize(14)
+              .fontSize(DEVICE_FS_SUBTITLE)
               .fontColor($r('app.color.muted'))
               .textAlign(TextAlign.Center)
           }
@@ -1877,7 +1883,7 @@ struct Index {
       Column({ space: 11 }) {
         Row() {
           Text(device.name)
-            .fontSize(19)
+            .fontSize(DEVICE_FS_CARD_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
             .maxLines(1)
@@ -1895,7 +1901,7 @@ struct Index {
         }
         .width('100%')
         Text(`${device.vendor} · ${device.transport}`)
-          .fontSize(13)
+          .fontSize(DEVICE_FS_SUB)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Text(`${this.tr('最近连接')} · ${this.formatDeviceTimestamp(device.lastConnectedAt)}`)
