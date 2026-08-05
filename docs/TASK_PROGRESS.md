@@ -480,3 +480,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - AI 呈现差异保留：macOS/iOS 编辑页「AI 工具」为工具分组之一 vs Windows/Harmony/Android「AI」轨钮 + 独立工作台，既有设计差异，非红线违规。
 - design.md：本批为执行既有条款（fig2 恒深直角、只归档不改值），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过（Windows 组序调整后复跑）；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Android assembleDebug BUILD SUCCESSFUL（仅基线 deprecation 提示）；iOS xcodebuild 模拟器 BUILD SUCCEEDED；git diff --check 干净；macOS 编辑区（9483-9700）复核 0 字号字面量（基准端无需改动）。
+
+## 12.10 v1.5.7 逐页批次 P4：我的设备页（devices）四端对齐 macOS 基准（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P4（我的设备/devices 四端对齐 macOS 基准）；分支 `agent/1.5.7-p4-devices`（worktree REPOS/ZENCHE-wt-1.5.7-p4-devices），基线 `073d816`（P1-P3 合入后）。
+- iOS（RootView.swift）：新增 `DeviceFontSize.heading=30`（对标 macOS WorkspaceHeading，值不等 F1 heading 26，只归档不改值）；设备页大标题 1 处字面量替换；**卡信息行补 vendor**（`device.vendor · device.transport`，对齐 macOS 基准「vendor · transport」信息项，原仅有 transport）。
+- Android（MainActivity.java）：新增 `POSITIVE_SOFT` 常量（Color.rgb(228,247,238) 去硬编码，对齐 Harmony POSITIVE_SOFT——P4 双外观审计点「无硬编码单外观色值」的收口）；新增 `PAGE_FS_HEADING=30/PAGE_FS_HEADING_COMPACT=25/PAGE_FS_SUBTITLE=14`（**sectionHeader 为共享组件，4 个调用方** 6167/6597/10640/11149，中性命名如实；compact 副标题 12 直接映射 TS_BODY）；设备页空态 `DEVICE_FS_EMPTY_TITLE=20`、`DEVICE_FS_SUB=13`；设备卡 18→TS_TITLE、11→TS_CAPTION、12→TS_BODY；**卡信息行补 vendor**（原仅 transport）。
+- Harmony（Index.ets）：新增 `DEVICE_FS_HEADING=30/SUBTITLE=14/EMPTY_TITLE=21/CARD_TITLE=19/SUB=13`；标题/副标题/空态/卡名/vendor·transport 7 处字面量替换。
+- Windows（Controls.xaml / MainWindow.xaml / MainWindow.xaml.cs）：新增 5 样式 `DeviceHeaderTitle(24)/DeviceEmptyTitle(21)/DeviceBadgeText(11)/DeviceNameText(18)/DeviceMetaText(11)`；DevicesPanel 头部标题与空态标题、cs 卡 badge/名称/最近连接全部样式化；占位图标 46 豁免注释。
+- 双外观核对（P4 审计点）：iOS/Harmony/Windows 设备页全部 token 引用（IPalette.*/$r('app.color.*')/DynamicResource）；Android 唯一硬编码色 POSITIVE_SOFT 已收口；iOS vendor 徽标白字（恒深 HUD 遮罩上）与 Windows 占位 ◉ 白字（GraphiteBrush 恒深底上）属恒深例外族豁免，注释声明。
+- 图标尺寸豁免：空态 ◉ 46/48、占位 ◉ 46（同 F1 先例，注释声明不受 TypeScale 约束）。
+- 设备卡信息项五端核对：名称/当前已连接徽标/vendor·transport/最近连接/快速连接+忘记设备按钮五端一致（本批补 iOS/Android vendor 信息项）。
+- design.md：本批为执行既有条款（双外观成对取 token、只归档不改值、图标豁免先例），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild 模拟器 BUILD SUCCEEDED；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期，构建中间产物已清理）；git diff --check 干净。

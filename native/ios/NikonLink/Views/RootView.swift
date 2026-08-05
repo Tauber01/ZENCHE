@@ -188,6 +188,11 @@ enum EditorFontSize {
     static let small: CGFloat = 10   // 编辑页小标签（示波器副文本）
 }
 
+// v1.5.7 P4: 设备页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+enum DeviceFontSize {
+    static let heading: CGFloat = 30 // 设备页大标题（对标 macOS WorkspaceHeading；值不等 F1 heading 26，收口归 F5）
+}
+
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
 private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
@@ -693,7 +698,7 @@ private struct MyDevicesPage: View {
             VStack(alignment: .leading, spacing: 22) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("我的设备")
-                        .font(.system(size: 30, weight: .bold))
+                        .font(.system(size: DeviceFontSize.heading, weight: .bold))
                         .foregroundStyle(IPalette.ink)
                     Text("管理连接过的相机，轻触即可快速重连")
                         .foregroundStyle(IPalette.muted)
@@ -764,7 +769,7 @@ private struct RememberedDeviceCard: View {
                             .foregroundStyle(IPalette.positive)
                     }
                 }
-                Label(device.transport, systemImage: "cable.connector")
+                Label("\(device.vendor) · \(device.transport)", systemImage: "cable.connector")
                     .font(.subheadline)
                     .foregroundStyle(IPalette.muted)
                 HStack(spacing: 4) {

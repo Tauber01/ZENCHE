@@ -89,6 +89,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - AI 区差异：macOS/iOS 编辑页「AI 工具」为工具分组之一，Windows/Harmony/Android 以「AI」轨钮 + 独立工作台呈现——既有设计差异，不视为五端契约缺口，本批不合并形态。
 - 沉浸 overlay 四件套、RGB 波形渲染层、导航 chrome 不在本批（同 P2 红线，见 0.7）。
 
+## 0.9. 1.5.7 逐页批次 P4：我的设备页四端对齐约定
+
+- 设备页大标题档位：非 TypeScale 五档的既有值（iOS/Android/Harmony 30、Android 25、Harmony 19/21、四端 13/14）以文件级命名常量保留原值（iOS `DeviceFontSize.heading`、Android `PAGE_FS_HEADING/HEADING_COMPACT/SUBTITLE` + `DEVICE_FS_EMPTY_TITLE/SUB`、Harmony `DEVICE_FS_HEADING/SUBTITLE/EMPTY_TITLE/CARD_TITLE/SUB`），与 TS 档重合值（12/18/11）直接映射既有 token；字号数值统一收口归 F5，本批不改任何显示值。
+- Android `sectionHeader` 为**共享组件**（4 个调用方：6167/6597/10640/11149），其字号归档以中性名 `PAGE_FS_*` 落位，影响全部调用方但值不变、零视觉变化；设备页专属字号用 `DEVICE_FS_*`。
+- 设备卡信息行契约（五端一致）：`vendor · transport`（以 macOS `RememberedDeviceCard` 为基准）；iOS/Android 原仅显示 transport，本批补 vendor 信息项；其余信息项（名称/当前已连接徽标/最近连接/快速连接+忘记设备）五端一致。
+- 双外观纪律（P4 为非恒深页）：前景/背景一律按外观成对取 token（iOS `IPalette.*` / Harmony `$r('app.color.*')` / Windows `DynamicResource`），不引入硬编码单外观色值——Android 本批新增 `POSITIVE_SOFT` 常量收口「当前已连接」徽标软底硬编码；恒深面上的白字（iOS vendor 徽标、Windows 占位图标）属恒深例外族豁免。
+- 图标尺寸豁免：设备页空态/占位图标（◉ 46/48）不受 TypeScale 约束，保留原值并注释声明（同 F1 先例）。
+- 沉浸 overlay 四件套、RGB 波形渲染层、导航 chrome 不在本批；Windows EditorPanel 内 AI 激活区 8 处字面量归 P6；云创监看面板已归档（见 0.8 勘误）不重复处理。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

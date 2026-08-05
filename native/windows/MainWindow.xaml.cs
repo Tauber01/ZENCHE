@@ -9763,6 +9763,7 @@ public partial class MainWindow : Window
             {
                 Height = 190,
                 Background = (Brush)FindResource("GraphiteBrush"),
+                // 占位图标 46pt，图标尺寸不受 TypeScale 约束（同 F1 先例）
                 Child = new TextBlock
                 {
                     Text = "◉",
@@ -9781,9 +9782,7 @@ public partial class MainWindow : Window
             var badge = new TextBlock
             {
                 Text = AppLocalization.T("当前已连接"),
-                Foreground = (Brush)FindResource("PositiveBrush"),
-                FontSize = 11,
-                FontWeight = FontWeights.Bold,
+                Style = (Style)FindResource("DeviceBadgeText"),
                 VerticalAlignment = VerticalAlignment.Center
             };
             DockPanel.SetDock(badge, Dock.Right);
@@ -9792,10 +9791,7 @@ public partial class MainWindow : Window
         heading.Children.Add(new TextBlock
         {
             Text = device.Name,
-            FontFamily = (FontFamily)FindResource("DisplayFont"),
-            FontSize = 18,
-            FontWeight = FontWeights.Bold,
-            Foreground = (Brush)FindResource("InkBrush"),
+            Style = (Style)FindResource("DeviceNameText"),
             TextTrimming = TextTrimming.CharacterEllipsis
         });
         body.Children.Add(heading);
@@ -9810,9 +9806,7 @@ public partial class MainWindow : Window
             Text = $"{AppLocalization.T("最近连接")} · " +
                    device.LastConnectedAt.ToString("yyyy-MM-dd HH:mm"),
             Margin = new Thickness(0, 7, 0, 0),
-            FontFamily = (FontFamily)FindResource("MonoFont"),
-            FontSize = 11,
-            Foreground = (Brush)FindResource("MutedBrush")
+            Style = (Style)FindResource("DeviceMetaText")
         });
 
         var actions = new Grid { Margin = new Thickness(0, 14, 0, 0) };
