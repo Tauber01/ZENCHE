@@ -134,16 +134,16 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_BLUETOOTH_REMOTE = 4106;
     private static final int REQUEST_CAPTURE_LOCATION = 4107;
     private static final int REQUEST_LOCAL_CAMERA = 4108;
-    private static final int PAPER = Color.rgb(233, 237, 242);
-    private static final int PAPER_2 = Color.rgb(228, 233, 239);
-    private static final int SURFACE = Color.rgb(248, 250, 252);
-    private static final int INK = Color.rgb(23, 28, 38);
-    private static final int MUTED = Color.rgb(90, 97, 108);
-    private static final int COBALT = Color.rgb(22, 115, 230);
-    private static final int COBALT_SOFT = Color.rgb(220, 234, 253);
-    private static final int VIDEO = Color.rgb(216, 50, 58);
-    private static final int VIDEO_SOFT = Color.rgb(251, 226, 227);
-    private static final int POSITIVE = Color.rgb(31, 168, 105);
+    private static int PAPER = Color.rgb(233, 237, 242);
+    private static int PAPER_2 = Color.rgb(228, 233, 239);
+    private static int SURFACE = Color.rgb(248, 250, 252);
+    private static int INK = Color.rgb(23, 28, 38);
+    private static int MUTED = Color.rgb(90, 97, 108);
+    private static int COBALT = Color.rgb(22, 115, 230);
+    private static int COBALT_SOFT = Color.rgb(220, 234, 253);
+    private static int VIDEO = Color.rgb(216, 50, 58);
+    private static int VIDEO_SOFT = Color.rgb(251, 226, 227);
+    private static int POSITIVE = Color.rgb(31, 168, 105);
     private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
     private static final int GRAPHITE = Color.rgb(10, 11, 13);
     // 1.5.3 编辑器 token：保留以兼容 native-ui-1.5.3 token 契约断言；
@@ -192,16 +192,65 @@ public final class MainActivity extends Activity {
     private static final int SCOPE_YUV_U = Color.rgb(0, 210, 255);    // YUV U
     private static final int SCOPE_YUV_V = Color.rgb(255, 38, 222);   // YUV V
     // ── v1.5.6 高频内联色归一 ──
-    private static final int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
-    private static final int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
-    private static final int STATUS_MUTED = Color.rgb(185, 193, 208); // 连接页状态文字
+    private static int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
+    private static int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
+    private static int STATUS_MUTED = Color.rgb(185, 193, 208); // 连接页状态文字
     // 监看页 HUD 玻璃背景（黑色半透明，同语义遮罩）
     private static final int HUD_BG = Color.argb(175, 0, 0, 0);       // 主 HUD 控件背景
     private static final int HUD_BG_SOFT = Color.argb(155, 0, 0, 0);  // 次要控件背景
     private static final int HUD_BG_MID = Color.argb(165, 0, 0, 0);   // 关闭/切换控件背景
     private static final int HUD_CARD_DIM = Color.argb(230, 28, 28, 30); // 深色面板（UI_CARD 半透明）
-    private static final int RULE = Color.rgb(207, 214, 223);
-    private static final int RULE_STRONG = Color.rgb(174, 184, 199);
+    private static int RULE = Color.rgb(207, 214, 223);
+    private static int RULE_STRONG = Color.rgb(174, 184, 199);
+    // ── v1.5.6 dual-appearance: token values are assigned at runtime from the
+    // system uiMode (light/dark), so the whole code-built UI follows the system
+    // theme. Values align to the design.md calibrated token table (6450106);
+    // colour-stable wells (GRAPHITE/STUDIO_*/EDITOR_*/UI_*/SCOPE_*/HUD_*)
+    // intentionally stay fixed in both appearances.
+    private static boolean nightMode = false;
+
+    private static void applyAppearanceTokens(boolean night) {
+        nightMode = night;
+        if (night) {
+            PAPER = Color.rgb(19, 21, 25);          // #131519
+            PAPER_2 = Color.rgb(35, 39, 46);        // #23272E
+            PAPER_3 = Color.rgb(27, 30, 36);        // #1B1E24 (surface)
+            SURFACE = Color.rgb(27, 30, 36);        // #1B1E24
+            INK = Color.rgb(236, 238, 242);         // #ECEEF2
+            MUTED = Color.rgb(154, 161, 173);       // #9AA1AD
+            COBALT = Color.rgb(46, 134, 224);       // #2E86E0 photo accent dark
+            COBALT_SOFT = Color.rgb(20, 41, 62);    // #14293E photo soft dark
+            VIDEO = Color.rgb(255, 82, 87);         // #FF5257
+            VIDEO_SOFT = Color.rgb(58, 27, 30);     // #3A1B1E
+            POSITIVE = Color.rgb(53, 201, 123);     // #35C97B
+            RULE = Color.argb(31, 255, 255, 255);   // #1FFFFFFF (white @31)
+            RULE_STRONG = Color.argb(51, 255, 255, 255); // #33FFFFFF
+            FIELD_BG = Color.rgb(35, 39, 46);       // #23272E
+            STATUS_MUTED = Color.rgb(142, 151, 163);// #8E97A3
+        } else {
+            PAPER = Color.rgb(233, 237, 242);       // #E9EDF2
+            PAPER_2 = Color.rgb(228, 233, 239);     // #E4E9EF
+            PAPER_3 = Color.rgb(247, 249, 252);     // #F7F9FC
+            SURFACE = Color.rgb(248, 250, 252);     // #F8FAFC
+            INK = Color.rgb(23, 28, 38);            // #171C26
+            MUTED = Color.rgb(90, 97, 108);         // #5A616C
+            COBALT = Color.rgb(22, 115, 230);       // #1673E6
+            COBALT_SOFT = Color.rgb(220, 234, 253); // #DCEAFD
+            VIDEO = Color.rgb(216, 50, 58);         // #D8323A
+            VIDEO_SOFT = Color.rgb(251, 226, 227);  // #FBE2E3
+            POSITIVE = Color.rgb(31, 168, 105);     // #1FA869
+            RULE = Color.rgb(207, 214, 223);        // #CFD6DF
+            RULE_STRONG = Color.rgb(174, 184, 199); // #AEB8C7
+            FIELD_BG = Color.rgb(241, 244, 249);    // #F1F4F9
+            STATUS_MUTED = Color.rgb(185, 193, 208);// #B9C1D0
+        }
+    }
+
+    private boolean isNightMode() {
+        return (getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+    }
+
     private static final String LATEST_RELEASE_API =
             "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
     private static final String DEFAULT_SELF_HOSTED_UPDATE_ENDPOINT =
@@ -1718,6 +1767,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
+        applyAppearanceTokens(isNightMode());
         diagnostics = new DiagnosticLogger(this);
         diagnostics.startSession();
         appLanguage = Localization.normalize(
@@ -1735,7 +1785,7 @@ public final class MainActivity extends Activity {
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                         | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+                        | (nightMode ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
 
         camera = new PtpCamera(this, diagnostics);
         wifiCamera = new PtpIpCamera();
@@ -1846,6 +1896,29 @@ public final class MainActivity extends Activity {
     @Override
     public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
+        boolean nowNight = (configuration.uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        if (nowNight != nightMode) {
+            applyAppearanceTokens(nowNight);
+            Window window = getWindow();
+            window.setStatusBarColor(PAPER);
+            window.setNavigationBarColor(GRAPHITE);
+            window.getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | (nowNight ? 0 : View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+            String destination = currentSection;
+            navigationButtons.clear();
+            setContentView(buildApplication());
+            showSection(destination);
+            updateConnectionUi();
+            updateWirelessUi();
+            refreshUpdateUi();
+            if (latestSourceFrame != null) {
+                refreshPreviewProcessing();
+            }
+        }
         if (immersiveDialog == null || !immersiveDialog.isShowing()) return;
         immersiveLandscape =
                 configuration.orientation == Configuration.ORIENTATION_LANDSCAPE;
