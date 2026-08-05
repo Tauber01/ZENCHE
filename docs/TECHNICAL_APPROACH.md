@@ -133,7 +133,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - F5 打回补遗（pro 复审 3 必改 + 1 docs 勘误）：①MainWindow.xaml 66 处 FontSize 全量归档（Monitor/Capture 62 处入样式、AppBar 品牌 Z22/名19/⚙20 与对焦框＋38/◉48/图标16 豁免注释；新建 MonitorTimecode/MonitorEmptyState/MonitorWellLabel/MonitorCloudTitle/MonitorOverlayMeta/MonitorStorageIcon/CaptureFieldLabel/CaptureFieldValue/CaptureStatusHint/CaptureSubHint/CaptureCardTitle/CaptureReadoutLabel/CaptureReadoutValue/CaptureReadoutUnit/CaptureCloudTitle/CaptureCloudSub/CaptureSessionHint/CaptureEmptyTitle/CaptureBadge/ShootingTaskHint/ProfMonitorValue/SidebarHint 22 样式）；②cs 16 处非 TS 档字号归档（8/10/13/14/16/17/19/25/26 → TelemetryMicro/DialogHint/ImmersiveLabel/FastFeedbackMono/DialogTitle/AnnouncementHeading/Section/Title/Text/Sub 10 样式；录制钮 16 为按钮符号字号注释声明）；③Warn/ErrorSoft 暗色对（Theme.Dark 补 ColorErrorSoft/WarnBg=#3A1B1E 对齐 design.md:59 Video soft 暗、WarnBgSoft=#5C2B30 中间档）；④docs 口径勘误（9 处仅 1 处真实热切换修复）。
 - 公告弹窗字号与 macOS 对照（记录差异，改值待 kimi 裁决）：Windows 更新公告 25 vs macOS heading=26、本次更新 19 vs macOS title=18、谨防诈骗/自愿赞助 17 vs macOS title=18、正文 14 vs macOS body=12——本批只归档不改值。
 
+## 0.14. 1.5.7 F2 iOS 收口批约定
+
+- iOS 字号归档口径（延续 F3/F5）：值等值映射既有档优先（9→EditorFontSize.tiny、10→EditorFontSize.small、13→SettingsFontSize.linkLabel），图标/品牌豁免注释声明（Splash 品牌资产、SF Symbol 图标），孤立值保留原值列清单归 F5 数值裁决（8/17/25/28/32 档）。
+- 动态字档（.caption/.headline 等 249 处）为 iOS 平台动态字体惯例，与 FontToken 固定 5 档语义不同——保留，不映射替换；映射关系仅落 docs（caption≈caption、headline≈emphasis、title2/3≈title、largeTitle≈display 为近似语义，非等值）。
+- STUDIO_* 死定义清理模式（F3 Android 先例）：全文件引用计数=1（仅定义处）即死；删除定义后标识符保留原位注释（native-ui-1.5.3.test.mjs:80-81 对五端源码文本断言 studioGold/studioPanel）。
+- AUTO 徽标契约：五端统一「AUTO」胶囊（caption/11pt bold + Capsule + height 18），iOS P1 已对齐，后续批次核验不重复改。
+
 ## 1. 总体原则
+
 
 
 

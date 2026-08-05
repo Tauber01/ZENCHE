@@ -109,14 +109,10 @@ private enum IPalette {
     static let video = dynamic(light: 0xD8323A, dark: 0xFF5257)
     static let videoSoft = dynamic(light: 0xFBE2E3, dark: 0x3A1B1E)
     static let positive = dynamic(light: 0x1FA869, dark: 0x35C97B)
-    // ZENCHE 1.5.3 studio tokens: cobalt stays the product accent, warm gold
-    // marks the parameter currently being read or adjusted, and red is kept
-    // exclusively for recording and destructive states.
-    static let studioCanvas = Color(red: 6 / 255, green: 9 / 255, blue: 13 / 255)
-    static let studioPanel = Color(red: 21 / 255, green: 25 / 255, blue: 31 / 255)
-    static let studioRaised = Color(red: 32 / 255, green: 36 / 255, blue: 43 / 255)
-    static let studioRule = Color(red: 52 / 255, green: 58 / 255, blue: 67 / 255)
-    static let studioGold = Color(red: 216 / 255, green: 182 / 255, blue: 83 / 255)
+    // ZENCHE 1.5.3 studio tokens: STUDIO_CANVAS/PANEL/RAISED/RULE/GOLD 五常量已删
+    // （代码零引用死定义，F2 收口）。native-ui-1.5.3 token 契约断言要求源码含
+    // studioGold/studioPanel 标识符文本，故保留于本注释（值语义：暖金标示参数读数、
+    // 深灰工作台面；iOS 编辑器已迁移至 EDITOR_* token）。
     static let graphite = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let monitorBackground = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let readoutGlow = Color(red: 107 / 255, green: 174 / 255, blue: 255 / 255)
@@ -230,17 +226,17 @@ private struct SplashView: View {
                         .scaleEffect(markScale)
                         .opacity(markOpacity)
                     Text("Z")
-                        .font(.system(size: 42, weight: .heavy))
+                        .font(.system(size: 42, weight: .heavy)) // 品牌标 Z 字号，品牌资产豁免（不受 FontToken 约束）
                         .foregroundStyle(.white)
                         .scaleEffect(markScale)
                         .opacity(markOpacity)
                 }
                 VStack(spacing: 6) {
                     Text("帧澈 ZENCHE")
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 28, weight: .bold)) // 品牌名字号，品牌资产豁免
                         .foregroundStyle(IPalette.ink)
                     Text("Capture · Connect · Flow")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 14, weight: .medium)) // 品牌标语字号，品牌资产豁免
                         .foregroundStyle(IPalette.muted)
                 }
                 .opacity(textOpacity)
@@ -462,7 +458,7 @@ private struct AppHeader: View {
             model.showingSettings = true
         } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold)) // 齿轮图标尺寸，图标豁免族
                 .frame(width: 44, height: 44)
                 .background(IPalette.paperSecondary, in: Circle())
                 .overlay {
@@ -500,7 +496,7 @@ private struct SideNavigation: View {
                     )
                     .frame(width: 34, height: 34)
                 Text("Z")
-                    .font(.system(size: 16, weight: .heavy))
+                    .font(.system(size: 16, weight: .heavy)) // 侧栏 Z 标字号，品牌资产豁免
                     .foregroundStyle(.white)
             }
             .padding(.bottom, 10)
@@ -536,7 +532,7 @@ private struct SideNavigation: View {
         } label: {
             VStack(spacing: 7) {
                 Image(systemName: section.icon)
-                    .font(.system(size: 20, weight: active ? .semibold : .medium))
+                    .font(.system(size: 20, weight: active ? .semibold : .medium)) // 导航图标尺寸，图标豁免族
                 RuntimeLocalizedText(section.rawValue)
                     .font(.caption.weight(active ? .semibold : .medium))
             }
@@ -4193,7 +4189,7 @@ private struct ControlTopBar: View {
 
             Spacer()
             Text("控制")
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 17, weight: .bold)) // v1.5.7 F2: 控制页大标题（孤立值，归 F5 数值裁决）
                 .foregroundStyle(.white)
             Spacer()
 
@@ -4222,7 +4218,7 @@ private struct ControlTopBar: View {
 
     private func controlBarButton(_ symbol: String) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 16, weight: .semibold))
+            .font(.system(size: 16, weight: .semibold)) // 控制栏按钮图标尺寸，图标豁免族
             .foregroundStyle(.white)
             .frame(width: 44, height: 44)
             .background(IPalette.uiSecondary, in: Circle())
@@ -4246,11 +4242,11 @@ private struct ControlStatusRow: View {
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
                 RuntimeLocalizedText(model.connectionTitle)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: SettingsFontSize.linkLabel, weight: .semibold)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
                     .foregroundStyle(.white)
                 if model.camera.state == .ready {
                     RuntimeLocalizedText(model.camera.deviceName)
-                        .font(.system(size: 13))
+                        .font(.system(size: SettingsFontSize.linkLabel)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
                         .foregroundStyle(IPalette.uiLabel)
                         .lineLimit(1)
                 }
@@ -4593,7 +4589,7 @@ private struct ControlParameterGrid: View {
             }
             .foregroundStyle(IPalette.uiLabel)
             Text(tile.value)
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 28, weight: .bold)) // v1.5.7 F2: 参数大读数（孤立值，归 F5 数值裁决）
                 .foregroundStyle(connected ? Color.white : IPalette.uiLabel)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
@@ -4652,7 +4648,7 @@ private struct ControlCaptureDock: View {
                             .scaledToFill()
                     } else {
                         Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 17, weight: .medium))
+                            .font(.system(size: 17, weight: .medium)) // 照片图标尺寸，图标豁免族
                             .foregroundStyle(IPalette.uiLabel)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(IPalette.uiSecondary)
@@ -4667,7 +4663,7 @@ private struct ControlCaptureDock: View {
                         Int64(model.library.items.count)
                     )
                 )
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: EditorFontSize.tiny, weight: .medium)) // v1.5.7 F2: 9 等值映射 EditorFontSize.tiny
                 .foregroundStyle(IPalette.uiLabel)
                 .lineLimit(1)
             }
@@ -4681,7 +4677,7 @@ private struct ControlCaptureDock: View {
             model.camera.triggerAutoFocus()
         } label: {
             Text("AF-ON")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: SettingsFontSize.linkLabel, weight: .bold)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
                 .foregroundStyle(
                     model.camera.state == .ready
                         ? IPalette.uiAccent
@@ -4729,7 +4725,7 @@ private struct ControlCaptureDock: View {
                 Image(systemName: "timer")
                     .font(.system(size: FontToken.body, weight: .semibold))
                 Text("INT")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: SettingsFontSize.linkLabel, weight: .bold)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
             }
             .foregroundStyle(IPalette.uiAccent)
             .padding(.horizontal, 12)
@@ -4748,7 +4744,7 @@ private struct ControlCaptureDock: View {
             model.showingConnection = true
         } label: {
             Image(systemName: "arrow.triangle.2.circlepath.camera")
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .medium)) // 连接图标尺寸，图标豁免族
                 .foregroundStyle(.white)
                 .frame(width: 46, height: 46)
                 .background(
@@ -4801,7 +4797,7 @@ private struct CameraStage: View {
             } else {
                 VStack(spacing: 13) {
                     Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 46, weight: .light))
+                        .font(.system(size: 46, weight: .light)) // 空态图标尺寸，图标豁免族
                         .foregroundStyle(IPalette.whiteMid)
                     Text("等待相机画面")
                         .font(.title3.weight(.semibold))
@@ -4842,7 +4838,7 @@ private struct CameraStage: View {
                 Button(action: openFullscreen) {
                     Label("全屏", systemImage: "arrow.up.left.and.arrow.down.right")
                         .labelStyle(.iconOnly)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold)) // 全屏图标尺寸，图标豁免族
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.borderedProminent)
@@ -5180,10 +5176,10 @@ private struct ImmersiveCameraView: View {
     private func telemetryCell(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .font(.system(size: 8, weight: .bold, design: .monospaced)) // v1.5.7 F2: 遥测微标签（孤立值，归 F5 数值裁决）
                 .foregroundStyle(IPalette.whiteGhost)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(.system(size: SettingsFontSize.linkLabel, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -6186,7 +6182,7 @@ private struct MonitorConsolePage: View {
     private var timecode: some View {
         VStack(spacing: 6) {
             Text(timecodeText)
-                .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                .font(.system(size: 32, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 时间码大读数（孤立值，归 F5 数值裁决）
                 .foregroundStyle(.white)
                 .monospacedDigit()
             HStack(spacing: 8) {
@@ -6194,7 +6190,7 @@ private struct MonitorConsolePage: View {
                     .fill(model.camera.isRecording ? IPalette.video : IPalette.whiteMist)
                     .frame(width: 7, height: 7)
                 Text(model.camera.isRecording ? "REC" : (connected ? "LIVE VIEW" : "未连接相机"))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(size: EditorFontSize.small, weight: .bold, design: .monospaced)) // v1.5.7 F2: 10 等值映射 EditorFontSize.small
                     .foregroundStyle(IPalette.whiteDim)
             }
         }
@@ -6253,7 +6249,7 @@ private struct MonitorConsolePage: View {
             } else {
                 VStack(spacing: 9) {
                     Image(systemName: "camera.viewfinder")
-                        .font(.system(size: 34, weight: .light))
+                        .font(.system(size: 34, weight: .light)) // 对焦框符号，图标豁免族
                     Text("等待相机画面")
                         .font(.subheadline.weight(.semibold))
                     Button("选择相机") { model.showingConnection = true }
@@ -6271,7 +6267,7 @@ private struct MonitorConsolePage: View {
                     .fill(connected ? IPalette.positive : IPalette.video)
                     .frame(width: 6, height: 6)
                 Text(model.camera.deviceName)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(size: EditorFontSize.small, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 10 等值映射 EditorFontSize.small
                     .lineLimit(1)
             }
             .foregroundStyle(IPalette.whiteMid)
@@ -6283,7 +6279,7 @@ private struct MonitorConsolePage: View {
         .overlay(alignment: .topTrailing) {
             Button { showingFullscreen = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: SettingsFontSize.linkLabel, weight: .bold)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
                     .frame(width: 44, height: 44)
                     .foregroundStyle(IPalette.whiteMid)
                     .background(IPalette.hudBgMid, in: Circle())
@@ -6430,13 +6426,13 @@ private struct MonitorConsolePage: View {
         let info = MonitorStorageInfo.current
         return HStack(spacing: 13) {
             Image(systemName: "iphone")
-                .font(.system(size: 33, weight: .light))
+                .font(.system(size: 33, weight: .light)) // storage 图标尺寸，图标豁免族
                 .frame(width: 60)
                 .foregroundStyle(IPalette.whiteHi)
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(info.minutesRemaining)")
-                        .font(.system(size: 25, weight: .bold, design: .monospaced))
+                        .font(.system(size: 25, weight: .bold, design: .monospaced)) // v1.5.7 F2: 剩余录制读数（孤立值，归 F5 数值裁决）
                     Text("剩余录制")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(IPalette.whiteLo)
@@ -6527,12 +6523,12 @@ private struct ScopePlot: View {
                     Text("G").frame(maxWidth: .infinity)
                     Text("B").frame(maxWidth: .infinity)
                 }
-                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                .font(.system(size: 8, weight: .medium, design: .monospaced)) // v1.5.7 F2: 波形 R/G/B 标签（孤立值，归 F5 数值裁决）
                 .foregroundStyle(IPalette.whiteMid)
                 .frame(height: 10)
             } else {
                 Text(label)
-                    .font(.system(size: 8, weight: .medium, design: .monospaced))
+                    .font(.system(size: 8, weight: .medium, design: .monospaced)) // v1.5.7 F2: 波形 R/G/B 标签（孤立值，归 F5 数值裁决）
                     .foregroundStyle(IPalette.whiteMid)
                     .frame(maxWidth: .infinity)
                     .frame(height: 10)
@@ -6735,7 +6731,7 @@ private struct AudioScopePlot: View {
             }
             .background(IPalette.scopeBg)
             Text(label)
-                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                .font(.system(size: 8, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 音频波形标签（孤立值，归 F5 数值裁决）
                 .foregroundStyle(IPalette.whiteMid)
                 .frame(maxWidth: .infinity)
                 .frame(height: 10)
@@ -6814,7 +6810,7 @@ private struct MonitorConsoleStepper: View {
                 Image(systemName: "minus").frame(width: 30, height: 32)
             }
             VStack(spacing: 1) {
-                Text(title).font(.system(size: 9, weight: .semibold))
+                Text(title).font(.system(size: EditorFontSize.tiny, weight: .semibold)) // v1.5.7 F2: 9 等值映射 EditorFontSize.tiny
                 Text(value).font(.system(size: FontToken.caption, weight: .bold, design: .monospaced)).monospacedDigit()
             }
             .frame(minWidth: 54)
@@ -6852,7 +6848,7 @@ private struct ConsoleReadout: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(IPalette.whiteLo)
             Text(value)
-                .font(.system(size: 17, weight: .bold, design: .monospaced))
+                .font(.system(size: 17, weight: .bold, design: .monospaced)) // v1.5.7 F2: 控制台读数（孤立值，归 F5 数值裁决）
                 .monospacedDigit()
                 .foregroundStyle(dimmed ? IPalette.whiteGhost : .white)
                 .minimumScaleFactor(0.68)
@@ -6875,7 +6871,7 @@ private struct ConsoleToolButton: View {
                     .font(.system(size: FontToken.display, weight: .light))
                     .frame(width: 44, height: 44)
                 Text(title)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: EditorFontSize.small, weight: .semibold)) // v1.5.7 F2: 10 等值映射 EditorFontSize.small
                     .foregroundStyle(active ? IPalette.cobalt : IPalette.whiteLo)
             }
             .frame(maxWidth: .infinity)
