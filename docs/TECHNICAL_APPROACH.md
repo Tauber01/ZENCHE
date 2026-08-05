@@ -124,7 +124,18 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 字号归并口径（延续 P 批）：能映射 TS 五档（11/12/15/18/24）的直接映射为 TS_CAPTION/TS_BODY/TS_EMPHASIS/TS_TITLE/TS_DISPLAY，等值不改渲染；P 批已归档的 FS 档位（PAGE_FS_*/EDITOR_FS_*/DEVICE_FS_*/LIBRARY_FS_*/SETTINGS_FS_*）不重复处理；落不了 TS 档的孤立值保留原值，列清单归 F5 数值裁决；条件式/三元（含可映射值）不拆改。
 - 导航 chrome/沉浸 overlay 的字号（◉⋯ 18pt 字符钮、immersive 读数）属 F3 归并范围（只做 TS 等值映射，不改渲染值）；P1 的「导航 chrome 不动」红线指结构/样式不动，字号等值归并不冲突。
 
+## 0.13. 1.5.7 F5 Windows 收口批约定
+
+- 画刷快照收口模式：cs 中禁止 `new SolidColorBrush((Color)FindResource("ColorX"))`（构造期冻结值）——统一改为 `(Brush)FindResource("XxxBrush")` 共享实例引用（Colors.xaml 已为每个 Color 定义配套 Brush，Color 经 DynamicResource 跟随主题字典切换）。**口径修正：audit 9 处中仅 PhotoSoftBorder 1 处有亮暗主题对（真实热切换修复），其余 8 色两主题同值属等价重构。**
+- 11pt 双样式分工：`MetaText`（MonoFont 等宽）= 等宽元信息（版本号/状态/节点详情）；`SettingsHint`（非等宽）= 普通说明文字（设置页提示）。同值不同用途，不合并，注释声明。
+- 数值裁决基准（改值需 macOS 证据）：读数档=macOS monitorReadout 值 `TypeScale.title`(18)；页面标题档=macOS `TypeScale.heading`(26)（WorkspaceHeading 设备/分支页）；日志弹窗标题=macOS `TypeScale.title`(18)。Windows 端已执行 22→18（MonitorReadout/SettingsLogTitle）、24→26（Device/LibraryHeaderTitle）。其余端标题档值（iOS 29/25、Android 30/25、Harmony 30）为各自批次归档值，对齐裁定归 F5 已记录、执行留各端后续批。
+
+- F5 打回补遗（pro 复审 3 必改 + 1 docs 勘误）：①MainWindow.xaml 66 处 FontSize 全量归档（Monitor/Capture 62 处入样式、AppBar 品牌 Z22/名19/⚙20 与对焦框＋38/◉48/图标16 豁免注释；新建 MonitorTimecode/MonitorEmptyState/MonitorWellLabel/MonitorCloudTitle/MonitorOverlayMeta/MonitorStorageIcon/CaptureFieldLabel/CaptureFieldValue/CaptureStatusHint/CaptureSubHint/CaptureCardTitle/CaptureReadoutLabel/CaptureReadoutValue/CaptureReadoutUnit/CaptureCloudTitle/CaptureCloudSub/CaptureSessionHint/CaptureEmptyTitle/CaptureBadge/ShootingTaskHint/ProfMonitorValue/SidebarHint 22 样式）；②cs 16 处非 TS 档字号归档（8/10/13/14/16/17/19/25/26 → TelemetryMicro/DialogHint/ImmersiveLabel/FastFeedbackMono/DialogTitle/AnnouncementHeading/Section/Title/Text/Sub 10 样式；录制钮 16 为按钮符号字号注释声明）；③Warn/ErrorSoft 暗色对（Theme.Dark 补 ColorErrorSoft/WarnBg=#3A1B1E 对齐 design.md:59 Video soft 暗、WarnBgSoft=#5C2B30 中间档）；④docs 口径勘误（9 处仅 1 处真实热切换修复）。
+- 公告弹窗字号与 macOS 对照（记录差异，改值待 kimi 裁决）：Windows 更新公告 25 vs macOS heading=26、本次更新 19 vs macOS title=18、谨防诈骗/自愿赞助 17 vs macOS title=18、正文 14 vs macOS body=12——本批只归档不改值。
+
 ## 1. 总体原则
+
+
 
 
 

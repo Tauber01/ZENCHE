@@ -59,6 +59,7 @@
                   Height="44"
                   Background="{DynamicResource UiBlueBrush}"
                   CornerRadius="13">
+            <!-- 品牌标 Z 22/品牌名 19：AppBar 品牌区豁免（设计品牌资产，不受 TypeScale 约束） -->
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
                        FontFamily="{DynamicResource DisplayFont}"
@@ -110,6 +111,7 @@
                 Effect="{x:Null}"
                 Content="连接管理"
                 Click="ConnectButton_Click" />
+        <!-- 图标尺寸 20，豁免族（⚙ 胶囊钮符号） -->
         <Button x:Name="SettingsButton"
                 Grid.Column="3"
                 Width="48"
@@ -138,8 +140,7 @@
           <StackPanel DockPanel.Dock="Bottom">
             <TextBlock Style="{DynamicResource MetaText}" Text="ZENCHE 1.5.3" />
             <TextBlock Margin="0,4,0,0"
-                       Foreground="{DynamicResource MutedBrush}"
-                       FontSize="12"
+                       Style="{DynamicResource SidebarHint}"
                        Text="照片保存在“图片\帧澈 ZENCHE”" />
           </StackPanel>
           <StackPanel>
@@ -187,22 +188,23 @@
           </Grid.RowDefinitions>
           <Border Grid.Row="0" Background="{DynamicResource MonitorWellBrush}" Padding="20,16" BorderBrush="{DynamicResource MonitorWellSecondaryBrush}" BorderThickness="1,1,1,0">
             <Grid>
-              <TextBlock x:Name="MonitorTimecodeText" Text="00:00:00:00" FontFamily="{DynamicResource MonoFont}" FontSize="38" FontWeight="SemiBold" Foreground="{DynamicResource MonitorWellTextBrush}" />
+              <TextBlock x:Name="MonitorTimecodeText" Text="00:00:00:00" Style="{DynamicResource MonitorTimecode}" />
               <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                 <Ellipse Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource ConnectedDotBrush}" />
-                <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" FontFamily="{DynamicResource MonoFont}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource MonitorWellLabelBrush}" />
+                <TextBlock x:Name="MonitorLiveStatusText" Text="NO SOURCE" Style="{DynamicResource MonitorLiveStatus}" />
               </StackPanel>
             </Grid>
           </Border>
           <Border Grid.Row="1" Background="{DynamicResource MonitorWellBrush}" BorderBrush="{DynamicResource MonitorWellSecondaryBrush}" BorderThickness="1,0,1,0" ClipToBounds="True">
             <Grid>
               <Image x:Name="MonitorPreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonUp="MonitorPreviewImage_MouseLeftButtonUp" />
+              <!-- 图标尺寸 38，豁免族（对焦框符号，不受样式库约束） -->
               <TextBlock x:Name="MonitorFocusReticle" Text="＋" Visibility="Collapsed" Foreground="{DynamicResource PeakingBrush}" FontSize="38" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top" />
               <StackPanel x:Name="MonitorPreviewEmpty" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" FontFamily="{DynamicResource DisplayFont}" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource MonitorWellTextBrush}" />
+                <TextBlock HorizontalAlignment="Center" Text="等待实时取景画面" Style="{DynamicResource MonitorEmptyState}" />
                 <TextBlock Margin="0,8,0,0" HorizontalAlignment="Center" Text="连接相机后开启实时取景" Foreground="{DynamicResource MonitorWellLabelBrush}" />
               </StackPanel>
-              <TextBlock x:Name="MonitorCameraOverlay" Margin="16" VerticalAlignment="Top" Text="未连接 · USB/PTP" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource MonitorWellLabelBrush}" />
+              <TextBlock x:Name="MonitorCameraOverlay" Margin="16" VerticalAlignment="Top" Text="未连接 · USB/PTP" Style="{DynamicResource MonitorOverlayMeta}" />
             </Grid>
           </Border>
           <Grid Grid.Row="2" Margin="0,14,0,0">
@@ -226,13 +228,13 @@
             </Border>
           </Grid>
           <UniformGrid Grid.Row="3" Columns="7" Margin="0,18,0,0">
-            <StackPanel Margin="4"><TextBlock Text="帧率" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorFrameRateText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="快门" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorShutterText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="光圈" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorApertureText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="ISO" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorIsoText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="白平衡" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="编码" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorCodecText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
-            <StackPanel Margin="4"><TextBlock Text="色调" Foreground="{DynamicResource MonitorWellLabelBrush}" FontSize="11" /><TextBlock x:Name="MonitorToneText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="帧率" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorFrameRateText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="快门" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorShutterText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="光圈" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorApertureText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="ISO" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorIsoText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="白平衡" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorWhiteBalanceText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="编码" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorCodecText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
+            <StackPanel Margin="4"><TextBlock Text="色调" Style="{DynamicResource MonitorWellLabel}" /><TextBlock x:Name="MonitorToneText" Text="—" Style="{DynamicResource MonitorReadout}" /></StackPanel>
           </UniformGrid>
           <StackPanel Grid.Row="4" Margin="0,16,0,4">
             <Border MaxWidth="720"
@@ -255,15 +257,12 @@
                 <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="12">
                   <TextBlock HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             FontWeight="Bold"
-                             Foreground="{DynamicResource AccentInkBrush}"
+                             Style="{DynamicResource CaptureBadge}"
                              Text="NP3" />
                 </Border>
                 <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
-                  <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource MonitorWellTextBrush}" Text="尼康云创监看" />
-                  <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource MonitorWellLabelBrush}" Text="107 款设备端 SDR 预设" />
+                  <TextBlock Style="{DynamicResource MonitorCloudTitle}" Text="尼康云创监看" />
+                  <TextBlock Margin="0,2,0,0" Style="{DynamicResource MonitorWellLabel}" Text="107 款设备端 SDR 预设" />
                 </StackPanel>
                 <ComboBox x:Name="MonitorNikonCloudPresetBox"
                           Grid.Column="2"
@@ -280,8 +279,7 @@
                 <TextBlock Grid.Row="1"
                            Grid.ColumnSpan="3"
                            Margin="0,8,0,0"
-                           FontSize="11"
-                           Foreground="{DynamicResource MonitorWellLabelBrush}"
+                           Style="{DynamicResource MonitorWellLabel}"
                            Text="照片与视频实时生效 · SDR 近似 · 不写入原片" />
               </Grid>
             </Border>
@@ -296,8 +294,8 @@
           </StackPanel>
           <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="{DynamicResource MonitorWellCardBrush}" CornerRadius="10">
             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="▯" FontSize="28" Foreground="{DynamicResource MonitorWellTextBrush}" VerticalAlignment="Center" />
-              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" Style="{DynamicResource MonitorReadout}" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource MonitorWellLabelBrush}" /></StackPanel>
+              <TextBlock Style="{DynamicResource MonitorStorageIcon}" Text="▯" VerticalAlignment="Center" />
+              <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" Style="{DynamicResource MonitorReadout}" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" Style="{DynamicResource MonitorWellLabel}" /></StackPanel>
             </StackPanel>
           </Border>
         </Grid>
@@ -337,7 +335,7 @@
                          Grid.Column="1"
                          Margin="10,0,0,0"
                          VerticalAlignment="Center"
-                         FontSize="13"
+                         Style="{DynamicResource CaptureStatusHint}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource UiCardInkBrush}"
                          Text="未连接" />
@@ -347,7 +345,7 @@
                       Background="{DynamicResource UiSecondaryBrush}"
                       CornerRadius="15">
                 <TextBlock x:Name="ControlStatusRateText"
-                           FontSize="12"
+                           Style="{DynamicResource CaptureSubHint}"
                            FontWeight="Bold"
                            Foreground="{DynamicResource UiCardInkBrush}"
                            Text="待连接" />
@@ -356,7 +354,7 @@
                          Grid.Row="1"
                          Grid.ColumnSpan="3"
                          Margin="0,6,0,0"
-                         FontSize="12"
+                         Style="{DynamicResource CaptureSubHint}"
                          Foreground="{DynamicResource VideoBrush}"
                          TextTrimming="CharacterEllipsis"
                          TextWrapping="NoWrap"
@@ -366,26 +364,26 @@
           <UniformGrid x:Name="ControlStatusGrid" Grid.Row="1" Columns="4" Margin="0,0,0,10">
             <Border Margin="0,0,6,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
               <StackPanel>
-                <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="9" Foreground="{DynamicResource UiLabelBrush}" Text="机身" />
-                <TextBlock x:Name="CaptureDeviceNameText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" TextTrimming="CharacterEllipsis" />
+                <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="机身" />
+                <TextBlock x:Name="CaptureDeviceNameText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
             <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
               <StackPanel>
-                <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="9" Foreground="{DynamicResource UiLabelBrush}" Text="传输" />
-                <TextBlock x:Name="CaptureLinkText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiCardInkBrush}" Text="OFFLINE" />
+                <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="传输" />
+                <TextBlock x:Name="CaptureLinkText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
             <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
               <StackPanel>
-                <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="9" Foreground="{DynamicResource UiLabelBrush}" Text="格式" />
-                <TextBlock x:Name="CaptureOutputText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="格式" />
+                <TextBlock x:Name="CaptureOutputText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
             <Border Margin="6,0,0,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
               <StackPanel>
-                <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="9" Foreground="{DynamicResource UiLabelBrush}" Text="文件库" />
-                <TextBlock x:Name="CaptureLibraryText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource UiCardInkBrush}" Text="0 个文件" />
+                <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="文件库" />
+                <TextBlock x:Name="CaptureLibraryText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
           </UniformGrid>
@@ -444,9 +442,7 @@
                            Grid.ColumnSpan="3"
                            Margin="0,12,12,0"
                            VerticalAlignment="Center"
-                           FontFamily="{DynamicResource MonoFont}"
-                           FontSize="11"
-                           Foreground="{DynamicResource MutedBrush}"
+                           Style="{DynamicResource CaptureSessionHint}"
                            Text="尚未开始拍摄会话" />
                 <Button x:Name="SessionActionButton"
                         Grid.Row="2"
@@ -474,9 +470,7 @@
                           VerticalAlignment="Center">
                 <TextBlock HorizontalAlignment="Center"
                            Foreground="{DynamicResource GraphiteInkBrush}"
-                           FontFamily="{DynamicResource DisplayFont}"
-                           FontSize="22"
-                           FontWeight="Bold"
+                           Style="{DynamicResource CaptureEmptyTitle}"
                            Text="等待相机画面" />
                 <TextBlock Margin="0,8,0,0"
                            Foreground="{DynamicResource GraphiteMutedBrush}"
@@ -515,7 +509,7 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock FontSize="15" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="参数" VerticalAlignment="Center" />
+                <TextBlock Style="{DynamicResource CaptureCardTitle}" Text="参数" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                   <Button x:Name="GridEditAllButton"
                           Width="68"
@@ -544,12 +538,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="来源" />
-                      <TextBlock x:Name="SourceReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock Style="{DynamicResource CaptureReadoutLabel}" Text="来源" />
+                      <TextBlock x:Name="SourceReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileSourceHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -570,12 +564,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="模式" />
-                      <TextBlock x:Name="ModeReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock Style="{DynamicResource CaptureReadoutLabel}" Text="模式" />
+                      <TextBlock x:Name="ModeReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileModeHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -596,12 +590,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock x:Name="ShutterReadoutLabel" FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="快门" />
-                      <TextBlock x:Name="ShutterReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock x:Name="ShutterReadoutLabel" Style="{DynamicResource CaptureReadoutLabel}" Text="快门" />
+                      <TextBlock x:Name="ShutterReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileShutterHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -622,12 +616,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock x:Name="ApertureReadoutLabel" FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="光圈" />
-                      <TextBlock x:Name="ApertureReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock x:Name="ApertureReadoutLabel" Style="{DynamicResource CaptureReadoutLabel}" Text="光圈" />
+                      <TextBlock x:Name="ApertureReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileApertureHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -648,12 +642,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock x:Name="IsoReadoutLabel" FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="ISO" />
-                      <TextBlock x:Name="IsoReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock x:Name="IsoReadoutLabel" Style="{DynamicResource CaptureReadoutLabel}" Text="ISO" />
+                      <TextBlock x:Name="IsoReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileIsoHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -674,12 +668,12 @@
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel>
-                      <TextBlock x:Name="CompensationReadoutLabel" FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="曝光补偿" />
-                      <TextBlock x:Name="CompensationReadoutText" Margin="0,4,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource UiCardInkBrush}" Text="—" />
+                      <TextBlock x:Name="CompensationReadoutLabel" Style="{DynamicResource CaptureReadoutLabel}" Text="曝光补偿" />
+                      <TextBlock x:Name="CompensationReadoutText" Margin="0,4,0,0" Style="{DynamicResource CaptureReadoutValue}" />
                     </StackPanel>
                     <TextBlock x:Name="ParameterTileCompensationHide"
                                Grid.Column="1"
-                               FontSize="14"
+                               Style="{DynamicResource CaptureReadoutUnit}"
                                FontWeight="Bold"
                                Foreground="{DynamicResource UiLabelBrush}"
                                Text="×"
@@ -693,8 +687,7 @@
               <TextBlock x:Name="ParameterTileEmptyText"
                          Margin="0,12,0,0"
                          HorizontalAlignment="Center"
-                         FontSize="12"
-                         Foreground="{DynamicResource UiLabelBrush}"
+                         Style="{DynamicResource CaptureSubHint}"
                          Text="参数已全部隐藏"
                          Visibility="Collapsed" />
             </StackPanel>
@@ -732,15 +725,12 @@
                   <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="12">
                     <TextBlock HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               FontFamily="{DynamicResource MonoFont}"
-                               FontSize="11"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource UiCardInkBrush}"
+                               Style="{DynamicResource CaptureBadge}"
                                Text="NP3" />
                   </Border>
                   <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
-                    <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource UiCardInkBrush}" Text="尼康云创监看" />
-                    <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource UiLabelBrush}" Text="107 款设备端 SDR 预设" />
+                    <TextBlock Style="{DynamicResource CaptureCloudTitle}" Text="尼康云创监看" />
+                    <TextBlock Margin="0,2,0,0" Style="{DynamicResource CaptureCloudSub}" Text="107 款设备端 SDR 预设" />
                   </StackPanel>
                   <ComboBox x:Name="CaptureNikonCloudPresetBox"
                             Grid.Column="2"
@@ -757,8 +747,7 @@
                   <TextBlock Grid.Row="1"
                              Grid.ColumnSpan="3"
                              Margin="0,8,0,0"
-                             FontSize="11"
-                             Foreground="{DynamicResource UiLabelBrush}"
+                             Style="{DynamicResource CaptureCloudSub}"
                              Text="照片与视频实时生效 · SDR 近似 · 不写入原片" />
                 </Grid>
               </Border>
@@ -812,9 +801,7 @@
                   </ComboBox>
                   <TextBlock x:Name="ShootingTaskStatusText"
                              Margin="0,6,12,0"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource ShootingTaskHint}"
                              Text="尚未开始拍摄任务" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="10,0,0,0">
@@ -2055,8 +2042,7 @@
                       Click="ExternalRecordingCheck_Click" />
             <TextBlock x:Name="ExternalRecordingHint"
                        Margin="0,4,0,10"
-                       Foreground="{DynamicResource MutedBrush}"
-                       FontSize="11"
+                       Style="{DynamicResource SettingsHint}"
                        TextWrapping="Wrap"
                        Text="实时取景会生成无声 Motion‑JPEG AVI 并写入 ZENCHE 文件库；可与机身录制并行。"
                        Visibility="Collapsed" />
@@ -2157,9 +2143,7 @@
                                          AutomationProperties.Name="专业波形图，RGB 三通道叠加" />
                     <TextBlock x:Name="PeakingCoverageText"
                                Margin="0,6,0,0"
-                               Foreground="{DynamicResource WhiteLoBrush}"
-                               FontFamily="{DynamicResource MonoFont}"
-                               FontSize="10"
+                               Style="{DynamicResource ProfMonitorValue}"
                                Text="峰值覆盖 0%" />
                   </StackPanel>
                 </Border>
@@ -2185,7 +2169,7 @@
                    VerticalAlignment="Center"
                    Foreground="{DynamicResource AppBarInkBrush}"
                    FontFamily="{DynamicResource MonoFont}"
-                   FontSize="11"
+                   Style="{DynamicResource CaptureSessionHint}"
                    TextTrimming="CharacterEllipsis"
                    TextWrapping="NoWrap"
                    Text="就绪" />
@@ -2195,7 +2179,7 @@
                    VerticalAlignment="Center"
                    Foreground="{DynamicResource AppBarMutedBrush}"
                    FontFamily="{DynamicResource MonoFont}"
-                   FontSize="11"
+                   Style="{DynamicResource CaptureSessionHint}"
                    Text="0 张照片" />
       </Grid>
     </Border>

@@ -27,6 +27,7 @@
     <Setter Property="Margin" Value="0,0,0,12" />
   </Style>
 
+  <!-- v1.5.7 F5: MetaText(11)=等宽元信息（版本号/状态行/节点详情，需等宽对齐）；SettingsHint(11)=普通说明文字（设置页提示）。语义差异（等宽 vs 非等宽）不合并，分工声明。 -->
   <Style x:Key="MetaText" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
     <Setter Property="FontSize" Value="11" />
@@ -34,9 +35,10 @@
   </Style>
 
   <!-- v1.5.7 P2: 监视读数数值——等宽 display 档（原 22pt 字面量归档，对齐 macOS 读数口径：等宽+大数字档）。 -->
+  <!-- v1.5.7 F5 数值裁决: 22→18 对齐 macOS monitorReadout 值=TypeScale.title=18（等宽 bold；五端读数对齐）。 -->
   <Style x:Key="MonitorReadout" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
   </Style>
@@ -549,9 +551,10 @@
     </Setter>
   </Style>
   <!-- v1.5.7 P4: 设备页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <!-- v1.5.7 F5 数值裁决: 24→26 对齐 macOS 页面标题 heading=26（WorkspaceHeading 设备页）。 -->
   <Style x:Key="DeviceHeaderTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
@@ -582,9 +585,10 @@
   </Style>
 
   <!-- v1.5.7 P5: 文件库页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <!-- v1.5.7 F5 数值裁决: 24→26 对齐 macOS 页面标题 heading=26（WorkspaceHeading 分支页）。 -->
   <Style x:Key="LibraryHeaderTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
@@ -615,14 +619,179 @@
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
 
+  <!-- v1.5.7 F5 数值裁决: 22→18 对齐 macOS 日志弹窗标题=TypeScale.title=18。 -->
   <Style x:Key="SettingsLogTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
 
   <Style x:Key="SettingsLogBox" TargetType="TextBox">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
     <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <!-- v1.5.7 F5 必改-1: Monitor/Capture 区字号字面量归档——原值入样式、不动渲染（F5 数值收口；MonitorReadout 等已裁决样式除外）。 -->
+  <Style x:Key="MonitorTimecode" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="38" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="MonitorLiveStatus" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellLabelBrush}" />
+  </Style>
+  <Style x:Key="MonitorEmptyState" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellMutedBrush}" />
+  </Style>
+  <Style x:Key="MonitorOverlayMeta" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellMutedBrush}" />
+  </Style>
+  <Style x:Key="MonitorWellLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellLabelBrush}" />
+  </Style>
+  <Style x:Key="MonitorCloudTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="MonitorStorageIcon" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="CaptureFieldLabel" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="9" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureFieldValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureStatusHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureSubHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureCardTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutUnit" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureCloudTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureCloudSub" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureSessionHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureEmptyTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureBadge" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentInkBrush}" />
+  </Style>
+  <Style x:Key="ShootingTaskHint" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+
+  <Style x:Key="ProfMonitorValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource WhiteLoBrush}" />
+  </Style>
+
+  <Style x:Key="SidebarHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
+  <!-- v1.5.7 F5 必改-2: cs 弹窗/沉浸/公告区字号字面量归档（只归档不改值）。 -->
+  <Style x:Key="TelemetryMicro" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="8" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource TelemetryLabelBrush}" />
+  </Style>
+  <Style x:Key="DialogHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+  <Style x:Key="ImmersiveLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource WhiteDimBrush}" />
+  </Style>
+  <Style x:Key="FastFeedbackMono" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style x:Key="DialogTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <!-- v1.5.7 F5 数值裁决: 25→26 对齐 macOS 公告标题=TypeScale.heading=26（kimi 17:52 裁决，仅改样式定义）。 -->
+  <Style x:Key="AnnouncementHeading" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <!-- v1.5.7 F5 数值裁决: 19→18 对齐 macOS 公告小节=TypeScale.title=18。 -->
+  <Style x:Key="AnnouncementSection" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <!-- v1.5.7 F5 数值裁决: 17→18 对齐 macOS 公告强调标题=TypeScale.title=18。 -->
+  <Style x:Key="AnnouncementTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <!-- v1.5.7 F5 数值裁决: 14→12 对齐 macOS 公告正文=TypeScale.body=12。 -->
+  <!-- v1.5.7 F5 二轮打回拆分：AnnouncementBody(12 继承色) 用于公告正文（本次更新/防诈，无前景覆盖）；防诈正文按 macOS 基准 body 12+semibold 本地补 SemiBold；辅助灰化文本（打赏说明）用 AnnouncementSub(12+Muted)。原 AnnouncementText(12+Muted) 已无引用方，删除避免死样式。 -->
+  <Style x:Key="AnnouncementBody" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <!-- v1.5.7 F5 数值裁决: 13→12 对齐 macOS 公告打赏说明=TypeScale.body=12（kimi 裁决「全部对齐 macOS 基准」延伸）。 -->
+  <Style x:Key="AnnouncementSub" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
 </ResourceDictionary>
