@@ -426,6 +426,7 @@ internal static class AppLocalization
             ["模式"] = new("Mode", "モード"),
             ["快门"] = new("Shutter", "シャッター"),
             ["照片拍摄"] = new("Photo Capture", "写真撮影"),
+            ["拍照"] = new("Capture", "撮影"),
             ["分支"] = new("Library", "ライブラリ"),
             ["视频监看"] = new("Video Monitor", "動画モニター"),
             ["编辑"] = new("Edit", "編集"),

@@ -150,17 +150,17 @@
             <Button x:Name="CaptureNav"
                     Style="{DynamicResource NavButton}"
                     Tag="capture"
-                    Content="照片拍摄"
+                    Content="拍照"
                     Click="Navigate_Click" />
             <Button x:Name="MonitorNav"
                     Style="{DynamicResource NavButton}"
                     Tag="monitor"
-                    Content="视频监看"
+                    Content="视频"
                     Click="Navigate_Click" />
             <Button x:Name="EditorNav"
                     Style="{DynamicResource NavButton}"
                     Tag="editor"
-                    Content="图像编辑"
+                    Content="编辑"
                     Click="Navigate_Click" />
             <Button x:Name="DevicesNav"
                     Style="{DynamicResource NavButton}"
@@ -170,7 +170,7 @@
             <Button x:Name="LibraryNav"
                     Style="{DynamicResource NavButton}"
                     Tag="library"
-                    Content="分支文件库"
+                    Content="分支"
                     Click="Navigate_Click" />
           </StackPanel>
         </DockPanel>

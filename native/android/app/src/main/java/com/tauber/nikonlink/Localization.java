@@ -369,6 +369,7 @@ final class Localization {
         add("曝光补偿", "Exposure", "露出補正");
         add("自动", "Auto", "オート");
         add("照片拍摄", "Photo Capture", "写真撮影");
+        add("拍照", "Capture", "撮影");
         add("视频监看", "Video Monitor", "動画モニター");
         add("文件与传输", "Files & Transfer", "ファイルと転送");
         add("照片", "Photos", "写真");

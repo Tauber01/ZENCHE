@@ -477,6 +477,7 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('自动', 'Auto', 'オート'),
   new TranslationEntry('工作区', 'Workspace', 'ワークスペース'),
   new TranslationEntry('照片拍摄', 'Photo Capture', '写真撮影'),
+  new TranslationEntry('拍照', 'Capture', '撮影'),
   new TranslationEntry('视频监看', 'Video Monitor', '動画モニター'),
   new TranslationEntry('照片', 'Photos', '写真'),
   new TranslationEntry('分支', 'Library', 'ライブラリ'),

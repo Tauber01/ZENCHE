@@ -28,11 +28,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 }
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case capture = "照片"
+    case capture = "拍照"
     case monitor = "视频"
     case editor = "编辑"
     case devices = "我的设备"
-    case library = "文件"
+    case library = "分支"
 
     var id: String { rawValue }
 

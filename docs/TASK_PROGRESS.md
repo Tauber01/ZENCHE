@@ -603,3 +603,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **仅加键不动任何 tab 渲染**；页签词表统一 + 紧凑导航提回（编辑/视频一级 tab）待 Tauber 拍板②后实施。
 - main.swift:10115 `Button(section.rawValue)` 未走 LocalizedStringKey 记 backlog。
 - 验证：npm test 256/256 全绿（无渲染/测试改动）；git diff --check 干净。
+
+## 12.20 v1.5.7 F6 全量实施：五端词表统一 + 紧凑导航提回（2026-08-06，Tauber 拍板）
+
+- Tauber 拍板（18:28）：删除「单机」「群组」键，重组为「拍照」「视频」键；kimi 落地口径（18:33）：五端一级导航统一 **拍照 / 视频 / 编辑 / 我的设备 / 分支**。
+- **键变更**：iOS 三语 Localizable.strings（macOS 打包拷此表=基准）删「单机」「群组」键、新增「拍照」=拍照/Capture/撮影（放「照片拍摄」后）；Android Localization.java / Harmony Localization.ets / Windows Localization.cs 同步加「拍照」三语值；「视频」「编辑」「我的设备」「分支」复用既有键（分支键 ba5cabf 已备）。
+- **iOS**（AppModel.swift + RootView.swift）：AppSection rawValue capture 照片→拍照、library 文件→分支（LocalizedStringKey 查表联动）；BottomNavigation 重排 拍照/视频/编辑/我的设备/分支+设置齿轮；「文件」标签/accessibilityLabel 两处同步改「分支」（4184/4673）。
+- **Android**（MainActivity.java）：底栏 4→6 tab 重排（拍照/视频/编辑/我的设备/分支+设置）；navButton 图标 switch 补 monitor→ic_nav_video（既有资源）；editor 路由已有（PRO 默认）。
+- **Harmony**（Index.ets）：CompactBottomNavigation 4→6 tab 重排；NavigationRail 侧栏长词（照片拍摄/视频监看/图像编辑/分支文件库）收短（拍照/视频/编辑/分支）；NavButton 紧凑宽度 25%→16%（6 tab 适配）；NavButton editor 路由已有。
+- **macOS**（main.swift）：AppSection rawValue capture 照片→拍照（侧栏自动走 iOS 表取 Capture/撮影）；main.swift:10570 Button(section.rawValue) backlog 顺手修（包 LocalizedStringKey）。
+- **Windows**（MainWindow.xaml + Localization.cs）：侧栏长词（照片拍摄/视频监看/图像编辑/分支文件库）→短词（拍照/视频/编辑/分支）；静态 Content 字面量经 Localization.cs Apply 翻译（「拍照」键已加）。
+- **测试**（Tauber 授权词表断言豁免）：native-global-status.test.mjs:87-88 断言改 navTab(.capture,"拍照")/navTab(.library,"分支")；native-image-editor.test.mjs:22-28 删除 doesNotMatch（编辑已一级 tab）、断言改 拍照/编辑/分支 + NavButton('编辑',editor)；native-library-tree.test.mjs:86「分支文件库」断言保留（页内标题仍在，非导航标签）。
+- 五端导航最终形态：macOS 侧栏 拍照/视频/编辑/我的设备/分支（+顶栏设置）；iOS/Android/Harmony 紧凑底栏 拍照/视频/编辑/我的设备/分支+设置齿轮；Windows 侧栏 拍照/视频/编辑/我的设备/分支。
+- 验证：npm test 256/256 全绿；iOS xcodebuild BUILD SUCCEEDED；Android assembleDebug SUCCESSFUL；Harmony assembleHap SUCCESSFUL；Windows dotnet 0 错误；git diff --check 干净。
