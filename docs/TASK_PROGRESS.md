@@ -578,3 +578,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **STUDIO_* 清理**：IPalette.studioCanvas/Panel/Raised/Rule/Gold 5 个死定义（全文件引用计数=1 仅定义处）删除；标识符保留原位注释（native-ui-1.5.3.test.mjs:80-81 文本断言，测试 8/8 过）。
 - **AUTO 徽标核对**：iOS P1 已改「AUTO 胶囊」（RootView.swift:4581，caption bold+Capsule+height 18），与 macOS F1 完全一致；全文件无单字母「A」残留——任务 4 无需本批改动，记录确认。
 - 验证：npm test 256/256（native-ui-1.5.3 8/8）；iOS xcodebuild BUILD SUCCEEDED（unsigned IPA）；git diff --check 干净。
+
+## 12.18 v1.5.7 F4 Harmony 收口批：字号归档 + STUDIO_* 清理 + 录制钮补齐（2026-08-06）
+
+- 批次：v1.5.7 字号地基批 F4（Harmony，本轮最后一批）；分支 `agent/1.5.7-f4-harmony`（worktree REPOS/ZENCHE-wt-1.5.7-f4-harmony），基线 `2cc21ab`（F2 后）。
+- **字号归档（73 处残留，全量扫描后报数）**：
+  - 映射 EDITOR_FS_* 档 38 处（值等值不改值）：13→EDITOR_FS_SUB×24（状态/云创监看/双目标备份/弹窗说明/公告版本/参数标签等）、9→EDITOR_FS_TINY×1（自动小字）、10→EDITOR_FS_SMALL×7（未连接/版本号/LIVE/读数标签/参数标签/峰值覆盖）、14→EDITOR_FS_MEDIUM×5（连接说明/库大小/公告正文/防诈正文/不再提醒）、16→EDITOR_FS_HEAD×1（存储值）
+  - 图标/品牌豁免 17 处（注释声明）：Splash Z 标 42/品牌名 28/标语 14、TopBar Z 22/标语 10、☰ 20、⚙ 22、●状态点 10×2、对焦框 ＋ 32、卡片图标 16×2、▢ 20、▯ 36、✨ 20、⚡ 19、☕ 20（L48 空态 P4 已豁免）
+  - 孤立值 15 处（保留原值，归 F5 数值裁决）：时间码 38、空态标题 22、参数大读数 28/20、读数值 17/21/22、弹窗标题 22×3、公告标题 22、公告小节标题 17×2、遥测微标签 8、沉浸按钮文本 17
+- **STUDIO_* 处置**：STUDIO_PANEL/RAISED/RULE/GOLD 4 个死定义（引用计数=1 仅定义处）删除，标识符保留原位注释（native-ui-1.5.3.test.mjs:80-81 文本断言，测试 8/8 过）；**STUDIO_CANVAS 保留**（两处实际使用 L7378/7383 沉浸 HUD 底，与 F3 Android 全删不同——Harmony 有真实落地）。
+- **MonitorScopeRail 补中间录制钮**（P2 backlog，功能补齐）：对齐 macOS monitor 三件套（RGB 波形 + 108 圆录制钮 + 音频波形，main.swift:6582-6608）；Harmony 采用 96 圆钮（同 ImmersiveCaptureButton 交互：videoRecording ? ■/● + UI_VIDEO 底 + toggleVideoRecording，enabled=connected&&!busy）。
+- **docs 勘误**：TECHNICAL_APPROACH 0.14 动态字档计数口径修正为「标识符出现 249 / 实际 .font() 调用 115」（F2 pro 观察项）。
+- 验证：npm test 256/256（native-ui-1.5.3 8/8）；assembleHap BUILD SUCCESSFUL（未签名预期）；git diff --check 干净。

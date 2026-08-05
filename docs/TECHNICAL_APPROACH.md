@@ -136,11 +136,19 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 ## 0.14. 1.5.7 F2 iOS 收口批约定
 
 - iOS 字号归档口径（延续 F3/F5）：值等值映射既有档优先（9→EditorFontSize.tiny、10→EditorFontSize.small、13→SettingsFontSize.linkLabel），图标/品牌豁免注释声明（Splash 品牌资产、SF Symbol 图标），孤立值保留原值列清单归 F5 数值裁决（8/17/25/28/32 档）。
-- 动态字档（.caption/.headline 等 249 处）为 iOS 平台动态字体惯例，与 FontToken 固定 5 档语义不同——保留，不映射替换；映射关系仅落 docs（caption≈caption、headline≈emphasis、title2/3≈title、largeTitle≈display 为近似语义，非等值）。
+- 动态字档（.caption/.headline 等：标识符出现 249 处 / 实际 .font() 调用 115 处，口径修正见 F2 pro 观察项）为 iOS 平台动态字体惯例，与 FontToken 固定 5 档语义不同——保留，不映射替换；映射关系仅落 docs（caption≈caption、headline≈emphasis、title2/3≈title、largeTitle≈display 为近似语义，非等值）。
 - STUDIO_* 死定义清理模式（F3 Android 先例）：全文件引用计数=1（仅定义处）即死；删除定义后标识符保留原位注释（native-ui-1.5.3.test.mjs:80-81 对五端源码文本断言 studioGold/studioPanel）。
 - AUTO 徽标契约：五端统一「AUTO」胶囊（caption/11pt bold + Capsule + height 18），iOS P1 已对齐，后续批次核验不重复改。
 
+## 0.15. 1.5.7 F4 Harmony 收口批约定
+
+- Harmony 字号归档口径：值等值映射既有 EDITOR_FS_* 档（9→TINY、10→SMALL、13→SUB、14→MEDIUM、16→HEAD）；TS 五档外且无 FS 档的孤立值（8/17/19/21/22/28/32/36/38/42）保留原值列清单归 F5；图标/品牌豁免注释声明（SF 语义字符 ☰⚙✨⚡☕ 与状态点 ● 同 F1 先例）。
+- STUDIO_* 清理判据修正：引用计数=1（仅定义处）即死；**有实际使用的必须保留**（Harmony STUDIO_CANVAS 两处沉浸 HUD 底使用，故仅删 PANEL/RAISED/RULE/GOLD 四死定义，与 F3 Android 全删差异源于真实使用情况）。
+- MonitorScopeRail 契约：monitor 区三件套（RGB 波形 + 中间录制钮 + 音频波形）五端统一；录制钮交互参照 ImmersiveCaptureButton（■/● + UI_VIDEO + toggleVideoRecording）。
+- 动态字档计数口径：标识符出现数 ≠ 实际调用数（iOS .font() 249 出现 / 115 实际调用），报告时双口径并陈。
+
 ## 1. 总体原则
+
 
 
 
