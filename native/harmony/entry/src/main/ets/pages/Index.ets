@@ -7877,49 +7877,6 @@ struct Index {
             .fontSize(11)
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Text(this.tr('没有兑换码？在爱发电购买兑换码'))
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
-            .width('100%')
-          Image($r('app.media.afdian_donation'))
-            .width(this.isCompact() ? '100%' : 300)
-            .height(this.isCompact() ? 390 : 416)
-            .objectFit(ImageFit.Contain)
-            .borderRadius(8)
-            .onClick((): void => {
-              const context = getContext(this) as common.UIAbilityContext;
-              try {
-                context.startAbility({
-                  action: 'ohos.want.action.viewData',
-                  entities: ['entity.system.browsable'],
-                  uri: AFDIAN_URL
-                });
-              } catch (_) {
-                this.aiActivationMsg = '无法打开浏览器';
-              }
-            })
-          Button(this.tr('在爱发电购买兑换码'), { type: ButtonType.Normal })
-            .height(40)
-            .width('100%')
-            .fontColor($r('app.color.ink'))
-            .backgroundColor($r('app.color.paper_2'))
-            .onClick((): void => {
-              const context = getContext(this) as common.UIAbilityContext;
-              try {
-                context.startAbility({
-                  action: 'ohos.want.action.viewData',
-                  entities: ['entity.system.browsable'],
-                  uri: AFDIAN_URL
-                });
-              } catch (_) {
-                this.aiActivationMsg = '无法打开浏览器';
-              }
-            })
-          Text(this.tr('兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。'))
-            .fontSize(10)
-            .fontColor($r('app.color.muted'))
-            .width('100%')
           Row() {
             Text('我的设备 ID')
               .fontSize(13)
@@ -8216,18 +8173,31 @@ struct Index {
             .fontSize(17)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配。'))
+          Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配；兑换码可在爱发电购买。'))
             .fontSize(14)
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Button(this.tr('请作者喝奶茶'), { type: ButtonType.Normal })
-            .height(44)
-            .fontColor($r('app.color.accent_ink'))
-            .backgroundColor($r('app.color.accent'))
-            .borderRadius(6)
-            .onClick((): void => {
-              this.openDonation();
-            })
+          Row({ space: 8 }) {
+            Button(this.tr('请作者喝奶茶'), { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.openDonation();
+              })
+            Button(this.tr('在爱发电购买兑换码'), { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.openAfdian();
+              })
+          }
+          .width('100%')
         }
         .width('100%')
         .padding(20)
