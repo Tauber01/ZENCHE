@@ -2,8 +2,8 @@
   app: {
     bundleName: "com.tauber.nikonlink",
     vendor: "ZENCHE contributors",
-    versionCode: 28,
-    versionName: "1.5.3",
+    versionCode: 29,
+    versionName: "1.5.6",
     icon: "$media:app_icon",
     label: "$string:app_name"
   }
