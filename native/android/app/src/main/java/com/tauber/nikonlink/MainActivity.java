@@ -168,6 +168,38 @@ public final class MainActivity extends Activity {
     private static final int UI_LABEL = Color.rgb(142, 142, 147);    // #8E8E93 labels
     private static final int UI_ACCENT = Color.rgb(205, 220, 57);    // #CDDC39 single accent
     private static final int UI_BLUE = Color.rgb(10, 132, 255);      // system blue (selected tab / auto)
+    // ── v1.5.6 TypeScale（design.md §78-79：每屏 ≤5 档）──
+    private static final int TS_CAPTION = 11;   // 辅助说明/状态
+    private static final int TS_BODY = 12;      // 正文/标签（Android 热点档）
+    private static final int TS_EMPHASIS = 15;  // 强调/卡片标题
+    private static final int TS_TITLE = 18;     // 区块标题
+    private static final int TS_DISPLAY = 24;   // 大数字/读数
+    // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
+    private static final int SPACE_4 = 4;
+    private static final int SPACE_8 = 8;
+    private static final int SPACE_12 = 12;
+    private static final int SPACE_16 = 16;
+    private static final int SPACE_20 = 20;
+    private static final int SPACE_24 = 24;
+    private static final int SPACE_32 = 32;
+    private static final int SPACE_40 = 40;
+    // ── v1.5.6 Scope 通道色（design.md §160-186 示波器）──
+    private static final int SCOPE_R = Color.rgb(255, 48, 42);        // RGB parade R
+    private static final int SCOPE_G = Color.rgb(40, 255, 105);       // RGB parade G
+    private static final int SCOPE_B = Color.rgb(34, 64, 255);        // RGB parade B
+    private static final int SCOPE_AUDIO = Color.rgb(76, 199, 232);   // #4CC7E8 音频缺失基线
+    private static final int SCOPE_YUV_Y = Color.rgb(20, 255, 92);    // YUV Y
+    private static final int SCOPE_YUV_U = Color.rgb(0, 210, 255);    // YUV U
+    private static final int SCOPE_YUV_V = Color.rgb(255, 38, 222);   // YUV V
+    // ── v1.5.6 高频内联色归一 ──
+    private static final int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
+    private static final int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
+    private static final int STATUS_MUTED = Color.rgb(185, 193, 208); // 连接页状态文字
+    // 监看页 HUD 玻璃背景（黑色半透明，同语义遮罩）
+    private static final int HUD_BG = Color.argb(175, 0, 0, 0);       // 主 HUD 控件背景
+    private static final int HUD_BG_SOFT = Color.argb(155, 0, 0, 0);  // 次要控件背景
+    private static final int HUD_BG_MID = Color.argb(165, 0, 0, 0);   // 关闭/切换控件背景
+    private static final int HUD_CARD_DIM = Color.argb(230, 28, 28, 30); // 深色面板（UI_CARD 半透明）
     private static final int RULE = Color.rgb(207, 214, 223);
     private static final int RULE_STRONG = Color.rgb(174, 184, 199);
     private static final String LATEST_RELEASE_API =
@@ -889,7 +921,7 @@ public final class MainActivity extends Activity {
                         bounds,
                         "RGB",
                         new String[]{red, green, blue},
-                        new int[]{Color.rgb(255, 48, 42), Color.rgb(40, 255, 105), Color.rgb(34, 64, 255)},
+                        new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
                         true);
                 return;
             }
@@ -920,14 +952,14 @@ public final class MainActivity extends Activity {
                     yuvBounds,
                     "YUV",
                     new String[]{luma, chromaPart(chroma, 0), chromaPart(chroma, 1)},
-                    new int[]{Color.rgb(20, 255, 92), Color.rgb(0, 210, 255), Color.rgb(255, 38, 222)},
+                    new int[]{SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V},
                     false);
             drawPanel(
                     canvas,
                     rgbBounds,
                     "RGB",
                     new String[]{red, green, blue},
-                    new int[]{Color.rgb(255, 48, 42), Color.rgb(40, 255, 105), Color.rgb(34, 64, 255)},
+                    new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
                     true);
         }
 
@@ -994,10 +1026,10 @@ public final class MainActivity extends Activity {
             float y = bounds.top + (bounds.height() - footerHeight) / 2f;
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(5));
-            paint.setColor(Color.argb(55, 76, 199, 232));
+            paint.setColor(Color.argb(55, (SCOPE_AUDIO >> 16) & 0xFF, (SCOPE_AUDIO >> 8) & 0xFF, SCOPE_AUDIO & 0xFF));
             canvas.drawLine(bounds.left + dp(4), y, bounds.right - dp(4), y, paint);
             paint.setStrokeWidth(dp(1));
-            paint.setColor(Color.rgb(76, 199, 232));
+            paint.setColor(SCOPE_AUDIO);
             canvas.drawLine(bounds.left + dp(4), y, bounds.right - dp(4), y, paint);
         }
 
@@ -1321,16 +1353,6 @@ public final class MainActivity extends Activity {
     private Button immersiveRecordButton;
     private TextView immersiveExposureText;
     private TextView connectionDot;
-    private TextView sourceReadoutValue;
-    private TextView modeReadoutValue;
-    private TextView shutterReadoutLabel;
-    private TextView shutterReadoutValue;
-    private TextView apertureReadoutLabel;
-    private TextView apertureReadoutValue;
-    private TextView isoReadoutLabel;
-    private TextView isoReadoutValue;
-    private TextView compensationReadoutLabel;
-    private TextView compensationReadoutValue;
     private TextView monitorTimerText;
     private SensorManager immersiveSensorManager;
     private Sensor immersiveRotationSensor;
@@ -2021,7 +2043,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.setPadding(dp(24), dp(22), dp(24), dp(24));
-        content.addView(text("链接网盘", 24, Typeface.BOLD, INK));
+        content.addView(text("链接网盘", TS_DISPLAY, Typeface.BOLD, INK));
         content.addView(
                 text(
                         "帧澈 ZENCHE 不代管网盘账号或密码。先在对应客户端登录，再通过系统文件选择器安全读取照片和视频。",
@@ -2299,6 +2321,19 @@ public final class MainActivity extends Activity {
                 new FrameLayout.LayoutParams(dp(88), dp(48), Gravity.TOP | Gravity.START);
         closeParams.setMargins(dp(16), dp(28), 0, 0);
         root.addView(close, closeParams);
+
+        Button edit = nativeButton("编辑", true);
+        edit.setOnClickListener(view -> {
+            dialog.dismiss();
+            editorSelectedPath = file.getAbsolutePath();
+            editorState = EditorState.PRO;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        FrameLayout.LayoutParams editParams =
+                new FrameLayout.LayoutParams(dp(88), dp(48), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        editParams.setMargins(0, dp(28), 0, 0);
+        root.addView(edit, editParams);
 
         Button share = nativeButton("分享", true);
         share.setOnClickListener(view -> sharePhoto(file));
@@ -2880,11 +2915,11 @@ public final class MainActivity extends Activity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(14), 0, dp(14), 0);
         bar.setBackgroundColor(GRAPHITE);
-        statusText = text("未连接", 11, Typeface.NORMAL, Color.rgb(185, 193, 208));
+        statusText = text("未连接", TS_CAPTION, Typeface.NORMAL, STATUS_MUTED);
         statusText.setSingleLine(true);
         statusText.setEllipsize(TextUtils.TruncateAt.END);
         countText = text(tr("文件库 · %lld 个文件").replace("%lld", "0"),
-                11, Typeface.BOLD, Color.rgb(185, 193, 208));
+                11, Typeface.BOLD, STATUS_MUTED);
         countText.setSingleLine(true);
         countText.setPadding(dp(12), 0, 0, 0);
         bar.addView(statusText, new LinearLayout.LayoutParams(0, dp(30), 1f));
@@ -3013,7 +3048,7 @@ public final class MainActivity extends Activity {
                 dp(compact ? 14 : 20),
                 dp(28));
         content.addView(buildControlStatusRow());
-        controlStatusError = text("", 12, Typeface.NORMAL, VIDEO);
+        controlStatusError = text("", TS_BODY, Typeface.NORMAL, VIDEO);
         controlStatusError.setSingleLine(true);
         controlStatusError.setEllipsize(TextUtils.TruncateAt.END);
         controlStatusError.setPadding(dp(2), 0, dp(2), 0);
@@ -3042,7 +3077,7 @@ public final class MainActivity extends Activity {
         LinearLayout left = new LinearLayout(this);
         left.setOrientation(LinearLayout.HORIZONTAL);
         left.setGravity(Gravity.CENTER_VERTICAL);
-        controlStatusDot = text("●", 12, Typeface.BOLD, UI_LABEL);
+        controlStatusDot = text("●", TS_BODY, Typeface.BOLD, UI_LABEL);
         controlStatusDot.setGravity(Gravity.CENTER);
         left.addView(controlStatusDot, new LinearLayout.LayoutParams(dp(22), dp(30)));
         controlStatusText = text("未连接", 13, Typeface.BOLD, Color.WHITE);
@@ -3057,7 +3092,7 @@ public final class MainActivity extends Activity {
         left.setContentDescription(tr("连接状态"));
         row.addView(left, new LinearLayout.LayoutParams(0, dp(36), 1f));
 
-        controlStatusRate = text("待连接", 12, Typeface.BOLD, Color.WHITE);
+        controlStatusRate = text("待连接", TS_BODY, Typeface.BOLD, Color.WHITE);
         controlStatusRate.setGravity(Gravity.CENTER);
         controlStatusRate.setSingleLine(true);
         controlStatusRate.setPadding(dp(12), 0, dp(12), 0);
@@ -3237,7 +3272,7 @@ public final class MainActivity extends Activity {
         TextView iconView = text("▯", 16, Typeface.NORMAL, UI_LABEL);
         iconView.setGravity(Gravity.CENTER);
         header.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView labelView = text("存储", 12, Typeface.NORMAL, UI_LABEL);
+        TextView labelView = text("存储", TS_BODY, Typeface.NORMAL, UI_LABEL);
         labelView.setPadding(dp(6), 0, 0, 0);
         header.addView(labelView);
         card.addView(header);
@@ -3296,8 +3331,8 @@ public final class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text("参数", 15, Typeface.BOLD, Color.WHITE);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(34), 1f));
+        TextView title = text("参数", TS_EMPHASIS, Typeface.BOLD, Color.WHITE);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1f));
         final Button all = controlCapsule("全部", true);
         final Button edit = controlCapsule("编辑", false);
         all.setOnClickListener(view -> {
@@ -3311,9 +3346,9 @@ public final class MainActivity extends Activity {
             refreshControlCapsules(all, edit);
             rebuildControlParameterTiles();
         });
-        LinearLayout.LayoutParams allParams = new LinearLayout.LayoutParams(dp(68), dp(32));
+        LinearLayout.LayoutParams allParams = new LinearLayout.LayoutParams(dp(68), dp(44));
         header.addView(all, allParams);
-        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(dp(68), dp(32));
+        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(dp(68), dp(44));
         editParams.setMargins(dp(8), 0, 0, 0);
         header.addView(edit, editParams);
         // Header spans full width so the weighted 参数 title cannot collapse.
@@ -3370,7 +3405,7 @@ public final class MainActivity extends Activity {
         }
         if (shown == 0) {
             controlParameterTilesHost.addView(
-                    text("参数已全部隐藏", 12, Typeface.NORMAL, UI_LABEL),
+                    text("参数已全部隐藏", TS_BODY, Typeface.NORMAL, UI_LABEL),
                     marginParams(-1, dp(44), 0, 12, 0, 0));
             return;
         }
@@ -3445,7 +3480,7 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         if (editing) {
-            TextView remove = text("×", 15, Typeface.BOLD, Color.WHITE);
+            TextView remove = text("×", TS_EMPHASIS, Typeface.BOLD, Color.WHITE);
             remove.setGravity(Gravity.CENTER);
             remove.setBackground(rounded(UI_SECONDARY, 11, 0));
             remove.setContentDescription(tr("隐藏") + " " + tr(label));
@@ -3577,94 +3612,6 @@ public final class MainActivity extends Activity {
         ((ScrollView) scroller).smoothScrollTo(0, Math.max(0, top - dp(16)));
     }
 
-    private View buildExposureReadoutRail() {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setFillViewport(true);
-        scroll.setBackground(rounded(GRAPHITE, 14, Color.rgb(32, 39, 55)));
-
-        LinearLayout rail = new LinearLayout(this);
-        rail.setOrientation(LinearLayout.HORIZONTAL);
-        rail.setGravity(Gravity.CENTER_VERTICAL);
-        rail.setPadding(dp(6), dp(10), dp(6), dp(10));
-        sourceReadoutValue = addReadoutCell(rail, tr("来源"), dp(92));
-        addReadoutDivider(rail);
-        modeReadoutValue = addReadoutCell(rail, tr("模式"), dp(82));
-        addReadoutDivider(rail);
-        shutterReadoutValue = addReadoutCell(rail, tr("快门"), dp(112));
-        shutterReadoutLabel = (TextView) shutterReadoutValue.getTag();
-        addReadoutDivider(rail);
-        apertureReadoutValue = addReadoutCell(rail, tr("光圈"), dp(104));
-        apertureReadoutLabel = (TextView) apertureReadoutValue.getTag();
-        addReadoutDivider(rail);
-        isoReadoutValue = addReadoutCell(rail, "ISO", dp(94));
-        isoReadoutLabel = (TextView) isoReadoutValue.getTag();
-        addReadoutDivider(rail);
-        compensationReadoutValue = addReadoutCell(
-                rail,
-                tr("曝光补偿"),
-                dp(120));
-        compensationReadoutLabel = (TextView) compensationReadoutValue.getTag();
-        scroll.addView(rail);
-        updateExposureReadoutRail();
-        return scroll;
-    }
-
-    private TextView addReadoutCell(LinearLayout rail, String label, int width) {
-        LinearLayout cell = new LinearLayout(this);
-        cell.setOrientation(LinearLayout.VERTICAL);
-        cell.setGravity(Gravity.CENTER_VERTICAL);
-        cell.setPadding(dp(12), 0, dp(12), 0);
-        TextView labelView = text(label, 9, Typeface.BOLD, Color.rgb(142, 151, 165));
-        labelView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        TextView valueView = text("—", 21, Typeface.BOLD, Color.WHITE);
-        valueView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        valueView.setTag(labelView);
-        cell.addView(labelView);
-        cell.addView(valueView, marginParams(-1, -2, 0, 4, 0, 0));
-        rail.addView(cell, new LinearLayout.LayoutParams(width, dp(62)));
-        return valueView;
-    }
-
-    private void addReadoutDivider(LinearLayout rail) {
-        View divider = new View(this);
-        divider.setBackgroundColor(Color.argb(28, 255, 255, 255));
-        rail.addView(divider, new LinearLayout.LayoutParams(dp(1), dp(42)));
-    }
-
-    private void updateExposureReadoutRail() {
-        if (sourceReadoutValue == null) return;
-        sourceReadoutValue.setText(
-                connected ? "USB/PTP" : wifiConnected ? "Wi‑Fi/PTP‑IP" : "—");
-        modeReadoutValue.setText(connected ? exposureModeCode() : "—");
-        shutterReadoutValue.setText(connected ? shutterDisplayValue() : "—");
-        apertureReadoutValue.setText(
-                connected ? String.format(Locale.CHINA, "f/%.1f", currentAperture) : "—");
-        isoReadoutValue.setText(connected ? String.valueOf(currentIso) : "—");
-        compensationReadoutValue.setText(
-                connected
-                        ? String.format(Locale.CHINA, "%+.1f EV", currentCompensation)
-                        : "—");
-        updateReadoutState(shutterReadoutLabel, shutterReadoutValue, "快门", "exposureTime");
-        updateReadoutState(apertureReadoutLabel, apertureReadoutValue, "光圈", "aperture");
-        updateReadoutState(isoReadoutLabel, isoReadoutValue, "ISO", "iso");
-        updateReadoutState(
-                compensationReadoutLabel,
-                compensationReadoutValue,
-                "曝光补偿",
-                "exposureCompensation");
-    }
-
-    private void updateReadoutState(
-            TextView label,
-            TextView value,
-            String title,
-            String parameter) {
-        boolean writable = connected && camera.isParameterWritable(parameter);
-        label.setText(tr(title) + (connected && !writable ? " · " + tr("自动") : ""));
-        value.setTextColor(writable ? READOUT_GLOW : Color.rgb(235, 238, 244));
-    }
-
     private String shutterDisplayValue() {
         return currentShutterSeconds < 1
                 ? "1/" + Math.round(1 / currentShutterSeconds)
@@ -3685,7 +3632,7 @@ public final class MainActivity extends Activity {
         LinearLayout panel = panel();
         // fig1: INT dock capsule scrolls here via scrollTagIntoView.
         panel.setTag("shootingTaskPanel");
-        panel.addView(text("拍摄自动化", 18, Typeface.BOLD, INK));
+        panel.addView(text("拍摄自动化", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(
                 text(
                         "间隔、包围与 B 门任务集中管理",
@@ -3757,7 +3704,7 @@ public final class MainActivity extends Activity {
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setTextColor(INK);
         input.setHintTextColor(MUTED);
-        input.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
+        input.setBackground(rounded(FIELD_BG, 9, RULE));
         input.setPadding(dp(10), 0, dp(8), 0);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 0,
@@ -3964,7 +3911,7 @@ public final class MainActivity extends Activity {
         LinearLayout detail = new LinearLayout(this);
         detail.setGravity(Gravity.CENTER_VERTICAL);
         detail.addView(text(usage, 11, Typeface.BOLD, UI_LABEL), new LinearLayout.LayoutParams(0, dp(18), 1f));
-        TextView space = text("可用空间", 11, Typeface.BOLD, UI_LABEL);
+        TextView space = text("可用空间", TS_CAPTION, Typeface.BOLD, UI_LABEL);
         space.setGravity(Gravity.RIGHT);
         detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
         copy.addView(detail);
@@ -4249,7 +4196,7 @@ public final class MainActivity extends Activity {
         close.setTextSize(22);
         close.setTextColor(Color.WHITE);
         close.setContentDescription(tr("退出全屏"));
-        close.setBackground(rounded(Color.argb(175, 0, 0, 0), 12, 0));
+        close.setBackground(rounded(HUD_BG, 12, 0));
         close.setOnClickListener(view -> closeImmersivePreview(dialog));
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
                 dp(52),
@@ -4266,7 +4213,7 @@ public final class MainActivity extends Activity {
                 Color.WHITE);
         device.setGravity(Gravity.CENTER);
         device.setMaxLines(1);
-        device.setBackground(rounded(Color.argb(155, 0, 0, 0), 22, 0));
+        device.setBackground(rounded(HUD_BG_SOFT, 22, 0));
         FrameLayout.LayoutParams deviceParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(44),
@@ -4281,7 +4228,7 @@ public final class MainActivity extends Activity {
                 Typeface.BOLD,
                 Color.WHITE);
         transport.setGravity(Gravity.CENTER);
-        transport.setBackground(rounded(Color.argb(155, 0, 0, 0), 22, 0));
+        transport.setBackground(rounded(HUD_BG_SOFT, 22, 0));
         FrameLayout.LayoutParams transportParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(44),
@@ -4373,7 +4320,7 @@ public final class MainActivity extends Activity {
         live.setBackground(rounded(
                 liveViewEnabled
                         ? UI_ACCENT
-                        : Color.argb(175, 0, 0, 0),
+                        : HUD_BG,
                 12,
                 0));
         live.setOnClickListener(view -> toggleLiveView());
@@ -4388,7 +4335,7 @@ public final class MainActivity extends Activity {
             peaking.setBackground(rounded(
                     focusPeakingEnabled
                             ? UI_ACCENT
-                            : Color.argb(175, 0, 0, 0),
+                            : HUD_BG,
                     12,
                     0));
             peaking.setOnClickListener(view -> {
@@ -4408,7 +4355,7 @@ public final class MainActivity extends Activity {
         HorizontalScrollView scroll = new HorizontalScrollView(this);
         scroll.setHorizontalScrollBarEnabled(false);
         scroll.setFillViewport(true);
-        scroll.setBackground(rounded(Color.argb(230, 28, 28, 30), 5, UI_SECONDARY));
+        scroll.setBackground(rounded(HUD_CARD_DIM, 5, UI_SECONDARY));
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         String source = connected ? "USB/PTP"
@@ -4459,7 +4406,7 @@ public final class MainActivity extends Activity {
         cell.setGravity(Gravity.CENTER_VERTICAL);
         cell.setPadding(dp(10), 0, dp(10), 0);
         cell.setLineSpacing(dp(2), 1f);
-        cell.setBackground(rounded(Color.argb(230, 28, 28, 30), 0, UI_SECONDARY));
+        cell.setBackground(rounded(HUD_CARD_DIM, 0, UI_SECONDARY));
         parent.addView(cell, new LinearLayout.LayoutParams(dp(102), dp(52)));
     }
 
@@ -4540,7 +4487,7 @@ public final class MainActivity extends Activity {
                 Typeface.BOLD,
                 Color.WHITE);
         state.setGravity(Gravity.CENTER);
-        state.setBackground(rounded(Color.argb(175, 0, 0, 0), 10, 0));
+        state.setBackground(rounded(HUD_BG, 10, 0));
         rail.addView(state, new LinearLayout.LayoutParams(
                 vertical ? dp(76) : dp(64),
                 vertical ? dp(44) : dp(64)));
@@ -4554,7 +4501,7 @@ public final class MainActivity extends Activity {
             int readoutBottom) {
         TextView exposure = text("", 13, Typeface.BOLD, Color.WHITE);
         exposure.setGravity(Gravity.CENTER);
-        exposure.setBackground(rounded(Color.argb(175, 0, 0, 0), 22, 0));
+        exposure.setBackground(rounded(HUD_BG, 22, 0));
         FrameLayout.LayoutParams exposureParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 dp(44),
@@ -4590,7 +4537,7 @@ public final class MainActivity extends Activity {
                 immersiveParametersExpanded ? "收起参数" : "展开参数",
                 false);
         toggle.setTextColor(Color.WHITE);
-        toggle.setBackground(rounded(Color.argb(175, 0, 0, 0), 10, 0));
+        toggle.setBackground(rounded(HUD_BG, 10, 0));
         toggle.setOnClickListener(view -> {
             immersiveParametersExpanded = !immersiveParametersExpanded;
             primaryScroller.setVisibility(
@@ -4618,7 +4565,7 @@ public final class MainActivity extends Activity {
         more.setBackground(rounded(
                 immersiveMoreParametersExpanded
                         ? UI_ACCENT
-                        : Color.argb(175, 0, 0, 0),
+                        : HUD_BG,
                 10,
                 0));
         more.setOnClickListener(view -> {
@@ -4637,7 +4584,7 @@ public final class MainActivity extends Activity {
             more.setBackground(rounded(
                     immersiveMoreParametersExpanded
                             ? UI_ACCENT
-                            : Color.argb(175, 0, 0, 0),
+                            : HUD_BG,
                     10,
                     0));
         });
@@ -4684,7 +4631,7 @@ public final class MainActivity extends Activity {
     private TextView immersiveReadout(String value, int width, int height) {
         TextView readout = text(value, 18, Typeface.BOLD, Color.WHITE);
         readout.setGravity(Gravity.CENTER);
-        readout.setBackground(rounded(Color.argb(175, 0, 0, 0), 12, 0));
+        readout.setBackground(rounded(HUD_BG, 12, 0));
         readout.setLayoutParams(
                 new LinearLayout.LayoutParams(dp(width), dp(height)));
         return readout;
@@ -4768,7 +4715,7 @@ public final class MainActivity extends Activity {
 
         Button close = nativeButton("⌄ 退出全屏", false);
         close.setTextColor(Color.WHITE);
-        close.setBackground(rounded(Color.argb(165, 0, 0, 0), 12, 0));
+        close.setBackground(rounded(HUD_BG_MID, 12, 0));
         close.setOnClickListener(view -> closeImmersivePreview(dialog));
         FrameLayout.LayoutParams closeParams =
                 new FrameLayout.LayoutParams(
@@ -4803,11 +4750,11 @@ public final class MainActivity extends Activity {
                 Typeface.BOLD,
                 Color.WHITE);
         mode.setGravity(Gravity.CENTER);
-        mode.setBackground(rounded(Color.argb(155, 0, 0, 0), 12, 0));
+        mode.setBackground(rounded(HUD_BG_SOFT, 12, 0));
         leftRail.addView(mode, new LinearLayout.LayoutParams(dp(64), dp(56)));
-        TextView protocol = text("USB\nPTP", 11, Typeface.BOLD, Color.WHITE);
+        TextView protocol = text("USB\nPTP", TS_CAPTION, Typeface.BOLD, Color.WHITE);
         protocol.setGravity(Gravity.CENTER);
-        protocol.setBackground(rounded(Color.argb(155, 0, 0, 0), 12, 0));
+        protocol.setBackground(rounded(HUD_BG_SOFT, 12, 0));
         LinearLayout.LayoutParams protocolParams =
                 new LinearLayout.LayoutParams(dp(64), dp(56));
         protocolParams.setMargins(0, dp(12), 0, 0);
@@ -4920,7 +4867,7 @@ public final class MainActivity extends Activity {
         root.addView(parameterScroller, parameterParams);
         Button parameterToggle = nativeButton("参数⌄", false);
         parameterToggle.setTextColor(Color.WHITE);
-        parameterToggle.setBackground(rounded(Color.argb(165, 0, 0, 0), 10, 0));
+        parameterToggle.setBackground(rounded(HUD_BG_MID, 10, 0));
         parameterToggle.setOnClickListener(view -> {
             boolean show = parameterScroller.getVisibility() != View.VISIBLE;
             parameterScroller.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -5244,7 +5191,7 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorParameterControls() {
         LinearLayout panel = panel();
-        panel.addView(text("参数调节", 18, Typeface.BOLD, INK));
+        panel.addView(text("参数调节", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(text(
                 connected
                         ? "曝光三要素通过 USB/PTP 写入 " + connectedCameraName
@@ -5345,7 +5292,7 @@ public final class MainActivity extends Activity {
 
     private View buildMonitorOutputControls() {
         LinearLayout panel = panel();
-        panel.addView(text("监看输出", 18, Typeface.BOLD, INK));
+        panel.addView(text("监看输出", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(text(
                 "本地显示处理不改变相机的视频录制设定。",
                 13,
@@ -5476,7 +5423,7 @@ public final class MainActivity extends Activity {
 
     private View buildCaptureSessionPanel() {
         LinearLayout panel = panel();
-        panel.addView(text("拍摄会话", 18, Typeface.BOLD, INK));
+        panel.addView(text("拍摄会话", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(
                 text(captureWorkflow.status(), 12, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 5, 0, 8));
@@ -5555,7 +5502,7 @@ public final class MainActivity extends Activity {
         input.setSingleLine(true);
         input.setTextColor(INK);
         input.setHintTextColor(MUTED);
-        input.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
+        input.setBackground(rounded(FIELD_BG, 9, RULE));
         input.setPadding(dp(10), 0, dp(8), 0);
         input.setLayoutParams(marginParams(-1, dp(48), 0, 0, 0, 8));
         return input;
@@ -5569,7 +5516,7 @@ public final class MainActivity extends Activity {
                 Localization.translate(appLanguage, labels));
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
-        spinner.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
+        spinner.setBackground(rounded(FIELD_BG, 9, RULE));
         spinner.setPadding(dp(10), 0, dp(8), 0);
         return spinner;
     }
@@ -5793,7 +5740,7 @@ public final class MainActivity extends Activity {
 
     private View buildProfessionalControls() {
         LinearLayout panel = panel();
-        panel.addView(text("拍摄控制", 18, Typeface.BOLD, INK));
+        panel.addView(text("拍摄控制", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(text(
                 connected
                         ? "参数通过 USB/PTP 写入 " + connectedCameraName
@@ -6027,7 +5974,7 @@ public final class MainActivity extends Activity {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
         spinner.setSelection(selected, false);
-        spinner.setBackground(rounded(Color.rgb(241, 244, 249), 9, RULE));
+        spinner.setBackground(rounded(FIELD_BG, 9, RULE));
         spinner.setPadding(dp(10), 0, dp(8), 0);
         spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             private boolean initialized;
@@ -7020,7 +6967,7 @@ public final class MainActivity extends Activity {
 
         // Secondary grading tools mirror the iOS and Harmony editor tabs.
         LinearLayout wheels = editorAdjustmentGroup();
-        wheels.addView(text("Lift / Gamma / Gain · 在圆盘内拖动色点", 12, Typeface.BOLD, MUTED));
+        wheels.addView(text("Lift / Gamma / Gain · 在圆盘内拖动色点", TS_BODY, Typeface.BOLD, MUTED));
         LinearLayout wheelRow = new LinearLayout(this);
         wheelRow.setOrientation(LinearLayout.HORIZONTAL);
         wheelRow.setGravity(Gravity.CENTER);
@@ -7037,13 +6984,13 @@ public final class MainActivity extends Activity {
         content.addView(collapsibleGroup("editor-wheels", "色轮", "三向色轮", wheels, false));
 
         LinearLayout curves = editorAdjustmentGroup();
-        curves.addView(text("主曲线 · 拖动曲线控制点", 12, Typeface.BOLD, MUTED));
+        curves.addView(text("主曲线 · 拖动曲线控制点", TS_BODY, Typeface.BOLD, MUTED));
         curves.addView(createEditorCurvePad(refreshPreview), marginParams(-1, dp(156), 0, 0, 0, 6));
-        curves.addView(text("点击任意位置新增控制点，拖动控制点调整曲线", 11, Typeface.NORMAL, MUTED));
+        curves.addView(text("点击任意位置新增控制点，拖动控制点调整曲线", TS_CAPTION, Typeface.NORMAL, MUTED));
         content.addView(collapsibleGroup("editor-curves", "曲线", "主曲线", curves, false));
 
         LinearLayout pickerPanel = editorAdjustmentGroup();
-        TextView pickerValue = text("RGB 取样：点击取样器读取中心像素", 12, Typeface.NORMAL, MUTED);
+        TextView pickerValue = text("RGB 取样：点击取样器读取中心像素", TS_BODY, Typeface.NORMAL, MUTED);
         pickerPanel.addView(pickerValue, marginParams(-1, -2, 0, 0, 0, 6));
         Button sample = nativeButton("取样当前照片", false);
         sample.setOnClickListener(view -> {
@@ -7063,7 +7010,7 @@ public final class MainActivity extends Activity {
         content.addView(collapsibleGroup("editor-picker", "取色器", "中心像素", pickerPanel, false));
 
         LinearLayout mask = editorAdjustmentGroup();
-        mask.addView(text("蒙版列表", 12, Typeface.BOLD, INK));
+        mask.addView(text("蒙版列表", TS_BODY, Typeface.BOLD, INK));
         if (editorAdjustments.maskLayers.isEmpty()) {
             mask.addView(text(
                     "暂无蒙版",
@@ -7165,7 +7112,7 @@ public final class MainActivity extends Activity {
         maskBrushes.addView(subtractMaskBrush, subtractMaskParams);
         mask.addView(maskBrushes, marginParams(-1, -2, 0, 8, 0, 0));
 
-        mask.addView(text("智能识别", 12, Typeface.BOLD, MUTED));
+        mask.addView(text("智能识别", TS_BODY, Typeface.BOLD, MUTED));
         HorizontalScrollView smartMaskScroll = new HorizontalScrollView(this);
         smartMaskScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout smartMasks = new LinearLayout(this);
@@ -7209,7 +7156,7 @@ public final class MainActivity extends Activity {
             refreshPreview.run();
         });
         mask.addView(invertMask, marginParams(-1, dp(44), 0, 4, 0, 10));
-        mask.addView(text("蒙版内调整", 12, Typeface.BOLD, INK));
+        mask.addView(text("蒙版内调整", TS_BODY, Typeface.BOLD, INK));
         addEditorAdjustment(mask, "曝光", editorAdjustments.maskExposure, -200, 200, true,
                 value -> editorAdjustments.maskExposure = value, refreshPreview);
         addEditorAdjustment(mask, "对比度", editorAdjustments.maskContrast, -100, 100, false,
@@ -7650,18 +7597,18 @@ public final class MainActivity extends Activity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
-        TextView aiStatus = text("请输入提示词", 11, Typeface.NORMAL, MUTED);
+        TextView aiStatus = text("请输入提示词", TS_CAPTION, Typeface.NORMAL, MUTED);
         LinearLayout promptSection = new LinearLayout(this);
         promptSection.setOrientation(LinearLayout.VERTICAL);
         promptSection.setPadding(dp(12), dp(10), dp(12), dp(10));
         promptSection.setBackground(rounded(SURFACE, 12, RULE));
-        promptSection.addView(text("提示词", 12, Typeface.BOLD, MUTED),
+        promptSection.addView(text("提示词", TS_BODY, Typeface.BOLD, MUTED),
                 marginParams(-1, -2, 0, 0, 0, 6));
         promptSection.addView(promptInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         content.addView(promptSection, marginParams(-1, -2, 0, 0, 0, 10));
 
-        content.addView(text("输出参数", 12, Typeface.BOLD, MUTED),
+        content.addView(text("输出参数", TS_BODY, Typeface.BOLD, MUTED),
                 marginParams(-1, -2, 0, 0, 0, 6));
         LinearLayout paramRow = new LinearLayout(this);
         paramRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -7986,7 +7933,7 @@ public final class MainActivity extends Activity {
         name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         row.addView(name, new LinearLayout.LayoutParams(0, dp(56), 1f));
         if (file.getAbsolutePath().equals(editorSelectedPath)) {
-            row.addView(text("✓", 18, Typeface.BOLD, COBALT),
+            row.addView(text("✓", TS_TITLE, Typeface.BOLD, COBALT),
                     new LinearLayout.LayoutParams(dp(32), dp(56)));
         }
         row.setOnClickListener(view -> {
@@ -8007,7 +7954,7 @@ public final class MainActivity extends Activity {
         container.setOrientation(LinearLayout.VERTICAL);
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(text("可组合预设", 11, Typeface.BOLD, MUTED),
+        header.addView(text("可组合预设", TS_CAPTION, Typeface.BOLD, MUTED),
                 new LinearLayout.LayoutParams(0, dp(36), 1f));
         Button clear = nativeButton("清空", false);
         clear.setContentDescription("清空已选 AI 提示词预设");
@@ -8598,7 +8545,7 @@ public final class MainActivity extends Activity {
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView badge = text("NP3", 11, Typeface.BOLD, Color.WHITE);
+        TextView badge = text("NP3", TS_CAPTION, Typeface.BOLD, Color.WHITE);
         badge.setGravity(Gravity.CENTER);
         badge.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         badge.setBackground(rounded(COBALT, 12, 0));
@@ -9062,7 +9009,7 @@ public final class MainActivity extends Activity {
     private View buildEditorGeometryControls(Runnable refreshPreview) {
         LinearLayout group = editorAdjustmentGroup();
         group.addView(
-                text("裁切比例", 12, Typeface.BOLD, MUTED),
+                text("裁切比例", TS_BODY, Typeface.BOLD, MUTED),
                 marginParams(-1, dp(24), 0, 0, 0, 4));
         Spinner crop = monitorSpinner(new String[]{
                 "原始比例",
@@ -9822,7 +9769,7 @@ public final class MainActivity extends Activity {
         heading.setOrientation(LinearLayout.HORIZONTAL);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         heading.addView(
-                text("用户分支", 15, Typeface.BOLD, INK),
+                text("用户分支", TS_EMPHASIS, Typeface.BOLD, INK),
                 new LinearLayout.LayoutParams(0, dp(48), 1f));
         Button add = nativeButton("＋ 新建分支", false);
         add.setOnClickListener(view -> showCreateLibraryBranchDialog(null));
@@ -9861,7 +9808,7 @@ public final class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(8 + depth * 14), 0, dp(4), 0);
         header.setBackground(rounded(
-                depth == 0 ? PAPER_2 : Color.rgb(247, 249, 252),
+                depth == 0 ? PAPER_2 : PAPER_3,
                 10,
                 RULE));
         Button toggle = nativeButton(expanded ? "⌄" : "›", false);
@@ -9927,7 +9874,7 @@ public final class MainActivity extends Activity {
         configureLibraryDropTarget(
                 header,
                 branch.id,
-                depth == 0 ? PAPER_2 : Color.rgb(247, 249, 252),
+                depth == 0 ? PAPER_2 : PAPER_3,
                 10);
         group.addView(
                 header,
@@ -10333,7 +10280,7 @@ public final class MainActivity extends Activity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(10), dp(10), dp(10));
         row.setBackground(rounded(SURFACE, 12, RULE));
-        LinearLayout.LayoutParams rowParams = marginParams(-1, dp(96), 0, 0, 0, 10);
+        LinearLayout.LayoutParams rowParams = marginParams(-1, dp(160), 0, 0, 0, 10);
         row.setLayoutParams(rowParams);
         row.setContentDescription("双击查看 " + file.getName() + " 大图");
         GestureDetector doubleTap = new GestureDetector(
@@ -10368,7 +10315,7 @@ public final class MainActivity extends Activity {
                     BitmapFactory.decodeFile(file.getAbsolutePath(), options));
         }
         thumbnail.setBackgroundColor(GRAPHITE);
-        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(76)));
+        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(140)));
 
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
@@ -10386,13 +10333,24 @@ public final class MainActivity extends Activity {
                 11,
                 Typeface.NORMAL,
                 COBALT));
-        row.addView(details, new LinearLayout.LayoutParams(0, dp(76), 1f));
+        row.addView(details, new LinearLayout.LayoutParams(0, dp(140), 1f));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.VERTICAL);
+        Button edit = nativeButton("编辑", false);
+        edit.setOnClickListener(view -> {
+            editorSelectedPath = file.getAbsolutePath();
+            editorState = EditorState.PRO;
+            aiResultBitmap = null;
+            showSection("editor");
+        });
+        actions.addView(edit, new LinearLayout.LayoutParams(dp(72), dp(44)));
         Button share = nativeButton("分享", false);
         share.setOnClickListener(view -> sharePhoto(file));
-        actions.addView(share, new LinearLayout.LayoutParams(dp(72), dp(36)));
+        LinearLayout.LayoutParams shareParams =
+                new LinearLayout.LayoutParams(dp(72), dp(44));
+        shareParams.setMargins(0, dp(4), 0, 0);
+        actions.addView(share, shareParams);
         Button delete = nativeButton("删除", false);
         delete.setOnClickListener(view -> new AlertDialog.Builder(this)
                 .setTitle(tr("删除照片？"))
@@ -10410,10 +10368,10 @@ public final class MainActivity extends Activity {
                 })
                 .show());
         LinearLayout.LayoutParams deleteParams =
-                new LinearLayout.LayoutParams(dp(72), dp(36));
+                new LinearLayout.LayoutParams(dp(72), dp(44));
         deleteParams.setMargins(0, dp(4), 0, 0);
         actions.addView(delete, deleteParams);
-        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(76)));
+        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(140)));
         return row;
     }
 
@@ -10435,8 +10393,8 @@ public final class MainActivity extends Activity {
                 buildWifiCameraPanel(),
                 marginParams(-1, -2, 0, 0, 0, 12));
         LinearLayout settings = panel();
-        settings.addView(text("文件接收", 12, Typeface.BOLD, MUTED));
-        settings.addView(text("多协议无线图片收件箱", 18, Typeface.BOLD, INK));
+        settings.addView(text("文件接收", TS_BODY, Typeface.BOLD, MUTED));
+        settings.addView(text("多协议无线图片收件箱", TS_TITLE, Typeface.BOLD, INK));
         settings.addView(text(
                 wirelessStatus,
                 13,
@@ -10483,15 +10441,15 @@ public final class MainActivity extends Activity {
 
     private View buildWifiCameraPanel() {
         LinearLayout wifiCard = panel();
-        wifiCard.addView(text("相机控制", 12, Typeface.BOLD, MUTED));
-        wifiCard.addView(text("Wi‑Fi 相机 · PTP/IP", 18, Typeface.BOLD, INK));
+        wifiCard.addView(text("相机控制", TS_BODY, Typeface.BOLD, MUTED));
+        wifiCard.addView(text("Wi‑Fi 相机 · PTP/IP", TS_TITLE, Typeface.BOLD, INK));
         wifiCard.addView(text(
                 "先在相机中开启无线遥控/PTP‑IP，并让手机加入相机热点或同一局域网。默认端口为 15740。",
                 12,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
-        wifiCard.addView(text("连接模式", 12, Typeface.BOLD, INK));
+        wifiCard.addView(text("连接模式", TS_BODY, Typeface.BOLD, INK));
         Spinner wifiMode = new Spinner(this);
         String[] wifiModeLabels = {tr("AP 直连"), tr("STA 局域网")};
         ArrayAdapter<String> wifiModeAdapter = new ArrayAdapter<>(
@@ -10593,7 +10551,7 @@ public final class MainActivity extends Activity {
 
     private View buildCaptureAssistantsPanel() {
         LinearLayout remoteCard = panel();
-        remoteCard.addView(text("拍摄辅助", 18, Typeface.BOLD, INK));
+        remoteCard.addView(text("拍摄辅助", TS_TITLE, Typeface.BOLD, INK));
         remoteCard.addView(text(
                 "蓝牙遥控与拍摄定位",
                 12,
@@ -10638,7 +10596,7 @@ public final class MainActivity extends Activity {
                 COBALT));
 
         LinearLayout languagePanel = panel();
-        languagePanel.addView(text("语言", 18, Typeface.BOLD, INK));
+        languagePanel.addView(text("语言", TS_TITLE, Typeface.BOLD, INK));
         languagePanel.addView(text(
                 "语言更改会立即应用，并在下次启动时保留。",
                 12,
@@ -10662,7 +10620,7 @@ public final class MainActivity extends Activity {
                 Math.max(0, Arrays.asList(languageCodes).indexOf(appLanguage)),
                 false);
         languageSpinner.setBackground(rounded(
-                Color.rgb(241, 244, 249),
+                FIELD_BG,
                 9,
                 RULE));
         languageSpinner.setPadding(dp(10), 0, dp(8), 0);
@@ -10729,7 +10687,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout aiPanel = panel();
-        aiPanel.addView(text("AI 功能激活", 18, Typeface.BOLD, INK));
+        aiPanel.addView(text("AI 功能激活", TS_TITLE, Typeface.BOLD, INK));
         aiPanel.addView(text(
                 "AI 修图与生图需购买激活码解锁；每个激活码绑定当前设备，服务器负责计数与扣减次数。",
                 12,
@@ -10785,7 +10743,7 @@ public final class MainActivity extends Activity {
         LinearLayout deviceIdHeader = new LinearLayout(this);
         deviceIdHeader.setOrientation(LinearLayout.HORIZONTAL);
         deviceIdHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView deviceIdLabel = text("我的设备 ID", 11, Typeface.BOLD, MUTED);
+        TextView deviceIdLabel = text("我的设备 ID", TS_CAPTION, Typeface.BOLD, MUTED);
         deviceIdHeader.addView(deviceIdLabel, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         Button copyDeviceId = nativeButton("复制", false);
@@ -10814,7 +10772,7 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 10));
-        aiPanel.addView(text("激活码", 12, Typeface.BOLD, MUTED),
+        aiPanel.addView(text("激活码", TS_BODY, Typeface.BOLD, MUTED),
                 marginParams(-1, -2, 0, 0, 0, 4));
         EditText aiActivationCodeInput = new EditText(this);
         aiActivationCodeInput.setHint(tr("输入激活码"));
@@ -10945,7 +10903,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout updatePanel = panel();
-        updatePanel.addView(text("软件更新", 18, Typeface.BOLD, INK));
+        updatePanel.addView(text("软件更新", TS_TITLE, Typeface.BOLD, INK));
         updatePanel.addView(text(
                 "当前版本 " + currentVersion()
                         + " · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。",
@@ -11037,7 +10995,7 @@ public final class MainActivity extends Activity {
         refreshUpdateUi();
 
         LinearLayout diagnosticsPanel = panel();
-        diagnosticsPanel.addView(text("诊断日志", 18, Typeface.BOLD, INK));
+        diagnosticsPanel.addView(text("诊断日志", TS_TITLE, Typeface.BOLD, INK));
         TextView logPath = text(
                 "日志按日保存、单个文件达到 5 MB 后滚动，保留 14 天。\n"
                         + diagnostics.getDirectory().getAbsolutePath(),
@@ -11073,7 +11031,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout supportPanel = panel();
-        supportPanel.addView(text("喜欢 帧澈 ZENCHE？", 18, Typeface.BOLD, INK));
+        supportPanel.addView(text("喜欢 帧澈 ZENCHE？", TS_TITLE, Typeface.BOLD, INK));
         supportPanel.addView(text(
                 "请作者喝杯奶茶，支持后续维护与新机型适配。",
                 13,
@@ -11331,7 +11289,7 @@ public final class MainActivity extends Activity {
         LinearLayout localCard = verticalContainer();
         localCard.setPadding(dp(18), dp(16), dp(18), dp(16));
         localCard.setBackground(rounded(COBALT_SOFT, 14, 0));
-        localCard.addView(text("本机摄像头", 18, Typeface.BOLD, INK));
+        localCard.addView(text("本机摄像头", TS_TITLE, Typeface.BOLD, INK));
         localCard.addView(text(
                 localCameraConnecting
                         ? "正在打开本机摄像头…"
@@ -11356,7 +11314,7 @@ public final class MainActivity extends Activity {
         LinearLayout card = verticalContainer();
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
         card.setBackground(rounded(COBALT_SOFT, 14, 0));
-        card.addView(text("原生 USB/PTP 相机", 18, Typeface.BOLD, INK));
+        card.addView(text("原生 USB/PTP 相机", TS_TITLE, Typeface.BOLD, INK));
         card.addView(text(
                 "连接后自动识别当前机型与可用参数",
                 12,
@@ -12424,7 +12382,6 @@ public final class MainActivity extends Activity {
                     if (statusText != null) {
                         statusText.setText(tr(label) + tr("已应用"));
                     }
-                    updateExposureReadoutRail();
                 });
             } catch (Exception error) {
                 diagnostics.error(
@@ -12507,7 +12464,6 @@ public final class MainActivity extends Activity {
                             : tr(base) + " · " + tr(reason));
             entry.getValue().setAlpha(reason == null ? 1f : 0.62f);
         }
-        updateExposureReadoutRail();
         if (shutterButton != null && !"monitor".equals(currentSection)) {
             shutterButton.setEnabled(
                     (connected || wifiConnected || localCameraConnected) && !capturing);
