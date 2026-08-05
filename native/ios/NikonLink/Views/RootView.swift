@@ -199,6 +199,11 @@ enum PageFontSize {
     static let titleRegular: CGFloat = 29 // 页面大标题（PageTitle 共享组件）
 }
 
+// v1.5.7 P6: 设置页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+enum SettingsFontSize {
+    static let linkLabel: CGFloat = 13 // 设置页链接/小节标签（爱发电兑换码、恢复设备码）
+}
+
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
 private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
@@ -9170,7 +9175,7 @@ private struct AppSettingsSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
 
                             Text("没有兑换码？在爱发电购买兑换码")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: SettingsFontSize.linkLabel, weight: .semibold))
 
                             if let image = UIImage(named: "wechat-donation") {
                                 Button {
@@ -9236,7 +9241,7 @@ private struct AppSettingsSheet: View {
                         Divider()
                         VStack(alignment: .leading, spacing: 8) {
                             Text("恢复设备码")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: SettingsFontSize.linkLabel, weight: .semibold))
                             TextField("旧设备 ID", text: $oldDeviceId)
                                 .textFieldStyle(.roundedBorder)
                                 .textInputAutocapitalization(.never)

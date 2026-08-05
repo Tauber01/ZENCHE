@@ -1561,9 +1561,7 @@ public partial class MainWindow : Window
         root.Children.Add(new TextBlock
         {
             Text = AppLocalization.T("拍摄辅助"),
-            FontSize = 16,
-            FontWeight = FontWeights.Bold,
-            Foreground = (Brush)FindResource("InkBrush")
+            Style = (Style)FindResource("SettingsCardTitle")
         });
         root.Children.Add(new TextBlock
         {
@@ -1575,8 +1573,7 @@ public partial class MainWindow : Window
         var bluetoothStatus = new TextBlock
         {
             Text = AppLocalization.T(_bluetoothRemote.Status),
-            FontSize = 12,
-            Foreground = (Brush)FindResource("MutedBrush")
+            Style = (Style)FindResource("SettingsFeedbackBody")
         };
         var bluetoothBody = new StackPanel();
         bluetoothBody.Children.Add(new TextBlock
@@ -1590,9 +1587,8 @@ public partial class MainWindow : Window
             Text = AppLocalization.T(
                 "兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。"),
             Margin = new Thickness(0, 4, 0, 0),
-            FontSize = 11,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)FindResource("MutedBrush")
+            Style = (Style)FindResource("SettingsHint"),
+            TextWrapping = TextWrapping.Wrap
         });
         var bluetoothToggle = new CheckBox
         {
@@ -1633,8 +1629,7 @@ public partial class MainWindow : Window
         var locationStatus = new TextBlock
         {
             Text = AppLocalization.T(_locationTagging.Status),
-            FontSize = 12,
-            Foreground = (Brush)FindResource("MutedBrush")
+            Style = (Style)FindResource("SettingsFeedbackBody")
         };
         var locationBody = new StackPanel();
         locationBody.Children.Add(new TextBlock
@@ -1648,9 +1643,8 @@ public partial class MainWindow : Window
             Text = AppLocalization.T(
                 "仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。"),
             Margin = new Thickness(0, 4, 0, 0),
-            FontSize = 11,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (Brush)FindResource("MutedBrush")
+            Style = (Style)FindResource("SettingsHint"),
+            TextWrapping = TextWrapping.Wrap
         });
         var locationToggle = new CheckBox
         {
@@ -4491,24 +4485,19 @@ public partial class MainWindow : Window
         logHeader.Children.Add(new TextBlock
         {
             Text = "诊断日志查询",
-            FontFamily = (FontFamily)FindResource("DisplayFont"),
-            FontSize = 22,
-            FontWeight = FontWeights.Bold,
-            Foreground = (Brush)FindResource("InkBrush")
+            Style = (Style)FindResource("SettingsLogTitle")
         });
         logHeader.Children.Add(new TextBlock
         {
             Text = "显示近期脱敏日志；刷新可读取最新记录。",
-            FontSize = 12,
-            Foreground = (Brush)FindResource("MutedBrush"),
+            Style = (Style)FindResource("SettingsFeedbackBody"),
             Margin = new Thickness(0, 2, 0, 0)
         });
         logGrid.Children.Add(logHeader);
         var logBox = new TextBox
         {
             Text = _diagnostics.RecentText(12_000),
-            FontFamily = new FontFamily("Cascadia Mono, Consolas"),
-            FontSize = 12,
+            Style = (Style)FindResource("SettingsLogBox"),
             IsReadOnly = true,
             AcceptsReturn = true,
             TextWrapping = TextWrapping.NoWrap,

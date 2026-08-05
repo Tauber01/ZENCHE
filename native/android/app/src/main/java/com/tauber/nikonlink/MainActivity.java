@@ -190,6 +190,9 @@ public final class MainActivity extends Activity {
     private static final int LIBRARY_FS_WORKBENCH = 20; // 分支工作台标题（hero）
     private static final int LIBRARY_FS_TITLE = 14;     // 行标题（分支名/文件名/提示文本）
     private static final int LIBRARY_FS_SUB = 13;       // 次级文本（说明/摘要/空态/条目名）
+    // ── v1.5.7 P6: 设置页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+    private static final int SETTINGS_FS_TINY = 10; // 设置页微标注（兑换说明、恢复说明）
+    private static final int SETTINGS_FS_SUB = 13;  // 设置页次级文本（SDK 说明、激活状态、链接标签）
     // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
     private static final int SPACE_4 = 4;
     private static final int SPACE_8 = 8;
@@ -10612,7 +10615,7 @@ public final class MainActivity extends Activity {
         remoteCard.addView(text("拍摄辅助", TS_TITLE, Typeface.BOLD, INK));
         remoteCard.addView(text(
                 "蓝牙遥控与拍摄定位",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 12));
@@ -10624,7 +10627,7 @@ public final class MainActivity extends Activity {
         remoteCard.addView(bluetooth);
         remoteCard.addView(text(
                 bluetoothRemoteStatus,
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 12));
@@ -10637,7 +10640,7 @@ public final class MainActivity extends Activity {
         remoteCard.addView(text(
                 tr(locationTaggingStatus)
                         + " · " + tr("拍摄文件会生成标准 XMP GPS 旁车文件"),
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 0));
@@ -10657,7 +10660,7 @@ public final class MainActivity extends Activity {
         languagePanel.addView(text("语言", TS_TITLE, Typeface.BOLD, INK));
         languagePanel.addView(text(
                 "语言更改会立即应用，并在下次启动时保留。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
@@ -10710,16 +10713,16 @@ public final class MainActivity extends Activity {
 
         LinearLayout nikonSdkPanel = panel();
         nikonSdkPanel.addView(text(
-                "尼康官方 SDK", 18, Typeface.BOLD, INK));
+                "尼康官方 SDK", TS_TITLE, Typeface.BOLD, INK));
         nikonSdkPanel.addView(text(
                 "官方桌面 SDK 不提供当前平台运行库",
-                13,
+                SETTINGS_FS_SUB,
                 Typeface.BOLD,
                 INK),
                 marginParams(-1, -2, 0, 5, 0, 5));
         nikonSdkPanel.addView(text(
                 "尼康只为 macOS 与 Windows 提供本次 SDK 运行库；当前平台继续使用原生相机连接后端。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED));
         content.addView(
@@ -10728,16 +10731,16 @@ public final class MainActivity extends Activity {
 
         LinearLayout sonySdkPanel = panel();
         sonySdkPanel.addView(text(
-                "索尼官方 SDK", 18, Typeface.BOLD, INK));
+                "索尼官方 SDK", TS_TITLE, Typeface.BOLD, INK));
         sonySdkPanel.addView(text(
                 "官方桌面 SDK 不提供当前平台运行库",
-                13,
+                SETTINGS_FS_SUB,
                 Typeface.BOLD,
                 INK),
                 marginParams(-1, -2, 0, 5, 0, 5));
         sonySdkPanel.addView(text(
                 "索尼 Camera Remote SDK 2.02.00 只提供 macOS 与 Windows 运行库；当前平台继续使用原生 Camera Remote Command 连接后端。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED));
         content.addView(
@@ -10748,7 +10751,7 @@ public final class MainActivity extends Activity {
         aiPanel.addView(text("AI 功能激活", TS_TITLE, Typeface.BOLD, INK));
         aiPanel.addView(text(
                 "AI 修图与生图需购买激活码解锁；每个激活码绑定当前设备，服务器负责计数与扣减次数。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
@@ -10759,13 +10762,13 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(44), 0, 0, 0, 8));
         aiPanel.addView(text(
                 "复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 10));
         aiPanel.addView(text(
                 "没有兑换码？在爱发电购买兑换码",
-                13,
+                SETTINGS_FS_SUB,
                 Typeface.BOLD,
                 INK),
                 marginParams(-1, -2, 0, 0, 0, 8));
@@ -10794,7 +10797,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(44), 0, 0, 0, 6));
         aiPanel.addView(text(
                 "兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。",
-                10,
+                SETTINGS_FS_TINY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 12));
@@ -10826,7 +10829,7 @@ public final class MainActivity extends Activity {
         aiPanel.addView(deviceIdValue, marginParams(-1, -2, 0, 0, 0, 4));
         aiPanel.addView(text(
                 "每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 10));
@@ -10848,7 +10851,7 @@ public final class MainActivity extends Activity {
                         .getBoolean("ai_activated", false)
                         ? "已激活 ✓"
                         : "未激活",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED);
         aiPanel.addView(aiActivationStatus,
@@ -10869,7 +10872,7 @@ public final class MainActivity extends Activity {
         });
         aiPanel.addView(activateAiBtn,
                 marginParams(-1, dp(44), 0, 0, 0, 10));
-        aiPanel.addView(text("恢复设备码", 13, Typeface.BOLD, INK),
+        aiPanel.addView(text("恢复设备码", SETTINGS_FS_SUB, Typeface.BOLD, INK),
                 marginParams(-1, -2, 0, 0, 0, 6));
         EditText oldDeviceIdInput = new EditText(this);
         oldDeviceIdInput.setHint(tr("旧设备 ID"));
@@ -10891,7 +10894,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(44), 0, 0, 0, 6));
         aiPanel.addView(text(
                 "恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。",
-                10,
+                SETTINGS_FS_TINY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 8));
@@ -10965,7 +10968,7 @@ public final class MainActivity extends Activity {
         updatePanel.addView(text(
                 "当前版本 " + currentVersion()
                         + " · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
@@ -10999,7 +11002,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, dp(44), 0, 0, 0, 6));
         updatePanel.addView(text(
                 "CDK 使用 Android Keystore 加密保存，不会写入诊断日志。",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 8));
@@ -11029,7 +11032,7 @@ public final class MainActivity extends Activity {
         updatePanel.addView(
                 mirrorActions,
                 marginParams(-1, -2, 0, 0, 0, 10));
-        updateStatusText = text(updateStatus, 12, Typeface.NORMAL, MUTED);
+        updateStatusText = text(updateStatus, TS_BODY, Typeface.NORMAL, MUTED);
         updatePanel.addView(
                 updateStatusText,
                 marginParams(-1, -2, 0, 0, 0, 10));
@@ -11057,7 +11060,7 @@ public final class MainActivity extends Activity {
         TextView logPath = text(
                 "日志按日保存、单个文件达到 5 MB 后滚动，保留 14 天。\n"
                         + diagnostics.getDirectory().getAbsolutePath(),
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         logPath.setTextIsSelectable(true);
@@ -11077,7 +11080,7 @@ public final class MainActivity extends Activity {
         diagnosticsPanel.addView(logActions);
         diagnosticsPanel.addView(text(
                 "将打开含最近脱敏日志的预填页面；在 GitHub 确认后才会提交。",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 8, 0, 0));
@@ -11092,7 +11095,7 @@ public final class MainActivity extends Activity {
         supportPanel.addView(text("喜欢 帧澈 ZENCHE？", TS_TITLE, Typeface.BOLD, INK));
         supportPanel.addView(text(
                 "请作者喝杯奶茶，支持后续维护与新机型适配。",
-                13,
+                SETTINGS_FS_SUB,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 12));
@@ -11105,7 +11108,7 @@ public final class MainActivity extends Activity {
 
         TextView path = text(
                 "保存位置\n" + photoDirectory.getAbsolutePath(),
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         path.setTextIsSelectable(true);
