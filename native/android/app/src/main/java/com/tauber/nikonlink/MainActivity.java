@@ -2725,9 +2725,10 @@ public final class MainActivity extends Activity {
                 dp(compact ? 112 : 142),
                 dp(44)));
 
-        connectionDot = text("●", 13, Typeface.BOLD, MUTED);
+        // v1.5.7 P1：状态点 22dp → 10dp（视觉对齐 macOS 8pt 基准；触控面由 44 高顶栏行保证）
+        connectionDot = text("●", 10, Typeface.BOLD, MUTED);
         connectionDot.setGravity(Gravity.CENTER);
-        top.addView(connectionDot, new LinearLayout.LayoutParams(dp(22), dp(44)));
+        top.addView(connectionDot, new LinearLayout.LayoutParams(dp(10), dp(44)));
 
         connectButton = nativeButton(compact ? "连接" : "连接相机", true);
         connectButton.setOnClickListener(view -> {
@@ -3094,9 +3095,10 @@ public final class MainActivity extends Activity {
         LinearLayout left = new LinearLayout(this);
         left.setOrientation(LinearLayout.HORIZONTAL);
         left.setGravity(Gravity.CENTER_VERTICAL);
-        controlStatusDot = text("●", TS_BODY, Typeface.BOLD, UI_LABEL);
+        // v1.5.7 P1：状态点 22dp → 10dp（视觉对齐 macOS 8pt 基准；触控面由行整体 36dp 高保证）
+        controlStatusDot = text("●", 10, Typeface.BOLD, UI_LABEL);
         controlStatusDot.setGravity(Gravity.CENTER);
-        left.addView(controlStatusDot, new LinearLayout.LayoutParams(dp(22), dp(30)));
+        left.addView(controlStatusDot, new LinearLayout.LayoutParams(dp(10), dp(30)));
         controlStatusText = text("未连接", 13, Typeface.BOLD, Color.WHITE);
         controlStatusText.setSingleLine(true);
         controlStatusText.setEllipsize(TextUtils.TruncateAt.END);
@@ -3507,8 +3509,9 @@ public final class MainActivity extends Activity {
                     rebuildControlParameterTiles();
                 }
             });
+            // v1.5.7 P1：×钮 22×22dp → 44×44dp 触控合规（design.md ≥44×44）
             FrameLayout.LayoutParams removeParams =
-                    new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.TOP | Gravity.END);
+                    new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
             frame.addView(remove, removeParams);
         }
         return frame;

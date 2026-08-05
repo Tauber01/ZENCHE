@@ -4321,11 +4321,12 @@ struct Index {
   private ControlStatusRow() {
     Column({ space: 4 }) {
       Row({ space: 8 }) {
+        // v1.5.7 P1：状态点宽 22vp → 10vp（视觉对齐 macOS 8pt 基准；触控面由行整体 44vp 高保证）
         Text('●')
-          .fontSize(TS_BODY)
+          .fontSize(10)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.controlStatusDotColor())
-          .width(22)
+          .width(10)
           .textAlign(TextAlign.Center)
         Text(this.tr(this.controlStatusTextValue()))
           .fontSize(13)
@@ -4724,8 +4725,9 @@ struct Index {
       .backgroundColor(UI_CARD)
       .borderRadius(15)
       if (this.gridEditMode) {
+        // v1.5.7 P1：×钮宽 22vp → 44vp 触控合规（design.md ≥44×44，高已 44）
         Button('×', { type: ButtonType.Normal })
-          .width(22)
+          .width(44)
           .height(44)
           .fontSize(TS_EMPHASIS)
           .fontWeight(FontWeight.Bold)
@@ -7934,6 +7936,16 @@ struct Index {
           Text('AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。')
             .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
+            .width('100%')
+          // v1.5.7 P1：恢复 4881042 删除的兑换码说明文案（审计 backlog 项）
+          Text(this.tr('兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。'))
+            .fontSize(TS_CAPTION)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.tr('没有兑换码？在爱发电购买兑换码'))
+            .fontSize(TS_BODY)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
             .width('100%')
           if (this.getAiActivationCode().length > 0) {
             Text('状态：已激活 ✓')
