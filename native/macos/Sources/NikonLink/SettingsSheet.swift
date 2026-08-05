@@ -217,7 +217,7 @@ struct SettingsSheet: View {
                             Text(language.displayName)
                                 .font(
                                     .system(
-                                        size: 11,
+                                        size: TypeScale.caption, // v1.5.7 P6: 语言选择器文本 11（等值映射 TypeScale.caption，只归档不改值）
                                         weight: language.rawValue == languageRaw
                                             ? .bold
                                             : .medium

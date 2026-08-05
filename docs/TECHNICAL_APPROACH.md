@@ -109,7 +109,17 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 图标尺寸豁免：iOS 28pt 分支工作台图标、Harmony 徽标方块 16/播放 ▶ 20、Windows 相机存储行图标 16 保留原值并注释声明（同 F1 先例）。
 - 不在本批：导航 chrome/沉浸 overlay/波形层；Windows EditorPanel AI 激活区归 P6；云创监看面板已归档（见 0.8 勘误）。
 
+## 0.11. 1.5.7 逐页批次 P6：设置页五端对齐约定（本批动 macOS 基准端）
+
+- macOS SettingsSheet 字号归档由 F1 主体完成（13 档→TypeScale 五档），P6 收尾：剩余语言选择器 11 等值映射 `TypeScale.caption`；19/22/20 图标尺寸豁免（F1 注释）。DiagnosticLogViewer 已全 token 化。
+- 设置页专属档位命名约定（延续 P3-P5 先例）：非 TS/FontToken 五档值以页面级常量保留原值——iOS `SettingsFontSize.linkLabel=13`；Android `SETTINGS_FS_TINY=10/SUB=13`；Harmony `SETTINGS_FS_TINY=10/SUB=13/TITLE=14`；Windows 样式 `SettingsHint(11)/SettingsCardTitle(16)/SettingsFeedbackTitle(15)/SettingsFeedbackBody(12)/SettingsLogTitle(22)/SettingsLogBox(12)`。与 TS 档重合值（Android 12/11/18→TS_BODY/TS_CAPTION/TS_TITLE）直接映射既有 token；只归档不改值，数值收口归 F5。
+- Windows 拍摄辅助卡（cs BuildCaptureAssistSettingsPanel）与诊断日志弹窗（ViewLogs_Click）属设置页功能，其字号与 FontFamily 字面量一并归档（cs 用 `Style=FindResource` 引用，P4 设备卡先例）；日志框 "Cascadia Mono, Consolas"→MonoFont 资源（Colors.xaml MonoFont=Cascadia Mono 等值）。公告弹窗（launch-announcement）非设置页、红线锁文案，不在本批。
+- 分区对齐口径：macOS 六区（外观/拍摄辅助/自动更新/AI 激活与兑换/诊断日志/捐赠·反馈）为契约；外观区为 macOS 专属（ThemeMode 三选），四端跟随系统外观属等价行为不强制加区；四端均含其余分区（语言/SDK 卡为等价补充信息项）。
+- 页式 vs sheet 形态裁定：Android/Harmony/Windows 设置页式、iOS/macOS sheet——保留（design.md:407 允许导航容器差异）。
+- 不在本批：Windows cs:4724 等 9 处画刷快照（归 F5）、Harmony CaptureSessionPanel（P1）、导航 chrome/沉浸 overlay/波形层。
+
 ## 1. 总体原则
+
 
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

@@ -512,3 +512,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 信息项五端一致性核对（以 macOS 为基准，存在等价操作即一致，不动标签文案）：顶部工具条（刷新相册/链接网盘/分享/访达显示/移到废纸篓）五端等价；iOS 大图预览含分享/编辑 + 选中区删除、Android 文件行含编辑/分享/删除按钮、Harmony/Windows 双击预览 + 右键/选中删除——均为等价信息项。标签文案一律不动（iOS「文件」/Android「已下载」/Harmony·Windows 侧栏长名属 F6 词表裁定，待 Tauber 拍板）。
 - design.md：本批为执行既有条款（每屏 ≤5 档、只归档不改值、双外观成对取 token、图标豁免先例），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过；iOS xcodebuild iphoneos BUILD SUCCEEDED（unsigned IPA）；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Windows dotnet publish 0 错误 4 既有警告 + NSIS Setup 构建成功（LANG=en_US.UTF-8 下 makensis 3.12 正常解析 UTF-8 中文脚本）；git diff --check 干净。
+
+## 12.12 v1.5.7 逐页批次 P6：设置页（settings）五端对齐 macOS 基准（2026-08-06）
+
+- 批次：v1.5.7 UI 统一轮最后页面批 P6（设置页 settings，本批动 macOS 基准端）；分支 `agent/1.5.7-p6-settings`（worktree REPOS/ZENCHE-wt-1.5.7-p6-settings），基线 `878c447`（P1-P5 后）。
+- macOS（SettingsSheet.swift，基准端，仅 1 处）：F1 已收敛 13 档→TypeScale 五档，本批补最后 1 处——语言选择器文本 `size: 11` → `TypeScale.caption`（等值映射 11=11，只归档不改值）；19/22/20 图标尺寸已有 F1 豁免注释不动。DiagnosticLogViewer（811-870）已全 token 化（22 图标豁免）。
+- iOS（RootView.swift）：新增 `SettingsFontSize.linkLabel=13`；AppSettingsSheet 内「没有兑换码？在爱发电购买兑换码」「恢复设备码」2 处 13 替换。设置页其余字号全系统动态字档（61 处 .caption/.headline 等既有形态，非本批数字字面量范围）。
+- Android（MainActivity.java）：新增 `SETTINGS_FS_TINY=10/SUB=13`；设置页 25 处替换——12→TS_BODY×11、13→SETTINGS_FS_SUB×5、11→TS_CAPTION×5、10→SETTINGS_FS_TINY×2、18→TS_TITLE×2（SDK 卡标题，等值映射 TS 档）；含拍摄辅助卡（buildCaptureAssistantsPanel 3 处 12）。
+- Harmony（Index.ets）：新增 `SETTINGS_FS_TINY=10/SUB=13/TITLE=14`；SettingsWorkspace（7841）+ 拍摄辅助卡（CaptureAssistSettingsCard 7769）共 13 处替换：14→SETTINGS_FS_TITLE×4、13→SETTINGS_FS_SUB×7、10→SETTINGS_FS_TINY×2。
+- Windows（Controls.xaml + MainWindow.xaml + cs）：新增样式 `SettingsHint(11,Muted)/SettingsCardTitle(16,Bold,Ink)/SettingsFeedbackTitle(15,Bold)/SettingsFeedbackBody(12,Muted)/SettingsLogTitle(22,DisplayFont,Bold)/SettingsLogBox(12,MonoFont)`；XAML SettingsPanel 8 处 FontSize（11×6/15/12）归档——3 处带 MonoFont 复用既有 MetaText（等值），3 处纯说明→SettingsHint，反馈标题/说明→SettingsFeedbackTitle/Body；cs BuildCaptureAssistSettingsPanel 拍摄辅助卡 5 处（16/12/11/12/11）→样式引用；ViewLogs 弹窗（诊断日志查询）3 处（22/12/12）+ FontFamily 字面量 "Cascadia Mono, Consolas"→MonoFont 资源（等值 Cascadia Mono）；XAML SettingsPanel 3 处 FontFamily 原已 DynamicResource（非字面量，其中 2 处随 MetaText 收口）。公告弹窗 FontFamily（Consolas）属启动公告（红线锁文案）不在本批。
+- 内容分区对齐 macOS 六区核对：外观（macOS 专属 ThemeMode 三选，四端跟随系统——既有差异等价行为）、拍摄辅助、自动更新/软件更新、AI 激活与兑换、诊断日志、捐赠/反馈——五端均有等价分区 ✓；iOS 另含「通用/相机兼容性」分区组（语言/SDK 卡，等价信息项）；Android/Harmony 含语言+SDK 卡补充分区。标签文案一律不动。
+- 页式 vs sheet 形态：Android/Harmony/Windows 设置是页（section/panel）、iOS/macOS 是 sheet——裁定保留（design.md:407 允许导航容器差异），docs 记裁定。
+- design.md：本批为执行既有条款（每屏 ≤5 档、只归档不改值、双外观成对取 token），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild iphoneos BUILD SUCCEEDED；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Windows dotnet build 0 错误 4 既有警告（CS8629×2/CS0414×2）；macOS 构建脚本因缺少 Nikon SDK zip 阻塞（基线 typecheck 同报 4 个外部桥接类型错误=环境限制非改动引入；本批 macOS 改动仅 1 行等值映射）；git diff --check 干净。

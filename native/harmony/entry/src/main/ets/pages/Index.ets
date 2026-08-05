@@ -116,6 +116,10 @@ const LIBRARY_FS_SUB: number = 13;      // 文件库次级文本（说明/容量
 const LIBRARY_FS_TITLE: number = 14;    // 文件库行标题（分支名/文件名/无线状态）
 const LIBRARY_FS_HEAD: number = 16;     // 文件库空态/区块标题（系统相册暂不可见、未分类已清空）
 const LIBRARY_FS_WORKBENCH: number = 20; // 分支工作台标题（hero）
+// ── v1.5.7 P6: 设置页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+const SETTINGS_FS_TINY: number = 10;    // 设置页微标注（恢复说明）
+const SETTINGS_FS_SUB: number = 13;     // 设置页次级文本（SDK 说明、激活状态、更新状态）
+const SETTINGS_FS_TITLE: number = 14;   // 设置页副标题/小节（页头副标题、蓝牙/定位小节、捐赠说明）
 
 // Spacing（4pt 体系，与 Android 同值）
 const SPACE_4: number = 4;
@@ -7779,7 +7783,7 @@ struct Index {
       Row() {
         Column({ space: 3 }) {
           Text(this.tr('蓝牙遥控拍摄'))
-            .fontSize(14)
+            .fontSize(SETTINGS_FS_TITLE)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
           Text(this.tr(this.bluetoothRemoteStatus))
@@ -7804,14 +7808,14 @@ struct Index {
       Row() {
         Column({ space: 3 }) {
           Text(this.tr('拍摄位置'))
-            .fontSize(14)
+            .fontSize(SETTINGS_FS_TITLE)
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
           Text(this.tr(this.locationTaggingStatus))
             .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
           Text(this.tr('拍摄时写入同名 XMP GPS，不在后台持续定位。'))
-            .fontSize(10)
+            .fontSize(SETTINGS_FS_TINY)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
@@ -7847,7 +7851,7 @@ struct Index {
           .fontColor($r('app.color.ink'))
           .width('100%')
         Text(this.tr('通用、拍摄辅助、更新、诊断与支持。'))
-          .fontSize(14)
+          .fontSize(SETTINGS_FS_TITLE)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
@@ -7904,7 +7908,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
-            .fontSize(13)
+            .fontSize(SETTINGS_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(
@@ -7929,7 +7933,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
-            .fontSize(13)
+            .fontSize(SETTINGS_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(
@@ -7969,7 +7973,7 @@ struct Index {
             .width('100%')
           if (this.getAiActivationCode().length > 0) {
             Text('状态：已激活 ✓')
-              .fontSize(13)
+              .fontSize(SETTINGS_FS_SUB)
               .fontWeight(FontWeight.Bold)
               .fontColor(Color.Green)
               .width('100%')
@@ -7999,7 +8003,7 @@ struct Index {
             .width('100%')
           Row() {
             Text('我的设备 ID')
-              .fontSize(13)
+              .fontSize(SETTINGS_FS_SUB)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
@@ -8065,7 +8069,7 @@ struct Index {
           Divider()
             .color($r('app.color.rule'))
           Text(this.tr('恢复设备码'))
-            .fontSize(13)
+            .fontSize(SETTINGS_FS_SUB)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
             .width('100%')
@@ -8089,7 +8093,7 @@ struct Index {
               this.aiRebindOldCode = value;
             })
           Text(this.tr('恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。'))
-            .fontSize(10)
+            .fontSize(SETTINGS_FS_TINY)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Button(
@@ -8133,7 +8137,7 @@ struct Index {
             .width('100%')
           Row() {
             Text(this.tr('启动时自动检查更新'))
-              .fontSize(13)
+              .fontSize(SETTINGS_FS_SUB)
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
             Toggle({
@@ -8187,7 +8191,7 @@ struct Index {
           }
           .width('100%')
           Text(this.tr(this.updateStatus))
-            .fontSize(13)
+            .fontSize(SETTINGS_FS_SUB)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row({ space: 8 }) {
@@ -8294,7 +8298,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配；兑换码可在爱发电购买。'))
-            .fontSize(14)
+            .fontSize(SETTINGS_FS_TITLE)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row({ space: 8 }) {

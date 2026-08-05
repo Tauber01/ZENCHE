@@ -1828,8 +1828,7 @@
                           Content="在爱发电购买兑换码"
                           Click="AiBuy_Click" />
                   <TextBlock Margin="0,0,0,12"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource SettingsHint}"
                              TextWrapping="Wrap"
                              Text="兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。" />
                   <DockPanel Margin="0,0,0,6">
@@ -1843,9 +1842,7 @@
                   </DockPanel>
                   <TextBlock x:Name="AiDeviceIdText"
                              Margin="0,0,0,8"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource MetaText}"
                              TextWrapping="Wrap" />
                   <TextBlock Margin="0,0,0,12"
                              Foreground="{DynamicResource MutedBrush}"
@@ -1868,17 +1865,14 @@
                   </WrapPanel>
                   <TextBlock x:Name="AiActivationStatusText"
                              Margin="0,8,0,0"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource MetaText}"
                              TextWrapping="Wrap" />
                   <Separator Margin="0,14,0,12" />
                   <TextBlock Margin="0,0,0,8"
                              FontWeight="SemiBold"
                              Text="恢复设备码" />
                   <TextBlock Margin="0,0,0,4"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource SettingsHint}"
                              Text="旧设备 ID" />
                   <TextBox x:Name="AiRebindOldDeviceIdBox"
                            Height="38"
@@ -1886,8 +1880,7 @@
                            Padding="10,7"
                            ToolTip="旧设备 ID" />
                   <TextBlock Margin="0,0,0,4"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource SettingsHint}"
                              Text="旧激活码" />
                   <PasswordBox x:Name="AiRebindOldCodeBox"
                                Height="38"
@@ -1895,8 +1888,7 @@
                                Padding="10,7"
                                ToolTip="旧激活码" />
                   <TextBlock Margin="0,0,0,8"
-                             FontSize="11"
-                             Foreground="{DynamicResource MutedBrush}"
+                             Style="{DynamicResource SettingsHint}"
                              TextWrapping="Wrap"
                              Text="恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。" />
                   <Button x:Name="AiRebindButton"
@@ -1946,12 +1938,10 @@
                         <ColumnDefinition Width="Auto" />
                       </Grid.ColumnDefinitions>
                       <StackPanel Margin="0,0,16,0">
-                        <TextBlock FontSize="15"
-                                   FontWeight="Bold"
+                        <TextBlock Style="{DynamicResource SettingsFeedbackTitle}"
                                    Text="快速问题反馈" />
                         <TextBlock Margin="0,4,0,0"
-                                   FontSize="12"
-                                   Foreground="{DynamicResource MutedBrush}"
+                                   Style="{DynamicResource SettingsFeedbackBody}"
                                    Text="公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。" />
                       </StackPanel>
                       <Button Grid.Column="1"

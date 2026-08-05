@@ -592,4 +592,37 @@
   <Style x:Key="LibraryNodeIcon" TargetType="TextBlock">
     <Setter Property="FontSize" Value="15" />
   </Style>
+
+  <!-- v1.5.7 P6: 设置页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <Style x:Key="SettingsHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
+  <Style x:Key="SettingsCardTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+  </Style>
+
+  <Style x:Key="SettingsFeedbackTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+
+  <Style x:Key="SettingsFeedbackBody" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
+  <Style x:Key="SettingsLogTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+
+  <Style x:Key="SettingsLogBox" TargetType="TextBox">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
 </ResourceDictionary>
