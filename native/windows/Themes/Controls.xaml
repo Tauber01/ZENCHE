@@ -785,9 +785,9 @@
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
   <!-- v1.5.7 F5 数值裁决: 14→12 对齐 macOS 公告正文=TypeScale.body=12。 -->
-  <Style x:Key="AnnouncementText" TargetType="TextBlock">
+  <!-- v1.5.7 F5 二轮打回拆分：AnnouncementBody(12 继承色) 用于公告正文（本次更新/防诈，无前景覆盖）；防诈正文按 macOS 基准 body 12+semibold 本地补 SemiBold；辅助灰化文本（打赏说明）用 AnnouncementSub(12+Muted)。原 AnnouncementText(12+Muted) 已无引用方，删除避免死样式。 -->
+  <Style x:Key="AnnouncementBody" TargetType="TextBlock">
     <Setter Property="FontSize" Value="12" />
-    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
   <!-- v1.5.7 F5 数值裁决: 13→12 对齐 macOS 公告打赏说明=TypeScale.body=12（kimi 裁决「全部对齐 macOS 基准」延伸）。 -->
   <Style x:Key="AnnouncementSub" TargetType="TextBlock">

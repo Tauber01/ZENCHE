@@ -556,3 +556,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 执行（Controls.xaml 5 个 Announcement 样式）：`AnnouncementHeading` 25→26（macOS 公告标题=TypeScale.heading=26）、`AnnouncementSection` 19→18（本次更新=title=18）、`AnnouncementTitle` 17→18（谨防诈骗/自愿赞助=title=18）、`AnnouncementText` 14→12（正文=body=12）、`AnnouncementSub` 13→12（打赏说明=body=12，裁决「全部对齐」精神延伸）。
 - 对齐后五端公告弹窗字号统一：标题 26/小节 18/正文 12。
 - 验证：npm test 256/256；dotnet build 0 错误 0 警告；xmllint 合法；git diff --check 干净。
+
+
+## 12.16 v1.5.7 F5 二轮打回修复：公告区 3 处缺陷（2026-08-06）
+
+- 二轮打回（pro 关门复审 17:58）：8d51e1e 公告区 cs 归档引入 3 处缺陷，99fc8ab 未修。
+- ① **运行时崩溃**：L4738「不再提醒」CheckBox 赋 TextBlock 样式（AnnouncementText）——跨 TargetType 赋样式运行时抛 ArgumentException，公告弹窗打开即崩。修复：恢复 FontSize=12 字面量（裁决对齐后值）。**教训：dotnet build 0 错误 ≠ 运行时安全，XAML 样式 TargetType 不匹配编译期不报。**
+- ② **字重丢失**：L4793 谨防诈骗正文原 FontWeight=SemiBold 被样式（无字重 setter）吃掉变 Regular。修复：改用 AnnouncementBody + 本地补 FontWeight=SemiBold（macOS 基准 SettingsSheet.swift:1003 body 12+semibold）。
+- ③ **颜色回归**：L4771 本次更新正文原无 Foreground（继承 InkBrush），AnnouncementText 带 MutedBrush 导致 ink→muted。修复：拆分样式——AnnouncementBody(12 继承色) 用于无前景覆盖正文，AnnouncementSub(12+Muted) 用于打赏灰化说明；原 AnnouncementText 无引用方已删除。
+- 后续批次纪律：引用方改样式赋值时逐处核对 TargetType 兼容 + 被样式覆盖的本地属性（字重/颜色）。
+- 验证：npm test 256/256；dotnet build 0 错误（既有基线警告）；xmllint 合法；git diff --check 干净。

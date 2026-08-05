@@ -4735,7 +4735,7 @@ public partial class MainWindow : Window
         {
             Content = AppLocalization.T(
                 "不再提醒（软件更新后仍会显示）"),
-            Style = (Style)FindResource("AnnouncementText"),
+            FontSize = 12, // v1.5.7 F5 二轮打回修复: CheckBox 不能用 TextBlock 样式（运行时崩溃），恢复字号字面量（裁决对齐 12）
             VerticalContentAlignment = VerticalAlignment.Center
         };
         var closeButton = new Button
@@ -4768,7 +4768,7 @@ public partial class MainWindow : Window
                 "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n" +
                 "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。"),
-            Style = (Style)FindResource("AnnouncementText"),
+            Style = (Style)FindResource("AnnouncementBody"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
             Margin = new Thickness(0, 0, 0, 18)
@@ -4790,7 +4790,8 @@ public partial class MainWindow : Window
             Text = AppLocalization.T(
                 "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”" +
                 "或要求付费购买软件的人都是骗子，请勿转账。"),
-            Style = (Style)FindResource("AnnouncementText"),
+            Style = (Style)FindResource("AnnouncementBody"),
+            FontWeight = FontWeights.SemiBold, // macOS 基准 body 12+semibold（SettingsSheet.swift:1003）
             Foreground = (Brush)FindResource("WarnDarkBrush"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 21
