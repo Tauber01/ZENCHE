@@ -60,7 +60,16 @@ may expose equivalent dynamic colours for system dark appearance.
 | Positive | `#1FA869` | `#35C97B` | Connected and successful state |
 | Graphite | `#0A0B0D` | `#0A0B0D` | Colour-stable preview well |
 | Readout glow | `#6BAEFF` | `#6BAEFF` | User-writable exposure values |
+| UI accent | `#CDDC39` | `#CDDC39` | Capture control-surface selected and active state |
+| Studio gold | `#D8B653` | `#D8B653` | Parameter readouts and adjusting-state markers only |
+| Editor accent | `#E8833A` | `#E8833A` | Editor selected tool and scope readouts |
 
+- UI accent, Studio gold, and Editor accent are the only additional accent
+  colours. Studio gold marks parameter readouts and in-progress adjustments; it
+  never becomes a selection or capture-action accent — selected and active
+  states on capture control surfaces use UI accent, and photo actions keep
+  Photo accent cobalt. Editor accent is confined to the image editor and
+  scopes.
 - Focus uses the platform accessibility focus colour with at least 3:1 contrast.
 - Preview wells stay graphite in every appearance so ambient UI colour never
   changes colour-critical image judgement.
@@ -100,19 +109,22 @@ Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
   control in the main parameter surface on cameras that expose those capabilities.
 - Disabled parameters include a visible reason; never rely on colour alone.
 
-## Calibration readout rail
+## Calibration readouts
 
-- Photo workspaces show a compact graphite calibration rail directly after the
-  preview and before capture actions.
-- The rail uses monospaced tabular numerals and exposes the platform's real
+- Desktop platforms (macOS, Windows) show a compact graphite calibration rail
+  directly after the preview and before capture actions.
+- Touch platforms (iOS/iPadOS, Android, HarmonyOS) present the same values in
+  the main parameter tile surface instead of a separate rail, keeping the
+  capture workspace single-column and uncluttered.
+- Readouts use monospaced tabular numerals and expose the platform's real
   source, mode, shutter or shutter angle, aperture when available, ISO, and
   exposure compensation.
 - Values currently writable by the user use `Readout glow`; camera-controlled
   values use high-contrast neutral text and an explicit `AUTO` label.
 - A disconnected camera or unavailable source shows em-dash placeholders and
   never presents model defaults as live camera values.
-- The rail is informational. Existing native parameter controls remain the
-  editing surface, and the rail must not introduce a second write path.
+- Readouts are informational. Existing native parameter controls remain the
+  editing surface, and readouts must not introduce a second write path.
 - Narrow layouts may horizontally scroll or reduce the number of simultaneous
   fields, but values and labels must not overlap or resize the surrounding page.
 
@@ -273,11 +285,14 @@ rather than exposing one undifferentiated list of camera properties:
   non-destructive raw developers without copying Adobe Camera Raw branding,
   proprietary icons, wording, panel order, or trade dress. It remains visibly
   and structurally part of 帧澈 ZENCHE.
-- Adjustments are divided into five focused native groups:
-  Light (exposure, contrast, highlights, shadows, whites, blacks), Color
-  (temperature, tint, vibrance, saturation), Detail (texture, clarity,
-  sharpening, noise reduction), Effects (dehaze, vignette), and Geometry
-  (quarter rotation, horizontal/vertical flip, centered aspect-ratio crop).
+- Adjustments are divided into focused native groups: Light (exposure,
+  contrast, highlights, shadows, whites, blacks), Color (temperature, tint,
+  vibrance, saturation), Color Wheels, Curves, Picker, Mask, Detail (texture,
+  clarity, sharpening, noise reduction), Effects (dehaze, vignette), and
+  Geometry (quarter rotation, horizontal/vertical flip, centered aspect-ratio
+  crop). A separate AI-tools mode hosts generative/assisted tools; the
+  professional and AI modes are an explicit, stable in-editor switch — never a
+  global density toggle and never changed implicitly by navigation.
 - Original, Natural Enhance, Soft Portrait, Clear Landscape, and High-Contrast
   B&W presets provide transparent starting points by changing the same visible
   sliders; presets are not opaque filters.
