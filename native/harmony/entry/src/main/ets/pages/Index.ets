@@ -1321,7 +1321,7 @@ struct Index {
         .maxLines(1)
     }
     .width('100%')
-    .height(32)
+    .height(44)
     .padding({ left: 14, right: 14 })
     .backgroundColor(UI_BG)
   }
@@ -1968,7 +1968,7 @@ struct Index {
       .justifyContent(FlexAlign.Center)
       .alignItems(VerticalAlign.Center)
     }
-      .height(42)
+      .height(44)
       .layoutWeight(1)
       .backgroundColor(this.editorWorkbenchToolActive(panel) ? EDITOR_RAISED : Color.Transparent)
       .border({
@@ -2478,7 +2478,7 @@ struct Index {
         `${this.isLibraryBranchExpanded(branch.id) ? '⌄' : '›'}  分支 · ${branch.name} · ${this.editablePhotosForBranch(branch.id).length}`,
         { type: ButtonType.Normal }
       )
-        .height(42)
+        .height(44)
         .width('100%')
         .padding({ left: 8 + depth * 14, right: 6 })
         .fontColor($r('app.color.ink'))
@@ -4278,7 +4278,7 @@ struct Index {
           })
       }
       .width('100%')
-      .height(36)
+      .height(44)
       if (this.controlStatusFailed()) {
         Text(this.lastConnectionError)
           .fontSize(12)
@@ -4571,7 +4571,7 @@ struct Index {
           .layoutWeight(1)
         Button(this.tr('全部'), { type: ButtonType.Normal })
           .width(68)
-          .height(32)
+          .height(44)
           .fontSize(12)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? Color.White : $r('app.color.ink'))
@@ -4583,7 +4583,7 @@ struct Index {
           })
         Button(this.tr('编辑'), { type: ButtonType.Normal })
           .width(68)
-          .height(32)
+          .height(44)
           .fontSize(12)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? $r('app.color.ink') : Color.White)
@@ -4595,7 +4595,7 @@ struct Index {
           })
       }
       .width('100%')
-      .height(34)
+      .height(44)
       if (this.controlTileRows().length === 0) {
         Text(this.tr('参数已全部隐藏'))
           .fontSize(12)
@@ -4654,7 +4654,7 @@ struct Index {
       if (this.gridEditMode) {
         Button('×', { type: ButtonType.Normal })
           .width(22)
-          .height(22)
+          .height(44)
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
@@ -6130,7 +6130,7 @@ struct Index {
         placeholder: this.tr('项目名称'),
         text: this.sessionName
       })
-        .height(42)
+        .height(44)
         .onChange((value: string): void => {
           this.sessionName = value;
         })
@@ -6138,7 +6138,7 @@ struct Index {
         placeholder: this.tr('命名模板'),
         text: this.sessionNamingTemplate
       })
-        .height(42)
+        .height(44)
         .fontFamily('monospace')
         .onChange((value: string): void => {
           this.sessionNamingTemplate = value;
@@ -6148,7 +6148,7 @@ struct Index {
           placeholder: this.tr('创作者'),
           text: this.sessionCreator
         })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.sessionCreator = value;
@@ -6157,7 +6157,7 @@ struct Index {
           placeholder: this.tr('版权'),
           text: this.sessionRights
         })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.sessionRights = value;
@@ -6297,13 +6297,13 @@ struct Index {
         .width('100%')
       Row({ space: 10 }) {
         TextInput({ placeholder: '192.168.1.1', text: this.wifiHost })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.wifiHost = value;
           })
         TextInput({ placeholder: '15740', text: this.wifiPort })
-          .height(42)
+          .height(44)
           .width(108)
           .type(InputType.Number)
           .onChange((value: string): void => {
@@ -6801,7 +6801,7 @@ struct Index {
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
           Button(this.tr('关闭公告'), { type: ButtonType.Normal })
-            .height(42)
+            .height(44)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
             .borderRadius(8)
@@ -6972,7 +6972,7 @@ struct Index {
       }
       .width('100%')
       Button(this.tr('打开爱发电'), { type: ButtonType.Normal })
-        .height(42)
+        .height(44)
         .width('100%')
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.surface'))
@@ -7011,7 +7011,7 @@ struct Index {
           }
           .layoutWeight(1)
           Button(this.tr('关闭'), { type: ButtonType.Normal })
-            .height(40)
+            .height(44)
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
             .borderRadius(8)
@@ -7900,7 +7900,7 @@ struct Index {
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
             Button('复制', { type: ButtonType.Normal })
-              .height(32)
+              .height(44)
               .fontSize(12)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
@@ -7931,7 +7931,7 @@ struct Index {
             })
           Row({ space: 8 }) {
             Button('购买激活码', { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
@@ -7949,7 +7949,7 @@ struct Index {
                 }
               })
             Button('激活', { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
@@ -7992,7 +7992,7 @@ struct Index {
             this.tr(this.aiRebindBusy ? '正在迁移…' : '恢复到当前设备'),
             { type: ButtonType.Normal }
           )
-            .height(40)
+            .height(44)
             .width('100%')
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
@@ -8050,7 +8050,7 @@ struct Index {
             text: this.mirrorChyanCdk
           })
             .type(InputType.Password)
-            .height(42)
+            .height(44)
             .showPasswordIcon(true)
             .onChange((value: string): void => {
               this.mirrorChyanCdk = value;
@@ -8063,7 +8063,7 @@ struct Index {
             .width('100%')
           Row({ space: 8 }) {
             Button(this.tr('保存 CDK'), { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
@@ -8072,7 +8072,7 @@ struct Index {
                 this.saveMirrorChyanCdk();
               })
             Button(this.tr('打开 Mirror酱'), { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
