@@ -5179,11 +5179,11 @@ private struct ImmersiveCameraView: View {
             ScopePlot(
                 label: "RGB",
                 traces: [
-                    ScopeTrace(value: model.camera.redHistogram, color: .red),
-                    ScopeTrace(value: model.camera.greenHistogram, color: .green),
-                    ScopeTrace(value: model.camera.blueHistogram, color: .blue)
+                    ScopeTrace(value: model.camera.redHistogram, color: IPalette.scopeR),
+                    ScopeTrace(value: model.camera.greenHistogram, color: IPalette.scopeG),
+                    ScopeTrace(value: model.camera.blueHistogram, color: IPalette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
             .frame(width: 172, height: 78)
             AudioScopePlot(label: "AUDIO")
@@ -6459,7 +6459,7 @@ private struct RGBWaveformCard: View {
                 ScopeTrace(value: model.camera.greenHistogram, color: IPalette.scopeG),
                 ScopeTrace(value: model.camera.blueHistogram, color: IPalette.scopeB)
             ],
-            parade: true
+            parade: false
         )
         .accessibilityLabel("RGB 波形")
     }
@@ -6759,29 +6759,9 @@ private struct ProfessionalScopeBoard: View {
     let red: String
     let green: String
     let blue: String
-    let luma: String
-    let chroma: String
 
     var body: some View {
-        let chromaParts = chroma.split(separator: "|", maxSplits: 1).map(String.init)
-        let cb = chromaParts.first ?? chroma
-        let cr = chromaParts.count > 1 ? chromaParts[1] : chroma
         VStack(spacing: 1) {
-            ScopePlot(
-                label: "Y",
-                traces: [ScopeTrace(value: luma, color: .white)]
-            )
-            ScopePlot(
-                label: "YUV",
-                traces: [
-                    ScopeTrace(value: luma, color: IPalette.scopeYuvY),
-                    ScopeTrace(value: cb, color: IPalette.scopeYuvU),
-                    ScopeTrace(
-                        value: cr,
-                        color: IPalette.scopeYuvV
-                    )
-                ]
-            )
             ScopePlot(
                 label: "RGB",
                 traces: [
@@ -6789,13 +6769,13 @@ private struct ProfessionalScopeBoard: View {
                     ScopeTrace(value: green, color: IPalette.scopeG),
                     ScopeTrace(value: blue, color: IPalette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
         }
         .padding(4)
         .background(Color.black)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("专业波形图，亮度、YUV 与 RGB 分量")
+        .accessibilityLabel("专业波形图，RGB 三通道叠加")
     }
 }
 
@@ -7218,9 +7198,7 @@ private struct MonitorOutputDeck: View {
                 ProfessionalScopeBoard(
                     red: model.camera.redHistogram,
                     green: model.camera.greenHistogram,
-                    blue: model.camera.blueHistogram,
-                    luma: model.camera.waveform,
-                    chroma: model.camera.vectorscope
+                    blue: model.camera.blueHistogram
                 )
                 .frame(height: 190)
                 Text("峰值覆盖 · \(model.camera.peakingCoverage)%")

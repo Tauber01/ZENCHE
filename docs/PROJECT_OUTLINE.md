@@ -28,7 +28,7 @@ v1.5.2 已完成集成并发布：五端全局状态条、五端“恢复设备�
 
 v1.5.2 Release 已公开 14 个附件：Android Debug 签名 APK、HarmonyOS 未签名 HAP、iOS / iPadOS unsigned IPA、macOS arm64 ad-hoc DMG、Windows x64 Setup/ZIP、精确源码 ZIP，以及七份同名 `.sha256`。发布前后均逐项核对线上大小与 GitHub SHA-256 摘要，14/14 一致；完整清单、签名和安装限制见 `docs/releases/v1.5.2.md`。GitHub 稳定通道标识不改变附件本身的验证属性：macOS 包未使用 Developer ID、未公证；Windows 包在 macOS 交叉构建，尚未在真实 Windows 主机验证安装、驱动和 SmartScreen。
 
-v1.5.3 聚焦五端原生工作台界面：全屏监看采用影像优先的遥测 HUD、焦点十字、工具轨、真实 RGB 示波器、静音音频基线和参数托盘；拍摄页使用设备摘要、自适应参数卡与常驻拍摄操作区；编辑器使用媒体池、中央预览、工具检查器和分析示波器协作布局。新界面只复用既有真实相机、图库与编辑状态；无连接或无画面时显示 `—`、`OFFLINE` 或明确空态，不把初始化默认值当作实时遥测。iOS 拍摄会话入口、Android 编辑快捷入口和 Windows 窄窗中央预览均已纳入回归门禁；相机连接、拍摄、外录、传输、AI 激活与设备码恢复协议保持兼容。五端共享 ZENCHE 蓝、参数暖金和录制/危险红的角色约定，不复制参考产品的商标或专有图标。
+v1.5.3 聚焦五端原生工作台界面：全屏监看采用影像优先的遥测 HUD、焦点十字、工具轨、RGB 三色叠加波形示波器、静音音频基线和参数托盘；拍摄页使用设备摘要、自适应参数卡与常驻拍摄操作区；编辑器使用媒体池、中央预览、工具检查器和分析示波器协作布局。新界面只复用既有真实相机、图库与编辑状态；无连接或无画面时显示 `—`、`OFFLINE` 或明确空态，不把初始化默认值当作实时遥测。iOS 拍摄会话入口、Android 编辑快捷入口和 Windows 窄窗中央预览均已纳入回归门禁；相机连接、拍摄、外录、传输、AI 激活与设备码恢复协议保持兼容。五端共享 ZENCHE 蓝、参数暖金和录制/危险红的角色约定，不复制参考产品的商标或专有图标。
 
 v1.5.3 固定于代码提交 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`、发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`：完整 `npm test` 256/256 通过，APK、HAP、unsigned IPA、macOS arm64 DMG、Windows x64 Setup/便携 ZIP 与源码 ZIP 共七包及同名 `.sha256` 已生成并逐个回验。它们不是商店或受信任签名包：Android 使用 Debug 证书，HarmonyOS 与 iOS 未签名，macOS 为 ad-hoc 且未公证，Windows 未做 Authenticode 且仍需真实 Windows 主机验收。文件名、字节数、SHA-256、源码快照和版本资源边界见 `docs/releases/v1.5.3.md`。v1.5.3 已于 2026-08-04 发布为 GitHub Latest，Release 共 14 个附件，线上字节数与 SHA-256 摘要已与本地逐项比对，14/14 一致。
 

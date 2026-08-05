@@ -4681,11 +4681,11 @@ private struct ImmersiveMacCameraView: View {
             MacScopePlot(
                 label: "RGB",
                 traces: [
-                    MacScopeTrace(value: model.redHistogram, color: .red),
-                    MacScopeTrace(value: model.greenHistogram, color: .green),
-                    MacScopeTrace(value: model.blueHistogram, color: .blue)
+                    MacScopeTrace(value: model.redHistogram, color: Palette.scopeR),
+                    MacScopeTrace(value: model.greenHistogram, color: Palette.scopeG),
+                    MacScopeTrace(value: model.blueHistogram, color: Palette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
             .frame(width: 180, height: 80)
             MacAudioScopePlot(label: "AUDIO")
@@ -6698,7 +6698,7 @@ private struct MonitorView: View {
                 MacScopeTrace(value: model.greenHistogram, color: Palette.scopeG),
                 MacScopeTrace(value: model.blueHistogram, color: Palette.scopeB)
             ],
-            parade: true
+            parade: false
         )
         .frame(maxWidth: .infinity, minHeight: 86)
         .accessibilityLabel("RGB 波形")
@@ -7100,9 +7100,7 @@ private struct MonitorControlDeck: View {
                     MacProfessionalScopeBoard(
                         red: model.redHistogram,
                         green: model.greenHistogram,
-                        blue: model.blueHistogram,
-                        luma: model.waveform,
-                        chroma: model.vectorscope
+                        blue: model.blueHistogram
                     )
                     .frame(height: 210)
                     Text("峰值覆盖 · \(model.peakingCoverage)%")
@@ -7456,29 +7454,9 @@ private struct MacProfessionalScopeBoard: View {
     let red: String
     let green: String
     let blue: String
-    let luma: String
-    let chroma: String
 
     var body: some View {
-        let chromaParts = chroma.split(separator: "|", maxSplits: 1).map(String.init)
-        let cb = chromaParts.first ?? chroma
-        let cr = chromaParts.count > 1 ? chromaParts[1] : chroma
         VStack(spacing: 1) {
-            MacScopePlot(
-                label: "Y",
-                traces: [MacScopeTrace(value: luma, color: .white)]
-            )
-            MacScopePlot(
-                label: "YUV",
-                traces: [
-                    MacScopeTrace(value: luma, color: Palette.scopeYuvY),
-                    MacScopeTrace(value: cb, color: Palette.scopeYuvU),
-                    MacScopeTrace(
-                        value: cr,
-                        color: Palette.scopeYuvV
-                    )
-                ]
-            )
             MacScopePlot(
                 label: "RGB",
                 traces: [
@@ -7486,13 +7464,13 @@ private struct MacProfessionalScopeBoard: View {
                     MacScopeTrace(value: green, color: Palette.scopeG),
                     MacScopeTrace(value: blue, color: Palette.scopeB)
                 ],
-                parade: true
+                parade: false
             )
         }
         .padding(4)
         .background(Color.black)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("专业波形图，亮度、YUV 与 RGB 分量")
+        .accessibilityLabel("专业波形图，RGB 三通道叠加")
     }
 }
 

@@ -921,7 +921,6 @@ public final class MainActivity extends Activity {
     private final class WaveformScopeView extends View {
         static final int RGB_PARADE = 0;
         static final int AUDIO = 1;
-        static final int PROFESSIONAL = 2;
 
         private final int mode;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -937,9 +936,7 @@ public final class MainActivity extends Activity {
             setBackgroundColor(Color.BLACK);
             setContentDescription(mode == AUDIO
                     ? tr("音频波形") + "，" + tr("无音频源")
-                    : mode == RGB_PARADE
-                            ? tr("RGB 波形")
-                            : tr("专业波形图"));
+                    : tr("RGB 波形"));
         }
 
         void setData(
@@ -964,52 +961,13 @@ public final class MainActivity extends Activity {
                 drawAudio(canvas, bounds);
                 return;
             }
-            if (mode == RGB_PARADE) {
-                drawPanel(
-                        canvas,
-                        bounds,
-                        "RGB",
-                        new String[]{red, green, blue},
-                        new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
-                        true);
-                return;
-            }
-
-            float gap = dpf(1);
-            float panelHeight = (bounds.height() - gap * 2) / 3f;
-            RectF yBounds = new RectF(
-                    bounds.left, bounds.top, bounds.right, bounds.top + panelHeight);
-            RectF yuvBounds = new RectF(
-                    bounds.left,
-                    yBounds.bottom + gap,
-                    bounds.right,
-                    yBounds.bottom + gap + panelHeight);
-            RectF rgbBounds = new RectF(
-                    bounds.left,
-                    yuvBounds.bottom + gap,
-                    bounds.right,
-                    bounds.bottom);
             drawPanel(
                     canvas,
-                    yBounds,
-                    "Y",
-                    new String[]{luma},
-                    new int[]{Color.WHITE},
-                    false);
-            drawPanel(
-                    canvas,
-                    yuvBounds,
-                    "YUV",
-                    new String[]{luma, chromaPart(chroma, 0), chromaPart(chroma, 1)},
-                    new int[]{SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V},
-                    false);
-            drawPanel(
-                    canvas,
-                    rgbBounds,
+                    bounds,
                     "RGB",
                     new String[]{red, green, blue},
                     new int[]{SCOPE_R, SCOPE_G, SCOPE_B},
-                    true);
+                    false);
         }
 
         private void drawPanel(
@@ -1247,11 +1205,6 @@ public final class MainActivity extends Activity {
             } catch (NumberFormatException error) {
                 return null;
             }
-        }
-
-        private String chromaPart(String value, int index) {
-            String[] parts = value.split("\\|", 2);
-            return parts.length > index ? parts[index] : value;
         }
 
         private final class ScopeDensity {
@@ -5476,7 +5429,7 @@ public final class MainActivity extends Activity {
         LinearLayout scopes = verticalContainer();
         scopes.setPadding(dp(4), dp(4), dp(4), dp(6));
         scopes.setBackgroundColor(Color.BLACK);
-        professionalScopeView = new WaveformScopeView(WaveformScopeView.PROFESSIONAL);
+        professionalScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
         professionalScopeView.setData(
                 redHistogram, greenHistogram, blueHistogram, waveform, vectorscope);
         peakingCoverageText = text(

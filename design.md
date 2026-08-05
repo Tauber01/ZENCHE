@@ -192,23 +192,25 @@ rather than exposing one undifferentiated list of camera properties:
   cloud beneath it. Waveform data is never shown as a text-only block-character
   sparkline or a single clean chart line.
 - Scope data is a spatial density measurement, not a column-average graph. Map
-  each sampled source pixel to source X and its Y′, R′, G′, B′, Cb, or Cr level,
-  accumulate a two-dimensional 64 × 48 density field, then apply logarithmic
-  intensity compression for display. Preserve the decoded frame's full signal
-  range and keep the channel calculation aligned with BT.709 coefficients.
-- Luma traces are neutral white. YUV overlays keep green, blue/cyan, and
-  magenta/red channels distinguishable. RGB parade views divide the plot into
-  three equal, labelled R, G, and B channels using signal red, green, and blue.
-- Compact monitor layouts may show an RGB parade and audio plot as separate
-  cards. The professional monitor panel combines Y, YUV, and RGB plots in that
-  order so exposure, colour balance, and per-channel clipping remain scannable.
+  each sampled source pixel to source X and its R′, G′, or B′ level, accumulate
+  a two-dimensional 64 × 48 density field, then apply logarithmic intensity
+  compression for display. Preserve the decoded frame's full signal range and
+  keep the channel calculation aligned with BT.709 coefficients.
+- Every video waveform is an RGB overlay: red, green, and blue channels drawn
+  in one shared coordinate space with additive blending so overlap reads as
+  composite colour. Signal red #FF302A, signal green #28FF69, and signal blue
+  #2240FF stay distinguishable at any intensity.
+- Compact monitor layouts may show the RGB overlay and audio plot as separate
+  cards. The professional monitor panel is a single RGB overlay plot so
+  exposure, colour balance, and per-channel clipping remain scannable. Luma and
+  YUV panels are removed; the waveform pipeline always renders RGB channels.
 - A missing audio source uses a centred cyan baseline and exposes the localized
   empty-source state to accessibility without placing status copy inside the plot.
   It must not fabricate audio activity.
 - Scope labels are measurement metadata in the platform monospaced face. Keep
   them small, centred beneath the plot frame, and quiet without reducing plot
-  contrast or shrinking touch targets. RGB parade plots show separate R, G, and B
-  labels beneath their thirds instead of a corner title.
+  contrast or shrinking touch targets. Overlay plots show a single centred
+  "RGB" label instead of per-channel thirds.
 - Scope plots contain no decorative signature, watermark, corner branding, or
   borrowed application chrome.
 

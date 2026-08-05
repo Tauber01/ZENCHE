@@ -7,8 +7,7 @@ namespace NikonLink.Windows;
 public enum WaveformScopeMode
 {
     RgbParade,
-    Audio,
-    Professional
+    Audio
 }
 
 public sealed class WaveformScope : FrameworkElement
@@ -57,46 +56,13 @@ public sealed class WaveformScope : FrameworkElement
             return;
         }
 
-        if (Mode == WaveformScopeMode.RgbParade)
-        {
-            DrawPanel(
-                drawingContext,
-                bounds,
-                "RGB",
-                [_red, _green, _blue],
-                [Color.FromRgb(255, 48, 42), Color.FromRgb(40, 255, 105), Color.FromRgb(34, 64, 255)],
-                parade: true);
-            return;
-        }
-
-        const double gap = 1;
-        var panelHeight = Math.Max(1, (bounds.Height - gap * 2) / 3);
-        var yBounds = new Rect(bounds.X, bounds.Y, bounds.Width, panelHeight);
-        var yuvBounds = new Rect(
-            bounds.X,
-            yBounds.Bottom + gap,
-            bounds.Width,
-            panelHeight);
-        var rgbBounds = new Rect(
-            bounds.X,
-            yuvBounds.Bottom + gap,
-            bounds.Width,
-            Math.Max(1, bounds.Bottom - yuvBounds.Bottom - gap));
-        DrawPanel(drawingContext, yBounds, "Y", [_luma], [Colors.White], parade: false);
         DrawPanel(
             drawingContext,
-            yuvBounds,
-            "YUV",
-            [_luma, ChromaPart(_chroma, 0), ChromaPart(_chroma, 1)],
-            [Color.FromRgb(20, 255, 92), Color.FromRgb(0, 210, 255), Color.FromRgb(255, 38, 222)],
-            parade: false);
-        DrawPanel(
-            drawingContext,
-            rgbBounds,
-            string.Empty,
+            bounds,
+            "RGB",
             [_red, _green, _blue],
             [Color.FromRgb(255, 48, 42), Color.FromRgb(40, 255, 105), Color.FromRgb(34, 64, 255)],
-            parade: true);
+            parade: false);
     }
 
     private void DrawPanel(
@@ -432,12 +398,6 @@ public sealed class WaveformScope : FrameworkElement
             }
         }
         return new ScopeDensity(columns, rows, values);
-    }
-
-    private static string ChromaPart(string value, int index)
-    {
-        var parts = value.Split('|', 2);
-        return parts.Length > index ? parts[index] : value;
     }
 
     private sealed record ScopeDensity(int Columns, int Rows, int[] Values);
