@@ -1869,8 +1869,7 @@ public partial class MainWindow : Window
             Text = AppLocalization.T(
                 "连接即表示同意索尼 SDK 使用限制；帧澈独立提供产品支持。"),
             Margin = new Thickness(0, 6, 0, 0),
-            FontSize = 10,
-            Foreground = (Brush)FindResource("MutedBrush"),
+            Style = (Style)FindResource("DialogHint"),
             TextWrapping = TextWrapping.Wrap
         };
         var sonyContent = new StackPanel();
@@ -2055,8 +2054,7 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(title),
-            FontSize = 16,
-            FontWeight = FontWeights.Bold,
+            Style = (Style)FindResource("DialogTitle"),
             Foreground = (Brush)FindResource("InkBrush")
         });
         if (content is FrameworkElement element)
@@ -2238,9 +2236,7 @@ public partial class MainWindow : Window
                 : "●\n拍摄",
             Width = 96,
             Height = 96,
-            Foreground = Brushes.White,
-            FontSize = 16,
-            FontWeight = FontWeights.Bold,
+            FontSize = 16, // v1.5.7 F5: 录制钮符号字号（归档不改值）
             Style = (Style)FindResource(
                 _videoMode ? "DangerButton" : "PrimaryButton"),
             IsEnabled = _camera.IsConnected
@@ -2445,10 +2441,7 @@ public partial class MainWindow : Window
                         new TextBlock
                         {
                             Text = label,
-                            FontFamily = (FontFamily)FindResource("MonoFont"),
-                            FontSize = 8,
-                            FontWeight = FontWeights.Bold,
-                            Foreground = (Brush)FindResource("TelemetryLabelBrush")
+                            Style = (Style)FindResource("TelemetryMicro"),
                         },
                         new TextBlock
                         {
@@ -2652,8 +2645,7 @@ public partial class MainWindow : Window
                 new TextBlock
                 {
                     Text = label,
-                    Foreground = (Brush)FindResource("WhiteDimBrush"),
-                    FontSize = 10,
+                    Style = (Style)FindResource("ImmersiveLabel"),
                     TextAlignment = TextAlignment.Center
                 },
                 value
@@ -4677,8 +4669,7 @@ public partial class MainWindow : Window
         copy.Children.Add(new TextBlock
         {
             Text = AppLocalization.T("官方 QQ 群：165315727"),
-            FontSize = 13,
-            FontFamily = (FontFamily)FindResource("MonoFont"),
+            Style = (Style)FindResource("FastFeedbackMono"),
             FontWeight = FontWeights.Bold,
             Foreground = (Brush)FindResource("AccentBrush"),
             Margin = new Thickness(0, 6, 0, 0)
@@ -4744,7 +4735,7 @@ public partial class MainWindow : Window
         {
             Content = AppLocalization.T(
                 "不再提醒（软件更新后仍会显示）"),
-            FontSize = 14,
+            Style = (Style)FindResource("AnnouncementText"),
             VerticalContentAlignment = VerticalAlignment.Center
         };
         var closeButton = new Button
@@ -4766,8 +4757,7 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T("本次更新"),
-            FontSize = 19,
-            FontWeight = FontWeights.Bold,
+            Style = (Style)FindResource("AnnouncementSection"),
             Margin = new Thickness(0, 0, 0, 8)
         });
         body.Children.Add(new TextBlock
@@ -4778,7 +4768,7 @@ public partial class MainWindow : Window
                 "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n" +
                 "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n" +
                 "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。"),
-            FontSize = 14,
+            Style = (Style)FindResource("AnnouncementText"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
             Margin = new Thickness(0, 0, 0, 18)
@@ -4791,8 +4781,7 @@ public partial class MainWindow : Window
         warning.Children.Add(new TextBlock
         {
             Text = AppLocalization.T("谨防诈骗"),
-            FontSize = 17,
-            FontWeight = FontWeights.Bold,
+            Style = (Style)FindResource("AnnouncementTitle"),
             Foreground = (Brush)FindResource("WarnDeepBrush"),
             Margin = new Thickness(0, 0, 0, 7)
         });
@@ -4801,8 +4790,7 @@ public partial class MainWindow : Window
             Text = AppLocalization.T(
                 "帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”" +
                 "或要求付费购买软件的人都是骗子，请勿转账。"),
-            FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
+            Style = (Style)FindResource("AnnouncementText"),
             Foreground = (Brush)FindResource("WarnDarkBrush"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 21
@@ -4832,15 +4820,14 @@ public partial class MainWindow : Window
                     new TextBlock
                     {
                         Text = AppLocalization.T("自愿赞助"),
-                        FontSize = 17,
-                        FontWeight = FontWeights.Bold,
+                        Style = (Style)FindResource("AnnouncementTitle"),
                         Margin = new Thickness(0, 0, 0, 6)
                     },
                     new TextBlock
                     {
                         Text = AppLocalization.T(
                             "如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。"),
-                        FontSize = 13,
+                        Style = (Style)FindResource("AnnouncementSub"),
                         Foreground = (Brush)FindResource("MutedBrush"),
                         TextWrapping = TextWrapping.Wrap,
                         Margin = new Thickness(0, 0, 0, 10)
@@ -4871,8 +4858,7 @@ public partial class MainWindow : Window
         header.Children.Add(new TextBlock
         {
             Text = AppLocalization.T("更新公告"),
-            FontSize = 25,
-            FontWeight = FontWeights.Bold
+            Style = (Style)FindResource("AnnouncementHeading")
         });
         header.Children.Add(new TextBlock
         {
@@ -5030,8 +5016,7 @@ public partial class MainWindow : Window
         header.Children.Add(new TextBlock
         {
             Text = "链接网盘",
-            Style = (Style)FindResource("DisplayText"),
-            FontSize = 26
+            Style = (Style)FindResource("DisplayText") // v1.5.7 F5: FontSize=26 与 DisplayText 样式等值冗余，删除（只归档不改值）
         });
         header.Children.Add(new TextBlock
         {

@@ -630,4 +630,163 @@
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
     <Setter Property="FontSize" Value="12" />
   </Style>
+
+  <!-- v1.5.7 F5 必改-1: Monitor/Capture 区字号字面量归档——原值入样式、不动渲染（F5 数值收口；MonitorReadout 等已裁决样式除外）。 -->
+  <Style x:Key="MonitorTimecode" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="38" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="MonitorLiveStatus" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellLabelBrush}" />
+  </Style>
+  <Style x:Key="MonitorEmptyState" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellMutedBrush}" />
+  </Style>
+  <Style x:Key="MonitorOverlayMeta" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellMutedBrush}" />
+  </Style>
+  <Style x:Key="MonitorWellLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellLabelBrush}" />
+  </Style>
+  <Style x:Key="MonitorCloudTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="MonitorStorageIcon" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="28" />
+    <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
+  </Style>
+  <Style x:Key="CaptureFieldLabel" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="9" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureFieldValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureStatusHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureSubHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureCardTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureReadoutUnit" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureCloudTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureCloudSub" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureSessionHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+  <Style x:Key="CaptureEmptyTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource UiCardInkBrush}" />
+  </Style>
+  <Style x:Key="CaptureBadge" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentInkBrush}" />
+  </Style>
+  <Style x:Key="ShootingTaskHint" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource UiLabelBrush}" />
+  </Style>
+
+  <Style x:Key="ProfMonitorValue" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource WhiteLoBrush}" />
+  </Style>
+
+  <Style x:Key="SidebarHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
+  <!-- v1.5.7 F5 必改-2: cs 弹窗/沉浸/公告区字号字面量归档（只归档不改值）。 -->
+  <Style x:Key="TelemetryMicro" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="8" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource TelemetryLabelBrush}" />
+  </Style>
+  <Style x:Key="DialogHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+  <Style x:Key="ImmersiveLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource WhiteDimBrush}" />
+  </Style>
+  <Style x:Key="FastFeedbackMono" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style x:Key="DialogTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style x:Key="AnnouncementHeading" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="25" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style x:Key="AnnouncementSection" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="19" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style x:Key="AnnouncementTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style x:Key="AnnouncementText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+  <Style x:Key="AnnouncementSub" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
 </ResourceDictionary>

@@ -41,5 +41,9 @@
   <Color x:Key="ColorCapsulePressed">#3A3A3C</Color>
   <Color x:Key="ColorShutterHover">#262628</Color>
   <Color x:Key="ColorPhotoSoftBorder">#2E425E</Color>
+  <!-- v1.5.7 F5 必改-3: Warn/ErrorSoft 暗色对（design.md:59 Video soft 暗 #3A1B1E 同族红 soft；WarnBgSoft 取中间档区分层次） -->
+  <Color x:Key="ColorErrorSoft">#3A1B1E</Color>
+  <Color x:Key="ColorWarnBg">#3A1B1E</Color>
+  <Color x:Key="ColorWarnBgSoft">#5C2B30</Color>
 
 </ResourceDictionary>
