@@ -6497,6 +6497,22 @@ struct Index {
           .onClick((): void => {
             this.closeLargePhoto();
           })
+        Button(this.tr('编辑'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor('#66000000')
+          .borderRadius(8)
+          .onClick((): void => {
+            const item: PhotoItem | undefined = this.photos.find(
+              (candidate: PhotoItem): boolean =>
+                candidate.name === this.largePreviewName
+            );
+            if (item !== undefined && !item.isVideo) {
+              this.editorSelectedPath = item.path;
+              this.closeLargePhoto();
+              this.section = 'editor';
+            }
+          })
         Blank()
         Button(this.tr('分享到社交平台'), { type: ButtonType.Normal })
           .height(44)
