@@ -435,3 +435,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 验收：收尾提交后与合并后各跑一次完整 `npm test`，均 **256/256** 全绿（含 native-waveform-scopes 5/5）。
 - 编译验证：macOS swiftc -typecheck 0 错误、Android javac 通过、Windows dotnet build 成功、Harmony assembleHap BUILD SUCCESSFUL（iOS 本轮未重跑，改动仅为 3 处死常量删除，首轮 BUILD SUCCEEDED）。
 - 打包暂不启动：等 v1.5.7 UI 轮定版后统一打。
+
+## 12.6 v1.5.7 F1 macOS 基准自修（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮先行批 F1（macOS 基准自修，做基准前先收口自身债务）；分支 `agent/1.5.7-f1-macos`（worktree REPOS/ZENCHE-wt-1.5.7-f1-macos），基线 `7a4ee35`，仅动 macOS 端与 design.md/docs 三件套。
+- TypeScale 新增 `heading 26` 页面标题档：WorkspaceHeading 32pt 归 heading、设置面板主标题/各页面大标题（26/28/34）归 heading；Typography 增补该档说明（文字页面标题，与 display 大数字档互补，每屏仍 ≤5 档）。
+- main.swift 字号字面量收敛：正文/标签 34 处归 TypeScale（8/9/10→caption 11 等）；图标尺寸 15 处（SF Symbols 17-46）与专属读数 3 处（曝光参数 28、存储读数 25、Splash Z 字标 42）保留原值并加注释声明。
+- SettingsSheet 13 档字号（10-26 共 13 值）收敛为 TypeScale 5 档 + heading：卡片标题 16→title、子项标题 14→emphasis、描述/按钮 13→body、辅助说明 10/11→caption、面板主标题 26→heading、面板标题 17/20/23/24→title/display；仅 3 处图标（19/20/22）保留并注释。
+- 小额项：曝光参数卡自动徽标「A」→「AUTO」完整字面（对齐 iOS 口径，圆徽标改 Capsule）；「选择预设」按钮暗色 tint 由 readoutGlow 改回 cobalt（readoutGlow 仅用于曝光读数）。
+- design.md 增补：恒深页（fig1 控制面/fig2 编辑器工作台）为「每页双外观」条款的文档化例外（v1.5.6 终审遗留文档债收口）+ 沉浸全屏 overlay 同属恒深例外族（预览井/沉浸 overlay 任何外观保持石墨）。
+- 验证：swiftc -typecheck（build-macos.sh 同口径源列表）0 错误；完整 `npm test` 256/256 通过；git diff --check 干净。

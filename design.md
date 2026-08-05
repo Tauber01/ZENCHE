@@ -67,6 +67,13 @@ may expose equivalent dynamic colours for system dark appearance.
 - Every page supports both light and dark appearance and follows the system
   appearance by default; an in-app appearance toggle, where the platform
   provides one, switches the same token set without a restart.
+- Two workspace families are permanently dark by design and do not switch
+  with the system appearance: the capture/monitor control surface (fig1) and
+  the editor workbench (fig2) keep the calibrated dark workbench tokens in
+  both appearances so colour-critical judgement and control contrast stay
+  stable. This is the documented exception to the every-page rule above: the
+  both-appearances requirement applies to the chrome surrounding these
+  fixed-dark surfaces, not to the surfaces themselves.
 - Foreground and background always pair by appearance: light text and icons
   on dark surfaces, dark text and icons on light surfaces, drawn from the
   token pairs above — never a hard-coded single-appearance colour.
@@ -94,6 +101,9 @@ Web CSS as a dependency of native implementations.
 - Display: platform system display face, bold, roman.
 - Body: platform system UI face, regular.
 - Data and camera readouts: platform monospaced face with tabular numerals.
+- Page heading: a single per-screen page-level title above the block-title
+  step (block title ≈ 18pt; page heading ≈ 26pt). It is a text title, distinct
+  from the display step reserved for large numerals/readouts.
 - Maximum five text sizes per screen. Body text is never below the platform's
   accessible default.
 
@@ -356,6 +366,11 @@ rather than exposing one undifferentiated list of camera properties:
   mistaken for a permanent capability limit.
 - Photo capture uses cobalt; active video capture uses signal red. Text and icons
   remain white or platform-high-contrast against the dark overlay.
+- The full-screen immersive overlay is part of the fixed-dark family defined
+  under Theme (fig1/fig2 exception): it is an edge-to-edge live-image surface
+  whose controls use compact dark translucent surfaces or native material, and
+  it never switches with the system appearance. Preview wells and the
+  immersive overlay therefore stay graphite in every appearance.
 - Every visible control performs a real action. Unsupported camera functions are
   omitted or visibly disabled with a reason.
 - The reference-derived composition is 帧澈 ZENCHE chrome, not a reproduction of

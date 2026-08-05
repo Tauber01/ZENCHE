@@ -196,14 +196,14 @@ struct SettingsSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("设置")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: TypeScale.heading, weight: .bold))
                     HStack(spacing: 4) {
                         Text("帧澈 ZENCHE")
                         Text(updater.currentVersion)
                     }
                     .foregroundStyle(SettingsPalette.muted)
                     RuntimeLocalizedText("通用、拍摄辅助、更新、诊断与支持。")
-                        .font(.system(size: 12))
+                        .font(.system(size: TypeScale.body))
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
@@ -247,9 +247,9 @@ struct SettingsSheet: View {
                     settingIcon("circle.lefthalf.filled", color: SettingsPalette.cobalt)
                     VStack(alignment: .leading, spacing: 5) {
                         RuntimeLocalizedText("外观")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         RuntimeLocalizedText("选择界面主题。跟随系统会随 macOS 明暗外观自动切换；实时画面区在任一主题下都保持石墨黑以保证取景判断。")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -274,9 +274,9 @@ struct SettingsSheet: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         RuntimeLocalizedText("拍摄辅助")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         RuntimeLocalizedText("蓝牙遥控与拍摄定位")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                     }
                 }
@@ -286,16 +286,16 @@ struct SettingsSheet: View {
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
                         RuntimeLocalizedText("蓝牙遥控拍摄")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         RuntimeLocalizedText(bluetoothRemote.status)
-                            .font(.system(size: 12))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(
                                 bluetoothRemote.connected
                                     ? SettingsPalette.positive
                                     : SettingsPalette.muted
                             )
                         RuntimeLocalizedText("兼容 ZENCHE BLE Remote 服务；遥控器发出快门通知后，将触发当前已连接相机。")
-                            .font(.system(size: 11))
+                            .font(.system(size: TypeScale.caption))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -313,12 +313,12 @@ struct SettingsSheet: View {
                 HStack(alignment: .top, spacing: 14) {
                     VStack(alignment: .leading, spacing: 4) {
                         RuntimeLocalizedText("拍摄位置")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         RuntimeLocalizedText(locationTagging.status)
-                            .font(.system(size: 12))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                         RuntimeLocalizedText("仅在应用使用期间定位；下载的照片会生成包含 GPS 信息的标准 XMP 旁车文件。")
-                            .font(.system(size: 11))
+                            .font(.system(size: TypeScale.caption))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -337,9 +337,9 @@ struct SettingsSheet: View {
                     settingIcon("arrow.triangle.2.circlepath", color: SettingsPalette.cobalt)
                     VStack(alignment: .leading, spacing: 5) {
                         Text("自动更新")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         Text("启动时优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -361,7 +361,7 @@ struct SettingsSheet: View {
                     )
                     .textFieldStyle(.roundedBorder)
                     Text("CDK 保存在系统钥匙串中，不会写入诊断日志。")
-                        .font(.system(size: 11))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(SettingsPalette.muted)
                     Spacer()
                     actionButton("打开 Mirror酱") {
@@ -374,12 +374,12 @@ struct SettingsSheet: View {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
                         RuntimeLocalizedText(updater.statusText)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: TypeScale.body, weight: .semibold))
                         HStack(spacing: 4) {
                             Text("当前版本")
                             Text(updater.currentVersion)
                         }
-                            .font(.system(size: 12))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                     }
                     Spacer()
@@ -412,13 +412,13 @@ struct SettingsSheet: View {
                     )
                     VStack(alignment: .leading, spacing: 5) {
                         Text("诊断日志")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         Text("记录相机连接、USB/PTP 命令、实时取景重试及错误详情，默认保留 14 天。")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("~/Library/Logs/帧澈 ZENCHE")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(.system(size: TypeScale.caption, design: .monospaced))
                             .foregroundStyle(SettingsPalette.muted)
                     }
                     Spacer()
@@ -428,7 +428,7 @@ struct SettingsSheet: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("导出和提交前会自动隐藏相机序列号和用户名路径；在 GitHub 确认后才会提交。")
-                        .font(.system(size: 12))
+                        .font(.system(size: TypeScale.body))
                         .foregroundStyle(SettingsPalette.muted)
                     HStack(spacing: 10) {
                         Spacer()
@@ -453,12 +453,12 @@ struct SettingsSheet: View {
                 HStack(alignment: .top, spacing: 14) {
                     settingIcon("key.fill", color: SettingsPalette.cobalt)
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("AI 功能激活").font(.system(size: 16, weight: .bold))
+                        Text("AI 功能激活").font(.system(size: TypeScale.title, weight: .bold))
                         Text("AI 修图与生图功能需购买激活码解锁。每个激活码可使用 100 次，绑定当前设备。")
-                            .font(.system(size: 13)).foregroundStyle(SettingsPalette.muted).fixedSize(horizontal: false, vertical: true)
+                            .font(.system(size: TypeScale.body)).foregroundStyle(SettingsPalette.muted).fixedSize(horizontal: false, vertical: true)
                         if ActivationManager.isActivated {
                             Text("状态：已激活 ✓ · 剩余 \(ActivationManager.remainingUsage) 次")
-                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(Color.green)
+                                .font(.system(size: TypeScale.body, weight: .semibold)).foregroundStyle(Color.green)
                         }
                     }
                     Spacer()
@@ -469,19 +469,19 @@ struct SettingsSheet: View {
                         NSWorkspace.shared.open(zencheWebsiteURL)
                     } label: {
                         Label("前往官网兑换密钥", systemImage: "globe")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: TypeScale.body, weight: .semibold))
                             .frame(maxWidth: .infinity)
                             .frame(height: 38)
                     }
                     .buttonStyle(.borderedProminent)
 
                     Text("复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。")
-                        .font(.system(size: 11))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(SettingsPalette.muted)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text("没有兑换码？在爱发电购买兑换码")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: TypeScale.body, weight: .semibold))
 
                     if let url = Bundle.main.url(
                         forResource: "wechat-donation",
@@ -510,13 +510,13 @@ struct SettingsSheet: View {
                     }
 
                     Text("兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。")
-                        .font(.system(size: 10))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
-                        Text("我的设备 ID").font(.system(size: 12, weight: .semibold))
+                        Text("我的设备 ID").font(.system(size: TypeScale.body, weight: .semibold))
                         Spacer()
                         Button("复制") {
                             NSPasteboard.general.clearContents()
@@ -524,25 +524,25 @@ struct SettingsSheet: View {
                             activationStatus = "设备 ID 已复制，可前往官网兑换密钥"
                         }
                         .buttonStyle(.plain)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: TypeScale.caption, weight: .semibold))
                         .foregroundStyle(SettingsPalette.cobalt)
                     }
                     Text(ActivationManager.deviceId)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: TypeScale.caption, design: .monospaced))
                         .foregroundStyle(SettingsPalette.muted)
                         .textSelection(.enabled)
                     Text("每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。")
-                        .font(.system(size: 10))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("激活码").font(.system(size: 12, weight: .semibold))
+                    Text("激活码").font(.system(size: TypeScale.body, weight: .semibold))
                     TextField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
                 }
                 HStack(spacing: 10) {
                     Spacer()
-                    if !activationStatus.isEmpty { Text(activationStatus).font(.system(size: 11)).foregroundStyle(SettingsPalette.muted) }
+                    if !activationStatus.isEmpty { Text(activationStatus).font(.system(size: TypeScale.caption)).foregroundStyle(SettingsPalette.muted) }
                     actionButton("购买激活码") { NSWorkspace.shared.open(URL(string: "https://www.ifdian.net/a/Tauber")!) }
                     actionButton("激活", primary: true) {
                         let c = activationCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -554,13 +554,13 @@ struct SettingsSheet: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("恢复设备码")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: TypeScale.body, weight: .semibold))
                     TextField("旧设备 ID", text: $oldDeviceId)
                         .textFieldStyle(.roundedBorder)
                     SecureField("旧激活码", text: $oldActivationCode)
                         .textFieldStyle(.roundedBorder)
                     Text("恢复成功后，AI 权益和剩余次数将迁移到当前设备；旧设备绑定会永久失效。")
-                        .font(.system(size: 10))
+                        .font(.system(size: TypeScale.caption))
                         .foregroundStyle(SettingsPalette.muted)
                         .fixedSize(horizontal: false, vertical: true)
                     actionButton(
@@ -582,9 +582,9 @@ struct SettingsSheet: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text("喜欢 帧澈 ZENCHE？")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                         Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                     }
                     Spacer()
@@ -592,7 +592,7 @@ struct SettingsSheet: View {
                         showDonation = true
                     } label: {
                         Label("请作者喝奶茶", systemImage: "heart.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: TypeScale.body, weight: .bold))
                             .foregroundStyle(Color.white)
                             .padding(.horizontal, 16)
                             .frame(height: 38)
@@ -610,7 +610,7 @@ struct SettingsSheet: View {
                 .buttonStyle(.link)
                 Spacer()
                 Text("更新包仅从 github.com/Tauber01/ZENCHE 获取")
-                    .font(.system(size: 11))
+                    .font(.system(size: TypeScale.caption))
                     .foregroundStyle(SettingsPalette.muted)
             }
             }
@@ -697,7 +697,7 @@ struct SettingsSheet: View {
             themeRaw = mode.rawValue
         } label: {
             RuntimeLocalizedText(mode.displayName)
-                .font(.system(size: 12, weight: selected ? .bold : .medium))
+                .font(.system(size: TypeScale.body, weight: selected ? .bold : .medium))
                 .foregroundStyle(
                     selected ? SettingsPalette.cobalt : SettingsPalette.muted
                 )
@@ -731,7 +731,7 @@ struct SettingsSheet: View {
         soft: Color = SettingsPalette.cobaltSoft
     ) -> some View {
         Image(systemName: name)
-            .font(.system(size: 19, weight: .semibold))
+            .font(.system(size: 19, weight: .semibold)) // 图标尺寸，不受 TypeScale 约束
             .foregroundStyle(color)
             .frame(width: 42, height: 42)
             .background(soft)
@@ -744,7 +744,7 @@ struct SettingsSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(LocalizedStringKey(title), action: action)
-            .font(.system(size: 13, weight: .semibold))
+            .font(.system(size: TypeScale.body, weight: .semibold))
             .foregroundStyle(primary ? Color.white : SettingsPalette.ink)
             .padding(.horizontal, 14)
             .frame(height: 36)
@@ -819,7 +819,7 @@ private struct DiagnosticLogViewer: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("诊断日志查询")
-                        .font(.system(size: 23, weight: .bold))
+                        .font(.system(size: TypeScale.title, weight: .bold))
                     Text("显示近期脱敏日志；刷新可读取最新记录。")
                         .foregroundStyle(SettingsPalette.muted)
                 }
@@ -834,7 +834,7 @@ private struct DiagnosticLogViewer: View {
 
             ScrollView([.horizontal, .vertical]) {
                 Text(logText)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: TypeScale.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(14)
@@ -853,7 +853,7 @@ private struct FastFeedbackCallout: View {
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             Image(systemName: "bolt.horizontal.circle.fill")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 22, weight: .semibold)) // 图标尺寸，不受 TypeScale 约束
                 .foregroundStyle(SettingsPalette.cobalt)
                 .frame(width: 42, height: 42)
                 .background(SettingsPalette.cobaltSoft)
@@ -861,13 +861,13 @@ private struct FastFeedbackCallout: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("快速问题反馈")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: TypeScale.emphasis, weight: .bold))
                 Text("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。")
-                    .font(.system(size: 12))
+                    .font(.system(size: TypeScale.body))
                     .foregroundStyle(SettingsPalette.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("官方 QQ 群：165315727")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
                     .foregroundStyle(SettingsPalette.cobalt)
                     .textSelection(.enabled)
             }
@@ -902,14 +902,14 @@ private struct DonationSheet: View {
             HStack {
                 HStack(spacing: 12) {
                     Image(systemName: "heart.fill")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 20, weight: .bold)) // 图标尺寸，不受 TypeScale 约束
                         .foregroundStyle(SettingsPalette.cobalt)
                         .frame(width: 44, height: 44)
                         .background(SettingsPalette.cobaltSoft)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("爱发电赞助")
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: TypeScale.display, weight: .bold))
                         Text("扫描二维码，或打开爱发电主页支持项目。")
                             .foregroundStyle(SettingsPalette.muted)
                     }
@@ -942,7 +942,7 @@ private struct DonationSheet: View {
             }
 
             Text("赞助不会解锁软件功能，也不影响公开 Issue 的处理。")
-                .font(.system(size: 11))
+                .font(.system(size: TypeScale.caption))
                 .foregroundStyle(SettingsPalette.muted)
         }
         .padding(24)
@@ -971,12 +971,12 @@ struct LaunchAnnouncementSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("更新公告")
-                        .font(.system(size: 26, weight: .bold))
+                        .font(.system(size: TypeScale.heading, weight: .bold))
                     HStack(spacing: 4) {
                         Text("当前版本")
                         Text(version)
                     }
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.system(size: TypeScale.body, design: .monospaced))
                     .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
@@ -992,7 +992,7 @@ struct LaunchAnnouncementSheet: View {
                         color: SettingsPalette.cobalt
                     ) {
                         RuntimeLocalizedText("• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。")
-                            .font(.system(size: 14))
+                            .font(.system(size: TypeScale.body))
                             .lineSpacing(5)
                     }
 
@@ -1002,7 +1002,7 @@ struct LaunchAnnouncementSheet: View {
                         color: .red
                     ) {
                         Text("帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”或要求付费购买软件的人都是骗子，请勿转账。")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: TypeScale.body, weight: .semibold))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .background(Color.red.opacity(0.08))
@@ -1010,10 +1010,10 @@ struct LaunchAnnouncementSheet: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         Label("爱发电赞助", systemImage: "heart.fill")
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(size: TypeScale.title, weight: .bold))
                             .foregroundStyle(SettingsPalette.cobalt)
                         Text("如果本项目对你有帮助，欢迎自愿打赏；软件功能永久免费。")
-                            .font(.system(size: 13))
+                            .font(.system(size: TypeScale.body))
                             .foregroundStyle(SettingsPalette.muted)
                         FastFeedbackCallout {
                             NSWorkspace.shared.open(afdianURL)
@@ -1056,7 +1056,7 @@ struct LaunchAnnouncementSheet: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: TypeScale.title, weight: .bold))
                 .foregroundStyle(color)
             content()
         }

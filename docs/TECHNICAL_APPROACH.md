@@ -55,6 +55,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 当前代码候选固定于 `846e1a0dc49c59b0cc5d032d84f954a98a61add0`，发布提交为 `697f3f8d1028426dc5eec430230dcf48754f9b15`（仅含 README/CHANGELOG 发布信息同步）；完整 `npm test` 256/256 通过，七个版本化交付包及同名 `.sha256` 已生成并回验。Android 为 Debug 证书，HarmonyOS/iOS 未签名，macOS ad-hoc 且未公证，Windows 无 Authenticode 并仍需真实 Windows 主机验收。源码 ZIP 固定于代码提交，包内发布文档是打包前快照；Windows PE 资源记录 `1.5.3`/`1.5.3.0`，未单独编码跨端候选号 `build 28`。完整文件名、字节数和 SHA-256 以 `docs/releases/v1.5.3.md` 为准。
 - v1.5.3 已于 2026-08-04T07:43:34Z 发布为 [GitHub Latest](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，注释标签解析到发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`。Release 为非草稿、非预发布，共 14 个附件；七个交付包和七份 `.sha256` 的线上字节数及 GitHub SHA-256 摘要已与本地逐项比对，14/14 一致、零差异。GitHub stable 标识不能替代正式证书签名、商店分发、Windows 主机验证或五端实机验收。
 
+## 0.5. 1.5.7 F1 macOS 基准自修约定（TypeScale 收敛）
+
+- TypeScale 新增页面标题档 `heading ≈ 26pt`（文字页面标题，与 `display 24` 大数字/读数档语义互补）；任一页面仍只用 ≤5 档（页面标题与正文/标签/读数组合不同屏超 5 档）。design.md Typography 已同步该档说明。
+- macOS 端字号字面量归 TypeScale：main.swift 正文/标签一律归 TypeScale 5 档（caption 11 / body 12 / emphasis 15 / title 18 / display 24）+ heading 26；图标尺寸（SF Symbols 17-46pt）与专属读数（曝光参数 28、存储读数 25、Splash Z 字标 42）保留原值并在代码注释声明「不受 TypeScale 约束」。
+- SettingsSheet 原 13 档字号（10/11/12/13/14/16/17/19/20/22/23/24/26）收敛为 TypeScale 档；其中卡片标题 16→title 18、子项标题 14→emphasis 15、卡片描述/按钮文字 13→body 12、辅助说明 10/11→caption 11、面板主标题 26→heading 26、面板标题 17/20/23/24→title/display；仅 3 处图标尺寸（19/20/22）保留原值并注释。
+- 曝光参数卡自动徽标由单字母「A」改为完整「AUTO」字面（对齐 iOS 口径），圆徽标改 Capsule；「选择预设」按钮暗色 tint 由 readoutGlow 改回 cobalt（readoutGlow 仅用于曝光读数，design.md 色板条款）。
+- design.md 增补恒深例外条款：fig1 控制面与 fig2 编辑器工作台为恒深页（不随系统外观切换），是「每页双外观」条款的文档化例外；沉浸全屏 overlay 同属恒深例外族，预览井与沉浸 overlay 任何外观下保持石墨。此三处为 v1.5.6 终审遗留文档债的收口。
+- 本批仅动 macOS 端与 design.md/docs 三件套；数据契约与四端渲染层零改动。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。
