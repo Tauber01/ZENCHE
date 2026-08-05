@@ -1,0 +1,20 @@
+{
+  "color": [
+    { "name": "paper", "value": "#131519" },
+    { "name": "paper_2", "value": "#23272E" },
+    { "name": "paper_3", "value": "#1B1E24" },
+    { "name": "surface", "value": "#1B1E24" },
+    { "name": "surface_raised", "value": "#23272E" },
+    { "name": "rule", "value": "#1FFFFFFF" },
+    { "name": "rule_strong", "value": "#33FFFFFF" },
+    { "name": "neutral", "value": "#8E97A3" },
+    { "name": "muted", "value": "#9AA1AD" },
+    { "name": "ink_2", "value": "#C3CBD6" },
+    { "name": "ink", "value": "#ECEEF2" },
+    { "name": "accent", "value": "#2E86E0" },
+    { "name": "accent_soft", "value": "#14293E" },
+    { "name": "video", "value": "#FF5257" },
+    { "name": "video_soft", "value": "#3A1B1E" },
+    { "name": "positive", "value": "#35C97B" }
+  ]
+}
