@@ -2881,12 +2881,13 @@ public final class MainActivity extends Activity {
                 dp(compact ? 5 : 7));
         navigation.setBackgroundColor(UI_BG);
         navigation.setElevation(0);
-        // v1.5.5 fig1 tab bar: 单机 / 群组 / 已下载 / 设置. The editor stays
-        // reachable from the library (open a photo) and the video monitor from
-        // the control page's viewfinder button; routing is unchanged.
-        navigation.addView(navButton("单机", "capture"));
-        navigation.addView(navButton("群组", "devices"));
-        navigation.addView(navButton("已下载", "library"));
+        // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
+        // 紧凑底栏提回编辑与视频为一级 tab，设置齿轮保持现状。
+        navigation.addView(navButton("拍照", "capture"));
+        navigation.addView(navButton("视频", "monitor"));
+        navigation.addView(navButton("编辑", "editor"));
+        navigation.addView(navButton("我的设备", "devices"));
+        navigation.addView(navButton("分支", "library"));
         navigation.addView(navButton("设置", "settings"));
         return navigation;
     }
@@ -2905,6 +2906,9 @@ public final class MainActivity extends Activity {
                 break;
             case "settings":
                 iconResource = R.drawable.ic_settings_gear;
+                break;
+            case "monitor":
+                iconResource = R.drawable.ic_nav_video;
                 break;
             case "devices":
                 iconResource = R.drawable.ic_nav_camera;

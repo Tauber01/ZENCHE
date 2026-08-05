@@ -1736,11 +1736,12 @@ struct Index {
         .fontColor($r('app.color.muted'))
         .width('100%')
         .margin({ bottom: 8 })
-      this.NavButton('照片拍摄', 'capture')
-      this.NavButton('视频监看', 'monitor')
-      this.NavButton('图像编辑', 'editor')
+      // v1.5.7 F6（Tauber 拍板）：五端一级导航统一短词 拍照/视频/编辑/我的设备/分支
+      this.NavButton('拍照', 'capture')
+      this.NavButton('视频', 'monitor')
+      this.NavButton('编辑', 'editor')
       this.NavButton('我的设备', 'devices')
-      this.NavButton('分支文件库', 'library')
+      this.NavButton('分支', 'library')
       Blank()
       Text('ZENCHE 1.5.3')
         .fontSize(EDITOR_FS_SMALL)
@@ -1760,12 +1761,13 @@ struct Index {
   @Builder
   private CompactBottomNavigation() {
     Row() {
-      // v1.5.5 fig1 tab bar: 单机 / 群组 / 已下载 / 设置. The editor stays
-      // reachable from the control-page menu and the desktop navigation rail;
-      // the video monitor from the control page's viewfinder button.
-      this.NavButton('单机', 'capture')
-      this.NavButton('群组', 'devices')
-      this.NavButton('已下载', 'library')
+      // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
+      // 紧凑底栏提回编辑与视频为一级 tab，设置保持现状。
+      this.NavButton('拍照', 'capture')
+      this.NavButton('视频', 'monitor')
+      this.NavButton('编辑', 'editor')
+      this.NavButton('我的设备', 'devices')
+      this.NavButton('分支', 'library')
       this.NavButton('设置', 'settings')
     }
     .width('100%')
@@ -1781,7 +1783,7 @@ struct Index {
   @Builder
   private NavButton(label: string, target: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
-      .width(this.isCompact() ? '25%' : '100%')
+      .width(this.isCompact() ? '16%' : '100%')
       .height(this.isCompact() ? 52 : 44)
       .fontSize(this.isCompact() ? 11 : 14)
       .fontWeight(

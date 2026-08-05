@@ -81,11 +81,11 @@ test('the iOS shell follows the in-app locale for navigation and monitor state',
   const ios = await read('native/ios/NikonLink/Views/RootView.swift');
 
   assert.match(ios, /private struct SideNavigation[\s\S]{0,2400}RuntimeLocalizedText\(section\.rawValue\)/);
-  // v1.5.5 fig1: compact primary nav aligns to 单机/群组/已下载/设置; editing
-  // stays reachable via the library and the control top-bar menu.
+  // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
+  // 紧凑底栏提回编辑与视频为一级 tab。
   assert.match(ios, /private struct BottomNavigation[\s\S]*?RuntimeLocalizedText\(title\)/);
-  assert.match(ios, /navTab\(\.capture, title: "单机"\)/);
-  assert.match(ios, /navTab\(\.library, title: "已下载"\)/);
+  assert.match(ios, /navTab\(\.capture, title: "拍照"\)/);
+  assert.match(ios, /navTab\(\.library, title: "分支"\)/);
   assert.doesNotMatch(ios, /section == \.library\s*\?\s*"分支"/);
   assert.match(
     ios,

@@ -570,12 +570,13 @@ private struct BottomNavigation: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            // v1.5.5 fig1: compact primary nav aligns with Android/Harmony —
-            // 单机/群组/已下载/设置. 视频 and 编辑 stay reachable through the
-            // control top-bar menu, and 编辑 additionally through the library.
-            navTab(.capture, title: "单机")
-            navTab(.devices, title: "群组")
-            navTab(.library, title: "已下载")
+            // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
+            // 紧凑底栏提回编辑与视频为一级 tab，设置齿轮保持现状。
+            navTab(.capture, title: "拍照")
+            navTab(.monitor, title: "视频")
+            navTab(.editor, title: "编辑")
+            navTab(.devices, title: "我的设备")
+            navTab(.library, title: "分支")
             settingsTab()
         }
         .padding(.horizontal, 8)
@@ -4180,7 +4181,7 @@ private struct ControlTopBar: View {
                 Button {
                     model.section = .library
                 } label: {
-                    Label("文件", systemImage: AppSection.library.icon)
+                    Label("分支", systemImage: AppSection.library.icon)
                 }
             } label: {
                 controlBarButton("line.3.horizontal")
@@ -4669,7 +4670,7 @@ private struct ControlCaptureDock: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text("文件"))
+        .accessibilityLabel(Text("分支"))
     }
 
     private var afOnButton: some View {

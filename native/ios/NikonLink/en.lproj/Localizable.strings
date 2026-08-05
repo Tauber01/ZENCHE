@@ -8,9 +8,11 @@
 "创作" = "Create";
 "管理" = "Manage";
 "照片" = "Photos";
+"分支" = "Library";
 "视频" = "Video";
 "文件" = "Files";
 "照片拍摄" = "Photo Capture";
+"拍照" = "Capture";
 "视频监看" = "Video Monitor";
 "工作区" = "Workspace";
 "连接相机" = "Connect Camera";
@@ -834,5 +836,3 @@
 "镜头" = "Lens";
 "存储" = "Storage";
 "格式" = "Format";
-"单机" = "Single";
-"群组" = "Group";

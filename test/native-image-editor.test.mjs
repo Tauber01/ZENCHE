@@ -19,13 +19,12 @@ test("all native targets expose image editing in primary navigation", async () =
 
   assert.match(iosModel, /case editor = "编辑"/);
   assert.match(iosView, /case \.editor:[\s\S]*ImageEditorPage/);
-  // v1.5.5 fig1: Android primary nav is 单机/群组/已下载/设置; editing stays
-  // reachable via the library and the editor route (no dedicated primary tab).
-  assert.doesNotMatch(android, /navButton\("编辑", "editor"\)/);
-  assert.match(android, /navButton\("单机", "capture"\)/);
-  assert.match(android, /navButton\("已下载", "library"\)/);
+  // v1.5.7 F6（Tauber 拍板）：Android 底栏提回编辑为一级 tab；五端统一短词。
+  assert.match(android, /navButton\("拍照", "capture"\)/);
+  assert.match(android, /navButton\("编辑", "editor"\)/);
+  assert.match(android, /navButton\("分支", "library"\)/);
   assert.match(android, /case "editor":[\s\S]*buildImageEditorView/);
-  assert.match(harmony, /NavButton\('图像编辑', 'editor'\)/);
+  assert.match(harmony, /NavButton\('编辑', 'editor'\)/);
   assert.match(harmony, /this\.ImageEditorWorkspace\(\)/);
   assert.match(macos, /case editor = "编辑"/);
   assert.match(macos, /case \.editor:[\s\S]*ImageEditorView/);

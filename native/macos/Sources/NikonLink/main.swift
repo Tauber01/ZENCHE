@@ -2199,7 +2199,7 @@ private struct PhotoRecord: Identifiable, Hashable {
 }
 
 private enum AppSection: String, CaseIterable, Identifiable {
-    case capture = "照片"
+    case capture = "拍照"
     case monitor = "视频"
     case editor = "编辑"
     case devices = "我的设备"
@@ -10567,7 +10567,7 @@ private struct ImageEditorView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 5) {
                 ForEach(EditorAdjustmentSection.allCases) { section in
-                    Button(section.rawValue) {
+                    Button(LocalizedStringKey(section.rawValue)) {
                         selectedSection = section
                     }
                     .buttonStyle(
