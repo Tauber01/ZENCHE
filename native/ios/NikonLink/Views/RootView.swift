@@ -4243,7 +4243,7 @@ private struct ControlStatusRow: View {
                         .font(.system(size: FontToken.body, weight: .semibold))
                         .foregroundStyle(capsuleTint)
                         .padding(.horizontal, 12)
-                        .frame(height: 28)
+                        .frame(height: 44)
                         .background(capsuleTint.opacity(0.14), in: Capsule())
                         .overlay {
                             Capsule()
@@ -4534,7 +4534,7 @@ private struct ControlParameterGrid: View {
                 .font(.system(size: FontToken.body, weight: .semibold))
                 .foregroundStyle(active ? Color.black : Color.white)
                 .padding(.horizontal, 14)
-                .frame(height: 30)
+                .frame(height: 44)
                 .background(
                     active ? IPalette.uiAccent : IPalette.uiSecondary,
                     in: Capsule()
@@ -4667,7 +4667,7 @@ private struct ControlCaptureDock: View {
                         : IPalette.uiLabel
                 )
                 .padding(.horizontal, 14)
-                .frame(height: 40)
+                .frame(height: 44)
                 .overlay {
                     Capsule()
                         .stroke(
@@ -4712,7 +4712,7 @@ private struct ControlCaptureDock: View {
             }
             .foregroundStyle(IPalette.uiAccent)
             .padding(.horizontal, 12)
-            .frame(height: 40)
+            .frame(height: 44)
             .overlay {
                 Capsule()
                     .stroke(IPalette.uiAccent, lineWidth: 1.5)
@@ -4822,7 +4822,7 @@ private struct CameraStage: View {
                     Label("全屏", systemImage: "arrow.up.left.and.arrow.down.right")
                         .labelStyle(.iconOnly)
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(IPalette.hudBg)
@@ -6263,7 +6263,7 @@ private struct MonitorConsolePage: View {
             Button { showingFullscreen = true } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 13, weight: .bold))
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
                     .foregroundStyle(IPalette.whiteMid)
                     .background(IPalette.hudBgMid, in: Circle())
             }
@@ -6871,7 +6871,7 @@ private struct ConsoleToolButton: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: FontToken.display, weight: .light))
-                    .frame(width: 44, height: 38)
+                    .frame(width: 44, height: 44)
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(active ? IPalette.cobalt : IPalette.whiteLo)
@@ -8533,7 +8533,11 @@ private struct SystemAlbumThumbnail: View {
                 .lineLimit(1)
         }
         .padding(7)
-        .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: 15))
+        .background(IPalette.surfaceRaised, in: RoundedRectangle(cornerRadius: 15))
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(IPalette.rule, lineWidth: 1)
+        )
         .task(id: item.id) {
             PHImageManager.default().requestImage(
                 for: item.asset,
@@ -8816,11 +8820,11 @@ private struct LibraryThumbnail: View {
         .padding(7)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(selected ? Color.accentColor.opacity(0.16) : IPalette.whiteWash)
+                .fill(selected ? Color.accentColor.opacity(0.16) : IPalette.surfaceRaised)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 15)
-                .stroke(selected ? Color.accentColor : .clear, lineWidth: 1.5)
+                .stroke(selected ? Color.accentColor : IPalette.rule, lineWidth: 1.5)
         )
     }
 }
@@ -9429,7 +9433,7 @@ private struct UpdateSettingsCard: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .padding(.horizontal, 12)
-                .frame(height: 42)
+                .frame(height: 44)
                 .background(IPalette.paper)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -9866,8 +9870,12 @@ private struct ConnectionOption: View {
             }
             .padding(16)
             .background(
-                selected ? Color.green.opacity(0.08) : IPalette.whiteWash,
+                selected ? Color.green.opacity(0.08) : IPalette.surfaceRaised,
                 in: RoundedRectangle(cornerRadius: 16)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(IPalette.rule, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
