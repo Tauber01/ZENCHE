@@ -627,3 +627,22 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - ZENCHE-1.5.7-macOS-arm64.dmg（三 SDK env：NIKON_IMAGE_SDK_ZIP/NIKON_REMOTE_SDK_ZIP/SONY_CRSDK_MAC_ZIP 指向 ~/Documents/NikonLink/）
   - ZENCHE-1.5.7-Windows-x64-Setup.exe + ZENCHE-1.5.7-Windows-x64.zip（NSIS Setup，LANG=en_US.UTF-8）
 - 构建验证：macOS DMG/iOS BUILD SUCCEEDED/Android assembleDebug SUCCESSFUL/Harmony assembleHap SUCCESSFUL（未签名）/Windows dotnet publish 0 错误 + NSIS 成功。
+
+## 12.22 v1.5.7 移动端拍照页五项改动（2026-08-06，Tauber 19:14 指令 + kimi 19:24 派工）
+
+- 批次：仅 iOS/Android/Harmony 三端，macOS/Windows 不动；分支 `agent/1.5.7-capture-mobile`（worktree REPOS/ZENCHE-wt-1.5.7-capture-mobile），基线 `b417b8e`（build 31 打包记录后）。
+- **① 快门键上移**：三端参数网格与快门 dock 顺序交换（iOS RootView.swift ControlCaptureDock 前置 ControlParameterGrid；Android buildControlCaptureDock 前置 buildControlParameterGrid；Harmony ControlCaptureDock 前置 ControlParameterGrid）。
+- **② 「编辑」toggle**：Android MainActivity.java:3431 与 Harmony Index.ets:4710 单向 `gridEditMode = true` 修为 `!gridEditMode`（对齐 iOS RootView.swift:4522 现有 toggle）；恢复被隐藏磁贴入口由既有「全部」按钮承担（`gridEditMode=false` + 清空隐藏数组，三端一致，同 iOS 语义）。
+- **③④ 底栏 6tab→4tab + ⋯ 气泡弹窗**：
+  - 底栏删「我的设备」「设置」（三端），剩 拍照/视频/编辑/分支；iOS 宽屏 SideNavigation「我的设备」保留（派工明示）。
+  - iOS ⋯ 已为 SwiftUI Menu，加「我的设备」项（导航 .devices），设置项保留（gearshape 图标）。
+  - Android 新写 `showControlBubbleMenu(anchor)`（PopupMenu，锚 ⋯ 按钮，深色控制栏风格），6 项：连接/断开相机、视频监看、编辑、设备、文件库、设置；抽 `handleControlMenuTarget(String)` 与 ☰ 对话框共用（原对话框内联逻辑去重）。新增 import Menu/MenuItem/PopupMenu。
+  - Harmony ⋯ 改 ArkUI 原生 `bindMenu`（6 项同 Android），抽 `handleControlMenuTarget` 与 ☰ 共用（原 showControlMenuDialog 内联分支去重）。
+  - 齿轮图标用法保全：iOS Menu 设置项 gearshape / Android ic_settings_gear（navButton 图标 switch + 顶栏设置按钮）/ Harmony ⚙（顶栏）——localization.test.mjs 齿轮断言三端仍过。
+- **⑤ 拍照页恢复 RGB 波形监看**（紧凑三色叠加条，无音频无录制钮，位置在快门 dock 下方）：
+  - iOS 新增 `CaptureScopeBar`（复用 ScopePlot/ScopeTrace，parade=false，height 78，immersiveScopeDock 样式语言）；数据源 CameraService 已发 RGB histogram。
+  - Android 新增 `captureScopeView`（WaveformScopeView.RGB_PARADE，height 78）；帧分析拓宽 `scopeAnalysis = packet.monitoring || capture 页`，capture 页跑 processPreview 更新直方图但显示仍用原图（showProcessedPreview 以 monitoring 判定，对齐 iOS captureOutput 语义）。
+  - Harmony 新增 `captureRgbScopeContext` + capture 分支 Canvas（height 78）+ `drawCaptureRgbScope()`（复用 drawScopePanel，RGB 叠加 parade=false）；`displayJpeg` 分析门控拓宽：新增 `scopeWanted`（monitor/capture/immersiveMonitoring），capture 页也更新直方图并 drawCaptureRgbScope，但 `pixelMap` 保持 `sourceMap`（仅 monitor/云预设用处理图；processProfessionalMonitor 无视觉处理时本就返回 source，语义同 Android）。
+- 测试：npm test 256/256 全绿（localization 齿轮断言 / native-global-status navTab 断言 / native-image-editor / native-waveform-scopes 均未动、仍过）。
+- 构建：iOS xcodebuild **BUILD SUCCEEDED**（unsigned IPA，44s）；Android **BUILD SUCCESSFUL** assembleDebug（12s，ANDROID_HOME=~/Library/Android/sdk 直跑 gradle，未走会重建 assets 的 build-android.sh）；Harmony **BUILD SUCCESSFUL** assembleHap（10.6s，未签名预期）；`git diff --check` 干净。
+- 说明：② 的「恢复被隐藏磁贴入口」未另做独立按钮，由既有「全部」复位承担（与 iOS 行为一致）；如需独立「恢复」入口待 pro 复审意见。
