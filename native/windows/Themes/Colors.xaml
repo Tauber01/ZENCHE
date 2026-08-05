@@ -76,77 +76,122 @@
   <Color x:Key="ColorWheelGamma">#C68CFF</Color>
   <Color x:Key="ColorWheelGain">#FFD36A</Color>
 
-  <SolidColorBrush x:Key="PaperBrush" Color="{StaticResource ColorPaper}" />
-  <SolidColorBrush x:Key="Paper2Brush" Color="{StaticResource ColorPaper2}" />
-  <SolidColorBrush x:Key="Paper3Brush" Color="{StaticResource ColorPaper3}" />
-  <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource ColorSurface}" />
-  <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{StaticResource ColorSurfaceRaised}" />
-  <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource ColorSidebar}" />
-  <SolidColorBrush x:Key="RuleBrush" Color="{StaticResource ColorRule}" />
-  <SolidColorBrush x:Key="RuleStrongBrush" Color="{StaticResource ColorRuleStrong}" />
-  <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource ColorNeutral}" />
-  <SolidColorBrush x:Key="MutedBrush" Color="{StaticResource ColorMuted}" />
-  <SolidColorBrush x:Key="Ink2Brush" Color="{StaticResource ColorInk2}" />
-  <SolidColorBrush x:Key="InkBrush" Color="{StaticResource ColorInk}" />
-  <SolidColorBrush x:Key="FocusBrush" Color="{StaticResource ColorFocus}" />
-  <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource ColorAccent}" />
-  <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource ColorAccentSoft}" />
-  <SolidColorBrush x:Key="AccentInkBrush" Color="{StaticResource ColorAccentInk}" />
-  <SolidColorBrush x:Key="VideoBrush" Color="{StaticResource ColorVideo}" />
-  <SolidColorBrush x:Key="VideoSoftBrush" Color="{StaticResource ColorVideoSoft}" />
-  <SolidColorBrush x:Key="PositiveBrush" Color="{StaticResource ColorPositive}" />
-  <SolidColorBrush x:Key="ReadoutGlowBrush" Color="{StaticResource ColorReadoutGlow}" />
-  <SolidColorBrush x:Key="GraphiteBrush" Color="{StaticResource ColorGraphite}" />
-  <SolidColorBrush x:Key="Graphite2Brush" Color="{StaticResource ColorGraphite2}" />
-  <SolidColorBrush x:Key="GraphiteRuleBrush" Color="{StaticResource ColorGraphiteRule}" />
-  <SolidColorBrush x:Key="GraphiteMutedBrush" Color="{StaticResource ColorGraphiteMuted}" />
-  <SolidColorBrush x:Key="GraphiteInkBrush" Color="{StaticResource ColorGraphiteInk}" />
-  <SolidColorBrush x:Key="UiCardBrush" Color="{StaticResource ColorUiCard}" />
-  <SolidColorBrush x:Key="UiSecondaryBrush" Color="{StaticResource ColorUiSecondary}" />
-  <SolidColorBrush x:Key="UiLabelBrush" Color="{StaticResource ColorUiLabel}" />
-  <SolidColorBrush x:Key="UiAccentBrush" Color="{StaticResource ColorUiAccent}" />
-  <SolidColorBrush x:Key="UiBlueBrush" Color="{StaticResource ColorUiBlue}" />
-  <SolidColorBrush x:Key="StudioCanvasBrush" Color="{StaticResource ColorStudioCanvas}" />
-  <SolidColorBrush x:Key="StudioPanelBrush" Color="{StaticResource ColorStudioPanel}" />
-  <SolidColorBrush x:Key="StudioRaisedBrush" Color="{StaticResource ColorStudioRaised}" />
-  <SolidColorBrush x:Key="StudioRuleBrush" Color="{StaticResource ColorStudioRule}" />
-  <SolidColorBrush x:Key="StudioGoldBrush" Color="{StaticResource ColorStudioGold}" />
-  <SolidColorBrush x:Key="EditorBgBrush" Color="{StaticResource ColorEditorBg}" />
-  <SolidColorBrush x:Key="EditorPanelBrush" Color="{StaticResource ColorEditorPanel}" />
-  <SolidColorBrush x:Key="EditorRaisedBrush" Color="{StaticResource ColorEditorRaised}" />
-  <SolidColorBrush x:Key="EditorRuleBrush" Color="{StaticResource ColorEditorRule}" />
-  <SolidColorBrush x:Key="EditorAccentBrush" Color="{StaticResource ColorEditorAccent}" />
-  <SolidColorBrush x:Key="EditorLabelBrush" Color="{StaticResource ColorEditorLabel}" />
-  <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
-  <SolidColorBrush x:Key="ErrorSoftBrush" Color="{StaticResource ColorErrorSoft}" />
-  <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource ColorSuccess}" />
-  <SolidColorBrush x:Key="ScopeWellBrush" Color="{StaticResource ColorScopeWell}" />
-  <SolidColorBrush x:Key="ScopeWellBorderBrush" Color="{StaticResource ColorScopeWellBorder}" />
-  <SolidColorBrush x:Key="GuideWhiteBrush" Color="{StaticResource ColorGuideWhite}" />
-  <SolidColorBrush x:Key="AccentBorderBrush" Color="{StaticResource ColorAccentBorder}" />
-  <SolidColorBrush x:Key="ScrimStrongBrush" Color="{StaticResource ColorScrimStrong}" />
-  <SolidColorBrush x:Key="ScrimMidBrush" Color="{StaticResource ColorScrimMid}" />
-  <SolidColorBrush x:Key="ScrimSoftBrush" Color="{StaticResource ColorScrimSoft}" />
-  <SolidColorBrush x:Key="TelemetryLabelBrush" Color="{StaticResource ColorTelemetryLabel}" />
-  <SolidColorBrush x:Key="StudioPanelScrimBrush" Color="{StaticResource ColorStudioPanelScrim}" />
-  <SolidColorBrush x:Key="WhiteDimBrush" Color="{StaticResource ColorWhiteDim}" />
-  <SolidColorBrush x:Key="WhiteLoBrush" Color="{StaticResource ColorWhiteLo}" />
-  <SolidColorBrush x:Key="GraphiteScrimBrush" Color="{StaticResource ColorGraphiteScrim}" />
-  <SolidColorBrush x:Key="LogBgBrush" Color="{StaticResource ColorLogBg}" />
-  <SolidColorBrush x:Key="LogTextBrush" Color="{StaticResource ColorLogText}" />
-  <SolidColorBrush x:Key="PhotoSoftBorderBrush" Color="{StaticResource ColorPhotoSoftBorder}" />
-  <SolidColorBrush x:Key="WarnDeepBrush" Color="{StaticResource ColorWarnDeep}" />
-  <SolidColorBrush x:Key="WarnDarkBrush" Color="{StaticResource ColorWarnDark}" />
-  <SolidColorBrush x:Key="WarnBgBrush" Color="{StaticResource ColorWarnBg}" />
-  <SolidColorBrush x:Key="WarnBgSoftBrush" Color="{StaticResource ColorWarnBgSoft}" />
-  <SolidColorBrush x:Key="ConnectedDotBrush" Color="{StaticResource ColorConnectedDot}" />
-  <SolidColorBrush x:Key="PeakingBrush" Color="{StaticResource ColorPeaking}" />
-  <SolidColorBrush x:Key="ScopeBlackBrush" Color="{StaticResource ColorScopeBlack}" />
-  <SolidColorBrush x:Key="GuideBrush" Color="{StaticResource ColorGuide}" />
-  <SolidColorBrush x:Key="EditorScrimBrush" Color="{StaticResource ColorEditorScrim}" />
-  <SolidColorBrush x:Key="WheelLiftBrush" Color="{StaticResource ColorWheelLift}" />
-  <SolidColorBrush x:Key="WheelGammaBrush" Color="{StaticResource ColorWheelGamma}" />
-  <SolidColorBrush x:Key="WheelGainBrush" Color="{StaticResource ColorWheelGain}" />
+  <SolidColorBrush x:Key="PaperBrush" Color="{DynamicResource ColorPaper}" />
+  <SolidColorBrush x:Key="Paper2Brush" Color="{DynamicResource ColorPaper2}" />
+  <SolidColorBrush x:Key="Paper3Brush" Color="{DynamicResource ColorPaper3}" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource ColorSurface}" />
+  <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{DynamicResource ColorSurfaceRaised}" />
+  <SolidColorBrush x:Key="SidebarBrush" Color="{DynamicResource ColorSidebar}" />
+  <SolidColorBrush x:Key="RuleBrush" Color="{DynamicResource ColorRule}" />
+  <SolidColorBrush x:Key="RuleStrongBrush" Color="{DynamicResource ColorRuleStrong}" />
+  <SolidColorBrush x:Key="NeutralBrush" Color="{DynamicResource ColorNeutral}" />
+  <SolidColorBrush x:Key="MutedBrush" Color="{DynamicResource ColorMuted}" />
+  <SolidColorBrush x:Key="Ink2Brush" Color="{DynamicResource ColorInk2}" />
+  <SolidColorBrush x:Key="InkBrush" Color="{DynamicResource ColorInk}" />
+  <SolidColorBrush x:Key="FocusBrush" Color="{DynamicResource ColorFocus}" />
+  <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource ColorAccent}" />
+  <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource ColorAccentSoft}" />
+  <SolidColorBrush x:Key="AccentInkBrush" Color="{DynamicResource ColorAccentInk}" />
+  <SolidColorBrush x:Key="VideoBrush" Color="{DynamicResource ColorVideo}" />
+  <SolidColorBrush x:Key="VideoSoftBrush" Color="{DynamicResource ColorVideoSoft}" />
+  <SolidColorBrush x:Key="PositiveBrush" Color="{DynamicResource ColorPositive}" />
+  <SolidColorBrush x:Key="ReadoutGlowBrush" Color="{DynamicResource ColorReadoutGlow}" />
+  <SolidColorBrush x:Key="GraphiteBrush" Color="{DynamicResource ColorGraphite}" />
+  <SolidColorBrush x:Key="Graphite2Brush" Color="{DynamicResource ColorGraphite2}" />
+  <SolidColorBrush x:Key="GraphiteRuleBrush" Color="{DynamicResource ColorGraphiteRule}" />
+  <SolidColorBrush x:Key="GraphiteMutedBrush" Color="{DynamicResource ColorGraphiteMuted}" />
+  <SolidColorBrush x:Key="GraphiteInkBrush" Color="{DynamicResource ColorGraphiteInk}" />
+  <SolidColorBrush x:Key="UiCardBrush" Color="{DynamicResource ColorUiCard}" />
+  <SolidColorBrush x:Key="UiSecondaryBrush" Color="{DynamicResource ColorUiSecondary}" />
+  <SolidColorBrush x:Key="UiLabelBrush" Color="{DynamicResource ColorUiLabel}" />
+  <SolidColorBrush x:Key="UiAccentBrush" Color="{DynamicResource ColorUiAccent}" />
+  <SolidColorBrush x:Key="UiBlueBrush" Color="{DynamicResource ColorUiBlue}" />
+  <SolidColorBrush x:Key="StudioCanvasBrush" Color="{DynamicResource ColorStudioCanvas}" />
+  <SolidColorBrush x:Key="StudioPanelBrush" Color="{DynamicResource ColorStudioPanel}" />
+  <SolidColorBrush x:Key="StudioRaisedBrush" Color="{DynamicResource ColorStudioRaised}" />
+  <SolidColorBrush x:Key="StudioRuleBrush" Color="{DynamicResource ColorStudioRule}" />
+  <SolidColorBrush x:Key="StudioGoldBrush" Color="{DynamicResource ColorStudioGold}" />
+  <SolidColorBrush x:Key="EditorBgBrush" Color="{DynamicResource ColorEditorBg}" />
+  <SolidColorBrush x:Key="EditorPanelBrush" Color="{DynamicResource ColorEditorPanel}" />
+  <SolidColorBrush x:Key="EditorRaisedBrush" Color="{DynamicResource ColorEditorRaised}" />
+  <SolidColorBrush x:Key="EditorRuleBrush" Color="{DynamicResource ColorEditorRule}" />
+  <SolidColorBrush x:Key="EditorAccentBrush" Color="{DynamicResource ColorEditorAccent}" />
+  <SolidColorBrush x:Key="EditorLabelBrush" Color="{DynamicResource ColorEditorLabel}" />
+  <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ColorError}" />
+  <SolidColorBrush x:Key="ErrorSoftBrush" Color="{DynamicResource ColorErrorSoft}" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource ColorSuccess}" />
+  <SolidColorBrush x:Key="ScopeWellBrush" Color="{DynamicResource ColorScopeWell}" />
+  <SolidColorBrush x:Key="ScopeWellBorderBrush" Color="{DynamicResource ColorScopeWellBorder}" />
+  <SolidColorBrush x:Key="GuideWhiteBrush" Color="{DynamicResource ColorGuideWhite}" />
+  <SolidColorBrush x:Key="AccentBorderBrush" Color="{DynamicResource ColorAccentBorder}" />
+  <SolidColorBrush x:Key="ScrimStrongBrush" Color="{DynamicResource ColorScrimStrong}" />
+  <SolidColorBrush x:Key="ScrimMidBrush" Color="{DynamicResource ColorScrimMid}" />
+  <SolidColorBrush x:Key="ScrimSoftBrush" Color="{DynamicResource ColorScrimSoft}" />
+  <SolidColorBrush x:Key="TelemetryLabelBrush" Color="{DynamicResource ColorTelemetryLabel}" />
+  <SolidColorBrush x:Key="StudioPanelScrimBrush" Color="{DynamicResource ColorStudioPanelScrim}" />
+  <SolidColorBrush x:Key="WhiteDimBrush" Color="{DynamicResource ColorWhiteDim}" />
+  <SolidColorBrush x:Key="WhiteLoBrush" Color="{DynamicResource ColorWhiteLo}" />
+  <SolidColorBrush x:Key="GraphiteScrimBrush" Color="{DynamicResource ColorGraphiteScrim}" />
+  <SolidColorBrush x:Key="LogBgBrush" Color="{DynamicResource ColorLogBg}" />
+  <SolidColorBrush x:Key="LogTextBrush" Color="{DynamicResource ColorLogText}" />
+  <SolidColorBrush x:Key="PhotoSoftBorderBrush" Color="{DynamicResource ColorPhotoSoftBorder}" />
+  <SolidColorBrush x:Key="WarnDeepBrush" Color="{DynamicResource ColorWarnDeep}" />
+  <SolidColorBrush x:Key="WarnDarkBrush" Color="{DynamicResource ColorWarnDark}" />
+  <SolidColorBrush x:Key="WarnBgBrush" Color="{DynamicResource ColorWarnBg}" />
+  <SolidColorBrush x:Key="WarnBgSoftBrush" Color="{DynamicResource ColorWarnBgSoft}" />
+  <SolidColorBrush x:Key="ConnectedDotBrush" Color="{DynamicResource ColorConnectedDot}" />
+  <SolidColorBrush x:Key="PeakingBrush" Color="{DynamicResource ColorPeaking}" />
+  <SolidColorBrush x:Key="ScopeBlackBrush" Color="{DynamicResource ColorScopeBlack}" />
+  <SolidColorBrush x:Key="GuideBrush" Color="{DynamicResource ColorGuide}" />
+  <SolidColorBrush x:Key="EditorScrimBrush" Color="{DynamicResource ColorEditorScrim}" />
+  <SolidColorBrush x:Key="WheelLiftBrush" Color="{DynamicResource ColorWheelLift}" />
+  <SolidColorBrush x:Key="WheelGammaBrush" Color="{DynamicResource ColorWheelGamma}" />
+  <SolidColorBrush x:Key="WheelGainBrush" Color="{DynamicResource ColorWheelGain}" />
+
+  <!-- Windows dual-theme (v1.5.6): surface tokens shared by both appearances.
+       AppBar*/UiCardInk/CapsulePressed/ShutterHover are appearance-paired and
+       overridden by Themes/Theme.{Light,Dark}.xaml.  MonitorWell*/EditorInk/
+       EditorAccentHover|Active stay colour-stable in every appearance (graphite
+       well / fig2 workbench exceptions, design.md 229455c). -->
+  <Color x:Key="ColorAppBar">#0A0B0D</Color>
+  <Color x:Key="ColorAppBarRule">#414856</Color>
+  <Color x:Key="ColorAppBarMuted">#ADB5C1</Color>
+  <Color x:Key="ColorAppBarInk">#F0F3F8</Color>
+  <Color x:Key="ColorUiCardInk">#F0F3F8</Color>
+  <Color x:Key="ColorCapsulePressed">#3A3A3C</Color>
+  <Color x:Key="ColorShutterHover">#262628</Color>
+  <Color x:Key="ColorMonitorWell">#0A0B0D</Color>
+  <Color x:Key="ColorMonitorWell2">#171B24</Color>
+  <Color x:Key="ColorMonitorWellRule">#414856</Color>
+  <Color x:Key="ColorMonitorWellMuted">#ADB5C1</Color>
+  <Color x:Key="ColorMonitorWellInk">#F0F3F8</Color>
+  <Color x:Key="ColorMonitorWellCard">#1C1C1E</Color>
+  <Color x:Key="ColorMonitorWellSecondary">#2C2C2E</Color>
+  <Color x:Key="ColorMonitorWellLabel">#8E8E93</Color>
+  <Color x:Key="ColorMonitorWellText">#FFFFFF</Color>
+  <Color x:Key="ColorEditorInk">#FFFFFF</Color>
+  <Color x:Key="ColorEditorAccentHover">#EFA866</Color>
+  <Color x:Key="ColorEditorAccentActive">#F5BE85</Color>
+
+  <SolidColorBrush x:Key="AppBarBrush" Color="{DynamicResource ColorAppBar}" />
+  <SolidColorBrush x:Key="AppBarRuleBrush" Color="{DynamicResource ColorAppBarRule}" />
+  <SolidColorBrush x:Key="AppBarMutedBrush" Color="{DynamicResource ColorAppBarMuted}" />
+  <SolidColorBrush x:Key="AppBarInkBrush" Color="{DynamicResource ColorAppBarInk}" />
+  <SolidColorBrush x:Key="UiCardInkBrush" Color="{DynamicResource ColorUiCardInk}" />
+  <SolidColorBrush x:Key="CapsulePressedBrush" Color="{DynamicResource ColorCapsulePressed}" />
+  <SolidColorBrush x:Key="ShutterHoverBrush" Color="{DynamicResource ColorShutterHover}" />
+  <SolidColorBrush x:Key="MonitorWellBrush" Color="{DynamicResource ColorMonitorWell}" />
+  <SolidColorBrush x:Key="MonitorWell2Brush" Color="{DynamicResource ColorMonitorWell2}" />
+  <SolidColorBrush x:Key="MonitorWellRuleBrush" Color="{DynamicResource ColorMonitorWellRule}" />
+  <SolidColorBrush x:Key="MonitorWellMutedBrush" Color="{DynamicResource ColorMonitorWellMuted}" />
+  <SolidColorBrush x:Key="MonitorWellInkBrush" Color="{DynamicResource ColorMonitorWellInk}" />
+  <SolidColorBrush x:Key="MonitorWellCardBrush" Color="{DynamicResource ColorMonitorWellCard}" />
+  <SolidColorBrush x:Key="MonitorWellSecondaryBrush" Color="{DynamicResource ColorMonitorWellSecondary}" />
+  <SolidColorBrush x:Key="MonitorWellLabelBrush" Color="{DynamicResource ColorMonitorWellLabel}" />
+  <SolidColorBrush x:Key="MonitorWellTextBrush" Color="{DynamicResource ColorMonitorWellText}" />
+  <SolidColorBrush x:Key="EditorInkBrush" Color="{DynamicResource ColorEditorInk}" />
+  <SolidColorBrush x:Key="EditorAccentHoverBrush" Color="{DynamicResource ColorEditorAccentHover}" />
+  <SolidColorBrush x:Key="EditorAccentActiveBrush" Color="{DynamicResource ColorEditorAccentActive}" />
 
   <FontFamily x:Key="DisplayFont">Bahnschrift</FontFamily>
   <FontFamily x:Key="BodyFont">Segoe UI Variable Text</FontFamily>

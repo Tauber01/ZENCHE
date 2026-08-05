@@ -7,6 +7,10 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Themes/Colors.xaml" />
         <ResourceDictionary Source="Themes/Controls.xaml" />
+        <!-- Appearance overrides; App.OnStartup swaps this to Theme.Light.xaml
+             when the Windows 11 system app theme is light, and listens for
+             system changes (v1.5.6 dual-theme, design.md 229455c). -->
+        <ResourceDictionary Source="Themes/Theme.Dark.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
