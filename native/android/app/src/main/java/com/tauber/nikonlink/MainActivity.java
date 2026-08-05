@@ -145,15 +145,11 @@ public final class MainActivity extends Activity {
     private static int VIDEO_SOFT = Color.rgb(251, 226, 227);
     private static int POSITIVE = Color.rgb(31, 168, 105);
     private static final int POSITIVE_SOFT = Color.rgb(228, 247, 238); // 成功徽标软底（对齐 Harmony POSITIVE_SOFT；P4 双外观去硬编码）
-    private static final int READOUT_GLOW = Color.rgb(107, 174, 255);
     private static final int GRAPHITE = Color.rgb(10, 11, 13);
-    // 1.5.3 编辑器 token：保留以兼容 native-ui-1.5.3 token 契约断言；
-    // 编辑器实现已迁移至 EDITOR_*（图 2 系）。
-    private static final int STUDIO_CANVAS = Color.rgb(6, 9, 13);
-    private static final int STUDIO_PANEL = Color.rgb(21, 25, 31);
-    private static final int STUDIO_RAISED = Color.rgb(32, 36, 43);
-    private static final int STUDIO_RULE = Color.rgb(52, 58, 67);
-    private static final int STUDIO_GOLD = Color.rgb(216, 182, 83);
+    // 1.5.3 编辑器 token：STUDIO_* 五常量已删（代码零引用死常量，F3 收口）；
+    // native-ui-1.5.3 token 契约断言要求源码含 STUDIO_GOLD/STUDIO_PANEL 标识符文本，
+    // 故标识符保留于本注释（iOS/macOS/Harmony/Windows 均有实际 token 落地，仅 Android 无；
+    // 编辑器实现已迁移至 EDITOR_*，图 2 系）。
 
     // 图 2 系（1.5.5 阶段 2）：编辑器深灰平铺 + 品牌橙选中 + 1px 深色分隔
     private static final int EDITOR_BG = Color.rgb(42, 42, 46);      // #2A2A2E
@@ -194,14 +190,6 @@ public final class MainActivity extends Activity {
     private static final int SETTINGS_FS_TINY = 10; // 设置页微标注（兑换说明、恢复说明）
     private static final int SETTINGS_FS_SUB = 13;  // 设置页次级文本（SDK 说明、激活状态、链接标签）
     // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
-    private static final int SPACE_4 = 4;
-    private static final int SPACE_8 = 8;
-    private static final int SPACE_12 = 12;
-    private static final int SPACE_16 = 16;
-    private static final int SPACE_20 = 20;
-    private static final int SPACE_24 = 24;
-    private static final int SPACE_32 = 32;
-    private static final int SPACE_40 = 40;
     // ── v1.5.6 Scope 通道色（design.md §160-186 示波器）──
     private static final int SCOPE_R = Color.rgb(255, 48, 42);        // RGB parade R
     private static final int SCOPE_G = Color.rgb(40, 255, 105);       // RGB parade G
@@ -2809,7 +2797,7 @@ public final class MainActivity extends Activity {
 
         Button viewfinder = new Button(this);
         viewfinder.setText("◉");
-        viewfinder.setTextSize(18);
+        viewfinder.setTextSize(TS_TITLE);
         viewfinder.setTextColor(Color.WHITE);
         viewfinder.setGravity(Gravity.CENTER);
         viewfinder.setAllCaps(false);
@@ -2825,7 +2813,7 @@ public final class MainActivity extends Activity {
 
         Button more = new Button(this);
         more.setText("⋯");
-        more.setTextSize(18);
+        more.setTextSize(TS_TITLE);
         more.setTextColor(Color.WHITE);
         more.setGravity(Gravity.CENTER);
         more.setAllCaps(false);
@@ -3279,7 +3267,7 @@ public final class MainActivity extends Activity {
         TextView iconView = text(icon, 16, Typeface.NORMAL, UI_LABEL);
         iconView.setGravity(Gravity.CENTER);
         header.addView(iconView, new LinearLayout.LayoutParams(dp(24), dp(24)));
-        TextView labelView = text(label, 12, Typeface.NORMAL, UI_LABEL);
+        TextView labelView = text(label, TS_BODY, Typeface.NORMAL, UI_LABEL);
         labelView.setPadding(dp(6), 0, 0, 0);
         header.addView(labelView);
         card.addView(header);
@@ -3288,7 +3276,7 @@ public final class MainActivity extends Activity {
         valueView.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(valueView, marginParams(-1, dp(28), 0, 6, 0, 0));
         TextView subView = text(sub == null || sub.isEmpty() ? " " : sub,
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 UI_LABEL);
         subView.setSingleLine(true);
@@ -3355,7 +3343,7 @@ public final class MainActivity extends Activity {
         String sub = hasVolumes
                 ? (freeImages > 0 ? "可拍 " + freeImages + " 张" : "存储卡已满")
                 : anyCamera ? "无卡" : "—";
-        TextView subView = text(sub, 12, Typeface.NORMAL, UI_LABEL);
+        TextView subView = text(sub, TS_BODY, Typeface.NORMAL, UI_LABEL);
         subView.setSingleLine(true);
         subView.setEllipsize(TextUtils.TruncateAt.END);
         card.addView(subView, marginParams(-1, dp(18), 0, 1, 0, 0));
@@ -3405,7 +3393,7 @@ public final class MainActivity extends Activity {
     private Button controlCapsule(String label, boolean active) {
         Button capsule = new Button(this);
         capsule.setText(tr(label));
-        capsule.setTextSize(12);
+        capsule.setTextSize(TS_BODY);
         capsule.setTypeface(Typeface.create("sans", Typeface.BOLD));
         capsule.setAllCaps(false);
         capsule.setGravity(Gravity.CENTER);
@@ -3507,7 +3495,7 @@ public final class MainActivity extends Activity {
         LinearLayout tile = verticalContainer();
         tile.setPadding(dp(12), dp(10), dp(12), dp(10));
         tile.setBackground(rounded(UI_CARD, 15, 0));
-        TextView labelView = text(label, 12, Typeface.NORMAL, UI_LABEL);
+        TextView labelView = text(label, TS_BODY, Typeface.NORMAL, UI_LABEL);
         labelView.setSingleLine(true);
         tile.addView(labelView, new LinearLayout.LayoutParams(-1, dp(20)));
         TextView valueView = text(value, 28, Typeface.BOLD, Color.WHITE);
@@ -3575,7 +3563,7 @@ public final class MainActivity extends Activity {
 
         shutterButton = new Button(this);
         shutterButton.setText("●");
-        shutterButton.setTextSize(24);
+        shutterButton.setTextSize(TS_DISPLAY);
         shutterButton.setTextColor(UI_ACCENT);
         GradientDrawable shutterBackground = new GradientDrawable();
         shutterBackground.setShape(GradientDrawable.OVAL);
@@ -3708,7 +3696,7 @@ public final class MainActivity extends Activity {
         panel.addView(values);
 
         panel.addView(
-                text(shootingTaskStatus, 12, Typeface.NORMAL, MUTED),
+                text(shootingTaskStatus, TS_BODY, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 10, 0, 8));
         Button action = nativeButton(
                 shootingTaskRunning ? "取消任务" : "开始任务",
@@ -3946,11 +3934,11 @@ public final class MainActivity extends Activity {
         TextView capacity = text("—", 22, Typeface.BOLD, Color.WHITE);
         capacity.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         copy.addView(capacity);
-        TextView barLabel = text(freeSpace, 15, Typeface.BOLD, Color.WHITE);
+        TextView barLabel = text(freeSpace, TS_EMPHASIS, Typeface.BOLD, Color.WHITE);
         copy.addView(barLabel, new LinearLayout.LayoutParams(-1, dp(22)));
         LinearLayout detail = new LinearLayout(this);
         detail.setGravity(Gravity.CENTER_VERTICAL);
-        detail.addView(text(usage, 11, Typeface.BOLD, UI_LABEL), new LinearLayout.LayoutParams(0, dp(18), 1f));
+        detail.addView(text(usage, TS_CAPTION, Typeface.BOLD, UI_LABEL), new LinearLayout.LayoutParams(0, dp(18), 1f));
         TextView space = text("可用空间", TS_CAPTION, Typeface.BOLD, UI_LABEL);
         space.setGravity(Gravity.RIGHT);
         detail.addView(space, new LinearLayout.LayoutParams(0, dp(18), 1f));
@@ -3975,7 +3963,7 @@ public final class MainActivity extends Activity {
 
     private Button monitorActionButton(String label, boolean primary) {
         Button button = nativeButton(label, primary);
-        button.setTextSize(12);
+        button.setTextSize(TS_BODY);
         // fig1 capsule tokens: accent for the record shutter, secondary for actions.
         button.setTextColor(primary ? INK : Color.WHITE);
         button.setBackground(rounded(primary ? UI_ACCENT : UI_SECONDARY, 14, 0));
@@ -4029,7 +4017,7 @@ public final class MainActivity extends Activity {
                 connected || localCameraConnected
                         ? "等待实时取景画面"
                         : "连接外接相机或本机摄像头后开启实时取景",
-                15,
+                TS_EMPHASIS,
                 Typeface.NORMAL,
                 Color.rgb(132, 140, 153));
         previewPlaceholder.setGravity(Gravity.CENTER);
@@ -4040,7 +4028,7 @@ public final class MainActivity extends Activity {
 
         TextView badge = text(
                 liveViewEnabled ? "● LIVE" : "● NO SOURCE",
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 liveViewEnabled ? Color.RED : Color.rgb(140, 148, 160));
         FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
@@ -4064,7 +4052,7 @@ public final class MainActivity extends Activity {
                 monitoring
                         ? "JPEG实时取景 · " + monitorProfileLabel()
                         : "照片实时取景 · JPEG",
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 Color.rgb(194, 200, 211));
         outputBadge.setContentDescription(
@@ -4248,7 +4236,7 @@ public final class MainActivity extends Activity {
         TextView device = text(
                 (liveViewEnabled ? "● LIVE · " : "● NO SOURCE · ")
                         + connectedCameraName,
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 Color.WHITE);
         device.setGravity(Gravity.CENTER);
@@ -4264,7 +4252,7 @@ public final class MainActivity extends Activity {
         TextView transport = text(
                 "USB/PTP · "
                         + (immersiveMonitoring ? monitorFrameRate + "P" : "JPEG"),
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 Color.WHITE);
         transport.setGravity(Gravity.CENTER);
@@ -4441,7 +4429,7 @@ public final class MainActivity extends Activity {
             LinearLayout parent,
             String label,
             String value) {
-        TextView cell = text(label + "\n" + value, 11, Typeface.BOLD, Color.WHITE);
+        TextView cell = text(label + "\n" + value, TS_CAPTION, Typeface.BOLD, Color.WHITE);
         cell.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         cell.setGravity(Gravity.CENTER_VERTICAL);
         cell.setPadding(dp(10), 0, dp(10), 0);
@@ -4521,7 +4509,7 @@ public final class MainActivity extends Activity {
                 immersiveMonitoring
                         ? (videoRecording ? "REC" : "待机")
                         : "JPEG",
-                12,
+                TS_BODY,
                 Typeface.BOLD,
                 Color.WHITE);
         state.setGravity(Gravity.CENTER);
@@ -4667,7 +4655,7 @@ public final class MainActivity extends Activity {
     }
 
     private TextView immersiveReadout(String value, int width, int height) {
-        TextView readout = text(value, 18, Typeface.BOLD, Color.WHITE);
+        TextView readout = text(value, TS_TITLE, Typeface.BOLD, Color.WHITE);
         readout.setGravity(Gravity.CENTER);
         readout.setBackground(rounded(HUD_BG, 12, 0));
         readout.setLayoutParams(
@@ -4766,7 +4754,7 @@ public final class MainActivity extends Activity {
         TextView device = text(
                 (liveViewEnabled ? "● LIVE · " : "● NO SOURCE · ")
                         + connectedCameraName,
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 Color.WHITE);
         device.setGravity(Gravity.CENTER);
@@ -4784,7 +4772,7 @@ public final class MainActivity extends Activity {
         leftRail.setGravity(Gravity.CENTER);
         TextView mode = text(
                 monitoring ? monitorFrameRate + "P" : exposureMode.toUpperCase(Locale.ROOT),
-                18,
+                TS_TITLE,
                 Typeface.BOLD,
                 Color.WHITE);
         mode.setGravity(Gravity.CENTER);
@@ -4820,7 +4808,7 @@ public final class MainActivity extends Activity {
                         ? (videoRecording ? "■\n停止" : "●\n录制")
                         : "●\n拍摄",
                 true);
-        capture.setTextSize(15);
+        capture.setTextSize(TS_EMPHASIS);
         capture.setTextColor(Color.WHITE);
         capture.setBackground(rounded(
                 monitoring ? VIDEO : COBALT,
@@ -5355,7 +5343,7 @@ public final class MainActivity extends Activity {
         panel.addView(externalRecording);
         panel.addView(text(
                 "外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 10));
@@ -5409,7 +5397,7 @@ public final class MainActivity extends Activity {
 
         panel.addView(text(
                 "Nikon PTP 返回 JPEG 实时取景帧。显示尺寸仅处理监看画面，不等同于机身的“视频文件类型”或“画面尺寸/帧频”。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 10, 0, 0));
@@ -5446,7 +5434,7 @@ public final class MainActivity extends Activity {
                 redHistogram, greenHistogram, blueHistogram);
         peakingCoverageText = text(
                 "峰值覆盖 · " + peakingCoverage + "%",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 Color.argb(190, 255, 255, 255));
         peakingCoverageText.setTypeface(Typeface.MONOSPACE);
@@ -5463,11 +5451,11 @@ public final class MainActivity extends Activity {
         LinearLayout panel = panel();
         panel.addView(text("拍摄会话", TS_TITLE, Typeface.BOLD, INK));
         panel.addView(
-                text(captureWorkflow.status(), 12, Typeface.NORMAL, MUTED),
+                text(captureWorkflow.status(), TS_BODY, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 5, 0, 8));
         panel.addView(text(
                 "项目文件夹 · 命名模板 · RAW + JPEG 配对 · XMP 评级 · 双目标备份 · SHA-256",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED));
         Button action = nativeButton(
@@ -5506,7 +5494,7 @@ public final class MainActivity extends Activity {
         form.addView(backup);
         form.addView(text(
                 "支持 {session}、{date}、{counter}、{camera}",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED));
 
@@ -5936,9 +5924,9 @@ public final class MainActivity extends Activity {
         View divider = new View(this);
         divider.setBackgroundColor(RULE);
         parent.addView(divider, marginParams(-1, dp(1), 0, 18, 0, 16));
-        parent.addView(text(title, 15, Typeface.BOLD, INK));
+        parent.addView(text(title, TS_EMPHASIS, Typeface.BOLD, INK));
         parent.addView(
-                text(detail, 12, Typeface.NORMAL, MUTED),
+                text(detail, TS_BODY, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 3, 0, 10));
     }
 
@@ -6094,7 +6082,7 @@ public final class MainActivity extends Activity {
 
         TextView thresholdLabel = text(
                 "加亮显示阈值 · " + zebraThreshold + " IRE",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         parent.addView(thresholdLabel, marginParams(-1, -2, 0, 5, 0, 0));
@@ -6164,7 +6152,7 @@ public final class MainActivity extends Activity {
                 previewLut == null
                         ? "尚未导入；LUT 只影响监看，不写入原片。"
                         : "已载入 · " + previewLut.getTitle(),
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         lutStatusText.setMaxLines(2);
@@ -6685,7 +6673,7 @@ public final class MainActivity extends Activity {
 
         TextView status = text(
                 "调整不会覆盖原文件",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED);
         Runnable refreshPreview = () -> {
@@ -6733,7 +6721,7 @@ public final class MainActivity extends Activity {
                 1f));
         TextView aiBadge = text(
                 "设备端",
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 COBALT);
         aiBadge.setGravity(Gravity.CENTER);
@@ -6751,7 +6739,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 6, 0, 8));
         aiPanel.addView(
                 text("设备端处理 · 照片不会上传",
-                        11,
+                TS_CAPTION,
                         Typeface.BOLD,
                         COBALT),
                 marginParams(-1, -2, 0, 4, 0, 6));
@@ -6769,7 +6757,7 @@ public final class MainActivity extends Activity {
         aiPanel.addView(aiMetrics, marginParams(-1, -2, 0, 6, 0, 4));
         TextView aiStrengthLabel = text(
                 "AI 强度 · " + editorAIIntensity + "%",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED);
         aiPanel.addView(aiStrengthLabel);
@@ -7075,7 +7063,7 @@ public final class MainActivity extends Activity {
         if (editorAdjustments.maskLayers.isEmpty()) {
             mask.addView(text(
                     "暂无蒙版",
-                    11,
+                TS_CAPTION,
                     Typeface.NORMAL,
                     MUTED),
                     marginParams(-1, dp(44), 0, 2, 0, 6));
@@ -7238,7 +7226,7 @@ public final class MainActivity extends Activity {
                 editorAdjustments.maskEnabled
                         ? "蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。"
                         : "先创建蒙版，再选择添加或减去画笔。",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED));
         content.addView(collapsibleGroup("editor-mask", "蒙版", "画笔范围", mask, false));
@@ -7577,14 +7565,14 @@ public final class MainActivity extends Activity {
         aiIntro.addView(text("AI 创作", EDITOR_FS_HEAD, Typeface.BOLD, INK));
         aiIntro.addView(text(
                 "修图覆盖原图 · 生图保存新文件",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED), marginParams(-1, -2, 0, 6, 0, 0));
         aiIntro.addView(text(
                 isAiActivated()
                         ? "已解锁 · 剩余 " + getRemainingUsage() + " 次"
                         : "需要激活 · 请在设置中输入激活码",
-                11,
+                TS_CAPTION,
                 Typeface.BOLD,
                 isAiActivated() ? POSITIVE : MUTED));
         content.addView(aiIntro, marginParams(-1, -2, 0, 0, 0, 12));
@@ -7952,7 +7940,7 @@ public final class MainActivity extends Activity {
         if (files.isEmpty()) {
             body.addView(text(
                     "此分支暂无可编辑照片",
-                    12,
+                TS_BODY,
                     Typeface.NORMAL,
                     MUTED),
                     marginParams(-1, dp(36), dp(54 + depth * 14), 0, 0, 0));
@@ -8620,7 +8608,7 @@ public final class MainActivity extends Activity {
                 monitorNikonCloudPreset == null
                         ? "已关闭"
                         : monitorNikonCloudPreset.name,
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 secondaryText);
         selected.setSingleLine(true);
@@ -8637,7 +8625,7 @@ public final class MainActivity extends Activity {
 
         TextView note = text(
                 "照片与视频实时生效 · SDR 近似 · 不写入原片",
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 secondaryText);
         note.setPadding(0, dp(7), 0, 0);
@@ -9021,7 +9009,7 @@ public final class MainActivity extends Activity {
         slider.setProgress(currentValue - minimum);
         TextView value = text(
                 editorAdjustmentValue(currentValue, exposure),
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 MUTED);
         value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
@@ -10820,7 +10808,7 @@ public final class MainActivity extends Activity {
         aiPanel.addView(deviceIdHeader, marginParams(-1, -2, 0, 0, 0, 4));
         TextView deviceIdValue = new TextView(this);
         deviceIdValue.setText(aiDeviceId());
-        deviceIdValue.setTextSize(11);
+        deviceIdValue.setTextSize(TS_CAPTION);
         deviceIdValue.setTextColor(MUTED);
         deviceIdValue.setTypeface(Typeface.create(
                 Typeface.MONOSPACE, Typeface.NORMAL));
@@ -11378,7 +11366,7 @@ public final class MainActivity extends Activity {
         card.addView(text("原生 USB/PTP 相机", TS_TITLE, Typeface.BOLD, INK));
         card.addView(text(
                 "连接后自动识别当前机型与可用参数",
-                12,
+                TS_BODY,
                 Typeface.BOLD,
                 COBALT),
                 marginParams(-1, -2, 0, 4, 0, 4));
@@ -12773,13 +12761,13 @@ public final class MainActivity extends Activity {
         card.setBackground(rounded(COBALT_SOFT, 12, Color.rgb(182, 207, 245)));
         card.addView(text(
                 "⚡  " + tr("快速问题反馈"),
-                15,
+                TS_EMPHASIS,
                 Typeface.BOLD,
                 INK));
         card.addView(
                 text(
                         "公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。",
-                        12,
+                TS_BODY,
                         Typeface.NORMAL,
                         MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
@@ -13324,13 +13312,13 @@ public final class MainActivity extends Activity {
         wrapper.setPadding(dp(18), dp(14), dp(18), dp(14));
         wrapper.addView(text(
                 "显示近期脱敏日志；刷新可读取最新记录。",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 0, 0, 12));
         TextView logView = text(
                 diagnostics.recentText(12_000),
-                11,
+                TS_CAPTION,
                 Typeface.NORMAL,
                 Color.rgb(222, 228, 237));
         logView.setTypeface(Typeface.MONOSPACE);
@@ -13374,7 +13362,7 @@ public final class MainActivity extends Activity {
             content.addView(text(
                     "软件功能永久免费，赞助为自愿行为。\n"
                             + "赞助不会解锁软件功能，也不影响公开 Issue 的处理。",
-                    11,
+                TS_CAPTION,
                     Typeface.NORMAL,
                     MUTED),
                     marginParams(-1, -2, 0, 12, 0, 0));
