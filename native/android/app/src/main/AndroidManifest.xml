@@ -52,7 +52,7 @@
         </provider>
         <activity
             android:name=".MainActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|uiMode"
             android:exported="true"
             android:screenOrientation="unspecified">
             <intent-filter>

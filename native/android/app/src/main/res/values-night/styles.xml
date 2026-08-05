@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark appearance: window chrome pairs with the dark token set
+         (design.md 229455c). Dark-theme parents so theme-derived text
+         (dialog buttons, spinner items, text cursor) stays light on the
+         darkened surfaces. The rest of the UI is code-built from the
+         runtime tokens assigned in MainActivity.applyAppearanceTokens. -->
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/photo_accent</item>
+        <item name="android:navigationBarColor">@color/graphite</item>
+        <item name="android:statusBarColor">@color/workbench</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/workbench</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:alertDialogTheme">@style/AppAlertDialogTheme</item>
+    </style>
+
+    <style name="AppAlertDialogTheme" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/photo_accent</item>
+        <item name="android:windowBackground">@drawable/dialog_surface</item>
+        <item name="android:windowElevation">20dp</item>
+        <item name="android:windowMinWidthMajor">88%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
+    </style>
+</resources>

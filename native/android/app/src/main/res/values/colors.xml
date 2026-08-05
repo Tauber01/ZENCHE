@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- v1.5.6 dual-appearance tokens (light) — design.md calibrated table. -->
+    <color name="workbench">#E9EDF2</color>
+    <color name="workbench_secondary">#E4E9EF</color>
+    <color name="surface">#F8FAFC</color>
+    <color name="surface_raised">#FFFFFF</color>
+    <color name="ink">#171C26</color>
+    <color name="muted_ink">#5A616C</color>
+    <color name="rule">#CFD6DF</color>
+    <color name="photo_accent">#1673E6</color>
+    <color name="photo_soft">#DCEAFD</color>
+    <color name="video_accent">#D8323A</color>
+    <color name="video_soft">#FBE2E3</color>
+    <color name="positive">#1FA869</color>
+    <color name="graphite">#0A0B0D</color>
+</resources>
