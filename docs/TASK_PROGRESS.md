@@ -535,3 +535,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **孤立值清单（58 处，保留原值，归 F5 数值裁决）**：13×27（text/setTextSize 混合，含 provider/menu/补偿标签/参数控件标题等）、10×6、16×5、17×5、20×4、14×3、22×2、38×2、19×1、28×1、34×1、46×1；条件式 3 处（`i == 1 ? 11 : 24`、`isCompactPhone() ? 10 : 11`、`videoRecording ? 26 : 34`）不拆改；COMPLEX_UNIT_SP 品牌字号 3 处（26/40/14，Splash 区）；95/64/48 等为 dp/图标参数非字号。全部不改渲染值。
 - 验证：npm test 256/256 全绿（native-ui-1.5.3 8/8 含 token 断言过）；assembleDebug BUILD SUCCESSFUL（红线必跑）；git diff --check 干净。
 - **12.13 勘误（pro 复审打回，6 处补归档）**：pro 独立全量扫描发现 6 处可归档遗漏——「设备端 SDR 近似预览」11→TS_CAPTION、「运行“分析画面”后显示实测范围」11→TS_CAPTION、「正在打开本机摄像头…」12→TS_BODY（此前误判为条件式不拆改，实际为直接参数替换）、媒体池计数 10→EDITOR_FS_SMALL、「编辑示波器」10→EDITOR_FS_SMALL、「非破坏编辑」9→EDITOR_FS_TINY（新建档=9，对齐 Harmony/iOS P3 tiny 先例）。替换总数 52→58，孤立值口径 54→58（pro 全量扫描 64 vs 自报 54，差额 10 处中 6 处属可归档，其余为口径分类差异）。pro 裁定接受：STUDIO_* 注释留名契约处理、52 处归档等值、14 死常量零引用、COMPLEX_UNIT_SP 豁免。
+
+## 12.14 v1.5.7 F5 Windows 收口批：样式归一 + 画刷快照 + 数值裁决（2026-08-06）
+
+- 批次：v1.5.7 字号地基批 F5（Windows）；分支 `agent/1.5.7-f5-windows`（worktree REPOS/ZENCHE-wt-1.5.7-f5-windows），基线 `f89bf94`（F3 后）。
+- **TypeScale 5 档样式归一**：Controls.xaml 盘点 33 个 TextBlock 样式（9-26pt 13 档）；pro P6 观察项 **SettingsHint(11)/MetaText(11) 合并评估**——结论**不合并**：MetaText=等宽元信息（MonoFont，版本号/状态行/节点详情需等宽对齐），SettingsHint=普通说明文字（设置页提示，非等宽），语义差异明确，注释声明分工（同值不同用途，design.md 每屏 ≤5 档不冲突）。
+- **画刷快照收口（9 处）**：cs 中 `new SolidColorBrush((Color)FindResource("ColorX"))` 构造期冻结值、主题热切换漏更（App.xaml.cs SwapTheme 换字典后旧快照不更新）→ 改为 `(Brush)FindResource("XxxBrush")` 共享实例引用（Colors.xaml 已定义对应 Brush，Color 经 DynamicResource 跟随主题）；9 处 = ColorAccentBorder/ColorWhiteDim/ColorLogBg/ColorLogText/ColorPhotoSoftBorder/ColorWarnDeep/ColorWarnDark/ColorWarnBg/ColorWarnBgSoft（对应审计 cs:2176/2663/4518/4520/4724/4725/4813/4824/4831/4833 行区间，行号随 P 批漂移后为 2169/2656/4506/4508/4713/4801/4812/4819/4821）。
+- **数值裁决（改值，逐项 macOS 基准证据）**：
+  - `MonitorReadout` 22→18：macOS monitorReadout 值=TypeScale.title=18（main.swift:6692-6698 等宽 bold），Windows 原 22 对齐
+  - `SettingsLogTitle` 22→18：macOS 日志弹窗标题=TypeScale.title=18（SettingsSheet.swift:822），Windows 原 22 对齐
+  - `DeviceHeaderTitle` 24→26、`LibraryHeaderTitle` 24→26：macOS 页面标题=TypeScale.heading=26（WorkspaceHeading 设备页 main.swift:12499/分支页 8001），Windows 原 24 对齐
+  - 其余端标题档（iOS 29/25、Android 30/25、Harmony 30）为各自批次归档值，本批不动；Android F3 的 58 处孤立值仅记录口径不处理
+- 未改：cs 编辑器/弹窗区 21 处 TS 可映射字号（11×14/12×4/15/18/24 等）——非页面批范围（fig2 恒深区/连接弹窗/公告弹窗），留 F2/F4/后续裁决；EditorHeaderTitle=24 为 fig2 恒深编辑器体系（macOS 编辑页标题=TypeScale.emphasis=15，fig2 恒深例外）。
+- 验证：npm test 256/256 全绿；dotnet build 0 错误 4 既有警告；git diff --check 干净；Controls.xaml XML 合法（xmllint）。

@@ -124,7 +124,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 字号归并口径（延续 P 批）：能映射 TS 五档（11/12/15/18/24）的直接映射为 TS_CAPTION/TS_BODY/TS_EMPHASIS/TS_TITLE/TS_DISPLAY，等值不改渲染；P 批已归档的 FS 档位（PAGE_FS_*/EDITOR_FS_*/DEVICE_FS_*/LIBRARY_FS_*/SETTINGS_FS_*）不重复处理；落不了 TS 档的孤立值保留原值，列清单归 F5 数值裁决；条件式/三元（含可映射值）不拆改。
 - 导航 chrome/沉浸 overlay 的字号（◉⋯ 18pt 字符钮、immersive 读数）属 F3 归并范围（只做 TS 等值映射，不改渲染值）；P1 的「导航 chrome 不动」红线指结构/样式不动，字号等值归并不冲突。
 
+## 0.13. 1.5.7 F5 Windows 收口批约定
+
+- 画刷快照收口模式：cs 中禁止 `new SolidColorBrush((Color)FindResource("ColorX"))`（构造期冻结值，主题热切换漏更）——统一改为 `(Brush)FindResource("XxxBrush")` 共享实例引用（Colors.xaml 已为每个 Color 定义配套 Brush，Color 经 DynamicResource 跟随主题字典切换）。audit 9 处（ColorAccentBorder/WhiteDim/LogBg/LogText/PhotoSoftBorder/WarnDeep/WarnDark/WarnBg/WarnBgSoft）已全量收口。
+- 11pt 双样式分工：`MetaText`（MonoFont 等宽）= 等宽元信息（版本号/状态/节点详情）；`SettingsHint`（非等宽）= 普通说明文字（设置页提示）。同值不同用途，不合并，注释声明。
+- 数值裁决基准（改值需 macOS 证据）：读数档=macOS monitorReadout 值 `TypeScale.title`(18)；页面标题档=macOS `TypeScale.heading`(26)（WorkspaceHeading 设备/分支页）；日志弹窗标题=macOS `TypeScale.title`(18)。Windows 端已执行 22→18（MonitorReadout/SettingsLogTitle）、24→26（Device/LibraryHeaderTitle）。其余端标题档值（iOS 29/25、Android 30/25、Harmony 30）为各自批次归档值，对齐裁定归 F5 已记录、执行留各端后续批。
+
 ## 1. 总体原则
+
 
 
 

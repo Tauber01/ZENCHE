@@ -2166,8 +2166,7 @@ public partial class MainWindow : Window
             Width = 84,
             Height = 84,
             BorderThickness = new Thickness(2),
-            BorderBrush = new SolidColorBrush(
-                (Color)FindResource("ColorAccentBorder")),
+            BorderBrush = (Brush)FindResource("AccentBorderBrush"),
             CornerRadius = new CornerRadius(4),
             Background = Brushes.Transparent,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -2653,8 +2652,7 @@ public partial class MainWindow : Window
                 new TextBlock
                 {
                     Text = label,
-                    Foreground = new SolidColorBrush(
-                        (Color)FindResource("ColorWhiteDim")),
+                    Foreground = (Brush)FindResource("WhiteDimBrush"),
                     FontSize = 10,
                     TextAlignment = TextAlignment.Center
                 },
@@ -4503,10 +4501,8 @@ public partial class MainWindow : Window
             TextWrapping = TextWrapping.NoWrap,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Background = new SolidColorBrush(
-                (Color)FindResource("ColorLogBg")),
-            Foreground = new SolidColorBrush(
-                (Color)FindResource("ColorLogText")),
+            Background = (Brush)FindResource("LogBgBrush"),
+            Foreground = (Brush)FindResource("LogTextBrush"),
             BorderBrush = (Brush)FindResource("RuleBrush"),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(14)
@@ -4710,8 +4706,7 @@ public partial class MainWindow : Window
         return new Border
         {
             Background = (Brush)FindResource("AccentSoftBrush"),
-            BorderBrush = new SolidColorBrush(
-                (Color)FindResource("ColorPhotoSoftBorder")),
+            BorderBrush = (Brush)FindResource("PhotoSoftBorderBrush"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14),
@@ -4798,8 +4793,7 @@ public partial class MainWindow : Window
             Text = AppLocalization.T("谨防诈骗"),
             FontSize = 17,
             FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(
-                (Color)FindResource("ColorWarnDeep")),
+            Foreground = (Brush)FindResource("WarnDeepBrush"),
             Margin = new Thickness(0, 0, 0, 7)
         });
         warning.Children.Add(new TextBlock
@@ -4809,17 +4803,14 @@ public partial class MainWindow : Window
                 "或要求付费购买软件的人都是骗子，请勿转账。"),
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(
-                (Color)FindResource("ColorWarnDark")),
+            Foreground = (Brush)FindResource("WarnDarkBrush"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 21
         });
         body.Children.Add(new Border
         {
-            Background = new SolidColorBrush(
-                (Color)FindResource("ColorWarnBg")),
-            BorderBrush = new SolidColorBrush(
-                (Color)FindResource("ColorWarnBgSoft")),
+            Background = (Brush)FindResource("WarnBgBrush"),
+            BorderBrush = (Brush)FindResource("WarnBgSoftBrush"),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12),
             Padding = new Thickness(16),

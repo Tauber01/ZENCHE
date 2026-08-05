@@ -27,6 +27,7 @@
     <Setter Property="Margin" Value="0,0,0,12" />
   </Style>
 
+  <!-- v1.5.7 F5: MetaText(11)=等宽元信息（版本号/状态行/节点详情，需等宽对齐）；SettingsHint(11)=普通说明文字（设置页提示）。语义差异（等宽 vs 非等宽）不合并，分工声明。 -->
   <Style x:Key="MetaText" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
     <Setter Property="FontSize" Value="11" />
@@ -34,9 +35,10 @@
   </Style>
 
   <!-- v1.5.7 P2: 监视读数数值——等宽 display 档（原 22pt 字面量归档，对齐 macOS 读数口径：等宽+大数字档）。 -->
+  <!-- v1.5.7 F5 数值裁决: 22→18 对齐 macOS monitorReadout 值=TypeScale.title=18（等宽 bold；五端读数对齐）。 -->
   <Style x:Key="MonitorReadout" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
   </Style>
@@ -549,9 +551,10 @@
     </Setter>
   </Style>
   <!-- v1.5.7 P4: 设备页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <!-- v1.5.7 F5 数值裁决: 24→26 对齐 macOS 页面标题 heading=26（WorkspaceHeading 设备页）。 -->
   <Style x:Key="DeviceHeaderTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
@@ -582,9 +585,10 @@
   </Style>
 
   <!-- v1.5.7 P5: 文件库页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <!-- v1.5.7 F5 数值裁决: 24→26 对齐 macOS 页面标题 heading=26（WorkspaceHeading 分支页）。 -->
   <Style x:Key="LibraryHeaderTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
@@ -615,9 +619,10 @@
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
 
+  <!-- v1.5.7 F5 数值裁决: 22→18 对齐 macOS 日志弹窗标题=TypeScale.title=18。 -->
   <Style x:Key="SettingsLogTitle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
 
