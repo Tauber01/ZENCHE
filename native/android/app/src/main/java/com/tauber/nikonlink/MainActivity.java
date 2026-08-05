@@ -173,6 +173,7 @@ public final class MainActivity extends Activity {
     private static final int TS_DISPLAY = 24;   // 大数字/读数
     // ── v1.5.7 P3: 编辑页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
     private static final int EDITOR_FS_SMALL = 10;   // 编辑页小标签（AI 模块名）
+    private static final int EDITOR_FS_TINY = 9;     // 编辑页微标注（非破坏编辑说明；对齐 Harmony/iOS P3 tiny=9 先例）
     private static final int EDITOR_FS_SUB = 13;     // 编辑页次级标题（云创监看、滑块标签）
     private static final int EDITOR_FS_MEDIUM = 14;  // 编辑页副标题（云创预览）
     private static final int EDITOR_FS_HEAD = 16;    // 编辑页小标题（AI 创作）
@@ -6902,7 +6903,7 @@ public final class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, dp(48)));
         nikonCloudPanel.addView(
                 text("设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同",
-                        11, Typeface.NORMAL, MUTED),
+                        TS_CAPTION, Typeface.NORMAL, MUTED),
                 marginParams(-1, -2, 0, 8, 0, 0));
         content.addView(
                 nikonCloudPanel,
@@ -7429,7 +7430,7 @@ public final class MainActivity extends Activity {
         rail.setPadding(dp(12), 0, dp(12), 0);
         rail.setBackground(rounded(EDITOR_PANEL, 0, 0));
         rail.addView(text(tr("媒体池") + " · " + photos.size(),
-                10, Typeface.BOLD, EDITOR_LABEL));
+                EDITOR_FS_SMALL, Typeface.BOLD, EDITOR_LABEL));
         String selected = editorSelectedPath == null
                 ? tr("未选择照片")
                 : new File(editorSelectedPath).getName();
@@ -7441,7 +7442,7 @@ public final class MainActivity extends Activity {
         filenameParams.setMargins(dp(10), 0, 0, 0);
         rail.addView(filename, filenameParams);
         rail.addView(text(tr("非破坏编辑 · 保存为高质量副本"),
-                9, Typeface.NORMAL, EDITOR_LABEL));
+                EDITOR_FS_TINY, Typeface.NORMAL, EDITOR_LABEL));
         return rail;
     }
 
@@ -7516,10 +7517,10 @@ public final class MainActivity extends Activity {
         dock.setPadding(dp(12), 0, dp(12), 0);
         dock.setBackground(rounded(EDITOR_PANEL, 0, 0));
         dock.addView(text(tr("编辑示波器"),
-                10, Typeface.BOLD, EDITOR_LABEL));
+                EDITOR_FS_SMALL, Typeface.BOLD, EDITOR_LABEL));
         if (editorAIAnalysis == null) {
             TextView empty = text(tr("运行“分析画面”后显示实测范围"),
-                    11, Typeface.NORMAL, EDITOR_LABEL);
+                    TS_CAPTION, Typeface.NORMAL, EDITOR_LABEL);
             LinearLayout.LayoutParams emptyParams =
                     new LinearLayout.LayoutParams(0, -2, 1f);
             emptyParams.setMargins(dp(10), 0, 0, 0);
@@ -11345,7 +11346,7 @@ public final class MainActivity extends Activity {
                         : localCameraConnected
                                 ? localCamera.getCameraName() + " · 已连接"
                                 : "使用手机或平板内置镜头取景、拍照并保存到文件库",
-                12,
+                TS_BODY,
                 Typeface.NORMAL,
                 localCameraConnected ? POSITIVE : MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
