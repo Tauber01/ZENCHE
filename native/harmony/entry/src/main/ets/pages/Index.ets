@@ -98,6 +98,13 @@ const TS_EMPHASIS: number = 15;   // 强调/卡片标题
 const TS_TITLE: number = 18;      // 区块标题
 const TS_DISPLAY: number = 24;    // 大数字/读数
 
+// v1.5.7 P3: 编辑页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+const EDITOR_FS_TINY: number = 9;    // 编辑页微标注（媒体行非破坏说明）
+const EDITOR_FS_SMALL: number = 10;  // 编辑页小标签/读数（媒体计数、示波器标题、AI 指标、模块名、曲线读数）
+const EDITOR_FS_SUB: number = 13;    // 编辑页次级说明（空态、AI 摘要、面板钮、取色采样）
+const EDITOR_FS_MEDIUM: number = 14; // 编辑页副标题/描述（页头副标题、云创预览、AI 工具描述、提示词输入）
+const EDITOR_FS_HEAD: number = 16;   // 编辑页小标题/强调（工作台标题、选中钩、AI 创作标题）
+
 // Spacing（4pt 体系，与 Android 同值）
 const SPACE_4: number = 4;
 const SPACE_8: number = 8;
@@ -1976,7 +1983,7 @@ struct Index {
     // 媒体行：媒体池计数 + 当前照片名 + 非破坏说明（图 2 顶部媒体信息，横向单行）
     Row({ space: 6 }) {
       Text(`${this.tr('媒体池')} · ${this.editablePhotos().length}`)
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(EDITOR_LABEL)
@@ -1993,7 +2000,7 @@ struct Index {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .layoutWeight(1)
       Text(this.tr('非破坏编辑 · 保存为高质量副本'))
-        .fontSize(9)
+        .fontSize(EDITOR_FS_TINY)
         .fontColor(EDITOR_LABEL)
     }
     .width('100%')
@@ -2086,7 +2093,7 @@ struct Index {
     // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
     Row({ space: 10 }) {
       Text(this.tr('编辑示波器'))
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(EDITOR_LABEL)
@@ -2152,7 +2159,7 @@ struct Index {
       Text(this.tr(
         '分组调整光线、色彩、细节、效果与几何；始终保留原文件。'
       ))
-        .fontSize(14)
+        .fontSize(EDITOR_FS_MEDIUM)
         .fontColor($r('app.color.muted'))
         .width('100%')
       if (this.editablePhotos().length === 0) {
@@ -2164,7 +2171,7 @@ struct Index {
           Text(this.tr(
             '视频与暂不支持解码的 RAW 文件不会进入编辑列表。'
           ))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontColor($r('app.color.muted'))
         }
         .width('100%')
@@ -2289,7 +2296,7 @@ struct Index {
           Scroll() {
             Row({ space: 8 }) {
             Text(this.tr('AI 智能修图 · 工作台'))
-              .fontSize(16)
+              .fontSize(EDITOR_FS_HEAD)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
@@ -2306,7 +2313,7 @@ struct Index {
           .scrollBar(BarState.Off)
           .width('100%')
           Text(this.tr(this.editorAISummary))
-            .fontSize(13)
+            .fontSize(EDITOR_FS_SUB)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Text(this.tr('设备端处理 · 照片不会上传'))
@@ -2426,7 +2433,7 @@ struct Index {
             this.applyEditorPreset(presets[index]);
           })
         Text(`${this.tr('尼康云创预览')} · ${NIKON_CLOUD_PRESETS.length} NP3`)
-          .fontSize(14)
+          .fontSize(EDITOR_FS_MEDIUM)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
@@ -2595,7 +2602,7 @@ struct Index {
               .layoutWeight(1)
             if (item.path === this.editorSelectedPath) {
               Text('✓')
-                .fontSize(16)
+                .fontSize(EDITOR_FS_HEAD)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.accent'))
             }
@@ -2631,7 +2638,7 @@ struct Index {
   private EditorAIMetric(title: string, value: number) {
     Column({ space: 2 }) {
       Text(this.tr(title))
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontColor($r('app.color.muted'))
       Text(`${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`)
         .fontSize(TS_CAPTION)
@@ -2651,7 +2658,7 @@ struct Index {
   private EditorPanelButton(label: string, panel: string) {
     Button(this.tr(label), { type: ButtonType.Normal })
       .height(44)
-      .fontSize(13)
+      .fontSize(EDITOR_FS_SUB)
       .fontWeight(FontWeight.Bold)
       .fontColor(
         this.editorPanel === panel
@@ -2684,14 +2691,14 @@ struct Index {
         .fontColor($r('app.color.ink'))
         .width('100%')
       Text(this.tr('基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。'))
-        .fontSize(14)
+        .fontSize(EDITOR_FS_MEDIUM)
         .fontColor($r('app.color.muted'))
         .width('100%')
 
       Row({ space: 10 }) {
         Column({ space: 3 }) {
           Text(this.tr('AI 创作'))
-            .fontSize(16)
+            .fontSize(EDITOR_FS_HEAD)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('修图覆盖原图 · 生图保存新文件'))
@@ -2763,7 +2770,7 @@ struct Index {
 
       TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…（可补充）' : '输入生图描述…（可补充）', text: this.aiManualPrompt })
         .height(80)
-        .fontSize(14)
+        .fontSize(EDITOR_FS_MEDIUM)
         .onChange((value: string): void => {
           this.aiManualPrompt = value;
           this.composeAiPrompt();
@@ -2839,7 +2846,7 @@ struct Index {
       .width('100%')
       ForEach(this.getAiModules(), (module: Array<string>) => {
         Text(this.tr(module[0]))
-          .fontSize(10)
+          .fontSize(EDITOR_FS_SMALL)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -3631,7 +3638,7 @@ struct Index {
         })
       } else if (this.editorPanel === 'picker') {
         Text(this.tr(this.editorPickerSample))
-          .fontSize(13).fontColor($r('app.color.muted')).width('100%')
+          .fontSize(EDITOR_FS_SUB).fontColor($r('app.color.muted')).width('100%')
         Button(this.tr('取样当前照片中心'), { type: ButtonType.Normal })
           .height(46).width('100%')
           .onClick((): void => {
@@ -4019,7 +4026,7 @@ struct Index {
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.muted'))
       Text(`${xValue >= 0 ? '+' : ''}${Math.round(xValue)}, ${yValue >= 0 ? '+' : ''}${Math.round(yValue)}`)
-        .fontSize(10)
+        .fontSize(EDITOR_FS_SMALL)
         .fontColor($r('app.color.muted'))
     }
     .layoutWeight(1)

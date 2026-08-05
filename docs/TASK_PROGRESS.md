@@ -467,3 +467,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - Harmony MonitorScopeRail 缺中间录制钮：与 macOS/Windows/Android/iOS 形态差异，但 Harmony 底部已有录制按钮覆盖交互且审计未列 → 记 backlog，本批不动。
 - design.md：本批为执行既有条款（读数 = 等宽 display 档，design.md Typography「display step reserved for large numerals/readouts」），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过；iOS xcodebuild Release（免签名）BUILD SUCCEEDED；Android `:app:compileDebugJavaWithJavac` 通过（仅基线 deprecation 提示）；Harmony assembleHap BUILD SUCCESSFUL（构建中间产物与 dist 已清理）；Windows dotnet build 通过；git diff --check 干净。
+
+## 12.9 v1.5.7 逐页批次 P3：编辑页（editor）四端对齐 macOS 基准（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P3（编辑/editor 四端对齐 macOS 基准）；分支 `agent/1.5.7-p3-editor`（worktree REPOS/ZENCHE-wt-1.5.7-p3-editor），基线 `7e52a75`（P1/P2 合入后）。
+- Windows（MainWindow.xaml / Controls.xaml / MainWindow.xaml.cs）：EditorPanel 区 21 处字号字面量归档为 DynamicResource 样式，新增 14 样式（EditorNodeIcon / EditorCaption / EditorPreviewEmpty / EditorAccentLabel / EditorAIMetrics / EditorAISummary / EditorMonoLabel / EditorRailTitle / EditorScopeHint / AiPreviewEmpty / AiPreviewBadge / AiPanelHint / AiUnlockStatus / AiStatusText）；XML 子树解析验证 EditorPanel 元素内 0 字面量（文件其余 79 处属 capture/settings/monitor/AppBar/dialog 等 P3 范围外区域）；`BuildEditorAdjustmentControls` 工具组添加顺序按 macOS 基准拉齐（光线/色彩/色轮/曲线/取色器/蒙版/细节/效果/几何）。
+- Harmony（Index.ets）：新增 5 常量 `EDITOR_FS_TINY=9 / SMALL=10 / SUB=13 / MEDIUM=14 / HEAD=16`（TS 五档之外既有值，只归档不改值）；编辑区（1944-4083）17 处字面量替换，残留 0。
+- Android（MainActivity.java）：新增 4 常量 `EDITOR_FS_SMALL=10 / SUB=13 / MEDIUM=14 / HEAD=16`；13 处替换（审计 9 + 同编辑区额外 4：L6888「款 NP3」11、L7594「已选择原图」11、L7978 文件名 12、L8390 色轮值 10）；与 TS token 重合值直接映射（11→TS_CAPTION×4、12→TS_BODY×2）。
+- iOS（RootView.swift）：新增 `EditorFontSize` 枚举（tiny=9 / small=10）；3 处替换（审计 1 + EditorScopeDock 1762/1767 + 2123）。
+- 十组工具一致性核对：五端均暴露同 10 组（光线/色彩/色轮/曲线/取色器/蒙版/细节/效果/几何/AI）、命名一致；macOS/iOS 走 `EditorAdjustmentSection.allCases` 枚举平铺、Windows/Harmony/Android 走 5 钮 EditorToolRail + 面板钮，属既有平台结构差异未动（守门测试仅断言标签不断言导航形态）。
+- 共享面板：`buildNikonCloudMonitorPanel`（capture/monitor/editor 共用）8599/8998 字面量按审计列 P3 归档为 EDITOR_FS_SUB，无视觉变化。
+- AI 呈现差异保留：macOS/iOS 编辑页「AI 工具」为工具分组之一 vs Windows/Harmony/Android「AI」轨钮 + 独立工作台，既有设计差异，非红线违规。
+- design.md：本批为执行既有条款（fig2 恒深直角、只归档不改值），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过（Windows 组序调整后复跑）；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Android assembleDebug BUILD SUCCESSFUL（仅基线 deprecation 提示）；iOS xcodebuild 模拟器 BUILD SUCCEEDED；git diff --check 干净；macOS 编辑区（9483-9700）复核 0 字号字面量（基准端无需改动）。

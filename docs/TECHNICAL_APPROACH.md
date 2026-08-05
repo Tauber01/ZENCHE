@@ -80,6 +80,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 沉浸监视 overlay 属 design.md 固定深色族（L67-76/369），四端维持恒深，不随系统主题切换；本批只复核不改动。
 - Harmony `MonitorScopeRail` 缺中间录制钮：底部录制按钮已覆盖交互，记 backlog 不本批处理。
 
+## 0.8. 1.5.7 逐页批次 P3：编辑页四端对齐约定
+
+- 编辑页字号归档纪律（只归档不改值）：非 TypeScale 五档的既有值（9/10/13/14/16）以文件级命名常量保留原值（Harmony/Android `EDITOR_FS_TINY/SMALL/SUB/MEDIUM/HEAD`、iOS `EditorFontSize.tiny/small`），与 TS 五档重合值（11/12）直接映射 `TS_CAPTION`/`TS_BODY`；字号数值统一收口归 F5，本批不改任何显示值。
+- 十组工具契约（五端一致）：光线 / 色彩 / 色轮 / 曲线 / 取色器 / 蒙版 / 细节 / 效果 / 几何 / AI，命名以 macOS `EditorToolRail`（main.swift:9543，十组 8608-8618）为基准；Windows 工具组添加顺序已按基准拉齐（色轮/曲线/取色器/蒙版位于细节/效果之前）。渲染形态差异保留：macOS/iOS 用 `EditorAdjustmentSection.allCases` 枚举平铺，Windows/Harmony/Android 用 5 钮 EditorToolRail + 面板钮，属既有平台结构差异（守门测试只断言分组标签，不断言导航形态）。
+- Windows 归档边界：字号字面量归档以 EditorPanel 元素子树为界（XML 子树解析验证 0 残留）；SettingsPanel（含专业监看、AI 兑换/设备码）、快速反馈对话框、底部 AppBar 状态栏属 P6/全局 chrome，不并入本批。
+- 共享面板口径：`buildNikonCloudMonitorPanel`（capture/monitor/editor 共用）的字号按审计列 P3 处理（归档为 EDITOR_FS_SUB），保持无视觉变化。
+- AI 区差异：macOS/iOS 编辑页「AI 工具」为工具分组之一，Windows/Harmony/Android 以「AI」轨钮 + 独立工作台呈现——既有设计差异，不视为五端契约缺口，本批不合并形态。
+- 沉浸 overlay 四件套、RGB 波形渲染层、导航 chrome 不在本批（同 P2 红线，见 0.7）。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

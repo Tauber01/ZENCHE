@@ -1183,10 +1183,7 @@
                   CornerRadius="0">
             <StackPanel>
               <TextBlock x:Name="EditorHeaderTitle"
-                         Foreground="{DynamicResource EditorInkBrush}"
-                         FontFamily="{DynamicResource DisplayFont}"
-                         FontSize="24"
-                         FontWeight="Bold"
+                         Style="{DynamicResource EditorHeaderTitle}"
                          Text="专业显影" />
               <TextBlock x:Name="EditorHeaderSubtitle"
                          Margin="0,4,0,0"
@@ -1226,15 +1223,11 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                   </Grid.RowDefinitions>
-                  <TextBlock FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             FontWeight="Bold"
-                             Foreground="{DynamicResource EditorInkBrush}"
-                             Text="媒体池" />
+                  <TextBlock Style="{DynamicResource EditorRailTitle}" Text="媒体池" />
                   <StackPanel Grid.Row="1" Margin="0,14,0,0">
-                    <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="9" Foreground="{DynamicResource EditorLabelBrush}" Text="可编辑照片" />
-                    <TextBlock x:Name="EditorMediaCountText" Margin="0,3,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource EditorInkBrush}" Text="0" />
-                    <TextBlock x:Name="EditorMediaSelectionText" Margin="0,10,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="11" Foreground="{DynamicResource EditorLabelBrush}" Text="未选择照片" TextWrapping="Wrap" />
+                    <TextBlock Style="{DynamicResource EditorRailLabel}" Text="可编辑照片" />
+                    <TextBlock x:Name="EditorMediaCountText" Margin="0,3,0,0" Style="{DynamicResource EditorMediaCount}" Text="0" />
+                    <TextBlock x:Name="EditorMediaSelectionText" Margin="0,10,0,0" Style="{DynamicResource EditorMonoLabel}" Text="未选择照片" TextWrapping="Wrap" />
                   </StackPanel>
                   <StackPanel Grid.Row="2" Margin="0,14,0,0" VerticalAlignment="Top">
                     <Button x:Name="EditorPhotoPickerButton"
@@ -1282,7 +1275,7 @@
                                              Visibility="Collapsed"
                                              HorizontalAlignment="Center"
                                              VerticalAlignment="Center"
-                                             FontSize="15"
+                                             Style="{DynamicResource EditorNodeIcon}"
                                              Text="{Binding Icon}" />
                                 </Grid>
                                 <StackPanel Grid.Column="1">
@@ -1310,7 +1303,7 @@
                       </Border>
                     </Popup>
                   </StackPanel>
-                  <TextBlock Grid.Row="3" FontSize="10" Foreground="{DynamicResource EditorLabelBrush}" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="3" Style="{DynamicResource EditorCaption}" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
                 </Grid>
               </Border>
               <Border Grid.Column="1"
@@ -1331,8 +1324,7 @@
                   <TextBlock x:Name="EditorPreviewEmpty"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             Foreground="{DynamicResource GraphiteMutedBrush}"
-                             FontSize="16"
+                             Style="{DynamicResource EditorPreviewEmpty}"
                              Text="选择一张照片开始编辑" />
                 </Grid>
               </Border>
@@ -1373,8 +1365,7 @@
                                   SelectionChanged="NikonCloudPresetBox_SelectionChanged" />
                       </DockPanel>
                       <TextBlock Margin="0,7,0,0"
-                                 Foreground="{DynamicResource EditorLabelBrush}"
-                                 FontSize="10"
+                                 Style="{DynamicResource EditorCaption}"
                                  TextWrapping="Wrap"
                                  Text="设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同" />
                     </StackPanel>
@@ -1387,27 +1378,20 @@
                         <DockPanel>
                           <TextBlock FontWeight="SemiBold" Text="AI 智能修图 · 工作台" />
                           <TextBlock DockPanel.Dock="Right"
-                                     Foreground="{DynamicResource EditorAccentBrush}"
-                                     FontSize="11"
-                                     FontWeight="SemiBold"
+                                     Style="{DynamicResource EditorAccentLabel}"
                                      Text="设备端" />
                         </DockPanel>
                         <TextBlock x:Name="EditorAIMetricsText"
                                    Margin="0,0,0,8"
-                                   Foreground="{DynamicResource EditorInkBrush}"
-                                   FontFamily="{DynamicResource MonoFont}"
-                                   FontSize="10"
+                                   Style="{DynamicResource EditorAIMetrics}"
                                    Text="等待分析 · 曝光 --  动态范围 --  色彩 --  细节 --" />
                         <TextBlock x:Name="EditorAISummaryText"
                                    Margin="0,6,0,8"
-                                   Foreground="{DynamicResource EditorLabelBrush}"
-                                   FontSize="12"
+                                   Style="{DynamicResource EditorAISummary}"
                                    Text="等待分析当前照片"
                                    TextWrapping="Wrap" />
                         <TextBlock Margin="0,0,0,8"
-                                   Foreground="{DynamicResource EditorAccentBrush}"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
+                                   Style="{DynamicResource EditorAccentLabel}"
                                    Text="设备端处理 · 照片不会上传" />
                         <DockPanel>
                           <TextBlock Text="AI 强度" />
@@ -1519,9 +1503,7 @@
                   <TextBlock x:Name="EditorStatusText"
                              Grid.Row="2"
                              Margin="0,10,0,8"
-                             FontFamily="{DynamicResource MonoFont}"
-                             FontSize="11"
-                             Foreground="{DynamicResource EditorLabelBrush}"
+                             Style="{DynamicResource EditorMonoLabel}"
                              Text="调整不会覆盖原文件"
                              TextWrapping="Wrap" />
                   <StackPanel Grid.Row="3"
@@ -1562,8 +1544,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                   </Grid.RowDefinitions>
-                  <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource EditorInkBrush}" Text="编辑示波器" />
-                  <TextBlock x:Name="EditorScopeText" Grid.Row="1" Margin="0,6,0,0" FontFamily="{DynamicResource MonoFont}" FontSize="10" Foreground="{DynamicResource EditorAccentBrush}" Text="分析后显示实测范围" TextWrapping="Wrap" />
+                  <TextBlock Style="{DynamicResource EditorRailTitle}" Text="编辑示波器" />
+                  <TextBlock x:Name="EditorScopeText" Grid.Row="1" Margin="0,6,0,0" Style="{DynamicResource EditorScopeHint}" Text="分析后显示实测范围" TextWrapping="Wrap" />
                   <Border Grid.Row="2" Margin="0,12,0,0" Background="{DynamicResource EditorBgBrush}" BorderBrush="{DynamicResource EditorRuleBrush}" BorderThickness="1">
                     <Grid>
                       <Border Height="1" VerticalAlignment="Center" Background="{DynamicResource GuideBrush}" />
@@ -1594,8 +1576,7 @@
                 <TextBlock x:Name="AiPreviewEmpty"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource GraphiteMutedBrush}"
-                           FontSize="14"
+                           Style="{DynamicResource AiPreviewEmpty}"
                            Text="选择原图或生成图像后将在这里显示" />
                 <StackPanel HorizontalAlignment="Left"
                             VerticalAlignment="Top">
@@ -1603,9 +1584,7 @@
                           CornerRadius="16"
                           Padding="10,6">
                     <TextBlock x:Name="AiPreviewBadge"
-                               Foreground="{DynamicResource EditorInkBrush}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
+                               Style="{DynamicResource AiPreviewBadge}"
                                Text="AI 生成"
                                Visibility="Collapsed" />
                   </Border>
@@ -1632,17 +1611,14 @@
                   <StackPanel>
                     <TextBlock FontWeight="SemiBold" Text="AI 创作" />
                     <TextBlock Margin="0,3,0,0"
-                               Foreground="{DynamicResource MutedBrush}"
-                               FontSize="11"
+                               Style="{DynamicResource AiPanelHint}"
                                Text="修图覆盖原图 · 生图保存新文件" />
                   </StackPanel>
                   <TextBlock x:Name="AiUnlockStatus"
                              DockPanel.Dock="Right"
                              Margin="10,0,0,0"
                              VerticalAlignment="Center"
-                             Foreground="{DynamicResource PositiveBrush}"
-                             FontSize="11"
-                             FontWeight="SemiBold"
+                             Style="{DynamicResource AiUnlockStatus}"
                              Text="需要激活" />
                 </DockPanel>
                 <TextBlock FontWeight="SemiBold" Text="AI 模式" Margin="0,14,0,0" />
@@ -1707,9 +1683,7 @@
                         Content="生成图像"
                         Click="AiGenerate_Click" />
                 <TextBlock x:Name="AiStatusText"
-                           FontFamily="{DynamicResource MonoFont}"
-                           FontSize="11"
-                           Foreground="{DynamicResource MutedBrush}"
+                           Style="{DynamicResource AiStatusText}"
                            Text="请输入提示词"
                            TextWrapping="Wrap" />
                 <Button x:Name="AiSaveBtn"

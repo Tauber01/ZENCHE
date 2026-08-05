@@ -7213,6 +7213,10 @@ public partial class MainWindow : Window
             new EditorSliderSpec("tint", "色调", -100, 100),
             new EditorSliderSpec("vibrance", "自然饱和度", -100, 100),
             new EditorSliderSpec("saturation", "饱和度", -100, 100)));
+        EditorAdjustmentHost.Children.Add(CreateEditorColorWheelsGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorCurvesGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorPickerGroup());
+        EditorAdjustmentHost.Children.Add(CreateEditorMaskGroup());
         EditorAdjustmentHost.Children.Add(CreateEditorGroup(
             "细节",
             false,
@@ -7225,10 +7229,6 @@ public partial class MainWindow : Window
             false,
             new EditorSliderSpec("dehaze", "去雾", -100, 100),
             new EditorSliderSpec("vignette", "暗角", -100, 100)));
-        EditorAdjustmentHost.Children.Add(CreateEditorColorWheelsGroup());
-        EditorAdjustmentHost.Children.Add(CreateEditorCurvesGroup());
-        EditorAdjustmentHost.Children.Add(CreateEditorPickerGroup());
-        EditorAdjustmentHost.Children.Add(CreateEditorMaskGroup());
         EditorAdjustmentHost.Children.Add(CreateEditorGeometryGroup());
     }
 

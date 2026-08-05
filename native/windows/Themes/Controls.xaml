@@ -41,6 +41,105 @@
     <Setter Property="Foreground" Value="{DynamicResource MonitorWellTextBrush}" />
   </Style>
 
+  <!-- v1.5.7 P3: 编辑页字号字面量归档——原值入样式、不动渲染（字号数值统一收口归 F5）。 -->
+  <Style x:Key="EditorHeaderTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorInkBrush}" />
+  </Style>
+
+  <Style x:Key="EditorRailTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorInkBrush}" />
+  </Style>
+
+  <Style x:Key="EditorRailLabel" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="9" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorLabelBrush}" />
+  </Style>
+
+  <Style x:Key="EditorMediaCount" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorInkBrush}" />
+  </Style>
+
+  <Style x:Key="EditorMonoLabel" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorLabelBrush}" />
+  </Style>
+
+  <Style x:Key="EditorNodeIcon" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="15" />
+  </Style>
+
+  <Style x:Key="EditorCaption" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorLabelBrush}" />
+  </Style>
+
+  <Style x:Key="EditorPreviewEmpty" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource GraphiteMutedBrush}" />
+  </Style>
+
+  <Style x:Key="EditorAccentLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorAccentBrush}" />
+  </Style>
+
+  <Style x:Key="EditorAIMetrics" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorInkBrush}" />
+  </Style>
+
+  <Style x:Key="EditorAISummary" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorLabelBrush}" />
+  </Style>
+
+  <Style x:Key="EditorScopeHint" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorAccentBrush}" />
+  </Style>
+
+  <Style x:Key="AiPreviewEmpty" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource GraphiteMutedBrush}" />
+  </Style>
+
+  <Style x:Key="AiPreviewBadge" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource EditorInkBrush}" />
+  </Style>
+
+  <Style x:Key="AiPanelHint" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
+  <Style x:Key="AiUnlockStatus" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource PositiveBrush}" />
+  </Style>
+
+  <Style x:Key="AiStatusText" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource MonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+  </Style>
+
   <Style x:Key="ButtonBase" TargetType="Button">
     <Setter Property="MinHeight" Value="44" />
     <Setter Property="Padding" Value="16,8" />

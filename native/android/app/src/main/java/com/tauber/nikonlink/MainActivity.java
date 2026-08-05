@@ -174,6 +174,11 @@ public final class MainActivity extends Activity {
     private static final int TS_EMPHASIS = 15;  // 强调/卡片标题
     private static final int TS_TITLE = 18;     // 区块标题
     private static final int TS_DISPLAY = 24;   // 大数字/读数
+    // ── v1.5.7 P3: 编辑页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
+    private static final int EDITOR_FS_SMALL = 10;   // 编辑页小标签（AI 模块名）
+    private static final int EDITOR_FS_SUB = 13;     // 编辑页次级标题（云创监看、滑块标签）
+    private static final int EDITOR_FS_MEDIUM = 14;  // 编辑页副标题（云创预览）
+    private static final int EDITOR_FS_HEAD = 16;    // 编辑页小标题（AI 创作）
     // ── v1.5.6 Spacing（design.md §81-84：4pt 体系 4/8/12/16/20/24/32/40）──
     private static final int SPACE_4 = 4;
     private static final int SPACE_8 = 8;
@@ -6877,10 +6882,10 @@ public final class MainActivity extends Activity {
         cloudHeading.setOrientation(LinearLayout.HORIZONTAL);
         cloudHeading.setGravity(Gravity.CENTER_VERTICAL);
         cloudHeading.addView(
-                text("尼康云创预览", 14, Typeface.BOLD, INK),
+                text("尼康云创预览", EDITOR_FS_MEDIUM, Typeface.BOLD, INK),
                 new LinearLayout.LayoutParams(0, dp(40), 1f));
         cloudHeading.addView(
-                text(nikonCloudPresets.size() + " 款 NP3", 11,
+                text(nikonCloudPresets.size() + " 款 NP3", TS_CAPTION,
                         Typeface.BOLD, COBALT),
                 new LinearLayout.LayoutParams(dp(88), dp(40)));
         nikonCloudPanel.addView(cloudHeading);
@@ -7426,7 +7431,7 @@ public final class MainActivity extends Activity {
         String selected = editorSelectedPath == null
                 ? tr("未选择照片")
                 : new File(editorSelectedPath).getName();
-        TextView filename = text(selected, 12, Typeface.BOLD, Color.WHITE);
+        TextView filename = text(selected, TS_BODY, Typeface.BOLD, Color.WHITE);
         filename.setSingleLine(true);
         filename.setEllipsize(TextUtils.TruncateAt.MIDDLE);
         LinearLayout.LayoutParams filenameParams =
@@ -7453,7 +7458,7 @@ public final class MainActivity extends Activity {
                     ? editorState == EditorState.AI
                     : Boolean.TRUE.equals(disclosureStates.get(key));
             Button tool = nativeButton(names[index], false);
-            tool.setTextSize(11);
+            tool.setTextSize(TS_CAPTION);
             tool.setTextColor(active ? EDITOR_ACCENT : EDITOR_LABEL);
             tool.setBackground(rounded(
                     active ? EDITOR_RAISED : Color.TRANSPARENT,
@@ -7526,7 +7531,7 @@ public final class MainActivity extends Activity {
                 Math.round(editorAIAnalysis.contrast * 100),
                 Math.round(editorAIAnalysis.saturation * 100),
                 Math.round(editorAIAnalysis.detail * 100));
-        TextView values = text(metrics, 11, Typeface.BOLD, EDITOR_ACCENT);
+        TextView values = text(metrics, TS_CAPTION, Typeface.BOLD, EDITOR_ACCENT);
         values.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         values.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams valuesParams =
@@ -7555,7 +7560,7 @@ public final class MainActivity extends Activity {
         aiIntro.setOrientation(LinearLayout.VERTICAL);
         aiIntro.setPadding(dp(14), dp(12), dp(14), dp(12));
         aiIntro.setBackground(rounded(COBALT_SOFT, 12, COBALT));
-        aiIntro.addView(text("AI 创作", 16, Typeface.BOLD, INK));
+        aiIntro.addView(text("AI 创作", EDITOR_FS_HEAD, Typeface.BOLD, INK));
         aiIntro.addView(text(
                 "修图覆盖原图 · 生图保存新文件",
                 12,
@@ -7586,7 +7591,7 @@ public final class MainActivity extends Activity {
                         1400);
                 if (original != null) {
                     content.addView(
-                            text(tr("已选择原图"), 11, Typeface.BOLD, MUTED),
+                            text(tr("已选择原图"), TS_CAPTION, Typeface.BOLD, MUTED),
                             marginParams(-1, -2, 0, 0, 0, 6));
                     ImageView originalPreview = new ImageView(this);
                     originalPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -7970,7 +7975,7 @@ public final class MainActivity extends Activity {
             thumbnail.setImageResource(android.R.drawable.ic_menu_gallery);
         }
         row.addView(thumbnail, new LinearLayout.LayoutParams(dp(84), dp(56)));
-        TextView name = text(file.getName(), 12, Typeface.BOLD, INK);
+        TextView name = text(file.getName(), TS_BODY, Typeface.BOLD, INK);
         name.setSingleLine(true);
         name.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         row.addView(name, new LinearLayout.LayoutParams(0, dp(56), 1f));
@@ -8011,7 +8016,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 8, 0, 2));
         String[][] modules = aiMode == 0 ? AI_EDIT_MODULES : AI_GENERATE_MODULES;
         for (String[] module : modules) {
-            TextView title = text(module[0], 10, Typeface.BOLD, MUTED);
+            TextView title = text(module[0], EDITOR_FS_SMALL, Typeface.BOLD, MUTED);
             container.addView(title, marginParams(-1, -2, 0, 0, 0, 4));
             HorizontalScrollView scroll = new HorizontalScrollView(this);
             scroll.setHorizontalScrollBarEnabled(false);
@@ -8379,10 +8384,10 @@ public final class MainActivity extends Activity {
             refreshPreview.run();
         });
         column.addView(wheel, new LinearLayout.LayoutParams(dp(82), dp(82)));
-        TextView label = text(title, 11, Typeface.BOLD, INK);
+        TextView label = text(title, TS_CAPTION, Typeface.BOLD, INK);
         label.setGravity(Gravity.CENTER);
         column.addView(label, new LinearLayout.LayoutParams(-1, dp(20)));
-        TextView value = text(String.format(Locale.ROOT, "%+d, %+d", initialX, initialY), 10, Typeface.NORMAL, MUTED);
+        TextView value = text(String.format(Locale.ROOT, "%+d, %+d", initialX, initialY), EDITOR_FS_SMALL, Typeface.NORMAL, MUTED);
         value.setGravity(Gravity.CENTER);
         wheel.setValueLabel(value);
         column.addView(value, new LinearLayout.LayoutParams(-1, dp(18)));
@@ -8596,7 +8601,7 @@ public final class MainActivity extends Activity {
         LinearLayout labels = new LinearLayout(this);
         labels.setOrientation(LinearLayout.VERTICAL);
         labels.setPadding(dp(12), 0, dp(8), 0);
-        labels.addView(text("尼康云创监看", 13, Typeface.BOLD, primaryText));
+        labels.addView(text("尼康云创监看", EDITOR_FS_SUB, Typeface.BOLD, primaryText));
         TextView selected = text(
                 monitorNikonCloudPreset == null
                         ? "已关闭"
@@ -8995,7 +9000,7 @@ public final class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = text(title, 13, Typeface.BOLD, INK);
+        TextView label = text(title, EDITOR_FS_SUB, Typeface.BOLD, INK);
         row.addView(label, new LinearLayout.LayoutParams(dp(86), dp(48)));
         SeekBar slider = new SeekBar(this);
         slider.setMax(maximum - minimum);
