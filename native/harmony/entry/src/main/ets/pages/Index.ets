@@ -4949,6 +4949,7 @@ struct Index {
         this.MonitorReadout('光圈', this.connected ? `f/${this.currentAperture.toFixed(1)}` : '—')
         this.MonitorReadout('ISO', this.connected ? `${this.currentIso}` : '—')
         this.MonitorReadout('白平衡', this.connected ? '自动' : '—')
+        this.MonitorReadout('编码', this.connected ? this.videoCodecShortLabel() : '—')
         this.MonitorReadout('色调', this.connected ? `${this.currentCompensation >= 0 ? '+' : ''}${Math.round(this.currentCompensation)}` : '—')
       }
     }
@@ -9800,6 +9801,29 @@ struct Index {
       (entry: SelectEntry): boolean => entry.value === this.videoCodec
     );
     return selected === undefined ? this.videoCodec : selected.label;
+  }
+
+  // v1.5.7 P2: 读数轨短标签（对齐 macOS MonitorReadout shortLabel 口径）。
+  private videoCodecShortLabel(): string {
+    switch (this.videoCodec) {
+      case 'h264': return 'H.264';
+      case 'h265': return 'H.265';
+      case 'prores422hq': return 'ProRes 422 HQ';
+      case 'proresRaw': return 'ProRes RAW';
+      case 'nraw': return 'N-RAW';
+      case 'sonyXavcHs8k': return 'XAVC HS 8K';
+      case 'sonyXavcHs4k': return 'XAVC HS 4K';
+      case 'sonyXavcS4k': return 'XAVC S 4K';
+      case 'sonyXavcSHd': return 'XAVC S HD';
+      case 'sonyXavcSi4k': return 'XAVC S-I 4K';
+      case 'sonyXavcSiHd': return 'XAVC S-I HD';
+      case 'canonRaw': return 'RAW';
+      case 'canonXfHevc422':
+      case 'canonXfHevc420': return 'XF-HEVC S';
+      case 'canonXfAvc422':
+      case 'canonXfAvc420': return 'XF-AVC S';
+      default: return this.videoCodecLabel();
+    }
   }
 
   private videoCodecEntries(): Array<SelectEntry> {

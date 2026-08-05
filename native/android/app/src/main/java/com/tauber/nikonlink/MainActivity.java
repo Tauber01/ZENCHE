@@ -3838,6 +3838,7 @@ public final class MainActivity extends Activity {
         addMonitorReadout(rail, "白平衡", connected
                 ? ("continuous".equals(currentWhiteBalance) ? "自动" : "预设")
                 : "—");
+        addMonitorReadout(rail, "编码", connected ? videoCodecShortLabel(videoCodec) : "—");
         addMonitorReadout(rail, "色调", connected ? String.format(Locale.CHINA, "%+d", (int) currentCompensation) : "—");
         scroll.addView(rail);
         return scroll;
@@ -5669,6 +5670,29 @@ public final class MainActivity extends Activity {
             if (values[index].equals(codec)) return labels[index];
         }
         return codec;
+    }
+
+    // v1.5.7 P2: 读数轨短标签（对齐 macOS MonitorReadout shortLabel 口径）。
+    private String videoCodecShortLabel(String codec) {
+        switch (codec) {
+            case "h264": return "H.264";
+            case "h265": return "H.265";
+            case "prores422hq": return "ProRes 422 HQ";
+            case "proresRaw": return "ProRes RAW";
+            case "nraw": return "N-RAW";
+            case "sonyXavcHs8k": return "XAVC HS 8K";
+            case "sonyXavcHs4k": return "XAVC HS 4K";
+            case "sonyXavcS4k": return "XAVC S 4K";
+            case "sonyXavcSHd": return "XAVC S HD";
+            case "sonyXavcSi4k": return "XAVC S-I 4K";
+            case "sonyXavcSiHd": return "XAVC S-I HD";
+            case "canonRaw": return "RAW";
+            case "canonXfHevc422":
+            case "canonXfHevc420": return "XF-HEVC S";
+            case "canonXfAvc422":
+            case "canonXfAvc420": return "XF-AVC S";
+            default: return codec;
+        }
     }
 
     private String[] videoCodecValues() {

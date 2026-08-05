@@ -72,6 +72,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 兑换码说明文案属信息性内容：恢复 4881042 删除的「兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。」与「没有兑换码？在爱发电购买兑换码」引导，以 TypeScale 档（TS_CAPTION/TS_BODY）呈现，不恢复二维码与重复按钮（保留单区块双按钮结构）。
 - P1 批仅执行既有 design.md 条款，不引入新规范；字号归档（iOS F2 / Android F3 / Harmony F4 / Windows F5）由后续地基批处理。
 
+## 0.7. 1.5.7 逐页批次 P2：视频页四端对齐约定
+
+- 监视读数 7 格契约（五端一致）：帧率 / 快门 / 光圈 / ISO / 白平衡 / 编码 / 色调，以 macOS `MonitorView.monitorReadout`（main.swift:6600-6608）为基准；iOS/Android/Harmony 读数轨本批补「编码」格。
+- 编码格短标签口径：读数轨内统一用短标签（macOS `shortLabel` / Windows `VideoCodecShortLabel` 同源映射：H.264 / H.265 / ProRes 422 HQ / ProRes RAW / N-RAW / XAVC HS 8K… / XF-HEVC S / XF-AVC S / RAW），iOS 新增 `MonitorVideoCodec.shortLabel`、Android/Harmony 新增 `videoCodecShortLabel()`；全标签（含位深/封装细节）仍用于参数选择器与沉浸参数显示，不混用。
+- Windows 读数 22pt 归档：监视读数数值（7 格 + 存储读数）归档为 `MonitorReadout` 样式（等宽 + Bold + 22pt + MonitorWellTextBrush），归 display 档（design.md「display step reserved for large numerals/readouts」）；品牌 Z 标与预览空态提示（DisplayFont 22pt）不属读数，保留字面量待 F5 统一收口。
+- 沉浸监视 overlay 属 design.md 固定深色族（L67-76/369），四端维持恒深，不随系统主题切换；本批只复核不改动。
+- Harmony `MonitorScopeRail` 缺中间录制钮：底部录制按钮已覆盖交互，记 backlog 不本批处理。
+
 ## 1. 总体原则
 
 项目采用“五端原生实现、行为对齐、平台能力如实降级”的技术路线。

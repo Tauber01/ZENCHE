@@ -6310,6 +6310,7 @@ private struct MonitorConsolePage: View {
             ConsoleReadout(label: "光圈", value: model.camera.lensAperture > 0 ? String(format: "f/%.1f", model.camera.lensAperture) : "—", dimmed: model.camera.lensAperture <= 0)
             ConsoleReadout(label: "ISO", value: connected ? "\(Int(model.camera.exposureISO.rounded()))" : "—")
             ConsoleReadout(label: "白平衡", value: "自动")
+            ConsoleReadout(label: "编码", value: connected ? model.monitorVideoCodec.shortLabel : "—")
             ConsoleReadout(label: "色调", value: String(format: "%+.0f", model.camera.exposureBias * 50))
         }
         .padding(.horizontal, 17)

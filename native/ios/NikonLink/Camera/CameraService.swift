@@ -76,6 +76,27 @@ enum MonitorVideoCodec: String, CaseIterable, Identifiable {
         }
     }
 
+    /// v1.5.7 P2: 读数轨短标签（对齐 macOS MonitorReadout shortLabel 口径）。
+    var shortLabel: String {
+        switch self {
+        case .automatic: return "自动"
+        case .h264: return "H.264"
+        case .hevc: return "H.265"
+        case .proRes422HQ: return "ProRes 422 HQ"
+        case .proResRAW: return "ProRes RAW"
+        case .nRaw: return "N-RAW"
+        case .sonyXavcHs8k: return "XAVC HS 8K"
+        case .sonyXavcHs4k: return "XAVC HS 4K"
+        case .sonyXavcS4k: return "XAVC S 4K"
+        case .sonyXavcSHd: return "XAVC S HD"
+        case .sonyXavcSi4k: return "XAVC S-I 4K"
+        case .sonyXavcSiHd: return "XAVC S-I HD"
+        case .canonRaw: return "RAW"
+        case .canonXfHevc422, .canonXfHevc420: return "XF-HEVC S"
+        case .canonXfAvc422, .canonXfAvc420: return "XF-AVC S"
+        }
+    }
+
     var supportsNLog: Bool {
         switch self {
         case .automatic, .h264: return false
