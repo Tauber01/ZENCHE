@@ -499,3 +499,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 设备卡信息项五端核对：名称/当前已连接徽标/vendor·transport/最近连接/快速连接+忘记设备按钮五端一致（本批补 iOS/Android vendor 信息项）。
 - design.md：本批为执行既有条款（双外观成对取 token、只归档不改值、图标豁免先例），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过；iOS xcodebuild 模拟器 BUILD SUCCEEDED；Windows dotnet build 0 错误 4 既有警告（CS8629×2 / CS0414×2）；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期，构建中间产物已清理）；git diff --check 干净。
+
+## 12.11 v1.5.7 逐页批次 P5：分支文件库页（library）四端对齐 macOS 基准（2026-08-06）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P5（分支文件库/library 四端对齐 macOS 基准）；分支 `agent/1.5.7-p5-library`（worktree REPOS/ZENCHE-wt-1.5.7-p5-library），基线 `71a4c4f`（P1-P4 + P3 勘误后）。
+- macOS 基准：LibraryView（main.swift:7956）HSplitView 左列分支工作台（MacLibraryBranchRow 7699）+ 相机存储（CameraStorageMacRow 7899）+ 系统相册 DisclosureGroup，右列无线传输折叠组（TransferView 8066，本批判定为分支页组成部分）；顶部工具条（刷新/网盘/分享/访达/废纸篓，7993-8016）。macOS 本端零改动（已全 token 化，仅 3 处图标豁免带注释）。
+- iOS（RootView.swift）：新增 `PageFontSize.titleCompact=25/titleRegular=29`（PageTitle 共享组件 3 调用方 1964/6088/7703，定义 9874，compact 25 / regular 29 只归档不改值）；分支工作台 28pt 图标豁免注释。分支页其余字号全系统字体无字面量。
+- Android（MainActivity.java）：新增 `LIBRARY_FS_WORKBENCH=20/TITLE=14/SUB=13`；分支页 9 函数 + 无线传输面板（buildWirelessTransferPanel/buildWifiCameraPanel，差距分析补录：macOS 基准右列即无线传输，属分支页）28 处字面量替换：20/14/13→LIBRARY_FS_*，12→TS_BODY、11→TS_CAPTION（与 TS 档重合直接映射既有 token）；sectionHeader 已 P4 归档未重复处理。
+- Harmony（Index.ets）：新增 `LIBRARY_FS_TINY=10/SUB=13/TITLE=14/HEAD=16/WORKBENCH=20`；LibraryWorkspace（5393 起）分支页 14 处替换 + 徽标方块 16/播放图标 ▶ 20 豁免注释；CaptureSessionPanel(6201) 属 P1 组件（仅 CameraWorkspace 4270 调用）不在本批；无线传输卡（WirelessTransferCard 6408）为分支页组成部分一并归档。
+- Windows（Controls.xaml / MainWindow.xaml）：新增样式 `LibraryHeaderTitle(24)/LibraryNodeIcon(15)`；LibraryPanel 头部标题 24→LibraryHeaderTitle、相机存储状态 11→MetaText（既有样式）、节点图标 15→LibraryNodeIcon、相机存储行图标 16 豁免注释；cs 中 BuildBranchNode/BuildMediaTypeNode 为纯数据构建无字号字面量。
+- 双外观核对（P5 审计点）：四端分支页前景/背景均按外观成对取 token（Android INK/MUTED/COBALT/COBALT_SOFT 经 applyAppearanceTokens 亮暗双套；Harmony $r('app.color.*') 亮暗双资源；iOS IPalette 双套；Windows DynamicResource 双字典），无硬编码单外观色值；iOS 28pt 图标白字/Windows 16 图标白字位于恒深色块上属豁免族注释声明。
+- 信息项五端一致性核对（以 macOS 为基准，存在等价操作即一致，不动标签文案）：顶部工具条（刷新相册/链接网盘/分享/访达显示/移到废纸篓）五端等价；iOS 大图预览含分享/编辑 + 选中区删除、Android 文件行含编辑/分享/删除按钮、Harmony/Windows 双击预览 + 右键/选中删除——均为等价信息项。标签文案一律不动（iOS「文件」/Android「已下载」/Harmony·Windows 侧栏长名属 F6 词表裁定，待 Tauber 拍板）。
+- design.md：本批为执行既有条款（每屏 ≤5 档、只归档不改值、双外观成对取 token、图标豁免先例），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild iphoneos BUILD SUCCEEDED（unsigned IPA）；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Windows dotnet publish 0 错误 4 既有警告 + NSIS Setup 构建成功（LANG=en_US.UTF-8 下 makensis 3.12 正常解析 UTF-8 中文脚本）；git diff --check 干净。

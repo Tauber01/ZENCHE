@@ -193,6 +193,12 @@ enum DeviceFontSize {
     static let heading: CGFloat = 30 // 设备页大标题（对标 macOS WorkspaceHeading；值不等 F1 heading 26，收口归 F5）
 }
 
+// v1.5.7 P5: 文件库页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+enum PageFontSize {
+    static let titleCompact: CGFloat = 25 // 页面大标题（紧凑形态，PageTitle 共享组件）
+    static let titleRegular: CGFloat = 29 // 页面大标题（PageTitle 共享组件）
+}
+
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
 private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
@@ -8173,7 +8179,7 @@ private struct LibraryPage: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 28, weight: .semibold)) // 图标尺寸，不受 FontToken 约束（豁免族）
                     .foregroundStyle(.white)
                     .frame(width: 54, height: 54)
                     .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: 15))
@@ -9887,7 +9893,7 @@ private struct PageTitle: View {
                 Text(LocalizedStringKey(title))
                     .font(
                         .system(
-                            size: horizontalSizeClass == .compact ? 25 : 29,
+                            size: horizontalSizeClass == .compact ? PageFontSize.titleCompact : PageFontSize.titleRegular,
                             weight: .bold
                         )
                     )
