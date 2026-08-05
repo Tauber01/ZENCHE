@@ -89,6 +89,81 @@ const UI_ACCENT: string = '#CDDC39';
 const UI_BLUE: string = '#0A84FF';
 const UI_VIDEO: string = '#D8323A';
 
+// ===== v1.5.6 token 层（对齐 Android TS_*/SPACE_*/SCOPE_*/HUD_* 与 design.md 色板）=====
+
+// TypeScale（5 档，与 Android 同值）
+const TS_CAPTION: number = 11;    // 辅助说明/状态
+const TS_BODY: number = 12;       // 正文/标签（Harmony 热点档）
+const TS_EMPHASIS: number = 15;   // 强调/卡片标题
+const TS_TITLE: number = 18;      // 区块标题
+const TS_DISPLAY: number = 24;    // 大数字/读数
+
+// Spacing（4pt 体系，与 Android 同值）
+const SPACE_4: number = 4;
+const SPACE_8: number = 8;
+const SPACE_12: number = 12;
+const SPACE_16: number = 16;
+const SPACE_20: number = 20;
+const SPACE_24: number = 24;
+const SPACE_32: number = 32;
+const SPACE_40: number = 40;
+
+// design.md 色板（dark 值为主，与 Android/其他端同名同值）
+const INK: string = '#ECEEF2';              // Ink（暗色主文本）
+const MUTED_INK: string = '#9AA1AD';        // Muted ink（暗色次要文本）
+const RULE: string = '#FFFFFF1F';           // Rule（暗色分隔线）
+const PHOTO_ACCENT: string = '#2E86E0';     // Photo accent dark（照片动作/选中）
+const PHOTO_ACCENT_LIGHT: string = '#1673E6'; // Photo accent light（渐变起点）
+const PHOTO_SOFT_BORDER: string = '#FFB6CFF5'; // AI 卡浅蓝边框
+const POSITIVE_SOFT: string = '#E4F7EE';    // 已连接浅绿底
+const READOUT_GLOW: string = '#6BAEFF';     // Readout glow（可写曝光值发光）
+
+// SCOPE_* 示波器轨迹色（五端同名同值）
+const SCOPE_R: string = '#FF302A';          // RGB parade R
+const SCOPE_G: string = '#28FF69';          // RGB parade G
+const SCOPE_B: string = '#2240FF';          // RGB parade B
+const SCOPE_AUDIO: string = '#4CC7E8';      // 音频缺失基线
+const SCOPE_YUV_Y: string = '#14FF5C';      // YUV Y
+const SCOPE_YUV_U: string = '#00D2FF';      // YUV U
+const SCOPE_YUV_V: string = '#FF26DE';      // YUV V
+const SCOPE_BG: string = '#050A0F';         // 示波器井背景
+
+// HUD 玻璃遮罩（对齐 Android HUD_* 语义）
+const HUD_BG: string = '#AA000000';         // 67% 黑：主 HUD 控件背景
+const HUD_BG_SOFT: string = '#99000000';    // 60% 黑：次要控件/胶囊
+const HUD_BG_MID: string = '#66000000';     // 40% 黑：关闭/编辑按钮
+const HUD_BG_DIM: string = '#55000000';     // 33% 黑：弱遮罩/弹层阴影
+const HUD_BG_DARK: string = '#88000000';    // 53% 黑：深色面板
+const HUD_SHADOW: string = '#44000000';     // 27% 黑：卡片投影
+const HUD_OVERLAY: string = '#F2080A0F';    // 大图弹层全屏背景
+
+// 白色系（alpha 白）
+const WHITE: string = '#FFFFFF';
+const WHITE_HI: string = '#F0FFFFFF';       // 94% 白
+const WHITE_MID: string = '#E0FFFFFF';      // 88% 白
+const WHITE_LO: string = '#BFFFFFFF';       // 75% 白
+const WHITE_DIM: string = '#99FFFFFF';      // 60% 白
+const WHITE_FAINT: string = '#90FFFFFF';    // 56% 白
+const BLACK: string = '#000000';
+
+// 专属语义色
+const NAV_ACTIVE_BG: string = '#140A84FF';  // 导航选中态背景（UI_BLUE 8%）
+const MORE_ACTIVE_BG: string = '#CC055AD2'; // 沉浸参数展开态蓝底
+const WHEEL_LIFT: string = '#43B7FF';       // 色轮 Lift
+const WHEEL_GAMMA: string = '#C68CFF';      // 色轮 Gamma
+const WHEEL_GAIN: string = '#FFD36A';       // 色轮 Gain
+const PEAKING_AMBER: string = '#FFE45C';    // 峰值覆盖高亮
+const CLOUD_MUTED: string = '#CAD3E0';      // 云创监看关闭态文字
+const CLOUD_CARD_BG: string = '#182434';    // 云创监看卡片背景
+const CLOUD_CARD_BORDER: string = '#304E70';// 云创监看卡片边框
+const WARN_BG: string = '#FFFFEEEE';        // 防诈卡浅红底
+const WARN_BG_SOFT: string = '#FFF4B9B9';   // 防诈徽标浅红
+const WARN_DEEP: string = '#B21923';        // 防诈深红标题
+const WARN_DARK: string = '#75141C';        // 防诈暗红正文
+const ACCENT_SOFT: string = '#DDFFD646';    // 等待画面 accent 边框
+const PHOTO_GLOW: string = '#24055AD2';     // 品牌蓝投影
+const CARD_SHADOW: string = '#14050B18';    // 顶栏/卡片投影
+
 class ControlTile {
   readonly label: string;
   readonly value: string;
@@ -1341,7 +1416,7 @@ struct Index {
         .borderRadius(24)
         .linearGradient({
           angle: 135,
-          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
         })
         .justifyContent(FlexAlign.Center)
         .scale({ x: 1, y: 1 })
@@ -1481,12 +1556,12 @@ struct Index {
     promptAction.showActionMenu({
       title: this.tr('菜单'),
       buttons: [
-        { text: this.tr('连接 / 断开相机'), color: '#FFFFFF' },
-        { text: this.tr('视频监看'), color: '#FFFFFF' },
-        { text: this.tr('编辑'), color: '#FFFFFF' },
-        { text: this.tr('设备'), color: '#FFFFFF' },
-        { text: this.tr('文件库'), color: '#FFFFFF' },
-        { text: this.tr('设置'), color: '#FFFFFF' }
+        { text: this.tr('连接 / 断开相机'), color: WHITE },
+        { text: this.tr('视频监看'), color: WHITE },
+        { text: this.tr('编辑'), color: WHITE },
+        { text: this.tr('设备'), color: WHITE },
+        { text: this.tr('文件库'), color: WHITE },
+        { text: this.tr('设置'), color: WHITE }
       ]
     }).then((response: promptAction.ActionMenuSuccessResponse): void => {
       const targets: Array<string> = [
@@ -1533,12 +1608,12 @@ struct Index {
         .justifyContent(FlexAlign.Center)
         .linearGradient({
           angle: 135,
-          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
         })
         .borderRadius(13)
         .shadow({
           radius: 8,
-          color: '#24055AD2',
+          color: PHOTO_GLOW,
           offsetX: 0,
           offsetY: 4
         })
@@ -1629,7 +1704,7 @@ struct Index {
     })
     .shadow({
       radius: 14,
-      color: '#14050B18',
+      color: CARD_SHADOW,
       offsetX: 0,
       offsetY: 4
     })
@@ -1697,7 +1772,7 @@ struct Index {
       )
       .fontColor(this.section === target ? UI_BLUE : UI_LABEL)
       .backgroundColor(
-        this.section === target ? '#140A84FF' : Color.Transparent
+        this.section === target ? NAV_ACTIVE_BG : Color.Transparent
       )
       .borderRadius(12)
       .flexShrink(0)
@@ -1810,7 +1885,7 @@ struct Index {
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.positive'))
               .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-              .backgroundColor('#E4F7EE')
+              .backgroundColor(POSITIVE_SOFT)
               .borderRadius(14)
           }
         }
@@ -3509,9 +3584,9 @@ struct Index {
           .fontSize(12).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted')).width('100%')
         Row({ space: 8 }) {
-          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, '#43B7FF', (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
-          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, '#C68CFF', (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
-          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, '#FFD36A', (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
+          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, WHEEL_LIFT, (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
+          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, WHEEL_GAMMA, (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
+          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, WHEEL_GAIN, (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
         }.width('100%')
       } else if (this.editorPanel === 'curves') {
         Text('主曲线 · 拖动曲线控制点')
@@ -4064,7 +4139,7 @@ struct Index {
         if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
           Text('＋')
             .fontSize(32)
-            .fontColor('#FFE45C')
+            .fontColor(PEAKING_AMBER)
             .position({
               x: `${this.monitorFocusPointX * 100}%`,
               y: `${this.monitorFocusPointY * 100}%`
@@ -4073,7 +4148,7 @@ struct Index {
           Button(this.tr('全屏'), { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(12)
             .align(Alignment.TopEnd)
             .margin(16)
@@ -4770,7 +4845,7 @@ struct Index {
           .height(40)
           .fontSize(11)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
+          .fontColor(WHITE)
           .textAlign(TextAlign.Center)
           .backgroundColor($r('app.color.accent'))
           .borderRadius(12)
@@ -4780,7 +4855,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.section === 'monitor'
-                ? '#FFFFFF'
+                ? WHITE
                 : $r('app.color.ink')
             )
           Text(
@@ -4790,7 +4865,7 @@ struct Index {
             .fontSize(11)
             .fontColor(
               this.section === 'monitor'
-                ? '#CAD3E0'
+                ? CLOUD_MUTED
                 : $r('app.color.muted')
             )
             .maxLines(1)
@@ -4818,7 +4893,7 @@ struct Index {
         .fontSize(11)
         .fontColor(
           this.section === 'monitor'
-            ? '#CAD3E0'
+            ? CLOUD_MUTED
             : $r('app.color.muted')
         )
         .maxLines(2)
@@ -4827,13 +4902,13 @@ struct Index {
     .padding(12)
     .backgroundColor(
       this.section === 'monitor'
-        ? '#182434'
+        ? CLOUD_CARD_BG
         : $r('app.color.accent_soft')
     )
     .border({
       width: 1,
       color: this.section === 'monitor'
-        ? '#304E70'
+        ? CLOUD_CARD_BORDER
         : $r('app.color.accent'),
       radius: 14
     })
@@ -4851,7 +4926,7 @@ struct Index {
       .layoutWeight(1)
       .height(112)
       .padding(3)
-      .backgroundColor('#000000')
+      .backgroundColor(BLACK)
       Canvas(this.monitorAudioScopeContext)
         .width('100%')
         .height(100)
@@ -4861,7 +4936,7 @@ struct Index {
       .layoutWeight(1)
       .height(112)
       .padding(3)
-      .backgroundColor('#000000')
+      .backgroundColor(BLACK)
     }
     .width('100%')
   }
@@ -5181,7 +5256,7 @@ struct Index {
       .vertical(true)
       .height(42)
       .strokeWidth(1)
-      .color('#1FFFFFFF')
+      .color(RULE)
   }
 
   @Builder
@@ -5439,7 +5514,7 @@ struct Index {
                         .fontSize(10)
                         .fontFamily('monospace')
                         .fontColor(Color.White)
-                        .backgroundColor('#99000000')
+                        .backgroundColor(HUD_BG_SOFT)
                         .borderRadius(12)
                         .padding({
                           left: 7,
@@ -6482,7 +6557,7 @@ struct Index {
       color: $r('app.color.rule_strong'),
       radius: 16
     })
-    .shadow({ radius: 24, color: '#44000000', offsetY: 10 })
+    .shadow({ radius: 24, color: HUD_SHADOW, offsetY: 10 })
   }
 
   @Builder
@@ -6492,7 +6567,7 @@ struct Index {
         Button(this.tr('关闭'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
-          .backgroundColor('#66000000')
+          .backgroundColor(HUD_BG_MID)
           .borderRadius(8)
           .onClick((): void => {
             this.closeLargePhoto();
@@ -6500,7 +6575,7 @@ struct Index {
         Button(this.tr('编辑'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
-          .backgroundColor('#66000000')
+          .backgroundColor(HUD_BG_MID)
           .borderRadius(8)
           .onClick((): void => {
             const item: PhotoItem | undefined = this.photos.find(
@@ -6546,7 +6621,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .padding(20)
-    .backgroundColor('#F2080A0F')
+    .backgroundColor(HUD_OVERLAY)
   }
 
   @Builder
@@ -6652,7 +6727,7 @@ struct Index {
     })
     .shadow({
       radius: 24,
-      color: '#55000000',
+      color: HUD_BG_DIM,
       offsetX: 0,
       offsetY: 10
     })
@@ -6712,14 +6787,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#66000000')
+    .backgroundColor(HUD_BG_MID)
   }
 
   @Builder
@@ -6767,14 +6842,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#66000000')
+    .backgroundColor(HUD_BG_MID)
   }
 
   @Builder
@@ -6847,7 +6922,7 @@ struct Index {
               Text(this.tr('谨防诈骗'))
                 .fontSize(17)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#B21923')
+                .fontColor(WARN_DEEP)
                 .width('100%')
               Text(this.tr(
                 '帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”' +
@@ -6855,16 +6930,16 @@ struct Index {
               ))
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#75141C')
+                .fontColor(WARN_DARK)
                 .width('100%')
             }
             .width('100%')
             .padding(16)
             .alignItems(HorizontalAlign.Start)
-            .backgroundColor('#FFFFEEEE')
+            .backgroundColor(WARN_BG)
             .border({
               width: 1,
-              color: '#FFF4B9B9',
+              color: WARN_BG_SOFT,
               radius: 12
             })
 
@@ -6931,14 +7006,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#88000000')
+    .backgroundColor(HUD_BG_DARK)
   }
 
   @Builder
@@ -6991,7 +7066,7 @@ struct Index {
     .backgroundColor($r('app.color.accent_soft'))
     .border({
       width: 1,
-      color: '#FFB6CFF5',
+      color: PHOTO_SOFT_BORDER,
       radius: 12
     })
   }
@@ -7066,14 +7141,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#88000000')
+    .backgroundColor(HUD_BG_DARK)
   }
 
   @Builder
@@ -7092,7 +7167,7 @@ struct Index {
             .fontColor(Color.White)
           Text(this.tr('连接相机并开启实时取景后即可全屏监看。'))
             .fontSize(13)
-            .fontColor('#99FFFFFF')
+            .fontColor(WHITE_DIM)
         }
       }
       Row()
@@ -7100,7 +7175,7 @@ struct Index {
         .height(82)
         .border({
           width: 2,
-          color: '#DDFFD646',
+          color: ACCENT_SOFT,
           radius: 4
         })
       Column() {
@@ -7108,7 +7183,7 @@ struct Index {
           Button(`⌄ ${this.tr('退出全屏')}`, { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(10)
             .onClick((): void => {
               this.closeImmersivePreview();
@@ -7120,7 +7195,7 @@ struct Index {
             .fontSize(11)
             .fontFamily('monospace')
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(22)
             .padding({
               left: 14,
@@ -7144,7 +7219,7 @@ struct Index {
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
-          .backgroundColor('#99000000')
+          .backgroundColor(HUD_BG_SOFT)
           .borderRadius(22)
           .padding({
             left: 18,
@@ -7298,7 +7373,7 @@ struct Index {
         .width(64)
         .height(56)
         .textAlign(TextAlign.Center)
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
       Button(
         this.tr(this.liveView ? 'LIVE' : '开启取景'),
@@ -7309,7 +7384,7 @@ struct Index {
         .fontSize(11)
         .fontWeight(FontWeight.Bold)
         .fontColor(this.liveView ? Color.Black : Color.White)
-        .backgroundColor(this.liveView ? UI_ACCENT : '#AA000000')
+        .backgroundColor(this.liveView ? UI_ACCENT : HUD_BG)
         .borderRadius(10)
         .onClick((): void => {
           this.toggleLiveView();
@@ -7320,7 +7395,7 @@ struct Index {
           .height(48)
           .fontSize(11)
           .fontColor(this.focusPeakingEnabled ? Color.Black : Color.White)
-          .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : '#AA000000')
+          .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
             this.focusPeakingEnabled = !this.focusPeakingEnabled;
@@ -7330,7 +7405,7 @@ struct Index {
           .height(48)
           .fontSize(11)
           .fontColor(this.falseColorEnabled ? Color.Black : Color.White)
-          .backgroundColor(this.falseColorEnabled ? UI_ACCENT : '#AA000000')
+          .backgroundColor(this.falseColorEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
             this.falseColorEnabled = !this.falseColorEnabled;
@@ -7341,7 +7416,7 @@ struct Index {
         .height(48)
         .fontSize(11)
         .fontColor(Color.White)
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
         .enabled(this.connected && this.liveView && !this.busy)
         .onClick((): void => { this.triggerAutoFocusOn(); })
@@ -7368,7 +7443,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
     }
   }
@@ -7429,7 +7504,7 @@ struct Index {
             .fontFamily('monospace')
             .fontColor(Color.White)
             .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-            .backgroundColor('#AA000000')
+            .backgroundColor(HUD_BG)
             .borderRadius(10)
         }
       }
@@ -7451,7 +7526,7 @@ struct Index {
         )
           .height(44)
           .fontColor(Color.White)
-          .backgroundColor('#99000000')
+          .backgroundColor(HUD_BG_SOFT)
           .borderRadius(10)
           .onClick((): void => {
             this.immersiveParametersExpanded =
@@ -7470,8 +7545,8 @@ struct Index {
             .fontColor(Color.White)
             .backgroundColor(
               this.immersiveMoreParametersExpanded
-                ? '#CC055AD2'
-                : '#99000000'
+                ? MORE_ACTIVE_BG
+                : HUD_BG_SOFT
             )
             .borderRadius(10)
             .onClick((): void => {
@@ -7621,7 +7696,7 @@ struct Index {
         .width(44)
         .height(44)
         .fontColor(Color.White)
-        .backgroundColor('#66000000')
+        .backgroundColor(HUD_BG_MID)
         .enabled(
           this.connected &&
           this.camera.canAdjustParameter(this.cameraParameter(parameter))
@@ -7632,7 +7707,7 @@ struct Index {
       Column({ space: 1 }) {
         Text(this.tr(label))
           .fontSize(10)
-          .fontColor('#99FFFFFF')
+          .fontColor(WHITE_DIM)
         Text(value)
           .fontSize(12)
           .fontFamily('monospace')
@@ -7649,7 +7724,7 @@ struct Index {
         .width(44)
         .height(44)
         .fontColor(Color.White)
-        .backgroundColor('#66000000')
+        .backgroundColor(HUD_BG_MID)
         .enabled(
           this.connected &&
           this.camera.canAdjustParameter(this.cameraParameter(parameter))
@@ -8431,12 +8506,12 @@ struct Index {
       Text(`${this.tr('峰值覆盖')} · ${this.peakingCoverage}%`)
         .fontSize(10)
         .fontFamily('monospace')
-        .fontColor('#BFFFFFFF')
+        .fontColor(WHITE_LO)
         .width('100%')
     }
     .width('100%')
     .padding(4)
-    .backgroundColor('#000000')
+    .backgroundColor(BLACK)
   }
 
   private scopeLevels(value: string): Array<number> {
@@ -8459,7 +8534,7 @@ struct Index {
     height: number,
     parade: boolean
   ): void {
-    context.strokeStyle = '#90FFFFFF';
+    context.strokeStyle = WHITE_FAINT;
     context.lineWidth = 0.72;
     for (let guide: number = 1; guide < 4; guide++) {
       const lineY: number = y + height * guide / 4;
@@ -8477,7 +8552,7 @@ struct Index {
         context.stroke();
       }
     }
-    context.strokeStyle = '#F0FFFFFF';
+    context.strokeStyle = WHITE_HI;
     context.lineWidth = 1.1;
     context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
   }
@@ -8686,9 +8761,9 @@ struct Index {
   ): void {
     const footerHeight: number = Math.min(14, Math.max(10, height * 0.17));
     const plotHeight: number = Math.max(1, height - footerHeight);
-    context.fillStyle = '#000000';
+    context.fillStyle = BLACK;
     context.fillRect(x, y, width, height);
-    context.fillStyle = '#050A0F';
+    context.fillStyle = SCOPE_BG;
     context.fillRect(x, y, width, plotHeight);
     for (let index: number = 0; index < values.length; index++) {
       this.drawScopeTrace(
@@ -8705,7 +8780,7 @@ struct Index {
     }
     this.drawScopeGrid(context, x, y, width, plotHeight, parade);
     context.globalAlpha = 1;
-    context.fillStyle = '#E0FFFFFF';
+    context.fillStyle = WHITE_MID;
     context.font = `${Math.min(9, footerHeight * 0.68)}px monospace`;
     context.textAlign = 'center';
     const baseline: number = y + height - Math.max(1.5, footerHeight * 0.12);
@@ -8731,7 +8806,7 @@ struct Index {
       context.height,
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'],
+      [SCOPE_R, SCOPE_G, SCOPE_B],
       true
     );
   }
@@ -8753,7 +8828,7 @@ struct Index {
     );
     const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
     const plotHeight: number = context.height - footerHeight;
-    context.strokeStyle = '#4CC7E8';
+    context.strokeStyle = SCOPE_AUDIO;
     context.globalAlpha = 0.22;
     context.lineWidth = 5;
     context.beginPath();
@@ -8778,7 +8853,7 @@ struct Index {
       context.height,
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'],
+      [SCOPE_R, SCOPE_G, SCOPE_B],
       true
     );
   }
@@ -8800,7 +8875,7 @@ struct Index {
     );
     const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
     const plotHeight: number = context.height - footerHeight;
-    context.strokeStyle = '#4CC7E8';
+    context.strokeStyle = SCOPE_AUDIO;
     context.globalAlpha = 0.86;
     context.lineWidth = 1;
     context.beginPath();
@@ -8818,18 +8893,18 @@ struct Index {
     const panelHeight: number = (context.height - gap * 2) / 3;
     this.drawScopePanel(
       context, 0, 0, context.width, panelHeight,
-      'Y', [this.waveform], ['#FFFFFF'], false
+      'Y', [this.waveform], [WHITE], false
     );
     this.drawScopePanel(
       context, 0, panelHeight + gap, context.width, panelHeight,
       'YUV', [this.waveform, this.chromaPart(this.vectorscope, 0),
         this.chromaPart(this.vectorscope, 1)],
-      ['#14FF5C', '#00D2FF', '#FF26DE'], false
+      [SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V], false
     );
     this.drawScopePanel(
       context, 0, (panelHeight + gap) * 2, context.width, panelHeight,
       '', [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'], true
+      [SCOPE_R, SCOPE_G, SCOPE_B], true
     );
   }
 
@@ -10365,8 +10440,8 @@ struct Index {
           '此操作无法撤销。已保护文件不会被选择。'
         ),
         buttons: [
-          { text: this.tr('取消'), color: '#5A616C' },
-          { text: this.tr('永久删除'), color: '#D8323A' }
+          { text: this.tr('取消'), color: MUTED_INK },
+          { text: this.tr('永久删除'), color: UI_VIDEO }
         ]
       });
       if (result.index !== 1) {
