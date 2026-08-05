@@ -548,3 +548,11 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - 其余端标题档（iOS 29/25、Android 30/25、Harmony 30）为各自批次归档值，本批不动；Android F3 的 58 处孤立值仅记录口径不处理
 - 未改：cs 编辑器/弹窗区 21 处 TS 可映射字号（11×14/12×4/15/18/24 等）——非页面批范围（fig2 恒深区/连接弹窗/公告弹窗），留 F2/F4/后续裁决；EditorHeaderTitle=24 为 fig2 恒深编辑器体系（macOS 编辑页标题=TypeScale.emphasis=15，fig2 恒深例外）。
 - 验证：npm test 256/256 全绿；dotnet build 0 错误 4 既有警告；git diff --check 干净；Controls.xaml XML 合法（xmllint）。
+
+
+## 12.15 v1.5.7 F5 数值裁决执行：公告弹窗对齐 macOS 基准（2026-08-06）
+
+- kimi 裁决（17:52）：公告弹窗非品牌资产、无豁免理由，全部对齐 macOS 基准；仅改样式定义处（引用方不动）。
+- 执行（Controls.xaml 5 个 Announcement 样式）：`AnnouncementHeading` 25→26（macOS 公告标题=TypeScale.heading=26）、`AnnouncementSection` 19→18（本次更新=title=18）、`AnnouncementTitle` 17→18（谨防诈骗/自愿赞助=title=18）、`AnnouncementText` 14→12（正文=body=12）、`AnnouncementSub` 13→12（打赏说明=body=12，裁决「全部对齐」精神延伸）。
+- 对齐后五端公告弹窗字号统一：标题 26/小节 18/正文 12。
+- 验证：npm test 256/256；dotnet build 0 错误 0 警告；xmllint 合法；git diff --check 干净。

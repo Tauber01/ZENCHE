@@ -769,24 +769,29 @@
     <Setter Property="FontSize" Value="16" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
+  <!-- v1.5.7 F5 数值裁决: 25→26 对齐 macOS 公告标题=TypeScale.heading=26（kimi 17:52 裁决，仅改样式定义）。 -->
   <Style x:Key="AnnouncementHeading" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="25" />
+    <Setter Property="FontSize" Value="26" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
+  <!-- v1.5.7 F5 数值裁决: 19→18 对齐 macOS 公告小节=TypeScale.title=18。 -->
   <Style x:Key="AnnouncementSection" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="19" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
+  <!-- v1.5.7 F5 数值裁决: 17→18 对齐 macOS 公告强调标题=TypeScale.title=18。 -->
   <Style x:Key="AnnouncementTitle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontSize" Value="18" />
     <Setter Property="FontWeight" Value="Bold" />
   </Style>
+  <!-- v1.5.7 F5 数值裁决: 14→12 对齐 macOS 公告正文=TypeScale.body=12。 -->
   <Style x:Key="AnnouncementText" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
+  <!-- v1.5.7 F5 数值裁决: 13→12 对齐 macOS 公告打赏说明=TypeScale.body=12（kimi 裁决「全部对齐 macOS 基准」延伸）。 -->
   <Style x:Key="AnnouncementSub" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
   </Style>
 </ResourceDictionary>
