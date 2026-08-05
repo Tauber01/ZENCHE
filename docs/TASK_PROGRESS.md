@@ -445,3 +445,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 小额项：曝光参数卡自动徽标「A」→「AUTO」完整字面（对齐 iOS 口径，圆徽标改 Capsule）；「选择预设」按钮暗色 tint 由 readoutGlow 改回 cobalt（readoutGlow 仅用于曝光读数）。
 - design.md 增补：恒深页（fig1 控制面/fig2 编辑器工作台）为「每页双外观」条款的文档化例外（v1.5.6 终审遗留文档债收口）+ 沉浸全屏 overlay 同属恒深例外族（预览井/沉浸 overlay 任何外观保持石墨）。
 - 验证：swiftc -typecheck（build-macos.sh 同口径源列表）0 错误；完整 `npm test` 256/256 通过；git diff --check 干净。
+
+## 12.7 v1.5.7 逐页批次 P1：照片页（capture）四端对齐 macOS 基准（2026-08-05）
+
+- 批次：v1.5.7 UI 统一轮逐页批次 P1（照片/capture 四端对齐 macOS 基准，含拍摄自动化面板）；分支 `agent/1.5.7-p1-capture`（worktree REPOS/ZENCHE-wt-1.5.7-p1-capture），基线 `693182a`（F1 合入后）。
+- iOS（RootView.swift）：曝光参数 automatic 徽标单字母「A」圆标 → 完整「AUTO」Capsule（FontToken.caption + IPalette.uiBlue，对齐 macOS F1 口径；pro 复审观察项收口）。
+- Android（MainActivity.java）：参数 tile 「×」隐藏钮 22×22dp → 44×44dp（触控合规，design.md ≥44×44）；顶栏与状态行状态点 22dp → 10dp（视觉对齐 macOS 8pt 基准，触控面由外层 44/36dp 高行保证，注释声明）。
+- Harmony（Index.ets）：参数 tile 「×」钮宽 22vp → 44vp（高已 44）；状态点宽 22vp → 10vp；恢复 4881042 删除的兑换码说明文案（「兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。」+「没有兑换码？在爱发电购买兑换码」，TS_CAPTION/TS_BODY token 化，审计 backlog 项收口）。
+- Windows：P1 结构已对齐 macOS fig1 基准（状态行/状态卡阵/参数格/拍摄坞/拍前会话/拍摄自动化面板均在），字号归档归 F5 批，本批无代码改动。
+- design.md：本批为执行既有条款（触控 ≥44×44、AUTO 口径对齐 F1 已文档化），未引入新规范，无需修改。
+- 验证：完整 `npm test` 256/256 通过；iOS xcodebuild Release（免签名）BUILD SUCCEEDED；Android `:app:compileDebugJavaWithJavac` 通过（仅基线 deprecation 提示）；Harmony assembleHap BUILD SUCCESSFUL（构建中间产物与 dist 已清理）；git diff --check 干净。

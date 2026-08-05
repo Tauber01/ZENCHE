@@ -4560,11 +4560,13 @@ private struct ControlParameterGrid: View {
                         hidden ? IPalette.uiAccent : IPalette.uiLabel
                     )
                 } else if tile.automatic {
-                    Text("A")
-                        .font(.system(size: 10, weight: .bold))
+                    // v1.5.7 P1：单字母 "A" 圆标 → 完整 "AUTO" 胶囊（对齐 macOS F1 口径）
+                    Text("AUTO")
+                        .font(.system(size: FontToken.caption, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 18, height: 18)
-                        .background(IPalette.uiBlue, in: Circle())
+                        .padding(.horizontal, 5)
+                        .frame(height: 18)
+                        .background(IPalette.uiBlue, in: Capsule())
                 }
             }
             .foregroundStyle(IPalette.uiLabel)
