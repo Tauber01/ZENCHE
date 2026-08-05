@@ -62,6 +62,8 @@ import android.view.animation.DecelerateInterpolator;
 import android.util.TypedValue;
 import android.view.Window;
 import android.view.WindowInsets;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -79,6 +81,7 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.PopupMenu;
 import android.widget.VideoView;
 
 import androidx.core.content.FileProvider;
@@ -1338,6 +1341,7 @@ public final class MainActivity extends Activity {
     private WaveformScopeView monitorRgbScopeView;
     private WaveformScopeView professionalScopeView;
     private WaveformScopeView immersiveScopeView;
+    private WaveformScopeView captureScopeView;
     private TextView peakingCoverageText;
     private Button checkUpdateButton;
     private Button openUpdateButton;
@@ -2822,7 +2826,7 @@ public final class MainActivity extends Activity {
         more.setBackground(rounded(UI_SECONDARY, 14, 0));
         more.setStateListAnimator(null);
         more.setContentDescription(tr("更多"));
-        more.setOnClickListener(view -> showControlMenuDialog());
+        more.setOnClickListener(view -> showControlBubbleMenu(view));
         top.addView(more, new LinearLayout.LayoutParams(dp(44), dp(44)));
     }
 
@@ -2847,25 +2851,75 @@ public final class MainActivity extends Activity {
         };
         new AlertDialog.Builder(this)
                 .setTitle(tr("菜单"))
-                .setItems(entries, (dialog, which) -> {
-                    String target = sections[which];
-                    if ("connect".equals(target)) {
-                        if (connected || wifiConnected || localCameraConnected) {
-                            if (connected) disconnectCamera();
-                            if (wifiConnected) disconnectWifiCamera();
-                            if (localCameraConnected) disconnectLocalCamera();
-                        } else {
-                            showConnectionDialog();
-                        }
-                    } else if ("editor".equals(target)) {
-                        editorState = EditorState.PRO;
-                        aiResultBitmap = null;
-                        showSection(target);
-                    } else {
-                        showSection(target);
-                    }
-                })
+                .setItems(entries, (dialog, which) ->
+                        handleControlMenuTarget(sections[which]))
                 .show();
+    }
+
+    /**
+     * v1.5.7 拍照页改版：右上角 ⋯ 收编「我的设备」「设置」并改为气泡弹窗
+     * （PopupMenu，深色控制栏风格）；☰ 保留原有对话框导航。
+     */
+    private void showControlBubbleMenu(View anchor) {
+        if (isFinishing() || isDestroyed()) return;
+        PopupMenu popup = new PopupMenu(this, anchor);
+        Menu menu = popup.getMenu();
+        final String[] sections = new String[]{
+                "connect",
+                "monitor",
+                "editor",
+                "devices",
+                "library",
+                "settings"
+        };
+        int id = 1;
+        for (String section : sections) {
+            menu.add(Menu.NONE, id++, Menu.NONE, controlMenuLabel(section));
+        }
+        popup.setOnMenuItemClickListener(item -> {
+            String target = sections[item.getItemId() - 1];
+            handleControlMenuTarget(target);
+            return true;
+        });
+        popup.show();
+    }
+
+    private String controlMenuLabel(String section) {
+        switch (section) {
+            case "connect":
+                return tr("连接 / 断开相机");
+            case "monitor":
+                return tr("视频监看");
+            case "editor":
+                return tr("编辑");
+            case "devices":
+                return tr("设备");
+            case "library":
+                return tr("文件库");
+            case "settings":
+                return tr("设置");
+            default:
+                return section;
+        }
+    }
+
+    private void handleControlMenuTarget(String target) {
+        if (isFinishing() || isDestroyed()) return;
+        if ("connect".equals(target)) {
+            if (connected || wifiConnected || localCameraConnected) {
+                if (connected) disconnectCamera();
+                if (wifiConnected) disconnectWifiCamera();
+                if (localCameraConnected) disconnectLocalCamera();
+            } else {
+                showConnectionDialog();
+            }
+        } else if ("editor".equals(target)) {
+            editorState = EditorState.PRO;
+            aiResultBitmap = null;
+            showSection(target);
+        } else {
+            showSection(target);
+        }
     }
 
 
@@ -2881,14 +2935,12 @@ public final class MainActivity extends Activity {
                 dp(compact ? 5 : 7));
         navigation.setBackgroundColor(UI_BG);
         navigation.setElevation(0);
-        // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
-        // 紧凑底栏提回编辑与视频为一级 tab，设置齿轮保持现状。
+        // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
+        // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
         navigation.addView(navButton("拍照", "capture"));
         navigation.addView(navButton("视频", "monitor"));
         navigation.addView(navButton("编辑", "editor"));
-        navigation.addView(navButton("我的设备", "devices"));
         navigation.addView(navButton("分支", "library"));
-        navigation.addView(navButton("设置", "settings"));
         return navigation;
     }
 
@@ -3085,8 +3137,13 @@ public final class MainActivity extends Activity {
         controlStatusError.setVisibility(View.GONE);
         content.addView(controlStatusError, marginParams(-1, dp(18), 0, 0, 0, 4));
         content.addView(buildStatusCardGrid());
-        content.addView(buildControlParameterGrid());
         content.addView(buildControlCaptureDock());
+        // v1.5.7 拍照页监看恢复：快门 dock 下方的紧凑 RGB 三色叠加波形条，
+        // 复用视频页 WaveformScopeView（RGB_PARADE），无音频无录制钮。
+        captureScopeView = new WaveformScopeView(WaveformScopeView.RGB_PARADE);
+        captureScopeView.setData(redHistogram, greenHistogram, blueHistogram);
+        content.addView(captureScopeView, marginParams(-1, dp(78), 0, 4, 0, 12));
+        content.addView(buildControlParameterGrid());
         content.addView(buildPreviewStage(false));
         content.addView(buildNikonCloudMonitorPanel());
         content.addView(buildCaptureSessionPanel());
@@ -3373,7 +3430,7 @@ public final class MainActivity extends Activity {
             rebuildControlParameterTiles();
         });
         edit.setOnClickListener(view -> {
-            gridEditMode = true;
+            gridEditMode = !gridEditMode;
             refreshControlCapsules(all, edit);
             rebuildControlParameterTiles();
         });
@@ -11813,8 +11870,14 @@ public final class MainActivity extends Activity {
                 boolean analyzeFrame =
                         visualProcessing
                                 || previewAnalysisSequence++ % (videoRecording ? 6 : 3) == 0;
+                // v1.5.7 拍照页监看恢复：拍照页也按帧分析以驱动 RGB 波形，
+                // 但显示仍用原图（showProcessedPreview 以 monitoring 判定），
+                // 仅在监看/云预设场景替换为处理后的 display。
+                boolean scopeAnalysis =
+                        packet.monitoring
+                                || "capture".equals(currentSection);
                 ProcessedPreview output =
-                        packet.monitoring && analyzeFrame
+                        scopeAnalysis && analyzeFrame
                                 ? processPreview(source)
                                 : new ProcessedPreview(
                                         packet.monitoring
@@ -12317,6 +12380,10 @@ public final class MainActivity extends Activity {
         }
         if (monitorRgbScopeView != null) {
             monitorRgbScopeView.setData(
+                    redHistogram, greenHistogram, blueHistogram);
+        }
+        if (captureScopeView != null) {
+            captureScopeView.setData(
                     redHistogram, greenHistogram, blueHistogram);
         }
         if (professionalScopeView != null) {

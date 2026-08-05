@@ -917,6 +917,8 @@ struct Index {
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   private readonly immersiveAudioScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly captureRgbScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
   @State private sessionName: string = '未命名会话';
   @State private sessionNamingTemplate: string =
     '{session}_{date}_{counter}';
@@ -1551,9 +1553,14 @@ struct Index {
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
         .borderRadius(14)
-        .onClick((): void => {
-          this.showControlMenuDialog();
-        })
+        .bindMenu([
+          { value: this.tr('连接 / 断开相机'), action: (): void => { this.handleControlMenuTarget('connect'); } },
+          { value: this.tr('视频监看'), action: (): void => { this.handleControlMenuTarget('monitor'); } },
+          { value: this.tr('编辑'), action: (): void => { this.handleControlMenuTarget('editor'); } },
+          { value: this.tr('设备'), action: (): void => { this.handleControlMenuTarget('devices'); } },
+          { value: this.tr('文件库'), action: (): void => { this.handleControlMenuTarget('library'); } },
+          { value: this.tr('设置'), action: (): void => { this.handleControlMenuTarget('settings'); } }
+        ])
     }
     .width('100%')
     .height(this.isCompact() ? 60 : 64)
@@ -1584,18 +1591,22 @@ struct Index {
       const targets: Array<string> = [
         'connect', 'monitor', 'editor', 'devices', 'library', 'settings'
       ];
-      const target: string = targets[response.index];
-      if (target === 'connect') {
-        if (this.connected || this.wifiConnected || this.localCameraSelected) {
-          this.disconnectFromControlMenu();
-        } else {
-          this.connectionPanelVisible = true;
-        }
-        return;
-      }
-      this.section = target;
+      this.handleControlMenuTarget(targets[response.index]);
     }).catch((): void => {
     });
+  }
+
+  /** v1.5.7 拍照页改版：⋯ 气泡与 ☰ 对话框共用的目标处理。 */
+  private handleControlMenuTarget(target: string): void {
+    if (target === 'connect') {
+      if (this.connected || this.wifiConnected || this.localCameraSelected) {
+        this.disconnectFromControlMenu();
+      } else {
+        this.connectionPanelVisible = true;
+      }
+      return;
+    }
+    this.section = target;
   }
 
   private async disconnectFromControlMenu(): Promise<void> {
@@ -1761,14 +1772,12 @@ struct Index {
   @Builder
   private CompactBottomNavigation() {
     Row() {
-      // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
-      // 紧凑底栏提回编辑与视频为一级 tab，设置保持现状。
+      // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
+      // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
       this.NavButton('拍照', 'capture')
       this.NavButton('视频', 'monitor')
       this.NavButton('编辑', 'editor')
-      this.NavButton('我的设备', 'devices')
       this.NavButton('分支', 'library')
-      this.NavButton('设置', 'settings')
     }
     .width('100%')
     .height(64)
@@ -4111,8 +4120,19 @@ struct Index {
         // below, exactly like the Android fig1 capture surface.
         this.ControlStatusRow()
         this.ControlStatusGrid()
-        this.ControlParameterGrid()
         this.ControlCaptureDock()
+        // v1.5.7 拍照页监看恢复：快门 dock 下方的紧凑 RGB 三色叠加波形条，
+        // 复用视频页 drawScopePanel 绘制（drawCaptureRgbScope），无音频无录制钮。
+        Canvas(this.captureRgbScopeContext)
+          .width('100%')
+          .height(78)
+          .onReady((): void => {
+            this.drawCaptureRgbScope();
+          })
+          .margin({ top: 4, bottom: 12 })
+          .padding(3)
+          .backgroundColor(BLACK)
+        this.ControlParameterGrid()
       } else {
         Text('00:00:00:00')
           .fontSize(38) // v1.5.7 F4: 时间码读数（孤立值，归 F5 数值裁决）
@@ -4686,7 +4706,7 @@ struct Index {
           .borderRadius(16)
           .margin({ left: 8 })
           .onClick((): void => {
-            this.gridEditMode = true;
+            this.gridEditMode = !this.gridEditMode;
           })
       }
       .width('100%')
@@ -8852,6 +8872,24 @@ struct Index {
     );
   }
 
+  /** v1.5.7 拍照页监看恢复：快门 dock 下方紧凑 RGB 波形条（无音频、无录制钮）。 */
+  private drawCaptureRgbScope(): void {
+    const context: CanvasRenderingContext2D = this.captureRgbScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    this.drawScopePanel(
+      context,
+      0,
+      0,
+      context.width,
+      context.height,
+      '',
+      [this.redHistogram, this.greenHistogram, this.blueHistogram],
+      [SCOPE_R, SCOPE_G, SCOPE_B],
+      false
+    );
+  }
+
   private drawAudioScope(): void {
     const context: CanvasRenderingContext2D = this.monitorAudioScopeContext;
     if (context.width <= 1 || context.height <= 1) return;
@@ -12609,6 +12647,11 @@ struct Index {
     const sourceMap: image.PixelMap = await source.createPixelMap(decodeOpts);
     source.release();
     let pixelMap: image.PixelMap = sourceMap;
+    // v1.5.7 拍照页监看恢复：拍照页（capture）也参与帧分析（更新 RGB 直方图），
+    // 但预览保持原始帧（对齐 Android showProcessedPreview：仅 monitor/预设显示处理图）。
+    const scopeWanted: boolean =
+      this.section === 'monitor' || this.section === 'capture' ||
+      this.immersiveMonitoring;
     const monitoring: boolean =
       this.section === 'monitor' || this.immersiveMonitoring;
     const nikonCloudPreset: NikonCloudPreset | undefined =
@@ -12618,7 +12661,7 @@ struct Index {
       nikonCloudPreset !== undefined;
     const analyzeFrame: boolean =
       visualProcessing || this.previewAnalysisSequence++ % (this.videoRecording ? 6 : 3) === 0;
-    if ((monitoring || nikonCloudPreset !== undefined) && analyzeFrame) {
+    if ((scopeWanted || nikonCloudPreset !== undefined) && analyzeFrame) {
       const result: ProfessionalMonitorResult =
         await processProfessionalMonitor(
           sourceMap,
@@ -12626,7 +12669,8 @@ struct Index {
           this.falseColorEnabled,
           nikonCloudPreset
         );
-      pixelMap = result.pixelMap;
+      pixelMap = (monitoring || nikonCloudPreset !== undefined)
+        ? result.pixelMap : sourceMap;
       this.redHistogram = result.redHistogram;
       this.greenHistogram = result.greenHistogram;
       this.blueHistogram = result.blueHistogram;
@@ -12637,6 +12681,7 @@ struct Index {
       this.drawProfessionalScope();
       this.drawImmersiveRgbScope();
       this.drawImmersiveAudioScope();
+      this.drawCaptureRgbScope();
       if (pixelMap !== sourceMap) {
         sourceMap.release();
       }

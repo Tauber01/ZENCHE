@@ -570,14 +570,13 @@ private struct BottomNavigation: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
-            // 紧凑底栏提回编辑与视频为一级 tab，设置齿轮保持现状。
+            // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
+            // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
+            // iOS 宽屏 SideNavigation 的「我的设备」保留。
             navTab(.capture, title: "拍照")
             navTab(.monitor, title: "视频")
             navTab(.editor, title: "编辑")
-            navTab(.devices, title: "我的设备")
             navTab(.library, title: "分支")
-            settingsTab()
         }
         .padding(.horizontal, 8)
         .padding(.top, 7)
@@ -4128,12 +4127,13 @@ private struct CapturePage: View {
                     }
                     ControlStatusRow()
                     ControlStatusCardGrid()
-                    ControlParameterGrid()
                     ControlCaptureDock {
                         withAnimation {
                             proxy.scrollTo("captureShootingTasks", anchor: .top)
                         }
                     }
+                    CaptureScopeBar()
+                    ControlParameterGrid()
                     NikonCloudMonitorBar()
                     CaptureSessionCard()
                     CaptureParameterDeck()
@@ -4204,6 +4204,11 @@ private struct ControlTopBar: View {
                 Toggle("网格", isOn: $model.showGrid)
                 Toggle("安全框", isOn: $model.showSafeGuide)
                 Divider()
+                Button {
+                    model.section = .devices
+                } label: {
+                    Label("我的设备", systemImage: AppSection.devices.icon)
+                }
                 Button {
                     model.showingSettings = true
                 } label: {
@@ -4755,6 +4760,35 @@ private struct ControlCaptureDock: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text("选择相机"))
+    }
+}
+
+/// v1.5.7 拍照页监看恢复：快门 dock 下方的紧凑 RGB 三色叠加波形条。
+/// 复用视频页 ScopePlot（数据源 CameraService 已发 RGB histogram），
+/// 不含音频与录制钮；样式语言参照全屏横屏 immersiveScopeDock。
+private struct CaptureScopeBar: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        ScopePlot(
+            label: "RGB",
+            traces: [
+                ScopeTrace(value: model.camera.redHistogram, color: IPalette.scopeR),
+                ScopeTrace(value: model.camera.greenHistogram, color: IPalette.scopeG),
+                ScopeTrace(value: model.camera.blueHistogram, color: IPalette.scopeB)
+            ],
+            parade: false
+        )
+        .frame(height: 78)
+        .padding(5)
+        .background(IPalette.uiBackground.opacity(0.86))
+        .overlay {
+            RoundedRectangle(cornerRadius: 5)
+                .stroke(IPalette.whiteMist, lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .allowsHitTesting(false)
+        .accessibilityLabel(Text("RGB 波形"))
     }
 }
 
