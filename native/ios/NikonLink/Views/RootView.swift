@@ -4781,12 +4781,12 @@ private struct CameraStage: View {
                 VStack(spacing: 13) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 46, weight: .light))
-                        .foregroundStyle(IPalette.muted)
+                        .foregroundStyle(IPalette.whiteMid)
                     Text("等待相机画面")
                         .font(.title3.weight(.semibold))
                     Text("iPad 可接 UVC；iPhone 使用本机镜头。")
                         .font(.subheadline)
-                        .foregroundStyle(IPalette.muted)
+                        .foregroundStyle(IPalette.whiteMid)
                         .multilineTextAlignment(.center)
                     Button("选择相机") {
                         model.showingConnection = true
