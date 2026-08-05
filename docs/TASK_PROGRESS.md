@@ -616,3 +616,14 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **测试**（Tauber 授权词表断言豁免）：native-global-status.test.mjs:87-88 断言改 navTab(.capture,"拍照")/navTab(.library,"分支")；native-image-editor.test.mjs:22-28 删除 doesNotMatch（编辑已一级 tab）、断言改 拍照/编辑/分支 + NavButton('编辑',editor)；native-library-tree.test.mjs:86「分支文件库」断言保留（页内标题仍在，非导航标签）。
 - 五端导航最终形态：macOS 侧栏 拍照/视频/编辑/我的设备/分支（+顶栏设置）；iOS/Android/Harmony 紧凑底栏 拍照/视频/编辑/我的设备/分支+设置齿轮；Windows 侧栏 拍照/视频/编辑/我的设备/分支。
 - 验证：npm test 256/256 全绿；iOS xcodebuild BUILD SUCCEEDED；Android assembleDebug SUCCESSFUL；Harmony assembleHap SUCCESSFUL；Windows dotnet 0 错误；git diff --check 干净。
+
+## 12.21 v1.5.7 build 31 五端打包（2026-08-06，kimi 18:44 打包指令）
+
+- 基线整合分支 4aab8ae（F6 合入后）+ 版本号升级提交 4e7eb05（1.5.6→1.5.7、build 30→31，五端一致：package.json/scripts/Android versionCode 31+versionName/Harmony versionCode 31/iOS CURRENT_PROJECT_VERSION 31+MARKETING_VERSION 1.5.7/macOS Info.plist/Windows csproj/test 断言）。
+- 产物（dist/，6 包 + 6 shasum）：
+  - ZENCHE-1.5.7-ios-unsigned.ipa（unsigned 预期）
+  - ZENCHE-1.5.7-android.apk（签名连续性验证：证书 SHA-256 45499c18... 与 v1.5.1/v1.5.3 一致）
+  - ZENCHE-1.5.7-HarmonyOS.hap（未签名预期，证书待 Tauber）
+  - ZENCHE-1.5.7-macOS-arm64.dmg（三 SDK env：NIKON_IMAGE_SDK_ZIP/NIKON_REMOTE_SDK_ZIP/SONY_CRSDK_MAC_ZIP 指向 ~/Documents/NikonLink/）
+  - ZENCHE-1.5.7-Windows-x64-Setup.exe + ZENCHE-1.5.7-Windows-x64.zip（NSIS Setup，LANG=en_US.UTF-8）
+- 构建验证：macOS DMG/iOS BUILD SUCCEEDED/Android assembleDebug SUCCESSFUL/Harmony assembleHap SUCCESSFUL（未签名）/Windows dotnet publish 0 错误 + NSIS 成功。
