@@ -6410,7 +6410,7 @@ private struct MonitorConsolePage: View {
             Image(systemName: "iphone")
                 .font(.system(size: 33, weight: .light))
                 .frame(width: 60)
-                .foregroundStyle(.white.opacity(0.9))
+                .foregroundStyle(IPalette.whiteHi)
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(info.minutesRemaining)")
@@ -6877,7 +6877,7 @@ private struct ConsoleToolButton: View {
                     .foregroundStyle(active ? IPalette.cobalt : IPalette.whiteLo)
             }
             .frame(maxWidth: .infinity)
-            .foregroundStyle(active ? IPalette.cobalt : .white.opacity(0.9))
+            .foregroundStyle(active ? IPalette.cobalt : IPalette.whiteHi)
         }
         .buttonStyle(.plain)
     }
