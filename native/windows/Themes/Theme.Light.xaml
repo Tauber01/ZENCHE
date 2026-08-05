@@ -1,0 +1,36 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Light appearance overrides (v1.5.6 dual-theme).  Follows the Windows 11
+       system app theme.  Colour-stable wells (MonitorWell/Scope/Studio/Editor/
+       preview wells) are intentionally absent: they stay graphite in every
+       appearance (design.md 229455c graphite-well exception). -->
+
+  <Color x:Key="ColorPaper">#E9EDF2</Color>
+  <Color x:Key="ColorPaper2">#E4E9EF</Color>
+  <Color x:Key="ColorPaper3">#DCE2E9</Color>
+  <Color x:Key="ColorSurface">#F8FAFC</Color>
+  <Color x:Key="ColorSurfaceRaised">#FFFFFF</Color>
+  <Color x:Key="ColorSidebar">#E4E9EF</Color>
+  <Color x:Key="ColorRule">#CFD6DF</Color>
+  <Color x:Key="ColorRuleStrong">#AEB8C7</Color>
+  <Color x:Key="ColorNeutral">#6D7787</Color>
+  <Color x:Key="ColorMuted">#5A616C</Color>
+  <Color x:Key="ColorInk2">#343B48</Color>
+  <Color x:Key="ColorInk">#171C26</Color>
+  <Color x:Key="ColorFocus">#050914</Color>
+  <Color x:Key="ColorAccentSoft">#DCEAFD</Color>
+  <Color x:Key="ColorUiCard">#FFFFFF</Color>
+  <Color x:Key="ColorUiSecondary">#E4E9EF</Color>
+  <Color x:Key="ColorUiLabel">#5A616C</Color>
+  <Color x:Key="ColorUiCardInk">#171C26</Color>
+  <Color x:Key="ColorAppBar">#E9EDF2</Color>
+  <Color x:Key="ColorAppBarRule">#CFD6DF</Color>
+  <Color x:Key="ColorAppBarMuted">#5A616C</Color>
+  <Color x:Key="ColorAppBarInk">#171C26</Color>
+  <Color x:Key="ColorCapsulePressed">#D5DAE2</Color>
+  <Color x:Key="ColorShutterHover">#E4E9EF</Color>
+  <Color x:Key="ColorPhotoSoftBorder">#B6CFF5</Color>
+
+</ResourceDictionary>
