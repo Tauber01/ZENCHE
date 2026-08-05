@@ -905,6 +905,9 @@ struct Index {
   @State private waveform: string = '—';
   @State private vectorscope: string = '—';
   @State private peakingCoverage: number = 0;
+  @State private editorRedHistogram: string = '—';
+  @State private editorGreenHistogram: string = '—';
+  @State private editorBlueHistogram: string = '—';
   private readonly scopeRenderingSettings: RenderingContextSettings =
     new RenderingContextSettings(true);
   private readonly monitorRgbScopeContext: CanvasRenderingContext2D =
@@ -918,6 +921,8 @@ struct Index {
   private readonly immersiveAudioScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   private readonly captureRgbScopeContext: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(this.scopeRenderingSettings);
+  private readonly editorScopeContext: CanvasRenderingContext2D =
     new CanvasRenderingContext2D(this.scopeRenderingSettings);
   @State private sessionName: string = '未命名会话';
   @State private sessionNamingTemplate: string =
@@ -2083,9 +2088,11 @@ struct Index {
         if (panel === 'ai') {
           this.editorTabMode = 'ai';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         } else {
           this.editorTabMode = 'pro';
           this.editorPanel = panel;
+          this.refreshEditorScopeDensities();
         }
       })
   }
@@ -2114,31 +2121,59 @@ struct Index {
 
   @Builder
   private EditorScopeDock() {
-    // 示波器区：面板内嵌，无卡片包装（图 2 波形图语言）
+    // 示波器区：标题列 + RGB 三色叠加波形（复用视频页 drawScopePanel 绘制，
+    // 数据契约 S64x48 与 processProfessionalMonitor 一致），AI 四项指标保留为文字。
     Row({ space: 10 }) {
-      Text(this.tr('编辑示波器'))
-        .fontSize(EDITOR_FS_SMALL)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor(EDITOR_LABEL)
-      if (this.editorAIAnalysis === undefined) {
-        Text(this.tr('运行“分析画面”后显示实测范围'))
-          .fontSize(TS_CAPTION)
-          .fontColor(EDITOR_LABEL)
-          .layoutWeight(1)
-      } else {
-        Text(
-          `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
-          `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}  ` +
-          `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
-          `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
-        )
-          .fontSize(TS_CAPTION)
+      Column({ space: 2 }) {
+        Text(this.tr('编辑示波器'))
+          .fontSize(EDITOR_FS_SMALL)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
-          .fontColor(EDITOR_ACCENT)
-          .layoutWeight(1)
+          .fontColor(EDITOR_LABEL)
+        Text(
+          this.editorSelectedPath.length > 0
+            ? this.tr('本地图像分析')
+            : this.tr('暂无图像源')
+        )
+          .fontSize(EDITOR_FS_TINY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(
+            this.editorSelectedPath.length > 0
+              ? EDITOR_ACCENT
+              : EDITOR_LABEL
+          )
+        if (this.editorAIAnalysis === undefined) {
+          Text(this.tr('运行“分析画面”后显示实测范围'))
+            .fontSize(TS_CAPTION)
+            .fontColor(EDITOR_LABEL)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        } else {
+          Text(
+            `LUMA ${Math.round(this.editorAIAnalysis.meanLuma * 100)}  ` +
+            `RANGE ${Math.round(this.editorAIAnalysis.contrast * 100)}  ` +
+            `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
+            `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
+          )
+            .fontSize(TS_CAPTION)
+            .fontFamily('monospace')
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EDITOR_ACCENT)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
       }
+      .width(190)
+      .alignItems(HorizontalAlign.Start)
+      Canvas(this.editorScopeContext)
+        .layoutWeight(1)
+        .height(64)
+        .padding(3)
+        .backgroundColor(BLACK)
+        .onReady((): void => {
+          this.drawEditorScope();
+          this.refreshEditorScopeDensities();
+        })
     }
     .width('100%')
     .height(64)
@@ -2158,6 +2193,7 @@ struct Index {
         .onClick((): void => {
           this.editorTabMode = 'pro';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         })
       Button(this.editorTabMode === 'ai' ? '● AI 工具' : '○ AI 工具', { type: ButtonType.Normal })
         .height(44)
@@ -2167,6 +2203,7 @@ struct Index {
         .onClick((): void => {
           this.editorTabMode = 'ai';
           this.aiResultPath = '';
+          this.refreshEditorScopeDensities();
         })
     }
     .width('100%')
@@ -3142,6 +3179,7 @@ struct Index {
       this.aiResultPath = tempPath;
       this.aiStatus = '生成完成';
       this.aiGenerating = false;
+      this.refreshEditorScopeDensities();
     } catch (err) {
       this.aiGenerating = false;
       const rawMessage: string = (err as Error).message || 'AI 生成失败';
@@ -4157,7 +4195,7 @@ struct Index {
               .fontColor($r('app.color.graphite_ink'))
             Text(this.tr('连接相机后开启实时取景'))
               .fontSize(EDITOR_FS_MEDIUM)
-              .fontColor($r('app.color.graphite_muted'))
+              .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页空态说明改纯白
           }
           .width('100%')
           .height('100%')
@@ -4166,11 +4204,7 @@ struct Index {
         Text(this.liveView ? 'LIVE VIEW ON' : 'LIVE VIEW OFF')
           .fontSize(EDITOR_FS_SMALL)
           .fontFamily('monospace')
-          .fontColor(
-            this.liveView
-              ? $r('app.color.accent_ink')
-              : $r('app.color.graphite_muted')
-          )
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: LIVE 状态字改纯白
           .backgroundColor($r('app.color.graphite_2'))
           .borderRadius(5)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -4236,7 +4270,7 @@ struct Index {
               : '相机原生 JPEG · 本地预览'
           ))
             .fontSize(TS_BODY)
-            .fontColor(UI_LABEL)
+            .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页状态字改纯白（CameraWorkspace 恒深 UI_BG）
             .layoutWeight(1)
           Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
             type: ButtonType.Normal
@@ -4906,7 +4940,7 @@ struct Index {
             .fontSize(TS_CAPTION)
             .fontColor(
               this.section === 'monitor'
-                ? CLOUD_MUTED
+                ? WHITE
                 : $r('app.color.muted')
             )
             .maxLines(1)
@@ -4934,7 +4968,7 @@ struct Index {
         .fontSize(TS_CAPTION)
         .fontColor(
           this.section === 'monitor'
-            ? CLOUD_MUTED
+            ? WHITE
             : $r('app.color.muted')
         )
         .maxLines(2)
@@ -4975,7 +5009,7 @@ struct Index {
         .height(96)
         .fontSize(this.videoRecording ? 26 : 34)
         .fontWeight(FontWeight.Bold)
-        .fontColor(this.videoRecording ? Color.White : Color.Black)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底录制钮黑●改白
         .backgroundColor(this.videoRecording ? UI_VIDEO : UI_VIDEO)
         .borderRadius(48)
         .enabled(this.connected && !this.busy)
@@ -5046,7 +5080,7 @@ struct Index {
       Text(this.tr(label))
         .fontSize(EDITOR_FS_SMALL)
         .fontWeight(FontWeight.Bold)
-        .fontColor(UI_LABEL)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页读数标签改纯白
       Text(value)
         .fontSize(17) // v1.5.7 F4: 读数值（孤立值，归 F5 数值裁决）
         .fontFamily('monospace')
@@ -5168,7 +5202,7 @@ struct Index {
           .fontColor(Color.White)
         Text(this.librarySizeText())
           .fontSize(EDITOR_FS_MEDIUM)
-          .fontColor(UI_BLUE)
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页读数改纯白（不再 UI_BLUE）
         Row() {
           Text('图库占用 · 本地缓存')
             .fontSize(TS_CAPTION)
@@ -5286,7 +5320,7 @@ struct Index {
         .fontSize(EDITOR_FS_TINY)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
-        .fontColor($r('app.color.graphite_muted'))
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页读数标签改纯白
         .maxLines(1)
       Text(value)
         .fontSize(21) // v1.5.7 F4: 读数值（孤立值，归 F5 数值裁决）
@@ -5294,7 +5328,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(
           writable
-            ? $r('app.color.readout_glow')
+            ? Color.White // v1.5.7 issue 655a0a14: 激活态读数不再用 readout_glow
             : $r('app.color.graphite_ink')
         )
         .maxLines(1)
@@ -7371,7 +7405,7 @@ struct Index {
         .fontSize(8) // v1.5.7 F4: 遥测微标签（孤立值，归 F5 数值裁决）
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
-        .fontColor(UI_LABEL)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 全屏监看遥测标签改纯白
         .width('100%')
       Text(value)
         .fontSize(TS_BODY)
@@ -7439,7 +7473,7 @@ struct Index {
         .height(52)
         .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Bold)
-        .fontColor(this.liveView ? Color.Black : Color.White)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
         .backgroundColor(this.liveView ? UI_ACCENT : HUD_BG)
         .borderRadius(10)
         .onClick((): void => {
@@ -7450,7 +7484,7 @@ struct Index {
           .width(64)
           .height(48)
           .fontSize(TS_CAPTION)
-          .fontColor(this.focusPeakingEnabled ? Color.Black : Color.White)
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
           .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
@@ -7460,7 +7494,7 @@ struct Index {
           .width(64)
           .height(48)
           .fontSize(TS_CAPTION)
-          .fontColor(this.falseColorEnabled ? Color.Black : Color.White)
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
           .backgroundColor(this.falseColorEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
@@ -7485,11 +7519,7 @@ struct Index {
       Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
         .fontSize(17) // v1.5.7 F4: 沉浸按钮文本（孤立值，归 F5 数值裁决）
         .fontWeight(FontWeight.Bold)
-        .fontColor(
-          this.immersiveMonitoring
-            ? UI_VIDEO
-            : UI_ACCENT
-        )
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 全屏监看标题不再用彩色
       this.ImmersiveCaptureButton()
       Text(this.immersiveMonitoring
         ? (this.videoRecording ? 'REC' : this.tr('待机'))
@@ -7516,7 +7546,7 @@ struct Index {
       .height(96)
       .fontSize(this.videoRecording ? 26 : 34)
       .fontWeight(FontWeight.Bold)
-      .fontColor(this.videoRecording ? Color.White : Color.Black)
+      .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
       .backgroundColor(
         this.immersiveMonitoring
           ? UI_VIDEO
@@ -7548,11 +7578,7 @@ struct Index {
           Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
             .fontSize(TS_EMPHASIS)
             .fontWeight(FontWeight.Bold)
-            .fontColor(
-              this.immersiveMonitoring
-                ? UI_VIDEO
-                : UI_ACCENT
-            )
+            .fontColor(Color.White) // v1.5.7 issue 655a0a14: 全屏监看标题不再用彩色
           Text(this.immersiveMonitoring
             ? (this.videoRecording ? 'REC' : this.tr('待机'))
             : 'JPEG')
@@ -7763,7 +7789,7 @@ struct Index {
       Column({ space: 1 }) {
         Text(this.tr(label))
           .fontSize(EDITOR_FS_SMALL)
-          .fontColor(WHITE_DIM)
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 参数标签改纯白
         Text(value)
           .fontSize(TS_BODY)
           .fontFamily('monospace')
@@ -7771,7 +7797,7 @@ struct Index {
           .fontColor(
             this.connected &&
             this.camera.canAdjustParameter(this.cameraParameter(parameter))
-              ? UI_ACCENT
+              ? Color.White // v1.5.7 issue 655a0a14: 激活态读数不再用 UI_ACCENT
               : Color.White
           )
       }
@@ -8380,13 +8406,17 @@ struct Index {
         Text(this.tr('拍摄控制'))
           .fontSize(TS_TITLE)
           .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
+          .fontColor(
+            this.section === 'monitor'
+              ? Color.White // v1.5.7 issue 655a0a14: 视频页参数面板恒深白字
+              : $r('app.color.ink')
+          )
           .width('100%')
           .margin({ bottom: 8 })
         if (this.section === 'monitor') {
           Text(this.tr('视频曝光三要素'))
             .fontSize(EDITOR_FS_SUB)
-            .fontColor($r('app.color.muted'))
+            .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板说明改纯白
             .width('100%')
             .margin({ bottom: 4 })
           this.ParameterSelect(
@@ -8501,10 +8531,16 @@ struct Index {
     }
     .width('100%')
     .height(this.isCompact() ? 'auto' : '100%')
-    .backgroundColor($r('app.color.paper_2'))
+    .backgroundColor(
+      this.section === 'monitor'
+        ? UI_CARD // v1.5.7 issue 655a0a14: 视频页参数面板强制恒深，其他页仍随主题
+        : $r('app.color.paper_2')
+    )
     .border({
       width: { left: 1 },
-      color: $r('app.color.rule')
+      color: this.section === 'monitor'
+        ? UI_SECONDARY
+        : $r('app.color.rule')
     })
   }
 
@@ -8513,16 +8549,17 @@ struct Index {
     Text(this.tr('专业监看'))
       .fontSize(EDITOR_FS_SUB)
       .fontWeight(FontWeight.Bold)
-      .fontColor($r('app.color.ink'))
+      .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板标题恒白字
       .width('100%')
       .margin({ top: 8 })
     Row() {
       Column({ space: 2 }) {
         Text(this.tr('外录到当前智能设备'))
           .fontSize(EDITOR_FS_SUB)
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板开关文字改纯白
         Text(this.tr('生成无声 Motion‑JPEG AVI，可与机身录制并行'))
           .fontSize(EDITOR_FS_SMALL)
-          .fontColor($r('app.color.muted'))
+          .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板说明改纯白
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
@@ -8539,6 +8576,7 @@ struct Index {
     Row() {
       Text(this.tr('峰值对焦'))
         .fontSize(EDITOR_FS_SUB)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板开关文字改纯白
         .layoutWeight(1)
       Toggle({
         type: ToggleType.Switch,
@@ -8552,6 +8590,7 @@ struct Index {
     Row() {
       Text(this.tr('假色曝光'))
         .fontSize(EDITOR_FS_SUB)
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板开关文字改纯白
         .layoutWeight(1)
       Toggle({
         type: ToggleType.Switch,
@@ -8975,6 +9014,84 @@ struct Index {
     );
   }
 
+  private drawEditorScope(): void {
+    const context: CanvasRenderingContext2D = this.editorScopeContext;
+    if (context.width <= 1 || context.height <= 1) return;
+    context.clearRect(0, 0, context.width, context.height);
+    if (this.editorSelectedPath.length === 0) {
+      // 无图空态：黑井 + 白网格 + RGB 标签，无轨迹（视频页同契约）
+      this.drawScopePanel(
+        context, 0, 0, context.width, context.height,
+        'RGB', [], [], false
+      );
+      return;
+    }
+    this.drawScopePanel(
+      context, 0, 0, context.width, context.height,
+      'RGB',
+      [this.editorRedHistogram, this.editorGreenHistogram, this.editorBlueHistogram],
+      [SCOPE_R, SCOPE_G, SCOPE_B], false
+    );
+  }
+
+  private async refreshEditorScopeDensities(): Promise<void> {
+    // 编辑页波形数据：从当前编辑图（预览同图源）计算 RGB 直方图，复用视频页
+    // processProfessionalMonitor 的 S64x48 密度契约；AI 模式取 AI 结果或原图，
+    // Pro 模式取渲染编辑图（遮罩/云预设）或原图。
+    if (this.editorSelectedPath.length === 0) {
+      this.editorRedHistogram = '—';
+      this.editorGreenHistogram = '—';
+      this.editorBlueHistogram = '—';
+      this.drawEditorScope();
+      return;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let loadedMap: image.PixelMap | undefined = undefined;
+    try {
+      let map: image.PixelMap | undefined = undefined;
+      if (this.editorTabMode === 'ai' && this.aiResultPath.length > 0) {
+        source = image.createImageSource(`file://${this.aiResultPath}`);
+      } else if (this.editorRenderedPreview !== undefined) {
+        map = this.editorRenderedPreview;
+      } else {
+        source = image.createImageSource(`file://${this.editorSelectedPath}`);
+      }
+      if (map === undefined && source !== undefined) {
+        const info: image.ImageInfo = await source.getImageInfo();
+        const scale: number = Math.min(
+          1,
+          320 / Math.max(info.size.width, info.size.height)
+        );
+        map = await source.createPixelMap({
+          editable: false,
+          desiredSize: {
+            width: Math.max(1, Math.round(info.size.width * scale)),
+            height: Math.max(1, Math.round(info.size.height * scale))
+          },
+          desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+        });
+        loadedMap = map;
+      }
+      if (map === undefined) return;
+      const result: ProfessionalMonitorResult =
+        await processProfessionalMonitor(map, false, false, undefined);
+      this.editorRedHistogram = result.redHistogram;
+      this.editorGreenHistogram = result.greenHistogram;
+      this.editorBlueHistogram = result.blueHistogram;
+      this.drawEditorScope();
+    } catch (_) {
+      this.editorRedHistogram = '—';
+      this.editorGreenHistogram = '—';
+      this.editorBlueHistogram = '—';
+      this.drawEditorScope();
+    } finally {
+      if (loadedMap !== undefined) {
+        loadedMap.release();
+      }
+      source?.release();
+    }
+  }
+
   @Builder
   private ParameterSelect(
     label: string,
@@ -8985,7 +9102,11 @@ struct Index {
   ) {
     Text(this.tr(label))
       .fontSize(EDITOR_FS_SUB)
-      .fontColor($r('app.color.ink_2'))
+      .fontColor(
+        this.section === 'monitor'
+          ? Color.White // v1.5.7 issue 655a0a14: 视频页参数面板标签恒白字
+          : $r('app.color.ink_2')
+      )
       .width('100%')
     Select(
       entries.map((entry: SelectEntry): SelectOption => {
@@ -8995,10 +9116,18 @@ struct Index {
       .selected(selectedIndex)
       .width('100%')
       .height(44)
-      .fontColor($r('app.color.ink'))
+      .fontColor(
+        this.section === 'monitor'
+          ? Color.White // v1.5.7 issue 655a0a14: 视频页 Select 控件白字
+          : $r('app.color.ink')
+      )
       .selectedOptionBgColor($r('app.color.accent_soft'))
       .selectedOptionFontColor($r('app.color.accent'))
-      .backgroundColor($r('app.color.paper'))
+      .backgroundColor(
+        this.section === 'monitor'
+          ? UI_CARD // v1.5.7 issue 655a0a14: 视频页 Select 控件恒深底
+          : $r('app.color.paper')
+      )
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
@@ -9028,7 +9157,7 @@ struct Index {
   private VideoFrameRateSelect() {
     Text(this.tr('视频帧率基准'))
       .fontSize(EDITOR_FS_SUB)
-      .fontColor($r('app.color.ink_2'))
+      .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板标签恒白字
       .width('100%')
     Select(
       VIDEO_FRAME_RATES.map((entry: SelectEntry): SelectOption => {
@@ -9038,8 +9167,16 @@ struct Index {
       .selected(2)
       .width('100%')
       .height(44)
-      .fontColor($r('app.color.ink'))
-      .backgroundColor($r('app.color.paper'))
+      .fontColor(
+        this.section === 'monitor'
+          ? Color.White // v1.5.7 issue 655a0a14: 视频页 Select 控件白字
+          : $r('app.color.ink')
+      )
+      .backgroundColor(
+        this.section === 'monitor'
+          ? UI_CARD // v1.5.7 issue 655a0a14: 视频页 Select 控件恒深底
+          : $r('app.color.paper')
+      )
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
@@ -9056,7 +9193,7 @@ struct Index {
   private VideoShutterModeSelect() {
     Text(this.tr('视频快门表示'))
       .fontSize(EDITOR_FS_SUB)
-      .fontColor($r('app.color.ink_2'))
+      .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板标签恒白字
       .width('100%')
     Select([
       { value: this.tr('快门角度') },
@@ -9065,8 +9202,16 @@ struct Index {
       .selected(this.videoShutterMode === 'angle' ? 0 : 1)
       .width('100%')
       .height(44)
-      .fontColor($r('app.color.ink'))
-      .backgroundColor($r('app.color.paper'))
+      .fontColor(
+        this.section === 'monitor'
+          ? Color.White // v1.5.7 issue 655a0a14: 视频页 Select 控件白字
+          : $r('app.color.ink')
+      )
+      .backgroundColor(
+        this.section === 'monitor'
+          ? UI_CARD // v1.5.7 issue 655a0a14: 视频页 Select 控件恒深底
+          : $r('app.color.paper')
+      )
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
@@ -9084,7 +9229,7 @@ struct Index {
       `${this.tr(this.videoShutterMode === 'angle' ? '快门角度' : '快门速度')} · ${this.videoFrameRate}p`
     )
       .fontSize(EDITOR_FS_SUB)
-      .fontColor($r('app.color.ink_2'))
+      .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页参数面板标签恒白字
       .width('100%')
     Select(
       (this.videoShutterMode === 'angle' ? SHUTTER_ANGLES : SHUTTER_SPEEDS)
@@ -9095,8 +9240,16 @@ struct Index {
       .selected(4)
       .width('100%')
       .height(44)
-      .fontColor($r('app.color.ink'))
-      .backgroundColor($r('app.color.paper'))
+      .fontColor(
+        this.section === 'monitor'
+          ? Color.White // v1.5.7 issue 655a0a14: 视频页 Select 控件白字
+          : $r('app.color.ink')
+      )
+      .backgroundColor(
+        this.section === 'monitor'
+          ? UI_CARD // v1.5.7 issue 655a0a14: 视频页 Select 控件恒深底
+          : $r('app.color.paper')
+      )
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
@@ -11596,6 +11749,7 @@ struct Index {
       if (this.editorMaskEnabled) {
         this.refreshEditorRenderedPreview();
       }
+      this.refreshEditorScopeDensities();
     } catch (_) {
     } finally {
       source?.release();
@@ -12405,6 +12559,7 @@ struct Index {
       this.editorMaskOverlay = overlayPixelMap;
       this.editorImageWidth = finalInfo.size.width;
       this.editorImageHeight = finalInfo.size.height;
+      this.refreshEditorScopeDensities();
       pixelMap = undefined;
       overlayPixelMap = undefined;
       if (previous !== undefined) {

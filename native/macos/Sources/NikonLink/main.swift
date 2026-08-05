@@ -4305,7 +4305,7 @@ private struct NikonCloudMacMonitorPicker: View {
                     .font(.system(size: TypeScale.caption))
                     .foregroundStyle(
                         darkAppearance
-                            ? Palette.whiteLo
+                            ? Color.white // v1.5.7 issue 655a0a14: 视频页云创卡文字改纯白
                             : Palette.muted
                     )
                     .lineLimit(1)
@@ -4329,7 +4329,7 @@ private struct NikonCloudMacMonitorPicker: View {
                 .font(.system(size: TypeScale.caption))
                 .foregroundStyle(
                     darkAppearance
-                        ? Palette.whiteLo
+                        ? Color.white // v1.5.7 issue 655a0a14: 视频页云创卡说明改纯白
                         : Palette.muted
                 )
         }
@@ -4487,9 +4487,7 @@ private struct ImmersiveMacCameraView: View {
                         systemImage: "circle.fill"
                     )
                     .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
-                    .foregroundStyle(
-                        model.liveViewEnabled ? Color.red : Palette.whiteDim
-                    )
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 全屏监看 LIVE 红/灰状态字改纯白
                     .padding(.horizontal, 14)
                     .frame(height: 44)
                     .background(Palette.hudBgSoft, in: Capsule())
@@ -4522,7 +4520,7 @@ private struct ImmersiveMacCameraView: View {
                         : "—")
                 }
                 .font(.system(size: TypeScale.emphasis, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Palette.whiteMid)
+                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 全屏监看读数改纯白
                 .padding(.horizontal, 18)
                 .frame(height: 44)
                 .background(Palette.hudBgSoft, in: Capsule())
@@ -4551,7 +4549,7 @@ private struct ImmersiveMacCameraView: View {
                             : monitoring ? "视频" : "照片"
                     )
                         .font(.system(size: TypeScale.title, weight: .bold))
-                        .foregroundStyle(monitoring ? Palette.video : Palette.uiAccent)
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 全屏监看标题不再用彩色
                     Button {
                         if monitoring {
                             model.toggleMovieRecording()
@@ -4575,7 +4573,7 @@ private struct ImmersiveMacCameraView: View {
                             if !monitoring {
                                 Image(systemName: "camera.fill")
                                     .font(.system(size: TypeScale.title, weight: .bold))
-                                    .foregroundStyle(.black)
+                                    .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
                             }
                         }
                         .frame(width: 96, height: 96)
@@ -4667,7 +4665,7 @@ private struct ImmersiveMacCameraView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
-                .foregroundStyle(Palette.whiteGhost)
+                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 全屏监看遥测标签改纯白
             Text(value)
                 .font(.system(size: TypeScale.body, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
@@ -5122,7 +5120,7 @@ private struct ImmersiveMacParameterControl: View {
         VStack(spacing: 5) {
             Text(LocalizedStringKey(title))
                 .font(.system(size: TypeScale.caption, weight: .semibold))
-                .foregroundStyle(Palette.whiteDim)
+                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 全屏参数标签改纯白
             HStack(spacing: 5) {
                 Button(action: decrease) {
                     Image(systemName: "minus")
@@ -5130,7 +5128,7 @@ private struct ImmersiveMacParameterControl: View {
                 }
                 Text(value)
                     .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
-                    .foregroundStyle(enabled ? Palette.uiAccent : .white)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 激活态读数不再用 uiAccent
                     .frame(minWidth: 72)
                 Button(action: increase) {
                     Image(systemName: "plus")
@@ -5259,7 +5257,7 @@ private struct ImmersiveMacButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: TypeScale.emphasis, weight: .semibold))
-            .foregroundStyle(active ? Color.black : Color.white)
+            .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
             .background(
@@ -6511,7 +6509,7 @@ private struct MonitorView: View {
                         Spacer()
                         Label(model.liveViewEnabled ? "LIVE" : "NO SOURCE", systemImage: "circle.fill")
                             .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
-                            .foregroundStyle(model.liveViewEnabled ? Palette.positive : Palette.whiteFaint)
+                            .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: LIVE/NO SOURCE 红绿状态字改纯白
                     }
                     .padding(.horizontal, 26)
                     .padding(.vertical, 18)
@@ -6536,12 +6534,12 @@ private struct MonitorView: View {
                                 Text(model.connected ? "等待实时取景画面" : "连接相机后开启实时取景")
                                     .font(.system(size: TypeScale.emphasis, weight: .medium))
                             }
-                            .foregroundStyle(Palette.whiteFaint)
+                            .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页空态文字改纯白
                             .frame(maxWidth: .infinity, minHeight: 270)
                         }
                         Text("\(model.cameraName ?? "未连接") · USB/PTP")
                             .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Palette.whiteLo)
+                            .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页角标改纯白
                             .padding(12)
                         if let focusPoint {
                             ImmersiveMacFocusReticle()
@@ -6655,9 +6653,9 @@ private struct MonitorView: View {
                             .tint(Palette.uiAccent)
                             Text("\(MacMonitorStorageInfo.current.percentUsed)% 已用 · 本地缓存")
                                 .font(.system(size: TypeScale.caption, design: .monospaced))
-                                .foregroundStyle(Palette.whiteFaint)
+                                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页云创卡读数改纯白
                         }
-                        .foregroundStyle(Color.white.opacity(0.9))
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页存储卡读数改纯白
                         .padding(.horizontal, 28)
                         .padding(.vertical, 14)
                         .background(Palette.uiCard)
@@ -6691,7 +6689,7 @@ private struct MonitorView: View {
 
     private func monitorReadout(_ title: String, _ value: String) -> some View {
         VStack(spacing: 6) {
-            Text(title).font(.system(size: TypeScale.caption, weight: .semibold)).foregroundStyle(Palette.whiteDim)
+            Text(title).font(.system(size: TypeScale.caption, weight: .semibold)).foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页读数标签改纯白
             Text(value).font(.system(size: TypeScale.title, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
@@ -6723,7 +6721,7 @@ private struct MonitorView: View {
                 Image(systemName: icon).font(.system(size: 25, weight: .medium)) // 图标尺寸，不受 TypeScale 约束
                 Text(title).font(.system(size: TypeScale.caption, weight: .semibold))
             }
-            .foregroundStyle(isOn ? Palette.uiAccent : Color.white.opacity(0.9))
+            .foregroundStyle(isOn ? Color.white : Color.white.opacity(0.9)) // v1.5.7 issue 655a0a14: 视频页工具钮激活态不再用 uiAccent 彩色
         }
         .buttonStyle(.plain)
     }
@@ -6737,7 +6735,7 @@ private struct MonitorMacStepper: View {
     var body: some View {
         HStack(spacing: 4) {
             Button("−", action: decrease).buttonStyle(.plain)
-            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.whiteDim); Text(value).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(.white) }
+            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(Color.white); Text(value).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(.white) }
             Button("+", action: increase).buttonStyle(.plain)
         }
         .padding(.horizontal, 7).frame(height: 40)
@@ -6778,11 +6776,11 @@ private struct MonitorControlDeck: View {
             HStack(spacing: 6) {
                 Text(display(current))
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(disabled ? Palette.uiLabel.opacity(0.55) : Color.white)
+                    .foregroundStyle(disabled ? Color.white.opacity(0.55) : Color.white) // v1.5.7 issue 655a0a14: 禁用态低透明白、激活态纯白
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold)) // 图标尺寸，不受 TypeScale 约束
-                    .foregroundStyle(Palette.uiLabel)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页下拉箭头改纯白
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
@@ -6818,7 +6816,7 @@ private struct MonitorControlDeck: View {
                 } label: {
                     Text(shutterModeLabel(mode))
                         .font(.system(size: TypeScale.body, weight: .semibold))
-                        .foregroundStyle(videoShutterMode == mode ? Color.black : Color.white)
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
                         .padding(.horizontal, 12)
                         .frame(height: 30)
                         .background(
@@ -6874,7 +6872,7 @@ private struct MonitorControlDeck: View {
                     .foregroundStyle(.white)
                 Text("优先使用快门角度；应用会按当前帧率换算为曝光时间并写入相机。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.uiLabel)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
 
                 HStack(spacing: 6) {
                     ForEach(["program", "shutterPriority", "aperturePriority", "manual"], id: \.self) { mode in
@@ -6884,7 +6882,7 @@ private struct MonitorControlDeck: View {
                         } label: {
                             Text(exposureModeLabel(mode))
                                 .font(.system(size: TypeScale.body, weight: .semibold))
-                                .foregroundStyle(model.exposureMode == mode ? Color.black : Color.white)
+                                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
                                 .frame(width: 34, height: 30)
                                 .background(
                                     model.exposureMode == mode ? Palette.uiAccent : Palette.uiSecondary,
@@ -6931,7 +6929,7 @@ private struct MonitorControlDeck: View {
                         : "录制规格与 Log / Picture Profile 会按连接相机品牌写入；不支持的组合由机身明确拒绝。"
                 )
                 .font(.system(size: TypeScale.body))
-                .foregroundStyle(Palette.uiLabel)
+                .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
 
                 deckMenuPicker(
                     current: model.aperture,
@@ -6978,7 +6976,7 @@ private struct MonitorControlDeck: View {
                         Spacer()
                         Text("\(model.compensation, specifier: "%+.1f") EV")
                             .font(.system(size: TypeScale.body, design: .monospaced))
-                            .foregroundStyle(Palette.uiAccent)
+                            .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 激活态读数不再用 uiAccent
                     }
                     Slider(
                         value: $model.compensation,
@@ -7017,11 +7015,11 @@ private struct MonitorControlDeck: View {
 
                 HStack(spacing: 6) {
                     Text("实时取景格式")
-                        .foregroundStyle(Palette.uiLabel)
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页标签改纯白
                     Spacer()
                     Text("JPEG（相机输出）")
                         .font(.system(size: TypeScale.body))
-                        .foregroundStyle(Palette.uiLabel.opacity(0.55))
+                        .foregroundStyle(Color.white.opacity(0.55)) // v1.5.7 issue 655a0a14: 禁用态低透明白（仍白）
                 }
 
                 Toggle(
@@ -7037,12 +7035,12 @@ private struct MonitorControlDeck: View {
 
                 Text("外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.uiLabel)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("Nikon PTP 返回 JPEG 实时取景帧。监看显示尺寸仅处理本地预览，不会改变机身的视频文件类型或画面尺寸。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.uiLabel)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
@@ -7076,7 +7074,7 @@ private struct MonitorControlDeck: View {
                     )
                     Text("\(Int(model.zebraThreshold)) IRE")
                         .font(.system(size: TypeScale.body, design: .monospaced))
-                        .foregroundStyle(Palette.uiLabel)
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页读数改纯白
                         .frame(width: 58)
                 }
                 .disabled(!model.zebraEnabled)
@@ -7112,7 +7110,7 @@ private struct MonitorControlDeck: View {
                     .frame(height: 210)
                     Text("峰值覆盖 · \(model.peakingCoverage)%")
                         .font(.system(size: TypeScale.caption, design: .monospaced))
-                        .foregroundStyle(Palette.whiteLo)
+                        .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页读数改纯白
                 }
                 .padding(8)
                 .background(Color.black)
@@ -7147,7 +7145,7 @@ private struct MonitorControlDeck: View {
                         ?? "尚未导入；LUT 只影响视频监看，不写入原片。"
                 )
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.uiLabel)
+                    .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
@@ -9565,8 +9563,9 @@ private struct EditorToolRail<Content: View>: View {
 }
 
 private struct EditorScopeDock: View {
-    let values: [Double]
+    let traces: [MacScopeTrace]
     let hasSource: Bool
+    let metrics: String?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -9574,45 +9573,95 @@ private struct EditorScopeDock: View {
                 RuntimeLocalizedText("编辑示波器")
                     .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
                     .foregroundStyle(Palette.editorLabel)
-                RuntimeLocalizedText(
-                    hasSource
-                        ? values.isEmpty
-                            ? "运行“分析画面”后显示实测范围"
-                            : "本地图像分析"
-                        : "暂无图像源"
-                )
+                RuntimeLocalizedText(hasSource ? "本地图像分析" : "暂无图像源")
                     .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(values.isEmpty ? Palette.editorLabel : Palette.editorAccent)
+                    .foregroundStyle(hasSource ? Palette.editorAccent : Palette.editorLabel)
+                if let metrics {
+                    Text(metrics)
+                        .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Palette.editorLabel)
+                        .lineLimit(1)
+                }
             }
             .frame(width: 190, alignment: .leading)
-            Canvas { context, size in
-                var guides = Path()
-                for fraction in [0.25, 0.5, 0.75] {
-                    let y = size.height * fraction
-                    guides.move(to: CGPoint(x: 0, y: y))
-                    guides.addLine(to: CGPoint(x: size.width, y: y))
-                }
-                context.stroke(guides, with: .color(.white.opacity(0.12)))
-                guard !values.isEmpty else { return }
-                let width = size.width / CGFloat(values.count)
-                for (index, raw) in values.enumerated() {
-                    let value = min(max(raw, 0), 1)
-                    let rect = CGRect(
-                        x: CGFloat(index) * width + 4,
-                        y: size.height * (1 - value),
-                        width: max(3, width - 8),
-                        height: size.height * value
-                    )
-                    var bar = Path()
-                    bar.addRect(rect)
-                    context.fill(bar, with: .color(Palette.editorAccent.opacity(0.82)))
-                }
-            }
-            .background(Palette.editorBg)
-            .overlay { Rectangle().stroke(Palette.editorRule) }
+            MacScopePlot(label: "RGB", traces: traces)
         }
         .padding(10)
         .background(Palette.editorPanel)
+    }
+}
+
+/// Computes the same `S64x48:hex` RGB density payloads the monitor page uses,
+/// from the current editor image (downsampled to ≤320 px wide). Mirrors
+/// ProfessionalMonitor's accumulate + log1p normalization so the editor
+/// waveform matches the video-page rendering contract exactly.
+private enum MacEditorRGBDensity {
+    static let columns = 64
+    static let rows = 48
+
+    static func compute(from image: NSImage) -> (red: String, green: String, blue: String)? {
+        var proposed = CGRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(
+            forProposedRect: &proposed,
+            context: nil,
+            hints: nil
+        ) else { return nil }
+        let sourceWidth = cgImage.width
+        let sourceHeight = cgImage.height
+        guard sourceWidth > 0, sourceHeight > 0 else { return nil }
+        let width = min(320, sourceWidth)
+        let height = max(1, width * sourceHeight / max(1, sourceWidth))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue
+            | CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        context.interpolationQuality = .medium
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        var red = [Int](repeating: 0, count: columns * rows)
+        var green = [Int](repeating: 0, count: columns * rows)
+        var blue = [Int](repeating: 0, count: columns * rows)
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = (y * width + x) * 4
+                let r = Int(pixels[offset])
+                let g = Int(pixels[offset + 1])
+                let b = Int(pixels[offset + 2])
+                let column = min(columns - 1, x * columns / max(1, width))
+                accumulate(&red, column: column, value: r)
+                accumulate(&green, column: column, value: g)
+                accumulate(&blue, column: column, value: b)
+            }
+        }
+        return (densityMap(red), densityMap(green), densityMap(blue))
+    }
+
+    private static func accumulate(_ buffer: inout [Int], column: Int, value: Int) {
+        let row = rows - 1 - clamp8(value) * (rows - 1) / 255
+        buffer[row * columns + column] += 1
+    }
+
+    private static func clamp8(_ value: Int) -> Int {
+        min(255, max(0, value))
+    }
+
+    private static func densityMap(_ values: [Int]) -> String {
+        let digits = Array("0123456789ABCDEF")
+        let maximum = max(1, values.max() ?? 1)
+        let divisor = log1p(Double(maximum))
+        let payload = values.map { value -> Character in
+            let level = Int((log1p(Double(value)) / divisor * 15).rounded())
+            return digits[min(15, max(0, level))]
+        }
+        return "S\(columns)x\(rows):" + String(payload)
     }
 }
 
@@ -9812,8 +9861,9 @@ private struct ImageEditorView: View {
                             editorColorPanel
                         }
                         EditorScopeDock(
-                            values: editorScopeValues,
-                            hasSource: selectedPhoto != nil
+                            traces: editorScopeTraces,
+                            hasSource: selectedPhoto != nil,
+                            metrics: editorScopeMetrics
                         )
                         .frame(width: 320)
                     }
@@ -9872,14 +9922,34 @@ private struct ImageEditorView: View {
         .background(Palette.editorBg)
     }
 
-    private var editorScopeValues: [Double] {
-        guard let aiAnalysis else { return [] }
+    /// RGB density traces computed from the current editor image — the same
+    /// source the preview renders (aiTools surfaces the AI result or original,
+    /// every other section the rendered edit). Empty when no image is selected.
+    private var editorScopeTraces: [MacScopeTrace] {
+        let image: NSImage?
+        if selectedSection == .aiTools {
+            image = aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil)
+        } else {
+            image = renderedImage
+        }
+        guard let image,
+              let densities = MacEditorRGBDensity.compute(from: image) else { return [] }
         return [
-            aiAnalysis.meanLuma,
-            aiAnalysis.contrast,
-            aiAnalysis.saturation,
-            aiAnalysis.detail
+            MacScopeTrace(value: densities.red, color: Palette.scopeR),
+            MacScopeTrace(value: densities.green, color: Palette.scopeG),
+            MacScopeTrace(value: densities.blue, color: Palette.scopeB)
         ]
+    }
+
+    /// Compact text form of the AI four metrics (mean luma / contrast /
+    /// saturation / detail), kept beside the RGB waveform so the analysis
+    /// readouts remain available on the editor page.
+    private var editorScopeMetrics: String? {
+        guard let aiAnalysis else { return nil }
+        func percent(_ value: Double) -> String {
+            "\(Int(max(0, min(1, value)) * 100))%"
+        }
+        return "曝光 \(percent(aiAnalysis.meanLuma)) · 动态 \(percent(aiAnalysis.contrast)) · 色彩 \(percent(aiAnalysis.saturation)) · 细节 \(percent(aiAnalysis.detail))"
     }
 
     private var aiToolsPanel: some View {
