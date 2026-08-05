@@ -6115,7 +6115,7 @@ private struct ShootingTaskPanel: View {
                 .font(.system(size: TypeScale.title, weight: .bold))
             Text("间隔、包围与 B 门任务集中管理")
                 .font(.system(size: TypeScale.body))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.uiLabel)
             Picker("任务类型", selection: $model.shootingTaskKind) {
                 ForEach(ShootingTaskKind.allCases) { kind in
                     Text(kind.rawValue).tag(kind)
@@ -6163,7 +6163,7 @@ private struct ShootingTaskPanel: View {
             }
             RuntimeLocalizedText(model.shootingTaskProgress)
                 .font(.system(size: TypeScale.body, design: .monospaced))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.uiLabel)
         }
         .padding(18)
         .background(Palette.uiCard)
@@ -6738,7 +6738,7 @@ private struct MonitorControlDeck: View {
                     .font(.system(size: TypeScale.title, weight: .bold))
                 Text("优先使用快门角度；应用会按当前帧率换算为曝光时间并写入相机。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.uiLabel)
 
                 Picker("拍摄模式", selection: Binding(get: { model.exposureMode }, set: { model.exposureMode = $0; model.applyParameter("exposureMode", value: $0, label: "拍摄模式") })) {
                     Text("P").tag("program")
@@ -6834,7 +6834,7 @@ private struct MonitorControlDeck: View {
                         : "录制规格与 Log / Picture Profile 会按连接相机品牌写入；不支持的组合由机身明确拒绝。"
                 )
                 .font(.system(size: TypeScale.body))
-                .foregroundStyle(Palette.muted)
+                .foregroundStyle(Palette.uiLabel)
 
                 Picker(
                     "光圈",
@@ -6953,12 +6953,12 @@ private struct MonitorControlDeck: View {
 
                 Text("外录使用实时取景生成无声 Motion‑JPEG AVI，可与机身录制并行；照片始终直接写入当前设备。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.uiLabel)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text("Nikon PTP 返回 JPEG 实时取景帧。监看显示尺寸仅处理本地预览，不会改变机身的视频文件类型或画面尺寸。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.uiLabel)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
@@ -7055,7 +7055,7 @@ private struct MonitorControlDeck: View {
                         ?? "尚未导入；LUT 只影响视频监看，不写入原片。"
                 )
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.uiLabel)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
@@ -7435,11 +7435,11 @@ private struct CaptureSessionPanel: View {
                 }
                 Text("命名支持 {session}、{date}、{counter}、{camera}；RAW + JPEG 自动配对，并生成 XMP 与 SHA-256 清单。")
                     .font(.system(size: TypeScale.body))
-                    .foregroundStyle(Palette.muted)
+                    .foregroundStyle(Palette.uiLabel)
                 HStack {
                     RuntimeLocalizedText(workflow.status)
                         .font(.system(size: TypeScale.body, design: .monospaced))
-                        .foregroundStyle(Palette.muted)
+                        .foregroundStyle(Palette.uiLabel)
                     Spacer()
                     Button(workflow.isActive ? "结束会话" : "开始会话") {
                         toggleSession()
