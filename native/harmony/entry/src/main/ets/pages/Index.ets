@@ -89,6 +89,81 @@ const UI_ACCENT: string = '#CDDC39';
 const UI_BLUE: string = '#0A84FF';
 const UI_VIDEO: string = '#D8323A';
 
+// ===== v1.5.6 token 层（对齐 Android TS_*/SPACE_*/SCOPE_*/HUD_* 与 design.md 色板）=====
+
+// TypeScale（5 档，与 Android 同值）
+const TS_CAPTION: number = 11;    // 辅助说明/状态
+const TS_BODY: number = 12;       // 正文/标签（Harmony 热点档）
+const TS_EMPHASIS: number = 15;   // 强调/卡片标题
+const TS_TITLE: number = 18;      // 区块标题
+const TS_DISPLAY: number = 24;    // 大数字/读数
+
+// Spacing（4pt 体系，与 Android 同值）
+const SPACE_4: number = 4;
+const SPACE_8: number = 8;
+const SPACE_12: number = 12;
+const SPACE_16: number = 16;
+const SPACE_20: number = 20;
+const SPACE_24: number = 24;
+const SPACE_32: number = 32;
+const SPACE_40: number = 40;
+
+// design.md 色板（dark 值为主，与 Android/其他端同名同值）
+const INK: string = '#ECEEF2';              // Ink（暗色主文本）
+const MUTED_INK: string = '#9AA1AD';        // Muted ink（暗色次要文本）
+const RULE: string = '#FFFFFF1F';           // Rule（暗色分隔线）
+const PHOTO_ACCENT: string = '#2E86E0';     // Photo accent dark（照片动作/选中）
+const PHOTO_ACCENT_LIGHT: string = '#1673E6'; // Photo accent light（渐变起点）
+const PHOTO_SOFT_BORDER: string = '#FFB6CFF5'; // AI 卡浅蓝边框
+const POSITIVE_SOFT: string = '#E4F7EE';    // 已连接浅绿底
+const READOUT_GLOW: string = '#6BAEFF';     // Readout glow（可写曝光值发光）
+
+// SCOPE_* 示波器轨迹色（五端同名同值）
+const SCOPE_R: string = '#FF302A';          // RGB parade R
+const SCOPE_G: string = '#28FF69';          // RGB parade G
+const SCOPE_B: string = '#2240FF';          // RGB parade B
+const SCOPE_AUDIO: string = '#4CC7E8';      // 音频缺失基线
+const SCOPE_YUV_Y: string = '#14FF5C';      // YUV Y
+const SCOPE_YUV_U: string = '#00D2FF';      // YUV U
+const SCOPE_YUV_V: string = '#FF26DE';      // YUV V
+const SCOPE_BG: string = '#050A0F';         // 示波器井背景
+
+// HUD 玻璃遮罩（对齐 Android HUD_* 语义）
+const HUD_BG: string = '#AA000000';         // 67% 黑：主 HUD 控件背景
+const HUD_BG_SOFT: string = '#99000000';    // 60% 黑：次要控件/胶囊
+const HUD_BG_MID: string = '#66000000';     // 40% 黑：关闭/编辑按钮
+const HUD_BG_DIM: string = '#55000000';     // 33% 黑：弱遮罩/弹层阴影
+const HUD_BG_DARK: string = '#88000000';    // 53% 黑：深色面板
+const HUD_SHADOW: string = '#44000000';     // 27% 黑：卡片投影
+const HUD_OVERLAY: string = '#F2080A0F';    // 大图弹层全屏背景
+
+// 白色系（alpha 白）
+const WHITE: string = '#FFFFFF';
+const WHITE_HI: string = '#F0FFFFFF';       // 94% 白
+const WHITE_MID: string = '#E0FFFFFF';      // 88% 白
+const WHITE_LO: string = '#BFFFFFFF';       // 75% 白
+const WHITE_DIM: string = '#99FFFFFF';      // 60% 白
+const WHITE_FAINT: string = '#90FFFFFF';    // 56% 白
+const BLACK: string = '#000000';
+
+// 专属语义色
+const NAV_ACTIVE_BG: string = '#140A84FF';  // 导航选中态背景（UI_BLUE 8%）
+const MORE_ACTIVE_BG: string = '#CC055AD2'; // 沉浸参数展开态蓝底
+const WHEEL_LIFT: string = '#43B7FF';       // 色轮 Lift
+const WHEEL_GAMMA: string = '#C68CFF';      // 色轮 Gamma
+const WHEEL_GAIN: string = '#FFD36A';       // 色轮 Gain
+const PEAKING_AMBER: string = '#FFE45C';    // 峰值覆盖高亮
+const CLOUD_MUTED: string = '#CAD3E0';      // 云创监看关闭态文字
+const CLOUD_CARD_BG: string = '#182434';    // 云创监看卡片背景
+const CLOUD_CARD_BORDER: string = '#304E70';// 云创监看卡片边框
+const WARN_BG: string = '#FFFFEEEE';        // 防诈卡浅红底
+const WARN_BG_SOFT: string = '#FFF4B9B9';   // 防诈徽标浅红
+const WARN_DEEP: string = '#B21923';        // 防诈深红标题
+const WARN_DARK: string = '#75141C';        // 防诈暗红正文
+const ACCENT_SOFT: string = '#DDFFD646';    // 等待画面 accent 边框
+const PHOTO_GLOW: string = '#24055AD2';     // 品牌蓝投影
+const CARD_SHADOW: string = '#14050B18';    // 顶栏/卡片投影
+
 class ControlTile {
   readonly label: string;
   readonly value: string;
@@ -1304,7 +1379,7 @@ struct Index {
             : $r('app.color.graphite_muted')
         )
       Text(this.tr(this.status))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontColor($r('app.color.graphite_ink'))
         .maxLines(1)
@@ -1314,14 +1389,14 @@ struct Index {
         this.tr('文件库 · %lld 个文件')
           .replace('%lld', this.photos.length.toString())
       )
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.graphite_muted'))
         .maxLines(1)
     }
     .width('100%')
-    .height(32)
+    .height(44)
     .padding({ left: 14, right: 14 })
     .backgroundColor(UI_BG)
   }
@@ -1341,7 +1416,7 @@ struct Index {
         .borderRadius(24)
         .linearGradient({
           angle: 135,
-          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
         })
         .justifyContent(FlexAlign.Center)
         .scale({ x: 1, y: 1 })
@@ -1444,7 +1519,7 @@ struct Index {
       Button('◉', { type: ButtonType.Normal })
         .width(44)
         .height(44)
-        .fontSize(18)
+        .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
         .borderRadius(14)
@@ -1455,7 +1530,7 @@ struct Index {
       Button('⋯', { type: ButtonType.Normal })
         .width(44)
         .height(44)
-        .fontSize(18)
+        .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
         .borderRadius(14)
@@ -1481,12 +1556,12 @@ struct Index {
     promptAction.showActionMenu({
       title: this.tr('菜单'),
       buttons: [
-        { text: this.tr('连接 / 断开相机'), color: '#FFFFFF' },
-        { text: this.tr('视频监看'), color: '#FFFFFF' },
-        { text: this.tr('编辑'), color: '#FFFFFF' },
-        { text: this.tr('设备'), color: '#FFFFFF' },
-        { text: this.tr('文件库'), color: '#FFFFFF' },
-        { text: this.tr('设置'), color: '#FFFFFF' }
+        { text: this.tr('连接 / 断开相机'), color: WHITE },
+        { text: this.tr('视频监看'), color: WHITE },
+        { text: this.tr('编辑'), color: WHITE },
+        { text: this.tr('设备'), color: WHITE },
+        { text: this.tr('文件库'), color: WHITE },
+        { text: this.tr('设置'), color: WHITE }
       ]
     }).then((response: promptAction.ActionMenuSuccessResponse): void => {
       const targets: Array<string> = [
@@ -1533,12 +1608,12 @@ struct Index {
         .justifyContent(FlexAlign.Center)
         .linearGradient({
           angle: 135,
-          colors: [['#1673E6', 0], ['#2E86E0', 1]]
+          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
         })
         .borderRadius(13)
         .shadow({
           radius: 8,
-          color: '#24055AD2',
+          color: PHOTO_GLOW,
           offsetX: 0,
           offsetY: 4
         })
@@ -1629,7 +1704,7 @@ struct Index {
     })
     .shadow({
       radius: 14,
-      color: '#14050B18',
+      color: CARD_SHADOW,
       offsetX: 0,
       offsetY: 4
     })
@@ -1639,7 +1714,7 @@ struct Index {
   private NavigationRail() {
     Column({ space: 8 }) {
       Text(this.tr('工作区'))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -1697,7 +1772,7 @@ struct Index {
       )
       .fontColor(this.section === target ? UI_BLUE : UI_LABEL)
       .backgroundColor(
-        this.section === target ? '#140A84FF' : Color.Transparent
+        this.section === target ? NAV_ACTIVE_BG : Color.Transparent
       )
       .borderRadius(12)
       .flexShrink(0)
@@ -1806,11 +1881,11 @@ struct Index {
             .layoutWeight(1)
           if (this.connected && this.cameraName === device.name) {
             Text(this.tr('当前已连接'))
-              .fontSize(11)
+              .fontSize(TS_CAPTION)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.positive'))
               .padding({ left: 9, right: 9, top: 5, bottom: 5 })
-              .backgroundColor('#E4F7EE')
+              .backgroundColor(POSITIVE_SOFT)
               .borderRadius(14)
           }
         }
@@ -1820,7 +1895,7 @@ struct Index {
           .fontColor($r('app.color.muted'))
           .width('100%')
         Text(`${this.tr('最近连接')} · ${this.formatDeviceTimestamp(device.lastConnectedAt)}`)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -1913,7 +1988,7 @@ struct Index {
           ? filenameFromPath(this.editorSelectedPath)
           : this.tr('未选择照片')
       )
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
@@ -1961,14 +2036,14 @@ struct Index {
           .strokeLineJoin(LineJoinStyle.Round)
           .strokeLineCap(LineCapStyle.Round)
         Text(this.tr(label))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_LABEL)
       }
       .justifyContent(FlexAlign.Center)
       .alignItems(VerticalAlign.Center)
     }
-      .height(42)
+      .height(44)
       .layoutWeight(1)
       .backgroundColor(this.editorWorkbenchToolActive(panel) ? EDITOR_RAISED : Color.Transparent)
       .border({
@@ -2020,7 +2095,7 @@ struct Index {
         .fontColor(EDITOR_LABEL)
       if (this.editorAIAnalysis === undefined) {
         Text(this.tr('运行“分析画面”后显示实测范围'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor(EDITOR_LABEL)
           .layoutWeight(1)
       } else {
@@ -2030,7 +2105,7 @@ struct Index {
           `COLOR ${Math.round(this.editorAIAnalysis.saturation * 100)}  ` +
           `DETAIL ${Math.round(this.editorAIAnalysis.detail * 100)}`
         )
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(EDITOR_ACCENT)
@@ -2073,7 +2148,7 @@ struct Index {
   private ProEditorWorkspace() {
     Column({ space: 16 }) {
       Text(this.tr('专业显影'))
-        .fontSize(24)
+        .fontSize(TS_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
@@ -2086,7 +2161,7 @@ struct Index {
       if (this.editablePhotos().length === 0) {
         Column({ space: 8 }) {
           Text(this.tr('文件库中没有可编辑照片'))
-            .fontSize(18)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr(
@@ -2183,7 +2258,7 @@ struct Index {
           Text(this.tr(
             this.editorShowingOriginal ? '原图' : '调整后'
           ))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
             .padding({ left: 10, right: 10, top: 7, bottom: 7 })
@@ -2206,7 +2281,7 @@ struct Index {
         Text(this.tr(
           this.editorShowingOriginal ? '正在查看原图' : '调整不会覆盖原文件'
         ))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor(EDITOR_LABEL)
           .width('100%')
         Divider()
@@ -2222,7 +2297,7 @@ struct Index {
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
             Text(this.tr('设备端'))
-              .fontSize(11)
+              .fontSize(TS_CAPTION)
               .fontWeight(FontWeight.Bold)
               .fontColor($r('app.color.accent_ink'))
               .padding({ left: 8, right: 8, top: 5, bottom: 5 })
@@ -2238,7 +2313,7 @@ struct Index {
             .fontColor($r('app.color.muted'))
             .width('100%')
           Text(this.tr('设备端处理 · 照片不会上传'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.accent_ink'))
             .width('100%')
@@ -2252,7 +2327,7 @@ struct Index {
             .width('100%')
           }
           Text(`${this.tr('AI 强度')} · ${this.editorAIIntensity}%`)
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Slider({
@@ -2370,7 +2445,7 @@ struct Index {
             this.applyNikonCloudPreset(NIKON_CLOUD_PRESETS[index - 1]);
           })
         Text(this.tr('设备端 SDR 近似预览 · 相机与 NX Studio 成片可能不同'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')
         // 图 2 移动端降级：监视器 Stack 已上移至照片选择下方（见上方新位置）
@@ -2478,7 +2553,7 @@ struct Index {
         `${this.isLibraryBranchExpanded(branch.id) ? '⌄' : '›'}  分支 · ${branch.name} · ${this.editablePhotosForBranch(branch.id).length}`,
         { type: ButtonType.Normal }
       )
-        .height(42)
+        .height(44)
         .width('100%')
         .padding({ left: 8 + depth * 14, right: 6 })
         .fontColor($r('app.color.ink'))
@@ -2501,7 +2576,7 @@ struct Index {
     Column({ space: 3 }) {
       if (title.length > 0) {
         Text(`${title} · ${items.length}`)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
           .padding({ left: 8 + depth * 14, top: 4, bottom: 2 })
@@ -2516,7 +2591,7 @@ struct Index {
               .objectFit(ImageFit.Cover)
               .borderRadius(6)
             Text(item.name)
-              .fontSize(12)
+              .fontSize(TS_BODY)
               .fontColor($r('app.color.ink'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -2547,7 +2622,7 @@ struct Index {
       )
       if (items.length === 0) {
         Text(this.tr('此分支暂无可编辑照片'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .padding({ left: 22 + depth * 14, top: 5, bottom: 5 })
       }
@@ -2562,7 +2637,7 @@ struct Index {
         .fontSize(10)
         .fontColor($r('app.color.muted'))
       Text(`${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`)
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
     }
@@ -2607,7 +2682,7 @@ struct Index {
   private AiToolsWorkspace() {
     Column({ space: 16 }) {
       Text(this.tr('AI 工具'))
-        .fontSize(24)
+        .fontSize(TS_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
@@ -2623,7 +2698,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('修图覆盖原图 · 生图保存新文件'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
@@ -2631,7 +2706,7 @@ struct Index {
         Text(this.checkAiActivated()
           ? `${this.tr('已解锁')} · ${this.getRemainingUsage()} ${this.tr('次剩余')}`
           : this.tr('需要激活'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.checkAiActivated()
             ? $r('app.color.positive')
@@ -2651,7 +2726,7 @@ struct Index {
         this.EditorPhotoPicker()
         if (this.aiResultPath.length === 0 && this.editorSelectedPath.length > 0) {
           Text(this.tr('已选择原图'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -2698,7 +2773,7 @@ struct Index {
         })
 
       Text(this.tr('输出参数'))
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -2750,13 +2825,13 @@ struct Index {
 
       Row() {
         Text('可组合预设')
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
           .layoutWeight(1)
         Button('清空', { type: ButtonType.Normal })
           .height(44)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .backgroundColor($r('app.color.surface'))
           .onClick((): void => {
             this.aiSelectedPresets = [];
@@ -2776,7 +2851,7 @@ struct Index {
             ForEach(module.slice(1), (value: string) => {
               Button(this.tr(value), { type: ButtonType.Normal })
                 .height(44)
-                .fontSize(11)
+                .fontSize(TS_CAPTION)
                 .fontColor($r('app.color.ink'))
                 .backgroundColor(this.isAiPresetSelected(module[0], value)
                   ? $r('app.color.accent_soft') : $r('app.color.surface'))
@@ -2817,7 +2892,7 @@ struct Index {
 
       if (this.aiStatus.length > 0 || this.aiGenerating) {
         Text(this.aiGenerating ? '正在调用 AI 模型…' : this.aiStatus)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')
           .textAlign(TextAlign.Start)
@@ -3506,16 +3581,16 @@ struct Index {
         )
       } else if (this.editorPanel === 'wheels') {
         Text(this.tr('Lift / Gamma / Gain 三向色轮 · 拖动圆盘色点'))
-          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontSize(TS_BODY).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted')).width('100%')
         Row({ space: 8 }) {
-          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, '#43B7FF', (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
-          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, '#C68CFF', (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
-          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, '#FFD36A', (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
+          this.EditorWheel('Lift', this.editorWheelLiftX, this.editorWheelLiftY, WHEEL_LIFT, (x: number, y: number): void => { this.editorWheelLiftX = x; this.editorWheelLiftY = y; })
+          this.EditorWheel('Gamma', this.editorWheelGammaX, this.editorWheelGammaY, WHEEL_GAMMA, (x: number, y: number): void => { this.editorWheelGammaX = x; this.editorWheelGammaY = y; })
+          this.EditorWheel('Gain', this.editorWheelGainX, this.editorWheelGainY, WHEEL_GAIN, (x: number, y: number): void => { this.editorWheelGainX = x; this.editorWheelGainY = y; })
         }.width('100%')
       } else if (this.editorPanel === 'curves') {
         Text('主曲线 · 拖动曲线控制点')
-          .fontSize(12).fontWeight(FontWeight.Bold)
+          .fontSize(TS_BODY).fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted')).width('100%')
         Stack({ alignContent: Alignment.TopStart }) {
           Path()
@@ -3567,13 +3642,13 @@ struct Index {
           })
       } else if (this.editorPanel === 'mask') {
         Text(this.tr('蒙版列表'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
         if (this.editorMaskLayers.length === 0) {
           Text(this.tr('暂无蒙版'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
             .height(44)
             .width('100%')
@@ -3589,7 +3664,7 @@ struct Index {
                   )
                     .height(46)
                     .layoutWeight(1)
-                    .fontSize(12)
+                    .fontSize(TS_BODY)
                     .fontColor($r('app.color.ink'))
                     .backgroundColor(Color.Transparent)
                     .onClick((): void => {
@@ -3657,7 +3732,7 @@ struct Index {
           Button(this.tr('添加蒙版（画笔）'), { type: ButtonType.Normal })
             .height(48)
             .layoutWeight(1)
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(!this.editorMaskSubtract && this.editorMaskEnabled
               ? $r('app.color.accent_ink') : $r('app.color.ink'))
             .backgroundColor(!this.editorMaskSubtract && this.editorMaskEnabled
@@ -3673,7 +3748,7 @@ struct Index {
           Button(this.tr('减去蒙版（画笔）'), { type: ButtonType.Normal })
             .height(48)
             .layoutWeight(1)
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(this.editorMaskSubtract && this.editorMaskEnabled
               ? $r('app.color.accent_ink') : $r('app.color.ink'))
             .backgroundColor(this.editorMaskSubtract && this.editorMaskEnabled
@@ -3689,7 +3764,7 @@ struct Index {
         }
         .width('100%')
         Text(this.tr('智能识别'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -3700,7 +3775,7 @@ struct Index {
               (type: string): void => {
                 Button(this.tr(type), { type: ButtonType.Normal })
                   .height(44)
-                  .fontSize(11)
+                  .fontSize(TS_CAPTION)
                   .fontColor(this.editorMaskType === type
                     ? $r('app.color.accent_ink') : $r('app.color.ink'))
                   .backgroundColor(this.editorMaskType === type
@@ -3747,7 +3822,7 @@ struct Index {
             this.refreshEditorRenderedPreview();
           })
         Text(this.tr('蒙版内调整'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
@@ -3778,7 +3853,7 @@ struct Index {
         Text(this.tr(this.editorMaskEnabled
           ? '蓝色显示当前蒙版覆盖；橡皮会擦除蓝色区域。'
           : '先创建蒙版，再选择添加或减去画笔。'))
-          .fontSize(11).fontColor($r('app.color.muted')).width('100%')
+          .fontSize(TS_CAPTION).fontColor($r('app.color.muted')).width('100%')
       } else if (this.editorPanel === 'detail') {
         this.EditorSlider(
           '纹理',
@@ -3843,7 +3918,7 @@ struct Index {
         )
       } else {
         Text(this.tr('裁切比例'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Medium)
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -3943,7 +4018,7 @@ struct Index {
         onChange(dx * 100, dy * 100);
       })
       Text(label)
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Medium)
         .fontColor($r('app.color.muted'))
       Text(`${xValue >= 0 ? '+' : ''}${Math.round(xValue)}, ${yValue >= 0 ? '+' : ''}${Math.round(yValue)}`)
@@ -3987,7 +4062,7 @@ struct Index {
           ? `${this.tr(label)} · ${(value / 100).toFixed(2)} EV`
           : `${this.tr(label)} · ${Math.round(value)}`
       )
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Slider({
@@ -4064,7 +4139,7 @@ struct Index {
         if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
           Text('＋')
             .fontSize(32)
-            .fontColor('#FFE45C')
+            .fontColor(PEAKING_AMBER)
             .position({
               x: `${this.monitorFocusPointX * 100}%`,
               y: `${this.monitorFocusPointY * 100}%`
@@ -4073,7 +4148,7 @@ struct Index {
           Button(this.tr('全屏'), { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(12)
             .align(Alignment.TopEnd)
             .margin(16)
@@ -4121,7 +4196,7 @@ struct Index {
               ? '相机原生 JPEG · 监看输出 · 不修改原片'
               : '相机原生 JPEG · 本地预览'
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor(UI_LABEL)
             .layoutWeight(1)
           Button(this.tr(this.liveView ? '停止取景' : '开启取景'), {
@@ -4250,7 +4325,7 @@ struct Index {
     Column({ space: 4 }) {
       Row({ space: 8 }) {
         Text('●')
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.controlStatusDotColor())
           .width(22)
@@ -4263,7 +4338,7 @@ struct Index {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
         Text(this.tr(this.controlStatusRateValue()))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -4278,10 +4353,10 @@ struct Index {
           })
       }
       .width('100%')
-      .height(36)
+      .height(44)
       if (this.controlStatusFailed()) {
         Text(this.lastConnectionError)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor(UI_VIDEO)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -4356,7 +4431,7 @@ struct Index {
           .width(24)
           .height(24)
         Text(label)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor(UI_LABEL)
       }
       .width('100%')
@@ -4369,7 +4444,7 @@ struct Index {
         .width('100%')
         .margin({ top: 6 })
       Text(sub.length > 0 ? sub : ' ')
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor(UI_LABEL)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -4445,7 +4520,7 @@ struct Index {
           .width(24)
           .height(24)
         Text(this.tr('存储'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor(UI_LABEL)
       }
       .width('100%')
@@ -4491,7 +4566,7 @@ struct Index {
             ? `可拍 ${this.storageFreeImages()} 张`
             : this.tr('存储卡已满'))
         : (this.connected || this.wifiConnected) ? this.tr('无卡') : '—')
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor(UI_LABEL)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -4565,14 +4640,14 @@ struct Index {
     Column({ space: 8 }) {
       Row() {
         Text(this.tr('参数'))
-          .fontSize(15)
+          .fontSize(TS_EMPHASIS)
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .layoutWeight(1)
         Button(this.tr('全部'), { type: ButtonType.Normal })
           .width(68)
-          .height(32)
-          .fontSize(12)
+          .height(44)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? Color.White : $r('app.color.ink'))
           .backgroundColor(this.gridEditMode ? UI_SECONDARY : UI_ACCENT)
@@ -4583,8 +4658,8 @@ struct Index {
           })
         Button(this.tr('编辑'), { type: ButtonType.Normal })
           .width(68)
-          .height(32)
-          .fontSize(12)
+          .height(44)
+          .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? $r('app.color.ink') : Color.White)
           .backgroundColor(this.gridEditMode ? UI_ACCENT : UI_SECONDARY)
@@ -4595,10 +4670,10 @@ struct Index {
           })
       }
       .width('100%')
-      .height(34)
+      .height(44)
       if (this.controlTileRows().length === 0) {
         Text(this.tr('参数已全部隐藏'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor(UI_LABEL)
           .width('100%')
           .height(44)
@@ -4633,7 +4708,7 @@ struct Index {
     Stack({ alignContent: Alignment.TopEnd }) {
       Column({ space: 4 }) {
         Text(this.tr(label))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor(UI_LABEL)
           .width('100%')
         Text(value)
@@ -4654,8 +4729,8 @@ struct Index {
       if (this.gridEditMode) {
         Button('×', { type: ButtonType.Normal })
           .width(22)
-          .height(22)
-          .fontSize(15)
+          .height(44)
+          .fontSize(TS_EMPHASIS)
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .backgroundColor(UI_SECONDARY)
@@ -4703,7 +4778,7 @@ struct Index {
       Button(this.tr('AF-ON'), { type: ButtonType.Normal })
         .width(76)
         .height(44)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
@@ -4715,7 +4790,7 @@ struct Index {
       Button('●', { type: ButtonType.Normal })
         .width(74)
         .height(74)
-        .fontSize(24)
+        .fontSize(TS_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor(UI_ACCENT)
         .backgroundColor(UI_CARD)
@@ -4731,7 +4806,7 @@ struct Index {
       Button('INT', { type: ButtonType.Normal })
         .width(64)
         .height(44)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontWeight(FontWeight.Bold)
         .fontColor(this.shootingTaskRunning ? $r('app.color.ink') : Color.White)
         .backgroundColor(this.shootingTaskRunning ? UI_ACCENT : UI_SECONDARY)
@@ -4745,7 +4820,7 @@ struct Index {
       Button('⇄', { type: ButtonType.Normal })
         .width(44)
         .height(44)
-        .fontSize(18)
+        .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
         .borderRadius(14)
@@ -4768,9 +4843,9 @@ struct Index {
         Text('NP3')
           .width(40)
           .height(40)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
+          .fontColor(WHITE)
           .textAlign(TextAlign.Center)
           .backgroundColor($r('app.color.accent'))
           .borderRadius(12)
@@ -4780,17 +4855,17 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.section === 'monitor'
-                ? '#FFFFFF'
+                ? WHITE
                 : $r('app.color.ink')
             )
           Text(
             this.selectedMonitorNikonCloudPreset()?.name ??
             this.tr('已关闭')
           )
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(
               this.section === 'monitor'
-                ? '#CAD3E0'
+                ? CLOUD_MUTED
                 : $r('app.color.muted')
             )
             .maxLines(1)
@@ -4815,10 +4890,10 @@ struct Index {
       }
       .width('100%')
       Text(this.tr('照片与视频实时生效 · SDR 近似 · 不写入原片'))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontColor(
           this.section === 'monitor'
-            ? '#CAD3E0'
+            ? CLOUD_MUTED
             : $r('app.color.muted')
         )
         .maxLines(2)
@@ -4827,13 +4902,13 @@ struct Index {
     .padding(12)
     .backgroundColor(
       this.section === 'monitor'
-        ? '#182434'
+        ? CLOUD_CARD_BG
         : $r('app.color.accent_soft')
     )
     .border({
       width: 1,
       color: this.section === 'monitor'
-        ? '#304E70'
+        ? CLOUD_CARD_BORDER
         : $r('app.color.accent'),
       radius: 14
     })
@@ -4851,7 +4926,7 @@ struct Index {
       .layoutWeight(1)
       .height(112)
       .padding(3)
-      .backgroundColor('#000000')
+      .backgroundColor(BLACK)
       Canvas(this.monitorAudioScopeContext)
         .width('100%')
         .height(100)
@@ -4861,7 +4936,7 @@ struct Index {
       .layoutWeight(1)
       .height(112)
       .padding(3)
-      .backgroundColor('#000000')
+      .backgroundColor(BLACK)
     }
     .width('100%')
   }
@@ -5040,12 +5115,12 @@ struct Index {
           .fontColor(UI_BLUE)
         Row() {
           Text('图库占用 · 本地缓存')
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
             .layoutWeight(1)
           Text(this.photos.length > 0 ? `${this.photos.length} 个文件` : '暂无文件')
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
         }
@@ -5181,19 +5256,19 @@ struct Index {
       .vertical(true)
       .height(42)
       .strokeWidth(1)
-      .color('#1FFFFFFF')
+      .color(RULE)
   }
 
   @Builder
   private ShootingTaskPanel() {
     Column({ space: 10 }) {
       Text(this.tr('拍摄自动化'))
-        .fontSize(17)
+        .fontSize(TS_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
       Text(this.tr('间隔、包围与 B 门任务集中管理'))
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Select([
@@ -5213,7 +5288,7 @@ struct Index {
             ['interval', 'exposure', 'focus', 'bulb'][index];
         })
       Text(`${this.tr('张数')} · ${this.shootingTaskCount}`)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Slider({
@@ -5231,7 +5306,7 @@ struct Index {
           this.shootingTaskKind === 'bulb' ? '曝光时长' : '间隔'
         )} · ${this.shootingTaskInterval} ${this.tr('秒')}`
       )
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Slider({
@@ -5249,7 +5324,7 @@ struct Index {
         this.shootingTaskKind === 'focus'
       ) {
         Text(`${this.tr('包围步长')} · ${this.shootingTaskStep}`)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Slider({
@@ -5264,7 +5339,7 @@ struct Index {
           })
       }
       Text(this.tr(this.shootingTaskStatus))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -5305,7 +5380,7 @@ struct Index {
   private LibraryWorkspace() {
     Column({ space: 16 }) {
       Text(this.tr('分支文件库'))
-        .fontSize(24)
+        .fontSize(TS_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
@@ -5358,7 +5433,7 @@ struct Index {
       }
       .width('100%')
       Text(this.tr('系统相册中的照片与视频直接显示在本页；网盘文件通过独立指引页和系统文件选择器安全加入。'))
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Button(
@@ -5381,7 +5456,7 @@ struct Index {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
           Text(this.tr('允许照片和视频访问后，最近媒体会直接显示在这里。'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
         }
         .width('100%')
@@ -5439,7 +5514,7 @@ struct Index {
                         .fontSize(10)
                         .fontFamily('monospace')
                         .fontColor(Color.White)
-                        .backgroundColor('#99000000')
+                        .backgroundColor(HUD_BG_SOFT)
                         .borderRadius(12)
                         .padding({
                           left: 7,
@@ -5451,7 +5526,7 @@ struct Index {
                     }
                   }
                   Text(item.name)
-                    .fontSize(11)
+                    .fontSize(TS_CAPTION)
                     .fontWeight(FontWeight.Medium)
                     .fontColor($r('app.color.ink'))
                     .width(150)
@@ -5483,7 +5558,7 @@ struct Index {
       }
       if (this.systemExpanded) {
         Text(this.tr('系统相册内容保持在原位置；帧澈 ZENCHE 只读取缩略图和预览。'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')
       }
@@ -5622,7 +5697,7 @@ struct Index {
                       })
                     Stack({ alignContent: Alignment.Center }) {
                       Text(item.isVideo ? '▶' : '▣')
-                        .fontSize(18)
+                        .fontSize(TS_TITLE)
                         .fontColor(Color.White)
                     }
                       .width(60)
@@ -5644,7 +5719,7 @@ struct Index {
                         ` · ${item.capturedAt}` +
                         `${item.protectedObject ? ' · 已保护' : ''}`
                       )
-                        .fontSize(11)
+                        .fontSize(TS_CAPTION)
                         .fontFamily('monospace')
                         .fontColor($r('app.color.muted'))
                         .maxLines(1)
@@ -5672,7 +5747,7 @@ struct Index {
             .scrollBar(BarState.Auto)
         }
         Text(this.tr(this.cameraStorageStatus))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
           .width('100%')
@@ -5702,7 +5777,7 @@ struct Index {
         )
           .width('100%')
           .height(56)
-          .fontSize(15)
+          .fontSize(TS_EMPHASIS)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.surface'))
@@ -5744,7 +5819,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('长按文件并拖到任意分支；拖回“未分类”即可移出分支。'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .maxLines(2)
         }
@@ -5808,7 +5883,7 @@ struct Index {
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
           Text(this.tr('拍摄、导入或无线接收的新文件会先显示在这里。'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
         }
         .width('100%')
@@ -5963,19 +6038,19 @@ struct Index {
     Column({ space: 4 }) {
       Row({ space: 8 }) {
         Text(this.tr('用户分支'))
-          .fontSize(15)
+          .fontSize(TS_EMPHASIS)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .layoutWeight(1)
         Text(this.tr(`${this.userLibraryBranches.length} 个根节点`))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
       }
       .width('100%')
       if (this.userLibraryBranches.length === 0) {
         Text(this.tr('可建立项目、客户或拍摄日等分支；媒体仍保留在原始存储位置。'))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor($r('app.color.muted'))
           .width('100%')
           .padding({ top: 8, bottom: 8 })
@@ -6023,7 +6098,7 @@ struct Index {
             this.toggleLibraryBranch(branch.id);
           })
         Text(`${this.photosForBranch(branch.id).length} 文件`)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
           .width(62)
@@ -6091,7 +6166,7 @@ struct Index {
           branch.children.length === 0
         ) {
           Text(this.tr('拖动文件到这里'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
             .height(32)
@@ -6117,7 +6192,7 @@ struct Index {
         { type: ButtonType.Normal }
       )
         .height(44)
-        .fontSize(17)
+        .fontSize(TS_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .backgroundColor(Color.Transparent)
@@ -6130,7 +6205,7 @@ struct Index {
         placeholder: this.tr('项目名称'),
         text: this.sessionName
       })
-        .height(42)
+        .height(44)
         .onChange((value: string): void => {
           this.sessionName = value;
         })
@@ -6138,7 +6213,7 @@ struct Index {
         placeholder: this.tr('命名模板'),
         text: this.sessionNamingTemplate
       })
-        .height(42)
+        .height(44)
         .fontFamily('monospace')
         .onChange((value: string): void => {
           this.sessionNamingTemplate = value;
@@ -6148,7 +6223,7 @@ struct Index {
           placeholder: this.tr('创作者'),
           text: this.sessionCreator
         })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.sessionCreator = value;
@@ -6157,7 +6232,7 @@ struct Index {
           placeholder: this.tr('版权'),
           text: this.sessionRights
         })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.sessionRights = value;
@@ -6165,7 +6240,7 @@ struct Index {
       }
       .width('100%')
       Text(`${this.tr('默认评级')} · ${this.sessionRating} ★`)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Slider({
@@ -6195,13 +6270,13 @@ struct Index {
       Text(this.tr(
         'RAW + JPEG 自动配对，并生成 XMP 与 SHA-256 清单。'
       ))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Text(this.tr(
         this.captureWorkflow?.status ?? '尚未开始拍摄会话'
       ))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -6240,14 +6315,14 @@ struct Index {
       Row() {
         Column({ space: 3 }) {
           Text(this.tr('Wi‑Fi 相机 · PTP/IP'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('相机控制'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
           Text(this.tr(this.wifiStatus))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(this.wifiConnected
               ? $r('app.color.positive')
               : $r('app.color.muted'))
@@ -6272,7 +6347,7 @@ struct Index {
       }
       .width('100%')
       Text(this.tr('连接模式'))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
@@ -6292,18 +6367,18 @@ struct Index {
           ? 'STA 模式：让相机与设备加入同一局域网，并输入路由器分配给相机的 IP 地址。'
           : 'AP 模式：让设备加入相机热点；相机地址通常为 192.168.1.1。'
       ))
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Row({ space: 10 }) {
         TextInput({ placeholder: '192.168.1.1', text: this.wifiHost })
-          .height(42)
+          .height(44)
           .layoutWeight(1)
           .onChange((value: string): void => {
             this.wifiHost = value;
           })
         TextInput({ placeholder: '15740', text: this.wifiPort })
-          .height(42)
+          .height(44)
           .width(108)
           .type(InputType.Number)
           .onChange((value: string): void => {
@@ -6323,12 +6398,12 @@ struct Index {
           Divider()
             .color($r('app.color.rule'))
           Text(this.tr('文件接收'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.muted'))
             .width('100%')
         Text(this.tr('多协议无线图片收件箱'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(this.wirelessStatus))
@@ -6359,7 +6434,7 @@ struct Index {
             `WebDAV · 端口 ${HTTP_PORT} · 用户名/密码 nikonlink\n` +
             `接收完成后自动进入文件库`
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -6381,11 +6456,11 @@ struct Index {
       Row() {
         Column({ space: 3 }) {
           Text(this.tr('相机连接'))
-            .fontSize(24)
+            .fontSize(TS_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('本机摄像头、USB/PTP 与官方 SDK'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
@@ -6404,7 +6479,7 @@ struct Index {
       Row({ space: 12 }) {
         Column({ space: 4 }) {
           Text(this.tr('本机摄像头'))
-            .fontSize(16)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr(
@@ -6412,7 +6487,7 @@ struct Index {
               ? '已选择 · 拍摄时由 HarmonyOS 系统相机接管取景'
               : '调用设备内置镜头拍照，并自动保存到帧澈文件库'
           ))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(this.localCameraSelected
               ? $r('app.color.positive')
               : $r('app.color.muted'))
@@ -6444,13 +6519,13 @@ struct Index {
       Row({ space: 12 }) {
         Column({ space: 4 }) {
           Text(this.tr('USB / PTP'))
-            .fontSize(16)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.connected
             ? `${this.cameraName} · ${this.tr('已连接')}`
             : this.tr('使用数据线连接受支持的相机'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
@@ -6482,7 +6557,7 @@ struct Index {
       color: $r('app.color.rule_strong'),
       radius: 16
     })
-    .shadow({ radius: 24, color: '#44000000', offsetY: 10 })
+    .shadow({ radius: 24, color: HUD_SHADOW, offsetY: 10 })
   }
 
   @Builder
@@ -6492,10 +6567,26 @@ struct Index {
         Button(this.tr('关闭'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
-          .backgroundColor('#66000000')
+          .backgroundColor(HUD_BG_MID)
           .borderRadius(8)
           .onClick((): void => {
             this.closeLargePhoto();
+          })
+        Button(this.tr('编辑'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor(HUD_BG_MID)
+          .borderRadius(8)
+          .onClick((): void => {
+            const item: PhotoItem | undefined = this.photos.find(
+              (candidate: PhotoItem): boolean =>
+                candidate.name === this.largePreviewName
+            );
+            if (item !== undefined && !item.isVideo) {
+              this.editorSelectedPath = item.path;
+              this.closeLargePhoto();
+              this.section = 'editor';
+            }
           })
         Blank()
         Button(this.tr('分享到社交平台'), { type: ButtonType.Normal })
@@ -6521,7 +6612,7 @@ struct Index {
           .layoutWeight(1)
       }
       Text(this.largePreviewName)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontFamily('monospace')
         .fontColor(Color.White)
         .maxLines(1)
@@ -6530,7 +6621,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .padding(20)
-    .backgroundColor('#F2080A0F')
+    .backgroundColor(HUD_OVERLAY)
   }
 
   @Builder
@@ -6539,11 +6630,11 @@ struct Index {
       Row() {
         Column({ space: 3 }) {
           Text(this.tr('链接网盘'))
-            .fontSize(24)
+            .fontSize(TS_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr('账号和密码始终由网盘客户端管理。'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
@@ -6570,24 +6661,24 @@ struct Index {
               Button({ type: ButtonType.Normal }) {
                 Row({ space: 12 }) {
                   Text('☁')
-                    .fontSize(24)
+                    .fontSize(TS_DISPLAY)
                     .fontColor($r('app.color.accent'))
                     .width(42)
                   Column({ space: 3 }) {
                     Text(this.tr(provider.name))
-                      .fontSize(15)
+                      .fontSize(TS_EMPHASIS)
                       .fontWeight(FontWeight.Bold)
                       .fontColor($r('app.color.ink'))
                       .width('100%')
                     Text(this.tr(provider.note))
-                      .fontSize(12)
+                      .fontSize(TS_BODY)
                       .fontColor($r('app.color.muted'))
                       .width('100%')
                   }
                   .alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
                   Text('↗')
-                    .fontSize(18)
+                    .fontSize(TS_TITLE)
                     .fontColor($r('app.color.muted'))
                 }
                 .width('100%')
@@ -6611,7 +6702,7 @@ struct Index {
       .width('100%')
       .layoutWeight(1)
       Text(this.tr('步骤：安装并登录 → 下载媒体 → 选择文件并加入。'))
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Button(this.tr('选择文件并加入'), { type: ButtonType.Normal })
@@ -6636,7 +6727,7 @@ struct Index {
     })
     .shadow({
       radius: 24,
-      color: '#55000000',
+      color: HUD_BG_DIM,
       offsetX: 0,
       offsetY: 10
     })
@@ -6696,14 +6787,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#66000000')
+    .backgroundColor(HUD_BG_MID)
   }
 
   @Builder
@@ -6751,14 +6842,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#66000000')
+    .backgroundColor(HUD_BG_MID)
   }
 
   @Builder
@@ -6785,7 +6876,7 @@ struct Index {
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
           Button(this.tr('关闭公告'), { type: ButtonType.Normal })
-            .height(42)
+            .height(44)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
             .borderRadius(8)
@@ -6801,7 +6892,7 @@ struct Index {
           Column({ space: 14 }) {
             Column({ space: 8 }) {
               Text(this.tr('本次更新'))
-                .fontSize(17)
+                .fontSize(TS_TITLE)
                 .fontWeight(FontWeight.Bold)
                 .fontColor($r('app.color.ink'))
                 .width('100%')
@@ -6831,7 +6922,7 @@ struct Index {
               Text(this.tr('谨防诈骗'))
                 .fontSize(17)
                 .fontWeight(FontWeight.Bold)
-                .fontColor('#B21923')
+                .fontColor(WARN_DEEP)
                 .width('100%')
               Text(this.tr(
                 '帧澈 ZENCHE 是开源免费项目。任何声称“进群领取软件”' +
@@ -6839,16 +6930,16 @@ struct Index {
               ))
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
-                .fontColor('#75141C')
+                .fontColor(WARN_DARK)
                 .width('100%')
             }
             .width('100%')
             .padding(16)
             .alignItems(HorizontalAlign.Start)
-            .backgroundColor('#FFFFEEEE')
+            .backgroundColor(WARN_BG)
             .border({
               width: 1,
-              color: '#FFF4B9B9',
+              color: WARN_BG_SOFT,
               radius: 12
             })
 
@@ -6915,14 +7006,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#88000000')
+    .backgroundColor(HUD_BG_DARK)
   }
 
   @Builder
@@ -6933,14 +7024,14 @@ struct Index {
           .fontSize(19)
         Column({ space: 4 }) {
           Text(this.tr('快速问题反馈'))
-            .fontSize(15)
+            .fontSize(TS_EMPHASIS)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
             .width('100%')
           Text(this.tr(
             '公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。'
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .lineHeight(19)
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -6956,7 +7047,7 @@ struct Index {
       }
       .width('100%')
       Button(this.tr('打开爱发电'), { type: ButtonType.Normal })
-        .height(42)
+        .height(44)
         .width('100%')
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.surface'))
@@ -6975,7 +7066,7 @@ struct Index {
     .backgroundColor($r('app.color.accent_soft'))
     .border({
       width: 1,
-      color: '#FFB6CFF5',
+      color: PHOTO_SOFT_BORDER,
       radius: 12
     })
   }
@@ -6995,7 +7086,7 @@ struct Index {
           }
           .layoutWeight(1)
           Button(this.tr('关闭'), { type: ButtonType.Normal })
-            .height(40)
+            .height(44)
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
             .borderRadius(8)
@@ -7012,7 +7103,7 @@ struct Index {
         Text(this.tr(
           '软件功能永久免费，赞助为自愿行为。'
         ))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')
           .margin({ top: -6 })
@@ -7034,7 +7125,7 @@ struct Index {
           radius: 12
         })
         Text(this.tr('赞助不会解锁软件功能，也不影响公开 Issue 的处理。'))
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')
       }
@@ -7050,14 +7141,14 @@ struct Index {
       })
       .shadow({
         radius: 24,
-        color: '#55000000',
+        color: HUD_BG_DIM,
         offsetX: 0,
         offsetY: 10
       })
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#88000000')
+    .backgroundColor(HUD_BG_DARK)
   }
 
   @Builder
@@ -7071,12 +7162,12 @@ struct Index {
       } else {
         Column({ space: 8 }) {
           Text(this.tr('等待相机画面'))
-            .fontSize(24)
+            .fontSize(TS_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor(Color.White)
           Text(this.tr('连接相机并开启实时取景后即可全屏监看。'))
             .fontSize(13)
-            .fontColor('#99FFFFFF')
+            .fontColor(WHITE_DIM)
         }
       }
       Row()
@@ -7084,7 +7175,7 @@ struct Index {
         .height(82)
         .border({
           width: 2,
-          color: '#DDFFD646',
+          color: ACCENT_SOFT,
           radius: 4
         })
       Column() {
@@ -7092,7 +7183,7 @@ struct Index {
           Button(`⌄ ${this.tr('退出全屏')}`, { type: ButtonType.Normal })
             .height(44)
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(10)
             .onClick((): void => {
               this.closeImmersivePreview();
@@ -7101,10 +7192,10 @@ struct Index {
             `${this.liveView ? '● LIVE' : '● NO SOURCE'} · ` +
             `${this.cameraName} · USB/PTP`
           )
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontFamily('monospace')
             .fontColor(Color.White)
-            .backgroundColor('#99000000')
+            .backgroundColor(HUD_BG_SOFT)
             .borderRadius(22)
             .padding({
               left: 14,
@@ -7128,7 +7219,7 @@ struct Index {
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
-          .backgroundColor('#99000000')
+          .backgroundColor(HUD_BG_SOFT)
           .borderRadius(22)
           .padding({
             left: 18,
@@ -7227,7 +7318,7 @@ struct Index {
         .fontColor(UI_LABEL)
         .width('100%')
       Text(value)
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
@@ -7276,13 +7367,13 @@ struct Index {
               : this.exposureMode.toUpperCase())
           : '—'
       )
-        .fontSize(19)
+        .fontSize(TS_TITLE)
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .width(64)
         .height(56)
         .textAlign(TextAlign.Center)
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
       Button(
         this.tr(this.liveView ? 'LIVE' : '开启取景'),
@@ -7290,10 +7381,10 @@ struct Index {
       )
         .width(64)
         .height(52)
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Bold)
         .fontColor(this.liveView ? Color.Black : Color.White)
-        .backgroundColor(this.liveView ? UI_ACCENT : '#AA000000')
+        .backgroundColor(this.liveView ? UI_ACCENT : HUD_BG)
         .borderRadius(10)
         .onClick((): void => {
           this.toggleLiveView();
@@ -7302,9 +7393,9 @@ struct Index {
         Button(this.tr('峰值'), { type: ButtonType.Normal })
           .width(64)
           .height(48)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor(this.focusPeakingEnabled ? Color.Black : Color.White)
-          .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : '#AA000000')
+          .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
             this.focusPeakingEnabled = !this.focusPeakingEnabled;
@@ -7312,9 +7403,9 @@ struct Index {
         Button(this.tr('假色'), { type: ButtonType.Normal })
           .width(64)
           .height(48)
-          .fontSize(11)
+          .fontSize(TS_CAPTION)
           .fontColor(this.falseColorEnabled ? Color.Black : Color.White)
-          .backgroundColor(this.falseColorEnabled ? UI_ACCENT : '#AA000000')
+          .backgroundColor(this.falseColorEnabled ? UI_ACCENT : HUD_BG)
           .borderRadius(10)
           .onClick((): void => {
             this.falseColorEnabled = !this.falseColorEnabled;
@@ -7323,9 +7414,9 @@ struct Index {
       Button('AF', { type: ButtonType.Normal })
         .width(64)
         .height(48)
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontColor(Color.White)
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
         .enabled(this.connected && this.liveView && !this.busy)
         .onClick((): void => { this.triggerAutoFocusOn(); })
@@ -7347,12 +7438,12 @@ struct Index {
       Text(this.immersiveMonitoring
         ? (this.videoRecording ? 'REC' : this.tr('待机'))
         : 'JPEG')
-        .fontSize(11)
+        .fontSize(TS_CAPTION)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-        .backgroundColor('#AA000000')
+        .backgroundColor(HUD_BG)
         .borderRadius(10)
     }
   }
@@ -7399,7 +7490,7 @@ struct Index {
         this.ImmersiveCaptureButton()
         Column({ space: 6 }) {
           Text(this.tr(this.immersiveMonitoring ? '视频' : '照片'))
-            .fontSize(15)
+            .fontSize(TS_EMPHASIS)
             .fontWeight(FontWeight.Bold)
             .fontColor(
               this.immersiveMonitoring
@@ -7409,11 +7500,11 @@ struct Index {
           Text(this.immersiveMonitoring
             ? (this.videoRecording ? 'REC' : this.tr('待机'))
             : 'JPEG')
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontFamily('monospace')
             .fontColor(Color.White)
             .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-            .backgroundColor('#AA000000')
+            .backgroundColor(HUD_BG)
             .borderRadius(10)
         }
       }
@@ -7435,7 +7526,7 @@ struct Index {
         )
           .height(44)
           .fontColor(Color.White)
-          .backgroundColor('#99000000')
+          .backgroundColor(HUD_BG_SOFT)
           .borderRadius(10)
           .onClick((): void => {
             this.immersiveParametersExpanded =
@@ -7454,8 +7545,8 @@ struct Index {
             .fontColor(Color.White)
             .backgroundColor(
               this.immersiveMoreParametersExpanded
-                ? '#CC055AD2'
-                : '#99000000'
+                ? MORE_ACTIVE_BG
+                : HUD_BG_SOFT
             )
             .borderRadius(10)
             .onClick((): void => {
@@ -7605,7 +7696,7 @@ struct Index {
         .width(44)
         .height(44)
         .fontColor(Color.White)
-        .backgroundColor('#66000000')
+        .backgroundColor(HUD_BG_MID)
         .enabled(
           this.connected &&
           this.camera.canAdjustParameter(this.cameraParameter(parameter))
@@ -7616,9 +7707,9 @@ struct Index {
       Column({ space: 1 }) {
         Text(this.tr(label))
           .fontSize(10)
-          .fontColor('#99FFFFFF')
+          .fontColor(WHITE_DIM)
         Text(value)
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(
@@ -7633,7 +7724,7 @@ struct Index {
         .width(44)
         .height(44)
         .fontColor(Color.White)
-        .backgroundColor('#66000000')
+        .backgroundColor(HUD_BG_MID)
         .enabled(
           this.connected &&
           this.camera.canAdjustParameter(this.cameraParameter(parameter))
@@ -7659,11 +7750,11 @@ struct Index {
   private CaptureAssistSettingsCard() {
     Column({ space: 12 }) {
       Text(this.tr('拍摄辅助'))
-        .fontSize(17)
+        .fontSize(TS_TITLE)
         .fontWeight(FontWeight.Bold)
         .width('100%')
       Text(this.tr('蓝牙遥控与拍摄定位'))
-        .fontSize(12)
+        .fontSize(TS_BODY)
         .fontColor($r('app.color.muted'))
         .width('100%')
       Row() {
@@ -7673,7 +7764,7 @@ struct Index {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
           Text(this.tr(this.bluetoothRemoteStatus))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor(this.bluetoothRemoteConnected
               ? $r('app.color.positive')
               : $r('app.color.muted'))
@@ -7698,7 +7789,7 @@ struct Index {
             .fontWeight(FontWeight.Medium)
             .fontColor($r('app.color.ink'))
           Text(this.tr(this.locationTaggingStatus))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
           Text(this.tr('拍摄时写入同名 XMP GPS，不在后台持续定位。'))
             .fontSize(10)
@@ -7732,7 +7823,7 @@ struct Index {
     Scroll() {
       Column({ space: 20 }) {
         Text(this.tr('设置'))
-          .fontSize(24)
+          .fontSize(TS_DISPLAY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
@@ -7742,11 +7833,11 @@ struct Index {
           .width('100%')
         Column({ space: 12 }) {
           Text(this.tr('语言'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('语言更改会立即应用，并在下次启动时保留。'))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Select([
@@ -7790,7 +7881,7 @@ struct Index {
         this.CaptureAssistSettingsCard()
         Column({ space: 8 }) {
           Text(this.tr('索尼官方 SDK'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
@@ -7800,7 +7891,7 @@ struct Index {
           Text(this.tr(
             '索尼 Camera Remote SDK 2.02.00 只提供 macOS 与 Windows 运行库；当前平台继续使用原生 Camera Remote Command 连接后端。'
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
         }
@@ -7815,7 +7906,7 @@ struct Index {
         })
         Column({ space: 8 }) {
           Text(this.tr('尼康官方 SDK'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr('官方桌面 SDK 不提供当前平台运行库'))
@@ -7825,7 +7916,7 @@ struct Index {
           Text(this.tr(
             '尼康只为 macOS 与 Windows 提供本次 SDK 运行库；当前平台继续使用原生相机连接后端。'
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
         }
@@ -7840,11 +7931,11 @@ struct Index {
         })
         Column({ space: 12 }) {
           Text('AI 功能激活')
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text('AI 修图与生图需购买激活码解锁。每个激活码 100 次，绑定设备，服务器端计数。')
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
           if (this.getAiActivationCode().length > 0) {
@@ -7874,50 +7965,7 @@ struct Index {
           Text(this.tr(
             '复制设备 ID 后，前往 zenche.top 使用兑换码兑换绑定当前设备的激活密钥。'
           ))
-            .fontSize(11)
-            .fontColor($r('app.color.muted'))
-            .width('100%')
-          Text(this.tr('没有兑换码？在爱发电购买兑换码'))
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
-            .width('100%')
-          Image($r('app.media.afdian_donation'))
-            .width(this.isCompact() ? '100%' : 300)
-            .height(this.isCompact() ? 390 : 416)
-            .objectFit(ImageFit.Contain)
-            .borderRadius(8)
-            .onClick((): void => {
-              const context = getContext(this) as common.UIAbilityContext;
-              try {
-                context.startAbility({
-                  action: 'ohos.want.action.viewData',
-                  entities: ['entity.system.browsable'],
-                  uri: AFDIAN_URL
-                });
-              } catch (_) {
-                this.aiActivationMsg = '无法打开浏览器';
-              }
-            })
-          Button(this.tr('在爱发电购买兑换码'), { type: ButtonType.Normal })
-            .height(40)
-            .width('100%')
-            .fontColor($r('app.color.ink'))
-            .backgroundColor($r('app.color.paper_2'))
-            .onClick((): void => {
-              const context = getContext(this) as common.UIAbilityContext;
-              try {
-                context.startAbility({
-                  action: 'ohos.want.action.viewData',
-                  entities: ['entity.system.browsable'],
-                  uri: AFDIAN_URL
-                });
-              } catch (_) {
-                this.aiActivationMsg = '无法打开浏览器';
-              }
-            })
-          Text(this.tr('兑换码仅用于 AI 云服务次数，帧澈本体保持免费开源。'))
-            .fontSize(10)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row() {
@@ -7927,8 +7975,8 @@ struct Index {
               .fontColor($r('app.color.ink'))
               .layoutWeight(1)
             Button('复制', { type: ButtonType.Normal })
-              .height(32)
-              .fontSize(12)
+              .height(44)
+              .fontSize(TS_BODY)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
               .borderRadius(8)
@@ -7940,14 +7988,14 @@ struct Index {
           .width('100%')
           .alignItems(VerticalAlign.Center)
           Text(this.getDeviceId())
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .width('100%')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Text(this.tr('每个激活密钥绑定当前设备，请复制上面的设备 ID 并前往官网兑换。'))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
             .width('100%')
           TextInput({ placeholder: '输入激活码', text: this.aiActivationInput })
@@ -7958,7 +8006,7 @@ struct Index {
             })
           Row({ space: 8 }) {
             Button('购买激活码', { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
@@ -7976,7 +8024,7 @@ struct Index {
                 }
               })
             Button('激活', { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
@@ -8019,7 +8067,7 @@ struct Index {
             this.tr(this.aiRebindBusy ? '正在迁移…' : '恢复到当前设备'),
             { type: ButtonType.Normal }
           )
-            .height(40)
+            .height(44)
             .width('100%')
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
@@ -8029,7 +8077,7 @@ struct Index {
             })
           if (this.aiActivationMsg.length > 0) {
             Text(this.aiActivationMsg)
-              .fontSize(11)
+              .fontSize(TS_CAPTION)
               .fontColor($r('app.color.muted'))
               .width('100%')
           }
@@ -8045,13 +8093,13 @@ struct Index {
         })
         Column({ space: 12 }) {
           Text(this.tr('软件更新'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(
             `当前版本 ${CURRENT_VERSION} · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。`
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row() {
@@ -8077,7 +8125,7 @@ struct Index {
             text: this.mirrorChyanCdk
           })
             .type(InputType.Password)
-            .height(42)
+            .height(44)
             .showPasswordIcon(true)
             .onChange((value: string): void => {
               this.mirrorChyanCdk = value;
@@ -8085,12 +8133,12 @@ struct Index {
           Text(this.tr(
             'CDK 保存在应用私有设置中，不会写入诊断日志。'
           ))
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
             .width('100%')
           Row({ space: 8 }) {
             Button(this.tr('保存 CDK'), { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
@@ -8099,7 +8147,7 @@ struct Index {
                 this.saveMirrorChyanCdk();
               })
             Button(this.tr('打开 Mirror酱'), { type: ButtonType.Normal })
-              .height(40)
+              .height(44)
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
@@ -8155,13 +8203,13 @@ struct Index {
         })
         Column({ space: 12 }) {
           Text(this.tr('诊断日志'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
           Text(this.tr(
             this.diagnostics?.directoryPath ?? '日志目录暂不可用'
           ))
-            .fontSize(12)
+            .fontSize(TS_BODY)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .width('100%')
@@ -8189,7 +8237,7 @@ struct Index {
           .width('100%')
           this.FastFeedbackCard()
           Text(this.recentLogs)
-            .fontSize(11)
+            .fontSize(TS_CAPTION)
             .fontFamily('monospace')
             .fontColor($r('app.color.muted'))
             .maxLines(14)
@@ -8208,26 +8256,39 @@ struct Index {
         Text(this.tr(
           '只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。'
         ))
-          .fontSize(12)
+          .fontSize(TS_BODY)
           .fontColor($r('app.color.muted'))
           .width('100%')
         Column({ space: 12 }) {
           Text(this.tr('喜欢 帧澈 ZENCHE？'))
-            .fontSize(17)
+            .fontSize(TS_TITLE)
             .fontWeight(FontWeight.Bold)
             .width('100%')
-          Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配。'))
+          Text(this.tr('请作者喝杯奶茶，支持后续维护与新机型适配；兑换码可在爱发电购买。'))
             .fontSize(14)
             .fontColor($r('app.color.muted'))
             .width('100%')
-          Button(this.tr('请作者喝奶茶'), { type: ButtonType.Normal })
-            .height(44)
-            .fontColor($r('app.color.accent_ink'))
-            .backgroundColor($r('app.color.accent'))
-            .borderRadius(6)
-            .onClick((): void => {
-              this.openDonation();
-            })
+          Row({ space: 8 }) {
+            Button(this.tr('请作者喝奶茶'), { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.openDonation();
+              })
+            Button(this.tr('在爱发电购买兑换码'), { type: ButtonType.Normal })
+              .height(44)
+              .layoutWeight(1)
+              .fontColor($r('app.color.ink'))
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(6)
+              .onClick((): void => {
+                this.openAfdian();
+              })
+          }
+          .width('100%')
         }
         .width('100%')
         .padding(20)
@@ -8251,7 +8312,7 @@ struct Index {
     Scroll() {
       Column({ space: 8 }) {
         Text(this.tr('拍摄控制'))
-          .fontSize(17)
+          .fontSize(TS_TITLE)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
@@ -8445,12 +8506,12 @@ struct Index {
       Text(`${this.tr('峰值覆盖')} · ${this.peakingCoverage}%`)
         .fontSize(10)
         .fontFamily('monospace')
-        .fontColor('#BFFFFFFF')
+        .fontColor(WHITE_LO)
         .width('100%')
     }
     .width('100%')
     .padding(4)
-    .backgroundColor('#000000')
+    .backgroundColor(BLACK)
   }
 
   private scopeLevels(value: string): Array<number> {
@@ -8473,7 +8534,7 @@ struct Index {
     height: number,
     parade: boolean
   ): void {
-    context.strokeStyle = '#90FFFFFF';
+    context.strokeStyle = WHITE_FAINT;
     context.lineWidth = 0.72;
     for (let guide: number = 1; guide < 4; guide++) {
       const lineY: number = y + height * guide / 4;
@@ -8491,7 +8552,7 @@ struct Index {
         context.stroke();
       }
     }
-    context.strokeStyle = '#F0FFFFFF';
+    context.strokeStyle = WHITE_HI;
     context.lineWidth = 1.1;
     context.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
   }
@@ -8700,9 +8761,9 @@ struct Index {
   ): void {
     const footerHeight: number = Math.min(14, Math.max(10, height * 0.17));
     const plotHeight: number = Math.max(1, height - footerHeight);
-    context.fillStyle = '#000000';
+    context.fillStyle = BLACK;
     context.fillRect(x, y, width, height);
-    context.fillStyle = '#050A0F';
+    context.fillStyle = SCOPE_BG;
     context.fillRect(x, y, width, plotHeight);
     for (let index: number = 0; index < values.length; index++) {
       this.drawScopeTrace(
@@ -8719,7 +8780,7 @@ struct Index {
     }
     this.drawScopeGrid(context, x, y, width, plotHeight, parade);
     context.globalAlpha = 1;
-    context.fillStyle = '#E0FFFFFF';
+    context.fillStyle = WHITE_MID;
     context.font = `${Math.min(9, footerHeight * 0.68)}px monospace`;
     context.textAlign = 'center';
     const baseline: number = y + height - Math.max(1.5, footerHeight * 0.12);
@@ -8745,7 +8806,7 @@ struct Index {
       context.height,
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'],
+      [SCOPE_R, SCOPE_G, SCOPE_B],
       true
     );
   }
@@ -8767,7 +8828,7 @@ struct Index {
     );
     const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
     const plotHeight: number = context.height - footerHeight;
-    context.strokeStyle = '#4CC7E8';
+    context.strokeStyle = SCOPE_AUDIO;
     context.globalAlpha = 0.22;
     context.lineWidth = 5;
     context.beginPath();
@@ -8792,7 +8853,7 @@ struct Index {
       context.height,
       '',
       [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'],
+      [SCOPE_R, SCOPE_G, SCOPE_B],
       true
     );
   }
@@ -8814,7 +8875,7 @@ struct Index {
     );
     const footerHeight: number = Math.min(14, Math.max(10, context.height * 0.17));
     const plotHeight: number = context.height - footerHeight;
-    context.strokeStyle = '#4CC7E8';
+    context.strokeStyle = SCOPE_AUDIO;
     context.globalAlpha = 0.86;
     context.lineWidth = 1;
     context.beginPath();
@@ -8832,18 +8893,18 @@ struct Index {
     const panelHeight: number = (context.height - gap * 2) / 3;
     this.drawScopePanel(
       context, 0, 0, context.width, panelHeight,
-      'Y', [this.waveform], ['#FFFFFF'], false
+      'Y', [this.waveform], [WHITE], false
     );
     this.drawScopePanel(
       context, 0, panelHeight + gap, context.width, panelHeight,
       'YUV', [this.waveform, this.chromaPart(this.vectorscope, 0),
         this.chromaPart(this.vectorscope, 1)],
-      ['#14FF5C', '#00D2FF', '#FF26DE'], false
+      [SCOPE_YUV_Y, SCOPE_YUV_U, SCOPE_YUV_V], false
     );
     this.drawScopePanel(
       context, 0, (panelHeight + gap) * 2, context.width, panelHeight,
       '', [this.redHistogram, this.greenHistogram, this.blueHistogram],
-      ['#FF302A', '#28FF69', '#2240FF'], true
+      [SCOPE_R, SCOPE_G, SCOPE_B], true
     );
   }
 
@@ -10379,8 +10440,8 @@ struct Index {
           '此操作无法撤销。已保护文件不会被选择。'
         ),
         buttons: [
-          { text: this.tr('取消'), color: '#5A616C' },
-          { text: this.tr('永久删除'), color: '#D8323A' }
+          { text: this.tr('取消'), color: MUTED_INK },
+          { text: this.tr('永久删除'), color: UI_VIDEO }
         ]
       });
       if (result.index !== 1) {
