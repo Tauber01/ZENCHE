@@ -627,3 +627,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - ZENCHE-1.5.7-macOS-arm64.dmg（三 SDK env：NIKON_IMAGE_SDK_ZIP/NIKON_REMOTE_SDK_ZIP/SONY_CRSDK_MAC_ZIP 指向 ~/Documents/NikonLink/）
   - ZENCHE-1.5.7-Windows-x64-Setup.exe + ZENCHE-1.5.7-Windows-x64.zip（NSIS Setup，LANG=en_US.UTF-8）
 - 构建验证：macOS DMG/iOS BUILD SUCCEEDED/Android assembleDebug SUCCESSFUL/Harmony assembleHap SUCCESSFUL（未签名）/Windows dotnet publish 0 错误 + NSIS 成功。
+
+## 12.22 v1.5.7 视频页白字 + 编辑页波形统一样式（2026-08-06，kimi 19:38 派工，事件 25e59e39）
+
+- 基线 agent/1.5.6-ui @ b417b8e（build 31）；独立 worktree agent/1.5.7-issues-whitewave；提交 80ffd52（Issue①）+ 6f012d6（Issue②）。
+- **Issue① 视频页文字全部调白（五端，issue 655a0a14）**：视频页（含全屏监看 HUD）所有文字改纯白——标签/说明/读数/状态/角标/空态/工具钮标题；禁用态低透明白（仍白）；激活态不再用彩色（uiAccent/uiBlue/cobalt/readout_glow 等）；黑字黄绿底激活钮改白字；LIVE/NO SOURCE 红绿状态字改白；视频页参数/输出面板强制恒深+白字（panel()/ParameterPanelShell/ParameterDeck 在 monitor 分支恒深，其他页不动）。iOS 注意点：PageTitle 副标题 muted 仅视频页用法改白（不波及他页）。Windows 用子树 DynamicResource 覆盖实现（离开视频页恢复），不改全局资源。
+- **Issue② 编辑页波形统一样式（五端，issue 5c0cf4ad）**：EditorScopeDock 图形区改为与视频页完全统一的 RGB 三色叠加波形——黑井 SCOPE_BG、白网格、SCOPE_R #FF302A / SCOPE_G #28FF69 / SCOPE_B #2240FF 三迹线单坐标系叠加（parade=false、加色混合）、底部居中「RGB」标签。数据：当前编辑图（预览同图源，AI 工具取 AI 结果/原图，Pro 取渲染编辑图）下采样≤320px 后统计 64×48 档（S64x48 契约，log1p 归一），无图时空态。AI 四项指标保留为波形旁/下方紧凑文字。iOS/macOS 橙色柱状图→ScopePlot/MacScopePlot 复用；Android 纯文字→WaveformScopeView(RGB_PARADE)；Harmony 纯文字→drawEditorScope 复用 drawScopePanel；Windows 空井参考线→WaveformScope(Mode=RgbParade) + UpdateEditorScopeWaveform()。
+- 验证：npm test 256/256 全绿；iOS xcodebuild Release BUILD SUCCEEDED；Android assembleRelease SUCCESSFUL；Harmony assembleHap SUCCESSFUL（未签名预期）；macOS swiftc -typecheck 0 错误；Windows dotnet Release 0 错误；git diff --check 干净（两次提交各自应用后合并 diff 与原始完全一致）。
