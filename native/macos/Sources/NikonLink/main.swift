@@ -2165,23 +2165,6 @@ private final class GPhotoCamera {
         )
     }
 
-    private func parameterDisplayName(_ name: String) -> String {
-        [
-            "exposureTime": "快门速度",
-            "videoExposureTime": "视频快门速度",
-            "aperture": "光圈",
-            "iso": "ISO",
-            "exposureCompensation": "曝光补偿",
-            "whiteBalanceMode": "白平衡",
-            "focusMode": "对焦模式",
-            "exposureMode": "拍摄模式",
-            "pictureControl": "优化校准",
-            "videoCodec": "视频录制规格",
-            "videoLog": "Log / Picture Profile",
-            "nLog": "N-Log"
-        ][name] ?? "参数"
-    }
-
     func disconnect() {
         logger.info("camera", "正在断开相机")
         if movieRecording {
@@ -4194,6 +4177,22 @@ private enum Palette {
     // 尼康云创深色卡（fig1 恒深面上的深蓝面）
     static let cloudBg = Color(red: 0.094, green: 0.141, blue: 0.204)
     static let cloudStroke = Color(red: 0.188, green: 0.306, blue: 0.439)
+    // 白色系（对齐 Harmony WHITE_* / iOS whiteHi 等 alpha 档）
+    static let whiteHi = Color.white.opacity(0.94)
+    static let whiteMid = Color.white.opacity(0.88)
+    static let whiteLo = Color.white.opacity(0.75)
+    static let whiteDim = Color.white.opacity(0.60)
+    static let whiteFaint = Color.white.opacity(0.56)
+    static let whiteGhost = Color.white.opacity(0.45)
+    static let whiteMist = Color.white.opacity(0.30)
+    static let whiteWash = Color.white.opacity(0.06)
+    // 黑遮罩（对齐 Harmony HUD_*：0.67/0.60/0.40/0.33/0.53/0.27）
+    static let hudBg = Color.black.opacity(0.67)
+    static let hudBgSoft = Color.black.opacity(0.60)
+    static let hudBgMid = Color.black.opacity(0.40)
+    static let hudBgDim = Color.black.opacity(0.33)
+    static let hudBgDark = Color.black.opacity(0.53)
+    static let hudShadow = Color.black.opacity(0.27)
     // fig2 编辑器 token（五端 1.5.5 统一常量，同名同值）：深灰工作台 /
     // 面板 / 浮层面 / 1px 分隔线 / 品牌橙（仅选中工具与示波器读数）/
     // 灰标签。固定深色，不随主题变化；无渐变无投影，直角平铺。
@@ -4305,7 +4304,7 @@ private struct NikonCloudMacMonitorPicker: View {
                     .font(.system(size: TypeScale.caption))
                     .foregroundStyle(
                         darkAppearance
-                            ? Color.white.opacity(0.74)
+                            ? Palette.whiteLo
                             : Palette.muted
                     )
                     .lineLimit(1)
@@ -4328,7 +4327,7 @@ private struct NikonCloudMacMonitorPicker: View {
                 .font(.system(size: TypeScale.caption))
                 .foregroundStyle(
                     darkAppearance
-                        ? Color.white.opacity(0.72)
+                        ? Palette.whiteLo
                         : Palette.muted
                 )
         }
@@ -4487,11 +4486,11 @@ private struct ImmersiveMacCameraView: View {
                     )
                     .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
                     .foregroundStyle(
-                        model.liveViewEnabled ? Color.red : Color.white.opacity(0.58)
+                        model.liveViewEnabled ? Color.red : Palette.whiteDim
                     )
                     .padding(.horizontal, 14)
                     .frame(height: 44)
-                    .background(.black.opacity(0.58), in: Capsule())
+                    .background(Palette.hudBgSoft, in: Capsule())
                     Spacer()
                     Text(
                         model.connected
@@ -4505,7 +4504,7 @@ private struct ImmersiveMacCameraView: View {
                         .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
                         .padding(.horizontal, 14)
                         .frame(height: 44)
-                        .background(.black.opacity(0.58), in: Capsule())
+                        .background(Palette.hudBgSoft, in: Capsule())
                 }
                 immersiveTelemetryHUD
                 Spacer()
@@ -4521,10 +4520,10 @@ private struct ImmersiveMacCameraView: View {
                         : "—")
                 }
                 .font(.system(size: TypeScale.emphasis, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.88))
+                .foregroundStyle(Palette.whiteMid)
                 .padding(.horizontal, 18)
                 .frame(height: 44)
-                .background(.black.opacity(0.58), in: Capsule())
+                .background(Palette.hudBgSoft, in: Capsule())
             }
             .padding(20)
 
@@ -4569,7 +4568,7 @@ private struct ImmersiveMacCameraView: View {
                                     .frame(width: 76, height: 76)
                             }
                             Circle()
-                                .stroke(.white.opacity(0.88), lineWidth: 3)
+                                .stroke(Palette.whiteMid, lineWidth: 3)
                                 .frame(width: 88, height: 88)
                             if !monitoring {
                                 Image(systemName: "camera.fill")
@@ -4666,7 +4665,7 @@ private struct ImmersiveMacCameraView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.white.opacity(0.46))
+                .foregroundStyle(Palette.whiteGhost)
             Text(value)
                 .font(.system(size: TypeScale.body, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
@@ -5121,7 +5120,7 @@ private struct ImmersiveMacParameterControl: View {
         VStack(spacing: 5) {
             Text(LocalizedStringKey(title))
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.62))
+                .foregroundStyle(Palette.whiteDim)
             HStack(spacing: 5) {
                 Button(action: decrease) {
                     Image(systemName: "minus")
@@ -5890,7 +5889,7 @@ private struct ControlParameterGrid: View {
     private func tileValueColor(_ tile: Tile) -> Color {
         guard model.connected else { return Palette.uiLabel }
         if tile.glow { return Palette.readoutGlow }
-        return .white.opacity(0.85)
+        return Palette.whiteMid
     }
 }
 
@@ -6487,7 +6486,7 @@ private struct MonitorView: View {
                         Spacer()
                         Label(model.liveViewEnabled ? "LIVE" : "NO SOURCE", systemImage: "circle.fill")
                             .font(.system(size: TypeScale.body, weight: .bold, design: .monospaced))
-                            .foregroundStyle(model.liveViewEnabled ? Palette.positive : Color.white.opacity(0.55))
+                            .foregroundStyle(model.liveViewEnabled ? Palette.positive : Palette.whiteFaint)
                     }
                     .padding(.horizontal, 26)
                     .padding(.vertical, 18)
@@ -6512,12 +6511,12 @@ private struct MonitorView: View {
                                 Text(model.connected ? "等待实时取景画面" : "连接相机后开启实时取景")
                                     .font(.system(size: TypeScale.emphasis, weight: .medium))
                             }
-                            .foregroundStyle(Color.white.opacity(0.55))
+                            .foregroundStyle(Palette.whiteFaint)
                             .frame(maxWidth: .infinity, minHeight: 270)
                         }
                         Text("\(model.cameraName ?? "未连接") · USB/PTP")
                             .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color.white.opacity(0.72))
+                            .foregroundStyle(Palette.whiteLo)
                             .padding(12)
                         if let focusPoint {
                             ImmersiveMacFocusReticle()
@@ -6630,7 +6629,7 @@ private struct MonitorView: View {
                             .tint(Palette.uiAccent)
                             Text("\(MacMonitorStorageInfo.current.percentUsed)% 已用 · 本地缓存")
                                 .font(.system(size: TypeScale.caption, design: .monospaced))
-                                .foregroundStyle(Color.white.opacity(0.55))
+                                .foregroundStyle(Palette.whiteFaint)
                         }
                         .foregroundStyle(Color.white.opacity(0.9))
                         .padding(.horizontal, 28)
@@ -6640,7 +6639,7 @@ private struct MonitorView: View {
                         Spacer()
                     }
                     .padding(.vertical, 36)
-                    .background(Color.black.opacity(0.2))
+                    .background(Palette.hudShadow)
 
                     MonitorControlDeck(model: model)
                         .padding(20)
@@ -6666,7 +6665,7 @@ private struct MonitorView: View {
 
     private func monitorReadout(_ title: String, _ value: String) -> some View {
         VStack(spacing: 6) {
-            Text(title).font(.system(size: TypeScale.caption, weight: .semibold)).foregroundStyle(Color.white.opacity(0.58))
+            Text(title).font(.system(size: TypeScale.caption, weight: .semibold)).foregroundStyle(Palette.whiteDim)
             Text(value).font(.system(size: TypeScale.title, weight: .bold, design: .monospaced)).monospacedDigit().foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
@@ -6712,7 +6711,7 @@ private struct MonitorMacStepper: View {
     var body: some View {
         HStack(spacing: 4) {
             Button("−", action: decrease).buttonStyle(.plain)
-            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.58)); Text(value).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(.white) }
+            VStack(spacing: 2) { Text(title).font(.system(size: 9, weight: .semibold)).foregroundStyle(Palette.whiteDim); Text(value).font(.system(size: TypeScale.body, design: .monospaced)).foregroundStyle(.white) }
             Button("+", action: increase).buttonStyle(.plain)
         }
         .padding(.horizontal, 7).frame(height: 40)
@@ -7023,7 +7022,7 @@ private struct MonitorControlDeck: View {
                     .frame(height: 210)
                     Text("峰值覆盖 · \(model.peakingCoverage)%")
                         .font(.system(size: TypeScale.caption, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Palette.whiteLo)
                 }
                 .padding(8)
                 .background(Color.black)
@@ -7117,12 +7116,12 @@ private struct MacScopePlot: View {
                     Text("B").frame(maxWidth: .infinity)
                 }
                 .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(Palette.whiteMid)
                 .frame(height: 11)
             } else {
                 Text(label)
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.86))
+                    .foregroundStyle(Palette.whiteMid)
                     .frame(maxWidth: .infinity)
                     .frame(height: 11)
             }
@@ -7150,10 +7149,10 @@ private struct MacScopePlot: View {
                 guides.addLine(to: CGPoint(x: x, y: bounds.maxY))
             }
         }
-        context.stroke(guides, with: .color(.white.opacity(0.56)), lineWidth: 0.72)
+        context.stroke(guides, with: .color(Palette.whiteFaint), lineWidth: 0.72)
         var frame = Path()
         frame.addRect(bounds)
-        context.stroke(frame, with: .color(.white.opacity(0.94)), lineWidth: 1.1)
+        context.stroke(frame, with: .color(Palette.whiteHi), lineWidth: 1.1)
     }
 
     private func drawTrace(
@@ -7317,15 +7316,15 @@ private struct MacAudioScopePlot: View {
                 let cyan = Palette.scopeAudio
                 context.stroke(baseline, with: .color(cyan.opacity(0.22)), lineWidth: 5)
                 context.stroke(baseline, with: .color(cyan.opacity(0.92)), lineWidth: 1)
-                context.stroke(guides, with: .color(.white.opacity(0.56)), lineWidth: 0.72)
+                context.stroke(guides, with: .color(Palette.whiteFaint), lineWidth: 0.72)
                 var frame = Path()
                 frame.addRect(CGRect(x: 0.75, y: 0.75, width: max(1, size.width - 1.5), height: max(1, size.height - 1.5)))
-                context.stroke(frame, with: .color(.white.opacity(0.94)), lineWidth: 1.1)
+                context.stroke(frame, with: .color(Palette.whiteHi), lineWidth: 1.1)
             }
             .background(Palette.scopeBg)
             Text(label)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(Palette.whiteMid)
                 .frame(maxWidth: .infinity)
                 .frame(height: 11)
         }
@@ -8447,7 +8446,7 @@ private struct LibraryView: View {
                                 Rectangle().fill(Palette.graphite)
                                 Image(systemName: "play.rectangle.fill")
                                     .font(.system(size: 34))
-                                    .foregroundStyle(.white.opacity(0.78))
+                                    .foregroundStyle(Palette.whiteLo)
                             }
                             .frame(height: 132)
                         } else if let image = NSImage(contentsOf: photo.url) {
@@ -9702,29 +9701,6 @@ private struct ImageEditorView: View {
         })
     }
 
-    private var aiPresets: [(String, String)] {
-        switch aiMode {
-        case .edit:
-            return [
-                ("一键美颜", "对照片中的人物进行自然美颜：柔化皮肤、去除瑕疵、提亮肤色、轻微瘦脸，保持自然真实质感，不过度处理。"),
-                ("自然增强", "增强照片的自然色彩与光影：提升饱和度与对比度，保留真实细节，使画面更通透清晰。"),
-                ("胶片质感", "为照片添加复古胶片质感：轻微颗粒、柔和对比、温暖色调，类似柯达 Portra 胶片的色彩风格。"),
-                ("日系清新", "调整为日系清新风格：低对比度、偏亮高调、冷色调、干净通透，画面清新柔和。"),
-                ("黑白大片", "转换为高反差黑白摄影风格：增强明暗对比、保留细节纹理，营造经典黑白大片质感。"),
-                ("复古暖调", "添加复古暖调风格：整体偏暖黄色调、轻微褪色、柔和光线，怀旧氛围。"),
-                ("天空增强", "增强画面中的天空：让蓝天更通透湛蓝、云朵更立体，同时保持地面细节自然。"),
-                ("美食诱人", "增强美食照片的诱人质感：提升色彩饱和度、增强光泽细节，让食物看起来更美味。")
-            ]
-        case .generate:
-            return [
-                ("人像写真", "professional portrait photography, studio lighting, sharp focus, shallow depth of field, high detail"),
-                ("风光大片", "breathtaking landscape photography, golden hour, dramatic sky, high dynamic range, ultra detailed"),
-                ("城市夜景", "city night photography, neon lights, long exposure, reflections, vibrant urban atmosphere"),
-                ("产品展示", "professional product photography, clean studio background, soft lighting, high detail")
-            ]
-        }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             editorHeader
@@ -9739,18 +9715,18 @@ private struct ImageEditorView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             RuntimeLocalizedText("可编辑照片")
                                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundStyle(Color.white.opacity(0.46))
+                                .foregroundStyle(Palette.whiteGhost)
                             Text("\(photos.count)")
                                 .font(.system(size: TypeScale.display, weight: .semibold, design: .monospaced))
                             if let selectedPhoto {
                                 Text(selectedPhoto.name)
                                     .font(.system(size: TypeScale.caption, design: .monospaced))
-                                    .foregroundStyle(Color.white.opacity(0.62))
+                                    .foregroundStyle(Palette.whiteDim)
                                     .lineLimit(4)
                             }
                             RuntimeLocalizedText("非破坏编辑 · 保存为高质量副本")
                                 .font(.system(size: 10))
-                                .foregroundStyle(Color.white.opacity(0.44))
+                                .foregroundStyle(Palette.whiteGhost)
                         }
                     } canvasArea: {
                         preview
@@ -10136,7 +10112,7 @@ private struct ImageEditorView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 28)
-                        .background(Color.black.opacity(0.58))
+                        .background(Palette.hudBgSoft)
                         .clipShape(Capsule())
                         .padding(12)
                 } else if image != nil {
@@ -10145,7 +10121,7 @@ private struct ImageEditorView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 28)
-                        .background(Color.black.opacity(0.58))
+                        .background(Palette.hudBgSoft)
                         .clipShape(Capsule())
                         .padding(12)
                 }
@@ -11905,7 +11881,7 @@ private struct SystemMacAlbumThumbnail: View {
                     Rectangle().fill(Palette.graphite)
                     Image(systemName: item.isVideo ? "video.fill" : "photo")
                         .font(.system(size: 30))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(Palette.whiteDim)
                 }
                 if item.isVideo {
                     Label(durationLabel, systemImage: "play.fill")
@@ -11913,7 +11889,7 @@ private struct SystemMacAlbumThumbnail: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 5)
-                        .background(.black.opacity(0.68), in: Capsule())
+                        .background(Palette.hudBg, in: Capsule())
                         .padding(7)
                 }
             }
@@ -12480,7 +12456,7 @@ private struct RememberedDeviceCard: View {
                         Palette.graphite
                         Image(systemName: "camera.fill")
                             .font(.system(size: 44))
-                            .foregroundStyle(.white.opacity(0.72))
+                            .foregroundStyle(Palette.whiteLo)
                     }
                 }
             }
@@ -12888,7 +12864,7 @@ private struct RootView: View {
                     .fixedSize(horizontal: true, vertical: false)
             }
             .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
-            .foregroundStyle(Color.white.opacity(0.72))
+            .foregroundStyle(Palette.whiteLo)
             .padding(.horizontal, 18)
             .frame(height: 32)
             .background(Palette.graphite)
