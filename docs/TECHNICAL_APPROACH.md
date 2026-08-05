@@ -118,7 +118,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 页式 vs sheet 形态裁定：Android/Harmony/Windows 设置页式、iOS/macOS sheet——保留（design.md:407 允许导航容器差异）。
 - 不在本批：Windows cs:4724 等 9 处画刷快照（归 F5）、Harmony CaptureSessionPanel（P1）、导航 chrome/沉浸 overlay/波形层。
 
+## 0.12. 1.5.7 F3 Android 收口批约定
+
+- 死常量删除判据：定义处之外全文件 grep 引用计数=1（仅定义行）即死；删除前须排除其他文件引用与测试文本断言。STUDIO_GOLD/STUDIO_PANEL 因 native-ui-1.5.3.test.mjs:80-81 对五端源码文本断言 `studioGold|STUDIO_GOLD|StudioGold` / `studioPanel|STUDIO_PANEL|StudioPanel`，删除定义后标识符保留于注释（文本断言满足；其他四端有实际 token 落地，仅 Android 无，注释如实声明）。
+- 字号归并口径（延续 P 批）：能映射 TS 五档（11/12/15/18/24）的直接映射为 TS_CAPTION/TS_BODY/TS_EMPHASIS/TS_TITLE/TS_DISPLAY，等值不改渲染；P 批已归档的 FS 档位（PAGE_FS_*/EDITOR_FS_*/DEVICE_FS_*/LIBRARY_FS_*/SETTINGS_FS_*）不重复处理；落不了 TS 档的孤立值保留原值，列清单归 F5 数值裁决；条件式/三元（含可映射值）不拆改。
+- 导航 chrome/沉浸 overlay 的字号（◉⋯ 18pt 字符钮、immersive 读数）属 F3 归并范围（只做 TS 等值映射，不改渲染值）；P1 的「导航 chrome 不动」红线指结构/样式不动，字号等值归并不冲突。
+
 ## 1. 总体原则
+
 
 
 

@@ -525,3 +525,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 页式 vs sheet 形态：Android/Harmony/Windows 设置是页（section/panel）、iOS/macOS 是 sheet——裁定保留（design.md:407 允许导航容器差异），docs 记裁定。
 - design.md：本批为执行既有条款（每屏 ≤5 档、只归档不改值、双外观成对取 token），未引入新规范，无需修改。
 - 验证：完整 `npm test` 256/256 通过；iOS xcodebuild iphoneos BUILD SUCCEEDED；Android assembleDebug BUILD SUCCESSFUL；Harmony assembleHap BUILD SUCCESSFUL（未签名预期）；Windows dotnet build 0 错误 4 既有警告（CS8629×2/CS0414×2）；macOS 构建脚本因缺少 Nikon SDK zip 阻塞（基线 typecheck 同报 4 个外部桥接类型错误=环境限制非改动引入；本批 macOS 改动仅 1 行等值映射）；git diff --check 干净。
+
+## 12.13 v1.5.7 F3 Android 收口批：死常量删除 + 字号归 TS_*（2026-08-06）
+
+- 批次：v1.5.7 字号地基批 F3（Android）；分支 `agent/1.5.7-f3-android`（worktree REPOS/ZENCHE-wt-1.5.7-f3-android），基线 `6a4e26d`（P1-P6 后）。
+- **死常量删除（14 个，零引用证据）**：`SPACE_4/8/12/16/20/24/32/40`（8 个，定义 197-204 行，全文件 grep 引用计数=1 即仅定义处）、`STUDIO_CANVAS/PANEL/RAISED/RULE/GOLD`（5 个，定义 152-156，同证）、`READOUT_GLOW`（1 个，定义 148，同证）——删除前逐个 `grep -c '\bNAME\b'` 全文件确认=1（仅定义行），并排除全仓库其他文件引用（grep -rn native/android 无其他文件）。
+- **STUDIO_GOLD/STUDIO_PANEL 契约处理**：native-ui-1.5.3.test.mjs:80-81 对五端源码文本断言 `assert.match(source, /studioGold|STUDIO_GOLD|StudioGold/)` 与 `studioPanel|STUDIO_PANEL|StudioPanel`——删除定义后标识符保留于原位置注释（测试为文本匹配断言，注释满足），其他四端均有实际 token 落地（iOS studioGold/macOS studioGold/Harmony STUDIO_GOLD/Windows StudioGoldBrush）仅 Android 无，注释如实声明。
+- **字号归 TS_*（58 处等值映射，不改渲染值）**：11→TS_CAPTION、12→TS_BODY、15→TS_EMPHASIS、18→TS_TITLE、24→TS_DISPLAY（setTextSize 同归）+ 10→EDITOR_FS_SMALL×2（媒体池计数、编辑示波器）+ 9→EDITOR_FS_TINY（新建=9，非破坏编辑说明）；覆盖壳层/沉浸 overlay/弹窗/共享组件/编辑页残留（P 批范围外）；P 批已归档 FS 档位不重复。
+- **孤立值清单（58 处，保留原值，归 F5 数值裁决）**：13×27（text/setTextSize 混合，含 provider/menu/补偿标签/参数控件标题等）、10×6、16×5、17×5、20×4、14×3、22×2、38×2、19×1、28×1、34×1、46×1；条件式 3 处（`i == 1 ? 11 : 24`、`isCompactPhone() ? 10 : 11`、`videoRecording ? 26 : 34`）不拆改；COMPLEX_UNIT_SP 品牌字号 3 处（26/40/14，Splash 区）；95/64/48 等为 dp/图标参数非字号。全部不改渲染值。
+- 验证：npm test 256/256 全绿（native-ui-1.5.3 8/8 含 token 断言过）；assembleDebug BUILD SUCCESSFUL（红线必跑）；git diff --check 干净。
+- **12.13 勘误（pro 复审打回，6 处补归档）**：pro 独立全量扫描发现 6 处可归档遗漏——「设备端 SDR 近似预览」11→TS_CAPTION、「运行“分析画面”后显示实测范围」11→TS_CAPTION、「正在打开本机摄像头…」12→TS_BODY（此前误判为条件式不拆改，实际为直接参数替换）、媒体池计数 10→EDITOR_FS_SMALL、「编辑示波器」10→EDITOR_FS_SMALL、「非破坏编辑」9→EDITOR_FS_TINY（新建档=9，对齐 Harmony/iOS P3 tiny 先例）。替换总数 52→58，孤立值口径 54→58（pro 全量扫描 64 vs 自报 54，差额 10 处中 6 处属可归档，其余为口径分类差异）。pro 裁定接受：STUDIO_* 注释留名契约处理、52 处归档等值、14 死常量零引用、COMPLEX_UNIT_SP 豁免。
