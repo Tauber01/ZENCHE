@@ -141,6 +141,48 @@ private enum IPalette {
     static let editorRule = Color(red: 27 / 255, green: 27 / 255, blue: 31 / 255)
     static let editorAccent = Color(red: 232 / 255, green: 131 / 255, blue: 58 / 255)
     static let editorLabel = Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
+
+    // ===== v1.5.6 token 层（对齐 Android/Harmony TypeScale·SCOPE_*·WHITE_*/HUD_*）=====
+
+    // 白色系（对齐 Harmony WHITE_* alpha 档：0.94/0.88/0.75/0.60/0.56）
+    static let whiteHi = Color.white.opacity(0.94)
+    static let whiteMid = Color.white.opacity(0.88)
+    static let whiteLo = Color.white.opacity(0.75)
+    static let whiteDim = Color.white.opacity(0.60)
+    static let whiteFaint = Color.white.opacity(0.56)
+    static let whiteGhost = Color.white.opacity(0.45)
+    static let whiteMist = Color.white.opacity(0.30)
+    static let whiteWash = Color.white.opacity(0.06)
+
+    // 黑遮罩（对齐 Harmony HUD_*：0.67/0.60/0.40/0.33/0.53/0.27）
+    static let hudBg = Color.black.opacity(0.67)
+    static let hudBgSoft = Color.black.opacity(0.60)
+    static let hudBgMid = Color.black.opacity(0.40)
+    static let hudBgDim = Color.black.opacity(0.33)
+    static let hudBgDark = Color.black.opacity(0.53)
+    static let hudShadow = Color.black.opacity(0.27)
+
+    // SCOPE_* 示波器轨迹色（五端同名同值）
+    static let scopeR = Color(red: 1, green: 0.19, blue: 0.16)          // #FF302A
+    static let scopeG = Color(red: 0.16, green: 1, blue: 0.41)          // #28FF69
+    static let scopeB = Color(red: 0.13, green: 0.25, blue: 1)          // #2240FF
+    static let scopeAudio = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255) // #4CC7E8
+    static let scopeYuvY = Color(red: 0.08, green: 1, blue: 0.36)       // #14FF5C
+    static let scopeYuvU = Color(red: 0, green: 0.82, blue: 1)          // #00D2FF
+    static let scopeYuvV = Color(red: 1, green: 0.15, blue: 0.87)       // #FF26DE
+    static let scopeBg = Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255) // #050A0F
+
+    // 专属语义色
+    static let videoIdle = Color(red: 0.55, green: 0.03, blue: 0.03)    // 录制按钮未激活深红
+}
+
+// ===== v1.5.6 FontToken（对齐 Android/Harmony TypeScale 5 档）=====
+enum FontToken {
+    static let caption: CGFloat = 11     // 辅助说明/状态
+    static let body: CGFloat = 12        // 正文/标签
+    static let emphasis: CGFloat = 15    // 强调/卡片标题
+    static let title: CGFloat = 18       // 区块标题
+    static let display: CGFloat = 24     // 大数字/读数
 }
 
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!
@@ -346,7 +388,7 @@ private struct AppHeader: View {
                         )
                     )
                 Text("Z")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(.system(size: FontToken.display, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
             }
             .frame(
@@ -386,7 +428,7 @@ private struct AppHeader: View {
             }
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, horizontalSizeClass == .compact ? 10 : 12)
-            .frame(minHeight: horizontalSizeClass == .compact ? 40 : 44)
+            .frame(minHeight: 44)
             .background(connectionColor.opacity(0.10), in: Capsule())
             .overlay {
                 Capsule()
@@ -402,10 +444,7 @@ private struct AppHeader: View {
         } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .semibold))
-                .frame(
-                    width: horizontalSizeClass == .compact ? 40 : 44,
-                    height: horizontalSizeClass == .compact ? 40 : 44
-                )
+                .frame(width: 44, height: 44)
                 .background(IPalette.paperSecondary, in: Circle())
                 .overlay {
                     Circle().stroke(IPalette.rule, lineWidth: 0.5)
@@ -568,7 +607,7 @@ private struct BottomNavigation: View {
     ) -> some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: active ? .semibold : .medium))
+                .font(.system(size: FontToken.title, weight: active ? .semibold : .medium))
             RuntimeLocalizedText(title)
                 .font(.caption2)
         }
@@ -609,7 +648,7 @@ private struct GlobalStatusBar: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(IPalette.muted)
         }
-        .font(.system(size: 11, weight: .medium, design: .monospaced))
+        .font(.system(size: FontToken.caption, weight: .medium, design: .monospaced))
         .foregroundStyle(IPalette.ink.opacity(0.8))
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -705,7 +744,7 @@ private struct RememberedDeviceCard: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
-                        .background(.black.opacity(0.58), in: Capsule())
+                        .background(IPalette.hudBgSoft, in: Capsule())
                         .padding(12)
                 }
 
@@ -1724,7 +1763,7 @@ private struct EditorScopeDock: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("编辑示波器")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.52))
+                    .foregroundStyle(IPalette.whiteFaint)
                 Text(hasSource
                     ? (values.isEmpty ? "运行“分析画面”后显示实测范围" : "本地图像分析")
                     : "暂无图像源")
@@ -1740,7 +1779,7 @@ private struct EditorScopeDock: View {
                     grid.move(to: CGPoint(x: 0, y: y))
                     grid.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                context.stroke(grid, with: .color(.white.opacity(0.12)), lineWidth: 1)
+                context.stroke(grid, with: .color(IPalette.whiteWash), lineWidth: 1)
                 guard !values.isEmpty else { return }
                 let width = size.width / CGFloat(max(values.count, 1))
                 for (index, raw) in values.enumerated() {
@@ -1795,7 +1834,7 @@ private struct ImageEditorPage: View {
     @State private var aiResultImage: UIImage?
     @State private var aiIsGenerating = false
     @State private var pickerSample = "—"
-    @State private var pickerColor = Color.white.opacity(0.12)
+    @State private var pickerColor = IPalette.whiteWash
     private let aiService = AiImageService()
 
     private var photos: [LibraryItem] {
@@ -2085,19 +2124,19 @@ private struct ImageEditorPage: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("可编辑照片")
                     .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.46))
+                    .foregroundStyle(IPalette.whiteGhost)
                 Text("\(photos.count)")
-                    .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                    .font(.system(size: FontToken.display, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white)
                 if let selectedItem {
                     Text(selectedItem.filename)
                         .font(.caption.monospaced())
-                        .foregroundStyle(Color.white.opacity(0.64))
+                        .foregroundStyle(IPalette.whiteDim)
                         .lineLimit(3)
                 }
                 Text("调整始终写入新副本，原文件保持不变。")
                     .font(.caption2)
-                    .foregroundStyle(Color.white.opacity(0.48))
+                    .foregroundStyle(IPalette.whiteGhost)
             }
         } canvasArea: {
             VStack(spacing: 10) {
@@ -2567,7 +2606,7 @@ private struct ImageEditorPage: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 30)
-                        .background(.black.opacity(0.58))
+                        .background(IPalette.hudBgSoft)
                         .clipShape(Capsule())
                         .padding(12)
                 } else if image != nil {
@@ -2576,7 +2615,7 @@ private struct ImageEditorPage: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10)
                         .frame(minHeight: 30)
-                        .background(.black.opacity(0.58))
+                        .background(IPalette.hudBgSoft)
                         .clipShape(Capsule())
                         .padding(12)
                 }
@@ -4201,7 +4240,7 @@ private struct ControlStatusRow: View {
                     model.showingConnection = true
                 } label: {
                     RuntimeLocalizedText(transportTitle)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: FontToken.body, weight: .semibold))
                         .foregroundStyle(capsuleTint)
                         .padding(.horizontal, 12)
                         .frame(height: 28)
@@ -4216,7 +4255,7 @@ private struct ControlStatusRow: View {
             }
             if case .failed(let message) = model.camera.state {
                 Text(message)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: FontToken.body, weight: .medium))
                     .foregroundStyle(.red)
                     .lineLimit(2)
             }
@@ -4323,19 +4362,19 @@ private struct ControlStatusCardGrid: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: FontToken.body, weight: .semibold))
                 Text(LocalizedStringKey(title))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: FontToken.body, weight: .medium))
                 Spacer(minLength: 2)
             }
             .foregroundStyle(IPalette.uiLabel)
             Text(value)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: FontToken.emphasis, weight: .bold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             RuntimeLocalizedText(subtitle)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: FontToken.caption, weight: .medium))
                 .foregroundStyle(IPalette.uiLabel)
                 .lineLimit(1)
         }
@@ -4349,20 +4388,20 @@ private struct ControlStatusCardGrid: View {
         return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: "externaldrive")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: FontToken.body, weight: .semibold))
                     .foregroundStyle(IPalette.uiAccent)
                 Text("存储")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: FontToken.body, weight: .medium))
                     .foregroundStyle(IPalette.uiLabel)
                 Spacer(minLength: 2)
                 Text("\(info.percentUsed)%")
                     .font(
-                        .system(size: 11, weight: .semibold, design: .monospaced)
+                        .system(size: FontToken.caption, weight: .semibold, design: .monospaced)
                     )
                     .foregroundStyle(IPalette.uiLabel)
             }
             Text(info.freeDescription)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: FontToken.emphasis, weight: .bold))
                 .foregroundStyle(.white)
             ProgressView(value: info.progress)
                 .tint(IPalette.uiAccent)
@@ -4370,7 +4409,7 @@ private struct ControlStatusCardGrid: View {
                 Text("剩余录制")
                 Text(info.minutesRemaining)
             }
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: FontToken.caption, weight: .medium))
             .foregroundStyle(IPalette.uiLabel)
         }
         .padding(12)
@@ -4456,7 +4495,7 @@ private struct ControlParameterGrid: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("拍摄参数")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: FontToken.emphasis, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
                 capsuleButton("全部", active: !editing) {
@@ -4492,7 +4531,7 @@ private struct ControlParameterGrid: View {
     ) -> some View {
         Button(action: action) {
             Text(LocalizedStringKey(title))
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: FontToken.body, weight: .semibold))
                 .foregroundStyle(active ? Color.black : Color.white)
                 .padding(.horizontal, 14)
                 .frame(height: 30)
@@ -4509,9 +4548,9 @@ private struct ControlParameterGrid: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Image(systemName: tile.symbol)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: FontToken.body, weight: .medium))
                 Text(LocalizedStringKey(tile.id))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: FontToken.body, weight: .medium))
                 Spacer(minLength: 2)
                 if editing {
                     Image(
@@ -4519,7 +4558,7 @@ private struct ControlParameterGrid: View {
                             ? "plus.circle.fill"
                             : "minus.circle.fill"
                     )
-                    .font(.system(size: 15))
+                    .font(.system(size: FontToken.emphasis))
                     .foregroundStyle(
                         hidden ? IPalette.uiAccent : IPalette.uiLabel
                     )
@@ -4667,7 +4706,7 @@ private struct ControlCaptureDock: View {
         Button(action: scrollToTasks) {
             HStack(spacing: 5) {
                 Image(systemName: "timer")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: FontToken.body, weight: .semibold))
                 Text("INT")
                     .font(.system(size: 13, weight: .bold))
             }
@@ -4729,7 +4768,7 @@ private struct CameraStage: View {
 
                 if model.showGrid {
                     GridOverlay()
-                        .stroke(Color.white.opacity(0.45), lineWidth: 0.7)
+                        .stroke(IPalette.whiteGhost, lineWidth: 0.7)
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
@@ -4774,7 +4813,7 @@ private struct CameraStage: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .foregroundStyle(Color.white)
-            .background(.black.opacity(0.55), in: Capsule())
+            .background(IPalette.hudBgSoft, in: Capsule())
             .padding(12)
         }
         .overlay(alignment: .topTrailing) {
@@ -4786,7 +4825,7 @@ private struct CameraStage: View {
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.black.opacity(0.62))
+                .tint(IPalette.hudBg)
                 .foregroundStyle(.white)
                 .padding(12)
                 .accessibilityLabel("打开全屏取景")
@@ -4796,115 +4835,13 @@ private struct CameraStage: View {
             if model.section == .monitor, model.camera.state == .ready {
                 Text("系统视频 · \(model.camera.activeVideoSpecLabel)")
                 .font(.caption2.monospaced().weight(.semibold))
-                .foregroundStyle(.white.opacity(0.78))
+                .foregroundStyle(IPalette.whiteLo)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
-                .background(.black.opacity(0.55), in: Capsule())
+                .background(IPalette.hudBgSoft, in: Capsule())
                 .padding(12)
             }
         }
-    }
-}
-
-private struct ExposureReadoutRail: View {
-    @EnvironmentObject private var model: AppModel
-
-    private var connected: Bool { model.camera.state == .ready }
-    private var modeValue: String {
-        guard connected else { return "—" }
-        return model.camera.exposureModeIsCustom ? "M" : "AUTO"
-    }
-    private var shutterValue: String {
-        guard connected else { return "—" }
-        return String(format: "%.1f°", model.camera.shutterAngle)
-    }
-    private var apertureValue: String {
-        guard connected, model.camera.lensAperture > 0 else { return "—" }
-        return String(format: "f/%.1f", model.camera.lensAperture)
-    }
-    private var isoValue: String {
-        connected ? "\(Int(model.camera.exposureISO.rounded()))" : "—"
-    }
-    private var compensationValue: String {
-        connected ? String(format: "%+.1f EV", model.camera.exposureBias) : "—"
-    }
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                cell(
-                    "来源",
-                    connected
-                        ? (model.camera.isExternalCamera ? "UVC" : "SYSTEM")
-                        : "—"
-                )
-                divider
-                cell("模式", modeValue)
-                divider
-                cell(
-                    "快门",
-                    shutterValue,
-                    writable: model.camera.supportsCustomExposure
-                )
-                divider
-                cell("光圈", apertureValue)
-                divider
-                cell(
-                    "ISO",
-                    isoValue,
-                    writable: model.camera.supportsCustomExposure
-                )
-                divider
-                cell(
-                    "曝光",
-                    compensationValue,
-                    writable: model.camera.supportsExposureBias,
-                    minWidth: 118
-                )
-            }
-            .padding(.horizontal, 8)
-        }
-        .frame(height: 82)
-        .background(IPalette.graphite, in: RoundedRectangle(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.09))
-            .frame(width: 1, height: 42)
-    }
-
-    private func cell(
-        _ label: String,
-        _ value: String,
-        writable: Bool = false,
-        minWidth: CGFloat = 96
-    ) -> some View {
-        let active = connected && writable
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 5) {
-                Text(LocalizedStringKey(label))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Color.white.opacity(0.48))
-                if connected && !writable && label != "来源" && label != "模式" {
-                    Text(LocalizedStringKey("自动"))
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                }
-            }
-            Text(connected ? value : "—")
-                .font(.system(size: 22, weight: .semibold, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(active ? IPalette.readoutGlow : Color.white.opacity(0.88))
-                .lineLimit(1)
-        }
-        .frame(minWidth: minWidth, alignment: .leading)
-        .padding(.horizontal, 14)
     }
 }
 
@@ -4966,7 +4903,7 @@ private struct ImmersiveCameraView: View {
 
                 if model.showGrid {
                     GridOverlay()
-                        .stroke(Color.white.opacity(0.42), lineWidth: 0.7)
+                        .stroke(IPalette.whiteGhost, lineWidth: 0.7)
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
@@ -5070,7 +5007,7 @@ private struct ImmersiveCameraView: View {
             .font(.caption.monospaced().weight(.semibold))
             .padding(.horizontal, 12)
             .frame(height: 44)
-            .background(.black.opacity(0.54), in: Capsule())
+            .background(IPalette.hudBgSoft, in: Capsule())
 
             Spacer()
 
@@ -5084,7 +5021,7 @@ private struct ImmersiveCameraView: View {
                 .font(.caption2.monospaced().weight(.semibold))
                 .padding(.horizontal, 12)
                 .frame(height: 44)
-                .background(.black.opacity(0.54), in: Capsule())
+                .background(IPalette.hudBgSoft, in: Capsule())
         }
     }
 
@@ -5109,7 +5046,7 @@ private struct ImmersiveCameraView: View {
             .font(.caption2.monospaced().weight(.semibold))
             .padding(.horizontal, 10)
             .frame(height: 44)
-            .background(.black.opacity(0.58), in: Capsule())
+            .background(IPalette.hudBgSoft, in: Capsule())
 
             Spacer()
 
@@ -5119,7 +5056,7 @@ private struct ImmersiveCameraView: View {
                 .font(.caption2.monospaced().weight(.bold))
                 .padding(.horizontal, 10)
                 .frame(height: 44)
-                .background(.black.opacity(0.58), in: Capsule())
+                .background(IPalette.hudBgSoft, in: Capsule())
         }
     }
 
@@ -5130,7 +5067,7 @@ private struct ImmersiveCameraView: View {
                 : "—")
                 .font(.title2.weight(.bold))
                 .frame(width: 52, height: 52)
-                .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 12))
+                .background(IPalette.hudBgSoft, in: RoundedRectangle(cornerRadius: 12))
 
             Button {
                 model.camera.setZoomFactor(max(1, model.camera.zoomFactor - 0.5))
@@ -5144,7 +5081,7 @@ private struct ImmersiveCameraView: View {
             Text(cameraReady ? String(format: "%.1f×", model.camera.zoomFactor) : "—")
                 .font(.body.monospacedDigit())
                 .frame(width: 58, height: 44)
-                .background(.black.opacity(0.58), in: Capsule())
+                .background(IPalette.hudBgSoft, in: Capsule())
 
             Button {
                 model.camera.setZoomFactor(
@@ -5223,7 +5160,7 @@ private struct ImmersiveCameraView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(Color.white.opacity(0.48))
+                .foregroundStyle(IPalette.whiteGhost)
             Text(value)
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
@@ -5256,7 +5193,7 @@ private struct ImmersiveCameraView: View {
         .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
             RoundedRectangle(cornerRadius: 5)
-                .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                .stroke(IPalette.whiteMist, lineWidth: 1)
         }
         .clipShape(RoundedRectangle(cornerRadius: 5))
         .allowsHitTesting(false)
@@ -5360,7 +5297,7 @@ private struct ImmersiveCameraView: View {
                     .fill(mode.accent)
                     .frame(width: 76, height: 76)
                 Circle()
-                    .stroke(.white.opacity(0.88), lineWidth: 3)
+                    .stroke(IPalette.whiteMid, lineWidth: 3)
                     .frame(width: 88, height: 88)
                 Image(
                     systemName: mode == .photo
@@ -5406,10 +5343,10 @@ private struct ImmersiveCameraView: View {
             }
         }
         .font(.body.monospaced().weight(.semibold))
-        .foregroundStyle(.white.opacity(0.86))
+        .foregroundStyle(IPalette.whiteMid)
         .padding(.horizontal, 16)
         .frame(height: 44)
-        .background(.black.opacity(0.54), in: Capsule())
+        .background(IPalette.hudBgSoft, in: Capsule())
     }
 
     private var parameterBar: some View {
@@ -5758,7 +5695,7 @@ private struct ImmersiveParameterStepper: View {
             VStack(spacing: 1) {
                 Text(LocalizedStringKey(title))
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.64))
+                    .foregroundStyle(IPalette.whiteDim)
                 Text(value)
                     .font(.caption.monospacedDigit().weight(.semibold))
                     .foregroundStyle(enabled ? IPalette.uiAccent : .white)
@@ -5794,7 +5731,7 @@ private struct ImmersiveControlStyle: ButtonStyle {
         configuration.label
             .foregroundStyle(active ? Color.black : Color.white)
             .background(
-                active ? IPalette.uiAccent : Color.black.opacity(0.58),
+                active ? IPalette.uiAccent : IPalette.hudBgSoft,
                 in: RoundedRectangle(cornerRadius: 12)
             )
             .opacity(configuration.isPressed ? 0.68 : 1)
@@ -5958,7 +5895,7 @@ private struct CapabilityChip: View {
             .foregroundStyle(available ? Color.green : Color.secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
-            .background(Color.white.opacity(0.05), in: Capsule())
+            .background(IPalette.whiteWash, in: Capsule())
     }
 }
 
@@ -5992,7 +5929,7 @@ private struct NikonCloudMonitorBar: View {
                     .font(.caption)
                     .foregroundStyle(
                         usesDarkSurface
-                            ? Color.white.opacity(0.74)
+                            ? IPalette.whiteLo
                             : IPalette.muted
                     )
                     .lineLimit(1)
@@ -6023,7 +5960,7 @@ private struct NikonCloudMonitorBar: View {
                 .font(.caption)
                 .foregroundStyle(
                     usesDarkSurface
-                        ? Color.white.opacity(0.72)
+                        ? IPalette.whiteLo
                         : IPalette.muted
                 )
                 .lineLimit(2)
@@ -6233,11 +6170,11 @@ private struct MonitorConsolePage: View {
                 .monospacedDigit()
             HStack(spacing: 8) {
                 Circle()
-                    .fill(model.camera.isRecording ? IPalette.video : Color.white.opacity(0.35))
+                    .fill(model.camera.isRecording ? IPalette.video : IPalette.whiteMist)
                     .frame(width: 7, height: 7)
                 Text(model.camera.isRecording ? "REC" : (connected ? "LIVE VIEW" : "未连接相机"))
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(IPalette.whiteDim)
             }
         }
     }
@@ -6273,7 +6210,7 @@ private struct MonitorConsolePage: View {
                 }
                 if model.showGrid {
                     GridOverlay()
-                        .stroke(Color.white.opacity(0.35), lineWidth: 0.7)
+                        .stroke(IPalette.whiteMist, lineWidth: 0.7)
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
@@ -6302,7 +6239,7 @@ private struct MonitorConsolePage: View {
                         .buttonStyle(.borderedProminent)
                         .tint(IPalette.cobalt)
                 }
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(IPalette.whiteLo)
             }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
@@ -6316,10 +6253,10 @@ private struct MonitorConsolePage: View {
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .lineLimit(1)
             }
-            .foregroundStyle(.white.opacity(0.82))
+            .foregroundStyle(IPalette.whiteMid)
             .padding(.horizontal, 9)
             .frame(height: 28)
-            .background(.black.opacity(0.48), in: Capsule())
+            .background(IPalette.hudBgMid, in: Capsule())
             .padding(10)
         }
         .overlay(alignment: .topTrailing) {
@@ -6327,8 +6264,8 @@ private struct MonitorConsolePage: View {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 13, weight: .bold))
                     .frame(width: 28, height: 28)
-                    .foregroundStyle(.white.opacity(0.84))
-                    .background(.black.opacity(0.48), in: Circle())
+                    .foregroundStyle(IPalette.whiteMid)
+                    .background(IPalette.hudBgMid, in: Circle())
             }
             .buttonStyle(.plain)
             .padding(10)
@@ -6344,10 +6281,10 @@ private struct MonitorConsolePage: View {
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(.white.opacity(0.95), lineWidth: 2)
+                        .stroke(IPalette.whiteHi, lineWidth: 2)
                         .frame(width: 86, height: 86)
                     Circle()
-                        .fill(model.camera.isRecording ? IPalette.video : Color(red: 0.55, green: 0.03, blue: 0.03))
+                        .fill(model.camera.isRecording ? IPalette.video : IPalette.videoIdle)
                         .frame(width: 51, height: 51)
                         .overlay {
                             if model.camera.isRecording {
@@ -6480,11 +6417,11 @@ private struct MonitorConsolePage: View {
                         .font(.system(size: 25, weight: .bold, design: .monospaced))
                     Text("剩余录制")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .foregroundStyle(IPalette.whiteLo)
                     Spacer(minLength: 10)
                     Text(info.freeDescription)
                         .font(.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(IPalette.whiteMid)
                 }
                 ProgressView(value: info.progress)
                     .tint(IPalette.uiAccent)
@@ -6495,7 +6432,7 @@ private struct MonitorConsolePage: View {
                     Text(model.camera.isRecording ? "录制中" : "待机")
                 }
                 .font(.caption2.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white.opacity(0.65))
+                .foregroundStyle(IPalette.whiteDim)
             }
         }
         .padding(.horizontal, 14)
@@ -6503,7 +6440,7 @@ private struct MonitorConsolePage: View {
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 9))
         .overlay(alignment: .leading) {
             Rectangle()
-                .fill(Color.white.opacity(0.04))
+                .fill(IPalette.whiteWash)
                 .frame(width: 62)
                 .clipShape(RoundedRectangle(cornerRadius: 9))
         }
@@ -6518,9 +6455,9 @@ private struct RGBWaveformCard: View {
         ScopePlot(
             label: "RGB",
             traces: [
-                ScopeTrace(value: model.camera.redHistogram, color: Color(red: 1, green: 0.19, blue: 0.16)),
-                ScopeTrace(value: model.camera.greenHistogram, color: Color(red: 0.16, green: 1, blue: 0.41)),
-                ScopeTrace(value: model.camera.blueHistogram, color: Color(red: 0.13, green: 0.25, blue: 1))
+                ScopeTrace(value: model.camera.redHistogram, color: IPalette.scopeR),
+                ScopeTrace(value: model.camera.greenHistogram, color: IPalette.scopeG),
+                ScopeTrace(value: model.camera.blueHistogram, color: IPalette.scopeB)
             ],
             parade: true
         )
@@ -6560,7 +6497,7 @@ private struct ScopePlot: View {
                 }
                 drawGrid(context: &context, size: size)
             }
-            .background(Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255))
+            .background(IPalette.scopeBg)
 
             if parade {
                 HStack(spacing: 0) {
@@ -6569,12 +6506,12 @@ private struct ScopePlot: View {
                     Text("B").frame(maxWidth: .infinity)
                 }
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(IPalette.whiteMid)
                 .frame(height: 10)
             } else {
                 Text(label)
                     .font(.system(size: 8, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.86))
+                    .foregroundStyle(IPalette.whiteMid)
                     .frame(maxWidth: .infinity)
                     .frame(height: 10)
             }
@@ -6602,10 +6539,10 @@ private struct ScopePlot: View {
                 guides.addLine(to: CGPoint(x: x, y: bounds.maxY))
             }
         }
-        context.stroke(guides, with: .color(.white.opacity(0.56)), lineWidth: 0.72)
+        context.stroke(guides, with: .color(IPalette.whiteFaint), lineWidth: 0.72)
         var frame = Path()
         frame.addRect(bounds)
-        context.stroke(frame, with: .color(.white.opacity(0.94)), lineWidth: 1.1)
+        context.stroke(frame, with: .color(IPalette.whiteHi), lineWidth: 1.1)
     }
 
     private func drawTrace(
@@ -6766,18 +6703,18 @@ private struct AudioScopePlot: View {
                 var baseline = Path()
                 baseline.move(to: CGPoint(x: 4, y: size.height / 2))
                 baseline.addLine(to: CGPoint(x: size.width - 4, y: size.height / 2))
-                let cyan = Color(red: 76 / 255, green: 199 / 255, blue: 232 / 255)
+                let cyan = IPalette.scopeAudio
                 context.stroke(baseline, with: .color(cyan.opacity(0.22)), lineWidth: 5)
                 context.stroke(baseline, with: .color(cyan.opacity(0.92)), lineWidth: 1)
-                context.stroke(guides, with: .color(.white.opacity(0.56)), lineWidth: 0.72)
+                context.stroke(guides, with: .color(IPalette.whiteFaint), lineWidth: 0.72)
                 var frame = Path()
                 frame.addRect(CGRect(x: 0.75, y: 0.75, width: max(1, size.width - 1.5), height: max(1, size.height - 1.5)))
-                context.stroke(frame, with: .color(.white.opacity(0.94)), lineWidth: 1.1)
+                context.stroke(frame, with: .color(IPalette.whiteHi), lineWidth: 1.1)
             }
-            .background(Color(red: 5 / 255, green: 10 / 255, blue: 15 / 255))
+            .background(IPalette.scopeBg)
             Text(label)
                 .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.86))
+                .foregroundStyle(IPalette.whiteMid)
                 .frame(maxWidth: .infinity)
                 .frame(height: 10)
         }
@@ -6837,20 +6774,20 @@ private struct ProfessionalScopeBoard: View {
             ScopePlot(
                 label: "YUV",
                 traces: [
-                    ScopeTrace(value: luma, color: Color(red: 0.08, green: 1, blue: 0.36)),
-                    ScopeTrace(value: cb, color: Color(red: 0, green: 0.82, blue: 1)),
+                    ScopeTrace(value: luma, color: IPalette.scopeYuvY),
+                    ScopeTrace(value: cb, color: IPalette.scopeYuvU),
                     ScopeTrace(
                         value: cr,
-                        color: Color(red: 1, green: 0.15, blue: 0.87)
+                        color: IPalette.scopeYuvV
                     )
                 ]
             )
             ScopePlot(
                 label: "RGB",
                 traces: [
-                    ScopeTrace(value: red, color: Color(red: 1, green: 0.19, blue: 0.16)),
-                    ScopeTrace(value: green, color: Color(red: 0.16, green: 1, blue: 0.41)),
-                    ScopeTrace(value: blue, color: Color(red: 0.13, green: 0.25, blue: 1))
+                    ScopeTrace(value: red, color: IPalette.scopeR),
+                    ScopeTrace(value: green, color: IPalette.scopeG),
+                    ScopeTrace(value: blue, color: IPalette.scopeB)
                 ],
                 parade: true
             )
@@ -6876,7 +6813,7 @@ private struct MonitorConsoleStepper: View {
             }
             VStack(spacing: 1) {
                 Text(title).font(.system(size: 9, weight: .semibold))
-                Text(value).font(.system(size: 11, weight: .bold, design: .monospaced)).monospacedDigit()
+                Text(value).font(.system(size: FontToken.caption, weight: .bold, design: .monospaced)).monospacedDigit()
             }
             .frame(minWidth: 54)
             Button(action: increase) {
@@ -6884,8 +6821,8 @@ private struct MonitorConsoleStepper: View {
             }
         }
         .buttonStyle(.plain)
-        .foregroundStyle(enabled ? .white : .white.opacity(0.45))
-        .background(Color.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 8))
+        .foregroundStyle(enabled ? .white : IPalette.whiteGhost)
+        .background(IPalette.hudBgMid, in: RoundedRectangle(cornerRadius: 8))
         .disabled(!enabled)
     }
 }
@@ -6911,11 +6848,11 @@ private struct ConsoleReadout: View {
         VStack(spacing: 6) {
             Text(label)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(IPalette.whiteLo)
             Text(value)
                 .font(.system(size: 17, weight: .bold, design: .monospaced))
                 .monospacedDigit()
-                .foregroundStyle(dimmed ? .white.opacity(0.48) : .white)
+                .foregroundStyle(dimmed ? IPalette.whiteGhost : .white)
                 .minimumScaleFactor(0.68)
                 .lineLimit(1)
         }
@@ -6933,11 +6870,11 @@ private struct ConsoleToolButton: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .light))
+                    .font(.system(size: FontToken.display, weight: .light))
                     .frame(width: 44, height: 38)
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(active ? IPalette.cobalt : .white.opacity(0.7))
+                    .foregroundStyle(active ? IPalette.cobalt : IPalette.whiteLo)
             }
             .frame(maxWidth: .infinity)
             .foregroundStyle(active ? IPalette.cobalt : .white.opacity(0.9))
@@ -7288,7 +7225,7 @@ private struct MonitorOutputDeck: View {
                 .frame(height: 190)
                 Text("峰值覆盖 · \(model.camera.peakingCoverage)%")
                     .font(.caption.monospaced())
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(IPalette.whiteLo)
             }
             .padding(8)
             .background(Color.black, in: RoundedRectangle(cornerRadius: 10))
@@ -7300,7 +7237,7 @@ private struct MonitorOutputDeck: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 16))
+        .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: 16))
     }
 
 }
@@ -8496,7 +8433,7 @@ private struct CameraStorageItemRow: View {
                         .scaledToFill()
                 } else {
                     Image(systemName: item.isVideo ? "play.fill" : "photo")
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(IPalette.whiteLo)
                 }
             }
             .frame(width: 76, height: 54)
@@ -8583,7 +8520,7 @@ private struct SystemAlbumThumbnail: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 5)
-                    .background(.black.opacity(0.68), in: Capsule())
+                    .background(IPalette.hudBg, in: Capsule())
                     .padding(7)
                 }
             }
@@ -8596,7 +8533,7 @@ private struct SystemAlbumThumbnail: View {
                 .lineLimit(1)
         }
         .padding(7)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 15))
+        .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: 15))
         .task(id: item.id) {
             PHImageManager.default().requestImage(
                 for: item.asset,
@@ -8656,14 +8593,14 @@ private struct SystemAlbumPreviewView: View {
                         Label("关闭", systemImage: "xmark")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.black.opacity(0.66))
+                    .tint(IPalette.hudBg)
                     Spacer()
                     Text("系统相册 · \(item.name)")
                         .font(.caption.monospaced())
                         .lineLimit(1)
                         .padding(.horizontal, 12)
                         .frame(height: 38)
-                        .background(.black.opacity(0.62), in: Capsule())
+                        .background(IPalette.hudBg, in: Capsule())
                 }
                 Spacer()
             }
@@ -8806,7 +8743,7 @@ private struct LibraryLargePhotoView: View {
                         Label("关闭", systemImage: "xmark")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.black.opacity(0.65))
+                    .tint(IPalette.hudBg)
                     Spacer()
                     if !item.isVideo {
                         Button {
@@ -8828,7 +8765,7 @@ private struct LibraryLargePhotoView: View {
                     .font(.caption.monospaced())
                     .foregroundStyle(.white)
                     .padding(8)
-                    .background(.black.opacity(0.65), in: Capsule())
+                    .background(IPalette.hudBg, in: Capsule())
             }
             .padding()
         }
@@ -8852,7 +8789,7 @@ private struct LibraryThumbnail: View {
                         Color.black
                         Image(systemName: "play.rectangle.fill")
                             .font(.largeTitle)
-                            .foregroundStyle(.white.opacity(0.78))
+                            .foregroundStyle(IPalette.whiteLo)
                     }
                 } else if let image = UIImage(contentsOfFile: item.url.path) {
                     Image(uiImage: image)
@@ -8868,7 +8805,7 @@ private struct LibraryThumbnail: View {
             .frame(height: 125)
             .clipped()
             .background(IPalette.graphite)
-        .foregroundStyle(Color.white.opacity(0.82))
+        .foregroundStyle(IPalette.whiteMid)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(item.filename)
@@ -8879,7 +8816,7 @@ private struct LibraryThumbnail: View {
         .padding(7)
         .background(
             RoundedRectangle(cornerRadius: 15)
-                .fill(selected ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.04))
+                .fill(selected ? Color.accentColor.opacity(0.16) : IPalette.whiteWash)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 15)
@@ -9208,11 +9145,11 @@ private struct AppSettingsSheet: View {
 
                     SettingsCard {
                         HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "key.fill").font(.system(size: 18, weight: .semibold)).foregroundStyle(IPalette.cobalt)
+                            Image(systemName: "key.fill").font(.system(size: FontToken.title, weight: .semibold)).foregroundStyle(IPalette.cobalt)
                                 .frame(width: 36, height: 36).background(IPalette.cobaltSoft).clipShape(RoundedRectangle(cornerRadius: 8))
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("AI 功能激活").font(.system(size: 15, weight: .bold))
-                                Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: 12)).foregroundStyle(IPalette.muted)
+                                Text("AI 功能激活").font(.system(size: FontToken.emphasis, weight: .bold))
+                                Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: FontToken.body)).foregroundStyle(IPalette.muted)
                                 if ActivationManager.isActivated {
                                     Text("状态：已激活 · 剩余 \(ActivationManager.remainingUsage) 次").font(.caption.weight(.semibold)).foregroundStyle(Color.green)
                                 }
@@ -9268,7 +9205,7 @@ private struct AppSettingsSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("我的设备 ID")
-                                    .font(.system(size: 12, weight: .semibold))
+                                    .font(.system(size: FontToken.body, weight: .semibold))
                                     .foregroundStyle(IPalette.muted)
                                 Spacer()
                                 Button("复制") {
@@ -9929,7 +9866,7 @@ private struct ConnectionOption: View {
             }
             .padding(16)
             .background(
-                selected ? Color.green.opacity(0.08) : Color.white.opacity(0.055),
+                selected ? Color.green.opacity(0.08) : IPalette.whiteWash,
                 in: RoundedRectangle(cornerRadius: 16)
             )
         }
