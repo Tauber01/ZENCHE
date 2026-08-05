@@ -590,3 +590,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **MonitorScopeRail 补中间录制钮**（P2 backlog，功能补齐）：对齐 macOS monitor 三件套（RGB 波形 + 108 圆录制钮 + 音频波形，main.swift:6582-6608）；Harmony 采用 96 圆钮（同 ImmersiveCaptureButton 交互：videoRecording ? ■/● + UI_VIDEO 底 + toggleVideoRecording，enabled=connected&&!busy）。
 - **docs 勘误**：TECHNICAL_APPROACH 0.14 动态字档计数口径修正为「标识符出现 249 / 实际 .font() 调用 115」（F2 pro 观察项）。
 - 验证：npm test 256/256（native-ui-1.5.3 8/8）；assembleHap BUILD SUCCESSFUL（未签名预期）；git diff --check 干净。
+
+## 12.19 v1.5.7 F6 键准备：新增「分支」三语键（2026-08-06，不动渲染）
+
+- F6 键裁决（kimi 18:26）：macOS 无独立 strings（build-macos.sh:118-124 拷贝 iOS lproj），iOS Localizable.strings 即五端对齐基准表；**「分支」键五端均缺**（macOS en/ja 下原样显示中文为存量缺口）。
+- 新增「分支」键（zh-Hans=分支 / en=Library / ja=ライブラリ，语义映射既有「文件库」=Library/ライブラリ）：
+  - iOS Localizable.strings ×3（zh-Hans/en/ja，macOS 侧栏缺口随打包自动修复）
+  - Android Localization.java
+  - Harmony Localization.ets
+  - Windows Localization.cs
+- 「单机」「群组」键：不新增不删除（iOS 既有键保留，设备分组 UI 可能在用；其余三端待 Tauber 拍板页签短名词表后再动）。
+- **仅加键不动任何 tab 渲染**；页签词表统一 + 紧凑导航提回（编辑/视频一级 tab）待 Tauber 拍板②后实施。
+- main.swift:10115 `Button(section.rawValue)` 未走 LocalizedStringKey 记 backlog。
+- 验证：npm test 256/256 全绿（无渲染/测试改动）；git diff --check 干净。

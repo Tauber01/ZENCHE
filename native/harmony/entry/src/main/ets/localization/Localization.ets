@@ -479,6 +479,7 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('照片拍摄', 'Photo Capture', '写真撮影'),
   new TranslationEntry('视频监看', 'Video Monitor', '動画モニター'),
   new TranslationEntry('照片', 'Photos', '写真'),
+  new TranslationEntry('分支', 'Library', 'ライブラリ'),
   new TranslationEntry('视频', 'Video', '動画'),
   new TranslationEntry('文件', 'Files', 'ファイル'),
   new TranslationEntry('连接相机', 'Connect Camera', 'カメラに接続'),
