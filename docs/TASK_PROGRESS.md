@@ -566,3 +566,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - ③ **颜色回归**：L4771 本次更新正文原无 Foreground（继承 InkBrush），AnnouncementText 带 MutedBrush 导致 ink→muted。修复：拆分样式——AnnouncementBody(12 继承色) 用于无前景覆盖正文，AnnouncementSub(12+Muted) 用于打赏灰化说明；原 AnnouncementText 无引用方已删除。
 - 后续批次纪律：引用方改样式赋值时逐处核对 TargetType 兼容 + 被样式覆盖的本地属性（字重/颜色）。
 - 验证：npm test 256/256；dotnet build 0 错误（既有基线警告）；xmllint 合法；git diff --check 干净。
+
+## 12.17 v1.5.7 F2 iOS 收口批：字号归档 + 动态字档盘点 + STUDIO_* 清理（2026-08-06）
+
+- 批次：v1.5.7 字号地基批 F2（iOS）；分支 `agent/1.5.7-f2-ios`（worktree REPOS/ZENCHE-wt-1.5.7-f2-ios），基线 `53133c6`（F5 后）。
+- **字号字面量归档（34 处使用）**：
+  - 映射既有档 11 处（值等值不改值）：9×2→EditorFontSize.tiny（库计数、示波器标题）、10×3→EditorFontSize.small（REC/LIVE 状态、设备名、工具标题）、13×6→SettingsFontSize.linkLabel（状态文本×2、AF-ON、timer、遥测值、设备名）
+  - 图标/品牌豁免 14 处（注释声明，F1 先例）：Splash Z 标 42/品牌名 28/标语 14、侧栏 Z 16、导航图标 20、齿轮 17、控制栏按钮 16、照片 17、连接 17、空态 46、全屏 16、对焦框 34、storage 图标 33；分支工作台 28 图标 P5 已豁免
+  - 孤立值 9 处（保留原值，归 F5 数值裁决）：控制页大标题 17、参数大读数 28、遥测微标签 8、时间码 32、剩余录制读数 25、波形 R/G/B 标签 8×2、音频波形标签 8、控制台读数 17
+- **动态字档盘点（249 处，不动渲染，映射关系落 docs）**：caption2 22/caption 103/footnote 1/subheadline 50/body 16/headline 31/title3 6/title2 9/title 9/largeTitle 2。iOS 系统动态字档（.caption 等）随用户动态字体缩放，与 FontToken 固定 5 档（11/12/15/18/24）语义不同——保留动态字档为 iOS 平台惯例（design.md「平台原生控件优先」），映射关系：caption≈caption 档、body≈body 档、headline≈emphasis 档、title2/title3≈title 档、largeTitle≈display 档（近似，非等值替换）。可直映 TypeScale 的静态语义处未发现（全部为动态字号上下文）。
+- **STUDIO_* 清理**：IPalette.studioCanvas/Panel/Raised/Rule/Gold 5 个死定义（全文件引用计数=1 仅定义处）删除；标识符保留原位注释（native-ui-1.5.3.test.mjs:80-81 文本断言，测试 8/8 过）。
+- **AUTO 徽标核对**：iOS P1 已改「AUTO 胶囊」（RootView.swift:4581，caption bold+Capsule+height 18），与 macOS F1 完全一致；全文件无单字母「A」残留——任务 4 无需本批改动，记录确认。
+- 验证：npm test 256/256（native-ui-1.5.3 8/8）；iOS xcodebuild BUILD SUCCEEDED（unsigned IPA）；git diff --check 干净。
