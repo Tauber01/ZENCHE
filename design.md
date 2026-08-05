@@ -64,6 +64,12 @@ may expose equivalent dynamic colours for system dark appearance.
 | Studio gold | `#D8B653` | `#D8B653` | Parameter readouts and adjusting-state markers only |
 | Editor accent | `#E8833A` | `#E8833A` | Editor selected tool and scope readouts |
 
+- Every page supports both light and dark appearance and follows the system
+  appearance by default; an in-app appearance toggle, where the platform
+  provides one, switches the same token set without a restart.
+- Foreground and background always pair by appearance: light text and icons
+  on dark surfaces, dark text and icons on light surfaces, drawn from the
+  token pairs above — never a hard-coded single-appearance colour.
 - UI accent, Studio gold, and Editor accent are the only additional accent
   colours. Studio gold marks parameter readouts and in-progress adjustments; it
   never becomes a selection or capture-action accent — selected and active
