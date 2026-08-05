@@ -386,8 +386,8 @@
 				ASSETCATALOG_COMPILER_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-						CURRENT_PROJECT_VERSION = 30;
-				DEVELOPMENT_TEAM = "";
+						CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = "6GP2R2D6XW";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NikonLink/Info.plist;
@@ -396,7 +396,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-						MARKETING_VERSION = 1.5.6;
+						MARKETING_VERSION = 1.5.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tauber.nikonlink.ios;
 				PRODUCT_NAME = "帧澈 ZENCHE";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -411,8 +411,8 @@
 				ASSETCATALOG_COMPILER_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-					CURRENT_PROJECT_VERSION = 30;
-				DEVELOPMENT_TEAM = "";
+						CURRENT_PROJECT_VERSION = 31;
+				DEVELOPMENT_TEAM = "6GP2R2D6XW";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NikonLink/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -420,7 +420,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-					MARKETING_VERSION = 1.5.6;
+					MARKETING_VERSION = 1.5.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.tauber.nikonlink.ios;
 				PRODUCT_NAME = "帧澈 ZENCHE";
 				SWIFT_EMIT_LOC_STRINGS = YES;
