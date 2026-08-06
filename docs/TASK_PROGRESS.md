@@ -653,3 +653,16 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **Issue② 编辑页波形统一样式（五端，issue 5c0cf4ad）**：EditorScopeDock 图形区改为与视频页完全统一的 RGB 三色叠加波形——黑井 SCOPE_BG、白网格、SCOPE_R #FF302A / SCOPE_G #28FF69 / SCOPE_B #2240FF 三迹线单坐标系叠加（parade=false、加色混合）、底部居中「RGB」标签。数据：当前编辑图（预览同图源，AI 工具取 AI 结果/原图，Pro 取渲染编辑图）下采样≤320px 后统计 64×48 档（S64x48 契约，log1p 归一），无图时空态。AI 四项指标保留为波形旁/下方紧凑文字。iOS/macOS 橙色柱状图→ScopePlot/MacScopePlot 复用；Android 纯文字→WaveformScopeView(RGB_PARADE)；Harmony 纯文字→drawEditorScope 复用 drawScopePanel；Windows 空井参考线→WaveformScope(Mode=RgbParade) + UpdateEditorScopeWaveform()。
 - 验证：npm test 256/256 全绿；iOS xcodebuild Release BUILD SUCCEEDED；Android assembleRelease SUCCESSFUL；Harmony assembleHap SUCCESSFUL（未签名预期）；macOS swiftc -typecheck 0 错误；Windows dotnet Release 0 错误；git diff --check 干净（两次提交各自应用后合并 diff 与原始完全一致）。
 
+
+## 12.23 v1.5.7 build 32 五端打包（2026-08-06，kimi 06:05 打包指令）
+
+- 基线整合分支 ccf223d（含拍照页 de204e6 + 两 issue 修复 80ffd52/6f012d6）+ 版本号提交 c0b5b28（31→32 五端一致：Android versionCode 32/Harmony versionCode 32/iOS CURRENT_PROJECT_VERSION 32/macOS CFBundleVersion 32/test 断言；.gitignore 补 .scratch/）。
+- 产物（dist/，6 包 + 6 shasum，覆盖同名保留 build 31 旧包）：Android apk / iOS unsigned ipa / HarmonyOS hap / macOS arm64 dmg / Windows Setup.exe + zip。
+- SHA-256：
+  - android.apk `0dec9273e5fcf337ea6357547dbd8c37b61985414bfa14c5e5a2bb8e05ea8c42`（签名连续性验证：SHA-256 45499c18... 与历史一致）
+  - ios-unsigned.ipa `ff287d9d60181d1acdd6c4fb4d28e769c58b97476ba3d77769feccd282b5edf1`
+  - HarmonyOS.hap `c51b98074fdc564181a0fbcf5db0766c8749a2f87369b2c70d7171bf1bc1a59d`（未签名预期）
+  - macOS-arm64.dmg `fffff063ec5db3319d3a4ecb1a93440cbb7d28cfb2200adec89c631dab41b845`（ad-hoc 签名）
+  - Windows Setup.exe `090cb31d44026a5bcbdd0ea0e1dcfee8cf5605dce41b087455b2c218a123fc4a`
+  - Windows zip `29d448cba05ae8e1889c08b35d2d4199922d3f5992fd1f178393e05cfc5501d6`
+- 构建验证：macOS dmg 产出（三 SDK env 指向 ~/Documents/NikonLink/）；iOS BUILD SUCCEEDED（unsigned ipa）；Android BUILD SUCCESSFUL（ANDROID_HOME=~/Library/Android/sdk，签名连续性 45499c18）；Harmony assembleHap SUCCESSFUL（未签名）；Windows dotnet publish 0 错误 + NSIS 成功（LANG=en_US.UTF-8 + SONY_CRSDK_WIN64_ZIP env）。
