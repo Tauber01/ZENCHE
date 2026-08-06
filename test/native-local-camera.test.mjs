@@ -70,7 +70,9 @@ test('local camera photos use the existing native capture workflows', async () =
     read('native/windows/MainWindow.xaml.cs'),
   ]);
 
-  assert.match(android, /File file = savePhoto\(jpeg\)/);
+  assert.match(android, /File file = savePhoto\(jpeg, baseName, liveClip\)/);
+  // E5 1.5.9：本机拍照入口接入 live 图配对后，单参重载仍保留（兼容路径）。
+  assert.match(android, /private File savePhoto\(byte\[\] jpeg\)/);
   assert.match(harmony, /workflow\.store\([\s\S]*local-camera\.jpg/);
   assert.match(macos, /ZENCHE_LOCAL_/);
   assert.match(macos, /captureWorkflow\.store\(/);

@@ -120,6 +120,28 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] Enabling 2× input sampling priority requests a higher format where available
       and falls back to the closest device-supported format without stopping preview.
 
+## Live 图（取景帧环形缓冲 + 快门切片配对）— E5 1.5.9（待设备，TBC-awaiting-hardware）
+
+- [ ] **macOS live 图**：设置开「Live 图」（默认关）后本机/USB 快门，照片与
+      `{base}_live.avi` 切片同 base 入库（切片约为快门时刻前最近 N 秒，默认 3s，
+      1/3/5/10/15s 可选）；切片时长正确、AVI 可播放（Motion-JPEG，帧数≈fps×N）；
+      照片 XMP `xmp:Label="live-photo"` + `dc:relation` 指向 AVI、AVI XMP 反向指向
+      照片；双备份与 SHA-256 清单包含 AVI 与两侧 XMP；关闭开关或停止取景后快门
+      不再生成切片（无孤儿 AVI）。
+- [ ] **iOS live 图**：本机摄像头快门附带切片（AVFoundation 喂帧转 JPEG 入环）；
+      Wi‑Fi PTP 相机快门**不**生成切片（原片在相机卡，避免孤儿 AVI）；配对 XMP
+      与时长设置同 macOS 口径。
+- [ ] **Windows live 图**：本机/USB 快门切片配对（`{base}_live.avi` 同 base 入库、
+      XMP 双向配对）；Wi‑Fi PTP 快门不切片；时长设置生效；另验证
+      **StepWifiShutterAsync 顺修**——Wi‑Fi 快门 ± 步进逐档变化（旧实现降序分母
+      + FindIndex 恒命中首档 1/8000，修复后按 升序阶梯+firstAtLeast 正确定位）。
+- [ ] **Android live 图**：本机/USB 快门切片配对；Wi‑Fi PTP 快门不切片；拍摄辅助
+      面板「Live 图」开关 + 1/3/5/10/15s Spinner 生效（开关默认关、默认 3s）；
+      取景停止后环形缓冲 disarm（复开取景重新 arm，无残留切片）。
+- [ ] **Harmony live 图**：本机/USB 快门切片配对（`{base}_live.avi` + XMP 双向）；
+      Wi‑Fi PTP 快门不切片；设置「Live 图」Toggle + 时长 Select（1/3/5/10/15s）
+      持久化并在重启后保留；取景停/disarm、每帧惰性 arm 行为正确。
+
 ## Android / Harmony PTP/IP 遥控 — E4 1.5.9（待设备，TBC-awaiting-hardware）
 
 - [ ] **Android Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后自动识别厂商
