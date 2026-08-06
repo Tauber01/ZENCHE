@@ -263,7 +263,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 
 ### 5.1 PTP/IP 链路与连接监看（B2，v1.5.7）
 
-- **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机，复用各端既有 PTP 会话通道（Swift actor / Java synchronized / ArkTS 顺序 await / C# 共享命令流）；同一通道上不并发交错心跳与事务命令。握手为 PTP/IP 标准 Init Command Request/ACK（UUID + initiator 名 + 版本）与事件通道建立，随后以 GetDeviceInfo 确认会话。
+- **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机，复用各端既有 PTP 会话通道：iOS/macOS 由 Swift actor、Android 由 Java synchronized 实例锁保证心跳与事务命令严格串行；Harmony（ArkTS 顺序 await）与 Windows（C# 共享命令流）为共享单通道隐式串行——无显式 gate，与基线用户操作同模式，交错仅限 await 点且心跳失败无害（补显式 gate 已入 backlog）。握手为 PTP/IP 标准 Init Command Request/ACK（UUID + initiator 名 + 版本）与事件通道建立，随后以 GetDeviceInfo 确认会话。
 - **心跳保活**：连接建立后每 5s 发送 GetDeviceInfo（0x1002）探测，单次超时 3s；连续 3 次失败判定离线（约 15–24s 无响应窗口）。
 - **状态机**：`connecting → connected → reconnecting → connected/disconnected`；新增 `reconnecting` 态承载自动重连。iOS/macOS 为带 attempt 的枚举（`reconnecting(attempt:)`，对外以 `isReconnecting` 呈现）；Android/Harmony/Windows 为布尔 + 计数。
 - **自动重连**：指数退避序列 1/2/4/8/16s，封顶 30s（`backoffDelay(forAttempt:)` / `wifiBackoffDelayMs` 等纯函数）；用户主动断开（`manualDisconnect` 标志）一律不触发自动重连。
