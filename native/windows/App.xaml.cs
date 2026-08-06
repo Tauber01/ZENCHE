@@ -175,14 +175,191 @@ public partial class App : Application
         object sender,
         DispatcherUnhandledExceptionEventArgs e)
     {
+        var exception = e.Exception;
         DiagnosticLogger.Shared.Error(
             "app",
-            $"未处理异常：{e.Exception}");
-        MessageBox.Show(
-            e.Exception.Message,
-            "帧澈 ZENCHE",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
+            $"未处理异常：{exception}");
+        try
+        {
+            ShowExceptionDetails(exception);
+        }
+        catch (Exception dialogError)
+        {
+            // 异常详情对话框自身失败时退回极简 MessageBox，
+            // 不再递归进入未处理异常路径。
+            MessageBox.Show(
+                $"{exception}\n\n（详情对话框失败：{dialogError.Message}）",
+                "帧澈 ZENCHE",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// 未处理异常详情对话框：异常类型 + Message + 完整 StackTrace
+    /// （ToString() 全文，只读可滚动 TextBox），支持一键复制到剪贴板。
+    /// 风格对齐现有深色主题（PaperBrush 底 / ErrorBrush 标题 / 日志盒样式）。
+    /// </summary>
+    private static void ShowExceptionDetails(Exception exception)
+    {
+        var details = exception.ToString();
+        Window? dialog = null;
+        var copyButton = new Button
+        {
+            Content = AppLocalization.T("复制详情"),
+            Style = FindStyle("PrimaryButton"),
+            MinWidth = 120,
+            Height = 38,
+            Padding = new Thickness(14, 0, 14, 0)
+        };
+        var closeButton = new Button
+        {
+            Content = AppLocalization.T("关闭"),
+            Style = FindStyle("ButtonBase"),
+            MinWidth = 110,
+            Height = 38,
+            Padding = new Thickness(14, 0, 14, 0)
+        };
+        var copyStatus = new TextBlock
+        {
+            FontSize = 12,
+            Foreground = FindBrush("PositiveBrush"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0)
+        };
+        copyButton.Click += (_, _) =>
+        {
+            try
+            {
+                Clipboard.SetText(details);
+                copyStatus.Text = AppLocalization.T("已复制到剪贴板");
+            }
+            catch (Exception clipboardError)
+            {
+                copyStatus.Text = clipboardError.Message;
+                DiagnosticLogger.Shared.Warning(
+                    "app",
+                    $"复制异常详情到剪贴板失败：{clipboardError.Message}");
+            }
+        };
+        closeButton.Click += (_, _) => dialog?.Close();
+
+        var footer = new DockPanel { Margin = new Thickness(0, 16, 0, 0) };
+        DockPanel.SetDock(copyButton, Dock.Right);
+        DockPanel.SetDock(closeButton, Dock.Right);
+        footer.Children.Add(copyButton);
+        footer.Children.Add(closeButton);
+        footer.Children.Add(copyStatus);
+
+        var typeText = new TextBlock
+        {
+            Text = exception.GetType().FullName ?? exception.GetType().Name,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            FontFamily = new FontFamily("Consolas"),
+            Foreground = FindBrush("ErrorBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var messageText = new TextBlock
+        {
+            Text = exception.Message,
+            FontSize = 14,
+            Foreground = FindBrush("InkBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+        var stackBox = new TextBox
+        {
+            Text = details,
+            IsReadOnly = true,
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.NoWrap,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Background = FindBrush("LogBgBrush"),
+            Foreground = FindBrush("LogTextBrush"),
+            BorderBrush = FindBrush("RuleBrush"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(14),
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = 12
+        };
+
+        var header = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+        header.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("未处理异常"),
+            FontSize = 20,
+            FontWeight = FontWeights.Bold,
+            Foreground = FindBrush("InkBrush")
+        });
+        header.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(
+                "帧澈 ZENCHE 遇到一个未处理的错误。完整堆栈已写入诊断日志，可复制详情后反馈给开发者。"),
+            FontSize = 12,
+            Foreground = FindBrush("MutedBrush"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+
+        var root = new DockPanel { Margin = new Thickness(24) };
+        DockPanel.SetDock(header, Dock.Top);
+        DockPanel.SetDock(footer, Dock.Bottom);
+        root.Children.Add(header);
+        root.Children.Add(footer);
+        root.Children.Add(new StackPanel
+        {
+            Children = { typeText, messageText, stackBox }
+        });
+
+        dialog = new Window
+        {
+            Owner = Application.Current?.MainWindow,
+            Title = $"{AppLocalization.T("未处理异常")} · 帧澈 ZENCHE",
+            Width = 720,
+            Height = 560,
+            MinWidth = 520,
+            MinHeight = 380,
+            Background = FindBrush("PaperBrush"),
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = root,
+            ShowInTaskbar = false
+        };
+        dialog.ShowDialog();
+    }
+
+    /// <summary>
+    /// 安全取主题画刷：资源缺失时退回系统默认，避免详情对话框自身
+    /// 再触发未处理异常（递归进入同一条处理路径）。
+    /// </summary>
+    private static Brush FindBrush(string key)
+    {
+        try
+        {
+            return (Brush)(Application.Current?.FindResource(key)
+                ?? SystemColors.WindowBrush);
+        }
+        catch (ResourceReferenceKeyNotFoundException)
+        {
+            return SystemColors.WindowBrush;
+        }
+    }
+
+    /// <summary>
+    /// 安全取主题控件样式：资源缺失时返回 null（Button 回落默认样式）。
+    /// </summary>
+    private static Style? FindStyle(string key)
+    {
+        try
+        {
+            return (Style?)Application.Current?.FindResource(key);
+        }
+        catch (ResourceReferenceKeyNotFoundException)
+        {
+            return null;
+        }
     }
 }

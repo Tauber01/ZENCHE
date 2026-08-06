@@ -887,8 +887,17 @@ internal static class AppLocalization
                     "• 撮影・設定画面をデバイス概要、可変パラメータカード、常設撮影ドックで再構成し、接続、出力、ライブラリ状態を一画面で確認できます。\n" +
                     "• エディタはメディアプール、中央プレビュー、ツールインスペクタ、解析スコープが連携する構成へ刷新。すべての調整は引き続き非破壊で新しいコピーへ保存します。\n" +
                     "• 5 クライアントで共通のダークスタジオ表現を採用。ZENCHE ブルーは主要操作、ウォームゴールドはパラメータ値、赤は収録と危険操作に限定します。\n" +
-                    "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新し、カメラ、AI、転送機能の互換性を維持します。")
-        };
+                    "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新し、カメラ、AI、転送機能の互換性を維持します。"),
+
+        // D1 1.5.8：未处理异常对话框（可复制完整堆栈）
+        ["未处理异常"] = new("Unhandled Exception", "未処理の例外"),
+        ["复制详情"] = new("Copy Details", "詳細をコピー"),
+        ["已复制到剪贴板"] = new("Copied to clipboard", "クリップボードにコピーしました"),
+        ["关闭"] = new("Close", "閉じる"),
+        ["帧澈 ZENCHE 遇到一个未处理的错误。完整堆栈已写入诊断日志，可复制详情后反馈给开发者。"] = new(
+            "ZENCHE hit an unhandled error. The full stack trace is saved to the diagnostic log; copy the details and send them to the developer.",
+            "帧澈 ZENCHE で未処理のエラーが発生しました。完全なスタックトレースは診断ログに保存済みです。詳細をコピーして開発者にお送りください。")
+    };
 
     private static readonly Dictionary<DependencyObject, string> OriginalText = [];
     private static readonly Dictionary<FrameworkElement, string> OriginalToolTips = [];
