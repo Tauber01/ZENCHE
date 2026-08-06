@@ -690,3 +690,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **UI**：仅文本分支——「重连中 / 正在重连 Wi‑Fi 相机…」+ 橙色状态点 + 连接按钮禁用态，五端一致，无新控件。
 - **测试**：`test/native-wifi-monitor.test.mjs` 6 用例（退避参考实现、五端符号断言、手动断连不触发）；npm test 262/262 全绿。
 - **构建**：Android assembleDebug **BUILD SUCCESSFUL**；iOS xcodebuild **BUILD SUCCEEDED**（generic/iOS 免签名）；Harmony assembleHap **BUILD SUCCESSFUL**（未签名预期，期间修复 NetConnection `register/unregister` 须带回调参数、无 `off` 方法的 SDK 事实）；Windows dotnet build 0 错误；`git diff --check` 干净。
+
+## 12.25 v1.5.8 C3：iOS PTP/IP 能力扩展（2026-08-06，kimi 10:22 派工，事件 0b920780）
+
+- 分支 `agent/1.5.8-c3-ios-ptpip`，基线 `38e6369`（agent/1.5.6-ui 整合线），独立 worktree，与 C1/C2 无文件交叠。
+- **厂商识别**：`PTPIPSession.detectVendor(using:)` 优先解析 GetDeviceInfo(0x1002) 数据段 Manufacturer（UTF-8 遍历五个数组后取字段）；无数据段机型退回连接握手相机名启发式（nikon/canon/sony/ilce/alpha）。新增 `PTPIPCameraVendor`（unknown/nikon/canon/sony），按会话缓存，断连清零。
+- **实时取景**：`startLiveView/endLiveView/getLiveViewFrame`——尼康走 0x9201/0x9202/0x9203（0x9203 数据段返回 JPEG）；佳能按 C2 选用序列对齐（0x9110 写 EVFMode(0xD1b1)=1 + EVFOutputDevice(0xD1b0)=2，Busy 容忍）后取 0x9153 GetViewFinderData；Sony/未知不开启。连接/重连成功后自动开取景（约 10fps 拉帧，失败 300ms 退避），断连先停取景再关会话。
+- **录像启停**：`startMovieRecording/stopMovieRecording` vendor 分发——尼康 0x920a/0x920b（未处取景态先开取景）；佳能 EVFRecordStatus(0xD1b8) 1/0（与 C2 三端口径一致）。`WifiCameraService.toggleVideoRecording` + `supportsMovieRecording`（仅尼康/佳能 true，Sony/未知 false 不误报）。
+- **参数读写**：GetDevicePropDesc(0x1014)/GetDevicePropValue(0x1015)/SetDevicePropValue(0x1016) + 新增 data-out 请求（DataPhaseInfo=2：请求→StartData(9)→EndData(12)→响应）；属性码与 Android PtpCamera 口径一致（ISO 0x500f / 光圈 0x5007 / 快门 0x500d）。`refreshParameters` 连接后自动读取，参数卡步进经 0x1016 写入后回读。
+- **UI 接线**：录像钮三处（全屏 captureButton / MonitorConsolePage scopeStrip / MonitorRecordingBar）改走 `AppModel.toggleVideoRecording`（系统相机优先、Wi‑Fi 兜底），`isRecording`/`videoRecordingAvailable` 计算属性；视频监看页与 iPad CameraStage 展示 Wi‑Fi 实时取景帧（含「等待 Wi‑Fi 实时取景…」空态与失败文案）；compact 页新增 `wifiParameterStrip`、iPad 页新增 `WifiMonitorParameterCard`（快门/光圈/ISO 步进）。
+- **测试**：`test/native-ptpip-capabilities.test.mjs` 6 用例（尼康取景/录像 opcode、参数属性 op、C2 佳能序列对齐、vendor 识别、WifiCameraService 状态暴露、UI 路由）；`native-liveview-release` 断连锚点保持（disconnect 先 cancel 连接再复位 C3 状态）。npm test **269/269** 全绿（原 263 + C3 6）。
+- **构建**：iOS xcodebuild Release generic/iOS 免签名 **BUILD SUCCEEDED**（编译期修复三处：静态上下文 readUInt16/readUTF8 归属、disconnect 局部变量遮蔽 vendor）；git diff --check 干净。
+- **纪律**：无佳能/尼康 Wi‑Fi 实机，实时取景/录像/参数全部按 PTP/EOS 规范实现并标 TBC-awaiting-hardware，报告明确「未经实机验证」；CAMERA_TEST_CHECKLIST 挂「iOS PTP/IP（C3 1.5.8）」待设备实测条目。

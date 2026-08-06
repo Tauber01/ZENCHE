@@ -711,6 +711,28 @@ final class AppModel: ObservableObject {
         return camera.state.title
     }
 
+    // MARK: - C3 录像路由（系统相机优先，Wi‑Fi 相机兜底）
+
+    var isRecording: Bool {
+        camera.isRecording || wifiCamera.isRecording
+    }
+
+    var videoRecordingAvailable: Bool {
+        (camera.state == .ready && camera.supportsMovieRecording)
+            || (wifiCamera.isConnected && wifiCamera.supportsMovieRecording)
+    }
+
+    func toggleVideoRecording() {
+        if camera.state == .ready {
+            camera.toggleVideoRecording()
+        } else if wifiCamera.isConnected {
+            wifiCamera.toggleVideoRecording()
+        } else {
+            statusMessage = "请先连接系统相机或 Wi‑Fi 相机"
+            showingConnection = true
+        }
+    }
+
     func capturePhoto(source: String = "界面") {
         locationTagging.refresh()
         if camera.state == .ready {

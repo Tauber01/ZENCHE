@@ -103,6 +103,23 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] Enabling 2× input sampling priority requests a higher format where available
       and falls back to the closest device-supported format without stopping preview.
 
+## iOS PTP/IP (Wi‑Fi 相机) — C3 1.5.8（待设备，TBC-awaiting-hardware）
+
+- [ ] **实时取景**：连接尼康/佳能 Wi‑Fi 相机后自动开实时取景，视频监看页与
+      iPad 监看页持续刷新 JPEG 帧（约 10fps，单帧失败 300ms 退避重试）；
+      断开连接后停止。尼康走 0x9201/0x9202/0x9203；佳能按 C2 序列
+      （0x9110 写 EVFMode/EVFOutputDevice，Busy 容忍）后取 0x9153
+      GetViewFinderData。
+- [ ] **录像启停**：Wi‑Fi 连接且厂商识别为尼康/佳能时录像钮可用；开始/停止走
+      尼康 0x920a/0x920b 或佳能 EVFRecordStatus(0xD1b8)（1=开始 0=停止）；
+      REC 指示与时间码随录像走动，文件保存在相机卡内。Sony/未知厂商不误报
+      录像能力。
+- [ ] **参数读写**：ISO（0x500f）/ 光圈（0x5007）/ 快门（0x500d）经
+      GetDevicePropValue(0x1015)/SetDevicePropValue(0x1016) 读取与写入，
+      Wi‑Fi 参数卡步进后机身数值变化且读回一致。
+- [ ] 心跳保活、断连清理与自动重连在新取景/录像路径下不回退：断连先停录像/
+      取景再关会话，重连成功后自动恢复取景与参数。
+
 ## Current build status
 
 The 1.0.0 stable release passes compilation, signature/container validation,

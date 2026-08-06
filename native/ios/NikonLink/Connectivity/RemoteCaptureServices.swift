@@ -1,7 +1,9 @@
 import Combine
 import CoreBluetooth
+import CoreGraphics
 import CoreLocation
 import Foundation
+import ImageIO
 import Network
 
 struct CaptureLocation: Codable, Equatable {
@@ -371,10 +373,52 @@ private final class PTPIPReceiveBox: @unchecked Sendable {
     }
 }
 
+/// C3：PTP/IP 能力扩展所用厂商扩展/标准属性常量。
+/// 尼康实时取景/录像走厂商扩展 0x9201/0x9202/0x9203/0x920a/0x920b；
+/// 佳能 EOS 走 0x9110 EOS_SetDevicePropValueEx 写 EVF 属性序列（与 C2
+/// 三端口径一致，TBC-awaiting-hardware）；参数读写走标准 PTP 属性。
+private enum PTPIPVendorOps {
+    // 尼康厂商扩展
+    static let startLiveView: UInt16 = 0x9201
+    static let endLiveView: UInt16 = 0x9202
+    static let getLiveViewImage: UInt16 = 0x9203
+    static let startMovieRecording: UInt16 = 0x920a
+    static let endMovieRecording: UInt16 = 0x920b
+
+    // 标准 PTP 属性访问
+    static let getDevicePropDesc: UInt16 = 0x1014
+    static let getDevicePropValue: UInt16 = 0x1015
+    static let setDevicePropValue: UInt16 = 0x1016
+
+    // 佳能 EOS 扩展（与 C2 分支选用的序列一致）
+    static let canonEOSSetDevicePropValueEx: UInt16 = 0x9110
+    static let canonGetViewFinderData: UInt16 = 0x9153
+    static let canonEVFRecordStatus: UInt32 = 0xd1b8
+    static let canonEVFMode: UInt32 = 0xd1b1
+    static let canonEVFOutputDevice: UInt32 = 0xd1b0
+
+    // 常用参数属性码（与 Android PtpCamera 口径一致：ISO 0x500f / 光圈 0x5007 / 快门 0x500d）
+    static let propISO: UInt16 = 0x500f
+    static let propFNumber: UInt16 = 0x5007
+    static let propExposureTime: UInt16 = 0x500d
+}
+
+/// 已连 PTP/IP 相机的厂商分类，用于实时取景/录像的 vendor 分发。
+enum PTPIPCameraVendor: Equatable {
+    case unknown
+    case nikon
+    case canon
+    case sony
+}
+
 private actor PTPIPSession {
     private var command: NWConnection?
     private var event: NWConnection?
     private var transactionID: UInt32 = 1
+    // C3 状态：厂商识别结果与取景/录像标记（断连时清零）。
+    private var detectedVendor: PTPIPCameraVendor = .unknown
+    private var liveViewActive = false
+    private var movieRecording = false
 
     func connect(host: String, port: UInt16) async throws -> String {
         await disconnect()
@@ -524,12 +568,284 @@ private actor PTPIPSession {
         }
     }
 
+    // MARK: - C3 能力扩展：厂商识别 / 实时取景 / 录像 / 参数读写
+
+    /// 识别已连机型厂商：优先解析 GetDeviceInfo(0x1002) 数据段中的
+    /// Manufacturer 字段；部分机型对 0x1002 直接回响应（无数据段），
+    /// 此时退回连接握手返回的相机名启发式。结果按会话缓存。
+    func detectVendor(using cameraName: String) async -> PTPIPCameraVendor {
+        if detectedVendor != .unknown { return detectedVendor }
+        let nameBased = Self.vendor(forName: cameraName)
+        var resolved = nameBased
+        if let info = try? await dataRequest(
+            operation: 0x1002,
+            parameters: [1]
+        ), let manufacturer = deviceInfoManufacturer(info) {
+            resolved = Self.vendor(
+                forManufacturer: manufacturer,
+                fallback: nameBased
+            )
+        }
+        detectedVendor = resolved
+        return resolved
+    }
+
+    /// 实时取景开始。佳能侧按 C2 序列写 EVFMode/EVFOutputDevice（Busy 容忍，
+    /// TBC-awaiting-hardware），数据帧走 GetViewFinderData(0x9153)；
+    /// 其余厂商走尼康 0x9201。
+    func startLiveView(vendor: PTPIPCameraVendor) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        if liveViewActive { return }
+        if vendor == .canon {
+            try? await canonWriteEosProp(PTPIPVendorOps.canonEVFMode, 1)
+            try? await canonWriteEosProp(PTPIPVendorOps.canonEVFOutputDevice, 2)
+        } else {
+            let current = transactionID
+            transactionID &+= 1
+            let response = try await commandRequest(
+                operation: PTPIPVendorOps.startLiveView,
+                transaction: current,
+                parameters: []
+            )
+            guard response == 0x2001 else {
+                throw PTPIPError.rejected(response)
+            }
+        }
+        liveViewActive = true
+    }
+
+    /// 实时取景结束（尽力而为，不抛错）。
+    func endLiveView(vendor: PTPIPCameraVendor) async {
+        guard command != nil else { return }
+        defer { liveViewActive = false }
+        if vendor == .canon {
+            try? await canonWriteEosProp(PTPIPVendorOps.canonEVFOutputDevice, 0)
+            try? await canonWriteEosProp(PTPIPVendorOps.canonEVFMode, 0)
+        } else {
+            let current = transactionID
+            transactionID &+= 1
+            _ = try? await commandRequest(
+                operation: PTPIPVendorOps.endLiveView,
+                transaction: current,
+                parameters: []
+            )
+        }
+    }
+
+    /// 取一帧实时取景 JPEG。尼康 0x9203 / 佳能 0x9153（TBC-awaiting-hardware）。
+    func getLiveViewFrame(vendor: PTPIPCameraVendor) async throws -> Data {
+        guard command != nil else { throw PTPIPError.notConnected }
+        if vendor == .canon {
+            return try await dataRequest(
+                operation: PTPIPVendorOps.canonGetViewFinderData,
+                parameters: [0, 0]
+            )
+        }
+        return try await dataRequest(
+            operation: PTPIPVendorOps.getLiveViewImage,
+            parameters: []
+        )
+    }
+
+    /// 开始录像。尼康 0x920a（未处取景态先开取景）；佳能走 EVFRecordStatus=1
+    /// （TBC-awaiting-hardware，与 C2 序列一致）。
+    func startMovieRecording(vendor: PTPIPCameraVendor) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        if movieRecording { return }
+        if vendor == .canon {
+            try await startLiveView(vendor: .canon)
+            try await canonWriteEosProp(PTPIPVendorOps.canonEVFRecordStatus, 1)
+        } else {
+            if !liveViewActive {
+                try await startLiveView(vendor: vendor)
+            }
+            let current = transactionID
+            transactionID &+= 1
+            let response = try await commandRequest(
+                operation: PTPIPVendorOps.startMovieRecording,
+                transaction: current,
+                parameters: []
+            )
+            guard response == 0x2001 else {
+                throw PTPIPError.rejected(response)
+            }
+        }
+        movieRecording = true
+    }
+
+    /// 停止录像。尼康 0x920b；佳能 EVFRecordStatus=0（TBC-awaiting-hardware）。
+    func stopMovieRecording(vendor: PTPIPCameraVendor) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        defer { movieRecording = false }
+        if vendor == .canon {
+            try await canonWriteEosProp(PTPIPVendorOps.canonEVFRecordStatus, 0)
+        } else {
+            let current = transactionID
+            transactionID &+= 1
+            let response = try await commandRequest(
+                operation: PTPIPVendorOps.endMovieRecording,
+                transaction: current,
+                parameters: []
+            )
+            guard response == 0x2001 else {
+                throw PTPIPError.rejected(response)
+            }
+        }
+    }
+
+    /// 读取设备属性原始值（GetDevicePropValue 0x1015）。
+    func readProperty(_ property: UInt16) async throws -> Data {
+        guard command != nil else { throw PTPIPError.notConnected }
+        return try await dataRequest(
+            operation: PTPIPVendorOps.getDevicePropValue,
+            parameters: [UInt32(property)]
+        )
+    }
+
+    /// 读取设备属性描述符（GetDevicePropDesc 0x1014），用于校验可写性。
+    func readPropertyDescriptor(_ property: UInt16) async throws -> Data {
+        guard command != nil else { throw PTPIPError.notConnected }
+        return try await dataRequest(
+            operation: PTPIPVendorOps.getDevicePropDesc,
+            parameters: [UInt32(property)]
+        )
+    }
+
+    /// 写入设备属性（SetDevicePropValue 0x1016，数据段携带属性值）。
+    func writeProperty(_ property: UInt16, value: Data) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        let response = try await dataOutRequest(
+            operation: PTPIPVendorOps.setDevicePropValue,
+            parameters: [UInt32(property)],
+            data: value
+        )
+        guard response == 0x2001 else { throw PTPIPError.rejected(response) }
+    }
+
+    /// 佳能 EOS 扩展属性写入：EOS_SetDevicePropValueEx(0x9110) 携带
+    /// 12 字节 LE 载荷 [长度(4) 属性码(4) 值(4)]，与 C2 三端口径一致，
+    /// TBC-awaiting-hardware。
+    private func canonWriteEosProp(
+        _ propCode: UInt32,
+        _ value: UInt32
+    ) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        var payload = Data()
+        appendLE(UInt32(12), to: &payload)
+        appendLE(propCode, to: &payload)
+        appendLE(value, to: &payload)
+        let response = try await dataOutRequest(
+            operation: PTPIPVendorOps.canonEOSSetDevicePropValueEx,
+            parameters: [],
+            data: payload
+        )
+        guard response == 0x2001 else { throw PTPIPError.rejected(response) }
+    }
+
+    /// 数据输出请求（DataPhaseInfo=2）：请求 → StartData(9) → EndData(12) → 响应。
+    /// 用于 SetDevicePropValue 与佳能 0x9110 等携带数据段的写入操作。
+    private func dataOutRequest(
+        operation: UInt16,
+        parameters: [UInt32],
+        data: Data
+    ) async throws -> UInt16 {
+        guard let command else { throw PTPIPError.notConnected }
+        let current = transactionID
+        transactionID &+= 1
+        var payload = Data()
+        appendLE(UInt32(2), to: &payload)
+        appendLE(operation, to: &payload)
+        appendLE(current, to: &payload)
+        parameters.forEach { appendLE($0, to: &payload) }
+        try await send(packet(type: 6, payload: payload), on: command)
+
+        var startPayload = Data()
+        appendLE(UInt32(0), to: &startPayload)
+        appendLE(current, to: &startPayload)
+        appendLE(UInt64(data.count), to: &startPayload)
+        startPayload.append(data)
+        try await send(packet(type: 9, payload: startPayload), on: command)
+
+        var endPayload = Data()
+        appendLE(UInt32(0), to: &endPayload)
+        appendLE(current, to: &endPayload)
+        try await send(packet(type: 12, payload: endPayload), on: command)
+
+        let response = try await receivePacket(on: command)
+        guard response.type == 7, response.data.count >= 14 else {
+            throw PTPIPError.invalidPacket
+        }
+        return readUInt16(response.data, at: 8)
+    }
+
+    // MARK: - C3 厂商识别解析
+
+    /// 从 GetDeviceInfo 数据段解析厂商名（Manufacturer，UTF-8）。
+    /// 布局：StandardVersion(2)+VendorExtensionID(4)+VendorExtensionVersion(2)+
+    /// VendorExtensionDesc(UTF8)+FunctionalMode(2)+五个数组(各 2 字节长度+条目)+
+    /// Manufacturer(UTF8)+Model(UTF8)+DeviceVersion(UTF8)+SerialNumber(UTF8)。
+    private func deviceInfoManufacturer(_ data: Data) -> String? {
+        guard data.count >= 8 else { return nil }
+        var offset = 8
+        guard Self.readUTF8(data, &offset) != nil else { return nil }  // VendorExtensionDesc
+        guard offset + 2 <= data.count else { return nil }
+        offset += 2  // FunctionalMode
+        for _ in 0..<4 {  // Operations/Events/DeviceProperties/CaptureFormats
+            guard offset + 2 <= data.count else { return nil }
+            let count = Int(readUInt16(data, at: offset))
+            offset += 2
+            guard offset + count * 2 <= data.count else { return nil }
+            offset += count * 2
+        }
+        guard offset + 2 <= data.count else { return nil }
+        let imageCount = Int(readUInt16(data, at: offset))  // ImageFormats
+        offset += 2
+        guard offset + imageCount * 2 <= data.count else { return nil }
+        offset += imageCount * 2
+        return Self.readUTF8(data, &offset)
+    }
+
+    private static func readUTF8(_ data: Data, _ offset: inout Int) -> String? {
+        guard offset < data.count else { return nil }
+        var end = offset
+        while end < data.count, data[end] != 0 { end += 1 }
+        guard end < data.count else { return nil }
+        let text = String(data: data[offset..<end], encoding: .utf8)
+        offset = end + 1
+        return text
+    }
+
+    private static func vendor(
+        forManufacturer manufacturer: String?,
+        fallback: PTPIPCameraVendor
+    ) -> PTPIPCameraVendor {
+        let text = (manufacturer ?? "").lowercased()
+        if text.contains("nikon") { return .nikon }
+        if text.contains("canon") { return .canon }
+        if text.contains("sony") { return .sony }
+        return fallback
+    }
+
+    private static func vendor(forName name: String) -> PTPIPCameraVendor {
+        let text = name.lowercased()
+        if text.contains("nikon") { return .nikon }
+        if text.contains("canon") { return .canon }
+        if text.contains("sony") || text.contains("ilce") || text.contains("alpha") {
+            return .sony
+        }
+        return .unknown
+    }
+
     func disconnect() async {
         command?.cancel()
         event?.cancel()
         command = nil
         event = nil
         transactionID = 1
+        // C3 会话状态复位（取景/录像/厂商识别随连接一起清空）。
+        liveViewActive = false
+        movieRecording = false
+        detectedVendor = .unknown
     }
 
     /// 无副作用链路探测：GetDeviceInfo（0x1002）并等待 OK，用于心跳保活。
@@ -855,12 +1171,24 @@ final class WifiCameraService: ObservableObject {
         didSet { UserDefaults.standard.set(portText, forKey: "wifiCameraPort") }
     }
 
+    // MARK: - C3 能力扩展状态（实时取景 / 录像 / 参数）
+    @Published private(set) var vendor: PTPIPCameraVendor = .unknown
+    @Published private(set) var supportsMovieRecording = false
+    @Published private(set) var isRecording = false
+    @Published private(set) var liveViewFrame: CGImage?
+    @Published private(set) var liveViewStatus = ""
+    @Published private(set) var isoValue = 0
+    @Published private(set) var apertureValue: Float = 0
+    /// 快门速度（秒）。0 表示未知/未读取。
+    @Published private(set) var shutterSpeedValue: Double = 0
+
     var onShutterTriggered: (() -> Void)?
 
     private let session = PTPIPSession()
     private var connectionTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var reconnectTask: Task<Void, Never>?
+    private var liveViewTask: Task<Void, Never>?
     private var pathMonitor: NWPathMonitor?
     private var manualDisconnect = false
     private var missedHeartbeats = 0
@@ -899,8 +1227,17 @@ final class WifiCameraService: ObservableObject {
         connectionTask?.cancel()
         reconnectTask?.cancel()
         heartbeatTask?.cancel()
+        stopLiveViewIfNeeded()
         missedHeartbeats = 0
         reconnectAttempt = 0
+        vendor = .unknown
+        supportsMovieRecording = false
+        isRecording = false
+        liveViewFrame = nil
+        liveViewStatus = ""
+        isoValue = 0
+        apertureValue = 0
+        shutterSpeedValue = 0
         state = .connecting
         status = "正在连接 Wi‑Fi 相机…"
         connectionTask = Task { [weak self] in
@@ -912,12 +1249,19 @@ final class WifiCameraService: ObservableObject {
                     ),
                     port: port
                 )
+                let vendor = await self.session.detectVendor(using: name)
                 guard !Task.isCancelled else { return }
                 self.cameraName = name
+                self.vendor = vendor
+                self.supportsMovieRecording = vendor == .nikon || vendor == .canon
                 self.state = .ready
                 self.status = "Wi‑Fi 已连接 · \(name)"
                 self.startHeartbeat()
                 self.startPathMonitor()
+                if vendor != .unknown {
+                    self.startLiveViewIfNeeded()
+                    self.refreshParameters()
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 self.cameraName = "—"
@@ -936,7 +1280,23 @@ final class WifiCameraService: ObservableObject {
         reconnectTask?.cancel()
         reconnectTask = nil
         stopPathMonitor()
-        Task { await session.disconnect() }
+        stopLiveViewIfNeeded()
+        let recordingVendor = self.vendor
+        Task { [weak self] in
+            guard let self else { return }
+            if self.isRecording {
+                try? await self.session.stopMovieRecording(vendor: recordingVendor)
+            }
+            await self.session.disconnect()
+        }
+        vendor = .unknown
+        supportsMovieRecording = false
+        isRecording = false
+        liveViewFrame = nil
+        liveViewStatus = ""
+        isoValue = 0
+        apertureValue = 0
+        shutterSpeedValue = 0
         state = .disconnected
         cameraName = "—"
         status = "Wi‑Fi 相机未连接"
@@ -1006,12 +1366,20 @@ final class WifiCameraService: ObservableObject {
                         ),
                         port: port
                     )
+                    let vendor = await self.session.detectVendor(using: name)
                     guard !Task.isCancelled else { return }
                     self.reconnectAttempt = 0
                     self.cameraName = name
+                    self.vendor = vendor
+                    self.supportsMovieRecording =
+                        vendor == .nikon || vendor == .canon
                     self.state = .ready
                     self.status = "Wi‑Fi 已重连 · \(name)"
                     self.startHeartbeat()
+                    if vendor != .unknown {
+                        self.startLiveViewIfNeeded()
+                        self.refreshParameters()
+                    }
                 } catch {
                     guard !Task.isCancelled, !self.manualDisconnect else { return }
                     self.state = .reconnecting(attempt: attempt)
@@ -1079,6 +1447,211 @@ final class WifiCameraService: ObservableObject {
                 self.state = .failed(error.localizedDescription)
             }
         }
+    }
+
+    // MARK: - C3 实时取景
+
+    /// 连接就绪后自动开实时取景：约 10fps 拉帧，单帧失败退避 300ms 重试。
+    /// 佳能路径 TBC-awaiting-hardware（与 C2 序列一致）。
+    func startLiveViewIfNeeded() {
+        guard isConnected, vendor != .unknown, liveViewTask == nil else { return }
+        liveViewTask = Task { [weak self] in
+            guard let self else { return }
+            let vendor = self.vendor
+            do {
+                try await self.session.startLiveView(vendor: vendor)
+            } catch {
+                self.liveViewStatus = error.localizedDescription
+                self.liveViewTask = nil
+                return
+            }
+            self.liveViewStatus = ""
+            while !Task.isCancelled {
+                do {
+                    let jpeg = try await self.session.getLiveViewFrame(
+                        vendor: vendor
+                    )
+                    if let frame = Self.decodeLiveViewJPEG(jpeg) {
+                        self.liveViewFrame = frame
+                    }
+                    try await Task.sleep(nanoseconds: 100_000_000)
+                } catch {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+            }
+        }
+    }
+
+    func stopLiveViewIfNeeded() {
+        liveViewTask?.cancel()
+        liveViewTask = nil
+        let vendor = self.vendor
+        Task { [weak self] in
+            guard let self else { return }
+            await self.session.endLiveView(vendor: vendor)
+            self.liveViewFrame = nil
+        }
+    }
+
+    /// 解码实时取景 JPEG 帧为可显示位图。
+    private static func decodeLiveViewJPEG(_ data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil)
+        else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    // MARK: - C3 录像启停
+
+    /// Wi‑Fi 录像开关：尼康 0x920a/0x920b，佳能 EVFRecordStatus
+    /// （TBC-awaiting-hardware）。文件保存在相机卡内，不走外录。
+    func toggleVideoRecording() {
+        guard isConnected else { return }
+        if isRecording {
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.session.stopMovieRecording(
+                        vendor: self.vendor
+                    )
+                    self.isRecording = false
+                    self.status = "Wi‑Fi 录像已停止"
+                } catch {
+                    self.status = error.localizedDescription
+                }
+            }
+        } else {
+            guard supportsMovieRecording else {
+                status = "已连相机暂不支持 PTP/IP 远程录像"
+                return
+            }
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.session.startMovieRecording(
+                        vendor: self.vendor
+                    )
+                    self.isRecording = true
+                    self.status = "Wi‑Fi 录像中 · 文件保存在相机卡内"
+                } catch {
+                    self.status = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    // MARK: - C3 参数读写（ISO / 光圈 / 快门）
+
+    /// 从相机读取常用参数（GetDevicePropValue 0x1015）。单属性失败不阻断
+    /// 其余属性（部分机型不暴露个别属性）。
+    func refreshParameters() {
+        guard isConnected else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            if let iso = try? await self.session.readProperty(
+                PTPIPVendorOps.propISO
+            ), let value = Self.leUInt16(iso), value > 0 {
+                self.isoValue = Int(value)
+            }
+            if let fNumber = try? await self.session.readProperty(
+                PTPIPVendorOps.propFNumber
+            ), let value = Self.leUInt16(fNumber), value > 0 {
+                self.apertureValue = Float(value) / 100
+            }
+            if let exposure = try? await self.session.readProperty(
+                PTPIPVendorOps.propExposureTime
+            ), let value = Self.leUInt32(exposure), value > 0 {
+                self.shutterSpeedValue = Double(value) / 10000
+            }
+        }
+    }
+
+    func stepISO(_ direction: Int) {
+        let values = [64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640,
+                      800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000,
+                      6400, 8000, 10000, 12800, 16000, 20000, 25600, 32000,
+                      40000, 51200, 64000, 102400]
+        let current = values.enumerated().min {
+            abs($0.element - isoValue) < abs($1.element - isoValue)
+        }?.offset ?? 0
+        let next = min(max(current + direction, 0), values.count - 1)
+        let payload = Self.le16(UInt16(values[next]))
+        writeParameter(PTPIPVendorOps.propISO, payload: payload, label: "ISO")
+    }
+
+    func stepAperture(_ direction: Int) {
+        let values: [Float] = [1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8, 3.2, 3.5, 4,
+                               4.5, 5, 5.6, 6.3, 7.1, 8, 9, 10, 11, 13, 14,
+                               16, 18, 20, 22]
+        let current = values.enumerated().min {
+            abs($0.element - apertureValue) < abs($1.element - apertureValue)
+        }?.offset ?? 0
+        let next = min(max(current + direction, 0), values.count - 1)
+        let payload = Self.le16(UInt16((values[next] * 100).rounded()))
+        writeParameter(PTPIPVendorOps.propFNumber, payload: payload, label: "光圈")
+    }
+
+    func stepShutterSpeed(_ direction: Int) {
+        let denominators: [Double] = [8000, 4000, 2000, 1000, 500, 250, 125,
+                                      60, 30, 15, 8, 4, 2, 1]
+        let current = denominators.enumerated().min {
+            abs(1.0 / $0.element - shutterSpeedValue)
+                < abs(1.0 / $1.element - shutterSpeedValue)
+        }?.offset ?? 6
+        let next = min(max(current + direction, 0), denominators.count - 1)
+        let seconds = 1.0 / denominators[next]
+        let payload = Self.le32(UInt32((seconds * 10000).rounded()))
+        writeParameter(
+            PTPIPVendorOps.propExposureTime,
+            payload: payload,
+            label: "快门"
+        )
+    }
+
+    private func writeParameter(
+        _ property: UInt16,
+        payload: Data,
+        label: String
+    ) {
+        guard isConnected else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.session.writeProperty(property, value: payload)
+                self.status = "Wi‑Fi \(label)已写入 · 相机已更新"
+                self.refreshParameters()
+            } catch {
+                self.status = "Wi‑Fi \(label)写入失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    private static func le16(_ value: UInt16) -> Data {
+        var data = Data()
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
+        return data
+    }
+
+    private static func le32(_ value: UInt32) -> Data {
+        var data = Data()
+        data.append(UInt8(value & 0xFF))
+        data.append(UInt8((value >> 8) & 0xFF))
+        data.append(UInt8((value >> 16) & 0xFF))
+        data.append(UInt8((value >> 24) & 0xFF))
+        return data
+    }
+
+    private static func leUInt16(_ data: Data) -> UInt16? {
+        guard data.count >= 2 else { return nil }
+        return UInt16(data[0]) | (UInt16(data[1]) << 8)
+    }
+
+    private static func leUInt32(_ data: Data) -> UInt32? {
+        guard data.count >= 4 else { return nil }
+        return UInt32(data[0])
+            | (UInt32(data[1]) << 8)
+            | (UInt32(data[2]) << 16)
+            | (UInt32(data[3]) << 24)
     }
 
     func listStorage() async throws -> CameraStorageSnapshot {
