@@ -24,6 +24,8 @@
 		A10000000000000000000023 /* CameraStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* CameraStorage.swift */; };
 		A10000000000000000000024 /* NikonCloudPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* NikonCloudPreview.swift */; };
 		A10000000000000000000025 /* nikon-cloud-presets.json in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* nikon-cloud-presets.json */; };
+		A10000000000000000000026 /* ExternalVideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ExternalVideoRecorder.swift */; };
+		A10000000000000000000027 /* LivePhotoClipRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* LivePhotoClipRecorder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +52,8 @@
 		B10000000000000000000023 /* CameraStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraStorage.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* NikonCloudPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../shared/NikonCloudPreview.swift"; sourceTree = SOURCE_ROOT; };
 		B10000000000000000000025 /* nikon-cloud-presets.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "../macos/Resources/nikon-cloud-presets.json"; sourceTree = SOURCE_ROOT; };
+		B10000000000000000000026 /* ExternalVideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalVideoRecorder.swift; sourceTree = "<group>"; };
+		B10000000000000000000027 /* LivePhotoClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoClipRecorder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +119,8 @@
 				B10000000000000000000011 /* UpdateController.swift */,
 				B10000000000000000000020 /* CaptureWorkflow.swift */,
 				B10000000000000000000023 /* CameraStorage.swift */,
+				B10000000000000000000026 /* ExternalVideoRecorder.swift */,
+				B10000000000000000000027 /* LivePhotoClipRecorder.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -240,6 +246,8 @@
 				A10000000000000000000022 /* RemoteCaptureServices.swift in Sources */,
 				A10000000000000000000023 /* CameraStorage.swift in Sources */,
 				A10000000000000000000024 /* NikonCloudPreview.swift in Sources */,
+				A10000000000000000000026 /* ExternalVideoRecorder.swift in Sources */,
+				A10000000000000000000027 /* LivePhotoClipRecorder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

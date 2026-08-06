@@ -248,7 +248,7 @@ final class CaptureWorkflow: ObservableObject {
         location: CaptureLocation?,
         pairedWithFilename: String? = nil
     ) throws {
-        if isActive || location != nil {
+        if isActive || location != nil || pairedWithFilename != nil {
             let xmp = xmpSidecar(
                 for: primary.lastPathComponent,
                 location: location,

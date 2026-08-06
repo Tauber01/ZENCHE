@@ -1,5 +1,8 @@
 @preconcurrency import AVFoundation
+import CoreImage
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 enum CameraConnectionState: Equatable {
     case disconnected
@@ -286,6 +289,10 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     var onPhotoCaptured: ((Data, String) -> Void)?
     var onVideoRecorded: ((URL) -> Void)?
     var onMessage: ((String) -> Void)?
+    /// E5 1.5.9：live 图（路线 B）——本机取景帧（CVPixelBuffer）转 JPEG 后
+    /// 的喂帧回调，由宿主注入 LivePhotoClipRecorder 环形缓冲。
+    /// TBC-awaiting-hardware。
+    var livePhotoJpegSink: ((Data) -> Void)?
 
     private let sessionQueue = DispatchQueue(label: "com.tauber.nikonlink.camera")
     private let photoOutput = AVCapturePhotoOutput()
@@ -300,6 +307,8 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
     private var shouldResumeSession = false
     private var lastMonitorFrameTime = CFAbsoluteTimeGetCurrent()
     private var lastExposureReadoutTime = CFAbsoluteTimeGetCurrent()
+    private var lastLivePhotoFrameTime = CFAbsoluteTimeGetCurrent()
+    private let livePhotoJpegContext = CIContext()
 
     override init() {
         super.init()
@@ -1066,6 +1075,20 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
                 self?.exposureModeIsCustom = customExposure
             }
         }
+        // E5 1.5.9：live 图——本机取景帧（CVPixelBuffer）节流转 JPEG 喂环形
+        // 缓冲（约 10fps，与 ring 帧率同量级）。仅当宿主挂载 sink 时开销。
+        // TBC-awaiting-hardware。
+        if livePhotoJpegSink != nil,
+           now - lastLivePhotoFrameTime >= 1.0 / 10.0 {
+            lastLivePhotoFrameTime = now
+            let image = CIImage(cvPixelBuffer: pixelBuffer)
+            if let cgImage = livePhotoJpegContext.createCGImage(
+                image,
+                from: image.extent
+            ), let jpeg = Self.jpegData(from: cgImage) {
+                livePhotoJpegSink?(jpeg)
+            }
+        }
         let result = ProfessionalMonitor.process(
             pixelBuffer,
             focusPeaking: focusPeakingEnabled,
@@ -1081,6 +1104,22 @@ final class CameraService: NSObject, ObservableObject, AVCaptureFileOutputRecord
             self?.vectorscope = result.vectorscope
             self?.peakingCoverage = result.peakingCoverage
         }
+    }
+
+    /// E5 1.5.9：CGImage → JPEG 数据（live 图环形缓冲喂帧用）。
+    private static func jpegData(from image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return data as Data
     }
 
     private static func discoverDevices() -> [AVCaptureDevice] {

@@ -193,7 +193,9 @@ final class MediaLibrary: ObservableObject {
     func saveCapture(
         _ data: Data,
         fileExtension: String,
-        location: CaptureLocation? = nil
+        location: CaptureLocation? = nil,
+        reservedBaseName: String? = nil,
+        pairedWithFilename: String? = nil
     ) -> URL? {
         let safeExtension = fileExtension.lowercased() == "heic" ? "heic" : "jpg"
 
@@ -202,7 +204,9 @@ final class MediaLibrary: ObservableObject {
                 data: data,
                 originalFilename: "capture.\(safeExtension)",
                 cameraName: "iOS Camera",
-                location: location
+                reservedBaseName: reservedBaseName,
+                location: location,
+                pairedWithFilename: pairedWithFilename
             )
             DiagnosticLogger.shared.info(
                 "capture",
@@ -483,6 +487,11 @@ final class AppModel: ObservableObject {
     @Published var shootingTaskStep = 1
     @Published var shootingTaskRunning = false
     @Published var shootingTaskStatus = "尚未开始拍摄任务"
+    // E5 1.5.9：live 图（路线 B）——取景帧环形缓冲，快门切最近 N 秒 AVI，
+    // 与照片同 reservedBaseName 配对入库。默认关（新功能默认口径）。
+    @Published var livePhotoEnabled = false
+    @Published var livePhotoSeconds = 3.0
+    private let livePhotoClipRecorder = LivePhotoClipRecorder()
     @Published var statusMessage = "选择相机后即可开始"
     @Published var language: AppLanguage {
         didSet {
@@ -562,6 +571,29 @@ final class AppModel: ObservableObject {
         }
         camera.setRecordingCodec(monitorVideoCodec)
 
+        // E5 1.5.9：live 图开关与时长持久化（默认关 / 3 秒）。
+        livePhotoEnabled = UserDefaults.standard.bool(
+            forKey: "livePhotoEnabled"
+        )
+        let savedLiveSeconds = UserDefaults.standard.double(
+            forKey: "livePhotoSeconds"
+        )
+        if savedLiveSeconds > 0 {
+            livePhotoSeconds = savedLiveSeconds
+        }
+        // E5 1.5.9：Wi‑Fi PTP 取景帧喂入 live 图环形缓冲（仅当开关开启）。
+        wifiCamera.livePhotoFrameSink = { [weak self] jpeg in
+            guard let self, self.livePhotoEnabled else { return }
+            self.livePhotoClipRecorder.append(jpeg: jpeg)
+        }
+        // E5 1.5.9：本机取景帧（CVPixelBuffer→JPEG）喂入同一环形缓冲。
+        // Wi‑Fi 拍照原片在相机卡内无本地照片可配对，故仅本机路径切片；
+        // ring 仅在本机取景（state == .ready）时 arm（见下方订阅）。
+        camera.livePhotoJpegSink = { [weak self] jpeg in
+            guard let self, self.livePhotoEnabled else { return }
+            self.livePhotoClipRecorder.append(jpeg: jpeg)
+        }
+
         camera.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
@@ -581,6 +613,15 @@ final class AppModel: ObservableObject {
                 self.camera.setMonitorVideoSpec(
                     self.monitorVideoSpec
                 )
+            }
+            .store(in: &subscriptions)
+        camera.$state
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                // E5 1.5.9：live 图 ring 随本机取景启停——本机取景持续运行
+                // （session ready 即取景），state 离开 ready（断开/失败）即
+                // disarm。Wi‑Fi 拍照无本地照片可配对，不 arm。
+                self?.syncLivePhotoRing(cameraState: state)
             }
             .store(in: &subscriptions)
         camera.$state
@@ -633,13 +674,42 @@ final class AppModel: ObservableObject {
 
         camera.onPhotoCaptured = { [weak self] data, fileExtension in
             Task { @MainActor in
-                guard let self,
-                      let url = self.library.saveCapture(
-                          data,
-                          fileExtension: fileExtension,
-                          location: self.locationTagging.snapshot()
-                      ) else {
+                guard let self else { return }
+                // E5 1.5.9：live 图——本机路径先 reserve base，照片与切片
+                // AVI 同 base 配对入库；Wi‑Fi 拍照原片在卡内无本地照片可配对
+                // （见 capturePhoto 分支），此处仅本机路径会触发。
+                let base = self.livePhotoEnabled
+                    ? self.captureWorkflow.reserveBaseName(
+                        cameraName: "iOS Camera"
+                    )
+                    : nil
+                var liveClipURL: URL?
+                if let base,
+                   let clip = try? self.livePhotoClipRecorder.captureSlice(
+                       to: FileManager.default.temporaryDirectory
+                           .appendingPathComponent(UUID().uuidString)
+                           .appendingPathExtension("avi")
+                   ) {
+                    liveClipURL = clip.url
+                }
+                guard let url = self.library.saveCapture(
+                    data,
+                    fileExtension: fileExtension,
+                    location: self.locationTagging.snapshot(),
+                    reservedBaseName: base,
+                    pairedWithFilename: liveClipURL == nil
+                        ? nil
+                        : "\(base!)_live.avi"
+                ) else {
                     return
+                }
+                if let liveClipURL, let base {
+                    _ = try? self.captureWorkflow.storeLivePhotoClip(
+                        from: liveClipURL,
+                        baseName: base,
+                        pairedPhotoFilename: url.lastPathComponent,
+                        cameraName: "iOS Camera"
+                    )
                 }
                 self.statusMessage = "拍摄完成 · \(url.lastPathComponent)"
                 if self.autoSaveToPhotos {
@@ -765,6 +835,46 @@ final class AppModel: ObservableObject {
         statusMessage = codec == .automatic
             ? "视频录制规格由输出目标自动选择"
             : "视频录制规格 · \(codec.label)"
+    }
+
+    /// E5 1.5.9：live 图开关（默认关）。切换时持久化并联动环形缓冲。
+    func setLivePhotoEnabled(_ enabled: Bool) {
+        livePhotoEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "livePhotoEnabled")
+        syncLivePhotoRing(cameraState: camera.state)
+        statusMessage = enabled
+            ? "live 图已开启 · 快门将附带最近 \(Int(livePhotoSeconds)) 秒取景切片"
+            : "live 图已关闭"
+    }
+
+    /// E5 1.5.9：live 图切片时长（秒，默认 3s）。变化时持久化；
+    /// ring 已 arm 则按新时长重建缓冲。
+    func setLivePhotoSeconds(_ seconds: Double) {
+        let clamped = max(1, min(15, seconds))
+        livePhotoSeconds = clamped
+        UserDefaults.standard.set(clamped, forKey: "livePhotoSeconds")
+        if livePhotoClipRecorder.isArmed {
+            livePhotoClipRecorder.arm(
+                frameRate: 10,
+                maxSeconds: clamped
+            )
+        }
+    }
+
+    /// E5 1.5.9：live 图环形缓冲启停。仅本机取景（state == .ready）时 arm
+    /// （Wi‑Fi 拍照原片在卡内无本地照片可配对）；断开/失败即 disarm。
+    /// TBC-awaiting-hardware。
+    private func syncLivePhotoRing(cameraState: CameraConnectionState) {
+        if livePhotoEnabled && cameraState == .ready {
+            if !livePhotoClipRecorder.isArmed {
+                livePhotoClipRecorder.arm(
+                    frameRate: 10,
+                    maxSeconds: livePhotoSeconds
+                )
+            }
+        } else if livePhotoClipRecorder.isArmed {
+            livePhotoClipRecorder.disarm()
+        }
     }
 
     var availableRecordingCodecs: [MonitorVideoCodec] {
