@@ -1,6 +1,7 @@
 using NikonLink.Windows.Models;
 using NikonLink.Windows.Services;
 using Microsoft.Win32;
+using System.Buffers.Binary;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -731,6 +732,13 @@ public partial class MainWindow : Window
     private bool _videoRecording;
     private bool _externalRecordToDevice = true;
     private string _wifiConnectionMode = "ap";
+    // ── E3 1.5.9：Wi‑Fi PTP/IP 取景 / 参数缓存 ──
+    private CancellationTokenSource? _wifiPreviewCancellation;
+    private Task? _wifiPreviewTask;
+    private ushort _wifiIso;
+    private double _wifiAperture;
+    private double _wifiShutterSeconds;
+    private TextBlock? WifiParameterReadout;
     // ── B2 WiFi 连接监看：保活/自动重连/网络监听 ──
     private static readonly int[] WifiReconnectBackoffMs =
         { 1000, 2000, 4000, 8000, 16000, 30000 };
@@ -1527,6 +1535,96 @@ public partial class MainWindow : Window
         endpoint.Children.Add(portBox);
         content.Children.Add(endpoint);
 
+        // ── E3 1.5.9：Wi‑Fi PTP/IP 取景 / 录像 / 参数控制卡 ──
+        var wifiControls = new StackPanel
+        {
+            Margin = new Thickness(0, 14, 0, 0)
+        };
+        var wifiControlTitle = new TextBlock
+        {
+            Text = AppLocalization.T("Wi‑Fi 相机控制 · PTP/IP"),
+            Margin = new Thickness(0, 0, 0, 6),
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        wifiControls.Children.Add(wifiControlTitle);
+        var wifiRecord = new Button
+        {
+            Content = AppLocalization.T("开始录制"),
+            Height = 38,
+            Margin = new Thickness(0, 6, 0, 0),
+            Style = (Style)FindResource("DangerButton")
+        };
+        wifiRecord.Click += async (_, _) => await ToggleWifiMovieRecordingAsync();
+        var wifiLiveView = new Button
+        {
+            Content = AppLocalization.T("开启实时取景"),
+            Height = 38,
+            Margin = new Thickness(0, 4, 0, 0),
+            Style = (Style)FindResource("ButtonBase")
+        };
+        wifiLiveView.Click += async (_, _) =>
+        {
+            if (!_wifiCamera.IsConnected)
+            {
+                return;
+            }
+            if (_wifiCamera.IsLiveView)
+            {
+                await RunOperationAsync("正在停止 Wi‑Fi 实时取景…", async token =>
+                {
+                    await _wifiCamera.StopLiveViewAsync(token);
+                    StopWifiPreviewLoop();
+                    UpdateWifiControlState(wifiLiveView, wifiRecord);
+                });
+            }
+            else
+            {
+                await RunOperationAsync("正在开启 Wi‑Fi 实时取景…", async token =>
+                {
+                    await _wifiCamera.StartLiveViewAsync(token);
+                    StartWifiPreviewLoop();
+                    UpdateWifiControlState(wifiLiveView, wifiRecord);
+                });
+            }
+        };
+        wifiControls.Children.Add(wifiLiveView);
+        wifiControls.Children.Add(wifiRecord);
+        var wifiParamReadout = new TextBlock
+        {
+            Text = AppLocalization.T("参数待读取 · 连接后自动刷新"),
+            Margin = new Thickness(0, 10, 0, 0),
+            FontSize = 12,
+            FontFamily = (FontFamily)FindResource("MonoFont"),
+            Foreground = (Brush)FindResource("MutedBrush")
+        };
+        WifiParameterReadout = wifiParamReadout;
+        wifiControls.Children.Add(wifiParamReadout);
+        wifiControls.Children.Add(WifiStepperRow(
+            "ISO", () => StepWifiIsoAsync(-1), () => StepWifiIsoAsync(1)));
+        wifiControls.Children.Add(WifiStepperRow(
+            "光圈", () => StepWifiApertureAsync(-1), () => StepWifiApertureAsync(1)));
+        wifiControls.Children.Add(WifiStepperRow(
+            "快门", () => StepWifiShutterAsync(-1), () => StepWifiShutterAsync(1)));
+        wifiControls.Visibility = Visibility.Collapsed;
+        content.Children.Add(wifiControls);
+
+        void UpdateWifiControlState(Button liveViewButton, Button recordButton)
+        {
+            var connected = _wifiCamera.IsConnected;
+            wifiControls.Visibility = connected
+                ? Visibility.Visible : Visibility.Collapsed;
+            liveViewButton.Content = AppLocalization.T(
+                _wifiCamera.IsLiveView ? "停止实时取景" : "开启实时取景");
+            liveViewButton.IsEnabled = connected;
+            recordButton.IsEnabled = connected &&
+                (_wifiCamera.Vendor == PtpIpCamera.CameraVendor.Nikon ||
+                 _wifiCamera.Vendor == PtpIpCamera.CameraVendor.Canon);
+            UpdateWifiParameterReadout();
+        }
+        UpdateWifiControlState(wifiLiveView, wifiRecord);
+
         button.Click += async (_, _) =>
         {
             button.IsEnabled = false;
@@ -1536,6 +1634,7 @@ public partial class MainWindow : Window
                 if (_wifiCamera.IsConnected)
                 {
                     StopWifiMonitoring();
+                    StopWifiPreviewLoop();
                     await _wifiCamera.DisconnectAsync();
                     _lastConnectionError = null;
                 }
@@ -1555,10 +1654,20 @@ public partial class MainWindow : Window
                         TimeSpan.FromSeconds(12));
                     await _wifiCamera.ConnectAsync(
                         _wifiHost, _wifiPort, timeout.Token);
+                    // E3 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；
+                    // 尼康/佳能自动开实时取景并拉帧（约 10fps），刷新参数。
+                    await _wifiCamera.DetectVendorAsync(timeout.Token);
+                    if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Unknown)
+                    {
+                        await _wifiCamera.StartLiveViewAsync(timeout.Token);
+                        StartWifiPreviewLoop();
+                        await RefreshWifiParametersAsync();
+                    }
                     _lastConnectionError = null;
                     _diagnostics.Info(
                         "wifi-camera",
-                        $"PTP/IP 已连接；模式={_wifiConnectionMode.ToUpperInvariant()}；相机={_wifiCamera.CameraName}");
+                        $"PTP/IP 已连接；模式={_wifiConnectionMode.ToUpperInvariant()}；" +
+                        $"相机={_wifiCamera.CameraName}；厂商={_wifiCamera.Vendor}");
                     StartWifiMonitoring();
                 }
             }
@@ -1574,12 +1683,52 @@ public partial class MainWindow : Window
                 _wifiCamera.IsConnected ? "断开" : "连接");
             button.IsEnabled = true;
             mode.IsEnabled = !_wifiCamera.IsConnected;
+            UpdateWifiControlState(wifiLiveView, wifiRecord);
             UpdateConnectionSummary();
             UpdateEnabledState();
             UpdateExposureReadout();
         };
 
         return ConnectionCard("Wi‑Fi 相机 · PTP/IP", content, button);
+    }
+
+    /// <summary>E3 1.5.9：Wi‑Fi 参数步进行（标题 + 减/加按钮）。</summary>
+    private FrameworkElement WifiStepperRow(
+        string title,
+        Func<Task> decrease,
+        Func<Task> increase)
+    {
+        var minus = new Button
+        {
+            Content = "−",
+            Width = 30,
+            Height = 30,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        minus.Click += async (_, _) => await decrease();
+        var plus = new Button
+        {
+            Content = "+",
+            Width = 30,
+            Height = 30,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        plus.Click += async (_, _) => await increase();
+        var row = new DockPanel
+        {
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        DockPanel.SetDock(plus, Dock.Right);
+        DockPanel.SetDock(minus, Dock.Right);
+        row.Children.Add(plus);
+        row.Children.Add(minus);
+        row.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T(title),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12
+        });
+        return row;
     }
 
     // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
@@ -1602,6 +1751,276 @@ public partial class MainWindow : Window
         _wifiReconnectCts = null;
         System.Net.NetworkInformation.NetworkChange
             .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+    }
+
+    // ── E3 1.5.9：Wi‑Fi PTP/IP 实时取景 / 参数 / 录像 ──
+
+    private void StartWifiPreviewLoop()
+    {
+        StopWifiPreviewLoop();
+        _wifiPreviewCancellation = new CancellationTokenSource();
+        _wifiPreviewTask = WifiPreviewLoopAsync(
+            _wifiPreviewCancellation.Token);
+    }
+
+    private void StopWifiPreviewLoop()
+    {
+        _wifiPreviewCancellation?.Cancel();
+        _wifiPreviewCancellation?.Dispose();
+        _wifiPreviewCancellation = null;
+        _wifiPreviewTask = null;
+    }
+
+    private async Task WifiPreviewLoopAsync(CancellationToken cancellationToken)
+    {
+        var failures = 0;
+        while (!cancellationToken.IsCancellationRequested &&
+               _wifiCamera.IsConnected && _wifiCamera.IsLiveView)
+        {
+            try
+            {
+                var jpeg = await _wifiCamera.GetLiveViewFrameAsync(
+                    cancellationToken);
+                failures = 0;
+                var prepared = await Task.Run(
+                    () => PrepareJpeg(
+                        jpeg,
+                        _videoMode,
+                        false,
+                        false,
+                        _videoRecording,
+                        _monitorNikonCloudPreset),
+                    cancellationToken);
+                await Dispatcher.InvokeAsync(
+                    () => DisplayWifiPreparedPreview(prepared));
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception error)
+            {
+                failures++;
+                _diagnostics.Warning(
+                    "wifi-liveview",
+                    $"获取 Wi‑Fi 实时取景帧失败（{failures}/3）：{error.Message}");
+                if (failures >= 3)
+                {
+                    _diagnostics.Warning(
+                        "wifi-liveview",
+                        "连续 3 次未收到 Wi‑Fi 实时取景画面，已停止重试。");
+                    break;
+                }
+                try
+                {
+                    await Task.Delay(600, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private void DisplayWifiPreparedPreview(PreparedPreview prepared)
+    {
+        _lastPreviewSource = prepared.Source;
+        PreviewImage.Source = prepared.Display;
+        MonitorPreviewImage.Source = prepared.Display;
+        MonitorPreviewEmpty.Visibility = Visibility.Collapsed;
+        MonitorCameraOverlay.Text =
+            $"{_wifiCamera.CameraName} · {_wifiConnectionMode.ToUpperInvariant()} · WI‑FI/PTP‑IP";
+        MonitorRgbScope.SetData(
+            prepared.Monitor.RedHistogram,
+            prepared.Monitor.GreenHistogram,
+            prepared.Monitor.BlueHistogram);
+        _immersiveScope?.SetData(
+            prepared.Monitor.RedHistogram,
+            prepared.Monitor.GreenHistogram,
+            prepared.Monitor.BlueHistogram);
+        if (_immersivePreviewImage is not null)
+        {
+            _immersivePreviewImage.Source = prepared.Display;
+        }
+        UpdateLiveViewState();
+    }
+
+    /// <summary>
+    /// 从 Wi‑Fi 相机读取 ISO/光圈/快门并缓存到本地字段（单属性失败不阻断其余）。
+    /// </summary>
+    private async Task RefreshWifiParametersAsync()
+    {
+        if (!_wifiCamera.IsConnected)
+        {
+            return;
+        }
+        try
+        {
+            var isoData = await _wifiCamera.ReadPropertyAsync(0x500f);
+            _wifiIso = isoData.Length >= 2
+                ? BinaryPrimitives.ReadUInt16LittleEndian(isoData)
+                : (ushort)0;
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "wifi-params", $"读取 Wi‑Fi ISO 失败：{error.Message}");
+        }
+        try
+        {
+            var fNumberData = await _wifiCamera.ReadPropertyAsync(0x5007);
+            if (fNumberData.Length >= 2)
+            {
+                _wifiAperture = BinaryPrimitives.ReadUInt16LittleEndian(
+                    fNumberData) / 100.0;
+            }
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "wifi-params", $"读取 Wi‑Fi 光圈失败：{error.Message}");
+        }
+        try
+        {
+            var shutterData = await _wifiCamera.ReadPropertyAsync(0x500d);
+            if (shutterData.Length >= 4)
+            {
+                _wifiShutterSeconds = BinaryPrimitives.ReadUInt32LittleEndian(
+                    shutterData) / 10000.0;
+            }
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "wifi-params", $"读取 Wi‑Fi 快门失败：{error.Message}");
+        }
+        await Dispatcher.InvokeAsync(UpdateWifiParameterReadout);
+    }
+
+    private void UpdateWifiParameterReadout()
+    {
+        if (WifiParameterReadout is null)
+        {
+            return;
+        }
+        var shutter = _wifiShutterSeconds > 0
+            ? (_wifiShutterSeconds >= 1
+                ? $"{_wifiShutterSeconds:0.##}″"
+                : $"1/{Math.Max(1, (int)Math.Round(1 / _wifiShutterSeconds))}")
+            : "—";
+        var aperture = _wifiAperture > 0
+            ? $"f/{_wifiAperture:0.#}"
+            : "—";
+        WifiParameterReadout.Text = AppLocalization.T(
+            $"ISO {(_wifiIso > 0 ? _wifiIso.ToString() : "—")} · {aperture} · {shutter}");
+    }
+
+    private async Task StepWifiIsoAsync(int direction)
+    {
+        if (!_wifiCamera.IsConnected) return;
+        var values = new[] { 64, 80, 100, 125, 160, 200, 250, 320, 400, 500,
+            640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400,
+            8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200,
+            64000, 102400 };
+        var currentIndex = Array.FindIndex(values, v => v >= _wifiIso);
+        if (currentIndex < 0) currentIndex = 0;
+        var next = Math.Clamp(currentIndex + direction, 0, values.Length - 1);
+        var payload = new byte[2];
+        BinaryPrimitives.WriteUInt16LittleEndian(
+            payload, (ushort)values[next]);
+        await RunOperationAsync(
+            $"正在写入 Wi‑Fi ISO {values[next]}…",
+            async token =>
+            {
+                await _wifiCamera.WritePropertyAsync(0x500f, payload, token);
+                await RefreshWifiParametersAsync();
+            });
+    }
+
+    private async Task StepWifiApertureAsync(int direction)
+    {
+        if (!_wifiCamera.IsConnected) return;
+        var values = new[] { 1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5,
+            4.0, 4.5, 5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10.0, 11.0, 13.0, 14.0,
+            16.0, 18.0, 20.0, 22.0 };
+        var currentIndex = Array.FindIndex(
+            values, v => v >= _wifiAperture - 0.01);
+        if (currentIndex < 0) currentIndex = 0;
+        var next = Math.Clamp(currentIndex + direction, 0, values.Length - 1);
+        var payload = new byte[2];
+        BinaryPrimitives.WriteUInt16LittleEndian(
+            payload, (ushort)(values[next] * 100));
+        await RunOperationAsync(
+            $"正在写入 Wi‑Fi 光圈 f/{values[next]:0.#}…",
+            async token =>
+            {
+                await _wifiCamera.WritePropertyAsync(0x5007, payload, token);
+                await RefreshWifiParametersAsync();
+            });
+    }
+
+    private async Task StepWifiShutterAsync(int direction)
+    {
+        if (!_wifiCamera.IsConnected) return;
+        var denominators = new[] { 8000.0, 4000.0, 2000.0, 1000.0, 500.0,
+            250.0, 125.0, 60.0, 30.0, 15.0, 8.0, 4.0, 2.0, 1.0 };
+        var currentIndex = Array.FindIndex(
+            denominators, d => 1.0 / d <= _wifiShutterSeconds + 0.00001);
+        if (currentIndex < 0) currentIndex = 0;
+        var next = Math.Clamp(
+            currentIndex + direction, 0, denominators.Length - 1);
+        var seconds = 1.0 / denominators[next];
+        var payload = new byte[4];
+        BinaryPrimitives.WriteUInt32LittleEndian(
+            payload, (uint)(seconds * 10000));
+        await RunOperationAsync(
+            seconds >= 1
+                ? $"正在写入 Wi‑Fi 快门 {seconds:0.#}″…"
+                : $"正在写入 Wi‑Fi 快门 1/{denominators[next]:0}…",
+            async token =>
+            {
+                await _wifiCamera.WritePropertyAsync(0x500d, payload, token);
+                await RefreshWifiParametersAsync();
+            });
+    }
+
+    /// <summary>Wi‑Fi 录像开关（Nikon 0x920a/0x920b；Canon EVFRecordStatus，TBC）。</summary>
+    private async Task ToggleWifiMovieRecordingAsync()
+    {
+        if (!_wifiCamera.IsConnected)
+        {
+            return;
+        }
+        if (_wifiCamera.IsMovieRecording)
+        {
+            await RunOperationAsync("正在停止 Wi‑Fi 录像…", async token =>
+            {
+                await _wifiCamera.StopMovieRecordingAsync(token);
+                _videoRecording = false;
+                _recordingStartedAt = null;
+                OperationStatusText.Text = AppLocalization.T(
+                    "Wi‑Fi 录像已停止 · 文件保存在相机卡内");
+            });
+        }
+        else
+        {
+            if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Nikon &&
+                _wifiCamera.Vendor != PtpIpCamera.CameraVendor.Canon)
+            {
+                ShowError("已连相机暂不支持 PTP/IP 远程录像");
+                return;
+            }
+            await RunOperationAsync("正在开始 Wi‑Fi 录像…", async token =>
+            {
+                await _wifiCamera.StartMovieRecordingAsync(token);
+                _videoRecording = true;
+                _recordingStartedAt = DateTime.Now;
+                OperationStatusText.Text = AppLocalization.T(
+                    "Wi‑Fi 录像中 · 文件保存在相机卡内");
+            });
+        }
+        UpdateRecordingState();
     }
 
     private async void WifiHeartbeatTimer_Tick(object? sender, EventArgs e)
@@ -1706,6 +2125,14 @@ public partial class MainWindow : Window
             _diagnostics.Info(
                 "wifi-camera",
                 $"PTP/IP 自动重连成功；相机={_wifiCamera.CameraName}");
+            // E3 1.5.9：重连成功后恢复厂商识别、取景与参数（对齐 iOS 重连路径）。
+            await _wifiCamera.DetectVendorAsync(token);
+            if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Unknown)
+            {
+                await _wifiCamera.StartLiveViewAsync(token);
+                StartWifiPreviewLoop();
+                await RefreshWifiParametersAsync();
+            }
             StartWifiMonitoring();
             UpdateConnectionSummary();
             UpdateControlStatusRow();
@@ -3099,7 +3526,8 @@ public partial class MainWindow : Window
         {
             if (_videoMode)
             {
-                ShowError("Wi‑Fi PTP/IP 当前仅支持照片遥控拍摄。");
+                // E3 1.5.9：Wi‑Fi PTP/IP 录像（Nikon 0x920a/0x920b；Canon EVFRecordStatus，TBC）。
+                await ToggleWifiMovieRecordingAsync();
                 return;
             }
             await RunOperationAsync("正在通过 Wi‑Fi 触发相机快门…", async token =>
@@ -6144,15 +6572,21 @@ public partial class MainWindow : Window
         var photoCaptureReady =
             (_camera.IsConnected || _localCamera.IsConnected || _wifiCamera.IsConnected) &&
             !_operationInProgress;
+        var videoRecordReady = _videoMode &&
+            ((_camera.IsConnected && !_operationInProgress) ||
+             (_wifiCamera.IsConnected &&
+              (_wifiCamera.Vendor == PtpIpCamera.CameraVendor.Nikon ||
+               _wifiCamera.Vendor == PtpIpCamera.CameraVendor.Canon) &&
+              !_operationInProgress));
         ConnectButton.IsEnabled = !_operationInProgress;
         LiveViewButton.IsEnabled = liveViewReady;
         ShutterButton.IsEnabled = _videoMode
-            ? liveViewReady && (_externalRecordToDevice || _camera.IsConnected)
+            ? videoRecordReady || (liveViewReady && _externalRecordToDevice)
             : photoCaptureReady;
         if (_immersiveRecordButton is not null)
         {
             _immersiveRecordButton.IsEnabled = _videoMode
-                ? liveViewReady && (_externalRecordToDevice || _camera.IsConnected)
+                ? videoRecordReady || (liveViewReady && _externalRecordToDevice)
                 : connected;
         }
         ExposureModeBox.IsEnabled = connected;
@@ -6341,7 +6775,8 @@ public partial class MainWindow : Window
 
     private void UpdateLiveViewState()
     {
-        var live = _camera.IsLiveView || _localCamera.IsLiveView;
+        var live = _camera.IsLiveView || _localCamera.IsLiveView ||
+            _wifiCamera.IsLiveView;
         LiveViewButton.Content =
             AppLocalization.T(live ? "停止取景" : "开启取景");
         LiveBadge.Text = live ? "LIVE VIEW ON" : "LIVE VIEW OFF";
@@ -10163,6 +10598,7 @@ public partial class MainWindow : Window
         Closing -= Window_Closing;
         _monitorTimecodeTimer.Stop();
         StopWifiMonitoring();
+        StopWifiPreviewLoop();
         if (_immersivePreviewWindow is { } immersive)
         {
             CloseImmersivePreview(immersive);

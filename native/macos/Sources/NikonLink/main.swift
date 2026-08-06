@@ -2519,6 +2519,22 @@ private final class CameraModel: ObservableObject {
         return cameraName ?? "相机"
     }
 
+    // E3 1.5.9：Wi‑Fi PTP/IP 参数显示辅助（快门秒→分数、光圈 F 值）。
+    var wifiShutterText: String {
+        let seconds = wifiCamera.shutterSpeedValue
+        guard seconds > 0 else { return "—" }
+        if seconds >= 1 {
+            return String(format: "%.0f″", seconds)
+        }
+        return "1/\\(Int((1 / seconds).rounded()))"
+    }
+
+    var wifiApertureText: String {
+        wifiCamera.apertureValue > 0
+            ? String(format: "f/%.1f", wifiCamera.apertureValue)
+            : "—"
+    }
+
     var hasAnyCameraConnection: Bool {
         connected || localCameraConnected || wifiCamera.isConnected
     }
@@ -2714,6 +2730,9 @@ private final class CameraModel: ObservableObject {
             videoShutterAngle = savedShutterAngle
         }
         shutter = videoShutterAngle / (360 * videoFrameRate)
+        // E3 1.5.9：macOS 不随连接自动拉取 Wi‑Fi 取景帧——由 MonitorView
+        // onAppear/onDisappear 显式开关，避免照片页空拉帧。
+        wifiCamera.autoStartLiveViewOnConnect = false
         wifiCamera.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &connectivityObservers)
@@ -3348,6 +3367,12 @@ private final class CameraModel: ObservableObject {
     }
 
     func toggleMovieRecording() {
+        // E3 1.5.9：Wi‑Fi PTP/IP 相机优先走机身录像（Nikon 0x920a/0x920b；
+        // Canon EVFRecordStatus，TBC-awaiting-hardware），不经过外录。
+        if !connected, !localCameraConnected, wifiCamera.isConnected {
+            wifiCamera.toggleVideoRecording()
+            return
+        }
         guard connected || localCameraConnected else {
             errorMessage = "请先连接支持的相机或视频设备。"
             return
@@ -4481,7 +4506,15 @@ private struct ImmersiveMacCameraView: View {
                 : AnyLayout(VStackLayout())
             ZStack {
             Color.black.ignoresSafeArea()
-            if let frame = (monitoring || model.monitorNikonCloudPreset != nil
+            if model.wifiCamera.isConnected,
+               let wifiFrame = model.wifiCamera.liveViewFrame {
+                // E3 1.5.9：全屏取景 Wi‑Fi PTP/IP 实时取景帧（CGImage）。
+                Image(decorative: wifiFrame, scale: 1)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .ignoresSafeArea()
+            } else if let frame = (monitoring || model.monitorNikonCloudPreset != nil
                 ? model.frame : model.photoFrame) {
                 Image(nsImage: frame)
                     .resizable()
@@ -4618,10 +4651,13 @@ private struct ImmersiveMacCameraView: View {
                     .buttonStyle(.plain)
                     .disabled(
                         (monitoring
-                            ? !(model.connected || (
-                                model.localCameraConnected
-                                    && model.externalRecordToDevice
-                            ))
+                            ? (model.connected || model.localCameraConnected
+                                ? !(model.connected || (
+                                    model.localCameraConnected
+                                        && model.externalRecordToDevice
+                                ))
+                                : !(model.wifiCamera.isConnected
+                                    && model.wifiCamera.supportsMovieRecording))
                             : !model.captureReady)
                             || model.capturing
                     )
@@ -4657,6 +4693,18 @@ private struct ImmersiveMacCameraView: View {
         }
         .preferredColorScheme(.dark)
         .onExitCommand(perform: close)
+        .onAppear {
+            // E3 1.5.9：全屏取景打开时确保 Wi‑Fi 取景拉帧。
+            if model.wifiCamera.isConnected {
+                model.wifiCamera.startLiveViewIfNeeded()
+            }
+        }
+        .onDisappear {
+            // 全屏取景关闭后停止 Wi‑Fi 拉帧（避免后台空转）。
+            if model.wifiCamera.isConnected {
+                model.wifiCamera.stopLiveViewIfNeeded()
+            }
+        }
     }
 
     private var immersiveTelemetryHUD: some View {
@@ -6553,7 +6601,15 @@ private struct MonitorView: View {
                     .padding(.vertical, 18)
 
                     ZStack(alignment: .topLeading) {
-                        if let frame = model.frame {
+                        if model.wifiCamera.isConnected,
+                           let wifiFrame = model.wifiCamera.liveViewFrame {
+                            // E3 1.5.9：Wi‑Fi PTP/IP 实时取景帧（CGImage）。
+                            Image(decorative: wifiFrame, scale: 1)
+                                .resizable()
+                                .interpolation(.medium)
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                        } else if let frame = model.frame {
                             Image(nsImage: frame)
                                 .resizable()
                                 .interpolation(.medium)
@@ -6569,13 +6625,25 @@ private struct MonitorView: View {
                             VStack(spacing: 12) {
                                 Image(systemName: "camera.viewfinder")
                                     .font(.system(size: 46, weight: .light)) // 图标尺寸，不受 TypeScale 约束
-                                Text(model.connected ? "等待实时取景画面" : "连接相机后开启实时取景")
+                                Text(
+                                    model.connected
+                                        ? "等待实时取景画面"
+                                        : (model.wifiCamera.isConnected
+                                            ? "Wi‑Fi 取景准备中…"
+                                            : "连接相机后开启实时取景")
+                                )
                                     .font(.system(size: TypeScale.emphasis, weight: .medium))
                             }
                             .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页空态文字改纯白
                             .frame(maxWidth: .infinity, minHeight: 270)
                         }
-                        Text("\(model.cameraName ?? "未连接") · USB/PTP")
+                        Text(
+                            model.connected
+                                ? "\(model.cameraName ?? "未连接") · USB/PTP"
+                                : model.wifiCamera.isConnected
+                                    ? "\(model.wifiCamera.cameraName) · WI‑FI/PTP‑IP"
+                                    : "\(model.cameraName ?? "未连接") · USB/PTP"
+                        )
                             .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Color.white) // v1.5.7 issue 655a0a14: 视频页角标改纯白
                             .padding(12)
@@ -6629,10 +6697,14 @@ private struct MonitorView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(
-                            !(model.connected || (
-                                model.localCameraConnected
-                                    && model.externalRecordToDevice
-                            )) || model.capturing
+                            model.connected || model.localCameraConnected
+                                ? !(model.connected || (
+                                    model.localCameraConnected
+                                        && model.externalRecordToDevice
+                                )) || model.capturing
+                                : !(model.wifiCamera.isConnected
+                                    && model.wifiCamera.supportsMovieRecording)
+                                    || model.capturing
                         )
                         monitorAudioWaveformCard()
                     }
@@ -6668,11 +6740,34 @@ private struct MonitorView: View {
                     .padding(.vertical, 18)
 
                     HStack(spacing: 8) {
-                        MonitorMacStepper(title: "帧率", value: "\(Int(model.videoFrameRate))p", decrease: { model.stepVideoFrameRate(-1) }, increase: { model.stepVideoFrameRate(1) })
-                        MonitorMacStepper(title: "快门", value: "\(model.videoShutterAngle.formatted())°", decrease: { model.stepVideoShutter(-1) }, increase: { model.stepVideoShutter(1) })
-                        MonitorMacStepper(title: "编码", value: model.monitorVideoCodec.shortLabel, decrease: { model.stepMonitorVideoCodec(-1) }, increase: { model.stepMonitorVideoCodec(1) })
-                        MonitorMacStepper(title: "Log", value: model.monitorVideoLog.shortLabel, decrease: { model.stepMonitorVideoLog(-1) }, increase: { model.stepMonitorVideoLog(1) })
-                        MonitorMacStepper(title: "ISO", value: "\(model.iso)", decrease: { model.stepISO(-1) }, increase: { model.stepISO(1) })
+                        if model.wifiCamera.isConnected && !model.connected {
+                            // E3 1.5.9：Wi‑Fi PTP/IP 参数卡（ISO/光圈/快门经
+                            // 0x1015/0x1016 读写，TBC-awaiting-hardware）。
+                            MonitorMacStepper(
+                                title: "快门",
+                                value: model.wifiShutterText,
+                                decrease: { model.wifiCamera.stepShutterSpeed(-1) },
+                                increase: { model.wifiCamera.stepShutterSpeed(1) }
+                            )
+                            MonitorMacStepper(
+                                title: "光圈",
+                                value: model.wifiApertureText,
+                                decrease: { model.wifiCamera.stepAperture(-1) },
+                                increase: { model.wifiCamera.stepAperture(1) }
+                            )
+                            MonitorMacStepper(
+                                title: "ISO",
+                                value: "\(model.wifiCamera.isoValue)",
+                                decrease: { model.wifiCamera.stepISO(-1) },
+                                increase: { model.wifiCamera.stepISO(1) }
+                            )
+                        } else {
+                            MonitorMacStepper(title: "帧率", value: "\(Int(model.videoFrameRate))p", decrease: { model.stepVideoFrameRate(-1) }, increase: { model.stepVideoFrameRate(1) })
+                            MonitorMacStepper(title: "快门", value: "\(model.videoShutterAngle.formatted())°", decrease: { model.stepVideoShutter(-1) }, increase: { model.stepVideoShutter(1) })
+                            MonitorMacStepper(title: "编码", value: model.monitorVideoCodec.shortLabel, decrease: { model.stepMonitorVideoCodec(-1) }, increase: { model.stepMonitorVideoCodec(1) })
+                            MonitorMacStepper(title: "Log", value: model.monitorVideoLog.shortLabel, decrease: { model.stepMonitorVideoLog(-1) }, increase: { model.stepMonitorVideoLog(1) })
+                            MonitorMacStepper(title: "ISO", value: "\(model.iso)", decrease: { model.stepISO(-1) }, increase: { model.stepISO(1) })
+                        }
                     }
                     .padding(.horizontal, 20)
 
@@ -6711,6 +6806,18 @@ private struct MonitorView: View {
             .onReceive(timecodeTimer) { now = $0 }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            // E3 1.5.9：监看页出现时若已连 Wi‑Fi 相机且取景未开，开启并拉帧。
+            if model.wifiCamera.isConnected && !model.wifiCamera.isRecording {
+                model.wifiCamera.startLiveViewIfNeeded()
+            }
+        }
+        .onDisappear {
+            // 离开监看页停止 Wi‑Fi 拉帧（避免后台空转）。
+            if model.wifiCamera.isConnected {
+                model.wifiCamera.stopLiveViewIfNeeded()
+            }
+        }
     }
 
     private var timecodeText: String {

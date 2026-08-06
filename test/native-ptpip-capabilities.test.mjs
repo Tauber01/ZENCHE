@@ -121,3 +121,56 @@ test('AppModel dispatches recording to camera or wifi by active source', async (
   assert.match(appModel, /func toggleVideoRecording\(\)/);
   assert.match(appModel, /wifiCamera\.toggleVideoRecording\(\)/);
 });
+
+test('E3: macOS gate keeps auto live-view off; UI wires wifi frame/record/params', async () => {
+  const [service, main] = await Promise.all([
+    read('native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift'),
+    read('native/macos/Sources/NikonLink/main.swift'),
+  ]);
+  // 门控：autoStartLiveViewOnConnect 默认 true（iOS 行为不变），macOS 显式置 false。
+  assert.match(service, /var autoStartLiveViewOnConnect = true/);
+  assert.match(service, /if self\.autoStartLiveViewOnConnect/);
+  assert.match(main, /wifiCamera\.autoStartLiveViewOnConnect = false/);
+  // macOS UI：取景帧（CGImage）、录像路由、参数步进卡。
+  assert.match(main, /wifiCamera\.liveViewFrame/);
+  assert.match(main, /wifiCamera\.toggleVideoRecording\(\)/);
+  assert.match(main, /wifiCamera\.stepISO/);
+  assert.match(main, /wifiCamera\.stepAperture/);
+  assert.match(main, /wifiCamera\.stepShutterSpeed/);
+  assert.match(main, /startLiveViewIfNeeded\(\)/);
+  assert.match(main, /stopLiveViewIfNeeded\(\)/);
+});
+
+test('E3: Windows PtpIpCamera exposes data-out, vendor detect, live view, record, params', async () => {
+  const [transport, window] = await Promise.all([
+    read('native/windows/Services/PtpIpCamera.cs'),
+    read('native/windows/MainWindow.xaml.cs'),
+  ]);
+  // data-out 相位（DataPhaseInfo=2：请求→StartData(9)→EndData(12)→响应）
+  assert.match(transport, /SendCommandWithDataOutAsync/);
+  assert.match(transport, /WriteUInt32\(payload, 2\)/);
+  // 厂商识别：0x1001 GetDeviceInfo + 名称启发式
+  assert.match(transport, /DetectVendorAsync/);
+  assert.match(transport, /0x1001/);
+  assert.match(transport, /VendorForManufacturer/);
+  // 取景/录像/参数方法（Nikon opcode + Canon EOS 序列）
+  assert.match(transport, /StartLiveViewAsync/);
+  assert.match(transport, /StopLiveViewAsync/);
+  assert.match(transport, /GetLiveViewFrameAsync/);
+  assert.match(transport, /StartMovieRecordingAsync/);
+  assert.match(transport, /StopMovieRecordingAsync/);
+  assert.match(transport, /WritePropertyAsync/);
+  assert.match(transport, /0x9201/);
+  assert.match(transport, /0x9203/);
+  assert.match(transport, /0x920a/);
+  assert.match(transport, /0x9153/);
+  // Windows UI：Wi‑Fi 取景循环 + 录像钮 + 参数卡
+  assert.match(window, /StartWifiPreviewLoop/);
+  assert.match(window, /WifiPreviewLoopAsync/);
+  assert.match(window, /ToggleWifiMovieRecordingAsync/);
+  assert.match(window, /StepWifiIsoAsync/);
+  assert.match(window, /StepWifiApertureAsync/);
+  assert.match(window, /StepWifiShutterAsync/);
+  assert.match(window, /WifiStepperRow/);
+  assert.match(window, /DetectVendorAsync/);
+});
