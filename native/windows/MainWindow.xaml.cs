@@ -693,6 +693,14 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "wifi-camera-connection-mode.txt");
+    private static readonly string LivePhotoStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "live-photo-enabled.txt");
+    private static readonly string LivePhotoSecondsStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "live-photo-seconds.txt");
     private const string LibraryDragFormat = "ZENCHE.LibraryFilePath";
     private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
     private const string ZencheWebsiteUrl = "https://zenche.top";
@@ -700,6 +708,7 @@ public partial class MainWindow : Window
     private readonly PtpIpCamera _wifiCamera = new();
     private readonly LocalCameraService _localCamera = new();
     private readonly ExternalVideoRecorder _externalVideoRecorder = new();
+    private readonly LivePhotoClipRecorder _livePhotoClipRecorder = new();
     private readonly BluetoothRemoteController _bluetoothRemote = new();
     private readonly LocationTaggingService _locationTagging = new();
     private readonly NikonOfficialSdkService _nikonOfficialSdk = new();
@@ -732,6 +741,9 @@ public partial class MainWindow : Window
     private bool _videoRecording;
     private bool _externalRecordToDevice = true;
     private string _wifiConnectionMode = "ap";
+    // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对）──
+    private bool _livePhotoEnabled;
+    private double _livePhotoSeconds = 3.0;
     // ── E3 1.5.9：Wi‑Fi PTP/IP 取景 / 参数缓存 ──
     private CancellationTokenSource? _wifiPreviewCancellation;
     private Task? _wifiPreviewTask;
@@ -1366,6 +1378,8 @@ public partial class MainWindow : Window
         MirrorChyanCdkBox.Password = _updateService.LoadMirrorChyanCdk();
         _externalRecordToDevice = LoadExternalRecordingPreference();
         _wifiConnectionMode = LoadWifiConnectionModePreference();
+        _livePhotoEnabled = LoadLivePhotoPreference();
+        _livePhotoSeconds = LoadLivePhotoSecondsPreference();
         WifiCameraTransferHost.Content = BuildWifiCameraTransferPanel();
         CaptureAssistSettingsHost.Content = BuildCaptureAssistSettingsPanel();
         ExternalRecordingCheck.IsChecked = _externalRecordToDevice;
@@ -1963,26 +1977,44 @@ public partial class MainWindow : Window
     private async Task StepWifiShutterAsync(int direction)
     {
         if (!_wifiCamera.IsConnected) return;
-        var denominators = new[] { 8000.0, 4000.0, 2000.0, 1000.0, 500.0,
-            250.0, 125.0, 60.0, 30.0, 15.0, 8.0, 4.0, 2.0, 1.0 };
-        var currentIndex = Array.FindIndex(
-            denominators, d => 1.0 / d <= _wifiShutterSeconds + 0.00001);
-        if (currentIndex < 0) currentIndex = 0;
+        // E3 遗留缺陷修复（pro 已裁定属实）：旧实现用降序分母 +
+        // Array.FindIndex(1.0/d <= seconds) 恒命中首档 d=8000，无法步进。
+        // 现改为升序秒值阶梯 + firstAtLeast，与 E4 Android/Harmony 同构。
+        var ladder = new[]
+        {
+            1.0 / 8000, 1.0 / 4000, 1.0 / 2000, 1.0 / 1000,
+            1.0 / 500, 1.0 / 250, 1.0 / 125, 1.0 / 60,
+            1.0 / 30, 1.0 / 15, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1.0
+        };
+        var currentIndex = FirstAtLeast(ladder, _wifiShutterSeconds - 0.00001);
         var next = Math.Clamp(
-            currentIndex + direction, 0, denominators.Length - 1);
-        var seconds = 1.0 / denominators[next];
+            currentIndex + direction, 0, ladder.Length - 1);
+        var seconds = ladder[next];
         var payload = new byte[4];
         BinaryPrimitives.WriteUInt32LittleEndian(
             payload, (uint)(seconds * 10000));
         await RunOperationAsync(
             seconds >= 1
                 ? $"正在写入 Wi‑Fi 快门 {seconds:0.#}″…"
-                : $"正在写入 Wi‑Fi 快门 1/{denominators[next]:0}…",
+                : $"正在写入 Wi‑Fi 快门 1/{1.0 / seconds:0}…",
             async token =>
             {
                 await _wifiCamera.WritePropertyAsync(0x500d, payload, token);
                 await RefreshWifiParametersAsync();
             });
+    }
+
+    /// <summary>升序阶梯中第一个 ≥ value 的下标（无则返回末位）。</summary>
+    private static int FirstAtLeast(IReadOnlyList<double> ladder, double value)
+    {
+        for (var i = 0; i < ladder.Count; i++)
+        {
+            if (ladder[i] >= value)
+            {
+                return i;
+            }
+        }
+        return ladder.Count - 1;
     }
 
     /// <summary>Wi‑Fi 录像开关（Nikon 0x920a/0x920b；Canon EVFRecordStatus，TBC）。</summary>
@@ -2284,6 +2316,103 @@ public partial class MainWindow : Window
         locationToggle.Margin = new Thickness(16, 0, 0, 0);
         locationRow.Children.Add(locationToggle);
         root.Children.Add(locationRow);
+
+        root.Children.Add(new Border
+        {
+            Height = 1,
+            Margin = new Thickness(0, 14, 0, 14),
+            Background = (Brush)FindResource("RuleBrush")
+        });
+
+        // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对）──
+        var livePhotoBody = new StackPanel();
+        livePhotoBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("Live 图"),
+            FontWeight = FontWeights.SemiBold
+        });
+        livePhotoBody.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("快门时附带最近几秒取景切片"),
+            Margin = new Thickness(0, 4, 0, 0),
+            Style = (Style)FindResource("SettingsHint"),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var livePhotoToggle = new CheckBox
+        {
+            Content = AppLocalization.T("启用"),
+            IsChecked = _livePhotoEnabled,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var livePhotoSecondsBox = new ComboBox
+        {
+            IsEnabled = _livePhotoEnabled,
+            MinWidth = 72
+        };
+        foreach (var seconds in new[] { 1, 3, 5, 10, 15 })
+        {
+            livePhotoSecondsBox.Items.Add(new ComboBoxItem
+            {
+                Content = AppLocalization.T(
+                    seconds == 1 ? "1 秒" : $"{seconds} 秒"),
+                Tag = seconds
+            });
+        }
+        livePhotoSecondsBox.SelectedIndex =
+            Math.Max(0, new[] { 1, 3, 5, 10, 15 }.ToList()
+                .IndexOf((int)Math.Round(_livePhotoSeconds)));
+        livePhotoToggle.Checked += (_, _) =>
+        {
+            _livePhotoEnabled = true;
+            SaveLivePhotoPreference(true);
+            livePhotoSecondsBox.IsEnabled = true;
+            SyncLivePhotoRing();
+            OperationStatusText.Text = AppLocalization.T(
+                $"live 图已开启 · 快门将附带最近 {Math.Round(_livePhotoSeconds)} 秒取景切片");
+        };
+        livePhotoToggle.Unchecked += (_, _) =>
+        {
+            _livePhotoEnabled = false;
+            SaveLivePhotoPreference(false);
+            livePhotoSecondsBox.IsEnabled = false;
+            SyncLivePhotoRing();
+            OperationStatusText.Text = AppLocalization.T("live 图已关闭");
+        };
+        livePhotoSecondsBox.SelectionChanged += (_, _) =>
+        {
+            if (livePhotoSecondsBox.SelectedItem is not ComboBoxItem item ||
+                item.Tag is not int seconds)
+            {
+                return;
+            }
+            _livePhotoSeconds = seconds;
+            SaveLivePhotoSecondsPreference(seconds);
+            if (_livePhotoClipRecorder.IsArmed)
+            {
+                _livePhotoClipRecorder.Arm(
+                    Math.Max(4, (int)Math.Round(_videoFrameRate)),
+                    _livePhotoSeconds);
+            }
+            OperationStatusText.Text = AppLocalization.T(
+                $"live 图切片时长已设为 {seconds} 秒");
+        };
+        var livePhotoRow = new Grid();
+        livePhotoRow.ColumnDefinitions.Add(new ColumnDefinition());
+        livePhotoRow.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+        livePhotoRow.Children.Add(livePhotoBody);
+        var livePhotoControls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal
+        };
+        livePhotoControls.Children.Add(livePhotoSecondsBox);
+        livePhotoControls.Children.Add(livePhotoToggle);
+        Grid.SetColumn(livePhotoControls, 1);
+        livePhotoControls.Margin = new Thickness(16, 0, 0, 0);
+        livePhotoRow.Children.Add(livePhotoControls);
+        root.Children.Add(livePhotoRow);
 
         return new Border
         {
@@ -3508,13 +3637,34 @@ public partial class MainWindow : Window
                 {
                     await _locationTagging.RefreshAsync(token);
                 }
+                // E5 1.5.9：live 图——与 USB 路径同构：先 reserve base，
+                // 照片与切片 AVI 同 base 配对。
+                var baseName = _workflow.ReserveBaseName(_localCamera.DeviceName);
+                string? liveClipPath = null;
+                if (_livePhotoEnabled)
+                {
+                    liveClipPath = CaptureLivePhotoSlice();
+                }
                 var jpeg = await _localCamera.CaptureJpegAsync(token);
                 var path = await _workflow.StoreAsync(
                     jpeg,
                     "local-camera.jpg",
                     _localCamera.DeviceName,
+                    reservedBaseName: baseName,
                     cancellationToken: token,
-                    location: _locationTagging.Snapshot());
+                    location: _locationTagging.Snapshot(),
+                    pairedWithFilename: liveClipPath is null
+                        ? null
+                        : $"{baseName}_live.avi");
+                if (liveClipPath is not null)
+                {
+                    await _workflow.StoreLivePhotoClipAsync(
+                        liveClipPath,
+                        baseName,
+                        Path.GetFileName(path),
+                        _localCamera.DeviceName,
+                        token);
+                }
                 DisplayJpeg(jpeg);
                 RefreshPhotoList();
                 OperationStatusText.Text = AppLocalization.T(
@@ -3532,6 +3682,8 @@ public partial class MainWindow : Window
             }
             await RunOperationAsync("正在通过 Wi‑Fi 触发相机快门…", async token =>
             {
+                // E5 1.5.9：Wi‑Fi PTP 拍照不生成 live 图切片——原片在相机
+                // 存储卡内，本地无照片文件可配对，切片会导致孤儿 AVI。
                 await _wifiCamera.CaptureAsync(token);
                 OperationStatusText.Text = AppLocalization.T(
                     "Wi‑Fi 快门已触发 · 原片保存在相机卡内");
@@ -3554,13 +3706,36 @@ public partial class MainWindow : Window
             {
                 await _locationTagging.RefreshAsync(token);
             }
+            // E5 1.5.9：live 图——先 reserve base，照片与切片 AVI 同 base 配对。
+            var baseName = _workflow.ReserveBaseName(
+                _camera.Profile?.Name ?? "Nikon 相机");
+            string? liveClipPath = null;
+            if (_livePhotoEnabled)
+            {
+                liveClipPath = CaptureLivePhotoSlice();
+            }
             var jpeg = await _camera.CaptureAsync(token);
             var path = await _workflow.StoreAsync(
                 jpeg,
                 "capture.jpg",
                 _camera.Profile?.Name ?? "Nikon 相机",
+                reservedBaseName: baseName,
                 cancellationToken: token,
-                location: _locationTagging.Snapshot());
+                location: _locationTagging.Snapshot(),
+                // 仅当切片实际生成（开关开且取景帧已入环）才写配对标记，
+                // 避免 XMP 指向不存在的 AVI。
+                pairedWithFilename: liveClipPath is null
+                    ? null
+                    : $"{baseName}_live.avi");
+            if (liveClipPath is not null)
+            {
+                await _workflow.StoreLivePhotoClipAsync(
+                    liveClipPath,
+                    baseName,
+                    Path.GetFileName(path),
+                    _camera.Profile?.Name ?? "Nikon 相机",
+                    token);
+            }
             DisplayJpeg(jpeg);
             RefreshPhotoList();
             OperationStatusText.Text = AppLocalization.T(
@@ -4202,6 +4377,72 @@ public partial class MainWindow : Window
             DiagnosticLogger.Shared.Warning(
                 "external-recording",
                 $"保存外录偏好失败：{error.Message}");
+        }
+    }
+
+    private static bool LoadLivePhotoPreference()
+    {
+        try
+        {
+            return File.Exists(LivePhotoStatePath) &&
+                File.ReadAllText(LivePhotoStatePath).Trim() == "1";
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void SaveLivePhotoPreference(bool enabled)
+    {
+        try
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(LivePhotoStatePath)!);
+            File.WriteAllText(LivePhotoStatePath, enabled ? "1" : "0");
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "live-photo",
+                $"保存 live 图偏好失败：{error.Message}");
+        }
+    }
+
+    private static double LoadLivePhotoSecondsPreference()
+    {
+        try
+        {
+            if (!File.Exists(LivePhotoSecondsStatePath))
+            {
+                return 3.0;
+            }
+            var parsed = double.TryParse(
+                File.ReadAllText(LivePhotoSecondsStatePath).Trim(),
+                out var seconds);
+            return parsed ? Math.Clamp(seconds, 1, 15) : 3.0;
+        }
+        catch
+        {
+            return 3.0;
+        }
+    }
+
+    private static void SaveLivePhotoSecondsPreference(double seconds)
+    {
+        try
+        {
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(LivePhotoSecondsStatePath)!);
+            File.WriteAllText(
+                LivePhotoSecondsStatePath,
+                seconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        catch (Exception error)
+        {
+            DiagnosticLogger.Shared.Warning(
+                "live-photo",
+                $"保存 live 图时长偏好失败：{error.Message}");
         }
     }
 
@@ -6222,10 +6463,43 @@ public partial class MainWindow : Window
 
     private void StartPreviewLoop()
     {
+        SyncLivePhotoRing();
         _previewCancellation?.Cancel();
         _previewCancellation?.Dispose();
         _previewCancellation = new CancellationTokenSource();
         _previewTask = PreviewLoopAsync(_previewCancellation.Token);
+    }
+
+    /// <summary>E5 1.5.9：live 图环形缓冲启停（取景开启时 arm、停止时 disarm）。
+    /// TBC-awaiting-hardware。</summary>
+    private void SyncLivePhotoRing()
+    {
+        var anyLiveView = (_camera.IsConnected && _camera.IsLiveView) ||
+                          (_localCamera.IsConnected && _localCamera.IsLiveView);
+        if (_livePhotoEnabled && anyLiveView)
+        {
+            if (!_livePhotoClipRecorder.IsArmed)
+            {
+                _livePhotoClipRecorder.Arm(
+                    Math.Max(4, (int)Math.Round(_videoFrameRate)),
+                    _livePhotoSeconds);
+            }
+        }
+        else if (_livePhotoClipRecorder.IsArmed)
+        {
+            _livePhotoClipRecorder.Disarm();
+        }
+    }
+
+    /// <summary>E5 1.5.9：把环形缓冲最近 N 秒帧切为临时 AVI；环为空返回 null。
+    /// TBC-awaiting-hardware。</summary>
+    private string? CaptureLivePhotoSlice()
+    {
+        var tempPath = Path.Combine(
+            Path.GetTempPath(),
+            $"{Guid.NewGuid():N}.avi");
+        var clip = _livePhotoClipRecorder.CaptureSlice(tempPath);
+        return clip is null ? null : tempPath;
     }
 
     private async Task PreviewLoopAsync(CancellationToken cancellationToken)
@@ -6246,6 +6520,11 @@ public partial class MainWindow : Window
                 pendingFetch = NextFrame();
                 var jpeg = await fetchTask;
                 failures = 0;
+                // E5 1.5.9：live 图环形缓冲常开（取景帧同源喂入，仅当开关开启）。
+                if (_livePhotoEnabled)
+                {
+                    _livePhotoClipRecorder.Append(jpeg);
+                }
                 if (_externalVideoRecorder.IsRecording)
                 {
                     try
@@ -6338,8 +6617,8 @@ public partial class MainWindow : Window
             }
         }
         cancellation?.Dispose();
+        SyncLivePhotoRing();
     }
-
     private async Task FinishExternalRecordingAfterFailureAsync(
         Exception cause,
         CancellationToken cancellationToken)
