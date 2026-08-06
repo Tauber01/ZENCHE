@@ -127,9 +127,26 @@ final class LocalCameraController implements AutoCloseable {
             }
 
             @Override public void onError(CameraDevice camera, int error) {
-                openError.set(new CameraAccessException(
-                        CameraAccessException.CAMERA_ERROR,
-                        "无法打开本机摄像头（错误 " + error + "）"));
+                String message;
+                int reason;
+                switch (error) {
+                    case CameraDevice.StateCallback.ERROR_CAMERA_IN_USE:
+                        message = "本机摄像头正被其他应用占用，请先关闭占用相机的应用";
+                        reason = CameraAccessException.CAMERA_IN_USE;
+                        break;
+                    case CameraDevice.StateCallback.ERROR_MAX_CAMERAS_IN_USE:
+                        message = "本机摄像头已达同时使用上限，请先关闭其他相机应用";
+                        reason = CameraAccessException.MAX_CAMERAS_IN_USE;
+                        break;
+                    case CameraDevice.StateCallback.ERROR_CAMERA_DISABLED:
+                        message = "本机摄像头已被系统禁用，请在系统设置中检查相机权限";
+                        reason = CameraAccessException.CAMERA_DISABLED;
+                        break;
+                    default:
+                        message = "无法打开本机摄像头（错误 " + error + "）";
+                        reason = CameraAccessException.CAMERA_ERROR;
+                }
+                openError.set(new CameraAccessException(reason, message));
                 camera.close();
                 opened.countDown();
             }

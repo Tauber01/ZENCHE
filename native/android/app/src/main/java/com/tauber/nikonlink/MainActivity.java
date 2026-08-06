@@ -33,6 +33,7 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.camera2.CameraAccessException;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.net.ConnectivityManager;
@@ -48,6 +49,7 @@ import android.os.Looper;
 import android.os.StatFs;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
+import android.provider.Settings;
 import android.content.ContentUris;
 import android.text.InputType;
 import android.text.Editable;
@@ -2026,7 +2028,14 @@ public final class MainActivity extends Activity {
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 connectLocalCamera();
             } else {
-                showError("未获得相机权限，无法使用本机摄像头");
+                boolean permanentlyDenied =
+                        !shouldShowRequestPermissionRationale(
+                                Manifest.permission.CAMERA);
+                if (permanentlyDenied) {
+                    showCameraPermissionSettingsGuide();
+                } else {
+                    showError("未获得相机权限，无法使用本机摄像头");
+                }
             }
             return;
         }
@@ -11654,11 +11663,30 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     localCameraConnecting = false;
                     localCameraConnected = false;
-                    lastConnectionError = error.getMessage() != null
+                    String message = error.getMessage() != null
                             ? error.getMessage()
                             : tr("连接失败");
+                    if (error instanceof CameraAccessException) {
+                        switch (((CameraAccessException) error).getReason()) {
+                            case CameraAccessException.CAMERA_IN_USE:
+                                message = tr(
+                                        "本机摄像头正被其他应用占用，请先关闭占用相机的应用");
+                                break;
+                            case CameraAccessException.MAX_CAMERAS_IN_USE:
+                                message = tr(
+                                        "本机摄像头已达同时使用上限，请先关闭其他相机应用");
+                                break;
+                            case CameraAccessException.CAMERA_DISABLED:
+                                message = tr(
+                                        "本机摄像头已被系统禁用，请在系统设置中检查相机权限");
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    lastConnectionError = message;
                     updateConnectionUi();
-                    showError(error.getMessage());
+                    showError(message);
                 });
             }
         });
@@ -13115,6 +13143,35 @@ public final class MainActivity extends Activity {
                 .setTitle("帧澈 ZENCHE")
                 .setMessage(tr(message == null ? "原生相机操作失败。" : message))
                 .setPositiveButton(tr("好"), null)
+                .show();
+    }
+
+    /** 相机权限被永久拒绝（勾选"不再询问"）时引导跳系统应用设置页。 */
+    private void showCameraPermissionSettingsGuide() {
+        diagnostics.error(
+                "local-camera",
+                "相机权限被永久拒绝，引导用户前往系统设置");
+        new AlertDialog.Builder(this)
+                .setTitle("需要相机权限")
+                .setMessage(
+                        "本机摄像头权限已被永久拒绝。"
+                                + "请前往系统设置开启相机权限后再试。")
+                .setNegativeButton(tr("取消"), null)
+                .setPositiveButton(tr("去设置"), (dialog, which) -> {
+                    Intent intent = new Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    try {
+                        startActivity(intent);
+                    } catch (RuntimeException error) {
+                        diagnostics.error(
+                                "local-camera",
+                                "无法打开系统设置："
+                                        + error.getMessage());
+                        showToast(
+                                "无法打开系统设置，请在系统设置中手动开启相机权限");
+                    }
+                })
                 .show();
     }
 
