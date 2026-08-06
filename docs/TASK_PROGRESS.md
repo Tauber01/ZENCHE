@@ -761,3 +761,23 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **构建**：Windows dotnet build Release **0 错误**（修 3 处编译期问题：lambda 捕获前声明、WriteUInt64 缺失、ushort 隐式转换）；iOS xcodebuild Release **BUILD SUCCEEDED**；macOS 全量构建（三 SDK env）**成功**（main.swift 编译含全部 UI 接线）；git diff --check 干净。
 - **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E3 待设备实机条目（macOS 遥控 / Windows 遥控 / data-out 相位）。
 - 纪律：PTP/IP 新代码 TBC-awaiting-hardware 标注（macOS UI 接线沿用逻辑层既有标注）；未建 dist（构建脚本中间产物不入库）；打包听 kimi 调度。
+
+## 12.31 v1.5.9 E4：PTP/IP 遥控全端化 Android + Harmony（2026-08-06，kimi 19:26 派工，事件 26a8e55d）
+
+- 背景：E3 合入整合分支 `2a3daa9`（pro 复审 0 阻塞）后接棒，PTP/IP 收官两端。分支 `agent/1.5.9-e4-ptpip-and-har`，基线 `2a3daa9`。事实标准 `docs/PTPIP_PROTOCOL.md` + iOS RemoteCaptureServices.swift + Windows PtpIpCamera.cs（9097944）。
+- **Android**（MainActivity.java + PtpIpCamera.java，Java）：
+  - 传输层 `sendCommandWithDataOut`（DataPhaseInfo=2：请求→StartData(9, 前导 0+TransactionID+TotalLength u64+数据)→EndData(12)→响应），用于 0x1016 与 Canon 0x9110 12B 载荷。
+  - `detectVendor`（0x1001 GetDeviceInfo 数据段 Manufacturer 解析 + 名称启发式回退，`deviceInfoManufacturer`/`readUtf8`/`vendorForManufacturer`/`vendorForName` 同构 iOS/Windows）。
+  - 取景/录像/参数方法：Nikon 0x9201/0x9202/0x9203/0x920a/0x920b、Canon 0x9110 EVF 序列（条件写 `(cur&~1)==0`）+ 0x9153 dataset type 1/9/11 取帧；参数 ISO 0x500f/光圈 0x5007/快门 0x500d，Canon 写走 0x9110。
+  - UI 接线：`wifiSourceActive()`（USB > 本机 > Wi‑Fi）、`refreshWifiParameters()`（UINT16/UINT16×100/UINT32×10000 小端，单属性失败容忍）、`stepWifiIso/Aperture/Shutter`（阶梯 + firstAtLeast）、`updateWifiControlCard()`、断连/重连清理与恢复（detectVendor→自动取景→参数刷新）。
+  - **快门步进语义修正**：Windows E3 用降序分母 + FindIndex 恒命中首档（TBC 未真机验证的缺陷）；Android/Harmony 改升序秒值正确定位，注释注明差异。
+  - 验证：javac 0 错误；`:app:assembleDebug` BUILD SUCCESSFUL（仅既有 deprecation 警告）。
+- **Harmony**（PtpIpCamera.ets + Index.ets，ArkTS）：
+  - PtpIpCamera.ets 新增 `CameraVendor` 枚举、16 个 opcode 常量、状态 getter（vendor/isLiveView/isMovieRecording）、detectVendor/startLiveView/stopLiveView/getLiveViewFrame/startMovieRecording/stopMovieRecording/readProperty/readPropertyDescriptor/writeProperty/canonWriteEosProp/canonOpenLiveView/readEosPropValue/extractEosJpeg/extractJpeg/sendCommandWithDataOut；模块级 helper 补齐 `appendU64`/`deviceInfoManufacturer`/`vendorForManufacturer`/`vendorForName`/Uint8Array 版 `readUtf8`（与 Android 字节级同构）。
+  - Index.ets UI 接线：`WifiCameraTransferSection` 新增控制卡（实时取景/录制钮 + 参数读数 + ISO/光圈/快门 `WifiStepperRow`）；`connectWifiCamera`/`attemptWifiReconnect` 成功路径 detectVendor→自动取景→参数刷新；`disconnectWifiCamera`/`enterWifiReconnecting` 停取景/清录像/清厂商；`toggleLiveView`/`toggleVideoRecording` 按源路由（Wi‑Fi 走机身录像，不触外录路径）；`startPreviewLoop` 按源取帧；监看页/全屏按钮 enabled 扩展 Wi‑Fi。
+  - 无 autoStartLiveViewOnConnect 门控（kimi 派工：Apple 双端私有需求，Android/Harmony 保持连上即拉帧）。
+- **B2 心跳契约不动**：0x1002 探测、5s/3s×3、退避 1-30s 未改（diff 无 probe 改动）。
+- **契约锚点**：native-ptpip-capabilities.test.mjs 新增 4 用例（Android 传输/UI、Harmony 传输/UI 具体符号断言）。该文件 14/14 全绿。
+- **构建**：Harmony 干净 assembleHap（rm -rf entry/build .hvigor，DevEco jbr + DEVECO_SDK_HOME）**BUILD SUCCESSFUL**（CompileArkTS 实跑 ~5s，unsigned HAP）；Android assembleDebug 通过；npm test 全量（见交付报告）。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E4 待设备实机条目（Android 遥控 / Harmony 遥控 / data-out 相位）。
+- 纪律：PTP/IP 新代码 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。

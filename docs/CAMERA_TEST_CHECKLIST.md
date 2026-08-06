@@ -120,6 +120,21 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] Enabling 2× input sampling priority requests a higher format where available
       and falls back to the closest device-supported format without stopping preview.
 
+## Android / Harmony PTP/IP 遥控 — E4 1.5.9（待设备，TBC-awaiting-hardware）
+
+- [ ] **Android Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后自动识别厂商
+      （GetDeviceInfo 0x1001 + 名称启发式），尼康/佳能自动开实时取景并拉帧
+      （约 10fps）；Wi‑Fi 控制卡「开启/停止实时取景」「开始/停止录制」可用；
+      ISO/光圈/快门步进写入后读回一致；录像文件保存在相机卡内；断连/重连后
+      取景与参数自动恢复（对齐 Windows E3 行为）。
+- [ ] **Harmony Wi‑Fi 遥控**：连接后自动识别厂商并开实时取景；控制卡
+      「实时取景/录制」按钮与 ISO/光圈/快门步进行可用；预览循环按源路由
+      （USB > 本机 > Wi‑Fi）取帧；断连/重连恢复取景与参数；录像走机身
+      （文件在相机卡内）。
+- [ ] **PTP/IP data-out 相位**（Android/Harmony 新增）：SetDevicePropValue
+      (0x1016) 与 Canon 0x9110 经 请求→StartData(9)→EndData(12)→响应 相位
+      写入成功，机身数值变化（对齐 docs/PTPIP_PROTOCOL.md 与 E3 两端）。
+
 ## macOS / Windows PTP/IP 遥控 — E3 1.5.9（待设备，TBC-awaiting-hardware）
 
 - [ ] **macOS Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后，监看页与全屏取景显示

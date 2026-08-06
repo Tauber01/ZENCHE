@@ -174,3 +174,114 @@ test('E3: Windows PtpIpCamera exposes data-out, vendor detect, live view, record
   assert.match(window, /WifiStepperRow/);
   assert.match(window, /DetectVendorAsync/);
 });
+
+test('E4: Android PtpIpCamera exposes data-out, vendor detect, live view, record, params', async () => {
+  const transport = await read(
+    'native/android/app/src/main/java/com/tauber/nikonlink/PtpIpCamera.java');
+  // data-out 相位（DataPhaseInfo=2：请求→StartData(9)→EndData(12)→响应）
+  assert.match(transport, /sendCommandWithDataOut/);
+  assert.match(transport, /request\.u32\(2\)/);
+  assert.match(transport, /startData\.u64\(data\.length\)/);
+  // 厂商识别：0x1001 GetDeviceInfo + 名称启发式
+  assert.match(transport, /detectVendor/);
+  assert.match(transport, /0x1001/);
+  assert.match(transport, /vendorForManufacturer/);
+  assert.match(transport, /vendorForName/);
+  // 取景/录像/参数方法（Nikon opcode + Canon EOS 序列）
+  assert.match(transport, /startLiveView/);
+  assert.match(transport, /stopLiveView/);
+  assert.match(transport, /getLiveViewFrame/);
+  assert.match(transport, /startMovieRecording/);
+  assert.match(transport, /stopMovieRecording/);
+  assert.match(transport, /writeProperty/);
+  assert.match(transport, /0x9201/);
+  assert.match(transport, /0x9203/);
+  assert.match(transport, /0x920a/);
+  assert.match(transport, /0x9153/);
+  assert.match(transport, /0x500f/);
+  assert.match(transport, /0x5007/);
+  assert.match(transport, /0x500d/);
+  assert.match(transport, /TBC-awaiting-hardware/);
+});
+
+test('E4: Android MainActivity wires wifi live view, body recording, parameter steppers', async () => {
+  const main = await read(
+    'native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java');
+  // 源优先级 + 厂商录像门控（USB > 本机 > Wi‑Fi）
+  assert.match(main, /wifiSourceActive\(\)/);
+  assert.match(main, /wifiVendorSupportsRecording\(\)/);
+  // 控制卡：取景/录像按钮 + 参数读数 + ISO/光圈/快门步进
+  assert.match(main, /updateWifiControlCard\(\)/);
+  assert.match(main, /wifiLiveViewButton/);
+  assert.match(main, /wifiRecordButton/);
+  assert.match(main, /wifiParameterReadoutView/);
+  assert.match(main, /stepWifiIso/);
+  assert.match(main, /stepWifiAperture/);
+  assert.match(main, /stepWifiShutter/);
+  assert.match(main, /refreshWifiParameters\(\)/);
+  // 连接/重连成功路径：detectVendor → 自动取景 → 参数刷新
+  assert.match(main, /detectVendor\(\)/);
+  assert.match(main, /startLiveView\(\)/);
+  assert.match(main, /refreshWifiParameters\(\)/);
+  // 断连/离线清理：停取景/停录像/清厂商
+  assert.match(main, /stopLiveView\(\)/);
+  assert.match(main, /wifiMovieRecording = false/);
+  assert.match(main, /wifiVendor = PtpIpCamera\.CameraVendor\.UNKNOWN/);
+  assert.match(main, /TBC-awaiting-hardware/);
+});
+
+test('E4: Harmony PtpIpCamera exposes data-out, vendor detect, live view, record, params', async () => {
+  const transport = await read(
+    'native/harmony/entry/src/main/ets/camera/PtpIpCamera.ets');
+  // data-out 相位（DataPhaseInfo=2：请求→StartData(9)→EndData(12)→响应）
+  assert.match(transport, /sendCommandWithDataOut/);
+  assert.match(transport, /appendU32\(request, 2\)/);
+  assert.match(transport, /appendU64\(startData, data\.length\)/);
+  // 厂商识别：0x1001 GetDeviceInfo + 名称启发式 + Manufacturer 解析
+  assert.match(transport, /detectVendor/);
+  assert.match(transport, /0x1001/);
+  assert.match(transport, /deviceInfoManufacturer/);
+  assert.match(transport, /vendorForManufacturer/);
+  assert.match(transport, /vendorForName/);
+  // 取景/录像/参数方法（Nikon opcode + Canon EOS 序列）
+  assert.match(transport, /startLiveView/);
+  assert.match(transport, /stopLiveView/);
+  assert.match(transport, /getLiveViewFrame/);
+  assert.match(transport, /startMovieRecording/);
+  assert.match(transport, /stopMovieRecording/);
+  assert.match(transport, /writeProperty/);
+  assert.match(transport, /0x9201/);
+  assert.match(transport, /0x9203/);
+  assert.match(transport, /0x920a/);
+  assert.match(transport, /0x9153/);
+  assert.match(transport, /0x500f/);
+  assert.match(transport, /0x5007/);
+  assert.match(transport, /0x500d/);
+  assert.match(transport, /TBC-awaiting-hardware/);
+});
+
+test('E4: Harmony Index wires wifi live view, body recording, parameter steppers', async () => {
+  const main = await read(
+    'native/harmony/entry/src/main/ets/pages/Index.ets');
+  // 源优先级 + 厂商录像门控（USB > 本机 > Wi‑Fi）
+  assert.match(main, /wifiSourceActive\(\)/);
+  assert.match(main, /wifiVendorSupportsRecording\(\)/);
+  // 控制卡：取景/录像按钮 + 参数读数 + ISO/光圈/快门步进
+  assert.match(main, /WifiStepperRow/);
+  assert.match(main, /stepWifiIso/);
+  assert.match(main, /stepWifiAperture/);
+  assert.match(main, /stepWifiShutter/);
+  assert.match(main, /refreshWifiParameters\(\)/);
+  assert.match(main, /wifiParameterReadout/);
+  // 连接/重连成功路径：detectVendor → 自动取景 → 参数刷新
+  assert.match(main, /detectVendor\(\)/);
+  assert.match(main, /startLiveView\(\)/);
+  assert.match(main, /refreshWifiParameters\(\)/);
+  // 预览循环按源路由（Wi‑Fi 源调 wifiCamera.getLiveViewFrame）
+  assert.match(main, /wifiCamera\.getLiveViewFrame\(\)/);
+  // 断连/离线清理：停取景/停录像/清厂商
+  assert.match(main, /wifiCamera\.stopLiveView\(\)/);
+  assert.match(main, /wifiMovieRecording = false/);
+  assert.match(main, /wifiVendor = CameraVendor\.UNKNOWN/);
+  assert.match(main, /TBC-awaiting-hardware/);
+});

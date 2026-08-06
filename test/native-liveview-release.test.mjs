@@ -40,9 +40,12 @@ test("Android: generation-guarded single-frame pump stops and releases on 3 stri
 
 test("HarmonyOS: failure loop stops live view and releases after 3 strikes", async () => {
   const source = await readFile(harmonyPage, "utf8");
+  // E4 1.5.9: startPreviewLoop 按源路由（USB > 本机 > Wi‑Fi），失败路径
+  // 仍是「收尾外录 → 停取景（wifiCamera 或 camera）→ 清 liveView 标志」；
+  // 源分支使 stopLiveView() 到 liveView=false 的间隔变宽，锚点窗口随布局放宽。
   assert.match(
     source,
-    /failures >= 3[\s\S]{0,200}finishExternalRecordingForDisconnect\(\)[\s\S]{0,120}stopLiveView\(\)[\s\S]{0,120}liveView = false;/,
+    /failures >= 3[\s\S]{0,200}finishExternalRecordingForDisconnect\(\)[\s\S]{0,250}stopLiveView\(\)[\s\S]{0,250}liveView = false;/,
     "3 failures must stop live view and clear state",
   );
   assert.match(source, /previewGeneration\+\+/, "stale generation must be invalidated");
