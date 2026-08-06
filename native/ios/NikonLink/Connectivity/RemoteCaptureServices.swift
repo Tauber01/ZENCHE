@@ -570,15 +570,17 @@ private actor PTPIPSession {
 
     // MARK: - C3 能力扩展：厂商识别 / 实时取景 / 录像 / 参数读写
 
-    /// 识别已连机型厂商：优先解析 GetDeviceInfo(0x1002) 数据段中的
-    /// Manufacturer 字段；部分机型对 0x1002 直接回响应（无数据段），
+    /// 识别已连机型厂商：优先解析 GetDeviceInfo(0x1001) 数据段中的
+    /// Manufacturer 字段；部分机型对 0x1001 直接回响应（无数据段），
     /// 此时退回连接握手返回的相机名启发式。结果按会话缓存。
+    /// （E2 1.5.9：0x1002→0x1001——ISO 15740 中 GetDeviceInfo 为 0x1001，
+    /// 0x1002 实为 OpenSession；pro 复审观察项收口。）
     func detectVendor(using cameraName: String) async -> PTPIPCameraVendor {
         if detectedVendor != .unknown { return detectedVendor }
         let nameBased = Self.vendor(forName: cameraName)
         var resolved = nameBased
         if let info = try? await dataRequest(
-            operation: 0x1002,
+            operation: 0x1001,
             parameters: [1]
         ), let manufacturer = deviceInfoManufacturer(info) {
             resolved = Self.vendor(
@@ -1337,6 +1339,9 @@ final class WifiCameraService: ObservableObject {
     /// 判离线后进入 reconnecting：立即尝试一次重连，失败则指数退避。
     private func enterReconnecting() {
         guard case .ready = state else { return }
+        // E2 1.5.9（pro 复审观察项④收口）：链路断开进入重连前先停实时取景，
+        // 避免拉帧循环在已失效会话上继续空转。
+        stopLiveViewIfNeeded()
         state = .reconnecting(attempt: reconnectAttempt)
         status = "Wi‑Fi 链路已断开，正在自动重连…"
         scheduleReconnect()

@@ -29,6 +29,18 @@ Record the camera firmware, lens, USB cable and host OS before testing.
       EVFRecordStatus(0xD1b8)（1=开始 0=停止）；机身出现「录像中」指示、再次
       停止后生成视频文件。实现按 libgphoto2 常量 + digiCamControl/qDslrDashboard
       社区方案，未经实机验证（TBC-awaiting-hardware），实机条目通过后移除该标注。
+- [ ] **Canon EOS 实时取景（待设备，E2 1.5.9）**：Android/Harmony/Windows 在佳能
+      （VID 0x04a9）上取景启停经 EVFMode(0xD1b1)/EVFOutputDevice(0xD1b0) 条件写
+      （EVFOutputDevice 仅 (cur & ~1)==0 时写 2=PC），取帧走 EOS_GetViewFinderData
+      (0x9153) 并解出内嵌 JPEG（EOS dataset type 1/9/11）；视频监看实时刷新、
+      停止取景后机身回到 TFT 显示。实现对齐 libgphoto2 library.c/ptp.c，
+      未经实机验证（TBC-awaiting-hardware），实机条目通过后移除该标注。
+- [ ] **Canon EOS 取景态参数读写（待设备，E2 1.5.9）**：EVF/Movie 态下 ISO/
+      光圈/快门经标准 GetDevicePropValue(0x1015) 读取、经 0x9110 写入（gphoto2
+      对 EOS 属性读同样走标准 0x1015；0x9114 实为 SetRemoteMode 非属性读）；
+      步进后机身数值变化且读回一致。
+- [ ] **macOS Canon 实时取景（待设备，E2 1.5.9）**：gphoto2 厂商中立管道
+      拉取佳能实时取景（未经实机验证）；本批不改 macOS 代码，仅挂条目。
 - [ ] Android displays a USB permission prompt once and reconnects after relaunch.
 - [ ] HarmonyOS displays the system USB permission prompt and reconnects after
       unplug/replug without retaining stale endpoints.

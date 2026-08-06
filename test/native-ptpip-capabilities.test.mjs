@@ -64,6 +64,20 @@ test('iOS vendor detection derives from DeviceInfo manufacturer with name fallba
   assert.match(service, /enum PTPIPCameraVendor: Equatable/);
 });
 
+test('E2 1.5.9: iOS detectVendor 用 GetDeviceInfo(0x1001)，重连先停取景', async () => {
+  const service = await read(
+    'native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift');
+  // 0x1002→0x1001（0x1001 才是 ISO 15740 GetDeviceInfo；0x1002 实为 OpenSession）。
+  assert.match(service, /func detectVendor\(using cameraName: String\)[\s\S]{0,400}0x1001/);
+  // 心跳探测仍走 0x1002（B2 契约不变）。
+  assert.match(service, /operation: 0x1002/);
+  // 重连前先停实时取景（pro 复审观察项④收口）。
+  assert.match(
+    service,
+    /enterReconnecting\(\)[\s\S]{0,300}stopLiveViewIfNeeded\(\)/,
+  );
+});
+
 test('WifiCameraService exposes live view, recording and parameter state', async () => {
   const service = await read(
     'native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift');

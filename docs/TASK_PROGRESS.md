@@ -739,3 +739,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **五端客户端**：更新检查 query 追加 `installId`——Android（SharedPreferences `anonymousInstallId`）、macOS/iOS（UserDefaults `NikonLink.anonymousInstallId`，UUID 首次生成）、Harmony（preferences `anonymousInstallId`，util.generateRandomUUID）、Windows（LocalApplicationData/NikonLink/anonymous-install-id.dat，Guid）。ID 与激活码/设备码无关，关闭自动更新检查即停止上报。
 - **SECURITY.md**：修订「no analytics」措辞——补充匿名/可选/仅存指纹/与照片日志无关的边界说明。
 - 验证：npm test 全量绿（ai-server 45/45 含 L0 3 项、server-update 9/9 含 L1 3 项）；node --check 三文件通过；git diff --check 干净。生产服务器未动（L1 有效性绑定 zenche.top DNS 切换待 Tauber）。
+## 12.29 v1.5.9 E2：佳能 USB 实时取景拉齐三端 + backlog 4 观察项（2026-08-06，kimi 16:05 派工，事件 ac93a279）
+
+- 背景：Tauber 指令「佳能实时取景拉齐尼康同级」。计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E2。基线 `b88c663`，分支 `agent/1.5.9-e2-canon-liveview`，串行批次第一棒（E3/E4/E5 不动）。
+- **三端佳能取帧**（Android PtpCamera.java / Harmony PtpCamera.ets / Windows PtpCamera.cs）：`EOS_GetViewFinderData=0x9153`（参数 0x00200000,0,0，对齐 gphoto2 ptp.c USB trace），start/stop/getLiveViewFrame 改 vendor 分发（Canon 走 EOS 序列，Nikon/Sony 0x9201/0x9202/0x9203 逐字节不变）；EOS dataset（[u32 len][u32 type][payload] 序列）→ 内嵌 JPEG 提取（type 1/9/11，对齐 libgphoto2 library.c ptp_canon_eos_get_viewfinder_image），全部标 TBC-awaiting-hardware。
+- **backlog 4 项收口**：①三端 Canon EVF 乐观置位改确认置位（canonOpenLiveView/CanonOpenLiveViewAsync 返回确认，两写至少一处被接受才置位；录像路径仍 Busy 容忍不阻断）；②EVFOutputDevice 条件写——仅当前值 (cur & ~1)==0 时写 2=PC（读失败回退无条件写，对齐 gphoto2 canon.c）；③iOS detectVendor 0x1002→0x1001（ISO 15740 GetDeviceInfo=0x1001，0x1002 实为 OpenSession；心跳探测仍 0x1002 契约不变）；④iOS enterReconnecting 先 stopLiveViewIfNeeded 再调度重连。
+- **参数 EOS 通道**：读走标准 GetDevicePropValue(0x1015)/GetDevicePropDesc(0x1014)（gphoto2 对 EOS 属性读同样走标准通道；**0x9114 实为 SetRemoteMode 非属性读**——计划口径勘正，注释与 CHECKLIST 已写明）；写经 0x9110 EOS_SetDevicePropValueEx（C2 已有）。videoCodec Canon 维持显式抛错 + E2 边界注释（EOS 通道仅覆盖取景/参数，录制规格需机身选择）。
+- **契约锚点**：test/native-my-devices.test.mjs 新增 E2 用例（三端 0x9153 + dataset type 1/9/11 + 确认置位 + 条件写 + 尼康 0x9203 保留锚点）；test/native-ptpip-capabilities.test.mjs 新增 iOS 用例（detectVendor 0x1001 + 探测 0x1002 保留 + 重连先停取景）。npm test **272/272** 全绿。
+- **构建**：Android assembleDebug SUCCESSFUL、Harmony assembleHap SUCCESSFUL（未签名）、Windows dotnet publish 0 错误（2 既有 warning：PtpCamera.cs:1613 CS8629 + MainWindow.xaml.cs:815 CS0414，与基线一致零新增）；git diff --check 干净。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E2 待设备实机条目（取景启停/取景态参数读写/macOS gphoto2 管道，不改 macOS 码只挂条目）。
+- 纪律：全部佳能新代码 TBC-awaiting-hardware 标注；未建 dist（worktree 内 build 脚本产物为 1.5.8 同名中间件，不入库）；打包听 kimi 调度。

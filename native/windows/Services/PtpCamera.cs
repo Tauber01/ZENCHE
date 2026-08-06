@@ -49,6 +49,11 @@ public sealed class PtpCamera : IDisposable
     private const ushort SonyMovieFileFormat = 0xd241;
     private const ushort CanonEosSetDevicePropValueEx = 0x9110;
     private const ushort CanonLogGamma = 0xd176;
+    // E2 1.5.9：佳能 EOS 取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
+    // - EOS_GetViewFinderData(0x9153)：实时取景取帧，数据段为 EOS dataset
+    //   （[u32 len][u32 type][payload] 序列，JPEG 在 type 1/9/11 载荷中）
+    // - 属性读走标准 GetDevicePropertyValue(0x1015)；0x9114 实为 SetRemoteMode 非属性读
+    private const ushort CanonEosGetViewFinderData = 0x9153;
     // Canon EOS 录像/取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
     // - EVFRecordStatus(0xD1b8)：0=停止录像 1=开始录像（digiCamControl/qDslrDashboard 社区方案）
     // - EVFMode(0xD1b1)：UINT16，0=off 1=on（gphoto2 canon.c 序列）
@@ -347,6 +352,16 @@ public sealed class PtpCamera : IDisposable
             {
                 return;
             }
+            if (Profile?.VendorId == 0x04a9)
+            {
+                // E2 1.5.9：佳能 EOS 取景序列（对齐 libgphoto2 canon.c，TBC-awaiting-hardware）。
+                if (!await CanonOpenLiveViewAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"{CameraName} 未能确认进入佳能实时取景（机身未确认取景输出）。");
+                }
+                return;
+            }
             await TransactAsync(
                 StartLiveViewOperation,
                 null,
@@ -395,6 +410,11 @@ public sealed class PtpCamera : IDisposable
             if (!_liveView)
             {
                 throw new InvalidOperationException("实时取景尚未开启。");
+            }
+            if (Profile?.VendorId == 0x04a9)
+            {
+                // E2 1.5.9：佳能走 EOS_GetViewFinderData(0x9153)（TBC-awaiting-hardware）。
+                return await CanonGetLiveViewFrameAsync(cancellationToken);
             }
             var data = await TransactAsync(
                 GetLiveViewImage,
@@ -542,27 +562,12 @@ public sealed class PtpCamera : IDisposable
         {
             try
             {
-                await CanonWriteEosPropAsync(
-                    CanonEvfMode,
-                    1,
-                    cancellationToken); // TBC-awaiting-hardware
+                await CanonOpenLiveViewAsync(cancellationToken);
             }
             catch (Exception)
             {
-                // 忽略取景开启失败，继续尝试录像
+                // 取景开启失败不阻断录像（Movie 模式 Busy 容忍）。
             }
-            try
-            {
-                await CanonWriteEosPropAsync(
-                    CanonEvfOutputDevice,
-                    2,
-                    cancellationToken); // TBC-awaiting-hardware
-            }
-            catch (Exception)
-            {
-                // 忽略取景输出失败，继续尝试录像
-            }
-            _liveView = true;
         }
         // TBC-awaiting-hardware：EOS 相机开始/停止录像均写 EVFRecordStatus。
         await CanonWriteEosPropAsync(
@@ -580,6 +585,153 @@ public sealed class PtpCamera : IDisposable
             CanonEvfRecordStatus,
             0,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// E2 1.5.9：佳能 EOS 实时取景开启（对齐 libgphoto2 canon.c 序列，
+    /// TBC-awaiting-hardware）：
+    /// 1. EVFMode(0xD1b1) 读当前值，非 1 才写 1（Movie 模式 Busy 容忍）；
+    /// 2. EVFOutputDevice(0xD1b0) 条件写——仅当前值 (cur &amp; ~1) == 0 时写 2
+    ///    （PC 输出位），读失败回退无条件写。
+    /// 返回是否确认进入取景态（两写至少一处被接受/已满足）。
+    /// </summary>
+    private async Task<bool> CanonOpenLiveViewAsync(
+        CancellationToken cancellationToken)
+    {
+        var confirmed = false;
+        // EVFMode：读当前值，非 1 才写（gphoto2「do not set it everytime」）。
+        try
+        {
+            var mode = await CanonReadEosPropValueAsync(
+                (ushort)CanonEvfMode,
+                cancellationToken);
+            if (mode != 1)
+            {
+                try
+                {
+                    await CanonWriteEosPropAsync(
+                        CanonEvfMode,
+                        1,
+                        cancellationToken); // TBC-awaiting-hardware
+                }
+                catch (Exception)
+                {
+                    // Movie 模式下 EVFMode 可能返回 Busy，容忍继续。
+                }
+            }
+            confirmed = true;
+        }
+        catch (Exception)
+        {
+            // 读取失败容忍
+        }
+        // EVFOutputDevice：仅 (cur & ~1) == 0 时写 2（对齐 libgphoto2 canon.c）。
+        try
+        {
+            uint current;
+            try
+            {
+                current = await CanonReadEosPropValueAsync(
+                    (ushort)CanonEvfOutputDevice,
+                    cancellationToken);
+            }
+            catch (Exception)
+            {
+                current = uint.MaxValue; // 读失败回退无条件写
+            }
+            if (current == uint.MaxValue || (current & ~1u) == 0)
+            {
+                try
+                {
+                    await CanonWriteEosPropAsync(
+                        CanonEvfOutputDevice,
+                        2,
+                        cancellationToken); // TBC-awaiting-hardware
+                }
+                catch (Exception)
+                {
+                    // 容忍。
+                }
+            }
+            confirmed = true;
+        }
+        catch (Exception)
+        {
+            // 容忍。
+        }
+        _liveView = confirmed;
+        return confirmed;
+    }
+
+    /// <summary>
+    /// E2 1.5.9：佳能 EOS 实时取景取帧——GetViewFinderData(0x9153)，
+    /// 数据段为 EOS dataset（[u32 len][u32 type][payload] 序列），
+    /// JPEG 在 type 1/9/11 载荷中（TBC-awaiting-hardware）。
+    /// </summary>
+    private async Task<byte[]> CanonGetLiveViewFrameAsync(
+        CancellationToken cancellationToken)
+    {
+        var raw = await TransactAsync(
+            CanonEosGetViewFinderData,
+            [0x00200000u, 0u, 0u],
+            null,
+            12_000,
+            cancellationToken);
+        return ExtractEosJpeg(raw);
+    }
+
+    /// <summary>
+    /// E2 1.5.9：EOS dataset → 内嵌 JPEG 提取。对齐 libgphoto2 library.c
+    /// ptp_canon_eos_get_viewfinder_image 的解析：多个 blob 依
+    /// [u32 len][u32 type][payload] 排列；type 1=常规 JPEG、9=Movie 模式 JPEG、
+    /// 11=JPEG；其余 type 跳过 len 字节。
+    /// </summary>
+    private byte[] ExtractEosJpeg(byte[] source)
+    {
+        var offset = 0;
+        while (offset + 8 <= source.Length)
+        {
+            var len = (int)BinaryPrimitives.ReadUInt32LittleEndian(
+                source.AsSpan(offset, 4));
+            var type = BinaryPrimitives.ReadUInt32LittleEndian(
+                source.AsSpan(offset + 4, 4));
+            if (len < 8 || offset + len > source.Length)
+            {
+                break;
+            }
+            if (type == 1 || type == 9 || type == 11)
+            {
+                // 载荷为 JPEG；再经标记扫描兜底（部分机身载荷带前导头）。
+                return ExtractJpeg(source[offset..(offset + len)]);
+            }
+            offset += len;
+        }
+        throw new IOException(
+            $"{CameraName} 返回的佳能取景数据中没有 JPEG 图像。");
+    }
+
+    /// <summary>
+    /// E2 1.5.9：EOS 属性读取。走标准 GetDevicePropertyValue(0x1015)——gphoto2
+    /// 对 EOS 属性读取同样用标准 0x1015/0x1014；0x9114 实为 SetRemoteMode 非属性读。
+    /// UINT16 属性返回 2 字节，UINT32 返回 4 字节。
+    /// </summary>
+    private async Task<uint> CanonReadEosPropValueAsync(
+        ushort propCode,
+        CancellationToken cancellationToken)
+    {
+        var data = await TransactAsync(
+            GetDevicePropertyValue,
+            [propCode],
+            null,
+            5_000,
+            cancellationToken);
+        if (data.Length < 2)
+        {
+            throw new InvalidOperationException("佳能属性读取返回长度不足。");
+        }
+        return data.Length >= 4
+            ? BinaryPrimitives.ReadUInt32LittleEndian(data)
+            : BinaryPrimitives.ReadUInt16LittleEndian(data);
     }
 
     public async Task<byte[]> CaptureAsync(
@@ -947,6 +1099,8 @@ public sealed class PtpCamera : IDisposable
         }
         if (Profile.VendorId == 0x04a9)
         {
+            // E2 1.5.9 边界：佳能录制格式维持显式抛错——EOS 通道仅覆盖
+            // 取景/参数读写；录制规格需在机身选择（TBC-awaiting-hardware）。
             throw new InvalidOperationException(
                 $"{CameraName} 未报告可写的佳能录制格式属性；" +
                 "规格已展示，请在机身中选择 RAW、XF-HEVC S 或 XF-AVC S。");
@@ -1976,6 +2130,27 @@ public sealed class PtpCamera : IDisposable
         }
         if (!_liveView || !IsConnected)
         {
+            _liveView = false;
+            return;
+        }
+        if (Profile?.VendorId == 0x04a9)
+        {
+            try
+            {
+                // E2 1.5.9：佳能先关 PC 输出再关取景模式（TBC-awaiting-hardware）。
+                await CanonWriteEosPropAsync(
+                    CanonEvfOutputDevice,
+                    0,
+                    cancellationToken);
+                await CanonWriteEosPropAsync(
+                    CanonEvfMode,
+                    0,
+                    cancellationToken);
+            }
+            catch (Exception)
+            {
+                // 忽略关闭失败
+            }
             _liveView = false;
             return;
         }

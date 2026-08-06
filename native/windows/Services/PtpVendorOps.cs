@@ -190,9 +190,9 @@ public sealed class CanonVendorOps : IPtpVendorOps
     // Canon EOS Utility USB captures.
     // These are best-effort mappings; real-hardware validation is required
     // before removing the experimental label.
-    public ushort StartLiveView => 0x9201;       // TBC: Canon uses proprietary LiveView
-    public ushort EndLiveView => 0x9202;         // TBC
-    public ushort GetLiveViewImage => 0x9203;     // TBC
+    public ushort StartLiveView => 0x9201;       // 尼康 opcode；Canon 不经过此处（PtpCamera 对 0x04a9 走 EOS 序列）
+    public ushort EndLiveView => 0x9202;         // 同上
+    public ushort GetLiveViewImage => 0x9203;    // 同上（Canon 用 0x9153 EOS_GetViewFinderData）
     public ushort CaptureToSdram => 0x9207;       // TBC: Canon may use standard InitiateCapture (0x100E)
     // Canon EOS 录像不走单一 opcode：PtpCamera 对 0x04a9 走
     // EOS_SetDevicePropValueEx(0x9110) 写 EVFRecordStatus(0xD1b8) 序列

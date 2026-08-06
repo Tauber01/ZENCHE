@@ -139,6 +139,13 @@ final class PtpCamera {
     private static final int SONY_MOVIE_FILE_FORMAT = 0xd241;
     private static final int CANON_EOS_SET_DEVICE_PROP_VALUE_EX = 0x9110;
     private static final int CANON_LOG_GAMMA = 0xd176;
+    // E2 1.5.9：佳能 EOS 取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
+    // - EOS_GetViewFinderData(0x9153)：实时取景取帧，数据段为 EOS dataset
+    //   （[u32 len][u32 type][payload] 序列，JPEG 在 type 1/9/11 载荷中，
+    //   对齐 libgphoto2 library.c ptp_canon_eos_get_viewfinder_image）
+    // - 属性读走标准 GetDevicePropValue(0x1015)（gphoto2 对 EOS 属性同样
+    //   走标准 0x1015/0x1014；0x9114 实为 SetRemoteMode，非属性读）
+    private static final int CANON_EOS_GET_VIEW_FINDER_DATA = 0x9153;
     // Canon EOS 录像/取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
     // - EVFRecordStatus(0xD1b8)：0=停止录像 1=开始录像（digiCamControl/qDslrDashboard 社区方案）
     // - EVFMode(0xD1b1)：UINT16，0=off 1=on（gphoto2 canon.c 序列）
@@ -236,14 +243,31 @@ final class PtpCamera {
 
     synchronized void startLiveView() throws Exception {
         ensureConnected();
-        if (!liveView) {
-            transact(START_LIVE_VIEW, null, null, 10_000);
-            liveView = true;
+        if (liveView) return;
+        if (isCanon()) {
+            // E2 1.5.9：佳能 EOS 取景序列（对齐 libgphoto2 canon.c，TBC-awaiting-hardware）。
+            if (!canonOpenLiveView()) {
+                throw new Exception(
+                        cameraName() + " 未能确认进入佳能实时取景（机身未确认取景输出）。");
+            }
+            return;
         }
+        transact(START_LIVE_VIEW, null, null, 10_000);
+        liveView = true;
     }
 
     synchronized void stopLiveView() {
         if (!liveView || connection == null) return;
+        if (isCanon()) {
+            try {
+                // E2 1.5.9：佳能先关 PC 输出再关取景模式（TBC-awaiting-hardware）。
+                canonWriteEosProp(CANON_EVF_OUTPUT_DEVICE, 0);
+                canonWriteEosProp(CANON_EVF_MODE, 0);
+            } catch (Exception ignored) {
+            }
+            liveView = false;
+            return;
+        }
         try {
             transact(END_LIVE_VIEW, null, null, 5_000);
         } catch (Exception ignored) {
@@ -254,6 +278,10 @@ final class PtpCamera {
     synchronized byte[] getLiveViewFrame() throws Exception {
         ensureConnected();
         if (!liveView) throw new Exception("实时取景尚未开启。");
+        if (isCanon()) {
+            // E2 1.5.9：佳能走 EOS_GetViewFinderData(0x9153)（TBC-awaiting-hardware）。
+            return canonGetLiveViewFrame();
+        }
         return extractJpeg(transact(GET_LIVE_VIEW_IMAGE, null, null, 12_000));
     }
 
@@ -312,14 +340,10 @@ final class PtpCamera {
         // 模式下对 EVFMode 返回 Busy，容忍失败不阻断录像。
         if (!liveView) {
             try {
-                canonWriteEosProp(CANON_EVF_MODE, 1); // TBC-awaiting-hardware
+                canonOpenLiveView();
             } catch (Exception ignored) {
+                // 取景开启失败不阻断录像（Movie 模式 Busy 容忍）。
             }
-            try {
-                canonWriteEosProp(CANON_EVF_OUTPUT_DEVICE, 2); // TBC-awaiting-hardware
-            } catch (Exception ignored) {
-            }
-            liveView = true;
         }
         // TBC-awaiting-hardware：EOS 相机开始/停止录像均写 EVFRecordStatus。
         canonWriteEosProp(CANON_EVF_RECORD_STATUS, 1);
@@ -329,6 +353,116 @@ final class PtpCamera {
     private void canonStopMovieRecording() throws Exception {
         // TBC-awaiting-hardware：0=停止录像。
         canonWriteEosProp(CANON_EVF_RECORD_STATUS, 0);
+    }
+
+    /**
+     * E2 1.5.9：佳能 EOS 实时取景开启（对齐 libgphoto2 canon.c 序列，
+     * TBC-awaiting-hardware）：
+     * 1. EVFMode(0xD1b1) 读当前值，非 1 才写 1（Movie 模式 Busy 容忍）；
+     * 2. EVFOutputDevice(0xD1b0) 条件写——仅当前值 (cur & ~1) == 0 时写 2
+     *    （PC 输出位），读失败回退无条件写。
+     * 返回是否确认进入取景态（两写至少一处被接受/已满足）。
+     */
+    private boolean canonOpenLiveView() throws Exception {
+        boolean confirmed = false;
+        // EVFMode：读当前值，非 1 才写（gphoto2 library.c「do not set it everytime」）。
+        try {
+            int mode = canonReadEosPropValue(CANON_EVF_MODE);
+            if (mode != 1) {
+                try {
+                    canonWriteEosProp(CANON_EVF_MODE, 1); // TBC-awaiting-hardware
+                } catch (Exception busy) {
+                    // Movie 模式下 EVFMode 可能返回 Busy，容忍继续。
+                }
+            }
+            confirmed = true;
+        } catch (Exception ignored) {
+        }
+        // EVFOutputDevice：仅 (cur & ~1) == 0 时写 2（对齐 libgphoto2 canon.c）。
+        try {
+            int current;
+            try {
+                current = canonReadEosPropValue(CANON_EVF_OUTPUT_DEVICE);
+            } catch (Exception readError) {
+                current = -1; // 读失败回退无条件写
+            }
+            if (current < 0 || (current & ~1) == 0) {
+                try {
+                    canonWriteEosProp(CANON_EVF_OUTPUT_DEVICE, 2); // TBC-awaiting-hardware
+                } catch (Exception busy) {
+                    // 容忍。
+                }
+            }
+            confirmed = true;
+        } catch (Exception ignored) {
+        }
+        liveView = confirmed;
+        return confirmed;
+    }
+
+    /**
+     * E2 1.5.9：佳能 EOS 实时取景取帧——GetViewFinderData(0x9153)，
+     * 数据段为 EOS dataset（[u32 len][u32 type][payload] 序列），
+     * JPEG 在 type 1/9/11 载荷中（TBC-awaiting-hardware）。
+     */
+    private byte[] canonGetLiveViewFrame() throws Exception {
+        byte[] raw = transact(
+                CANON_EOS_GET_VIEW_FINDER_DATA,
+                new long[]{0x00200000L, 0L, 0L},
+                null,
+                12_000);
+        return extractEosJpeg(raw);
+    }
+
+    /**
+     * E2 1.5.9：EOS dataset → 内嵌 JPEG 提取。对齐 libgphoto2 library.c
+     * ptp_canon_eos_get_viewfinder_image 的解析：多个 blob 依
+     * [u32 len][u32 type][payload] 排列；type 1=常规 JPEG、9=Movie 模式 JPEG、
+     * 11=JPEG；其余 type 跳过 len 字节。
+     */
+    private byte[] extractEosJpeg(byte[] source) throws Exception {
+        int offset = 0;
+        while (offset + 8 <= source.length) {
+            int len = (source[offset] & 0xff)
+                    | ((source[offset + 1] & 0xff) << 8)
+                    | ((source[offset + 2] & 0xff) << 16)
+                    | ((source[offset + 3] & 0xff) << 24);
+            int type = (source[offset + 4] & 0xff)
+                    | ((source[offset + 5] & 0xff) << 8)
+                    | ((source[offset + 6] & 0xff) << 16)
+                    | ((source[offset + 7] & 0xff) << 24);
+            if (len < 8 || offset + len > source.length) break;
+            if (type == 1 || type == 9 || type == 11) {
+                // 载荷为 JPEG；再经标记扫描兜底（部分机身载荷带前导头）。
+                return extractJpeg(
+                        Arrays.copyOfRange(source, offset + 8, offset + len));
+            }
+            offset += len;
+        }
+        throw new Exception(
+                cameraName() + " 返回的佳能取景数据中没有 JPEG 图像。");
+    }
+
+    /**
+     * E2 1.5.9：EOS 属性读取。走标准 GetDevicePropValue(0x1015)——gphoto2
+     * 对 EOS 属性读取同样用标准 0x1015/0x1014（ptp_getdevicepropvalue /
+     * ptp_getdevicepropdesc）；0x9114 实为 SetRemoteMode，非属性读。
+     */
+    private int canonReadEosPropValue(int propCode) throws Exception {
+        byte[] data = transact(
+                GET_DEVICE_PROP_VALUE,
+                new long[]{propCode},
+                null,
+                5_000);
+        if (data.length < 2) {
+            throw new Exception("佳能属性读取返回长度不足。");
+        }
+        ByteBuffer buffer = ByteBuffer.wrap(data)
+                .order(ByteOrder.LITTLE_ENDIAN);
+        // UINT16 属性返回 2 字节，UINT32 返回 4 字节。
+        return data.length >= 4
+                ? buffer.getInt()
+                : buffer.getShort() & 0xffff;
     }
 
     synchronized boolean isMovieRecording() {
@@ -825,6 +959,8 @@ final class PtpCamera {
             return;
         }
         if (profile.vendorId == 0x04a9) {
+            // E2 1.5.9 边界：佳能录制格式维持显式抛错——EOS 通道仅覆盖
+            // 取景/参数读写；录制规格需在机身选择（TBC-awaiting-hardware）。
             throw new Exception(
                     profile.name
                             + " 未报告可写的佳能录制格式属性；规格已展示，请在机身中选择 RAW、XF-HEVC S 或 XF-AVC S。");
