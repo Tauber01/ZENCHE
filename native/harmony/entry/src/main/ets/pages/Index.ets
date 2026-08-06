@@ -65,6 +65,8 @@ import {
 } from '../localization/Localization';
 
 const STUDIO_CANVAS: string = '#06090D'; // 沉浸 HUD 底（两处实际使用：L7378/7383）
+// E1: 匿名安装 ID 持久化键（preferences 'zenche-settings'）。
+const INSTALL_ID_KEY: string = 'anonymousInstallId';
 // 1.5.3 studio tokens：STUDIO_PANEL/RAISED/RULE/GOLD 四常量已删（代码零引用死定义，F4
 // 收口）；native-ui-1.5.3 token 契约断言要求源码含 STUDIO_GOLD/STUDIO_PANEL 标识符文本，
 // 故保留于本注释（值语义：暖金标示参数读数、深灰工作台面；编辑器已迁移至 EDITOR_*）。
@@ -13261,10 +13263,24 @@ struct Index {
   private async checkSelfHostedUpdate(): Promise<UpdateCandidate> {
     const request: http.HttpRequest = http.createHttp();
     try {
+      // E1: 匿名安装 ID——首次生成 UUID 存 preferences，与激活码/设备码无关，
+      // 仅用于服务器匿名用量统计（服务端只存 sha256 前 12 位指纹）。
+      let installId: string = '';
+      if (this.settingsPreferences !== undefined) {
+        const saved: preferences.ValueType =
+          await this.settingsPreferences.get(INSTALL_ID_KEY, '');
+        if (typeof saved === 'string' && saved.length > 0) {
+          installId = saved;
+        } else {
+          installId = util.generateRandomUUID();
+          await this.settingsPreferences.put(INSTALL_ID_KEY, installId);
+        }
+      }
       const endpoint: string =
         `${SELF_HOSTED_UPDATE_ENDPOINT}?platform=harmony&arch=arm64`
         + `&current_version=${encodeURIComponent(CURRENT_VERSION)}`
-        + '&channel=stable';
+        + '&channel=stable'
+        + `&installId=${encodeURIComponent(installId)}`;
       const response: http.HttpResponse = await request.request(
         endpoint,
         {

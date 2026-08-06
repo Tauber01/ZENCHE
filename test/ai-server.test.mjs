@@ -867,3 +867,72 @@ test("R6: consume and upstream rollback share the same durable-write path (sourc
   assert.match(source, /storageUnhealthy/, "storage-unhealthy gate must exist");
   assert.match(source, /enterStorageUnhealthy/, "enterStorageUnhealthy must exist");
 });
+
+// ---------- L0: loopback-only /v1/admin/stats ----------
+
+async function startStats(opts = {}) {
+  return start({ adminSecret: "test-admin-secret", ...opts });
+}
+
+test("L0: /v1/admin/stats returns merged totals and remaining buckets", async (t) => {
+  const app = await startStats({
+    enableRebind: true,
+    signNewCodeImpl: async (newDeviceId, expiry) => ({ ok: true, code: makeCode(newDeviceId, expiry) }),
+    rebindIpLimit: 100,
+    rebindActivationLimit: 100,
+    auditLogImpl: () => {},
+  });
+  t.after(async () => { await closeServer(app.server); fs.rmSync(app.cleanupDir, { recursive: true, force: true }); });
+  // 三个激活：dev-A、dev-B 独立；dev-C 走真实 rebind 迁移到 dev-C2。
+  const codeA = makeCode("dev-A");
+  const codeB = makeCode("dev-B");
+  const codeC = makeCode("dev-C");
+  await post(app.port, { activationCode: codeA, deviceId: "dev-A", prompt: "a" });
+  await post(app.port, { activationCode: codeB, deviceId: "dev-B", prompt: "b" });
+  await post(app.port, { activationCode: codeC, deviceId: "dev-C", prompt: "c" });
+  const rebindRes = await fetch(`http://127.0.0.1:${app.port}/v1/ai/rebind`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activationCode: codeC, oldDeviceId: "dev-C", newDeviceId: "dev-C2" }),
+  });
+  assert.equal(rebindRes.status, 200, "rebind must succeed");
+
+  const res = await fetch(`http://127.0.0.1:${app.port}/v1/admin/stats`, {
+    headers: { Authorization: "Bearer test-admin-secret" },
+  });
+  assert.equal(res.status, 200);
+  const stats = await res.json();
+  // 迁移链 dev-C→dev-C2 归并为一台：A + B + (C→C2) = 3 台
+  assert.equal(stats.totalDevices, 3);
+  assert.equal(stats.active24h, 3);
+  assert.equal(stats.active7d, 3);
+  // remaining = 100 - used = 99 → high51to99 桶
+  assert.equal(stats.remainingDistribution.high51to99, 3);
+});
+
+test("L0: resolveMigrationTail collapses migrated chains for stats (source)", async () => {
+  // 迁移归并口径由 resolveMigrationTail 保证；此处锚定 adminStats 调用它。
+  const source = await readFile("ai-server/app.mjs", "utf8");
+  assert.match(source, /resolveMigrationTail\(devices, deviceId\)/, "stats must merge via migration tail");
+  assert.match(source, /function adminStats/, "adminStats must exist");
+});
+
+test("L0: /v1/admin/stats requires loopback + bearer secret (fail-closed)", async (t) => {
+  const app = await start({}); // no adminSecret -> route hidden
+  t.after(async () => { await closeServer(app.server); fs.rmSync(app.cleanupDir, { recursive: true, force: true }); });
+  const noSecret = await fetch(`http://127.0.0.1:${app.port}/v1/admin/stats`);
+  assert.equal(noSecret.status, 404, "no adminSecret -> route must not exist");
+});
+
+test("L0: /v1/admin/stats rejects wrong token and non-GET", async (t) => {
+  const app = await startStats();
+  t.after(async () => { await closeServer(app.server); fs.rmSync(app.cleanupDir, { recursive: true, force: true }); });
+  const wrong = await fetch(`http://127.0.0.1:${app.port}/v1/admin/stats`, {
+    headers: { Authorization: "Bearer nope" },
+  });
+  assert.equal(wrong.status, 401);
+  const postReq = await fetch(`http://127.0.0.1:${app.port}/v1/admin/stats`, {
+    method: "POST", headers: { Authorization: "Bearer test-admin-secret" },
+  });
+  assert.equal(postReq.status, 404, "non-GET on stats -> 404");
+});

@@ -283,6 +283,7 @@ public final class MainActivity extends Activity {
             "https://www.ifdian.net/a/Tauber";
     private static final String ZENCHE_WEBSITE_URL = "https://zenche.top";
     private static final String AUTOMATIC_UPDATE_KEY = "automaticallyCheckForUpdates";
+    private static final String INSTALL_ID_KEY = "anonymousInstallId";
     private static final String DISMISSED_ANNOUNCEMENT_VERSION_KEY =
             "dismissedLaunchAnnouncementVersion";
     private static final String LIBRARY_BRANCHES_KEY = "libraryUserBranches";
@@ -1559,6 +1560,18 @@ public final class MainActivity extends Activity {
         if (id == null) id = java.util.UUID.randomUUID().toString();
         getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .edit().putString("ai_device_id", id).commit();
+        return id;
+    }
+
+    /** E1: 匿名安装 ID——首次生成 UUID 存 SharedPreferences，与激活码/设备码无关，
+     *  仅用于服务器匿名用量统计（服务端只存 sha256 前 12 位指纹）。 */
+    private String anonymousInstallId() {
+        String existing = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString(INSTALL_ID_KEY, "");
+        if (existing != null && !existing.isEmpty()) return existing;
+        String id = java.util.UUID.randomUUID().toString();
+        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .edit().putString(INSTALL_ID_KEY, id).commit();
         return id;
     }
 
@@ -13284,7 +13297,8 @@ public final class MainActivity extends Activity {
                 .appendQueryParameter("platform", "android")
                 .appendQueryParameter("arch", mirrorChyanArchitecture())
                 .appendQueryParameter("current_version", currentVersion())
-                .appendQueryParameter("channel", "stable");
+                .appendQueryParameter("channel", "stable")
+                .appendQueryParameter("installId", anonymousInstallId());
         JSONObject root = requestJson(
                 builder.build().toString(),
                 "ZENCHE-Android/" + currentVersion());

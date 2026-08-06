@@ -116,8 +116,21 @@ final class UpdateController: ObservableObject {
         string: "https://github.com/Tauber01/ZENCHE"
     )!
     private static let automaticUpdateKey = "NikonLink.automaticallyChecksForUpdates"
+    private static let installIdKey = "NikonLink.anonymousInstallId"
     private static let keychainService = "com.tauber.nikonlink.mirrorchyan"
     private static let keychainAccount = "cdk"
+
+    /// E1: 匿名安装 ID——首次生成 UUID 存 UserDefaults，与激活码/设备码无关，
+    /// 仅用于服务器匿名用量统计（服务端只存 sha256 前 12 位指纹）。
+    private static func anonymousInstallId() -> String {
+        if let existing = UserDefaults.standard.string(forKey: Self.installIdKey),
+           !existing.isEmpty {
+            return existing
+        }
+        let id = UUID().uuidString
+        UserDefaults.standard.set(id, forKey: Self.installIdKey)
+        return id
+    }
 
     @Published var automaticallyChecksForUpdates: Bool {
         didSet {
@@ -223,7 +236,8 @@ final class UpdateController: ObservableObject {
             URLQueryItem(name: "platform", value: "ios"),
             URLQueryItem(name: "arch", value: "arm64"),
             URLQueryItem(name: "current_version", value: currentVersion),
-            URLQueryItem(name: "channel", value: "stable")
+            URLQueryItem(name: "channel", value: "stable"),
+            URLQueryItem(name: "installId", value: Self.anonymousInstallId())
         ]
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = 20
