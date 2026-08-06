@@ -81,10 +81,16 @@ final class ExternalVideoRecorder implements AutoCloseable {
     }
 
     synchronized void appendJpeg(byte[] jpeg) throws IOException {
+        appendJpeg(jpeg, true);
+    }
+
+    synchronized void appendJpeg(byte[] jpeg, boolean throttle) throws IOException {
         if (!isRecording() || jpeg == null || jpeg.length == 0) return;
         long now = System.nanoTime();
         long minimumSpacing = 1_000_000_000L / requestedFrameRate;
-        if (lastFrameAtNanos != 0 && now - lastFrameAtNanos < minimumSpacing) {
+        if (throttle
+                && lastFrameAtNanos != 0
+                && now - lastFrameAtNanos < minimumSpacing) {
             return;
         }
         if (output == null) {
