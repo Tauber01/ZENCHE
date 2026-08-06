@@ -24,6 +24,11 @@ Record the camera firmware, lens, USB cable and host OS before testing.
       名称正确、ISO 范围显示 100–102400；Sony/Canon VID 通配（0x054c / 0x04a9）
       不误匹配 Nikon 机型。注：Canon 深度控制（对焦/快门/LiveView 专属 opcode）为
       TBC 未实机验证项，入册仅覆盖识别/名称/ISO 范围/泛型 PTP 连接。
+- [ ] **Canon EOS 录像（待设备，C2 1.5.8）**：Android/Harmony/Windows 在佳能
+      （VID 0x04a9）上开始/停止录像经 EOS_SetDevicePropValueEx(0x9110) 写
+      EVFRecordStatus(0xD1b8)（1=开始 0=停止）；机身出现「录像中」指示、再次
+      停止后生成视频文件。实现按 libgphoto2 常量 + digiCamControl/qDslrDashboard
+      社区方案，未经实机验证（TBC-awaiting-hardware），实机条目通过后移除该标注。
 - [ ] Android displays a USB permission prompt once and reconnects after relaunch.
 - [ ] HarmonyOS displays the system USB permission prompt and reconnects after
       unplug/replug without retaining stale endpoints.

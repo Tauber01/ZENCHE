@@ -61,3 +61,27 @@ test('all native packages include Nikon, Sony, and Canon camera photos', async (
   assert.match(windowsProject, /camera-sony\.jpg/);
   assert.match(windowsProject, /camera-canon\.jpg/);
 });
+
+test('Canon movie recording uses EOS EVFRecordStatus path on Android/Harmony/Windows (C2)', async () => {
+  const [android, harmony, windows, windowsOps] = await Promise.all([
+    read('native/android/app/src/main/java/com/tauber/nikonlink/PtpCamera.java'),
+    read('native/harmony/entry/src/main/ets/camera/PtpCamera.ets'),
+    read('native/windows/Services/PtpCamera.cs'),
+    read('native/windows/Services/PtpVendorOps.cs'),
+  ]);
+
+  for (const source of [android, harmony, windows]) {
+    // 佳能（VID 0x04a9）录像必须走 EOS 属性写路径：0x9110 + EVFRecordStatus 0xD1b8。
+    assert.match(source, /0x9110/);
+    assert.match(source, /0xd1b8|0xD1b8/);
+    // 佳能分支必须存在（vendor 判定 + 录像启停走 EVFRecordStatus）。
+    assert.match(source, /0x04a9/);
+    assert.match(source, /EVF_RECORD_STATUS|CanonEvfRecordStatus/);
+  }
+
+  // 尼康/索尼路径保持尼康 opcode（0x920a/0x920b），不被佳能分支吞掉。
+  assert.match(android, /START_MOVIE_RECORDING/);
+  assert.match(harmony, /START_MOVIE_RECORDING/);
+  assert.match(windows, /_vendorOps\.StartMovieRecording/);
+  assert.match(windowsOps, /0x920a/);
+});

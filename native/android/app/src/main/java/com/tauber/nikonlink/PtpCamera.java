@@ -139,6 +139,13 @@ final class PtpCamera {
     private static final int SONY_MOVIE_FILE_FORMAT = 0xd241;
     private static final int CANON_EOS_SET_DEVICE_PROP_VALUE_EX = 0x9110;
     private static final int CANON_LOG_GAMMA = 0xd176;
+    // Canon EOS 录像/取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
+    // - EVFRecordStatus(0xD1b8)：0=停止录像 1=开始录像（digiCamControl/qDslrDashboard 社区方案）
+    // - EVFMode(0xD1b1)：UINT16，0=off 1=on（gphoto2 canon.c 序列）
+    // - EVFOutputDevice(0xD1b0)：UINT32 mask，bit0=TFT bit1=PC，2=PC（gphoto2 canon.c 序列）
+    private static final int CANON_EVF_RECORD_STATUS = 0xd1b8;
+    private static final int CANON_EVF_MODE = 0xd1b1;
+    private static final int CANON_EVF_OUTPUT_DEVICE = 0xd1b0;
     private static final int USB_BULK_CHUNK_BYTES =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
                     ? 64 * 1024
@@ -253,6 +260,10 @@ final class PtpCamera {
     synchronized void startMovieRecording() throws Exception {
         ensureConnected();
         if (movieRecording) return;
+        if (isCanon()) {
+            canonStartMovieRecording();
+            return;
+        }
         if (!liveView) startLiveView();
         transact(START_MOVIE_RECORDING, null, null, 15_000);
         movieRecording = true;
@@ -261,11 +272,63 @@ final class PtpCamera {
     synchronized void stopMovieRecording() throws Exception {
         ensureConnected();
         if (!movieRecording) return;
+        if (isCanon()) {
+            try {
+                canonStopMovieRecording();
+            } finally {
+                movieRecording = false;
+            }
+            return;
+        }
         try {
             transact(END_MOVIE_RECORDING, null, null, 15_000);
         } finally {
             movieRecording = false;
         }
+    }
+
+    private boolean isCanon() {
+        return profile != null && profile.vendorId == 0x04a9;
+    }
+
+    /**
+     * 佳能 EOS 录像启停：经 EOS_SetDevicePropValueEx(0x9110) 写
+     * EVFRecordStatus(0xD1b8)，0=停止录像、1=开始录像。
+     * 参照 libgphoto2 常量与 digiCamControl/qDslrDashboard 社区方案实现，
+     * 未在佳能实机验证（TBC-awaiting-hardware）。
+     */
+    private void canonWriteEosProp(int propCode, int value) throws Exception {
+        byte[] payload = new byte[12];
+        ByteBuffer buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(12);
+        buffer.putInt(propCode);
+        buffer.putInt(value);
+        transact(CANON_EOS_SET_DEVICE_PROP_VALUE_EX, null, payload, 10_000);
+    }
+
+    private void canonStartMovieRecording() throws Exception {
+        // 未处于取景态时，先按 gphoto2 canon.c 序列开启实时取景：
+        // EVFMode=1（on）+ EVFOutputDevice 置 PC 位（2）。部分机型在 Movie
+        // 模式下对 EVFMode 返回 Busy，容忍失败不阻断录像。
+        if (!liveView) {
+            try {
+                canonWriteEosProp(CANON_EVF_MODE, 1); // TBC-awaiting-hardware
+            } catch (Exception ignored) {
+            }
+            try {
+                canonWriteEosProp(CANON_EVF_OUTPUT_DEVICE, 2); // TBC-awaiting-hardware
+            } catch (Exception ignored) {
+            }
+            liveView = true;
+        }
+        // TBC-awaiting-hardware：EOS 相机开始/停止录像均写 EVFRecordStatus。
+        canonWriteEosProp(CANON_EVF_RECORD_STATUS, 1);
+        movieRecording = true;
+    }
+
+    private void canonStopMovieRecording() throws Exception {
+        // TBC-awaiting-hardware：0=停止录像。
+        canonWriteEosProp(CANON_EVF_RECORD_STATUS, 0);
     }
 
     synchronized boolean isMovieRecording() {
