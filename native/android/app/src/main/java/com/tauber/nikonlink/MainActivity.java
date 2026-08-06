@@ -1397,6 +1397,19 @@ public final class MainActivity extends Activity {
     private volatile int wifiReconnectAttempt;
     private volatile String wifiCameraHost = "192.168.1.1";
     private volatile int wifiCameraPort = 15740;
+    // ── E4 1.5.9：Wi‑Fi PTP/IP 取景 / 录像 / 参数控制 ──
+    private volatile PtpIpCamera.CameraVendor wifiVendor =
+            PtpIpCamera.CameraVendor.UNKNOWN;
+    private volatile boolean wifiLiveView;
+    private volatile boolean wifiMovieRecording;
+    private volatile int wifiIso;
+    private volatile double wifiAperture;
+    private volatile double wifiShutterSeconds;
+    private volatile int wifiPreviewGeneration;
+    private volatile String wifiParameterReadout = "参数待读取 · 连接后自动刷新";
+    private TextView wifiParameterReadoutView;
+    private Button wifiLiveViewButton;
+    private Button wifiRecordButton;
     private ConnectivityManager.NetworkCallback wifiNetworkCallback;
     private final Runnable wifiHeartbeatRunnable = new Runnable() {
         @Override public void run() {
@@ -10776,7 +10789,283 @@ public final class MainActivity extends Activity {
             connectWifiCamera(targetHost, targetPort, targetMode);
         });
         wifiCard.addView(wifiButton, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        // ── E4 1.5.9：Wi‑Fi PTP/IP 控制卡（取景 / 录像 / 参数步进，镜像
+        //    Windows E3 MainWindow.xaml.cs 接法；全部 TBC-awaiting-hardware）──
+        wifiCard.addView(text(
+                "Wi‑Fi 相机控制 · PTP/IP",
+                TS_BODY,
+                Typeface.BOLD,
+                MUTED),
+                marginParams(-1, -2, 0, 18, 0, 6));
+        wifiLiveViewButton = nativeButton(
+                wifiLiveView ? "停止实时取景" : "开启实时取景",
+                wifiConnected);
+        wifiLiveViewButton.setOnClickListener(view -> toggleLiveView());
+        wifiCard.addView(wifiLiveViewButton, marginParams(-1, dp(44), 0, 0, 0, 6));
+        wifiRecordButton = nativeButton(
+                wifiMovieRecording ? "停止录制" : "开始录制",
+                wifiConnected && wifiVendorSupportsRecording());
+        wifiRecordButton.setOnClickListener(view -> toggleVideoRecording());
+        wifiCard.addView(wifiRecordButton, marginParams(-1, dp(44), 0, 0, 0, 10));
+        wifiParameterReadoutView = text(
+                wifiParameterReadout,
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED);
+        wifiCard.addView(
+                wifiParameterReadoutView,
+                marginParams(-1, -2, 0, 0, 0, 10));
+        wifiCard.addView(wifiStepperRow(
+                "ISO",
+                view -> stepWifiIso(-1),
+                view -> stepWifiIso(1)),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        wifiCard.addView(wifiStepperRow(
+                "光圈",
+                view -> stepWifiAperture(-1),
+                view -> stepWifiAperture(1)),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        wifiCard.addView(wifiStepperRow(
+                "快门",
+                view -> stepWifiShutter(-1),
+                view -> stepWifiShutter(1)),
+                marginParams(-1, -2, 0, 0, 0, 6));
+        updateWifiControlCard();
         return wifiCard;
+    }
+
+    /** E4：Wi‑Fi 源是否当前取景/录像的数据源（优先级：USB > 本机摄像头 > Wi‑Fi）。 */
+    private boolean wifiSourceActive() {
+        return wifiConnected && !connected && !localCameraConnected;
+    }
+
+    private boolean wifiVendorSupportsRecording() {
+        return wifiVendor == PtpIpCamera.CameraVendor.NIKON
+                || wifiVendor == PtpIpCamera.CameraVendor.CANON;
+    }
+
+    /** E4：Wi‑Fi 控制卡状态刷新（可见性/文案/可用性，镜像 Windows UpdateWifiControlState）。 */
+    private void updateWifiControlCard() {
+        boolean connected = wifiConnected;
+        if (wifiLiveViewButton != null) {
+            wifiLiveViewButton.setVisibility(connected ? View.VISIBLE : View.GONE);
+            wifiLiveViewButton.setText(tr(
+                    wifiLiveView ? "停止实时取景" : "开启实时取景"));
+            wifiLiveViewButton.setEnabled(connected);
+        }
+        if (wifiRecordButton != null) {
+            wifiRecordButton.setVisibility(connected ? View.VISIBLE : View.GONE);
+            wifiRecordButton.setText(tr(
+                    wifiMovieRecording ? "停止录制" : "开始录制"));
+            wifiRecordButton.setEnabled(connected && wifiVendorSupportsRecording());
+        }
+        if (wifiParameterReadoutView != null) {
+            wifiParameterReadoutView.setVisibility(
+                    connected ? View.VISIBLE : View.GONE);
+            wifiParameterReadoutView.setText(wifiParameterReadout);
+        }
+    }
+
+    /**
+     * E4：从 Wi‑Fi 相机读取 ISO/光圈/快门并刷新本地字段与读数
+     * （镜像 Windows RefreshWifiParametersAsync；单属性失败不阻断其余；
+     * 须在 cameraExecutor 上调用；TBC-awaiting-hardware）。
+     * 解码口径与 Windows 一致：ISO UINT16；光圈 UINT16（f 数×100）；
+     * 快门 UINT32（秒×10000），均小端。
+     */
+    private void refreshWifiParameters() {
+        if (!wifiConnected) return;
+        try {
+            byte[] iso = wifiCamera.readProperty(0x500f);
+            if (iso.length >= 2) {
+                wifiIso = (iso[0] & 0xff) | ((iso[1] & 0xff) << 8);
+            }
+        } catch (Exception error) {
+            diagnostics.warning("wifi-params",
+                    "读取 Wi‑Fi ISO 失败：" + error.getMessage());
+        }
+        try {
+            byte[] aperture = wifiCamera.readProperty(0x5007);
+            if (aperture.length >= 2) {
+                int scaled = (aperture[0] & 0xff)
+                        | ((aperture[1] & 0xff) << 8);
+                wifiAperture = scaled / 100.0;
+            }
+        } catch (Exception error) {
+            diagnostics.warning("wifi-params",
+                    "读取 Wi‑Fi 光圈失败：" + error.getMessage());
+        }
+        try {
+            byte[] shutter = wifiCamera.readProperty(0x500d);
+            if (shutter.length >= 4) {
+                long scaled = (shutter[0] & 0xffL)
+                        | ((shutter[1] & 0xffL) << 8)
+                        | ((shutter[2] & 0xffL) << 16)
+                        | ((shutter[3] & 0xffL) << 24);
+                wifiShutterSeconds = scaled / 10000.0;
+            }
+        } catch (Exception error) {
+            diagnostics.warning("wifi-params",
+                    "读取 Wi‑Fi 快门失败：" + error.getMessage());
+        }
+        wifiParameterReadout = wifiParameterReadoutText();
+        mainHandler.post(() -> {
+            if (wifiParameterReadoutView != null) {
+                wifiParameterReadoutView.setText(wifiParameterReadout);
+            }
+            updateWifiControlCard();
+        });
+    }
+
+    /** E4：读数文案（镜像 Windows UpdateWifiParameterReadout）。 */
+    private String wifiParameterReadoutText() {
+        String shutter = wifiShutterSeconds > 0
+                ? (wifiShutterSeconds >= 1
+                        ? String.format(Locale.ROOT, "%.2g″",
+                                wifiShutterSeconds)
+                        : "1/" + Math.max(1,
+                                (int) Math.round(1.0 / wifiShutterSeconds)))
+                : "—";
+        String aperture = wifiAperture > 0
+                ? String.format(Locale.ROOT, "f/%.1f", wifiAperture)
+                : "—";
+        String iso = wifiIso > 0 ? String.valueOf(wifiIso) : "—";
+        return tr(String.format(Locale.ROOT,
+                "ISO %s · %s · %s", iso, aperture, shutter));
+    }
+
+    /** E4：步进 Wi‑Fi ISO（镜像 Windows StepWifiIsoAsync；TBC）。 */
+    private void stepWifiIso(int delta) {
+        if (!wifiConnected) return;
+        cameraExecutor.submit(() -> {
+            try {
+                int[] ladder = new int[]{
+                        64, 80, 100, 125, 160, 200, 250, 320, 400, 500,
+                        640, 800, 1000, 1250, 1600, 2000, 2500, 3200,
+                        4000, 5000, 6400, 8000, 10000, 12800, 16000,
+                        20000, 25600, 32000, 40000, 51200, 64000, 102400};
+                int index = firstAtLeast(ladder, wifiIso);
+                int next = Math.max(0,
+                        Math.min(ladder.length - 1, index + delta));
+                byte[] payload = new byte[]{
+                        (byte) ladder[next],
+                        (byte) (ladder[next] >> 8)};
+                wifiCamera.writeProperty(0x500f, payload);
+                refreshWifiParameters();
+            } catch (Exception error) {
+                diagnostics.error("wifi-params",
+                        "写入 Wi‑Fi ISO 失败：" + error.getMessage());
+                mainHandler.post(() -> showError(
+                        tr(String.format(Locale.ROOT,
+                                "写入 Wi‑Fi ISO 失败：%s",
+                                error.getMessage()))));
+            }
+        });
+    }
+
+    /** E4：步进 Wi‑Fi 光圈（镜像 Windows StepWifiApertureAsync；TBC）。 */
+    private void stepWifiAperture(int delta) {
+        if (!wifiConnected) return;
+        cameraExecutor.submit(() -> {
+            try {
+                double[] ladder = new double[]{
+                        1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5,
+                        4.0, 4.5, 5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10.0,
+                        11.0, 13.0, 14.0, 16.0, 18.0, 20.0, 22.0};
+                int index = firstAtLeast(ladder, wifiAperture - 0.01);
+                int next = Math.max(0,
+                        Math.min(ladder.length - 1, index + delta));
+                int scaled = (int) Math.round(ladder[next] * 100);
+                byte[] payload = new byte[]{
+                        (byte) scaled,
+                        (byte) (scaled >> 8)};
+                wifiCamera.writeProperty(0x5007, payload);
+                refreshWifiParameters();
+            } catch (Exception error) {
+                diagnostics.error("wifi-params",
+                        "写入 Wi‑Fi 光圈失败：" + error.getMessage());
+                mainHandler.post(() -> showError(
+                        tr(String.format(Locale.ROOT,
+                                "写入 Wi‑Fi 光圈失败：%s",
+                                error.getMessage()))));
+            }
+        });
+    }
+
+    /** E4：步进 Wi‑Fi 快门（数值镜像 Windows StepWifiShutterAsync；TBC）。 */
+    private void stepWifiShutter(int delta) {
+        if (!wifiConnected) return;
+        cameraExecutor.submit(() -> {
+            try {
+                // 快门档位（秒），升序：1/8000 → 1″。注：Windows E3 用降序
+                // 分母 + Array.FindIndex(1.0/d <= seconds) 恒命中首档（TBC
+                // 未真机验证的缺陷）；此处以升序秒值正确定位当前档。
+                double[] ladder = new double[]{
+                        1.0 / 8000, 1.0 / 4000, 1.0 / 2000, 1.0 / 1000,
+                        1.0 / 500, 1.0 / 250, 1.0 / 125, 1.0 / 60,
+                        1.0 / 30, 1.0 / 15, 1.0 / 8, 1.0 / 4, 1.0 / 2, 1.0};
+                int index = firstAtLeast(ladder, wifiShutterSeconds - 0.00001);
+                int next = Math.max(0,
+                        Math.min(ladder.length - 1, index + delta));
+                double seconds = ladder[next];
+                long scaled = (long) Math.round(seconds * 10000);
+                byte[] payload = new byte[]{
+                        (byte) scaled,
+                        (byte) (scaled >> 8),
+                        (byte) (scaled >> 16),
+                        (byte) (scaled >> 24)};
+                wifiCamera.writeProperty(0x500d, payload);
+                refreshWifiParameters();
+            } catch (Exception error) {
+                diagnostics.error("wifi-params",
+                        "写入 Wi‑Fi 快门失败：" + error.getMessage());
+                mainHandler.post(() -> showError(
+                        tr(String.format(Locale.ROOT,
+                                "写入 Wi‑Fi 快门失败：%s",
+                                error.getMessage()))));
+            }
+        });
+    }
+
+    /** E4：升序阶梯中第一个 ≥ value 的下标（无则返回末位；镜像 Windows FindIndex）。 */
+    private static int firstAtLeast(int[] ladder, int value) {
+        for (int i = 0; i < ladder.length; i++) {
+            if (ladder[i] >= value) return i;
+        }
+        return ladder.length - 1;
+    }
+
+    private static int firstAtLeast(double[] ladder, double value) {
+        for (int i = 0; i < ladder.length; i++) {
+            if (ladder[i] >= value) return i;
+        }
+        return ladder.length - 1;
+    }
+
+    /** E4：参数步进行（标题 + 减/加按钮）。 */
+    private View wifiStepperRow(
+            String title,
+            View.OnClickListener decrease,
+            View.OnClickListener increase) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        Button minus = new Button(this);
+        minus.setText("−");
+        minus.setAllCaps(false);
+        minus.setTextSize(18);
+        minus.setOnClickListener(decrease);
+        row.addView(minus, new LinearLayout.LayoutParams(dp(52), dp(44)));
+        TextView label = text(title, TS_BODY, Typeface.BOLD, INK);
+        label.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(label, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button plus = new Button(this);
+        plus.setText("+");
+        plus.setAllCaps(false);
+        plus.setTextSize(18);
+        plus.setOnClickListener(increase);
+        row.addView(plus, new LinearLayout.LayoutParams(dp(52), dp(44)));
+        return row;
     }
 
     private View buildCaptureAssistantsPanel() {
@@ -11598,17 +11887,41 @@ public final class MainActivity extends Activity {
         cameraExecutor.submit(() -> {
             try {
                 String name = wifiCamera.connect(host, port);
+                // E4 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；
+                // 尼康/佳能自动开实时取景并拉帧（约 10fps），刷新参数
+                // （镜像 Windows E3 连接路径；Android/Harmony 不做 autoStart 门控）。
+                wifiVendor = wifiCamera.detectVendor();
+                boolean autoLiveView = wifiVendorSupportsRecording();
+                if (autoLiveView) {
+                    try {
+                        wifiCamera.startLiveView();
+                        wifiLiveView = true;
+                    } catch (Exception liveViewError) {
+                        diagnostics.warning(
+                                "wifi-liveview",
+                                "连接后自动开启实时取景失败："
+                                        + liveViewError.getMessage());
+                    }
+                }
+                refreshWifiParameters();
                 diagnostics.info(
                         "wifi-camera",
                         "PTP/IP 已连接；模式="
                                 + wifiConnectionMode.toUpperCase(Locale.ROOT)
-                                + "；相机=" + name);
+                                + "；相机=" + name
+                                + "；厂商=" + wifiVendor);
                 mainHandler.post(() -> {
                     wifiCameraName = name;
                     wifiConnected = true;
                     wifiConnecting = false;
                     lastConnectionError = null;
-                    updateConnectionUi();
+                    if (autoLiveView && wifiLiveView && wifiSourceActive()) {
+                        liveViewEnabled = true;
+                        updateConnectionUi();
+                        startPreviewLoop();
+                    } else {
+                        updateConnectionUi();
+                    }
                     startWifiHeartbeat();
                     registerWifiNetworkCallback();
                     if ("library".equals(currentSection)) showSection("library");
@@ -11732,6 +12045,27 @@ public final class MainActivity extends Activity {
         wifiReconnecting = false;
         mainHandler.removeCallbacks(wifiHeartbeatRunnable);
         mainHandler.removeCallbacks(wifiReconnectRunnable);
+        // E4 1.5.9：手动断开——停 Wi‑Fi 取景/录像并清控制状态
+        // （镜像 Windows 手动断开 StopWifiPreviewLoop + DisconnectAsync）。
+        if (wifiLiveView || wifiMovieRecording || liveViewEnabled) {
+            previewGeneration++;
+            pendingPreview.set(null);
+            liveViewEnabled = false;
+        }
+        if (wifiMovieRecording) {
+            videoRecording = false;
+            recordingStartedAt = 0;
+        }
+        if (wifiLiveView) {
+            try {
+                wifiCamera.stopLiveView();
+            } catch (Exception ignored) {
+            }
+        }
+        wifiLiveView = false;
+        wifiMovieRecording = false;
+        wifiVendor = PtpIpCamera.CameraVendor.UNKNOWN;
+        wifiParameterReadout = "参数待读取 · 连接后自动刷新";
         wifiCamera.close();
         wifiConnected = false;
         lastConnectionError = null;
@@ -11758,8 +12092,25 @@ public final class MainActivity extends Activity {
                 try {
                     String name = wifiCamera.connect(
                             wifiCameraHost, wifiCameraPort);
+                    // E4 1.5.9：重连成功后恢复厂商识别、取景与参数
+                    // （对齐 Windows AttemptWifiReconnectAsync）。
+                    wifiVendor = wifiCamera.detectVendor();
+                    boolean autoLiveView = wifiVendorSupportsRecording();
+                    if (autoLiveView) {
+                        try {
+                            wifiCamera.startLiveView();
+                            wifiLiveView = true;
+                        } catch (Exception liveViewError) {
+                            diagnostics.warning(
+                                    "wifi-liveview",
+                                    "重连后自动开启实时取景失败："
+                                            + liveViewError.getMessage());
+                        }
+                    }
+                    refreshWifiParameters();
                     diagnostics.info("wifi-camera",
-                            "PTP/IP 自动重连成功；相机=" + name);
+                            "PTP/IP 自动重连成功；相机=" + name
+                                    + "；厂商=" + wifiVendor);
                     mainHandler.post(() -> {
                         if (!wifiReconnecting || wifiManualDisconnect) return;
                         wifiReconnecting = false;
@@ -11768,7 +12119,13 @@ public final class MainActivity extends Activity {
                         wifiCameraName = name;
                         wifiReconnectAttempt = 0;
                         lastConnectionError = null;
-                        updateConnectionUi();
+                        if (autoLiveView && wifiLiveView && wifiSourceActive()) {
+                            liveViewEnabled = true;
+                            updateConnectionUi();
+                            startPreviewLoop();
+                        } else {
+                            updateConnectionUi();
+                        }
                         startWifiHeartbeat();
                         showToast("Wi‑Fi 已自动重连 · " + name);
                     });
@@ -11796,6 +12153,28 @@ public final class MainActivity extends Activity {
         wifiReconnecting = true;
         wifiReconnectAttempt = 0;
         mainHandler.removeCallbacks(wifiHeartbeatRunnable);
+        // E4 1.5.9：链路离线即停 Wi‑Fi 取景/录像并清控制状态
+        // （重连成功后再恢复，对齐 Windows AttemptWifiReconnectAsync）。
+        if (wifiLiveView || wifiMovieRecording || liveViewEnabled) {
+            previewGeneration++;
+            pendingPreview.set(null);
+            liveViewEnabled = false;
+            if (wifiMovieRecording) {
+                videoRecording = false;
+                recordingStartedAt = 0;
+            }
+            if (wifiLiveView) {
+                try {
+                    wifiCamera.stopLiveView();
+                } catch (Exception ignored) {
+                }
+            }
+            wifiLiveView = false;
+            wifiMovieRecording = false;
+            wifiVendor = PtpIpCamera.CameraVendor.UNKNOWN;
+            wifiParameterReadout = "参数待读取 · 连接后自动刷新";
+            updateWifiControlCard();
+        }
         updateConnectionUi();
         scheduleWifiReconnect();
     }
@@ -11963,7 +12342,7 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleLiveView() {
-        if (!connected && !localCameraConnected) {
+        if (!connected && !localCameraConnected && !wifiConnected) {
             showConnectionDialog();
             return;
         }
@@ -11971,8 +12350,10 @@ public final class MainActivity extends Activity {
             previewGeneration++;
             pendingPreview.set(null);
             liveViewEnabled = false;
+            if (wifiSourceActive()) wifiLiveView = false;
             cameraExecutor.submit(() -> {
-                if (localCameraConnected) localCamera.stopLiveView();
+                if (wifiSourceActive()) wifiCamera.stopLiveView();
+                else if (localCameraConnected) localCamera.stopLiveView();
                 else camera.stopLiveView();
             });
             updateConnectionUi();
@@ -11982,10 +12363,12 @@ public final class MainActivity extends Activity {
         } else {
             cameraExecutor.submit(() -> {
                 try {
-                    if (localCameraConnected) localCamera.startLiveView();
+                    if (wifiSourceActive()) wifiCamera.startLiveView();
+                    else if (localCameraConnected) localCamera.startLiveView();
                     else camera.startLiveView();
                     mainHandler.post(() -> {
                         liveViewEnabled = true;
+                        if (wifiSourceActive()) wifiLiveView = true;
                         updateConnectionUi();
                         startPreviewLoop();
                     });
@@ -12008,19 +12391,21 @@ public final class MainActivity extends Activity {
     }
 
     private void pullPreview(int generation) {
-        if ((!connected && !localCameraConnected)
+        if ((!connected && !localCameraConnected && !wifiConnected)
                 || !liveViewEnabled
                 || generation != previewGeneration) return;
         cameraExecutor.submit(() -> {
             try {
                 if (generation != previewGeneration
-                        || (!connected && !localCameraConnected)
+                        || (!connected && !localCameraConnected && !wifiConnected)
                         || !liveViewEnabled) {
                     return;
                 }
-                byte[] jpeg = localCameraConnected
-                        ? localCamera.getLiveViewFrame()
-                        : camera.getLiveViewFrame();
+                byte[] jpeg = wifiSourceActive()
+                        ? wifiCamera.getLiveViewFrame()
+                        : localCameraConnected
+                                ? localCamera.getLiveViewFrame()
+                                : camera.getLiveViewFrame();
                 if (externalVideoRecorder.isRecording()) {
                     try {
                         externalVideoRecorder.appendJpeg(jpeg);
@@ -12060,10 +12445,12 @@ public final class MainActivity extends Activity {
                     if (failures >= 3) {
                         previewGeneration++;
                         liveViewEnabled = false;
+                        if (wifiSourceActive()) wifiLiveView = false;
                         previewFailureCount = 0;
                         cameraExecutor.submit(() -> {
                             finishExternalRecordingForDisconnect();
-                            if (localCameraConnected) localCamera.stopLiveView();
+                            if (wifiSourceActive()) wifiCamera.stopLiveView();
+                            else if (localCameraConnected) localCamera.stopLiveView();
                             else camera.stopLiveView();
                         });
                         updateConnectionUi();
@@ -12092,7 +12479,7 @@ public final class MainActivity extends Activity {
                 PreviewPacket packet = pendingPreview.getAndSet(null);
                 if (packet == null
                         || packet.generation != previewGeneration
-                        || (!connected && !localCameraConnected)
+                        || (!connected && !localCameraConnected && !wifiConnected)
                         || !liveViewEnabled) {
                     return;
                 }
@@ -12132,7 +12519,7 @@ public final class MainActivity extends Activity {
                                         null);
                 mainHandler.post(() -> {
                     if (packet.generation != previewGeneration
-                            || (!connected && !localCameraConnected)
+                            || (!connected && !localCameraConnected && !wifiConnected)
                             || !liveViewEnabled) {
                         return;
                     }
@@ -12389,7 +12776,7 @@ public final class MainActivity extends Activity {
     }
 
     private void toggleVideoRecording() {
-        if (!connected && !localCameraConnected) {
+        if (!connected && !localCameraConnected && !wifiConnected) {
             showConnectionDialog();
             return;
         }
@@ -12402,6 +12789,60 @@ public final class MainActivity extends Activity {
         updateRecordingButtons();
         cameraExecutor.submit(() -> {
             try {
+                // E4 1.5.9：Wi‑Fi 源走机身录像（Nikon 0x920a/0x920b；
+                // Canon EVFRecordStatus，TBC-awaiting-hardware；文件保存在相机卡内）。
+                if (wifiSourceActive()) {
+                    try {
+                        if (videoRecording) {
+                            wifiCamera.stopMovieRecording();
+                            mainHandler.post(() -> {
+                                videoRecording = false;
+                                wifiMovieRecording = false;
+                                recordingStartedAt = 0;
+                                capturing = false;
+                                updateRecordingButtons();
+                                if (statusText != null) {
+                                    statusText.setText(tr(
+                                            "Wi‑Fi 录像已停止 · 文件保存在相机卡内"));
+                                }
+                                updateConnectionUi();
+                            });
+                        } else {
+                            if (!wifiVendorSupportsRecording()) {
+                                throw new Exception(
+                                        "已连相机暂不支持 PTP/IP 远程录像");
+                            }
+                            wifiCamera.startMovieRecording();
+                            mainHandler.post(() -> {
+                                videoRecording = true;
+                                wifiMovieRecording = true;
+                                recordingStartedAt = System.currentTimeMillis();
+                                capturing = false;
+                                updateRecordingButtons();
+                                if (statusText != null) {
+                                    statusText.setText(tr(
+                                            "● REC · 正在录制到相机存储卡（Wi‑Fi）"));
+                                }
+                                updateConnectionUi();
+                            });
+                        }
+                    } catch (Exception wifiError) {
+                        diagnostics.error(
+                                "wifi-recording",
+                                "切换 Wi‑Fi 录像失败：" + wifiError.getMessage());
+                        mainHandler.post(() -> {
+                            wifiMovieRecording = wifiCamera.isMovieRecording();
+                            videoRecording = wifiMovieRecording;
+                            recordingStartedAt = videoRecording
+                                    ? System.currentTimeMillis()
+                                    : 0;
+                            capturing = false;
+                            updateRecordingButtons();
+                            showError("Wi‑Fi 录像失败：" + wifiError.getMessage());
+                        });
+                    }
+                    return;
+                }
                 if (videoRecording) {
                     Exception bodyError = null;
                     if (connected && camera.isMovieRecording()) {
@@ -12509,7 +12950,9 @@ public final class MainActivity extends Activity {
             // fig1: accent when idle (快门大圆), safety red only while recording.
             shutterButton.setBackground(rounded(videoRecording ? VIDEO : UI_ACCENT, 14, 0));
             shutterButton.setTextColor(videoRecording ? Color.WHITE : INK);
-            shutterButton.setEnabled((connected || localCameraConnected) && !capturing);
+            shutterButton.setEnabled(
+                    (connected || localCameraConnected || wifiConnected)
+                            && !capturing);
         }
         if (immersiveRecordButton != null) {
             immersiveRecordButton.setText(tr(
@@ -12518,7 +12961,8 @@ public final class MainActivity extends Activity {
                             : videoRecording ? "■\n停止" : "●\n录制"));
             immersiveRecordButton.setTextColor(videoRecording ? Color.WHITE : INK);
             immersiveRecordButton.setEnabled(
-                    (connected || localCameraConnected) && !capturing);
+                    (connected || localCameraConnected || wifiConnected)
+                            && !capturing);
         }
     }
 
@@ -12803,6 +13247,7 @@ public final class MainActivity extends Activity {
         }
         updateCameraControls();
         updateRecordingButtons();
+        updateWifiControlCard();
         updateFileCount();
         // fig1: keep the capture-page status row in sync with connection state
         // changes that don't rebuild the page (no-op when capture UI absent).
@@ -12812,7 +13257,8 @@ public final class MainActivity extends Activity {
     private void updateCameraControls() {
         for (View control : cameraControls) control.setEnabled(connected);
         if (liveViewButton != null) {
-            liveViewButton.setEnabled(connected || localCameraConnected);
+            liveViewButton.setEnabled(
+                    connected || localCameraConnected || wifiConnected);
         }
         for (Map.Entry<String, View> entry : parameterControls.entrySet()) {
             boolean enabled = connected && camera.isParameterWritable(entry.getKey());

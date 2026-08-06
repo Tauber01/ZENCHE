@@ -19,7 +19,7 @@ import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
 import { CameraProfile } from '../camera/CameraProfiles';
 import { PtpCamera } from '../camera/PtpCamera';
-import { PtpIpCamera } from '../camera/PtpIpCamera';
+import { CameraVendor, PtpIpCamera } from '../camera/PtpIpCamera';
 import { LocalCameraController } from '../camera/LocalCameraController';
 import { BluetoothRemoteController } from '../camera/BluetoothRemoteController';
 import {
@@ -854,6 +854,15 @@ struct Index {
   @State private wifiPort: string = '15740';
   @State private wifiCameraName: string = 'PTP/IP Camera';
   @State private wifiStatus: string = 'Wi‑Fi 相机未连接';
+  // ── E4 1.5.9：Wi‑Fi PTP/IP 取景 / 机身录像 / 参数（镜像 Windows E3 +
+  //    Android E4 接法；全部 TBC-awaiting-hardware）──
+  @State private wifiLiveView: boolean = false;
+  @State private wifiMovieRecording: boolean = false;
+  @State private wifiVendor: CameraVendor = CameraVendor.UNKNOWN;
+  @State private wifiIso: number = 0;
+  @State private wifiAperture: number = 0;
+  @State private wifiShutterSeconds: number = 0;
+  @State private wifiParameterReadout: string = '参数待读取 · 连接后自动刷新';
   // ── B2 WiFi 连接监看：保活/自动重连/网络监听 ──
   @State private wifiReconnecting: boolean = false;
   private wifiHeartbeatTimer: number = -1;
@@ -4300,7 +4309,7 @@ struct Index {
               color: UI_SECONDARY,
               radius: 12
             })
-            .enabled(this.connected && !this.busy)
+            .enabled((this.connected || this.wifiConnected) && !this.busy)
             .onClick((): void => {
               this.toggleLiveView();
             })
@@ -4322,7 +4331,7 @@ struct Index {
             .borderRadius(12)
             .enabled(
               (this.section === 'monitor'
-                ? this.connected
+                ? (this.connected || this.wifiConnected)
                 : (this.connected || this.wifiConnected || this.localCameraSelected)) && !this.busy
             )
             .onClick((): void => {
@@ -6503,9 +6512,132 @@ struct Index {
           })
       }
       .width('100%')
+      // ── E4 1.5.9：Wi‑Fi PTP/IP 控制卡（取景 / 机身录像 / 参数步进，
+      //    镜像 Windows UpdateWifiControlState 与 Android updateWifiControlCard；
+      //    全部 TBC-awaiting-hardware）──
+      if (this.wifiConnected) {
+        Divider()
+          .color($r('app.color.rule'))
+        Text(this.tr('Wi‑Fi 相机控制 · PTP/IP'))
+          .fontSize(TS_CAPTION)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        Button(
+          this.tr(this.wifiLiveView ? '停止实时取景' : '开启实时取景'),
+          { type: ButtonType.Normal }
+        )
+          .height(44)
+          .width('100%')
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.rule'),
+            radius: 8
+          })
+          .enabled(!this.busy)
+          .onClick((): void => {
+            this.toggleLiveView();
+          })
+        Button(
+          this.tr(this.wifiMovieRecording ? '停止录制' : '开始录制'),
+          { type: ButtonType.Normal }
+        )
+          .height(44)
+          .width('100%')
+          .fontColor(Color.White)
+          .backgroundColor(
+            this.wifiMovieRecording ? $r('app.color.video') : $r('app.color.accent')
+          )
+          .borderRadius(8)
+          .enabled(this.wifiVendorSupportsRecording() && !this.busy)
+          .onClick((): void => {
+            this.toggleVideoRecording();
+          })
+        Text(this.tr(this.wifiParameterReadout))
+          .fontSize(TS_CAPTION)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+        this.WifiStepperRow(
+          'ISO',
+          (): void => {
+            this.stepWifiIso(-1);
+          },
+          (): void => {
+            this.stepWifiIso(1);
+          }
+        )
+        this.WifiStepperRow(
+          '光圈',
+          (): void => {
+            this.stepWifiAperture(-1);
+          },
+          (): void => {
+            this.stepWifiAperture(1);
+          }
+        )
+        this.WifiStepperRow(
+          '快门',
+          (): void => {
+            this.stepWifiShutter(-1);
+          },
+          (): void => {
+            this.stepWifiShutter(1);
+          }
+        )
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
+  }
+
+  /** E4：Wi‑Fi 参数步进行（标题 + 减/加按钮；镜像 Windows WifiStepperRow）。 */
+  @Builder
+  private WifiStepperRow(
+    title: string,
+    decrease: () => void,
+    increase: () => void
+  ) {
+    Row({ space: 10 }) {
+      Text(this.tr(title))
+        .fontSize(TS_CAPTION)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .layoutWeight(1)
+      Button('−', { type: ButtonType.Normal })
+        .width(40)
+        .height(36)
+        .fontSize(TS_TITLE)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        .enabled(!this.busy)
+        .onClick((): void => {
+          decrease();
+        })
+      Button('＋', { type: ButtonType.Normal })
+        .width(40)
+        .height(36)
+        .fontSize(TS_TITLE)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: 8
+        })
+        .enabled(!this.busy)
+        .onClick((): void => {
+          increase();
+        })
+    }
+    .width('100%')
   }
 
   @Builder
@@ -7581,9 +7713,7 @@ struct Index {
       )
       .borderRadius(48)
       .enabled(
-        (this.immersiveMonitoring
-          ? this.connected
-          : (this.connected || this.wifiConnected)) && !this.busy
+        (this.connected || this.wifiConnected) && !this.busy
       )
       .onClick((): void => {
         if (this.immersiveMonitoring) {
@@ -9409,11 +9539,37 @@ struct Index {
         this.wifiHost.trim(),
         port
       );
+      // E4 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；尼康/佳能
+      // 自动开实时取景并拉帧，刷新参数（镜像 Windows E3 连接路径与 Android
+      // E4 同构；Android/Harmony 不做 autoStartLiveViewOnConnect 门控）。
+      this.wifiVendor = await this.wifiCamera.detectVendor();
+      const autoLiveView: boolean = this.wifiVendorSupportsRecording();
+      if (autoLiveView) {
+        try {
+          await this.wifiCamera.startLiveView();
+          this.wifiLiveView = true;
+        } catch (liveViewError) {
+          this.diagnostics?.warning(
+            'wifi-liveview',
+            `连接后自动开启实时取景失败：${(liveViewError as Error).message}`
+          );
+        }
+      }
+      await this.refreshWifiParameters();
+      this.diagnostics?.info(
+        'wifi-camera',
+        `PTP/IP 已连接；模式=${this.wifiConnectionMode.toUpperCase()}；` +
+        `相机=${name}；厂商=${this.wifiVendor}`
+      );
       this.wifiCameraName = name;
       this.wifiConnected = true;
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已通过 PTP/IP 连接`;
       this.status = this.wifiStatus;
       this.lastConnectionError = '';
+      if (autoLiveView && this.wifiLiveView && this.wifiSourceActive()) {
+        this.liveView = true;
+        this.startPreviewLoop();
+      }
       this.startWifiHeartbeat();
       this.registerWifiNetConnection();
     } catch (error) {
@@ -9434,12 +9590,206 @@ struct Index {
     this.stopWifiHeartbeat();
     this.stopWifiReconnect();
     this.unregisterWifiNetConnection();
+    // E4 1.5.9：手动断开——停 Wi‑Fi 取景/录像并清控制状态
+    // （镜像 Windows StopWifiPreviewLoop + DisconnectAsync 与 Android
+    // disconnectWifiCamera 的 E4 清理）。
+    if (this.wifiLiveView || this.wifiMovieRecording || this.liveView) {
+      this.previewGeneration++;
+      this.liveView = false;
+    }
+    if (this.wifiMovieRecording) {
+      this.videoRecording = false;
+    }
+    if (this.wifiLiveView) {
+      try {
+        await this.wifiCamera.stopLiveView();
+      } catch (error) {
+      }
+    }
+    this.wifiLiveView = false;
+    this.wifiMovieRecording = false;
+    this.wifiVendor = CameraVendor.UNKNOWN;
+    this.wifiIso = 0;
+    this.wifiAperture = 0;
+    this.wifiShutterSeconds = 0;
+    this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
     await this.wifiCamera.disconnect();
     this.wifiConnected = false;
     this.wifiCameraName = 'PTP/IP Camera';
     this.wifiStatus = 'Wi‑Fi 相机未连接';
     this.status = 'Wi‑Fi 相机已断开';
     this.lastConnectionError = '';
+  }
+
+  // ── E4 1.5.9：Wi‑Fi PTP/IP 参数读取与步进（镜像 Windows RefreshWifiParametersAsync
+  //    + StepWifiIso/Aperture/ShutterAsync 与 Android refreshWifiParameters +
+  //    stepWifiIso/Aperture/Shutter；全部 TBC-awaiting-hardware）──
+
+  /**
+   * 从 Wi‑Fi 相机读取 ISO/光圈/快门并刷新本地字段与读数
+   * （单属性失败不阻断其余；解码口径与 Windows/Android 一致：
+   * ISO UINT16；光圈 UINT16（f 数×100）；快门 UINT32（秒×10000），均小端）。
+   */
+  private async refreshWifiParameters(): Promise<void> {
+    if (!this.wifiCamera.isConnected) {
+      return;
+    }
+    try {
+      const iso: Uint8Array = await this.wifiCamera.readProperty(0x500f);
+      if (iso.length >= 2) {
+        this.wifiIso = iso[0] | (iso[1] << 8);
+      }
+    } catch (error) {
+      this.diagnostics?.warning(
+        'wifi-params',
+        `读取 Wi‑Fi ISO 失败：${(error as Error).message}`
+      );
+    }
+    try {
+      const aperture: Uint8Array = await this.wifiCamera.readProperty(0x5007);
+      if (aperture.length >= 2) {
+        const scaled: number = aperture[0] | (aperture[1] << 8);
+        this.wifiAperture = scaled / 100.0;
+      }
+    } catch (error) {
+      this.diagnostics?.warning(
+        'wifi-params',
+        `读取 Wi‑Fi 光圈失败：${(error as Error).message}`
+      );
+    }
+    try {
+      const shutter: Uint8Array = await this.wifiCamera.readProperty(0x500d);
+      if (shutter.length >= 4) {
+        const scaled: number = (shutter[0] | (shutter[1] << 8) |
+          (shutter[2] << 16) | (shutter[3] << 24)) >>> 0;
+        this.wifiShutterSeconds = scaled / 10000.0;
+      }
+    } catch (error) {
+      this.diagnostics?.warning(
+        'wifi-params',
+        `读取 Wi‑Fi 快门失败：${(error as Error).message}`
+      );
+    }
+    this.wifiParameterReadout = this.wifiParameterReadoutText();
+  }
+
+  /** E4：读数文案（镜像 Windows UpdateWifiParameterReadout 与 Android）。 */
+  private wifiParameterReadoutText(): string {
+    let shutter: string = '—';
+    if (this.wifiShutterSeconds > 0) {
+      shutter = this.wifiShutterSeconds >= 1
+        ? `${this.wifiShutterSeconds.toFixed(2)}″`
+        : `1/${Math.max(1, Math.round(1.0 / this.wifiShutterSeconds))}`;
+    }
+    const aperture: string = this.wifiAperture > 0
+      ? `f/${this.wifiAperture.toFixed(1)}`
+      : '—';
+    const iso: string = this.wifiIso > 0
+      ? String(this.wifiIso)
+      : '—';
+    return this.tr(`ISO ${iso} · ${aperture} · ${shutter}`);
+  }
+
+  /** E4：步进 Wi‑Fi ISO（镜像 Windows StepWifiIsoAsync；TBC）。 */
+  private async stepWifiIso(delta: number): Promise<void> {
+    if (!this.wifiConnected) {
+      return;
+    }
+    const ladder: Array<number> = [
+      64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000,
+      1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000,
+      12800, 16000, 20000, 25600, 32000, 40000, 51200, 64000, 102400];
+    const index: number = this.firstAtLeastNumber(ladder, this.wifiIso);
+    const next: number = Math.max(0,
+      Math.min(ladder.length - 1, index + delta));
+    const payload: Uint8Array = new Uint8Array([
+      ladder[next] & 0xff,
+      (ladder[next] >> 8) & 0xff
+    ]);
+    try {
+      await this.wifiCamera.writeProperty(0x500f, payload);
+      await this.refreshWifiParameters();
+    } catch (error) {
+      this.showError(`写入 Wi‑Fi ISO 失败：${(error as Error).message}`);
+    }
+  }
+
+  /** E4：步进 Wi‑Fi 光圈（镜像 Windows StepWifiApertureAsync；TBC）。 */
+  private async stepWifiAperture(delta: number): Promise<void> {
+    if (!this.wifiConnected) {
+      return;
+    }
+    const ladder: Array<number> = [
+      1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5, 4.0, 4.5, 5.0,
+      5.6, 6.3, 7.1, 8.0, 9.0, 10.0, 11.0, 13.0, 14.0, 16.0, 18.0,
+      20.0, 22.0];
+    const index: number = this.firstAtLeastDouble(ladder, this.wifiAperture - 0.01);
+    const next: number = Math.max(0,
+      Math.min(ladder.length - 1, index + delta));
+    const scaled: number = Math.round(ladder[next] * 100);
+    const payload: Uint8Array = new Uint8Array([
+      scaled & 0xff,
+      (scaled >> 8) & 0xff
+    ]);
+    try {
+      await this.wifiCamera.writeProperty(0x5007, payload);
+      await this.refreshWifiParameters();
+    } catch (error) {
+      this.showError(`写入 Wi‑Fi 光圈失败：${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * E4：步进 Wi‑Fi 快门（数值镜像 Windows StepWifiShutterAsync；TBC）。
+   * 注：Windows E3 用降序分母 + FindIndex 恒命中首档（TBC 未真机验证的
+   * 缺陷）；Android/Harmony 以升序秒值正确定位当前档。
+   */
+  private async stepWifiShutter(delta: number): Promise<void> {
+    if (!this.wifiConnected) {
+      return;
+    }
+    // 快门档位（秒），升序：1/8000 → 1″。
+    const ladder: Array<number> = [
+      1.0 / 8000, 1.0 / 4000, 1.0 / 2000, 1.0 / 1000, 1.0 / 500,
+      1.0 / 250, 1.0 / 125, 1.0 / 60, 1.0 / 30, 1.0 / 15, 1.0 / 8,
+      1.0 / 4, 1.0 / 2, 1.0];
+    const index: number = this.firstAtLeastDouble(
+      ladder, this.wifiShutterSeconds - 0.00001);
+    const next: number = Math.max(0,
+      Math.min(ladder.length - 1, index + delta));
+    const seconds: number = ladder[next];
+    const scaled: number = Math.round(seconds * 10000);
+    const payload: Uint8Array = new Uint8Array([
+      scaled & 0xff,
+      (scaled >> 8) & 0xff,
+      (scaled >> 16) & 0xff,
+      (scaled >> 24) & 0xff
+    ]);
+    try {
+      await this.wifiCamera.writeProperty(0x500d, payload);
+      await this.refreshWifiParameters();
+    } catch (error) {
+      this.showError(`写入 Wi‑Fi 快门失败：${(error as Error).message}`);
+    }
+  }
+
+  /** E4：升序阶梯中第一个 ≥ value 的下标（无则返回末位；镜像 Android firstAtLeast）。 */
+  private firstAtLeastNumber(ladder: Array<number>, value: number): number {
+    for (let index: number = 0; index < ladder.length; index++) {
+      if (ladder[index] >= value) {
+        return index;
+      }
+    }
+    return ladder.length - 1;
+  }
+
+  private firstAtLeastDouble(ladder: Array<number>, value: number): number {
+    for (let index: number = 0; index < ladder.length; index++) {
+      if (ladder[index] >= value) {
+        return index;
+      }
+    }
+    return ladder.length - 1;
   }
 
   // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
@@ -9494,6 +9844,26 @@ struct Index {
     this.wifiReconnecting = true;
     this.wifiReconnectAttempt = 0;
     this.stopWifiHeartbeat();
+    // E4 1.5.9：链路离线即停 Wi‑Fi 取景/录像并清控制状态
+    // （重连成功后再恢复，镜像 Android enterWifiReconnecting 与 Windows
+    // AttemptWifiReconnectAsync 的清理路径）。
+    if (this.wifiLiveView || this.wifiMovieRecording || this.liveView) {
+      this.previewGeneration++;
+      this.liveView = false;
+      if (this.wifiMovieRecording) {
+        this.videoRecording = false;
+      }
+      if (this.wifiLiveView) {
+        try {
+          this.wifiCamera.stopLiveView();
+        } catch (error) {
+        }
+      }
+      this.wifiLiveView = false;
+      this.wifiMovieRecording = false;
+      this.wifiVendor = CameraVendor.UNKNOWN;
+      this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
+    }
     this.wifiStatus = 'Wi‑Fi 链路已断开，正在自动重连…';
     this.status = this.wifiStatus;
     this.scheduleWifiReconnect();
@@ -9541,6 +9911,22 @@ struct Index {
       if (!this.wifiReconnecting || this.wifiManualDisconnect) {
         return;
       }
+      // E4 1.5.9：重连成功后恢复厂商识别、自动取景与参数刷新
+      // （对齐 Windows AttemptWifiReconnectAsync 与 Android 重连路径）。
+      this.wifiVendor = await this.wifiCamera.detectVendor();
+      const autoLiveView: boolean = this.wifiVendorSupportsRecording();
+      if (autoLiveView) {
+        try {
+          await this.wifiCamera.startLiveView();
+          this.wifiLiveView = true;
+        } catch (liveViewError) {
+          this.diagnostics?.warning(
+            'wifi-liveview',
+            `重连后自动开启实时取景失败：${(liveViewError as Error).message}`
+          );
+        }
+      }
+      await this.refreshWifiParameters();
       this.wifiReconnecting = false;
       this.wifiConnecting = false;
       this.wifiConnected = true;
@@ -9549,6 +9935,10 @@ struct Index {
       this.lastConnectionError = '';
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已重连（PTP/IP）`;
       this.status = this.wifiStatus;
+      if (autoLiveView && this.wifiLiveView && this.wifiSourceActive()) {
+        this.liveView = true;
+        this.startPreviewLoop();
+      }
       this.startWifiHeartbeat();
     } catch (error) {
       if (!this.wifiReconnecting || this.wifiManualDisconnect) {
@@ -9738,22 +10128,43 @@ struct Index {
     return this.section === 'capture' || this.section === 'monitor';
   }
 
+  /** E4：Wi‑Fi 源是否当前取景/录像的数据源（优先级：USB > 本机摄像头 > Wi‑Fi）。 */
+  private wifiSourceActive(): boolean {
+    return this.wifiConnected && !this.connected && !this.localCameraSelected;
+  }
+
+  /** E4：已连厂商是否支持 PTP/IP 远程录像（Nikon/Canon）。 */
+  private wifiVendorSupportsRecording(): boolean {
+    return this.wifiVendor === CameraVendor.NIKON ||
+      this.wifiVendor === CameraVendor.CANON;
+  }
+
   private async toggleLiveView(): Promise<void> {
-    if (!this.connected || this.busy) {
+    if ((!this.connected && !this.wifiConnected) || this.busy) {
       return;
     }
     if (this.liveView) {
       this.previewGeneration++;
       await this.runBusy('正在停止实时取景…', async (): Promise<void> => {
         await this.finishExternalRecordingForDisconnect();
-        await this.camera.stopLiveView();
+        if (this.wifiSourceActive()) {
+          await this.wifiCamera.stopLiveView();
+          this.wifiLiveView = false;
+        } else {
+          await this.camera.stopLiveView();
+        }
         this.liveView = false;
         this.status = '实时取景已停止';
       });
       return;
     }
     await this.runBusy('正在开启实时取景…', async (): Promise<void> => {
-      await this.camera.startLiveView();
+      if (this.wifiSourceActive()) {
+        await this.wifiCamera.startLiveView();
+        this.wifiLiveView = true;
+      } else {
+        await this.camera.startLiveView();
+      }
       this.liveView = true;
       this.status = '实时取景已开启';
       this.startPreviewLoop();
@@ -9763,13 +10174,17 @@ struct Index {
   private async startPreviewLoop(): Promise<void> {
     const generation: number = ++this.previewGeneration;
     let failures: number = 0;
+    const wifiSource: boolean = this.wifiSourceActive();
     while (
       generation === this.previewGeneration &&
-      this.camera.isConnected &&
-      this.camera.isLiveView
+      (wifiSource
+        ? this.wifiCamera.isConnected && this.wifiCamera.isLiveView
+        : this.camera.isConnected && this.camera.isLiveView)
     ) {
       try {
-        const jpeg: Uint8Array = await this.camera.getLiveViewFrame();
+        const jpeg: Uint8Array = wifiSource
+          ? await this.wifiCamera.getLiveViewFrame()
+          : await this.camera.getLiveViewFrame();
         failures = 0;
         if (this.externalVideoRecorder.isRecording) {
           try {
@@ -9791,7 +10206,15 @@ struct Index {
         if (failures >= 3) {
           this.previewGeneration++;
           await this.finishExternalRecordingForDisconnect();
-          await this.camera.stopLiveView();
+          if (wifiSource) {
+            try {
+              await this.wifiCamera.stopLiveView();
+            } catch (stopError) {
+            }
+            this.wifiLiveView = false;
+          } else {
+            await this.camera.stopLiveView();
+          }
           this.liveView = false;
           this.status = '实时取景已安全停止 · 机身控制已释放';
           this.showError('连续 3 次未收到画面，已停止重试并释放相机。');
@@ -10035,7 +10458,37 @@ struct Index {
   }
 
   private async toggleVideoRecording(): Promise<void> {
-    if (!this.connected || this.busy) {
+    if ((!this.connected && !this.wifiConnected) || this.busy) {
+      return;
+    }
+    // E4 1.5.9：Wi‑Fi 源走机身录像（Nikon 0x920a/0x920b；Canon
+    // EVFRecordStatus，TBC-awaiting-hardware；文件保存在相机卡内）。
+    if (this.wifiSourceActive()) {
+      await this.runBusy(
+        this.wifiMovieRecording ? '正在停止录制…' : '正在开始录制…',
+        async (): Promise<void> => {
+          try {
+            if (this.wifiMovieRecording) {
+              await this.wifiCamera.stopMovieRecording();
+              this.wifiMovieRecording = false;
+              this.videoRecording = false;
+              this.status = 'Wi‑Fi 录像已停止 · 文件保存在相机卡内';
+            } else {
+              if (!this.wifiVendorSupportsRecording()) {
+                throw new Error('已连相机暂不支持 PTP/IP 远程录像');
+              }
+              await this.wifiCamera.startMovieRecording();
+              this.wifiMovieRecording = true;
+              this.videoRecording = true;
+              this.status = '● REC · 正在录制到相机存储卡（Wi‑Fi）';
+            }
+          } catch (error) {
+            this.wifiMovieRecording = this.wifiCamera.isMovieRecording;
+            this.videoRecording = this.wifiMovieRecording;
+            this.showError(`Wi‑Fi 录像失败：${(error as Error).message}`);
+          }
+        }
+      );
       return;
     }
     await this.runBusy(
