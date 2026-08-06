@@ -4951,6 +4951,11 @@ public partial class MainWindow : Window
                 $"读取公告提醒设置失败：{error.Message}");
         }
 
+        // D1 1.5.8：启动路径公告区整体降级保护——UI 构建（FindResource/
+        // BitmapImage/资源查找）或 ShowDialog 展示失败时只记诊断日志，
+        // 不弹窗、不阻断启动。
+        try
+        {
         var doNotRemind = new CheckBox
         {
             Content = AppLocalization.T(
@@ -5136,6 +5141,13 @@ public partial class MainWindow : Window
             }
         };
         dialog.ShowDialog();
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "announcement",
+                $"展示更新公告失败，已跳过：{error}");
+        }
     }
 
     private void OpenPhotoFolder_Click(object sender, RoutedEventArgs e)

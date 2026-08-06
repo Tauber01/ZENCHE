@@ -702,3 +702,11 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **测试**：`test/native-ptpip-capabilities.test.mjs` 6 用例（尼康取景/录像 opcode、参数属性 op、C2 佳能序列对齐、vendor 识别、WifiCameraService 状态暴露、UI 路由）；`native-liveview-release` 断连锚点保持（disconnect 先 cancel 连接再复位 C3 状态）。npm test **269/269** 全绿（原 263 + C3 6）。
 - **构建**：iOS xcodebuild Release generic/iOS 免签名 **BUILD SUCCEEDED**（编译期修复三处：静态上下文 readUInt16/readUTF8 归属、disconnect 局部变量遮蔽 vendor）；git diff --check 干净。
 - **纪律**：无佳能/尼康 Wi‑Fi 实机，实时取景/录像/参数全部按 PTP/EOS 规范实现并标 TBC-awaiting-hardware，报告明确「未经实机验证」；CAMERA_TEST_CHECKLIST 挂「iOS PTP/IP（C3 1.5.8）」待设备实测条目。
+
+## 12.26 v1.5.8 D1：Windows 启动弹窗异常诊断加固（2026-08-06，kimi 14:13 派工，事件 f70341eb）
+
+- 背景：Tauber 报「一打开就弹 Object reference not set to an instance of an object，长期存在」；kimi 审计 HEAD f07b5a4 启动路径确认应用代码无可未防护 NRE，需更强诊断 + 防护收口。分支 `agent/1.5.8-d1-windows-nre`，基线 `f07b5a4`，只动 native/windows。
+- **未处理异常弹窗升级**（App.xaml.cs HandleUnhandledException）：原 MessageBox 只显示 e.Exception.Message → 改为主题化详情对话框——异常类型（ErrorBrush + Consolas）+ Message + 完整 StackTrace（ToString() 全文，只读可滚动 TextBox，LogBgBrush/LogTextBrush/RuleBrush 日志盒样式）+「复制详情」按钮（Clipboard.SetText，失败记 Warning 不弹错）+「关闭」。异常日志写入保持。对话框自身失败退回极简 MessageBox，不递归进未处理异常路径（FindBrush/FindStyle 安全取资源，缺失回落系统默认）。
+- **公告区降级保护**（MainWindow.xaml.cs ShowLaunchAnnouncementIfNeeded）：整个 UI 构建（FindResource/BitmapImage/资源查找）+ ShowDialog 包 try/catch，失败走 `_diagnostics.Warning("announcement", …)` 静默降级——不弹窗、不阻断启动。
+- 三语文案走 AppLocalization：新增 5 键（未处理异常 / 复制详情 / 已复制到剪贴板 / 关闭 / 对话框引导句），中文/English/日本語。
+- 验证：dotnet build Release **0 错误**（4 warning 与基线 f07b5a4 完全一致，既有）；npm test **270/270** 全绿；git diff --check 干净。
