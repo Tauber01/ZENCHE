@@ -419,9 +419,9 @@ private struct SupportedCamera: Equatable {
             vendorName: "Canon",
             vendorID: 0x04a9,
             productID: 0x0000,
-            detectionTokens: ["canon eos r6 mark iii", "canon eos r6 mk iii", "canon eos r6 3", "canon r6 mark iii", "canon r6 mk3", "eos r6 mark iii"],
+            detectionTokens: ["canon eos r6 mark iii", "canon eos r6 mk iii", "canon eos r6 iii", "canon eos r6 3", "canon r6 mark iii", "canon r6 iii", "canon r6 mk3", "eos r6 mark iii"],
             minimumISO: 100,
-            maximumISO: 102400
+            maximumISO: 64000
         ),
         SupportedCamera(
             name: "Canon EOS R6",
