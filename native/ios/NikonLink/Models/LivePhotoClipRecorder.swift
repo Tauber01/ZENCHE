@@ -79,7 +79,9 @@ final class LivePhotoClipRecorder {
         let recorder = ExternalVideoRecorder()
         try recorder.start(at: url, frameRate: Double(frameRate))
         for frame in frames {
-            try recorder.append(jpeg: frame)
+            // bypassThrottle：切片回放帧为内存已有帧，快速写入不得被
+            // 实时取景的帧率节流丢弃（否则 AVI 只剩第一帧）。
+            try recorder.append(jpeg: frame, bypassThrottle: true)
         }
         guard let result = try recorder.stopIfRecording() else { return nil }
         return Slice(url: result.url, frames: result.frames, bytes: result.bytes)

@@ -57,12 +57,13 @@ final class ExternalVideoRecorder {
         index.removeAll(keepingCapacity: true)
     }
 
-    func append(jpeg: Data) throws {
+    func append(jpeg: Data, bypassThrottle: Bool = false) throws {
         lock.lock()
         defer { lock.unlock() }
         guard target != nil, !jpeg.isEmpty else { return }
         let now = ProcessInfo.processInfo.systemUptime
-        if lastFrameTime > 0,
+        if !bypassThrottle,
+           lastFrameTime > 0,
            now - lastFrameTime < 1.0 / Double(frameRate) {
             return
         }
