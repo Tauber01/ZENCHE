@@ -62,6 +62,11 @@ public sealed record CameraProfile(
         new("Canon EOS R10", "Canon", 0x04a9, 0x0000, 100, 12800),
         new("Canon EOS R50", "Canon", 0x04a9, 0x0000, 100, 12800),
         new("Canon EOS R100", "Canon", 0x04a9, 0x0000, 100, 12800),
+        // ── Canon DIGIC X (2025 补齐) ──
+        new("Canon EOS R6 Mark III", "Canon", 0x04a9, 0x0000, 100, 64000),
+        new("Canon EOS R6", "Canon", 0x04a9, 0x0000, 100, 102400),
+        new("Canon EOS R5 C", "Canon", 0x04a9, 0x0000, 100, 51200),
+        new("Canon EOS R50 V", "Canon", 0x04a9, 0x0000, 100, 32000),
     ];
 
     public static string Summary =>

@@ -666,3 +666,17 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - Windows Setup.exe `090cb31d44026a5bcbdd0ea0e1dcfee8cf5605dce41b087455b2c218a123fc4a`
   - Windows zip `29d448cba05ae8e1889c08b35d2d4199922d3f5992fd1f178393e05cfc5501d6`
 - 构建验证：macOS dmg 产出（三 SDK env 指向 ~/Documents/NikonLink/）；iOS BUILD SUCCEEDED（unsigned ipa）；Android BUILD SUCCESSFUL（ANDROID_HOME=~/Library/Android/sdk，签名连续性 45499c18）；Harmony assembleHap SUCCESSFUL（未签名）；Windows dotnet publish 0 错误 + NSIS 成功（LANG=en_US.UTF-8 + SONY_CRSDK_WIN64_ZIP env）。
+
+## 12.24 v1.5.7 B1 佳能 R6III 及 DIGIC X 同代机型入册（2026-08-06，Tauber 06:33 指令，kimi 06:45 派工，事件 90f2aa2c）
+
+- 基线 agent/1.5.6-ui @ a5abff8；独立 worktree agent/1.5.7-b1-canon。
+- **新增四款**（Canon VID 0x04a9、PID 0x0000 通配不变，注释分组「── Canon DIGIC X (2025 补齐) ──」）：
+  - Canon EOS R6 Mark III：DIGIC X、ISO 100–102400
+  - Canon EOS R6（初代）：DIGIC X、ISO 100–102400
+  - Canon EOS R5 C：DIGIC X、ISO 100–51200
+  - Canon EOS R50 V：DIGIC X、ISO 100–32000
+  - ISO 口径与佳能官方规格页核对一致（R6 系 100–102400 / R5 C 100–51200 / R50 V 100–32000），无需更正 kimi 给定值。
+- 改动：Windows CameraProfile.cs、Harmony CameraProfiles.ets、Android PtpCamera.java（注册表 + 手写摘要串补 4 款）、macOS main.swift（每款 detectionTokens：R6III 含 "r6 mark iii"/"r6 mk iii"/"r6 3" 等变体；R5 C/R50 V 含连写与空格变体；R6 初代基础 token 与既有 Mark II 最长匹配不冲突）、test/camera-profiles.test.mjs canonProfiles 基准 +4（契约同步，否则红）。
+- docs 勘正：PROJECT_OUTLINE §2.1 目标用户 Nikon → Nikon/Sony/Canon；§4.2 标题「Nikon 相机支持」→「相机支持（Nikon / Sony / Canon）」，注册表口径 20 款 → 46 款（Nikon 20 + Sony 12 + Canon 14）；CAMERA_TEST_CHECKLIST 新增 R6III 实机验收条目（标记待设备，注 Canon 深度控制 TBC 不在入册范围）。
+- 不动：Android device_filter.xml（已有佳能类通配）、PTP vendor 操作层（Canon opcode TBC）、iOS。
+- 验证：npm test 256/256 全绿（Canon 注册表断言通过）；Windows dotnet 0 错误；macOS swiftc typecheck 0 错误；Android assembleDebug SUCCESSFUL；Harmony assembleHap SUCCESSFUL；git diff --check 干净。
