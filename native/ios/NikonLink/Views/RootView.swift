@@ -4875,7 +4875,26 @@ private struct CameraStage: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color.black)
 
-            if model.camera.state == .ready {
+            if model.wifiCamera.isConnected {
+                if let frame = model.wifiCamera.liveViewFrame {
+                    Image(decorative: frame, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                } else {
+                    VStack(spacing: 13) {
+                        Image(systemName: "wifi")
+                            .font(.system(size: 46, weight: .light)) // 空态图标尺寸，图标豁免族
+                            .foregroundStyle(IPalette.whiteMid)
+                        Text(model.wifiCamera.liveViewStatus.isEmpty
+                             ? "等待 Wi‑Fi 实时取景…"
+                             : model.wifiCamera.liveViewStatus)
+                            .font(.title3.weight(.semibold))
+                    }
+                    .padding(30)
+                    .foregroundStyle(Color.white)
+                }
+            } else if model.camera.state == .ready {
                 CameraPreview(
                     session: model.camera.session,
                     focusHandler: { model.camera.focus(at: $0) }
@@ -4929,9 +4948,12 @@ private struct CameraStage: View {
         .overlay(alignment: .topLeading) {
             HStack(spacing: 7) {
                 Circle()
-                    .fill(model.camera.state == .ready ? Color.green : Color.red)
+                    .fill((model.wifiCamera.isConnected || model.camera.state == .ready)
+                          ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                RuntimeLocalizedText(model.camera.deviceName)
+                RuntimeLocalizedText(model.wifiCamera.isConnected
+                                     ? model.wifiCamera.cameraName
+                                     : model.camera.deviceName)
                     .textCase(.uppercase)
                     .font(.caption2.monospaced().weight(.semibold))
             }
@@ -5412,7 +5434,7 @@ private struct ImmersiveCameraView: View {
     private var captureButton: some View {
         Button {
             if mode == .video {
-                model.camera.toggleVideoRecording()
+                model.toggleVideoRecording()
             } else {
                 model.capturePhoto()
             }
@@ -5427,7 +5449,7 @@ private struct ImmersiveCameraView: View {
                 Image(
                     systemName: mode == .photo
                         ? "camera.fill"
-                        : model.camera.isRecording ? "stop.fill" : "circle.fill"
+                        : model.isRecording ? "stop.fill" : "circle.fill"
                 )
                     .font(.title2)
                     .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
@@ -5438,13 +5460,12 @@ private struct ImmersiveCameraView: View {
         .disabled(
             mode == .photo
                 ? !model.isCaptureReady
-                : model.camera.state != .ready
-                    || !model.camera.supportsMovieRecording
+                : !model.videoRecordingAvailable
         )
         .accessibilityLabel(
             mode == .photo
                 ? "拍摄照片"
-                : model.camera.isRecording ? "停止录制" : "开始录制"
+                : model.isRecording ? "停止录制" : "开始录制"
         )
     }
 
@@ -6216,6 +6237,9 @@ private struct MonitorPage: View {
                             alignment: .leading,
                             spacing: 14
                         ) {
+                            if model.wifiCamera.isConnected {
+                                WifiMonitorParameterCard()
+                            }
                             MonitorParameterDeck()
                             MonitorOutputDeck()
                         }
@@ -6261,8 +6285,13 @@ private struct MonitorConsolePage: View {
                         .padding(.top, 14)
                     readoutStrip
                         .padding(.top, 13)
-                    parameterStrip
-                        .padding(.top, 8)
+                    if model.wifiCamera.isConnected && model.camera.state != .ready {
+                        wifiParameterStrip
+                            .padding(.top, 8)
+                    } else {
+                        parameterStrip
+                            .padding(.top, 8)
+                    }
                     toolStrip
                         .padding(.top, 12)
                     Spacer(minLength: 10)
@@ -6276,7 +6305,7 @@ private struct MonitorConsolePage: View {
             .background(IPalette.monitorBackground)
             .preferredColorScheme(.dark)
             .onReceive(timer) { _ in
-                if model.camera.isRecording {
+                if model.isRecording {
                     elapsedSeconds += 1
                 } else {
                     elapsedSeconds = 0
@@ -6296,9 +6325,11 @@ private struct MonitorConsolePage: View {
                 .monospacedDigit()
             HStack(spacing: 8) {
                 Circle()
-                    .fill(model.camera.isRecording ? IPalette.video : IPalette.whiteMist)
+                    .fill(model.isRecording ? IPalette.video : IPalette.whiteMist)
                     .frame(width: 7, height: 7)
-                Text(model.camera.isRecording ? "REC" : (connected ? "LIVE VIEW" : "未连接相机"))
+                Text(model.isRecording
+                     ? "REC"
+                     : (model.hasAnyCameraConnection ? "LIVE VIEW" : "未连接相机"))
                     .font(.system(size: EditorFontSize.small, weight: .bold, design: .monospaced)) // v1.5.7 F2: 10 等值映射 EditorFontSize.small
                     .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页状态字改纯白
             }
@@ -6315,7 +6346,23 @@ private struct MonitorConsolePage: View {
     private func preview(width: CGFloat) -> some View {
         ZStack {
             Color.black
-            if connected {
+            if model.wifiCamera.isConnected {
+                if let frame = model.wifiCamera.liveViewFrame {
+                    Image(decorative: frame, scale: 1)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    VStack(spacing: 9) {
+                        Image(systemName: "wifi")
+                            .font(.system(size: 34, weight: .light)) // 对焦框符号，图标豁免族
+                        Text(model.wifiCamera.liveViewStatus.isEmpty
+                             ? "等待 Wi‑Fi 实时取景…"
+                             : model.wifiCamera.liveViewStatus)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页空态文字改纯白
+                }
+            } else if connected {
                 CameraPreview(
                     session: model.camera.session,
                     focusHandler: { point in
@@ -6373,9 +6420,9 @@ private struct MonitorConsolePage: View {
         .overlay(alignment: .topLeading) {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(connected ? IPalette.positive : IPalette.video)
+                    .fill((model.wifiCamera.isConnected || connected) ? IPalette.positive : IPalette.video)
                     .frame(width: 6, height: 6)
-                Text(model.camera.deviceName)
+                Text(model.wifiCamera.isConnected ? model.wifiCamera.cameraName : model.camera.deviceName)
                     .font(.system(size: EditorFontSize.small, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 10 等值映射 EditorFontSize.small
                     .lineLimit(1)
             }
@@ -6403,17 +6450,17 @@ private struct MonitorConsolePage: View {
         HStack(spacing: 10) {
             RGBWaveformCard()
             Button {
-                model.camera.toggleVideoRecording()
+                model.toggleVideoRecording()
             } label: {
                 ZStack {
                     Circle()
                         .stroke(IPalette.whiteHi, lineWidth: 2)
                         .frame(width: 86, height: 86)
                     Circle()
-                        .fill(model.camera.isRecording ? IPalette.video : IPalette.videoIdle)
+                        .fill(model.isRecording ? IPalette.video : IPalette.videoIdle)
                         .frame(width: 51, height: 51)
                         .overlay {
-                            if model.camera.isRecording {
+                            if model.isRecording {
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(.white)
                                     .frame(width: 15, height: 15)
@@ -6423,7 +6470,7 @@ private struct MonitorConsolePage: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
-            .disabled(!connected || !model.camera.supportsMovieRecording)
+            .disabled(!model.videoRecordingAvailable)
             AudioWaveformCard()
         }
         .padding(.horizontal, 18)
@@ -6468,6 +6515,52 @@ private struct MonitorConsolePage: View {
             )
         }
         .padding(.horizontal, 18)
+    }
+
+    /// C3：Wi‑Fi 相机参数卡（ISO/光圈/快门经 PTP/IP 属性读写，
+    /// 实机待验证 TBC-awaiting-hardware）。
+    private var wifiParameterStrip: some View {
+        let enabled = model.wifiCamera.isConnected
+            && model.wifiCamera.vendor != .unknown
+        return HStack(spacing: 8) {
+            MonitorConsoleStepper(
+                title: "快门",
+                value: wifiShutterText,
+                enabled: enabled,
+                decrease: { model.wifiCamera.stepShutterSpeed(-1) },
+                increase: { model.wifiCamera.stepShutterSpeed(1) }
+            )
+            MonitorConsoleStepper(
+                title: "光圈",
+                value: wifiApertureText,
+                enabled: enabled,
+                decrease: { model.wifiCamera.stepAperture(-1) },
+                increase: { model.wifiCamera.stepAperture(1) }
+            )
+            MonitorConsoleStepper(
+                title: "ISO",
+                value: "\(model.wifiCamera.isoValue)",
+                enabled: enabled,
+                decrease: { model.wifiCamera.stepISO(-1) },
+                increase: { model.wifiCamera.stepISO(1) }
+            )
+        }
+        .padding(.horizontal, 18)
+    }
+
+    private var wifiShutterText: String {
+        let seconds = model.wifiCamera.shutterSpeedValue
+        guard seconds > 0 else { return "—" }
+        if seconds >= 1 {
+            return String(format: "%.0f″", seconds)
+        }
+        return "1/\(Int((1 / seconds).rounded()))"
+    }
+
+    private var wifiApertureText: String {
+        model.wifiCamera.apertureValue > 0
+            ? String(format: "f/%.1f", model.wifiCamera.apertureValue)
+            : "—"
     }
 
     private var shutterSpeed: String {
@@ -6556,7 +6649,7 @@ private struct MonitorConsolePage: View {
                 HStack {
                     Text("\(info.percentUsed)% 已用")
                     Spacer()
-                    Text(model.camera.isRecording ? "录制中" : "待机")
+                    Text(model.isRecording ? "录制中" : "待机")
                 }
                 .font(.caption2.monospacedDigit().weight(.semibold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页状态文字改纯白
@@ -7018,11 +7111,11 @@ private struct MonitorRecordingBar: View {
 
     var body: some View {
         Button {
-            model.camera.toggleVideoRecording()
+            model.toggleVideoRecording()
         } label: {
             Label(
-                model.camera.isRecording ? "停止录制" : "开始录制",
-                systemImage: model.camera.isRecording ? "stop.fill" : "record.circle"
+                model.isRecording ? "停止录制" : "开始录制",
+                systemImage: model.isRecording ? "stop.fill" : "record.circle"
             )
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -7030,10 +7123,73 @@ private struct MonitorRecordingBar: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.red)
-        .disabled(
-            model.camera.state != .ready
-                || !model.camera.supportsMovieRecording
-        )
+        .disabled(!model.videoRecordingAvailable)
+    }
+}
+
+/// C3：Wi‑Fi 相机参数卡（ISO/光圈/快门经 PTP/IP 属性读写，
+/// 实机待验证 TBC-awaiting-hardware）。仅 Wi‑Fi 连接时展示。
+private struct WifiMonitorParameterCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Wi‑Fi 相机参数")
+                .font(.headline)
+            Text("ISO / 光圈 / 快门经 PTP/IP 属性读写（0x1015/0x1016），连接后自动读取。")
+                .font(.subheadline)
+                .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
+
+            HStack(spacing: 10) {
+                MonitorConsoleStepper(
+                    title: "快门",
+                    value: wifiShutterText,
+                    enabled: wifiParamsEnabled,
+                    decrease: { model.wifiCamera.stepShutterSpeed(-1) },
+                    increase: { model.wifiCamera.stepShutterSpeed(1) }
+                )
+                MonitorConsoleStepper(
+                    title: "光圈",
+                    value: wifiApertureText,
+                    enabled: wifiParamsEnabled,
+                    decrease: { model.wifiCamera.stepAperture(-1) },
+                    increase: { model.wifiCamera.stepAperture(1) }
+                )
+                MonitorConsoleStepper(
+                    title: "ISO",
+                    value: "\(model.wifiCamera.isoValue)",
+                    enabled: wifiParamsEnabled,
+                    decrease: { model.wifiCamera.stepISO(-1) },
+                    increase: { model.wifiCamera.stepISO(1) }
+                )
+            }
+
+            Text("从相机读取 · 自动刷新 · 实机待验证")
+                .font(.caption)
+                .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var wifiParamsEnabled: Bool {
+        model.wifiCamera.isConnected && model.wifiCamera.vendor != .unknown
+    }
+
+    private var wifiShutterText: String {
+        let seconds = model.wifiCamera.shutterSpeedValue
+        guard seconds > 0 else { return "—" }
+        if seconds >= 1 {
+            return String(format: "%.0f″", seconds)
+        }
+        return "1/\(Int((1 / seconds).rounded()))"
+    }
+
+    private var wifiApertureText: String {
+        model.wifiCamera.apertureValue > 0
+            ? String(format: "f/%.1f", model.wifiCamera.apertureValue)
+            : "—"
     }
 }
 
