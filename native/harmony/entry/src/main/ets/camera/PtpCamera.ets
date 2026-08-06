@@ -49,6 +49,13 @@ const SONY_PICTURE_PROFILE: number = 0xd23f;
 const SONY_MOVIE_FILE_FORMAT: number = 0xd241;
 const CANON_EOS_SET_DEVICE_PROP_VALUE_EX: number = 0x9110;
 const CANON_LOG_GAMMA: number = 0xd176;
+// Canon EOS 录像/取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
+// - EVFRecordStatus(0xD1b8)：0=停止录像 1=开始录像（digiCamControl/qDslrDashboard 社区方案）
+// - EVFMode(0xD1b1)：UINT16，0=off 1=on（gphoto2 canon.c 序列）
+// - EVFOutputDevice(0xD1b0)：UINT32 mask，bit0=TFT bit1=PC，2=PC（gphoto2 canon.c 序列）
+const CANON_EVF_RECORD_STATUS: number = 0xd1b8;
+const CANON_EVF_MODE: number = 0xd1b1;
+const CANON_EVF_OUTPUT_DEVICE: number = 0xd1b0;
 const CHANGE_CAMERA_MODE: number = 0x90c2;
 const DEVICE_READY: number = 0x90c8;
 const GET_EVENT: number = 0x90c7;
@@ -376,6 +383,10 @@ export class PtpCamera {
     if (this.movieRecording) {
       return;
     }
+    if (this.isCanon()) {
+      await this.canonStartMovieRecording();
+      return;
+    }
     if (!this.liveView) {
       await this.startLiveView();
     }
@@ -393,6 +404,14 @@ export class PtpCamera {
     if (!this.movieRecording) {
       return;
     }
+    if (this.isCanon()) {
+      try {
+        await this.canonStopMovieRecording();
+      } finally {
+        this.movieRecording = false;
+      }
+      return;
+    }
     try {
       await this.transact(
         END_MOVIE_RECORDING,
@@ -403,6 +422,58 @@ export class PtpCamera {
     } finally {
       this.movieRecording = false;
     }
+  }
+
+  private isCanon(): boolean {
+    return this.activeProfile !== undefined
+      && this.activeProfile.vendorId === 0x04a9;
+  }
+
+  /**
+   * 佳能 EOS 录像启停：经 EOS_SetDevicePropValueEx(0x9110) 写
+   * EVFRecordStatus(0xD1b8)，0=停止录像、1=开始录像。
+   * 参照 libgphoto2 常量与 digiCamControl/qDslrDashboard 社区方案实现，
+   * 未在佳能实机验证（TBC-awaiting-hardware）。
+   */
+  private async canonWriteEosProp(propCode: number, value: number): Promise<void> {
+    const payload: Uint8Array = new Uint8Array(12);
+    const view: DataView = new DataView(payload.buffer);
+    view.setUint32(0, 12, true);
+    view.setUint32(4, propCode, true);
+    view.setUint32(8, value, true);
+    await this.transact(
+      CANON_EOS_SET_DEVICE_PROP_VALUE_EX,
+      [],
+      payload,
+      10000
+    );
+  }
+
+  private async canonStartMovieRecording(): Promise<void> {
+    // 未处于取景态时，先按 gphoto2 canon.c 序列开启实时取景：
+    // EVFMode=1（on）+ EVFOutputDevice 置 PC 位（2）。部分机型在 Movie
+    // 模式下对 EVFMode 返回 Busy，容忍失败不阻断录像。
+    if (!this.liveView) {
+      try {
+        await this.canonWriteEosProp(CANON_EVF_MODE, 1); // TBC-awaiting-hardware
+      } catch (err) {
+        // 忽略取景开启失败，继续尝试录像
+      }
+      try {
+        await this.canonWriteEosProp(CANON_EVF_OUTPUT_DEVICE, 2); // TBC-awaiting-hardware
+      } catch (err) {
+        // 忽略取景输出失败，继续尝试录像
+      }
+      this.liveView = true;
+    }
+    // TBC-awaiting-hardware：EOS 相机开始/停止录像均写 EVFRecordStatus。
+    await this.canonWriteEosProp(CANON_EVF_RECORD_STATUS, 1);
+    this.movieRecording = true;
+  }
+
+  private async canonStopMovieRecording(): Promise<void> {
+    // TBC-awaiting-hardware：0=停止录像。
+    await this.canonWriteEosProp(CANON_EVF_RECORD_STATUS, 0);
   }
 
   async capture(): Promise<Uint8Array> {

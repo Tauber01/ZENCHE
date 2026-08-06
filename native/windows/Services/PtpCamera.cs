@@ -32,8 +32,6 @@ public sealed class PtpCamera : IDisposable
     private const ushort GetLiveViewImage = 0x9203;
     private const ushort ManualFocusDriveOperation = 0x9204;
     private const ushort CaptureToSdram = 0x9207;
-    private const ushort StartMovieRecordingOperation = 0x920a;
-    private const ushort EndMovieRecordingOperation = 0x920b;
     private const ushort TerminateCapture = 0x920c;
     private const ushort ObjectAddedInSdram = 0xc101;
     private const ushort ExposureTime = 0x500d;
@@ -51,6 +49,13 @@ public sealed class PtpCamera : IDisposable
     private const ushort SonyMovieFileFormat = 0xd241;
     private const ushort CanonEosSetDevicePropValueEx = 0x9110;
     private const ushort CanonLogGamma = 0xd176;
+    // Canon EOS 录像/取景扩展（libgphoto2 camlibs/ptp2/ptp.h 常量）：
+    // - EVFRecordStatus(0xD1b8)：0=停止录像 1=开始录像（digiCamControl/qDslrDashboard 社区方案）
+    // - EVFMode(0xD1b1)：UINT16，0=off 1=on（gphoto2 canon.c 序列）
+    // - EVFOutputDevice(0xD1b0)：UINT32 mask，bit0=TFT bit1=PC，2=PC（gphoto2 canon.c 序列）
+    private const uint CanonEvfRecordStatus = 0xD1b8;
+    private const uint CanonEvfMode = 0xD1b1;
+    private const uint CanonEvfOutputDevice = 0xD1b0;
     private const int StillImageClass = 6;
     private const int MaximumContainerSize = 256 * 1024 * 1024;
 
@@ -423,6 +428,11 @@ public sealed class PtpCamera : IDisposable
             {
                 return;
             }
+            if (Profile?.VendorId == 0x04a9)
+            {
+                await CanonStartMovieRecordingAsync(cancellationToken);
+                return;
+            }
             if (!_liveView)
             {
                 await TransactAsync(
@@ -434,7 +444,7 @@ public sealed class PtpCamera : IDisposable
                 _liveView = true;
             }
             await TransactAsync(
-                StartMovieRecordingOperation,
+                _vendorOps.StartMovieRecording,
                 null,
                 null,
                 15_000,
@@ -465,10 +475,22 @@ public sealed class PtpCamera : IDisposable
             {
                 return;
             }
+            if (Profile?.VendorId == 0x04a9)
+            {
+                try
+                {
+                    await CanonStopMovieRecordingAsync(cancellationToken);
+                }
+                finally
+                {
+                    _movieRecording = false;
+                }
+                return;
+            }
             try
             {
                 await TransactAsync(
-                    EndMovieRecordingOperation,
+                    _vendorOps.EndMovieRecording,
                     null,
                     null,
                     15_000,
@@ -483,6 +505,81 @@ public sealed class PtpCamera : IDisposable
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    /// 佳能 EOS 录像启停：经 EOS_SetDevicePropValueEx(0x9110) 写
+    /// EVFRecordStatus(0xD1b8)，0=停止录像、1=开始录像。
+    /// 参照 libgphoto2 常量与 digiCamControl/qDslrDashboard 社区方案实现，
+    /// 未在佳能实机验证（TBC-awaiting-hardware）。
+    /// </summary>
+    private async Task CanonWriteEosPropAsync(
+        uint propCode,
+        uint value,
+        CancellationToken cancellationToken)
+    {
+        var payload = new byte[12];
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 12);
+        BinaryPrimitives.WriteUInt32LittleEndian(
+            payload.AsSpan(4, 4), propCode);
+        BinaryPrimitives.WriteUInt32LittleEndian(
+            payload.AsSpan(8, 4), value);
+        await TransactAsync(
+            CanonEosSetDevicePropValueEx,
+            null,
+            payload,
+            10_000,
+            cancellationToken);
+    }
+
+    private async Task CanonStartMovieRecordingAsync(
+        CancellationToken cancellationToken)
+    {
+        // 未处于取景态时，先按 gphoto2 canon.c 序列开启实时取景：
+        // EVFMode=1（on）+ EVFOutputDevice 置 PC 位（2）。部分机型在 Movie
+        // 模式下对 EVFMode 返回 Busy，容忍失败不阻断录像。
+        if (!_liveView)
+        {
+            try
+            {
+                await CanonWriteEosPropAsync(
+                    CanonEvfMode,
+                    1,
+                    cancellationToken); // TBC-awaiting-hardware
+            }
+            catch (Exception)
+            {
+                // 忽略取景开启失败，继续尝试录像
+            }
+            try
+            {
+                await CanonWriteEosPropAsync(
+                    CanonEvfOutputDevice,
+                    2,
+                    cancellationToken); // TBC-awaiting-hardware
+            }
+            catch (Exception)
+            {
+                // 忽略取景输出失败，继续尝试录像
+            }
+            _liveView = true;
+        }
+        // TBC-awaiting-hardware：EOS 相机开始/停止录像均写 EVFRecordStatus。
+        await CanonWriteEosPropAsync(
+            CanonEvfRecordStatus,
+            1,
+            cancellationToken);
+        _movieRecording = true;
+    }
+
+    private async Task CanonStopMovieRecordingAsync(
+        CancellationToken cancellationToken)
+    {
+        // TBC-awaiting-hardware：0=停止录像。
+        await CanonWriteEosPropAsync(
+            CanonEvfRecordStatus,
+            0,
+            cancellationToken);
     }
 
     public async Task<byte[]> CaptureAsync(
@@ -1246,12 +1343,19 @@ public sealed class PtpCamera : IDisposable
             {
                 try
                 {
-                    await TransactAsync(
-                        EndMovieRecordingOperation,
-                        null,
-                        null,
-                        15_000,
-                        cancellationToken);
+                    if (Profile?.VendorId == 0x04a9)
+                    {
+                        await CanonStopMovieRecordingAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        await TransactAsync(
+                            _vendorOps.EndMovieRecording,
+                            null,
+                            null,
+                            15_000,
+                            cancellationToken);
+                    }
                 }
                 catch
                 {

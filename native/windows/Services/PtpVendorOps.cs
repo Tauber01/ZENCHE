@@ -194,8 +194,11 @@ public sealed class CanonVendorOps : IPtpVendorOps
     public ushort EndLiveView => 0x9202;         // TBC
     public ushort GetLiveViewImage => 0x9203;     // TBC
     public ushort CaptureToSdram => 0x9207;       // TBC: Canon may use standard InitiateCapture (0x100E)
-    public ushort StartMovieRecording => 0x920a;  // TBC
-    public ushort EndMovieRecording => 0x920b;    // TBC
+    // Canon EOS 录像不走单一 opcode：PtpCamera 对 0x04a9 走
+    // EOS_SetDevicePropValueEx(0x9110) 写 EVFRecordStatus(0xD1b8) 序列
+    // （1=开始 0=停止，digiCamControl/qDslrDashboard 社区方案，TBC-awaiting-hardware）。
+    public ushort StartMovieRecording => 0x920a;  // TBC: unused for Canon — see CanonStartMovieRecordingAsync
+    public ushort EndMovieRecording => 0x920b;    // TBC: unused for Canon — see CanonStopMovieRecordingAsync
     public ushort TerminateCapture => 0x920c;     // Standard PTP
     public ushort ManualFocusDrive => 0x9204;     // TBC
     public ushort ChangeCameraMode => 0x90c2;     // TBC: Canon "remote shooting" mode entry
