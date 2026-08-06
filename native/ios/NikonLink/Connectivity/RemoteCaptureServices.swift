@@ -850,7 +850,9 @@ private actor PTPIPSession {
         detectedVendor = .unknown
     }
 
-    /// 无副作用链路探测：GetDeviceInfo（0x1002）并等待 OK，用于心跳保活。
+    /// 无副作用链路探测：OpenSession（0x1002，transaction=0）并等待 OK，
+    /// 用于心跳保活。（E3 1.5.9：注释勘正——0x1002 实为 OpenSession 而非
+    /// GetDeviceInfo；厂商识别用 0x1001 见 detectVendor，pro 复审观察项收口。）
     /// 超时通过竞速实现：NWConnection 的 receive 无超时参数，故用 Task 竞速。
     func probe(timeoutMilliseconds: UInt64 = 3000) async throws {
         guard command != nil else { throw PTPIPError.notConnected }
@@ -1184,6 +1186,11 @@ final class WifiCameraService: ObservableObject {
     /// 快门速度（秒）。0 表示未知/未读取。
     @Published private(set) var shutterSpeedValue: Double = 0
 
+    /// E3 1.5.9：连接/重连成功后是否自动开实时取景并拉帧（约 10fps）。
+    /// iOS 默认 true（监看页常驻）；macOS 由 UI 显式控制（MonitorView
+    /// onAppear/onDisappear 调 start/stopLiveViewIfNeeded），连接时不白拉帧。
+    var autoStartLiveViewOnConnect = true
+
     var onShutterTriggered: (() -> Void)?
 
     private let session = PTPIPSession()
@@ -1261,7 +1268,9 @@ final class WifiCameraService: ObservableObject {
                 self.startHeartbeat()
                 self.startPathMonitor()
                 if vendor != .unknown {
-                    self.startLiveViewIfNeeded()
+                    if self.autoStartLiveViewOnConnect {
+                        self.startLiveViewIfNeeded()
+                    }
                     self.refreshParameters()
                 }
             } catch {
@@ -1382,7 +1391,9 @@ final class WifiCameraService: ObservableObject {
                     self.status = "Wi‑Fi 已重连 · \(name)"
                     self.startHeartbeat()
                     if vendor != .unknown {
-                        self.startLiveViewIfNeeded()
+                        if self.autoStartLiveViewOnConnect {
+                            self.startLiveViewIfNeeded()
+                        }
                         self.refreshParameters()
                     }
                 } catch {

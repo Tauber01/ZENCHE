@@ -120,6 +120,21 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] Enabling 2× input sampling priority requests a higher format where available
       and falls back to the closest device-supported format without stopping preview.
 
+## macOS / Windows PTP/IP 遥控 — E3 1.5.9（待设备，TBC-awaiting-hardware）
+
+- [ ] **macOS Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后，监看页与全屏取景显示
+      Wi‑Fi 实时取景帧（CGImage，约 10fps）；录像钮对 Wi‑Fi 相机走机身录像
+      （Nikon 0x920a/0x920b；Canon EVFRecordStatus，TBC）；参数步进卡经
+      0x1015/0x1016 读写 ISO/光圈/快门后机身数值变化且读回一致；离开监看页
+      停止拉帧（不白空转）。
+- [ ] **Windows Wi‑Fi 遥控**：连接后自动识别厂商（GetDeviceInfo 0x1001 +
+      名称启发式），尼康/佳能自动开实时取景并拉帧；控制卡「开启/停止实时取景」
+      「开始/停止录制」可用；ISO/光圈/快门步进写入后读回一致；录像文件保存在
+      相机卡内；断连/重连后取景与参数自动恢复。
+- [ ] **PTP/IP data-out 相位**（Windows 新增）：SetDevicePropValue(0x1016) 与
+      Canon 0x9110 经 请求→StartData(9)→EndData(12)→响应 相位写入成功，机身
+      数值变化（对齐 iOS 实现与 docs/PTPIP_PROTOCOL.md）。
+
 ## iOS PTP/IP (Wi‑Fi 相机) — C3 1.5.8（待设备，TBC-awaiting-hardware）
 
 - [ ] **实时取景**：连接尼康/佳能 Wi‑Fi 相机后自动开实时取景，视频监看页与

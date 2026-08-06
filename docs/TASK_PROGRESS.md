@@ -749,3 +749,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **构建**：Android assembleDebug SUCCESSFUL、Harmony assembleHap SUCCESSFUL（未签名）、Windows dotnet publish 0 错误（2 既有 warning：PtpCamera.cs:1613 CS8629 + MainWindow.xaml.cs:815 CS0414，与基线一致零新增）；git diff --check 干净。
 - **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E2 待设备实机条目（取景启停/取景态参数读写/macOS gphoto2 管道，不改 macOS 码只挂条目）。
 - 纪律：全部佳能新代码 TBC-awaiting-hardware 标注；未建 dist（worktree 内 build 脚本产物为 1.5.8 同名中间件，不入库）；打包听 kimi 调度。
+
+## 12.30 v1.5.9 E3：PTP/IP 遥控全端化 macOS + Windows（2026-08-06，kimi 16:31 派工，事件 d3fecd35）
+
+- 背景：Tauber 指令「Wi‑Fi PTP/IP 遥控全端化」。计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E3。基线 `e798afe`，分支 `agent/1.5.9-e3-ptpip-macwin`，串行批次第二棒（E4/E5 未动）。
+- **docs/PTPIP_PROTOCOL.md（新）**：字节级协议文档，以 iOS RemoteCaptureServices.swift 为事实标准——双通道握手/包帧（type 1-12 表）、DataPhaseInfo 1（data-in/无数据）与 2（data-out）、厂商识别（0x1001 GetDeviceInfo 数据段布局）、取景/录像 vendor 分发（Nikon 0x9201-3/0x920a-b，Canon 0x9110 EVF 序列 + 0x9153 EOS dataset type 1/9/11）、参数属性（ISO 0x500f/光圈 0x5007/快门 0x500d）、B2 心跳契约（0x1002 探测不动）。供 E4 及后续维护。
+- **macOS**（仅 main.swift UI 接线，逻辑复用 iOS 编译产物）：监看页与全屏取景显示 `wifiCamera.liveViewFrame`（CGImage）；录像钮经 `toggleMovieRecording` 路由 Wi‑Fi 机身录像（不经过外录）；监看页参数步进卡绑定 `wifiCamera.stepShutterSpeed/stepAperture/stepISO`；**auto-live-view 门控**——共享服务新增 `autoStartLiveViewOnConnect`（默认 true，iOS 行为不变），macOS 置 false，由 MonitorView/全屏 onAppear 显式 startLiveViewIfNeeded、onDisappear 停止（照片页不空拉帧）。
+- **Windows**（PtpIpCamera.cs + MainWindow.xaml.cs）：传输层补 `SendCommandWithDataOutAsync`（DataPhaseInfo=2：请求→StartData(9)→EndData(12)→响应）+ `DetectVendorAsync`（0x1001 Manufacturer 解析 + 名称启发式，与 E2 iOS 口径一致）+ 取景/录像/参数方法（Nikon/Canon vendor 分发，TBC-awaiting-hardware）；UI 接 JPEG→BitmapImage 取景帧循环（WifiPreviewLoopAsync）、控制卡（实时取景/录像钮 + ISO/光圈/快门步进 + 参数读数）、快门钮视频态路由 Wi‑Fi 录像、断连/重连恢复取景与参数、关窗停循环。
+- **顺手项**：iOS probe 注释 0x1002「GetDeviceInfo」勘正为「OpenSession」（pro 复审观察项②收口，仅注释；心跳 opcode 不变）。
+- **契约锚点**：native-ptpip-capabilities.test.mjs 新增 2 用例（macOS 门控 + UI 接线；Windows 传输/UI 符号）。npm test **281/281** 全绿（基线 279 + E3 2）。
+- **构建**：Windows dotnet build Release **0 错误**（修 3 处编译期问题：lambda 捕获前声明、WriteUInt64 缺失、ushort 隐式转换）；iOS xcodebuild Release **BUILD SUCCEEDED**；macOS 全量构建（三 SDK env）**成功**（main.swift 编译含全部 UI 接线）；git diff --check 干净。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E3 待设备实机条目（macOS 遥控 / Windows 遥控 / data-out 相位）。
+- 纪律：PTP/IP 新代码 TBC-awaiting-hardware 标注（macOS UI 接线沿用逻辑层既有标注）；未建 dist（构建脚本中间产物不入库）；打包听 kimi 调度。
