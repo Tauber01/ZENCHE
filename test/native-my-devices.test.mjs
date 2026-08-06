@@ -85,3 +85,27 @@ test('Canon movie recording uses EOS EVFRecordStatus path on Android/Harmony/Win
   assert.match(windows, /_vendorOps\.StartMovieRecording/);
   assert.match(windowsOps, /0x920a/);
 });
+
+test('E2 1.5.9: 佳能实时取景走 EOS_GetViewFinderData(0x9153)，尼康取景 0x9203 保留', async () => {
+  const [android, harmony, windows] = await Promise.all([
+    read('native/android/app/src/main/java/com/tauber/nikonlink/PtpCamera.java'),
+    read('native/harmony/entry/src/main/ets/camera/PtpCamera.ets'),
+    read('native/windows/Services/PtpCamera.cs'),
+  ]);
+
+  for (const source of [android, harmony, windows]) {
+    // 佳能取帧 opcode：0x9153 EOS_GetViewFinderData（vendor 分发进入）。
+    assert.match(source, /0x9153/);
+    assert.match(source, /CANON_EOS_GET_VIEW_FINDER_DATA|CanonEosGetViewFinderData/);
+    // EOS dataset → 内嵌 JPEG 提取：type 1/9/11（libgphoto2 对齐）。
+    assert.match(source, /type == 1 \|\| type == 9 \|\| type == 11|type === 1 \|\| type === 9 \|\| type === 11/);
+    // 确认置位（不再乐观置位）：取景开启返回是否确认。
+    assert.match(source, /canonOpenLiveView|CanonOpenLiveViewAsync/);
+    // EVFOutputDevice 条件写：(cur & ~1) == 0。
+    assert.match(source, /& ~1|& ~1u|& 0xffffffff/);
+  }
+  // 尼康取景 0x9203 保留（非佳能路径不变）。
+  assert.match(android, /GET_LIVE_VIEW_IMAGE, null, null/);
+  assert.match(harmony, /GET_LIVE_VIEW_IMAGE,\n\s*\[\],\n\s*undefined/);
+  assert.match(windows, /GetLiveViewImage,/);
+});
