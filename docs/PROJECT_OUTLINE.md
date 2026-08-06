@@ -44,7 +44,7 @@ v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8
 
 ### 2.1 目标用户
 
-- 使用 Nikon 相机进行棚拍、静物、活动、延时或视频监看的摄影师。
+- 使用 Nikon、Sony、Canon 相机进行棚拍、静物、活动、延时或视频监看的摄影师。
 - 需要在移动端和桌面端接收、整理、备份与交付素材的个人或小型团队。
 - 需要开放、可诊断、可自行构建的跨平台相机工作流用户。
 
@@ -90,13 +90,19 @@ v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8
 - **Diagnose**：脱敏日志、更新检查、启动公告、防诈骗提示和问题反馈。
 - **Localize**：简体中文、English、日本語运行时切换与持久化。
 
-### 4.2 Nikon 相机支持
+### 4.2 相机支持（Nikon / Sony / Canon）
 
-当前四个直接 PTP 平台的注册表对齐为 20 款机型：
+当前四个直接 PTP 平台（Android、HarmonyOS、macOS、Windows；iOS 受 Apple 公开 API
+限制无厂商 USB/PTP 能力）的注册表对齐为 46 款机型：
 
-- EXPEED 5：D500、D7500、D850
-- EXPEED 6：Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
-- EXPEED 7：Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
+- Nikon（20 款）：EXPEED 5（D500、D7500、D850）；EXPEED 6（Z7、Z6、Z50、
+  D780、D6、Z5、Z7II、Z6II、Z fc、Z30）；EXPEED 7（Z9、Z8、Z f、Z6III、
+  Z50II、Z5II、ZR）
+- Sony α（12 款，VID 0x054c 通配）：A1、A1 II、A9 III、A7R V、A7 IV、
+  A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II
+- Canon EOS R（14 款，VID 0x04a9 通配）：R1、R3、R5、R5 Mark II、
+  R6 Mark II、R7、R8、R10、R50、R100，以及 2025 年按 DIGIC X 世代补齐的
+  R6 Mark III、R6（初代）、R5 C、R50 V
 
 机型注册表代表设备识别和参数范围已进入源码，不代表所有固件、镜头、线材、拍摄模式与主机组合均完成实机验收。硬件结论必须以 `docs/CAMERA_TEST_CHECKLIST.md` 的实际记录为准。
 

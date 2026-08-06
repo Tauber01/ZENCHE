@@ -413,6 +413,43 @@ private struct SupportedCamera: Equatable {
             minimumISO: 100,
             maximumISO: 12800
         ),
+        // ── Canon DIGIC X (2025 补齐) ──
+        SupportedCamera(
+            name: "Canon EOS R6 Mark III",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r6 mark iii", "canon eos r6 mk iii", "canon eos r6 3", "canon r6 mark iii", "canon r6 mk3", "eos r6 mark iii"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R6",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r6", "canon r6", "eos r6"],
+            minimumISO: 100,
+            maximumISO: 102400
+        ),
+        SupportedCamera(
+            name: "Canon EOS R5 C",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r5 c", "canon eos r5c", "canon r5 c", "canon r5c", "eos r5 c", "eos r5c"],
+            minimumISO: 100,
+            maximumISO: 51200
+        ),
+        SupportedCamera(
+            name: "Canon EOS R50 V",
+            vendorName: "Canon",
+            vendorID: 0x04a9,
+            productID: 0x0000,
+            detectionTokens: ["canon eos r50 v", "canon eos r50v", "canon r50 v", "canon r50v", "eos r50 v", "eos r50v"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
     ]
 
     static var summary: String {

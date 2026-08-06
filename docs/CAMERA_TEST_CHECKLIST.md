@@ -20,6 +20,10 @@ Record the camera firmware, lens, USB cable and host OS before testing.
 - [ ] Z5II (`04b0:0456`) is identified by its correct model name.
 - [ ] ZR (`04b0:0457`) is identified by its correct model name or descriptor fallback.
 - [ ] Other Nikon USB models are rejected with their actual Product ID.
+- [ ] **Canon EOS R6 Mark III（待设备）**：USB/PTP 被识别为「Canon EOS R6 Mark III」，
+      名称正确、ISO 范围显示 100–102400；Sony/Canon VID 通配（0x054c / 0x04a9）
+      不误匹配 Nikon 机型。注：Canon 深度控制（对焦/快门/LiveView 专属 opcode）为
+      TBC 未实机验证项，入册仅覆盖识别/名称/ISO 范围/泛型 PTP 连接。
 - [ ] Android displays a USB permission prompt once and reconnects after relaunch.
 - [ ] HarmonyOS displays the system USB permission prompt and reconnects after
       unplug/replug without retaining stale endpoints.

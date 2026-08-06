@@ -53,6 +53,10 @@ const canonProfiles = [
   ["Canon EOS R10", 0x0000, 100, 12800],
   ["Canon EOS R50", 0x0000, 100, 12800],
   ["Canon EOS R100", 0x0000, 100, 12800],
+  ["Canon EOS R6 Mark III", 0x0000, 100, 102400],
+  ["Canon EOS R6", 0x0000, 100, 102400],
+  ["Canon EOS R5 C", 0x0000, 100, 51200],
+  ["Canon EOS R50 V", 0x0000, 100, 32000],
 ];
 
 const allProfiles = [...nikonProfiles, ...sonyProfiles, ...canonProfiles];

@@ -28,7 +28,7 @@ final class PtpCamera {
             "Nikon D500、Z7、Z6、Z50、D7500、D780、D6、Z5、D850、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
                     + "Z f、Z6III、Z50II、Z5II、ZR"
                     + "、Sony A1、A7R V、A7 IV、A7S III、A7C II"
-                    + "、Canon EOS R5、R6 Mark II、R3、R7、R8";
+                    + "、Canon EOS R5、R6 Mark II、R3、R7、R8、R6 Mark III、R6、R5 C、R50 V";
     private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
             // ── Nikon EXPEED 5 ──
             new CameraProfile("Nikon D500", "Nikon", 0x04b0, 0x043a, 100, 51200),
@@ -79,6 +79,11 @@ final class PtpCamera {
             new CameraProfile("Canon EOS R10", "Canon", 0x04a9, 0x0000, 100, 12800),
             new CameraProfile("Canon EOS R50", "Canon", 0x04a9, 0x0000, 100, 12800),
             new CameraProfile("Canon EOS R100", "Canon", 0x04a9, 0x0000, 100, 12800),
+            // ── Canon DIGIC X (2025 补齐) ──
+            new CameraProfile("Canon EOS R6 Mark III", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R6", "Canon", 0x04a9, 0x0000, 100, 102400),
+            new CameraProfile("Canon EOS R5 C", "Canon", 0x04a9, 0x0000, 100, 51200),
+            new CameraProfile("Canon EOS R50 V", "Canon", 0x04a9, 0x0000, 100, 32000),
     };
 
     private static final int TYPE_COMMAND = 1;
