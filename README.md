@@ -28,10 +28,10 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - 最新正式版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 当前源码版本：**1.5.3 / build 28**
+- 当前源码版本：**1.5.7 / build 32**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
-- 相机档案：**42 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、10 Canon）
+- 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
 - 安装包：[v1.5.3 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
@@ -41,6 +41,14 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > 已发布版本和实际可下载文件以 GitHub Releases 为准。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.7 更新
+
+- 五端界面二次拉齐：页签词表统一为拍照 / 视频 / 编辑 / 我的设备 / 分支，跨页面字号与排版按 macOS 基准全量归档，亮暗双主题覆盖五端。
+- 波形示波器统一为 RGB 三色叠加：视频页监看与编辑页分析波形同款样式，视频页文字全部调白。
+- 移动端（iOS / Android / HarmonyOS）拍照页改版：快门上移至参数条上方，底栏收为 4 个页签，「我的设备 / 设置」并入右上角气泡菜单，拍照页新增 RGB 波形监看条。
+- 新增 WiFi（PTP/IP）连接监看：心跳保活、断线检测与指数退避自动重连，五端生效。
+- 相机档案新增佳能 DIGIC X 同代四款：EOS R6 Mark III、EOS R6、EOS R5 C、EOS R50 V。
 
 ### 1.5.3 工作台界面
 
@@ -394,10 +402,10 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - Latest stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
-- Source version: **1.5.3 / build 28**
+- Source version: **1.5.7 / build 32**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
-- Camera profiles: **42 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 10 Canon)
+- Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
 - Downloads: [latest stable v1.5.3 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
@@ -408,6 +416,14 @@ in a local library for review and export.
 > Published versions and downloadable files are defined by GitHub Releases.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### What's new in v1.5.7
+
+- Second UI alignment across all five clients: tab labels unified (Capture / Video / Edit / My Devices / Library), cross-page typography normalized against the macOS baseline, and light/dark themes covered on every platform.
+- Waveform scopes are now a unified RGB three-channel overlay: the video monitor and the editor analysis scope share the same style, and all video-page text switched to white.
+- Mobile capture page redesign (iOS / Android / HarmonyOS): the shutter moved above the parameter bar, the bottom bar is reduced to 4 tabs, "My Devices / Settings" moved into a top-right bubble menu, and the capture page gains an RGB waveform monitor strip.
+- New WiFi (PTP/IP) connection monitoring on all five clients: heartbeat keep-alive, drop detection, and exponential-backoff auto-reconnect.
+- Four new Canon DIGIC X-generation camera profiles: EOS R6 Mark III, EOS R6, EOS R5 C, and EOS R50 V.
 
 ### 1.5.3 Studio Interface
 
@@ -703,10 +719,10 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - 最新安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 現在のソースバージョン：**1.5.3 / build 28**
+- 現在のソースバージョン：**1.5.7 / build 32**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
-- カメラプロファイル：**Nikon / Sony / Canon の 42 機種**（Nikon 20、Sony 12、Canon 10）
+- カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
 - ダウンロード：[最新安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
@@ -717,6 +733,14 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > 公開済みバージョンと実際にダウンロードできるファイルは GitHub Releases を
 > 正とします。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.7 の更新
+
+- 5 端末の UI を再統一：タブ表記を「撮影 / ビデオ / 編集 / マイデバイス / ライブラリ」に統一し、ページ横断のタイポグラフィを macOS 基準で整理。ライト / ダーク両テーマを全端末でカバーします。
+- 波形スコープを RGB 3 色オーバーレイに統一：ビデオ監視とエディタ解析スコープが同じスタイルになり、ビデオページの文字はすべて白色に変更しました。
+- モバイル（iOS / Android / HarmonyOS）撮影ページを刷新：シャッターをパラメータバーの上へ移動、下部バーを 4 タブに集約、「マイデバイス / 設定」を右上のバブルメニューに統合し、撮影ページに RGB 波形モニター帯を追加しました。
+- WiFi（PTP/IP）接続モニタリングを新規追加：ハートビートによるキープアライブ、切断検出、指数バックオフによる自動再接続が 5 端末で有効です。
+- Canon DIGIC X 世代のカメラプロファイルを 4 機種追加：EOS R6 Mark III、EOS R6、EOS R5 C、EOS R50 V。
 
 ### 1.5.3 スタジオインターフェース
 
