@@ -721,4 +721,12 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - **C3 iOS PTP/IP 能力扩展**（实时取景 + 录像 + 参数读写，TBC-awaiting-hardware）
   - **D1 Windows 启动弹窗异常诊断加固**（完整堆栈可复制 + 公告区降级防护）
 - 版本号提交：1.5.7→**1.5.8**、build 32→**33** 五端一致（沿用 c0b5b28 改动面）：package.json 1.5.8；五个构建脚本 VERSION/PackageVersion 1.5.8；Android versionCode 33/versionName 1.5.8；Harmony AppScope versionCode 33/versionName 1.5.8 + oh-package.json5 1.5.8；iOS CURRENT_PROJECT_VERSION 33 ×2 + MARKETING_VERSION 1.5.8 ×2；macOS CFBundleVersion 33 + CFBundleShortVersionString 1.5.8；Windows csproj Version 1.5.8；test 断言 buildNumber 33。
-- 五端出包与自验结果（dist/ 清单 + 逐包 SHA-256 + 验收输出）见打包记录提交。
+- 产物（dist/，6 包 + 6 shasum + SHA256SUMS，覆盖同名保留 build 32 旧包）：
+  - `ZENCHE-1.5.8-android.apk` `b9ae57a025318fe5609e470722e7bdda6d3b32f92b5a4b62b06b0bd8cf009bc3`
+  - `ZENCHE-1.5.8-ios-unsigned.ipa` `4dc53b5a07599cc92cd1a533fb1094cdd056c1ccd783b17bbe7ff865f3b1325a`
+  - `ZENCHE-1.5.8-HarmonyOS.hap` `5e792b8f085107c704549b284b04c6ee49465e7e5e6b019408a4a2aa39a8024e`（未签名预期）
+  - `ZENCHE-1.5.8-macOS-arm64.dmg` `e664bc83fb896258b1cd69869fa32ad70b16ed2a61a85b5326adae4530e0838d`（ad-hoc 签名）
+  - `ZENCHE-1.5.8-Windows-x64-Setup.exe` `2bbf4cdc38cb671bd32ae3240f50fa1bc4d079b04ae97f01c78b35e62e7798cb`
+  - `ZENCHE-1.5.8-Windows-x64.zip` `a402bb00d80bcf483a475ccc179521a8873007101b8751f96e730517196b1c41`
+- 构建验证：Android assembleDebug BUILD SUCCESSFUL（ANDROID_HOME=~/Library/Android/sdk，debug 签名连续性 45499c18 已验）；iOS BUILD SUCCEEDED（unsigned ipa：无 _CodeSignature/embedded.mobileprovision，「code object is not signed at all」）；Harmony assembleHap BUILD SUCCESSFUL（未签名预期，module.json versionName 1.5.8/versionCode 33）；Windows dotnet publish 0 错误 + NSIS 成功（LANG=en_US.UTF-8 + 三 SDK env 指向 ~/Documents/NikonLink/）；macOS dmg 产出（三 SDK env）+ 挂测（/Volumes/帧澈 ZENCHE 1.5.8）+ codesign --deep --strict 通过（CFBundleShortVersionString 1.5.8/CFBundleVersion 33）。
+- 验证：6/6 shasum -c OK；apksigner 验签（DevEco JBR）SHA-256 `45499c18…` 与历史一致；版本提交后 npm test 270/270 全绿。
