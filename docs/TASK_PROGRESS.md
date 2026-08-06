@@ -710,3 +710,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **公告区降级保护**（MainWindow.xaml.cs ShowLaunchAnnouncementIfNeeded）：整个 UI 构建（FindResource/BitmapImage/资源查找）+ ShowDialog 包 try/catch，失败走 `_diagnostics.Warning("announcement", …)` 静默降级——不弹窗、不阻断启动。
 - 三语文案走 AppLocalization：新增 5 键（未处理异常 / 复制详情 / 已复制到剪贴板 / 关闭 / 对话框引导句），中文/English/日本語。
 - 验证：dotnet build Release **0 错误**（4 warning 与基线 f07b5a4 完全一致，既有）；npm test **270/270** 全绿；git diff --check 干净。
+
+## 12.27 v1.5.8 build 33 五端打包（2026-08-06，Tauber 15:06 打包指令，kimi 15:07 派工）
+
+- 基线整合分支 `agent/1.5.6-ui @ d77bc84`（已推 GitHub main，合并后 270/270 全绿）。v1.5.8 版本内容六项：
+  - **B1 佳能 R6III 及 DIGIC X 同代机型入册**（Canon +4，档案 46 款）
+  - **B2 WiFi (PTP/IP) 连接监看**（心跳保活 + 自动重连 + 网络监听联动，五端）
+  - **C1 安卓本机摄像头权限引导**（永久拒绝弹设置引导 + 占用分级提示）
+  - **C2 佳能 EOS 录像厂商路径**（Android/Harmony/Windows 三端 per-vendor，TBC-awaiting-hardware）
+  - **C3 iOS PTP/IP 能力扩展**（实时取景 + 录像 + 参数读写，TBC-awaiting-hardware）
+  - **D1 Windows 启动弹窗异常诊断加固**（完整堆栈可复制 + 公告区降级防护）
+- 版本号提交：1.5.7→**1.5.8**、build 32→**33** 五端一致（沿用 c0b5b28 改动面）：package.json 1.5.8；五个构建脚本 VERSION/PackageVersion 1.5.8；Android versionCode 33/versionName 1.5.8；Harmony AppScope versionCode 33/versionName 1.5.8 + oh-package.json5 1.5.8；iOS CURRENT_PROJECT_VERSION 33 ×2 + MARKETING_VERSION 1.5.8 ×2；macOS CFBundleVersion 33 + CFBundleShortVersionString 1.5.8；Windows csproj Version 1.5.8；test 断言 buildNumber 33。
+- 五端出包与自验结果（dist/ 清单 + 逐包 SHA-256 + 验收输出）见打包记录提交。
