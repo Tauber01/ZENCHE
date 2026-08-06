@@ -279,6 +279,7 @@ export function createApp(opts = {}) {
     rebindIpLimit = 10,
     rebindActivationLimit = 3,
     rebindLimiterMaxKeys = 10_000,
+    adminSecret = "", // loopback-only /v1/admin/stats bearer secret (constant-time compare)
     auditLogImpl = (line) => console.log(line),
     fsAdapter = null, // injectable fs adapter (R6 fault injection; tests only)
     onUnrecoverableStorage = null, // injectable fail-stop policy; CLI supplies the exit strategy
@@ -488,6 +489,73 @@ export function createApp(opts = {}) {
     return crypto.createHash("sha256").update(String(value || ""), "utf8").digest("hex").slice(0, 12);
   }
 
+  // Constant-time bearer compare (same pattern as redeem-rebind.mjs): both
+  // sides are hashed first so timingSafeEqual sees equal-length buffers and
+  // the digest leaks nothing usable about the secret.
+  function constantTimeEqual(a, b) {
+    const ha = crypto.createHash("sha256").update(String(a || ""), "utf8").digest();
+    const hb = crypto.createHash("sha256").update(String(b || ""), "utf8").digest();
+    return crypto.timingSafeEqual(ha, hb);
+  }
+
+  function bearerToken(req) {
+    const header = req.headers.authorization;
+    if (typeof header !== "string") return null;
+    const match = /^Bearer\s+(\S+)$/i.exec(header);
+    return match ? match[1] : null;
+  }
+
+  // Loopback-only guard: the stats route is meant for the operator on the
+  // same host (systemd / nohup supervisor), never for the public surface.
+  function isLoopback(req) {
+    const remote = req.socket.remoteAddress || "";
+    return remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+  }
+
+  // Aggregate usage statistics over the migration-merged device registry.
+  // resolveMigrationTail collapses a migrated chain to its final device so a
+  // migrated activation is never double-counted. "活跃" (active) is measured
+  // by last_seen within the window on the merged tail device.
+  function adminStats(now = Date.now()) {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const tailSeen = new Map(); // tail -> newest last_seen
+    const remaining = new Map(); // tail -> remaining (min across merged records)
+    const tails = new Set();
+    for (const [deviceId, record] of Object.entries(devices)) {
+      if (!record || typeof record !== "object") continue;
+      const tail = resolveMigrationTail(devices, deviceId);
+      tails.add(tail);
+      const seen = Number(record.last_seen) || 0;
+      if (seen > (tailSeen.get(tail) || 0)) tailSeen.set(tail, seen);
+      const rem = Math.max(0, maxUsage - (Number(record.used) || 0));
+      const current = remaining.get(tail);
+      if (current === undefined || rem < current) remaining.set(tail, rem);
+    }
+    const active24h = [...tailSeen.values()].filter((ts) => now - ts <= dayMs).length;
+    const active7d = [...tailSeen.values()].filter((ts) => now - ts <= 7 * dayMs).length;
+    const buckets = {
+      zero: 0,
+      low1to10: 0,
+      mid11to50: 0,
+      high51to99: 0,
+      full100: 0,
+    };
+    for (const rem of remaining.values()) {
+      if (rem <= 0) buckets.zero += 1;
+      else if (rem <= 10) buckets.low1to10 += 1;
+      else if (rem <= 50) buckets.mid11to50 += 1;
+      else if (rem < maxUsage) buckets.high51to99 += 1;
+      else buckets.full100 += 1;
+    }
+    return {
+      totalDevices: tails.size,
+      active24h,
+      active7d,
+      remainingDistribution: buckets,
+      generated_at: new Date(now).toISOString(),
+    };
+  }
+
   function auditRebind(oldDeviceId, newDeviceId, activation, ip, result) {
     try {
       auditLogImpl(
@@ -652,6 +720,22 @@ export function createApp(opts = {}) {
       const route = req.url.split("?")[0];
       const isAi = route === "/v1/ai";
       const isRebind = enableRebind && route === "/v1/ai/rebind";
+      const isAdminStats = route === "/v1/admin/stats";
+      // L0: operator-only usage stats — loopback + constant-time bearer secret.
+      // The route only exists when an admin secret is configured (fail-closed).
+      if (isAdminStats) {
+        if (!adminSecret || req.method !== "GET") {
+          return reply(res, 404, { error: "Not found" });
+        }
+        if (!isLoopback(req)) {
+          return reply(res, 403, { error: "Forbidden" });
+        }
+        const token = bearerToken(req);
+        if (!token || !constantTimeEqual(token, adminSecret)) {
+          return reply(res, 401, { error: "未授权" }, { "WWW-Authenticate": "Bearer" });
+        }
+        return reply(res, 200, adminStats());
+      }
       if (req.method !== "POST" || (!isAi && !isRebind)) {
         return reply(res, 404, { error: "Not found" });
       }
@@ -796,6 +880,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     enableRebind: process.env.ZENCHE_AI_ENABLE_REBIND === "1",
     redeemEndpoint: process.env.ZENCHE_REDEEM_ENDPOINT || "http://127.0.0.1:8899/issue-migrated",
     rebindSecret: process.env.ZENCHE_REBIND_SECRET || "",
+    adminSecret: process.env.ZENCHE_AI_ADMIN_SECRET || "", // enables loopback-only /v1/admin/stats
     // R6 fail-stop policy: on unrecoverable storage, shut the service down so
     // the supervisor (nohup wrapper / systemd) restarts it for operator review.
     onUnrecoverableStorage: (err) => {

@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, statSync, readFileSync, readdirSync, mkdirSync, openSync, closeSync, writeSync, fsyncSync, renameSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
-import { extname, isAbsolute, join, normalize, resolve } from "node:path";
+import { extname, isAbsolute, join, normalize, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const defaultRepository = "Tauber01/ZENCHE";
@@ -306,9 +307,134 @@ function json(response, status, value, requestMethod = "GET") {
   else response.end();
 }
 
+// L1: anonymous usage store. 每次更新检查（客户端带 installId 时）追加一条
+// {fingerprint, platform, version, ts} 到 data/usage-YYYY-MM-DD.json（按天分片）。
+// 写入走与 ai-server 一致的 tmp→fsync→rename 耐久路径；测试注入内存实现。
+export function createUsageStore({ dataDir, fs = null }) {
+  const useMemory = fs !== null; // 测试注入内存模式；默认写盘
+  const F = fs || {
+    mkdirSync, existsSync, readFileSync, readdirSync,
+    openSync, closeSync, writeSync, fsyncSync, renameSync,
+  };
+  const dayKey = (ts) => {
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  };
+  const fileFor = (ts) => join(dataDir, `usage-${dayKey(ts)}.json`);
+  const entries = []; // 内存模式（测试注入）时所有记录都进这里
+
+  function persistDay(ts, records) {
+    F.mkdirSync(dataDir, { recursive: true });
+    const file = fileFor(ts);
+    const tmp = `${file}.tmp`;
+    const fd = F.openSync(tmp, "w", 0o600);
+    try {
+      F.writeSync(fd, JSON.stringify(records, null, 2));
+      F.fsyncSync(fd);
+    } finally {
+      F.closeSync(fd);
+    }
+    F.renameSync(tmp, file);
+  }
+
+  function loadDay(ts) {
+    const file = fileFor(ts);
+    if (!F.existsSync(file)) return [];
+    try {
+      const parsed = JSON.parse(F.readFileSync(file, "utf8"));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return []; // 损坏的当日文件按空处理，不阻断更新检查
+    }
+  }
+
+  function allRecords(nowTs) {
+    if (useMemory) return entries.slice();
+    const day = 24 * 60 * 60 * 1000;
+    const records = [];
+    let files = [];
+    try {
+      files = F.readdirSync(dataDir).filter((f) => /^usage-\d{4}-\d{2}-\d{2}\.json$/.test(f));
+    } catch { /* dataDir 未创建 -> 空 */ }
+    for (const file of files) {
+      const filePath = join(dataDir, file);
+      try {
+        if (!F.existsSync(filePath)) continue;
+        const parsed = JSON.parse(F.readFileSync(filePath, "utf8"));
+        if (Array.isArray(parsed)) records.push(...parsed);
+      } catch { /* 单个损坏文件跳过 */ }
+    }
+    return records;
+  }
+
+  return {
+    // 返回是否记录成功；任何 IO 错误静默返回 false（不阻断更新响应）。
+    record(platform, version, installId, ts = Date.now()) {
+      if (!installId) return false;
+      const fingerprint = crypto.createHash("sha256")
+        .update(String(installId), "utf8").digest("hex").slice(0, 12);
+      const record = { fingerprint, platform, version, ts };
+      try {
+        if (useMemory) {
+          entries.push(record);
+          return true;
+        }
+        const today = loadDay(ts);
+        today.push(record);
+        persistDay(ts, today);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // DAU/WAU/累计安装 + 平台/版本拆分（按指纹去重，取每个指纹最新记录）。
+    stats(nowTs = Date.now()) {
+      const day = 24 * 60 * 60 * 1000;
+      const all = new Map(); // fingerprint -> latest record
+      for (const item of allRecords(nowTs)) {
+        if (!item || !item.fingerprint) continue;
+        const ts = Number(item.ts) || 0;
+        const prev = all.get(item.fingerprint);
+        if (!prev || ts > prev.ts) all.set(item.fingerprint, item);
+      }
+      const byPlatform = {};
+      const byVersion = {};
+      let dau = 0;
+      let wau = 0;
+      for (const item of all.values()) {
+        const ts = Number(item.ts) || 0;
+        if (nowTs - ts <= day) dau += 1;
+        if (nowTs - ts <= 7 * day) wau += 1;
+        const p = item.platform || "unknown";
+        byPlatform[p] = (byPlatform[p] || 0) + 1;
+        const v = item.version || "unknown";
+        byVersion[v] = (byVersion[v] || 0) + 1;
+      }
+      return {
+        totalInstallations: all.size,
+        dau,
+        wau,
+        byPlatform,
+        byVersion,
+        generated_at: new Date(nowTs).toISOString(),
+      };
+    },
+    _entries: entries,
+  };
+}
+
 export function createApp(options = {}) {
   const updateService = options.updateService || createUpdateService(options);
   const corsOrigin = options.corsOrigin || process.env.UPDATE_CORS_ORIGIN || "*";
+  // L1: anonymous usage telemetry. installId 只存 sha256 前 12 位指纹。
+  // usageStore 可注入（测试用内存实现）；默认落到 data/usage-YYYY-MM-DD.json。
+  const usageStore = options.usageStore || createUsageStore({
+    dataDir: options.dataDir || process.env.UPDATE_DATA_DIR || join(root, "data"),
+  });
+  const adminSecret = options.adminSecret || process.env.UPDATE_ADMIN_SECRET || "";
+  const statsSecret = options.statsSecret || adminSecret; // /api/stats 鉴权：回环优先，允许显式 Bearer
+  const now = options.now || (() => Date.now());
   return createHttpServer(async (request, response) => {
     setSecurityHeaders(response, corsOrigin);
     let requestUrl;
@@ -333,8 +459,16 @@ export function createApp(options = {}) {
         json(response, 405, { error: "method_not_allowed" }, request.method);
         return;
       }
+      // L1: anonymous usage heartbeat. Optional installId 只存 12 位指纹；
+      // 记录失败绝不影响更新响应（静默）。
       try {
-        const result = await updateService.getUpdate(Object.fromEntries(requestUrl.searchParams.entries()));
+        const query = Object.fromEntries(requestUrl.searchParams.entries());
+        const platform = normalizePlatform(query.platform || "unknown");
+        const installId = String(query.installId || "").trim().slice(0, 128);
+        if (installId) {
+          usageStore.record(platform, query.current_version || query.version || "unknown", installId, now());
+        }
+        const result = await updateService.getUpdate(query);
         const etag = `\"${createHash("sha256").update(JSON.stringify(result)).digest("hex").slice(0, 24)}\"`;
         response.setHeader("ETag", etag);
         if (request.headers["if-none-match"] === etag) {
@@ -346,6 +480,41 @@ export function createApp(options = {}) {
       } catch (error) {
         json(response, 503, { error: "update_unavailable", message: "Update metadata is temporarily unavailable" }, request.method);
       }
+      return;
+    }
+    if (pathname === "/api/stats") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        json(response, 405, { error: "method_not_allowed" }, request.method);
+        return;
+      }
+      // 回环直连或显式 Bearer 常数时间比较；其余 403/401。
+      const remote = request.socket.remoteAddress || "";
+      const loopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+      const header = request.headers.authorization;
+      const token = typeof header === "string" ? /^Bearer\s+(\S+)$/i.exec(header)?.[1] : null;
+      if (statsSecret && token) {
+        const ha = createHash("sha256").update(token, "utf8").digest();
+        const hb = createHash("sha256").update(statsSecret, "utf8").digest();
+        if (crypto.timingSafeEqual(ha, hb)) {
+          json(response, 200, usageStore.stats(now()), request.method);
+          return;
+        }
+      }
+      if (loopback && statsSecret) {
+        if (!token) {
+          json(response, 401, { error: "unauthorized" }, request.method);
+          return;
+        }
+        const ha = createHash("sha256").update(token, "utf8").digest();
+        const hb = createHash("sha256").update(statsSecret, "utf8").digest();
+        if (crypto.timingSafeEqual(ha, hb)) {
+          json(response, 200, usageStore.stats(now()), request.method);
+          return;
+        }
+        json(response, 401, { error: "unauthorized" }, request.method);
+        return;
+      }
+      json(response, loopback ? 401 : 403, { error: "forbidden" }, request.method);
       return;
     }
     if (request.method !== "GET" && request.method !== "HEAD") {

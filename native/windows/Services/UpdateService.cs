@@ -30,6 +30,33 @@ public sealed class UpdateService
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "mirrorchyan-cdk.dat");
+    private static readonly string InstallIdPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "anonymous-install-id.dat");
+
+    /// E1: 匿名安装 ID——首次生成 UUID 存本地文件，与激活码/设备码无关，
+    /// 仅用于服务器匿名用量统计（服务端只存 sha256 前 12 位指纹）。
+    private static string AnonymousInstallId()
+    {
+        try
+        {
+            if (File.Exists(InstallIdPath))
+            {
+                var existing = File.ReadAllText(InstallIdPath).Trim();
+                if (existing.Length > 0) return existing;
+            }
+            var id = Guid.NewGuid().ToString();
+            Directory.CreateDirectory(Path.GetDirectoryName(InstallIdPath)!);
+            File.WriteAllText(InstallIdPath, id);
+            return id;
+        }
+        catch
+        {
+            // 读取/写入失败时回退到空串：不阻断更新检查。
+            return "";
+        }
+    }
 
     public string CurrentVersion { get; } =
         Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.5.3";
@@ -120,7 +147,8 @@ public sealed class UpdateService
             $"platform=windows",
             $"arch={Uri.EscapeDataString(MirrorChyanArchitecture)}",
             $"current_version={Uri.EscapeDataString(CurrentVersion)}",
-            "channel=stable"
+            "channel=stable",
+            $"installId={Uri.EscapeDataString(AnonymousInstallId())}"
         };
         var separator = string.IsNullOrEmpty(builder.Query) ? "?" : "&";
         builder.Query = builder.Query.TrimStart('?');

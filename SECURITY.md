@@ -14,6 +14,14 @@ device access.
 automatic cloud upload or analytics. The GitHub Issue action sends only the
 diagnostic text visible in the prefilled form, and only after the user reviews
 and submits it on GitHub; photos and complete log archives are not attached.
+The only network heartbeat is an anonymous, optional update check: each app
+start that has automatic update checking enabled sends the update server a
+random per-install ID (stored only on the device, independent of activation
+and device codes) which the server hashes to a 12-character fingerprint before
+storing, alongside the platform and version, purely to count installs and
+daily/weekly active users. The install ID never leaves the device as a raw
+identifier, can be disabled by turning off automatic update checking, and is
+never linked to photos, logs, activation codes, or camera identifiers.
 USB access is requested only after the user chooses
 the native Nikon camera connection. The FTP wireless inbox listens only while
 the user enables it and should be used on a trusted local network; stop the

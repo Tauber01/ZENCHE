@@ -730,3 +730,12 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   - `ZENCHE-1.5.8-Windows-x64.zip` `a402bb00d80bcf483a475ccc179521a8873007101b8751f96e730517196b1c41`
 - 构建验证：Android assembleDebug BUILD SUCCESSFUL（ANDROID_HOME=~/Library/Android/sdk，debug 签名连续性 45499c18 已验）；iOS BUILD SUCCEEDED（unsigned ipa：无 _CodeSignature/embedded.mobileprovision，「code object is not signed at all」）；Harmony assembleHap BUILD SUCCESSFUL（未签名预期，module.json versionName 1.5.8/versionCode 33）；Windows dotnet publish 0 错误 + NSIS 成功（LANG=en_US.UTF-8 + 三 SDK env 指向 ~/Documents/NikonLink/）；macOS dmg 产出（三 SDK env）+ 挂测（/Volumes/帧澈 ZENCHE 1.5.8）+ codesign --deep --strict 通过（CFBundleShortVersionString 1.5.8/CFBundleVersion 33）。
 - 验证：6/6 shasum -c OK；apksigner 验签（DevEco JBR）SHA-256 `45499c18…` 与历史一致；版本提交后 npm test 270/270 全绿。
+
+## 12.28 v1.5.9 E1 使用人数监控（服务端 + 五端匿名上报，2026-08-06）
+
+- 派工：Tauber「服务器后台能监控使用人数」（08-06 线程 16:05，kimi E1 派工）；计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E1。
+- **L0（ai-server/app.mjs）**：新增回环-only `GET /v1/admin/stats`——Bearer 常数时间比较（仿 redeem-rebind.mjs），返回总激活设备数、24h/7d 活跃（按 last_seen + resolveMigrationTail 迁移链归并）、剩余次数分布（0/1-10/11-50/51-99/满额桶）；CLI 由 `ZENCHE_AI_ADMIN_SECRET` 启用。附一次性报表脚本 `scripts/ai-stats-report.mjs`（直接读 devices.json 出同口径 JSON）。
+- **L1（server.mjs）**：`/api/update` 处理新增可选 `installId`——服务端只存 sha256(installId) 前 12 位指纹 + platform + version 到 `data/usage-YYYY-MM-DD.json`（tmp→fsync→rename 耐久路径，与 ai-server 同款）；新增 `GET /api/stats`（回环 + Bearer 常数时间比较）聚合 DAU/WAU/累计安装 + 按平台/版本拆分。记录失败静默不影响更新响应。
+- **五端客户端**：更新检查 query 追加 `installId`——Android（SharedPreferences `anonymousInstallId`）、macOS/iOS（UserDefaults `NikonLink.anonymousInstallId`，UUID 首次生成）、Harmony（preferences `anonymousInstallId`，util.generateRandomUUID）、Windows（LocalApplicationData/NikonLink/anonymous-install-id.dat，Guid）。ID 与激活码/设备码无关，关闭自动更新检查即停止上报。
+- **SECURITY.md**：修订「no analytics」措辞——补充匿名/可选/仅存指纹/与照片日志无关的边界说明。
+- 验证：npm test 全量绿（ai-server 45/45 含 L0 3 项、server-update 9/9 含 L1 3 项）；node --check 三文件通过；git diff --check 干净。生产服务器未动（L1 有效性绑定 zenche.top DNS 切换待 Tauber）。

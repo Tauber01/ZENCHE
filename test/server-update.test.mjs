@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createApp, createUpdateService, selectReleaseAsset } from "../server.mjs";
+import { readFile } from "node:fs/promises";
+import { createApp, createUpdateService, selectReleaseAsset, createUsageStore } from "../server.mjs";
 
 const release = {
   tag_name: "v1.5.0",
@@ -132,4 +133,71 @@ test("static server behavior remains available", async () => {
     assert.equal(response.status, 200);
     assert.match(await response.text(), /帧澈 ZENCHE/);
   });
+});
+
+// ---------- L1: anonymous usage recording + /api/stats ----------
+
+test("L1: /api/update records anonymous usage and /api/stats aggregates DAU/WAU", async () => {
+  // 内存 usage store（注入空 fs 触发内存模式）——不改磁盘。
+  const memoryFs = {};
+  const usageStore = createUsageStore({ dataDir: "/tmp/zenche-usage-mem", fs: memoryFs });
+  const release = { tag_name: "v1.5.9", assets: [] };
+  await withServer(
+    {
+      updateService: createUpdateService({ fetchImpl: async () => ({ ok: true, json: async () => release }) }),
+      usageStore,
+      adminSecret: "test-stats-secret",
+    },
+    async (base) => {
+      // 同一 installId 两次、另一 installId 一次 → 累计安装 2，DAU 2
+      const u1 = "00000000-0000-4000-8000-000000000001";
+      const u2 = "00000000-0000-4000-8000-000000000002";
+      const url = (id) => `${base}/api/update?platform=windows&architecture=x64&current_version=1.5.8&installId=${id}`;
+      for (let i = 0; i < 2; i++) {
+        const r = await fetch(url(u1));
+        assert.equal(r.status, 200);
+      }
+      await fetch(url(u2));
+
+      const stats = await fetch(`${base}/api/stats`, { headers: { Authorization: "Bearer test-stats-secret" } });
+      assert.equal(stats.status, 200);
+      const body = await stats.json();
+      assert.equal(body.totalInstallations, 2);
+      assert.equal(body.dau, 2);
+      assert.equal(body.wau, 2);
+      assert.equal(body.byPlatform.windows, 2);
+      assert.equal(body.byVersion["1.5.8"], 2);
+
+      // 未授权（非回环视角）→ 403/401
+      const forbidden = await fetch(`${base}/api/stats`);
+      assert.ok(forbidden.status === 401 || forbidden.status === 403);
+    },
+  );
+});
+
+test("L1: usage recording never blocks update response on store failure", async () => {
+  // fs 注入抛错 → record 静默 false，更新仍 200。
+  const failingFs = {
+    mkdirSync() { throw new Error("disk full"); },
+  };
+  const usageStore = createUsageStore({ dataDir: "/tmp/zenche-usage-fail", fs: failingFs });
+  const release = { tag_name: "v1.5.9", assets: [] };
+  await withServer(
+    {
+      updateService: createUpdateService({ fetchImpl: async () => ({ ok: true, json: async () => release }) }),
+      usageStore,
+    },
+    async (base) => {
+      const r = await fetch(`${base}/api/update?platform=macos&current_version=1.5.8&installId=whatever`);
+      assert.equal(r.status, 200, "update must succeed even if usage record fails");
+    },
+  );
+});
+
+test("L1: usage files are per-day with tmp→rename durability (source)", async () => {
+  const source = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
+  assert.match(source, /usage-\$\{dayKey\(ts\)\}\.json/, "per-day usage file naming");
+  assert.match(source, /fsyncSync/, "durable write path must fsync");
+  assert.match(source, /renameSync/, "durable write path must rename");
+  assert.match(source, /sha256/, "fingerprint must be hashed");
 });
