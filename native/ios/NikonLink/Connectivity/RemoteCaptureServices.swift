@@ -339,6 +339,38 @@ private final class PTPIPContinuationGate: @unchecked Sendable {
     }
 }
 
+/// 单次续体容器：保证 receive 回调与 onCancel 竞速时只恢复一次，
+/// 且 onCancel（Task 取消路径）也能拿到 continuation 主动恢复。
+private final class PTPIPReceiveBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Data, Error>?
+    private var finished = false
+
+    func install(_ continuation: CheckedContinuation<Data, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Data) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished, let continuation else { return }
+        finished = true
+        self.continuation = nil
+        continuation.resume(returning: value)
+    }
+
+    func resume(throwing error: Error) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !finished, let continuation else { return }
+        finished = true
+        self.continuation = nil
+        continuation.resume(throwing: error)
+    }
+}
+
 private actor PTPIPSession {
     private var command: NWConnection?
     private var event: NWConnection?
@@ -500,6 +532,32 @@ private actor PTPIPSession {
         transactionID = 1
     }
 
+    /// 无副作用链路探测：GetDeviceInfo（0x1002）并等待 OK，用于心跳保活。
+    /// 超时通过竞速实现：NWConnection 的 receive 无超时参数，故用 Task 竞速。
+    func probe(timeoutMilliseconds: UInt64 = 3000) async throws {
+        guard command != nil else { throw PTPIPError.notConnected }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                let response = try await self.commandRequest(
+                    operation: 0x1002,
+                    transaction: 0,
+                    parameters: [1]
+                )
+                guard response == 0x2001 else {
+                    throw PTPIPError.rejected(response)
+                }
+            }
+            group.addTask {
+                try await Task.sleep(
+                    nanoseconds: timeoutMilliseconds * 1_000_000
+                )
+                throw PTPIPError.connectionFailed("心跳探测超时")
+            }
+            _ = try await group.next()
+            group.cancelAll()
+        }
+    }
+
     private func commandRequest(
         operation: UInt16,
         transaction: UInt32,
@@ -647,36 +705,47 @@ private actor PTPIPSession {
         on connection: NWConnection
     ) async throws -> Data {
         if count == 0 { return Data() }
-        return try await withCheckedThrowingContinuation { continuation in
-            var accumulated = Data()
-            func pull() {
-                connection.receive(
-                    minimumIncompleteLength: 1,
-                    maximumLength: count - accumulated.count
-                ) { content, _, isComplete, error in
-                    if let content {
-                        accumulated.append(content)
-                    }
-                    if accumulated.count == count {
-                        continuation.resume(returning: accumulated)
-                    } else if let error {
-                        continuation.resume(
-                            throwing: PTPIPError.connectionFailed(
-                                error.localizedDescription
+        let box = PTPIPReceiveBox()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Data, Error>) in
+                box.install(continuation)
+                var accumulated = Data()
+                func pull() {
+                    connection.receive(
+                        minimumIncompleteLength: 1,
+                        maximumLength: count - accumulated.count
+                    ) { content, _, isComplete, error in
+                        if let content {
+                            accumulated.append(content)
+                        }
+                        if accumulated.count == count {
+                            box.resume(returning: accumulated)
+                        } else if let error {
+                            box.resume(
+                                throwing: PTPIPError.connectionFailed(
+                                    error.localizedDescription
+                                )
                             )
-                        )
-                    } else if isComplete {
-                        continuation.resume(
-                            throwing: PTPIPError.connectionFailed(
-                                "相机提前关闭了连接"
+                        } else if isComplete {
+                            box.resume(
+                                throwing: PTPIPError.connectionFailed(
+                                    "相机提前关闭了连接"
+                                )
                             )
-                        )
-                    } else {
-                        pull()
+                        } else {
+                            pull()
+                        }
                     }
                 }
+                pull()
             }
-            pull()
+        } onCancel: {
+            // 竞速超时路径：让挂起的 receive 以超时错误结束。
+            box.resume(
+                throwing: PTPIPError.connectionFailed("心跳探测超时")
+            )
+            connection.cancel()
         }
     }
 
@@ -759,7 +828,13 @@ final class WifiCameraService: ObservableObject {
         case disconnected
         case connecting
         case ready
+        case reconnecting(attempt: Int)
         case failed(String)
+
+        var isReconnecting: Bool {
+            if case .reconnecting = self { return true }
+            return false
+        }
     }
 
     @Published private(set) var state: State = .disconnected
@@ -784,6 +859,20 @@ final class WifiCameraService: ObservableObject {
 
     private let session = PTPIPSession()
     private var connectionTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var pathMonitor: NWPathMonitor?
+    private var manualDisconnect = false
+    private var missedHeartbeats = 0
+    private var reconnectAttempt = 0
+
+    // B2 保活参数（契约测试锚点，勿改数值）：
+    // 心跳间隔 5s / 单次探测超时 3s / 连续 3 次判离线 /
+    // 退避 1/2/4/8/16 封顶 30s。
+    static let heartbeatIntervalSeconds: UInt64 = 5
+    static let probeTimeoutMilliseconds: UInt64 = 3000
+    static let offlineThreshold = 3
+    static let reconnectMaxDelaySeconds: UInt64 = 30
 
     init() {
         connectionMode = WifiConnectionMode(
@@ -806,7 +895,12 @@ final class WifiCameraService: ObservableObject {
             status = PTPIPError.invalidEndpoint.localizedDescription
             return
         }
+        manualDisconnect = false
         connectionTask?.cancel()
+        reconnectTask?.cancel()
+        heartbeatTask?.cancel()
+        missedHeartbeats = 0
+        reconnectAttempt = 0
         state = .connecting
         status = "正在连接 Wi‑Fi 相机…"
         connectionTask = Task { [weak self] in
@@ -822,6 +916,8 @@ final class WifiCameraService: ObservableObject {
                 self.cameraName = name
                 self.state = .ready
                 self.status = "Wi‑Fi 已连接 · \(name)"
+                self.startHeartbeat()
+                self.startPathMonitor()
             } catch {
                 guard !Task.isCancelled else { return }
                 self.cameraName = "—"
@@ -832,12 +928,138 @@ final class WifiCameraService: ObservableObject {
     }
 
     func disconnect() {
+        manualDisconnect = true
         connectionTask?.cancel()
         connectionTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        stopPathMonitor()
         Task { await session.disconnect() }
         state = .disconnected
         cameraName = "—"
         status = "Wi‑Fi 相机未连接"
+    }
+
+    // MARK: - B2 链路保活 + 自动重连
+
+    /// 心跳循环：就绪态下每 5s 探测一次（串行于 PTPIPSession actor），
+    /// 连续 3 次无响应判离线，进入退避重连。
+    private func startHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(
+                    nanoseconds: Self.heartbeatIntervalSeconds * 1_000_000_000
+                )
+                guard !Task.isCancelled else { return }
+                guard self.state == .ready else { return }
+                do {
+                    try await self.session.probe(
+                        timeoutMilliseconds: Self.probeTimeoutMilliseconds
+                    )
+                    self.missedHeartbeats = 0
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    self.missedHeartbeats += 1
+                    if self.missedHeartbeats >= Self.offlineThreshold {
+                        self.missedHeartbeats = 0
+                        self.enterReconnecting()
+                        return
+                    }
+                }
+            }
+        }
+    }
+
+    /// 判离线后进入 reconnecting：立即尝试一次重连，失败则指数退避。
+    private func enterReconnecting() {
+        guard case .ready = state else { return }
+        state = .reconnecting(attempt: reconnectAttempt)
+        status = "Wi‑Fi 链路已断开，正在自动重连…"
+        scheduleReconnect()
+    }
+
+    private func scheduleReconnect() {
+        reconnectTask?.cancel()
+        let attempt = reconnectAttempt + 1
+        reconnectAttempt = attempt
+        let delay = Self.backoffDelay(forAttempt: attempt)
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await Task.sleep(nanoseconds: delay * 1_000_000_000)
+                guard !Task.isCancelled, !self.manualDisconnect else { return }
+                self.state = .reconnecting(attempt: attempt)
+                self.status = "正在重连 Wi‑Fi 相机（第 \(attempt) 次）…"
+                let port = UInt16(self.portText)
+                guard let port else {
+                    self.state = .failed("端口无效")
+                    return
+                }
+                do {
+                    let name = try await self.session.connect(
+                        host: self.host.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        ),
+                        port: port
+                    )
+                    guard !Task.isCancelled else { return }
+                    self.reconnectAttempt = 0
+                    self.cameraName = name
+                    self.state = .ready
+                    self.status = "Wi‑Fi 已重连 · \(name)"
+                    self.startHeartbeat()
+                } catch {
+                    guard !Task.isCancelled, !self.manualDisconnect else { return }
+                    self.state = .reconnecting(attempt: attempt)
+                    self.status = "Wi‑Fi 重连失败：\(error.localizedDescription)"
+                    self.scheduleReconnect()
+                }
+            } catch {
+                // Task.sleep 被取消：重连调度已被新调度或断开取代。
+            }
+        }
+    }
+
+    /// 指数退避（纯函数，契约测试锚点）：1/2/4/8/16 封顶 30s。
+    static func backoffDelay(forAttempt attempt: Int) -> UInt64 {
+        let exponent = UInt64(max(0, attempt - 1))
+        let doubled: UInt64
+        if exponent >= 30 {
+            doubled = UInt64.max
+        } else {
+            doubled = 1 << exponent
+        }
+        return min(doubled, reconnectMaxDelaySeconds)
+    }
+
+    // MARK: - B2 网络层监听
+
+    /// NWPathMonitor：Wi-Fi 断开即判链路不可用（不等心跳超时）。
+    private func startPathMonitor() {
+        stopPathMonitor()
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                guard let self, !self.manualDisconnect else { return }
+                if path.status != .satisfied {
+                    self.missedHeartbeats = 0
+                    self.enterReconnecting()
+                }
+            }
+        }
+        monitor.start(queue: DispatchQueue(
+            label: "com.tauber.nikonlink.wifi.path"
+        ))
+        pathMonitor = monitor
+    }
+
+    private func stopPathMonitor() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
     }
 
     func capture() {

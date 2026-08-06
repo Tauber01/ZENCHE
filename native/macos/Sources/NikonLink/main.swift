@@ -5539,7 +5539,8 @@ private struct ControlStatusRow: View {
     var openConnection: () -> Void
 
     private var connecting: Bool {
-        model.connecting || model.wifiCamera.state == .connecting
+        model.connecting || model.wifiCamera.state == .connecting ||
+            model.wifiCamera.state.isReconnecting
     }
 
     private var wifiFailure: String? {
@@ -12397,12 +12398,18 @@ private struct TransferView: View {
                                 .font(.title3.bold())
                             RuntimeLocalizedText(wifiCamera.status)
                                 .foregroundStyle(
-                                    wifiCamera.isConnected
-                                        ? Palette.positive : Palette.muted
+                                    wifiCamera.state.isReconnecting
+                                        ? Color.orange
+                                        : wifiCamera.isConnected
+                                            ? Palette.positive : Palette.muted
                                 )
                         }
                         Spacer()
-                        Button(wifiCamera.isConnected ? "断开" : "连接") {
+                        Button(
+                            wifiCamera.state.isReconnecting
+                                ? "正在重连…"
+                                : wifiCamera.isConnected ? "断开" : "连接"
+                        ) {
                             wifiCamera.isConnected
                                 ? wifiCamera.disconnect()
                                 : wifiCamera.connect()
@@ -12410,7 +12417,10 @@ private struct TransferView: View {
                         .buttonStyle(
                             NativeButtonStyle(primary: !wifiCamera.isConnected)
                         )
-                        .disabled(wifiCamera.state == .connecting)
+                        .disabled(
+                            wifiCamera.state == .connecting ||
+                                wifiCamera.state.isReconnecting
+                        )
                     }
 
                     Divider()

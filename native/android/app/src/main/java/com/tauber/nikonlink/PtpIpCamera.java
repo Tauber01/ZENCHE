@@ -24,6 +24,8 @@ final class PtpIpCamera implements Closeable {
     private static final int PACKET_DATA = 10;
     private static final int PACKET_END_DATA = 12;
     private static final int RESPONSE_OK = 0x2001;
+    /** B2 保活参数（契约测试锚点）：单次探测超时 3s。 */
+    static final int PROBE_TIMEOUT_MS = 3000;
 
     private Socket commandSocket;
     private Socket eventSocket;
@@ -86,6 +88,22 @@ final class PtpIpCamera implements Closeable {
                 transactionId++,
                 new long[]{0, 0});
         if (response != RESPONSE_OK) throw rejected(response);
+    }
+
+    /**
+     * 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
+     * synchronized 与在途会话命令串行；单次超时 3s（临时收紧 soTimeout）。
+     */
+    synchronized void probe() throws Exception {
+        ensureConnected();
+        int previous = commandSocket.getSoTimeout();
+        try {
+            commandSocket.setSoTimeout(PROBE_TIMEOUT_MS);
+            int response = command(0x1002, 0, new long[]{1});
+            if (response != RESPONSE_OK) throw rejected(response);
+        } finally {
+            commandSocket.setSoTimeout(previous);
+        }
     }
 
     synchronized CameraStorage.Snapshot listStorage() throws Exception {

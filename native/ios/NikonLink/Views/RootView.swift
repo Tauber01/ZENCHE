@@ -470,6 +470,7 @@ private struct AppHeader: View {
     }
 
     private var connectionColor: Color {
+        if model.wifiCamera.state.isReconnecting { return .orange }
         if model.wifiCamera.isConnected { return IPalette.positive }
         switch model.camera.state {
         case .ready: return IPalette.positive
@@ -4354,6 +4355,7 @@ private struct ControlStatusRow: View {
     }
 
     private var statusColor: Color {
+        if model.wifiCamera.state.isReconnecting { return .orange }
         if model.wifiCamera.isConnected { return IPalette.positive }
         switch model.camera.state {
         case .ready: return IPalette.positive
@@ -4364,6 +4366,7 @@ private struct ControlStatusRow: View {
     }
 
     private var transportTitle: String {
+        if model.wifiCamera.state.isReconnecting { return "重连中" }
         if model.wifiCamera.isConnected { return "Wi-Fi" }
         switch model.camera.state {
         case .ready:
@@ -8948,9 +8951,11 @@ private struct WifiCameraTransferCard: View {
                     Spacer()
                     Circle()
                         .fill(
-                            model.wifiCamera.isConnected
-                                ? Color.green
-                                : Color.secondary
+                            model.wifiCamera.state.isReconnecting
+                                ? Color.orange
+                                : model.wifiCamera.isConnected
+                                    ? Color.green
+                                    : Color.secondary
                         )
                         .frame(width: 9, height: 9)
                 }
@@ -9001,9 +9006,11 @@ private struct WifiCameraTransferCard: View {
                 RuntimeLocalizedText(model.wifiCamera.status)
                     .font(.caption)
                     .foregroundStyle(
-                        model.wifiCamera.isConnected
-                            ? Color.green
-                            : IPalette.muted
+                        model.wifiCamera.state.isReconnecting
+                            ? Color.orange
+                            : model.wifiCamera.isConnected
+                                ? Color.green
+                                : IPalette.muted
                     )
                 Button {
                     model.wifiCamera.isConnected
@@ -9011,9 +9018,11 @@ private struct WifiCameraTransferCard: View {
                         : model.wifiCamera.connect()
                 } label: {
                     Label(
-                        model.wifiCamera.isConnected
-                            ? "断开 Wi‑Fi 相机"
-                            : "连接 Wi‑Fi 相机",
+                        model.wifiCamera.state.isReconnecting
+                            ? "正在重连 Wi‑Fi 相机…"
+                            : model.wifiCamera.isConnected
+                                ? "断开 Wi‑Fi 相机"
+                                : "连接 Wi‑Fi 相机",
                         systemImage: model.wifiCamera.isConnected
                             ? "wifi.slash"
                             : "wifi"
@@ -9021,7 +9030,10 @@ private struct WifiCameraTransferCard: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.wifiCamera.state == .connecting)
+                .disabled(
+                    model.wifiCamera.state == .connecting ||
+                        model.wifiCamera.state.isReconnecting
+                )
             }
         }
     }

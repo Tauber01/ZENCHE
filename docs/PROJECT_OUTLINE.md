@@ -83,7 +83,7 @@ v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8
 - **Capture**：设备识别、实时取景、SDRAM 拍摄、JPEG 下载和自动拍摄任务。
 - **Control**：曝光、对焦、白平衡、拍摄模式与 Picture Control。
 - **Monitor**：专业示波与辅助监看；监看效果不得修改原片。
-- **Connect**：FTP/PASV、HTTP PUT/POST、WebDAV 局域网收件箱。
+- **Connect**：FTP/PASV、HTTP PUT/POST、WebDAV 局域网收件箱；PTP/IP 直连相机，含 5s 心跳保活（GetDeviceInfo 探测、3s 超时、连续 3 次判离线）、指数退避自动重连（1/2/4/8/16s 封顶 30s、用户主动断开不触发）与网络层监听联动（丢网即判离线并进入重连）。
 - **Flow**：本地图库、树状分支、拍摄会话、RAW + JPEG 配对、评级、备份与 SHA-256。
 - **Develop**：分组参数、预设、前后对比、几何调整和 JPEG 副本导出。
 - **AI 工具**：AI 修图与 AI 生图、快捷预设、宽高比/分辨率选择、激活码授权与服务器端计数；开源客户端不内置模型 API 密钥。

@@ -731,6 +731,24 @@ public partial class MainWindow : Window
     private bool _videoRecording;
     private bool _externalRecordToDevice = true;
     private string _wifiConnectionMode = "ap";
+    // ── B2 WiFi 连接监看：保活/自动重连/网络监听 ──
+    private static readonly int[] WifiReconnectBackoffMs =
+        { 1000, 2000, 4000, 8000, 16000, 30000 };
+    private static int WifiBackoffDelayMs(int attempt) =>
+        WifiReconnectBackoffMs[
+            Math.Clamp(attempt, 1, WifiReconnectBackoffMs.Length) - 1];
+    private readonly System.Windows.Threading.DispatcherTimer
+        _wifiHeartbeatTimer = new()
+        {
+            Interval = TimeSpan.FromMilliseconds(5000)
+        };
+    private CancellationTokenSource? _wifiReconnectCts;
+    private bool _wifiReconnecting;
+    private bool _wifiManualDisconnect;
+    private int _wifiMissedHeartbeats;
+    private int _wifiReconnectAttempt;
+    private string _wifiHost = "192.168.1.1";
+    private int _wifiPort = 15740;
     private DateTime? _recordingStartedAt;
     private readonly System.Windows.Threading.DispatcherTimer _monitorTimecodeTimer =
         new() { Interval = TimeSpan.FromMilliseconds(100) };
@@ -1517,6 +1535,7 @@ public partial class MainWindow : Window
             {
                 if (_wifiCamera.IsConnected)
                 {
+                    StopWifiMonitoring();
                     await _wifiCamera.DisconnectAsync();
                     _lastConnectionError = null;
                 }
@@ -1526,13 +1545,21 @@ public partial class MainWindow : Window
                     {
                         throw new ArgumentException("Wi‑Fi 相机端口无效");
                     }
+                    _wifiHost = hostBox.Text.Trim();
+                    _wifiPort = port;
+                    _wifiManualDisconnect = false;
+                    _wifiReconnecting = false;
+                    _wifiReconnectAttempt = 0;
+                    _wifiMissedHeartbeats = 0;
                     using var timeout = new CancellationTokenSource(
                         TimeSpan.FromSeconds(12));
-                    await _wifiCamera.ConnectAsync(hostBox.Text, port, timeout.Token);
+                    await _wifiCamera.ConnectAsync(
+                        _wifiHost, _wifiPort, timeout.Token);
                     _lastConnectionError = null;
                     _diagnostics.Info(
                         "wifi-camera",
                         $"PTP/IP 已连接；模式={_wifiConnectionMode.ToUpperInvariant()}；相机={_wifiCamera.CameraName}");
+                    StartWifiMonitoring();
                 }
             }
             catch (Exception error)
@@ -1553,6 +1580,162 @@ public partial class MainWindow : Window
         };
 
         return ConnectionCard("Wi‑Fi 相机 · PTP/IP", content, button);
+    }
+
+    // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
+
+    private void StartWifiMonitoring()
+    {
+        _wifiHeartbeatTimer.Tick -= WifiHeartbeatTimer_Tick;
+        _wifiHeartbeatTimer.Tick += WifiHeartbeatTimer_Tick;
+        _wifiHeartbeatTimer.Start();
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
+    }
+
+    private void StopWifiMonitoring()
+    {
+        _wifiHeartbeatTimer.Stop();
+        _wifiReconnectCts?.Cancel();
+        _wifiReconnectCts = null;
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+    }
+
+    private async void WifiHeartbeatTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_wifiCamera.IsConnected || _wifiReconnecting ||
+            _wifiManualDisconnect)
+        {
+            return;
+        }
+        bool alive;
+        try
+        {
+            await _wifiCamera.ProbeAsync();
+            alive = true;
+        }
+        catch
+        {
+            alive = false;
+        }
+        if (!_wifiCamera.IsConnected || _wifiManualDisconnect)
+        {
+            return;
+        }
+        if (alive)
+        {
+            _wifiMissedHeartbeats = 0;
+        }
+        else
+        {
+            _wifiMissedHeartbeats++;
+            if (_wifiMissedHeartbeats >= 3)
+            {
+                _wifiMissedHeartbeats = 0;
+                EnterWifiReconnecting();
+            }
+        }
+    }
+
+    private void EnterWifiReconnecting()
+    {
+        if (!_wifiCamera.IsConnected || _wifiReconnecting ||
+            _wifiManualDisconnect)
+        {
+            return;
+        }
+        _wifiReconnecting = true;
+        _wifiReconnectAttempt = 0;
+        _wifiHeartbeatTimer.Stop();
+        _diagnostics.Info(
+            "wifi-camera",
+            "Wi‑Fi 链路已断开，进入自动重连");
+        UpdateConnectionSummary();
+        UpdateControlStatusRow();
+        ScheduleWifiReconnect();
+    }
+
+    private void ScheduleWifiReconnect()
+    {
+        if (!_wifiReconnecting || _wifiManualDisconnect)
+        {
+            return;
+        }
+        _wifiReconnectAttempt++;
+        var delay = WifiBackoffDelayMs(_wifiReconnectAttempt);
+        _wifiReconnectCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _wifiReconnectCts = cts;
+        _diagnostics.Info(
+            "wifi-camera",
+            $"调度自动重连（第 {_wifiReconnectAttempt} 次，退避 {delay}ms）");
+        _ = ReconnectAfterDelayAsync(delay, cts.Token);
+    }
+
+    private async Task ReconnectAfterDelayAsync(
+        int delayMs,
+        CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(delayMs, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        await AttemptWifiReconnectAsync(token);
+    }
+
+    private async Task AttemptWifiReconnectAsync(CancellationToken token)
+    {
+        if (!_wifiReconnecting || _wifiManualDisconnect)
+        {
+            return;
+        }
+        UpdateControlStatusRow();
+        try
+        {
+            await _wifiCamera.ConnectAsync(_wifiHost, _wifiPort, token);
+            _wifiReconnecting = false;
+            _wifiReconnectAttempt = 0;
+            _lastConnectionError = null;
+            _diagnostics.Info(
+                "wifi-camera",
+                $"PTP/IP 自动重连成功；相机={_wifiCamera.CameraName}");
+            StartWifiMonitoring();
+            UpdateConnectionSummary();
+            UpdateControlStatusRow();
+        }
+        catch
+        {
+            if (!_wifiReconnecting || _wifiManualDisconnect)
+            {
+                return;
+            }
+            ScheduleWifiReconnect();
+        }
+    }
+
+    /// <summary>NetworkAvailabilityChanged：网络丢失即判链路不可用。</summary>
+    private void OnNetworkAvailabilityChanged(
+        object? sender,
+        System.Net.NetworkInformation.NetworkAvailabilityEventArgs e)
+    {
+        if (e.IsAvailable)
+        {
+            return;
+        }
+        Dispatcher.Invoke(() =>
+        {
+            if (_wifiCamera.IsConnected && !_wifiManualDisconnect)
+            {
+                EnterWifiReconnecting();
+            }
+        });
     }
 
     private FrameworkElement BuildCaptureAssistSettingsPanel()
@@ -5870,6 +6053,12 @@ public partial class MainWindow : Window
             ControlStatusText.Text = AppLocalization.T("正在连接…");
             ControlStatusRateText.Text = AppLocalization.T("连接中");
         }
+        else if (_wifiReconnecting)
+        {
+            ControlStatusDot.Fill = (Brush)FindResource("UiAccentBrush");
+            ControlStatusText.Text = AppLocalization.T("Wi‑Fi 已断开，正在重连…");
+            ControlStatusRateText.Text = AppLocalization.T("重连中");
+        }
         else if (anyCamera)
         {
             ControlStatusDot.Fill = (Brush)FindResource("UiAccentBrush");
@@ -9961,6 +10150,7 @@ public partial class MainWindow : Window
         _shutdownStarted = true;
         Closing -= Window_Closing;
         _monitorTimecodeTimer.Stop();
+        StopWifiMonitoring();
         if (_immersivePreviewWindow is { } immersive)
         {
             CloseImmersivePreview(immersive);
