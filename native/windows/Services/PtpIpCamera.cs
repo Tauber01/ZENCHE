@@ -228,6 +228,32 @@ public sealed class PtpIpCamera : IAsyncDisposable
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
+    /// 与在途命令同走 SendCommandAsync（共享命令流，天然串行）；
+    /// 单次探测超时 3s。
+    /// </summary>
+    public async Task ProbeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_commandStream is null)
+        {
+            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
+        }
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMilliseconds(ProbeTimeoutMilliseconds));
+        var response = await SendCommandAsync(
+            0x1002,
+            0,
+            [1],
+            timeout.Token);
+        EnsureAccepted(response);
+    }
+
+    /// <summary>B2 保活参数（契约测试锚点）：单次探测超时 3s。</summary>
+    public const int ProbeTimeoutMilliseconds = 3000;
+
     public async ValueTask DisposeAsync() => await DisconnectAsync();
 
     private async Task<ushort> SendCommandAsync(

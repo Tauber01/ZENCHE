@@ -35,6 +35,10 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -1379,6 +1383,49 @@ public final class MainActivity extends Activity {
     private volatile boolean bluetoothRemoteEnabled;
     private volatile boolean locationTaggingEnabled;
     private volatile String wifiCameraName = "PTP/IP Camera";
+    // ── B2 WiFi 连接监看：保活/自动重连/网络监听 ──
+    private static final long WIFI_HEARTBEAT_INTERVAL_MS = 5000;
+    private static final int WIFI_OFFLINE_THRESHOLD = 3;
+    private static final long[] WIFI_RECONNECT_BACKOFF_MS =
+            {1000, 2000, 4000, 8000, 16000, 30000};
+    private volatile boolean wifiReconnecting;
+    private volatile boolean wifiManualDisconnect;
+    private volatile int wifiMissedHeartbeats;
+    private volatile int wifiReconnectAttempt;
+    private volatile String wifiCameraHost = "192.168.1.1";
+    private volatile int wifiCameraPort = 15740;
+    private ConnectivityManager.NetworkCallback wifiNetworkCallback;
+    private final Runnable wifiHeartbeatRunnable = new Runnable() {
+        @Override public void run() {
+            if (!wifiConnected || wifiReconnecting || wifiManualDisconnect) return;
+            cameraExecutor.submit(() -> {
+                boolean ok = false;
+                try {
+                    wifiCamera.probe();
+                    ok = true;
+                } catch (Exception ignored) {
+                    // 心跳失败：计入连续失败计数。
+                }
+                final boolean alive = ok;
+                mainHandler.post(() -> {
+                    if (!wifiConnected || wifiManualDisconnect) return;
+                    if (alive) {
+                        wifiMissedHeartbeats = 0;
+                    } else {
+                        wifiMissedHeartbeats++;
+                        if (wifiMissedHeartbeats >= WIFI_OFFLINE_THRESHOLD) {
+                            wifiMissedHeartbeats = 0;
+                            enterWifiReconnecting();
+                            return;
+                        }
+                    }
+                    mainHandler.postDelayed(
+                            wifiHeartbeatRunnable,
+                            WIFI_HEARTBEAT_INTERVAL_MS);
+                });
+            });
+        }
+    };
     private volatile String bluetoothRemoteStatus = "蓝牙遥控未开启";
     private volatile String locationTaggingStatus = "定位未开启";
     private volatile boolean liveViewEnabled;
@@ -10666,16 +10713,21 @@ public final class MainActivity extends Activity {
         wifiCard.addView(text(
                 wifiConnecting
                         ? "正在连接 Wi‑Fi 相机…"
-                        : wifiConnected
-                                ? "Wi‑Fi 已连接 · " + wifiCameraName
-                                : "Wi‑Fi 相机未连接",
+                        : wifiReconnecting
+                                ? "Wi‑Fi 链路已断开，正在自动重连…"
+                                : wifiConnected
+                                        ? "Wi‑Fi 已连接 · " + wifiCameraName
+                                        : "Wi‑Fi 相机未连接",
                 TS_BODY,
                 Typeface.NORMAL,
-                wifiConnected ? POSITIVE : MUTED),
+                wifiConnected ? POSITIVE
+                        : (wifiReconnecting || wifiConnecting) ? UI_ACCENT : MUTED),
                 marginParams(-1, -2, 0, 8, 0, 10));
         Button wifiButton = nativeButton(
-                wifiConnected ? "断开 Wi‑Fi 相机" : "连接 Wi‑Fi 相机",
-                !wifiConnected);
+                wifiReconnecting
+                        ? "正在重连 Wi‑Fi 相机…"
+                        : wifiConnected ? "断开 Wi‑Fi 相机" : "连接 Wi‑Fi 相机",
+                !wifiConnected && !wifiReconnecting);
         wifiButton.setOnClickListener(view -> {
             if (wifiConnected) {
                 disconnectWifiCamera();
@@ -11513,6 +11565,12 @@ public final class MainActivity extends Activity {
     private void connectWifiCamera(String host, int port, String connectionMode) {
         if (wifiConnecting || wifiConnected) return;
         wifiConnectionMode = "sta".equals(connectionMode) ? "sta" : "ap";
+        wifiCameraHost = host;
+        wifiCameraPort = port;
+        wifiManualDisconnect = false;
+        wifiReconnecting = false;
+        wifiReconnectAttempt = 0;
+        wifiMissedHeartbeats = 0;
         wifiConnecting = true;
         updateConnectionUi();
         cameraExecutor.submit(() -> {
@@ -11529,6 +11587,8 @@ public final class MainActivity extends Activity {
                     wifiConnecting = false;
                     lastConnectionError = null;
                     updateConnectionUi();
+                    startWifiHeartbeat();
+                    registerWifiNetworkCallback();
                     if ("library".equals(currentSection)) showSection("library");
                     showToast(
                             wifiConnectionMode.toUpperCase(Locale.ROOT)
@@ -11627,6 +11687,10 @@ public final class MainActivity extends Activity {
     }
 
     private void disconnectWifiCamera() {
+        wifiManualDisconnect = true;
+        wifiReconnecting = false;
+        mainHandler.removeCallbacks(wifiHeartbeatRunnable);
+        mainHandler.removeCallbacks(wifiReconnectRunnable);
         wifiCamera.close();
         wifiConnected = false;
         lastConnectionError = null;
@@ -11634,6 +11698,102 @@ public final class MainActivity extends Activity {
         wifiCameraName = "PTP/IP Camera";
         updateConnectionUi();
         if ("library".equals(currentSection)) showSection("library");
+    }
+
+    // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
+
+    /** 退避序列（纯函数，契约测试锚点）：1/2/4/8/16 封顶 30s。 */
+    static long wifiBackoffDelayMs(int attempt) {
+        int index = Math.min(Math.max(attempt, 1), WIFI_RECONNECT_BACKOFF_MS.length) - 1;
+        return WIFI_RECONNECT_BACKOFF_MS[index];
+    }
+
+    private final Runnable wifiReconnectRunnable = new Runnable() {
+        @Override public void run() {
+            if (!wifiReconnecting || wifiManualDisconnect) return;
+            wifiConnecting = true;
+            updateConnectionUi();
+            cameraExecutor.submit(() -> {
+                try {
+                    String name = wifiCamera.connect(
+                            wifiCameraHost, wifiCameraPort);
+                    diagnostics.info("wifi-camera",
+                            "PTP/IP 自动重连成功；相机=" + name);
+                    mainHandler.post(() -> {
+                        if (!wifiReconnecting || wifiManualDisconnect) return;
+                        wifiReconnecting = false;
+                        wifiConnecting = false;
+                        wifiConnected = true;
+                        wifiCameraName = name;
+                        wifiReconnectAttempt = 0;
+                        lastConnectionError = null;
+                        updateConnectionUi();
+                        startWifiHeartbeat();
+                        showToast("Wi‑Fi 已自动重连 · " + name);
+                    });
+                } catch (Exception error) {
+                    diagnostics.error("wifi-camera",
+                            "自动重连失败：" + error.getMessage());
+                    mainHandler.post(() -> {
+                        if (!wifiReconnecting || wifiManualDisconnect) return;
+                        wifiConnecting = false;
+                        scheduleWifiReconnect();
+                    });
+                }
+            });
+        }
+    };
+
+    private void startWifiHeartbeat() {
+        mainHandler.removeCallbacks(wifiHeartbeatRunnable);
+        mainHandler.postDelayed(wifiHeartbeatRunnable, WIFI_HEARTBEAT_INTERVAL_MS);
+    }
+
+    /** 连续 3 次心跳无响应 / 网络丢失 → 判离线，进入重连态。 */
+    private void enterWifiReconnecting() {
+        if (!wifiConnected || wifiReconnecting || wifiManualDisconnect) return;
+        wifiReconnecting = true;
+        wifiReconnectAttempt = 0;
+        mainHandler.removeCallbacks(wifiHeartbeatRunnable);
+        updateConnectionUi();
+        scheduleWifiReconnect();
+    }
+
+    private void scheduleWifiReconnect() {
+        if (!wifiReconnecting || wifiManualDisconnect) return;
+        wifiReconnectAttempt++;
+        long delay = wifiBackoffDelayMs(wifiReconnectAttempt);
+        diagnostics.info("wifi-camera",
+                "调度自动重连（第 " + wifiReconnectAttempt
+                        + " 次，退避 " + delay + "ms）");
+        mainHandler.removeCallbacks(wifiReconnectRunnable);
+        mainHandler.postDelayed(wifiReconnectRunnable, delay);
+    }
+
+    /** ConnectivityManager.NetworkCallback：Wi-Fi 网络丢失即判链路不可用。 */
+    private void registerWifiNetworkCallback() {
+        if (wifiNetworkCallback != null) return;
+        ConnectivityManager manager = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (manager == null) return;
+        wifiNetworkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override public void onLost(Network network) {
+                mainHandler.post(() -> {
+                    if (wifiConnected && !wifiManualDisconnect) {
+                        enterWifiReconnecting();
+                    }
+                });
+            }
+        };
+        try {
+            manager.registerNetworkCallback(
+                    new NetworkRequest.Builder()
+                            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                            .build(),
+                    wifiNetworkCallback);
+        } catch (Exception ignored) {
+            wifiNetworkCallback = null;
+        }
     }
 
     private void setBluetoothRemoteEnabled(boolean enabled) {
@@ -13745,6 +13905,17 @@ public final class MainActivity extends Activity {
         bluetoothRemote.stop();
         locationTagging.stop();
         wifiCamera.close();
+        if (wifiNetworkCallback != null) {
+            try {
+                ConnectivityManager manager = (ConnectivityManager)
+                        getSystemService(Context.CONNECTIVITY_SERVICE);
+                if (manager != null) {
+                    manager.unregisterNetworkCallback(wifiNetworkCallback);
+                }
+            } catch (Exception ignored) {
+            }
+            wifiNetworkCallback = null;
+        }
         localCamera.close();
         finishExternalRecordingForDisconnect();
         cameraExecutor.submit(camera::disconnect);

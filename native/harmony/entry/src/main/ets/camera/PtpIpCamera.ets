@@ -272,10 +272,43 @@ export class PtpIpCamera {
     }
   }
 
+  /**
+   * 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
+   * 与在途命令同走 sendCommand（顺序 await，天然串行）；单次超时 3s。
+   */
+  async probe(timeoutMilliseconds: number = 3000): Promise<void> {
+    if (this.command === undefined) {
+      throw new Error('请先连接 Wi‑Fi 相机');
+    }
+    const response: number = await this.sendCommandWithTimeout(
+      0x1002,
+      0,
+      [1],
+      timeoutMilliseconds
+    );
+    if (response !== 0x2001) {
+      throw rejected(response);
+    }
+  }
+
   private async sendCommand(
     operation: number,
     transaction: number,
     parameters: Array<number>
+  ): Promise<number> {
+    return this.sendCommandWithTimeout(
+      operation,
+      transaction,
+      parameters,
+      undefined
+    );
+  }
+
+  private async sendCommandWithTimeout(
+    operation: number,
+    transaction: number,
+    parameters: Array<number>,
+    timeoutMilliseconds: number | undefined
   ): Promise<number> {
     const command: PtpIpChannel | undefined = this.command;
     if (command === undefined) {
@@ -287,7 +320,7 @@ export class PtpIpCamera {
     appendU32(payload, transaction);
     parameters.forEach((value: number): void => appendU32(payload, value));
     await command.send(6, new Uint8Array(payload));
-    const response: PtpIpPacket = await command.receive();
+    const response: PtpIpPacket = await command.receive(timeoutMilliseconds);
     if (response.type !== 7 || response.data.length < 14) {
       throw new Error('相机返回了无效的 PTP/IP 响应');
     }

@@ -680,3 +680,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - docs 勘正：PROJECT_OUTLINE §2.1 目标用户 Nikon → Nikon/Sony/Canon；§4.2 标题「Nikon 相机支持」→「相机支持（Nikon / Sony / Canon）」，注册表口径 20 款 → 46 款（Nikon 20 + Sony 12 + Canon 14）；CAMERA_TEST_CHECKLIST 新增 R6III 实机验收条目（标记待设备，注 Canon 深度控制 TBC 不在入册范围）。
 - 不动：Android device_filter.xml（已有佳能类通配）、PTP vendor 操作层（Canon opcode TBC）、iOS。
 - 验证：npm test 256/256 全绿（Canon 注册表断言通过）；Windows dotnet 0 错误；macOS swiftc typecheck 0 错误；Android assembleDebug SUCCESSFUL；Harmony assembleHap SUCCESSFUL；git diff --check 干净。
+
+## 12.23 v1.5.7 B2：WiFi (PTP/IP) 连接监看（2026-08-06，kimi 06:57 设计批复）
+
+- 基线 `agent/1.5.6-ui @ b417b8e`（B1 合入后 rebase 对齐 `995c0ff`）；独立 worktree `agent/1.5.7-b2-wifi`；设计 `PLANS/B2_WIFI_MONITORING.md`（kimi 批复：参数全认可 + 心跳与会话命令串行化纪律）。
+- **心跳保活**：连接建立后每 5s GetDeviceInfo（0x1002）探测、单次超时 3s、连续 3 次判离线（15–24s 无响应窗口）；全部挂在既有 PTP/IP 会话通道上（Swift actor / Java synchronized / ArkTS 顺序 await / C# 共享命令流），不与在途事务交错。
+- **自动重连**：新增 `reconnecting` 态（iOS/macOS `reconnecting(attempt:)` 枚举 + `isReconnecting` 呈现）；指数退避 1/2/4/8/16s 封顶 30s（五端纯函数 `backoffDelay(forAttempt:)`/`wifiBackoffDelayMs`）；用户主动断开（`manualDisconnect`）不触发重连。
+- **网络监听联动**：iOS/macOS `NWPathMonitor`、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（'netLost'）、Windows `NetworkChange.NetworkAvailabilityChanged`——丢网即判离线并进入退避重连。
+- **UI**：仅文本分支——「重连中 / 正在重连 Wi‑Fi 相机…」+ 橙色状态点 + 连接按钮禁用态，五端一致，无新控件。
+- **测试**：`test/native-wifi-monitor.test.mjs` 6 用例（退避参考实现、五端符号断言、手动断连不触发）；npm test 262/262 全绿。
+- **构建**：Android assembleDebug **BUILD SUCCESSFUL**；iOS xcodebuild **BUILD SUCCEEDED**（generic/iOS 免签名）；Harmony assembleHap **BUILD SUCCESSFUL**（未签名预期，期间修复 NetConnection `register/unregister` 须带回调参数、无 `off` 方法的 SDK 事实）；Windows dotnet build 0 错误；`git diff --check` 干净。

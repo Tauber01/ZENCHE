@@ -261,6 +261,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 重名文件生成唯一名称，不覆盖已有素材；缺少 `Content-Length` 或鉴权失败时不创建空文件。
 - 服务只在用户明确开启且应用生命周期允许时监听，退出后释放全部端口。
 
+### 5.1 PTP/IP 链路与连接监看（B2，v1.5.7）
+
+- **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机，复用各端既有 PTP 会话通道（Swift actor / Java synchronized / ArkTS 顺序 await / C# 共享命令流）；同一通道上不并发交错心跳与事务命令。握手为 PTP/IP 标准 Init Command Request/ACK（UUID + initiator 名 + 版本）与事件通道建立，随后以 GetDeviceInfo 确认会话。
+- **心跳保活**：连接建立后每 5s 发送 GetDeviceInfo（0x1002）探测，单次超时 3s；连续 3 次失败判定离线（约 15–24s 无响应窗口）。
+- **状态机**：`connecting → connected → reconnecting → connected/disconnected`；新增 `reconnecting` 态承载自动重连。iOS/macOS 为带 attempt 的枚举（`reconnecting(attempt:)`，对外以 `isReconnecting` 呈现）；Android/Harmony/Windows 为布尔 + 计数。
+- **自动重连**：指数退避序列 1/2/4/8/16s，封顶 30s（`backoffDelay(forAttempt:)` / `wifiBackoffDelayMs` 等纯函数）；用户主动断开（`manualDisconnect` 标志）一律不触发自动重连。
+- **网络层监听联动**：丢网即判离线，不等心跳超时——iOS/macOS `NWPathMonitor`（`path.status != .satisfied`）、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（'netLost'）、Windows `NetworkChange.NetworkAvailabilityChanged`；监听到位后走同一退避重连流程，网络恢复即重连。
+- **UI 呈现**：仅文本分支——`reconnecting` 态显示「重连中 / 正在重连 Wi‑Fi 相机…」并禁用连接按钮，橙色状态点；断连文案与既有样式语言一致，无新控件。
+
 ## 6. 本地工作流与图像处理
 
 ### 6.1 拍摄会话

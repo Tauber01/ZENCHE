@@ -14,7 +14,7 @@ import {
   BusinessError,
   pasteboard
 } from '@kit.BasicServicesKit';
-import { http } from '@kit.NetworkKit';
+import { connection, http } from '@kit.NetworkKit';
 import { systemShare } from '@kit.ShareKit';
 import { sensor } from '@kit.SensorServiceKit';
 import { CameraProfile } from '../camera/CameraProfiles';
@@ -852,6 +852,18 @@ struct Index {
   @State private wifiPort: string = '15740';
   @State private wifiCameraName: string = 'PTP/IP Camera';
   @State private wifiStatus: string = 'Wi‑Fi 相机未连接';
+  // ── B2 WiFi 连接监看：保活/自动重连/网络监听 ──
+  @State private wifiReconnecting: boolean = false;
+  private wifiHeartbeatTimer: number = -1;
+  private wifiReconnectTimer: number = -1;
+  private wifiMissedHeartbeats: number = 0;
+  private wifiReconnectAttempt: number = 0;
+  private wifiManualDisconnect: boolean = false;
+  private wifiNetConnection?: connection.NetConnection;
+  private static readonly WIFI_HEARTBEAT_INTERVAL_MS: number = 5000;
+  private static readonly WIFI_OFFLINE_THRESHOLD: number = 3;
+  private static readonly WIFI_RECONNECT_BACKOFF_MS: Array<number> =
+    [1000, 2000, 4000, 8000, 16000, 30000];
   @State private bluetoothRemoteEnabled: boolean = false;
   @State private bluetoothRemoteConnected: boolean = false;
   @State private bluetoothRemoteStatus: string = '蓝牙遥控未开启';
@@ -1315,6 +1327,9 @@ struct Index {
     this.previewGeneration++;
     this.finishExternalRecordingForDisconnect();
     this.camera.disconnect();
+    this.stopWifiHeartbeat();
+    this.stopWifiReconnect();
+    this.unregisterWifiNetConnection();
     this.wifiCamera.disconnect();
     this.bluetoothRemote?.stop();
     this.locationTagging?.setEnabled(false);
@@ -4366,7 +4381,8 @@ struct Index {
   }
 
   private controlStatusDotColor(): string {
-    if (this.controlStatusLoading() || this.controlAnyCamera()) {
+    if (this.controlStatusLoading() || this.controlAnyCamera() ||
+      this.wifiReconnecting) {
       return UI_ACCENT;
     }
     return this.controlStatusFailed() ? UI_VIDEO : UI_LABEL;
@@ -4375,6 +4391,9 @@ struct Index {
   private controlStatusTextValue(): string {
     if (this.controlStatusLoading()) {
       return this.wifiConnecting ? '正在连接 Wi‑Fi 相机…' : '正在连接…';
+    }
+    if (this.wifiReconnecting) {
+      return 'Wi‑Fi 已断开，正在重连…';
     }
     if (this.controlAnyCamera()) {
       return '就绪';
@@ -4385,6 +4404,9 @@ struct Index {
   private controlStatusRateValue(): string {
     if (this.controlStatusLoading()) {
       return '连接中';
+    }
+    if (this.wifiReconnecting) {
+      return '重连中';
     }
     if (this.controlAnyCamera()) {
       return this.connected ? 'USB/PTP'
@@ -6415,18 +6437,21 @@ struct Index {
             .fontSize(TS_CAPTION)
             .fontColor(this.wifiConnected
               ? $r('app.color.positive')
-              : $r('app.color.muted'))
+              : (this.wifiReconnecting || this.wifiConnecting)
+                ? $r('app.color.accent')
+                : $r('app.color.muted'))
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-        Button(this.tr(this.wifiConnected ? '断开' : '连接'), {
+        Button(this.tr(this.wifiReconnecting ? '正在重连…' :
+          (this.wifiConnected ? '断开' : '连接')), {
           type: ButtonType.Normal
         })
           .height(44)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
           .borderRadius(8)
-          .enabled(!this.wifiConnecting && !this.busy)
+          .enabled(!this.wifiConnecting && !this.wifiReconnecting && !this.busy)
           .onClick((): void => {
             if (this.wifiConnected) {
               this.disconnectWifiCamera();
@@ -9369,6 +9394,10 @@ struct Index {
       this.wifiStatus = 'Wi‑Fi 相机地址或端口无效';
       return;
     }
+    this.wifiManualDisconnect = false;
+    this.wifiReconnecting = false;
+    this.wifiReconnectAttempt = 0;
+    this.wifiMissedHeartbeats = 0;
     this.wifiConnecting = true;
     this.localCameraSelected = false;
     this.wifiStatus = '正在连接 Wi‑Fi 相机…';
@@ -9383,6 +9412,8 @@ struct Index {
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已通过 PTP/IP 连接`;
       this.status = this.wifiStatus;
       this.lastConnectionError = '';
+      this.startWifiHeartbeat();
+      this.registerWifiNetConnection();
     } catch (error) {
       this.wifiConnected = false;
       this.lastConnectionError = (error as Error).message !== undefined
@@ -9396,12 +9427,171 @@ struct Index {
   }
 
   private async disconnectWifiCamera(): Promise<void> {
+    this.wifiManualDisconnect = true;
+    this.wifiReconnecting = false;
+    this.stopWifiHeartbeat();
+    this.stopWifiReconnect();
+    this.unregisterWifiNetConnection();
     await this.wifiCamera.disconnect();
     this.wifiConnected = false;
     this.wifiCameraName = 'PTP/IP Camera';
     this.wifiStatus = 'Wi‑Fi 相机未连接';
     this.status = 'Wi‑Fi 相机已断开';
     this.lastConnectionError = '';
+  }
+
+  // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
+
+  private startWifiHeartbeat(): void {
+    this.stopWifiHeartbeat();
+    this.wifiHeartbeatTimer = setTimeout((): void => {
+      this.wifiHeartbeatTick();
+    }, Index.WIFI_HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopWifiHeartbeat(): void {
+    if (this.wifiHeartbeatTimer >= 0) {
+      clearTimeout(this.wifiHeartbeatTimer);
+      this.wifiHeartbeatTimer = -1;
+    }
+  }
+
+  private async wifiHeartbeatTick(): Promise<void> {
+    if (!this.wifiConnected || this.wifiReconnecting ||
+      this.wifiManualDisconnect) {
+      return;
+    }
+    let alive: boolean = false;
+    try {
+      await this.wifiCamera.probe(3000);
+      alive = true;
+    } catch (error) {
+      alive = false;
+    }
+    if (!this.wifiConnected || this.wifiManualDisconnect) {
+      return;
+    }
+    if (alive) {
+      this.wifiMissedHeartbeats = 0;
+    } else {
+      this.wifiMissedHeartbeats++;
+      if (this.wifiMissedHeartbeats >= Index.WIFI_OFFLINE_THRESHOLD) {
+        this.wifiMissedHeartbeats = 0;
+        this.enterWifiReconnecting();
+        return;
+      }
+    }
+    this.startWifiHeartbeat();
+  }
+
+  private enterWifiReconnecting(): void {
+    if (!this.wifiConnected || this.wifiReconnecting ||
+      this.wifiManualDisconnect) {
+      return;
+    }
+    this.wifiReconnecting = true;
+    this.wifiReconnectAttempt = 0;
+    this.stopWifiHeartbeat();
+    this.wifiStatus = 'Wi‑Fi 链路已断开，正在自动重连…';
+    this.status = this.wifiStatus;
+    this.scheduleWifiReconnect();
+  }
+
+  private wifiBackoffDelayMs(attempt: number): number {
+    const index: number = Math.min(
+      Math.max(attempt, 1),
+      Index.WIFI_RECONNECT_BACKOFF_MS.length
+    ) - 1;
+    return Index.WIFI_RECONNECT_BACKOFF_MS[index];
+  }
+
+  private scheduleWifiReconnect(): void {
+    if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+      return;
+    }
+    this.wifiReconnectAttempt++;
+    const delay: number = this.wifiBackoffDelayMs(this.wifiReconnectAttempt);
+    this.stopWifiReconnect();
+    this.wifiReconnectTimer = setTimeout((): void => {
+      this.attemptWifiReconnect();
+    }, delay);
+  }
+
+  private stopWifiReconnect(): void {
+    if (this.wifiReconnectTimer >= 0) {
+      clearTimeout(this.wifiReconnectTimer);
+      this.wifiReconnectTimer = -1;
+    }
+  }
+
+  private async attemptWifiReconnect(): Promise<void> {
+    if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+      return;
+    }
+    this.wifiConnecting = true;
+    this.wifiStatus = `正在重连 Wi‑Fi 相机（第 ${this.wifiReconnectAttempt} 次）…`;
+    this.status = this.wifiStatus;
+    try {
+      const name: string = await this.wifiCamera.connect(
+        this.wifiHost.trim(),
+        Number(this.wifiPort)
+      );
+      if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+        return;
+      }
+      this.wifiReconnecting = false;
+      this.wifiConnecting = false;
+      this.wifiConnected = true;
+      this.wifiCameraName = name;
+      this.wifiReconnectAttempt = 0;
+      this.lastConnectionError = '';
+      this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已重连（PTP/IP）`;
+      this.status = this.wifiStatus;
+      this.startWifiHeartbeat();
+    } catch (error) {
+      if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+        return;
+      }
+      this.wifiConnecting = false;
+      this.wifiStatus = `Wi‑Fi 重连失败：${(error as Error).message}`;
+      this.status = this.wifiStatus;
+      this.scheduleWifiReconnect();
+    }
+  }
+
+  private registerWifiNetConnection(): void {
+    this.unregisterWifiNetConnection();
+    try {
+      const netConnection: connection.NetConnection =
+        connection.createNetConnection();
+      this.wifiNetConnection = netConnection;
+      netConnection.on('netLost', (): void => {
+        if (this.wifiConnected && !this.wifiManualDisconnect) {
+          this.enterWifiReconnecting();
+        }
+      });
+      netConnection.register((error: BusinessError): void => {
+        if (error) {
+          this.wifiNetConnection = undefined;
+        }
+      });
+    } catch (error) {
+      this.wifiNetConnection = undefined;
+    }
+  }
+
+  private unregisterWifiNetConnection(): void {
+    if (this.wifiNetConnection !== undefined) {
+      try {
+        this.wifiNetConnection.unregister((error: BusinessError): void => {
+          if (error) {
+            this.wifiNetConnection = undefined;
+          }
+        });
+      } catch (error) {
+      }
+      this.wifiNetConnection = undefined;
+    }
   }
 
   private async persistWifiConnectionSettings(): Promise<void> {
