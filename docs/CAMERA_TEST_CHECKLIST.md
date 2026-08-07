@@ -142,6 +142,29 @@ Record the camera firmware, lens, USB cable and host OS before testing.
       Wi‑Fi PTP 快门不切片；设置「Live 图」Toggle + 时长 Select（1/3/5/10/15s）
       持久化并在重启后保留；取景停/disarm、每帧惰性 arm 行为正确。
 
+## 延时合成视频 — E6 1.5.9（待设备，TBC-awaiting-hardware）
+
+- [ ] **macOS 延时合成**：文件库入口「合成延时视频」→ 预选最近 8 帧（可改选、
+      按文件名排序合成）→ 帧率 24/25/30 → H.264 MP4（可选 ProRes 422 → .mov）
+      产出；逐帧解码→aspect-fit 黑底画布→编码链正确，首帧尺寸即输出尺寸
+      （上限源尺寸）；损坏帧跳过并计数、不整批失败；进度显示 + 可取消；
+      产出走 CaptureWorkflow 会话目录 + reserveBaseName 命名 + finalize 全套
+      （XMP sidecar/双备份/SHA-256 清单）。
+- [ ] **iOS 延时合成**：入口与合成行为同 macOS（H.264 MP4 / 可选 ProRes .mov）；
+      帧率与分辨率口径一致；取消/进度/损坏帧跳过行为正确。
+- [ ] **Windows 延时合成**：MediaComposition 静态帧 clip 渲染 H.264 MP4；入口/
+      帧率 24/25/30/损坏帧跳过/进度取消/会话入库同口径。
+- [ ] **Android 延时合成**：MediaCodec+MediaMuxer 序列帧合成 H.264 MP4（YUV420
+      I420 输入、显式 bitrate=clamp(w*h*fps*0.07, 1M, 20M)、I 帧间隔 1）；入口/
+      帧率/跳过/进度取消/会话入库同口径。
+- [ ] **Harmony 延时合成**：native C++ 编码链（libtimelapse.so：
+      OH_VideoEncoder H.264 + OH_AVMuxer MP4，NV12 输入、AVC Profile Main、
+      bitrate 公式与 Android 对齐）在真机上编码/mux 正常；入口面板「合成延时
+      视频」帧率 24/25/30 生效；进度/取消/损坏帧跳过/会话入库正确；确认
+      buffer 模式回调（onNeedInputBuffer/onNewOutputBuffer）与
+      NotifyEndOfStream+EOS 输出在实机上的行为（API 21 移除 ArkTS 低级编解码
+      API，本端为唯一 native 路径，与其他四端高级 API 方案不同，需实机回归）。
+
 ## Android / Harmony PTP/IP 遥控 — E4 1.5.9（待设备，TBC-awaiting-hardware）
 
 - [ ] **Android Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后自动识别厂商

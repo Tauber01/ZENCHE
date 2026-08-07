@@ -37,6 +37,7 @@ import {
   ExternalVideoRecorder
 } from '../storage/ExternalVideoRecorder';
 import { LivePhotoClipRecorder } from '../storage/LivePhotoClipRecorder';
+import { TimelapseComposer, TimelapseComposerResult } from '../storage/TimelapseComposer';
 import {
   FTP_PORT,
   HTTP_PORT,
@@ -975,6 +976,12 @@ struct Index {
   @State private systemMedia: Array<SystemMediaItem> = [];
   @State private systemAlbumStatus: string = '等待相册授权';
   @State private cloudGuideVisible: boolean = false;
+  @State private timelapseComposerVisible: boolean = false;
+  @State private timelapseSelected: Array<string> = [];
+  @State private timelapseFrameRate: number = 24;
+  @State private timelapseRunning: boolean = false;
+  @State private timelapseProgressText: string = '';
+  @State private timelapseResultText: string = '';
   @State private launchAnnouncementVisible: boolean = false;
   @State private showSplash: boolean = true;
   @State private announcementDoNotRemind: boolean = false;
@@ -1408,6 +1415,9 @@ struct Index {
       }
       if (this.cloudGuideVisible) {
         this.CloudDriveGuideOverlay()
+      }
+      if (this.timelapseComposerVisible) {
+        this.TimelapseComposerOverlay()
       }
       if (this.branchCreatorVisible) {
         this.LibraryBranchCreatorOverlay()
@@ -5553,6 +5563,18 @@ struct Index {
       }
       this.CameraStorageWorkspace()
       Row({ space: 8 }) {
+        Button(this.tr('合成延时视频'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.openTimelapseComposer();
+          })
+      }
+      .width('100%')
+      Row({ space: 8 }) {
         Button(this.tr('刷新系统相册'), { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
@@ -6889,6 +6911,262 @@ struct Index {
     .height('100%')
     .padding(20)
     .backgroundColor(HUD_OVERLAY)
+  }
+
+  @Builder
+  private TimelapseComposerOverlay() {
+    Column({ space: 14 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('合成延时视频'))
+            .fontSize(TS_DISPLAY)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('选择序列帧（按文件名排序合成）并设置帧率。损坏帧自动跳过。'))
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        Blank()
+        Button(this.tr('关闭'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.timelapseComposerVisible = false;
+          })
+      }
+      .width('100%')
+
+      Scroll() {
+        Column({ space: 6 }) {
+          ForEach(
+            this.timelapseFrameItems(),
+            (item: PhotoItem) => {
+              Row({ space: 10 }) {
+                Checkbox()
+                  .select(this.timelapseSelected.includes(item.path))
+                  .selectedColor($r('app.color.accent'))
+                  .onChange((checked: boolean): void => {
+                    this.toggleTimelapseFrame(item.path, checked);
+                  })
+                Text(item.name)
+                  .fontSize(LIBRARY_FS_TITLE)
+                  .fontColor($r('app.color.ink'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .layoutWeight(1)
+                Text(item.detail)
+                  .fontSize(LIBRARY_FS_TINY)
+                  .fontColor($r('app.color.muted'))
+              }
+              .width('100%')
+              .height(40)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor($r('app.color.surface'))
+              .border({
+                width: 1,
+                color: $r('app.color.rule'),
+                radius: 8
+              })
+            },
+            (item: PhotoItem): string => item.path
+          )
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .height(this.isCompact() ? 260 : 320)
+      .backgroundColor($r('app.color.surface'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule'),
+        radius: 8
+      })
+
+      Row({ space: 8 }) {
+        Text(this.tr('帧率：'))
+          .fontSize(TS_BODY)
+          .fontColor($r('app.color.muted'))
+        ForEach([24, 25, 30] as Array<number>, (fps: number) => {
+          Button(`${fps} fps`, { type: ButtonType.Normal })
+            .height(40)
+            .fontSize(LIBRARY_FS_SUB)
+            .fontColor(
+              this.timelapseFrameRate === fps
+                ? $r('app.color.accent_ink')
+                : $r('app.color.ink')
+            )
+            .backgroundColor(
+              this.timelapseFrameRate === fps
+                ? $r('app.color.accent')
+                : $r('app.color.paper_2')
+            )
+            .borderRadius(6)
+            .onClick((): void => {
+              this.timelapseFrameRate = fps;
+            })
+        }, (fps: number): string => fps.toString())
+      }
+      .width('100%')
+
+      if (this.timelapseRunning) {
+        Row({ space: 8 }) {
+          Progress({ value: 0, total: 100, type: ProgressType.Linear })
+            .width(0)
+            .layoutWeight(1)
+            .color($r('app.color.accent'))
+          Text(this.timelapseProgressText)
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+      }
+      if (this.timelapseResultText.length > 0) {
+        Text(this.timelapseResultText)
+          .fontSize(TS_BODY)
+          .fontColor($r('app.color.accent'))
+          .width('100%')
+      }
+
+      Button(
+        this.tr(this.timelapseRunning ? '正在合成…' : '开始合成'),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(48)
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
+        .borderRadius(8)
+        .enabled(!this.timelapseRunning && this.timelapseSelected.length > 0)
+        .onClick((): void => {
+          this.startTimelapseCompose();
+        })
+      if (this.timelapseRunning) {
+        Button(this.tr('取消'), { type: ButtonType.Normal })
+          .width('100%')
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(8)
+          .onClick((): void => {
+            this.cancelTimelapseCompose();
+          })
+      }
+    }
+    .width(this.isCompact() ? '94%' : 620)
+    .height(this.isCompact() ? '94%' : '88%')
+    .padding(22)
+    .backgroundColor($r('app.color.paper'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule_strong'),
+      radius: 14
+    })
+    .shadow({
+      radius: 24,
+      color: HUD_BG_DIM,
+      offsetX: 0,
+      offsetY: 10
+    })
+  }
+
+  /** E6：文件库内可作延时序列帧的照片（非视频 + 图片扩展名，按文件名排序）。 */
+  private timelapseFrameItems(): Array<PhotoItem> {
+    const items: Array<PhotoItem> = this.photos.filter(
+      (item: PhotoItem): boolean => !item.isVideo
+    );
+    return items.sort((left: PhotoItem, right: PhotoItem): number =>
+      left.name.toLowerCase() < right.name.toLowerCase() ? -1 : 1
+    );
+  }
+
+  /** E6：打开合成面板，预选最近 8 帧（常见连拍场景）并复位状态。 */
+  private openTimelapseComposer(): void {
+    this.timelapseSelected = this.timelapseFrameItems()
+      .slice(0, 8)
+      .map((item: PhotoItem): string => item.path);
+    this.timelapseRunning = false;
+    this.timelapseProgressText = '';
+    this.timelapseResultText = '';
+    this.timelapseComposerVisible = true;
+  }
+
+  private toggleTimelapseFrame(path: string, checked: boolean): void {
+    if (checked) {
+      if (!this.timelapseSelected.includes(path)) {
+        this.timelapseSelected = [...this.timelapseSelected, path];
+      }
+    } else {
+      this.timelapseSelected = this.timelapseSelected.filter(
+        (item: string): boolean => item !== path
+      );
+    }
+  }
+
+  /** E6：后台执行合成 → 入库 → 刷新文件库。 */
+  private async startTimelapseCompose(): Promise<void> {
+    if (this.timelapseRunning || this.timelapseSelected.length === 0) {
+      return;
+    }
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    const library: PhotoLibrary | undefined = this.library;
+    if (workflow === undefined || library === undefined) {
+      return;
+    }
+    this.timelapseRunning = true;
+    this.timelapseResultText = '';
+    this.timelapseProgressText = '0/' + this.timelapseSelected.length;
+    const frames: Array<string> = [...this.timelapseSelected].sort(
+      (left: string, right: string): number =>
+        left.toLowerCase() < right.toLowerCase() ? -1 : 1
+    );
+    const fps: number = this.timelapseFrameRate;
+    const temporary: string =
+      library.directoryPath + '/.timelapse-' + Date.now() + '.mp4';
+    const composer: TimelapseComposer = new TimelapseComposer();
+    try {
+      const result: TimelapseComposerResult = await composer.compose(
+        frames,
+        temporary,
+        fps,
+        (): boolean => !this.timelapseRunning,
+        (done: number, total: number): void => {
+          this.timelapseProgressText = `${done}/${total}`;
+        }
+      );
+      const destination: string = await workflow.storeTimelapseVideo(
+        temporary,
+        '延时合成'
+      );
+      this.timelapseProgressText = '';
+      this.timelapseResultText =
+        `已合成 ${result.framesWritten} 帧` +
+        (result.skippedFrames > 0
+          ? `（跳过 ${result.skippedFrames} 个损坏帧）`
+          : '') +
+        ` → ${destination.split('/').pop()}`;
+      this.photos = library.list();
+    } catch (error) {
+      this.timelapseResultText =
+        error instanceof Error ? error.message : String(error);
+    } finally {
+      this.timelapseRunning = false;
+      try {
+        if (fs.accessSync(temporary)) {
+          fs.unlinkSync(temporary);
+        }
+      } catch (cleanupError) {
+        // 临时文件清理失败可忽略。
+      }
+    }
+  }
+
+  /** E6：置取消标志；composer 在帧循环内检查后抛 '已取消'。 */
+  private cancelTimelapseCompose(): void {
+    this.timelapseRunning = false;
+    this.timelapseProgressText = '已取消';
   }
 
   @Builder

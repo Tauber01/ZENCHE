@@ -119,6 +119,15 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('5 秒', '5s', '5秒'),
   new TranslationEntry('10 秒', '10s', '10秒'),
   new TranslationEntry('15 秒', '15s', '15秒'),
+  new TranslationEntry('合成延时视频', 'Compose Timelapse', 'タイムラプス合成'),
+  new TranslationEntry(
+    '选择序列帧（按文件名排序合成）并设置帧率。损坏帧自动跳过。',
+    'Select frames (composed in filename order) and set the frame rate. Corrupt frames are skipped automatically.',
+    'フレームを選択（ファイル名順で合成）しフレームレートを設定します。破損フレームは自動的にスキップされます。'
+  ),
+  new TranslationEntry('帧率：', 'Frame rate: ', 'フレームレート：'),
+  new TranslationEntry('开始合成', 'Start', '合成開始'),
+  new TranslationEntry('正在合成…', 'Composing…', '合成中…'),
   new TranslationEntry('Wi‑Fi 相机未连接', 'Wi‑Fi camera not connected', 'Wi‑Fi カメラ未接続'),
   new TranslationEntry('蓝牙遥控未开启', 'Bluetooth remote is off', 'Bluetooth リモコンはオフです'),
   new TranslationEntry('定位未开启', 'Location is off', '位置情報はオフです'),
