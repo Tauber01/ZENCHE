@@ -781,3 +781,19 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **构建**：Harmony 干净 assembleHap（rm -rf entry/build .hvigor，DevEco jbr + DEVECO_SDK_HOME）**BUILD SUCCESSFUL**（CompileArkTS 实跑 ~5s，unsigned HAP）；Android assembleDebug 通过；npm test 全量（见交付报告）。
 - **docs**：CAMERA_TEST_CHECKLIST 挂 3 条 E4 待设备实机条目（Android 遥控 / Harmony 遥控 / data-out 相位）。
 - 纪律：PTP/IP 新代码 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。
+
+## 12.32 v1.5.9 E5：live 图拍摄五端（路线 B）（2026-08-06，kimi 20:12 派工，事件 26a8e55d）
+
+- 背景：Tauber 指令「live 图」。计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E5。E4 合入整合分支 `c212070` 后接棒（功能批收官）。分支 `agent/1.5.9-e5-livephoto`，基线 `c212070`。
+- **方案（路线 B，已定案）**：取景帧内存环形缓冲（LivePhotoClipRecorder，约 10fps×N 秒 JPEG）+ 快门触发时把最近 N 秒切为 Motion-JPEG AVI；照片与切片同 reservedBaseName 配对入库（`{base}_live.avi`），CaptureWorkflow 的命名/双备份/SHA-256/XMP 全复用；XMP `xmp:Label="live-photo"` + `dc:relation` 双向配对。不碰机身状态机。开关默认**关**、默认 **3s**（1/3/5/10/15s 可配）。
+- **macOS**（`0f47f67`）：LivePhotoClipRecorder.swift（内存 ring + captureSlice 复用 ExternalVideoRecorder 写 AVI）+ main.swift 本机/USB 快门接线（reserveBaseName → 切片 → storeLivePhotoClip）+ SettingsSheet 开关。typecheck 0 error。
+- **iOS**（`85627b4`）：移植 LivePhotoClipRecorder 接 RemoteCaptureServices/本机源喂帧转 JPEG 入环 + 快门配对 + RootView 开关。xcodebuild SUCCEEDED。
+- **Windows**（`f44fdfb` + `d087b25`）：LivePhotoClipRecorder.cs + MainWindow.xaml.cs 接线 + 设置开关；**StepWifiShutterAsync 顺修**（E3 遗留缺陷，pro 裁定属实：降序分母 + FindIndex 恒命中首档 → 升序秒值阶梯 + FirstAtLeast，对齐 E4 Android/Harmony）。dotnet 0 错误。
+- **节流缺陷修复**（`d087b25`）：五端 ExternalVideoRecorder.append 的帧率节流会让 captureSlice 快速回放只写第一帧（AVI 剩 1 帧）；macOS/iOS 加 `bypassThrottle: Bool = false`、captureSlice 传 true；macOS/iOS 双文件字节级一致。Android/Harmony/Windows 对应 throttle/bypass 重载。
+- **Android**（`866a9d7`）：LivePhotoClipRecorder.java + MainActivity.java 接线 + 拍摄辅助面板「Live 图」开关 + 1/3/5/10/15s Spinner + `syncLivePhotoRing()` 每帧惰性幂等 arm/disarm。assembleDebug SUCCESSFUL。
+- **Harmony**（`af166da`）：LivePhotoClipRecorder.ets（新增）+ CaptureWorkflow.ets（store 加 pairedWithFilename？ + storeLivePhotoClip + XMP 配对）+ ExternalVideoRecorder.ets（appendJpeg throttle 参数）+ Index.ets（字段/偏好加载/syncLivePhotoRing/captureLivePhotoSlice/本机与 USB 快门配对/Wi‑Fi 跳过 + CaptureAssistSettingsCard「Live 图」Toggle + 时长 Select）+ Localization.ets 三语条目（防子串误译：'5 秒' 是 '15 秒' 子串，五档全入表）。干净 assembleHap **BUILD SUCCESSFUL**（CompileArkTS 实跑 3.7s，unsigned HAP 1,624,449 B）。
+- **Wi‑Fi PTP 遥控快门不生成切片**（五端一致）：原片在相机存储卡内，本地无照片文件可配对，切片会导致孤儿 AVI。
+- **契约锚点**：native-livephoto.test.mjs（新）12 用例——五端 LivePhotoClipRecorder/captureSlice/append 绕过节流/配对 XMP/开关默认值具体符号断言 + Windows StepWifiShutterAsync 顺修锚点（升序阶梯 + FirstAtLeast）+ 五端全部 TBC-awaiting-hardware。native-local-camera.test.mjs 1 断言随 E5 契约更新（Android 本机拍照入口 `savePhoto(jpeg, baseName, liveClip)` 三参配对，单参重载保留）。npm test **297/297** 全绿（基线 285 + E5 12，含契约更新）。
+- **构建（全部本会话复跑）**：macOS swiftc typecheck 0 error（build-macos.sh 同口径源列表）；iOS xcodebuild Release **BUILD SUCCEEDED**；Windows dotnet build Release **0 错误**；Android `:app:compileDebugJavaWithJavac --rerun-tasks` **BUILD SUCCESSFUL**（强制重编译，非 UP-TO-DATE 缓存）；Harmony 干净 assembleHap **BUILD SUCCESSFUL**。git diff --check 干净。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 5 条 E5 待设备实机条目（macOS/iOS/Windows/Android/Harmony live 图，含 Windows 快门顺修验证）。
+- 纪律：E5 新代码全部 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。

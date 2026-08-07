@@ -94,7 +94,8 @@ public sealed class CaptureWorkflow
         string cameraName,
         string? reservedBaseName = null,
         CancellationToken cancellationToken = default,
-        CaptureLocation? location = null)
+        CaptureLocation? location = null,
+        string? pairedWithFilename = null)
     {
         EnsureDirectories();
         var extension = Path.GetExtension(originalFilename);
@@ -107,8 +108,41 @@ public sealed class CaptureWorkflow
             : Sanitize(reservedBaseName);
         var destination = UniquePath(PrimaryDirectory, baseName, extension);
         await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
-        await FinalizeAsync(destination, cancellationToken, location);
+        await FinalizeAsync(
+            destination,
+            cancellationToken,
+            location,
+            pairedWithFilename);
         Status = $"已写入会话 · {Path.GetFileName(destination)}";
+        return destination;
+    }
+
+    /// <summary>E5 live 图：把快门切片 AVI 以照片同 base 存入会话，
+    /// XMP sidecar 写配对标记（指向配对照片），双备份/SHA-256 全复用。
+    /// TBC-awaiting-hardware。</summary>
+    public async Task<string> StoreLivePhotoClipAsync(
+        string source,
+        string baseName,
+        string pairedPhotoFilename,
+        string cameraName,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureDirectories();
+        var destination = UniquePath(
+            PrimaryDirectory,
+            $"{Sanitize(baseName)}_live",
+            ".avi");
+        if (File.Exists(destination))
+        {
+            File.Delete(destination);
+        }
+        File.Move(source, destination);
+        await FinalizeAsync(
+            destination,
+            cancellationToken,
+            null,
+            pairedPhotoFilename);
+        Status = $"live 图视频已写入会话 · {Path.GetFileName(destination)}";
         return destination;
     }
 
@@ -156,16 +190,17 @@ public sealed class CaptureWorkflow
     private async Task FinalizeAsync(
         string primary,
         CancellationToken cancellationToken,
-        CaptureLocation? location)
+        CaptureLocation? location,
+        string? pairedWithFilename = null)
     {
-        if (!IsActive && location is null)
+        if (!IsActive && location is null && pairedWithFilename is null)
         {
             return;
         }
         var sidecar = Path.ChangeExtension(primary, ".xmp");
         await File.WriteAllTextAsync(
             sidecar,
-            Xmp(Path.GetFileName(primary), location),
+            Xmp(Path.GetFileName(primary), location, pairedWithFilename),
             Encoding.UTF8,
             cancellationToken);
         if (!IsActive || SessionRoot is null)
@@ -196,9 +231,15 @@ public sealed class CaptureWorkflow
             cancellationToken);
     }
 
-    private string Xmp(string filename, CaptureLocation? location)
+    private string Xmp(
+        string filename,
+        CaptureLocation? location,
+        string? pairedWithFilename = null)
     {
         var gps = location is null ? "" : GpsAttributes(location);
+        var pairing = pairedWithFilename is null
+            ? ""
+            : $"\n              xmp:Label=\"live-photo\"\n              dc:relation=\"{Xml(pairedWithFilename)}\"";
         return $"""
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -207,7 +248,7 @@ public sealed class CaptureWorkflow
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:exif="http://ns.adobe.com/exif/1.0/"
-              xmp:Rating="{Configuration.Rating}"{gps}>
+              xmp:Rating="{Configuration.Rating}"{gps}{pairing}>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Name)}</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>{Xml(Configuration.Creator)}</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Rights)}</rdf:li></rdf:Alt></dc:rights>

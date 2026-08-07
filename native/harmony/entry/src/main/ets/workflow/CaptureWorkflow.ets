@@ -94,7 +94,8 @@ export class CaptureWorkflow {
     originalFilename: string,
     cameraName: string,
     reservedBaseName?: string,
-    location?: CaptureLocationMetadata
+    location?: CaptureLocationMetadata,
+    pairedWithFilename?: string
   ): Promise<string> {
     this.ensureDirectories();
     const extension: string = fileExtension(originalFilename);
@@ -107,9 +108,34 @@ export class CaptureWorkflow {
       extension
     );
     writeBytes(destination, bytes);
-    await this.finalize(destination, location);
+    await this.finalize(destination, location, pairedWithFilename);
     this.statusValue =
       `已写入会话 · ${destination.substring(destination.lastIndexOf('/') + 1)}`;
+    return destination;
+  }
+
+  /** E5 live 图：把快门切片 AVI 以照片同 base 存入会话，
+   *  XMP sidecar 写配对标记（指向配对照片），双备份/SHA-256 全复用。
+   *  TBC-awaiting-hardware。 */
+  async storeLivePhotoClip(
+    source: string,
+    baseName: string,
+    pairedPhotoFilename: string,
+    cameraName: string
+  ): Promise<string> {
+    this.ensureDirectories();
+    const destination: string = this.uniquePath(
+      this.primaryDirectory(),
+      `${sanitize(baseName)}_live`,
+      'avi'
+    );
+    if (fs.accessSync(destination)) {
+      fs.unlinkSync(destination);
+    }
+    fs.copyFileSync(source, destination);
+    fs.unlinkSync(source);
+    await this.finalize(destination, undefined, pairedPhotoFilename);
+    this.statusValue = `live 图视频已写入会话 · ${filename(destination)}`;
     return destination;
   }
 
@@ -160,13 +186,15 @@ export class CaptureWorkflow {
 
   private async finalize(
     primary: string,
-    location?: CaptureLocationMetadata
+    location?: CaptureLocationMetadata,
+    pairedWithFilename?: string
   ): Promise<void> {
-    if (!this.activeValue && location === undefined) {
+    if (!this.activeValue && location === undefined
+      && pairedWithFilename === undefined) {
       return;
     }
     const sidecar: string = `${withoutExtension(primary)}.xmp`;
-    writeText(sidecar, this.xmp(filename(primary), location));
+    writeText(sidecar, this.xmp(filename(primary), location, pairedWithFilename));
     if (!this.activeValue) {
       return;
     }
@@ -305,11 +333,16 @@ export class CaptureWorkflow {
 
   private xmp(
     mediaName: string,
-    location?: CaptureLocationMetadata
+    location?: CaptureLocationMetadata,
+    pairedWithFilename?: string
   ): string {
     const gps: string = location === undefined
       ? ''
       : gpsAttributes(location);
+    const pairing: string = pairedWithFilename === undefined
+      ? ''
+      : `\n              xmp:Label="live-photo"\n` +
+        `              dc:relation="${xml(pairedWithFilename)}"`;
     return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
       `<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF ` +
       `xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
@@ -317,7 +350,7 @@ export class CaptureWorkflow {
       `xmlns:xmp="http://ns.adobe.com/xap/1.0/" ` +
       `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
       `xmlns:exif="http://ns.adobe.com/exif/1.0/" ` +
-      `xmp:Rating="${this.configurationValue.rating}"${gps}>` +
+      `xmp:Rating="${this.configurationValue.rating}"${gps}${pairing}>` +
       `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">` +
       `${xml(this.configurationValue.name)}</rdf:li></rdf:Alt></dc:title>` +
       `<dc:creator><rdf:Seq><rdf:li>` +

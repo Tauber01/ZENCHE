@@ -2430,6 +2430,11 @@ private final class CameraModel: ObservableObject {
     @Published var videoRecording = false
     @Published var videoRecordingStartedAt: Date?
     @Published var externalRecordToDevice = true
+    // E5 1.5.9：live 图（路线 B）——取景帧环形缓冲，快门切最近 N 秒 AVI，
+    // 与照片同 reservedBaseName 配对入库。默认关（新功能默认口径）。
+    @Published var livePhotoEnabled = false
+    @Published var livePhotoSeconds = 3.0
+    private let livePhotoClipRecorder = LivePhotoClipRecorder()
     private var previewAnalysisSequence = 0
     @Published var frame: NSImage?
     @Published var photoFrame: NSImage?
@@ -2721,6 +2726,16 @@ private final class CameraModel: ObservableObject {
         externalRecordToDevice = UserDefaults.standard.object(
             forKey: "externalRecordToDevice"
         ) == nil || UserDefaults.standard.bool(forKey: "externalRecordToDevice")
+        // E5 1.5.9：live 图开关与时长持久化（默认关 / 3 秒）。
+        livePhotoEnabled = UserDefaults.standard.bool(
+            forKey: "livePhotoEnabled"
+        )
+        let savedLiveSeconds = UserDefaults.standard.double(
+            forKey: "livePhotoSeconds"
+        )
+        if savedLiveSeconds > 0 {
+            livePhotoSeconds = savedLiveSeconds
+        }
         let savedFrameRate = UserDefaults.standard.double(forKey: "videoFrameRate")
         if savedFrameRate > 0 {
             videoFrameRate = savedFrameRate
@@ -2733,6 +2748,11 @@ private final class CameraModel: ObservableObject {
         // E3 1.5.9：macOS 不随连接自动拉取 Wi‑Fi 取景帧——由 MonitorView
         // onAppear/onDisappear 显式开关，避免照片页空拉帧。
         wifiCamera.autoStartLiveViewOnConnect = false
+        // E5 1.5.9：Wi‑Fi PTP 取景帧喂入 live 图环形缓冲。
+        wifiCamera.livePhotoFrameSink = { [weak self] jpeg in
+            guard let self, self.livePhotoEnabled else { return }
+            self.livePhotoClipRecorder.append(jpeg: jpeg)
+        }
         wifiCamera.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &connectivityObservers)
@@ -2857,6 +2877,7 @@ private final class CameraModel: ObservableObject {
         localCamera.disconnect()
         localCameraConnected = false
         liveViewEnabled = false
+        syncLivePhotoRing()
         frame = nil
         photoFrame = nil
         cameraName = nil
@@ -2871,6 +2892,7 @@ private final class CameraModel: ObservableObject {
         previewToken = UUID()
         clearPendingPreviewProcessing()
         liveViewEnabled = false
+        syncLivePhotoRing()
         videoRecording = false
         videoRecordingStartedAt = nil
         cameraQueue.async { [weak self] in
@@ -2966,6 +2988,7 @@ private final class CameraModel: ObservableObject {
                 clearPendingPreviewProcessing()
                 localCamera.stopLiveView()
                 liveViewEnabled = false
+                syncLivePhotoRing()
                 detail = "本机摄像头 · 取景已停止"
             } else {
                 previewToken = UUID()
@@ -2974,6 +2997,7 @@ private final class CameraModel: ObservableObject {
                     switch result {
                     case .success:
                         self.liveViewEnabled = true
+                        self.syncLivePhotoRing()
                         self.detail = "本机摄像头 · 实时取景中"
                     case .failure(let error):
                         self.errorMessage = error.localizedDescription
@@ -2991,6 +3015,7 @@ private final class CameraModel: ObservableObject {
             previewToken = UUID()
             clearPendingPreviewProcessing()
             liveViewEnabled = false
+            syncLivePhotoRing()
             cameraQueue.async { [weak self] in self?.camera.stopLiveView() }
         } else {
             logger.info("workflow", "用户开启实时取景")
@@ -3000,6 +3025,7 @@ private final class CameraModel: ObservableObject {
                     try self.camera.startLiveView()
                     DispatchQueue.main.async {
                         self.liveViewEnabled = true
+                        self.syncLivePhotoRing()
                         self.startPreviewLoop()
                     }
                 } catch {
@@ -3108,6 +3134,7 @@ private final class CameraModel: ObservableObject {
                     if shouldStop {
                         self.previewToken = UUID()
                         self.liveViewEnabled = false
+                        self.syncLivePhotoRing()
                         self.detail = thermalFailure
                             ? "相机温度过高 · 实时取景已停止"
                             : "实时取景已暂停 · 请检查相机状态"
@@ -3138,12 +3165,38 @@ private final class CameraModel: ObservableObject {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyyMMdd_HHmmss"
                         let filename = "ZENCHE_LOCAL_\(formatter.string(from: Date())).JPG"
+                        // E5 1.5.9：live 图——与 USB 路径同构：先 reserve base，
+                        // 照片与切片 AVI 同 base 配对。
+                        let base = self.captureWorkflow.reserveBaseName(
+                            cameraName: self.localCamera.deviceName
+                        )
+                        var liveClipURL: URL?
+                        if self.livePhotoEnabled,
+                           let clip = try self.livePhotoClipRecorder.captureSlice(
+                               to: FileManager.default.temporaryDirectory
+                                   .appendingPathComponent(UUID().uuidString)
+                                   .appendingPathExtension("avi")
+                           ) {
+                            liveClipURL = clip.url
+                        }
                         let url = try self.captureWorkflow.store(
                             data: data,
                             originalFilename: filename,
                             cameraName: self.localCamera.deviceName,
-                            location: captureLocation
+                            reservedBaseName: base,
+                            location: captureLocation,
+                            pairedWithFilename: liveClipURL == nil
+                                ? nil
+                                : "\(base)_live.avi"
                         )
+                        if let liveClipURL {
+                            _ = try self.captureWorkflow.storeLivePhotoClip(
+                                from: liveClipURL,
+                                baseName: base,
+                                pairedPhotoFilename: url.lastPathComponent,
+                                cameraName: self.localCamera.deviceName
+                            )
+                        }
                         let image = NSImage(data: data)
                         self.capturing = false
                         self.detail = "本机拍摄已保存 · \(url.lastPathComponent)"
@@ -3171,6 +3224,9 @@ private final class CameraModel: ObservableObject {
             guard !capturing else { return }
             capturing = true
             detail = "正在通过 Wi‑Fi 触发快门…"
+            // E5 live 图决策：Wi‑Fi 拍照原片保存在相机存储卡内，本地没有
+            // 照片文件可配对——live 图切片跳过（配对语义要求 photo+clip
+            // 同 base 双文件本地入库，无本地照片则不应产生孤儿 AVI）。
             wifiCamera.onShutterTriggered = { [weak self] in
                 self?.capturing = false
                 self?.status = self?.wifiCamera.cameraName ?? "Wi‑Fi 相机"
@@ -3206,12 +3262,39 @@ private final class CameraModel: ObservableObject {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyyMMdd_HHmmss"
                 let filename = "ZENCHE_\(formatter.string(from: Date())).JPG"
+                // E5 1.5.9：live 图——先 reserve base，照片与切片 AVI 同 base 配对。
+                let base = self.captureWorkflow.reserveBaseName(
+                    cameraName: self.activeCameraName
+                )
+                var liveClipURL: URL?
+                if self.livePhotoEnabled,
+                   let clip = try self.livePhotoClipRecorder.captureSlice(
+                       to: FileManager.default.temporaryDirectory
+                           .appendingPathComponent(UUID().uuidString)
+                           .appendingPathExtension("avi")
+                   ) {
+                    liveClipURL = clip.url
+                }
                 let url = try self.captureWorkflow.store(
                     data: data,
                     originalFilename: filename,
                     cameraName: self.activeCameraName,
-                    location: captureLocation
+                    reservedBaseName: base,
+                    location: captureLocation,
+                    // 仅当切片实际生成（开关开且取景帧已入环）才写配对标记，
+                    // 避免 XMP 指向不存在的 AVI。
+                    pairedWithFilename: liveClipURL == nil
+                        ? nil
+                        : "\(base)_live.avi"
                 )
+                if let liveClipURL {
+                    _ = try self.captureWorkflow.storeLivePhotoClip(
+                        from: liveClipURL,
+                        baseName: base,
+                        pairedPhotoFilename: url.lastPathComponent,
+                        cameraName: self.activeCameraName
+                    )
+                }
                 self.logger.info(
                     "capture",
                     "照片已保存；文件=\(url.lastPathComponent)；大小=\(data.count) 字节"
@@ -3510,7 +3593,50 @@ private final class CameraModel: ObservableObject {
             : "外录已关闭 · PTP 相机仅记录到机身存储卡"
     }
 
+    /// E5 1.5.9：live 图开关（默认关）。切换时持久化并联动环形缓冲。
+    func setLivePhotoEnabled(_ enabled: Bool) {
+        livePhotoEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "livePhotoEnabled")
+        syncLivePhotoRing()
+        detail = enabled
+            ? "live 图已开启 · 快门将附带最近 \(Int(livePhotoSeconds)) 秒取景切片"
+            : "live 图已关闭"
+    }
+
+    /// E5 1.5.9：live 图切片时长（秒，默认 3s）。变化时持久化；
+    /// ring 已 arm 则按新时长重建缓冲。
+    func setLivePhotoSeconds(_ seconds: Double) {
+        let clamped = max(1, min(15, seconds))
+        livePhotoSeconds = clamped
+        UserDefaults.standard.set(clamped, forKey: "livePhotoSeconds")
+        if livePhotoClipRecorder.isArmed {
+            livePhotoClipRecorder.arm(
+                frameRate: max(4, Int(videoFrameRate.rounded())),
+                maxSeconds: clamped
+            )
+        }
+    }
+
+    /// E5 1.5.9：live 图环形缓冲启停。取景开启时 arm（若开关开），
+    /// 取景关闭/断连时 disarm。TBC-awaiting-hardware。
+    private func syncLivePhotoRing() {
+        if livePhotoEnabled && liveViewEnabled {
+            if !livePhotoClipRecorder.isArmed {
+                livePhotoClipRecorder.arm(
+                    frameRate: max(4, Int(videoFrameRate.rounded())),
+                    maxSeconds: livePhotoSeconds
+                )
+            }
+        } else if livePhotoClipRecorder.isArmed {
+            livePhotoClipRecorder.disarm()
+        }
+    }
+
     private func appendExternalFrame(_ data: Data) {
+        // E5 1.5.9：live 图环形缓冲常开（取景帧同源喂入，仅当开关开启）。
+        if livePhotoEnabled {
+            livePhotoClipRecorder.append(jpeg: data)
+        }
         guard externalVideoRecorder.isRecording else { return }
         do {
             try externalVideoRecorder.append(jpeg: data)
@@ -13227,7 +13353,15 @@ private struct RootView: View {
                 languageRaw: $languageRaw,
                 themeRaw: $themeRaw,
                 bluetoothRemote: model.bluetoothRemote,
-                locationTagging: model.locationTagging
+                locationTagging: model.locationTagging,
+                livePhotoEnabled: Binding(
+                    get: { model.livePhotoEnabled },
+                    set: { model.setLivePhotoEnabled($0) }
+                ),
+                livePhotoSeconds: Binding(
+                    get: { model.livePhotoSeconds },
+                    set: { model.setLivePhotoSeconds($0) }
+                )
             )
         }
         .sheet(isPresented: $showLaunchAnnouncement) {

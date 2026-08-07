@@ -54,17 +54,20 @@ public sealed class ExternalVideoRecorder : IDisposable
         }
     }
 
-    public void AppendJpeg(byte[] jpeg)
+    public void AppendJpeg(byte[] jpeg, bool throttle = true)
     {
         lock (_gate)
         {
             if (_path is null || jpeg.Length == 0) return;
             var now = System.Diagnostics.Stopwatch.GetTimestamp();
-            var minimumTicks = System.Diagnostics.Stopwatch.Frequency /
-                Math.Max(1, _frameRate);
-            if (_lastFrameTicks != 0 && now - _lastFrameTicks < minimumTicks)
+            if (throttle)
             {
-                return;
+                var minimumTicks = System.Diagnostics.Stopwatch.Frequency /
+                    Math.Max(1, _frameRate);
+                if (_lastFrameTicks != 0 && now - _lastFrameTicks < minimumTicks)
+                {
+                    return;
+                }
             }
             if (_writer is null)
             {

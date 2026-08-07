@@ -1313,6 +1313,8 @@ public final class MainActivity extends Activity {
     private LocalCameraController localCamera;
     private final ExternalVideoRecorder externalVideoRecorder =
             new ExternalVideoRecorder();
+    private final LivePhotoClipRecorder livePhotoClipRecorder =
+            new LivePhotoClipRecorder();
     private BluetoothRemoteController bluetoothRemote;
     private LocationTaggingController locationTagging;
     private DiagnosticLogger diagnostics;
@@ -1448,6 +1450,9 @@ public final class MainActivity extends Activity {
     private volatile boolean capturing;
     private volatile boolean videoRecording;
     private volatile boolean externalRecordToDevice = true;
+    // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对，默认关 3s）──
+    private volatile boolean livePhotoEnabled;
+    private volatile double livePhotoSeconds = 3.0;
     private volatile long recordingStartedAt;
     private final Runnable monitorTimerTicker = new Runnable() {
         @Override public void run() {
@@ -1847,6 +1852,10 @@ public final class MainActivity extends Activity {
                 .getBoolean("captureLocationEnabled", false);
         externalRecordToDevice = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getBoolean("externalRecordToDevice", true);
+        livePhotoEnabled = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getBoolean("livePhotoEnabled", false);
+        livePhotoSeconds = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getFloat("livePhotoSeconds", 3.0f);
         monitorVideoProfile = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("monitorVideoProfile", "source");
         monitorFrameRate = getSharedPreferences("nikon-link", MODE_PRIVATE)
@@ -11102,6 +11111,77 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED),
                 marginParams(-1, -2, 0, 4, 0, 0));
+
+        // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对，默认关 3s）──
+        Switch livePhoto = new Switch(this);
+        livePhoto.setText(tr("Live 图"));
+        livePhoto.setChecked(livePhotoEnabled);
+        livePhoto.setOnCheckedChangeListener((button, checked) -> {
+            livePhotoEnabled = checked;
+            getSharedPreferences("nikon-link", MODE_PRIVATE)
+                    .edit().putBoolean("livePhotoEnabled", checked).apply();
+            syncLivePhotoRing();
+            if (statusText != null) {
+                statusText.setText(checked
+                        ? tr("live 图已开启 · 快门将附带最近 ")
+                                + Math.round(livePhotoSeconds)
+                                + tr(" 秒取景切片")
+                        : tr("live 图已关闭"));
+            }
+        });
+        remoteCard.addView(livePhoto);
+        String[] liveSecondsLabels = new String[]{
+                tr("1 秒"), tr("3 秒"), tr("5 秒"), tr("10 秒"), tr("15 秒")};
+        int[] liveSecondsValues = new int[]{1, 3, 5, 10, 15};
+        Spinner liveSecondsSpinner = new Spinner(this);
+        ArrayAdapter<String> liveSecondsAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                liveSecondsLabels);
+        liveSecondsAdapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item);
+        liveSecondsSpinner.setAdapter(liveSecondsAdapter);
+        liveSecondsSpinner.setSelection(
+                Math.max(0, Arrays.asList(1, 3, 5, 10, 15)
+                        .indexOf((int) Math.round(livePhotoSeconds))),
+                false);
+        liveSecondsSpinner.setBackground(rounded(
+                FIELD_BG,
+                9,
+                RULE));
+        liveSecondsSpinner.setPadding(dp(10), 0, dp(8), 0);
+        liveSecondsSpinner.setOnItemSelectedListener(
+                new android.widget.AdapterView.OnItemSelectedListener() {
+                    @Override
+                    public void onItemSelected(
+                            android.widget.AdapterView<?> parent,
+                            View view,
+                            int position,
+                            long id) {
+                        int seconds = liveSecondsValues[position];
+                        livePhotoSeconds = seconds;
+                        getSharedPreferences("nikon-link", MODE_PRIVATE)
+                                .edit().putFloat("livePhotoSeconds", seconds).apply();
+                        if (livePhotoClipRecorder.isArmed()) {
+                            livePhotoClipRecorder.arm(
+                                    Math.max(4, (int) Math.round(monitorFrameRate)),
+                                    livePhotoSeconds);
+                        }
+                    }
+
+                    @Override
+                    public void onNothingSelected(
+                            android.widget.AdapterView<?> parent) {}
+                });
+        remoteCard.addView(liveSecondsSpinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(44)));
+        remoteCard.addView(text(
+                tr("快门时附带最近几秒取景切片，与照片同 base 配对入库（Wi‑Fi 遥控拍摄除外）"),
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 4, 0, 0));
         return remoteCard;
     }
 
@@ -12385,9 +12465,26 @@ public final class MainActivity extends Activity {
     private void startPreviewLoop() {
         previewFailureCount = 0;
         previewAnalysisSequence = 0;
+        syncLivePhotoRing();
         pendingPreview.set(null);
         int generation = ++previewGeneration;
         pullPreview(generation);
+    }
+
+    /** E5 1.5.9：live 图环形缓冲启停（取景开启时 arm、停止时 disarm）。
+     *  TBC-awaiting-hardware。 */
+    private void syncLivePhotoRing() {
+        boolean anyLiveView = liveViewEnabled
+                && (connected || localCameraConnected || wifiConnected);
+        if (livePhotoEnabled && anyLiveView) {
+            if (!livePhotoClipRecorder.isArmed()) {
+                livePhotoClipRecorder.arm(
+                        Math.max(4, (int) Math.round(monitorFrameRate)),
+                        livePhotoSeconds);
+            }
+        } else if (livePhotoClipRecorder.isArmed()) {
+            livePhotoClipRecorder.disarm();
+        }
     }
 
     private void pullPreview(int generation) {
@@ -12406,6 +12503,11 @@ public final class MainActivity extends Activity {
                         : localCameraConnected
                                 ? localCamera.getLiveViewFrame()
                                 : camera.getLiveViewFrame();
+                // E5 1.5.9：live 图环形缓冲常开（取景帧同源喂入，仅当开关开启）。
+                syncLivePhotoRing();
+                if (livePhotoEnabled) {
+                    livePhotoClipRecorder.append(jpeg);
+                }
                 if (externalVideoRecorder.isRecording()) {
                     try {
                         externalVideoRecorder.appendJpeg(jpeg);
@@ -12552,6 +12654,8 @@ public final class MainActivity extends Activity {
         if (!connected && !localCameraConnected) {
             cameraExecutor.submit(() -> {
                 try {
+                    // E5 1.5.9：Wi‑Fi PTP 拍照不生成 live 图切片——原片在相机
+                    // 存储卡内，本地无照片文件可配对，切片会导致孤儿 AVI。
                     wifiCamera.capture();
                     diagnostics.info("wifi-camera", "PTP/IP 快门已触发");
                     mainHandler.post(() -> {
@@ -12578,13 +12682,21 @@ public final class MainActivity extends Activity {
         }
         cameraExecutor.submit(() -> {
             try {
+                // E5 1.5.9：live 图——与 USB 路径同构：先 reserve base，
+                // 照片与切片 AVI 同 base 配对。
+                String baseName = captureWorkflow.reserveBaseName(
+                        localCameraConnected ? "LocalCamera" : connectedCameraName);
+                File liveClip = null;
+                if (livePhotoEnabled) {
+                    liveClip = captureLivePhotoSlice();
+                }
                 byte[] jpeg = localCameraConnected
                         ? localCamera.capture()
                         : camera.capture();
                 boolean liveViewRestored = localCameraConnected
                         ? localCamera.isLiveView()
                         : camera.isLiveView();
-                File file = savePhoto(jpeg);
+                File file = savePhoto(jpeg, baseName, liveClip);
                 diagnostics.info(
                         "capture",
                         "拍摄完成；文件=" + file.getName()
@@ -13137,12 +13249,50 @@ public final class MainActivity extends Activity {
     }
 
     private File savePhoto(byte[] jpeg) throws Exception {
+        return savePhoto(jpeg, null, null);
+    }
+
+    private File savePhoto(
+            byte[] jpeg,
+            String baseName,
+            File liveClip) throws Exception {
+        if (liveClip != null && baseName != null) {
+            File stored = captureWorkflow.store(
+                    jpeg,
+                    "capture.jpg",
+                    connectedCameraName,
+                    baseName,
+                    locationTagging.snapshot(),
+                    baseName + "_live.avi");
+            captureWorkflow.storeLivePhotoClip(
+                    liveClip,
+                    baseName,
+                    stored.getName(),
+                    connectedCameraName);
+            return stored;
+        }
         return captureWorkflow.store(
                 jpeg,
                 "capture.jpg",
                 connectedCameraName,
                 null,
                 locationTagging.snapshot());
+    }
+
+    /** E5 1.5.9：把环形缓冲最近 N 秒帧切为临时 AVI；环为空返回 null。
+     *  TBC-awaiting-hardware。 */
+    private File captureLivePhotoSlice() {
+        try {
+            File temp = new File(getCacheDir(), "livephoto-" + System.nanoTime() + ".avi");
+            ExternalVideoRecorder.Result clip =
+                    livePhotoClipRecorder.captureSlice(temp);
+            return clip == null ? null : temp;
+        } catch (Exception error) {
+            diagnostics.warning(
+                    "live-photo",
+                    "live 图切片失败：" + error.getMessage());
+            return null;
+        }
     }
 
     private void applyParameter(String name, Object value, String label) {

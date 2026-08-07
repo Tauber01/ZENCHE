@@ -112,7 +112,8 @@ final class CaptureWorkflow: ObservableObject {
         originalFilename: String,
         cameraName: String,
         reservedBaseName: String? = nil,
-        location: CaptureLocation? = nil
+        location: CaptureLocation? = nil,
+        pairedWithFilename: String? = nil
     ) throws -> URL {
         try ensureSessionDirectories()
         let original = URL(fileURLWithPath: originalFilename)
@@ -127,8 +128,41 @@ final class CaptureWorkflow: ObservableObject {
             extension: fileExtension
         )
         try data.write(to: destination, options: .atomic)
-        try finalize(destination, location: location)
+        try finalize(
+            destination,
+            location: location,
+            pairedWithFilename: pairedWithFilename
+        )
         status = "已写入会话 · \(destination.lastPathComponent)"
+        return destination
+    }
+
+    /// E5 live 图：把快门切片 AVI 以照片同 base 存入会话，
+    /// XMP sidecar 写配对标记（指向配对照片），双备份/SHA-256 全复用。
+    /// TBC-awaiting-hardware。
+    @discardableResult
+    func storeLivePhotoClip(
+        from sourceURL: URL,
+        baseName: String,
+        pairedPhotoFilename: String,
+        cameraName: String
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let destination = uniqueURL(
+            in: primaryDirectory,
+            base: "\(baseName)_live",
+            extension: "avi"
+        )
+        if fileManager.fileExists(atPath: destination.path) {
+            try? fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: sourceURL, to: destination)
+        try finalize(
+            destination,
+            location: nil,
+            pairedWithFilename: pairedPhotoFilename
+        )
+        status = "live 图视频已写入会话 · \(destination.lastPathComponent)"
         return destination
     }
 
@@ -209,7 +243,8 @@ final class CaptureWorkflow: ObservableObject {
 
     private func finalize(
         _ primary: URL,
-        location: CaptureLocation?
+        location: CaptureLocation?,
+        pairedWithFilename: String? = nil
     ) throws {
         var hasher = SHA256()
         let input = try FileHandle(forReadingFrom: primary)
@@ -221,10 +256,11 @@ final class CaptureWorkflow: ObservableObject {
         let digest = hasher.finalize()
             .map { String(format: "%02x", $0) }
             .joined()
-        if isActive || location != nil {
+        if isActive || location != nil || pairedWithFilename != nil {
             let xmp = xmpSidecar(
                 for: primary.lastPathComponent,
-                location: location
+                location: location,
+                pairedWithFilename: pairedWithFilename
             )
             let sidecar = primary
                 .deletingPathExtension()
@@ -282,12 +318,16 @@ final class CaptureWorkflow: ObservableObject {
 
     private func xmpSidecar(
         for filename: String,
-        location: CaptureLocation?
+        location: CaptureLocation?,
+        pairedWithFilename: String? = nil
     ) -> String {
         let title = xmlEscaped(configuration.name)
         let creator = xmlEscaped(configuration.creator)
         let rights = xmlEscaped(configuration.rights)
         let gps = location.map(gpsAttributes) ?? ""
+        let pairing = pairedWithFilename.map {
+            "\n              xmp:Label=\"live-photo\"\n              dc:relation=\"\(xmlEscaped($0))\""
+        } ?? ""
         return """
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -296,7 +336,7 @@ final class CaptureWorkflow: ObservableObject {
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:exif="http://ns.adobe.com/exif/1.0/"
-              xmp:Rating="\(configuration.rating)"\(gps)>
+              xmp:Rating="\(configuration.rating)"\(gps)\(pairing)>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">\(title)</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>\(creator)</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">\(rights)</rdf:li></rdf:Alt></dc:rights>

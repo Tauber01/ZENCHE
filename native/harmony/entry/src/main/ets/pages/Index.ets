@@ -36,6 +36,7 @@ import {
   ExternalRecordingResult,
   ExternalVideoRecorder
 } from '../storage/ExternalVideoRecorder';
+import { LivePhotoClipRecorder } from '../storage/LivePhotoClipRecorder';
 import {
   FTP_PORT,
   HTTP_PORT,
@@ -842,6 +843,8 @@ struct Index {
   private previewAnalysisSequence: number = 0;
   private externalVideoRecorder: ExternalVideoRecorder =
     new ExternalVideoRecorder();
+  private livePhotoClipRecorder: LivePhotoClipRecorder =
+    new LivePhotoClipRecorder();
 
   @State private section: string = 'capture';
   @State private language: string = LANGUAGE_SIMPLIFIED_CHINESE;
@@ -957,6 +960,9 @@ struct Index {
   @State private captureSessionExpanded: boolean = false;
   @State private videoRecording: boolean = false;
   @State private externalRecordToDevice: boolean = true;
+  // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对，默认关 3s）──
+  @State private livePhotoEnabled: boolean = false;
+  @State private livePhotoSeconds: number = 3.0;
   @State private recentLogs: string = '点击“查询最近日志”后显示。';
   @State private updateStatus: string = '尚未检查更新';
   @State private updateChecking: boolean = false;
@@ -1201,6 +1207,18 @@ struct Index {
           true
         );
       this.externalRecordToDevice = externalRecording as boolean;
+      const livePhoto: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'livePhotoEnabled',
+          false
+        );
+      this.livePhotoEnabled = livePhoto as boolean;
+      const livePhotoSeconds: preferences.ValueType =
+        await this.settingsPreferences.get(
+          'livePhotoSeconds',
+          3.0
+        );
+      this.livePhotoSeconds = livePhotoSeconds as number;
       const wifiConnectionMode: preferences.ValueType =
         await this.settingsPreferences.get(
           'wifiCameraConnectionMode',
@@ -8045,6 +8063,63 @@ struct Index {
           })
       }
       .width('100%')
+      Divider()
+        .color($r('app.color.rule'))
+      // ── E5 1.5.9：live 图（取景帧环形缓冲 + 快门切片配对，默认关 3s）──
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('Live 图'))
+            .fontSize(SETTINGS_FS_TITLE)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('快门时附带最近 N 秒取景切片，与照片同 base 配对。'))
+            .fontSize(SETTINGS_FS_TINY)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Toggle({
+          type: ToggleType.Switch,
+          isOn: this.livePhotoEnabled
+        })
+          .onChange((enabled: boolean): void => {
+            this.setLivePhotoEnabled(enabled);
+          })
+      }
+      .width('100%')
+      Row() {
+        Text(this.tr('切片时长'))
+          .fontSize(SETTINGS_FS_TITLE)
+          .fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.ink'))
+        Blank()
+        Select([
+          { value: this.tr('1 秒') },
+          { value: this.tr('3 秒') },
+          { value: this.tr('5 秒') },
+          { value: this.tr('10 秒') },
+          { value: this.tr('15 秒') }
+        ])
+          .selected(
+            Math.max(
+              0,
+              [1, 3, 5, 10, 15].indexOf(Math.round(this.livePhotoSeconds))
+            )
+          )
+          .width(120)
+          .height(40)
+          .backgroundColor($r('app.color.paper'))
+          .border({
+            width: 1,
+            color: $r('app.color.rule_strong'),
+            radius: 6
+          })
+          .onSelect((index: number): void => {
+            const seconds: Array<number> = [1, 3, 5, 10, 15];
+            this.setLivePhotoSeconds(seconds[index]);
+          })
+      }
+      .width('100%')
     }
     .width('100%')
     .padding(20)
@@ -10043,6 +10118,48 @@ struct Index {
     this.locationTagging?.setEnabled(true);
   }
 
+  /** E5 1.5.9：live 图开关（持久化 + 环形缓冲联动，默认关）。
+   *  TBC-awaiting-hardware。 */
+  private async setLivePhotoEnabled(enabled: boolean): Promise<void> {
+    this.livePhotoEnabled = enabled;
+    this.syncLivePhotoRing();
+    await this.persistLivePhotoSettings();
+  }
+
+  /** E5 1.5.9：live 图切片时长（持久化；若环形缓冲已 arm 则按新时长重新 arm）。 */
+  private async setLivePhotoSeconds(seconds: number): Promise<void> {
+    this.livePhotoSeconds = seconds;
+    if (this.livePhotoClipRecorder.isArmed) {
+      this.livePhotoClipRecorder.arm(
+        Math.max(4, Math.round(this.videoFrameRate)),
+        this.livePhotoSeconds
+      );
+    }
+    await this.persistLivePhotoSettings();
+  }
+
+  private async persistLivePhotoSettings(): Promise<void> {
+    if (this.settingsPreferences === undefined) {
+      return;
+    }
+    try {
+      await this.settingsPreferences.put(
+        'livePhotoEnabled',
+        this.livePhotoEnabled
+      );
+      await this.settingsPreferences.put(
+        'livePhotoSeconds',
+        this.livePhotoSeconds
+      );
+      await this.settingsPreferences.flush();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'settings',
+        `无法保存 live 图设置：${(error as BusinessError).message}`
+      );
+    }
+  }
+
   private async requestFeaturePermissions(
     permissionsToRequest: Array<Permissions>
   ): Promise<boolean> {
@@ -10175,6 +10292,7 @@ struct Index {
     const generation: number = ++this.previewGeneration;
     let failures: number = 0;
     const wifiSource: boolean = this.wifiSourceActive();
+    this.syncLivePhotoRing();
     while (
       generation === this.previewGeneration &&
       (wifiSource
@@ -10186,6 +10304,11 @@ struct Index {
           ? await this.wifiCamera.getLiveViewFrame()
           : await this.camera.getLiveViewFrame();
         failures = 0;
+        // E5 1.5.9：live 图环形缓冲常开（取景帧同源喂入，仅当开关开启）。
+        this.syncLivePhotoRing();
+        if (this.livePhotoEnabled) {
+          this.livePhotoClipRecorder.append(jpeg);
+        }
         if (this.externalVideoRecorder.isRecording) {
           try {
             this.externalVideoRecorder.appendJpeg(jpeg);
@@ -10228,6 +10351,40 @@ struct Index {
     }
   }
 
+  /** E5 1.5.9：live 图环形缓冲启停（取景开启时 arm、停止时 disarm）。
+   *  TBC-awaiting-hardware。 */
+  private syncLivePhotoRing(): void {
+    const anyLiveView: boolean = this.liveView &&
+      (this.connected || this.wifiConnected || this.localCameraSelected);
+    if (this.livePhotoEnabled && anyLiveView) {
+      if (!this.livePhotoClipRecorder.isArmed) {
+        this.livePhotoClipRecorder.arm(
+          Math.max(4, Math.round(this.videoFrameRate)),
+          this.livePhotoSeconds
+        );
+      }
+    } else if (this.livePhotoClipRecorder.isArmed) {
+      this.livePhotoClipRecorder.disarm();
+    }
+  }
+
+  /** E5 1.5.9：把环形缓冲最近 N 秒帧切为临时 AVI；环为空返回 undefined。
+   *  TBC-awaiting-hardware。 */
+  private captureLivePhotoSlice(): string | undefined {
+    try {
+      const temp: string = `${getContext(this).cacheDir}/livephoto-${Date.now()}.avi`;
+      const clip: ExternalRecordingResult | undefined =
+        this.livePhotoClipRecorder.captureSlice(temp);
+      return clip === undefined ? undefined : temp;
+    } catch (error) {
+      this.diagnostics?.warning(
+        'live-photo',
+        `live 图切片失败：${(error as Error).message}`
+      );
+      return undefined;
+    }
+  }
+
   private async capturePhoto(): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
     const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
@@ -10241,6 +10398,14 @@ struct Index {
         }
         const context: common.UIAbilityContext =
           getContext(this) as common.UIAbilityContext;
+        // E5 1.5.9：live 图——与 USB 路径同构：先 reserve base，
+        // 照片与切片 AVI 同 base 配对。
+        const baseName: string = workflow.reserveBaseName(
+          'HarmonyOS 本机摄像头'
+        );
+        const liveClip: string | undefined = this.livePhotoEnabled
+          ? this.captureLivePhotoSlice()
+          : undefined;
         const jpeg: Uint8Array = await this.localCamera.capture(context);
         if (this.locationTaggingEnabled) {
           await this.locationTagging?.refresh();
@@ -10249,9 +10414,18 @@ struct Index {
           jpeg,
           'local-camera.jpg',
           'HarmonyOS 本机摄像头',
-          undefined,
-          this.locationTagging?.snapshot()
+          baseName,
+          this.locationTagging?.snapshot(),
+          liveClip === undefined ? undefined : `${baseName}_live.avi`
         );
+        if (liveClip !== undefined) {
+          await workflow.storeLivePhotoClip(
+            liveClip,
+            baseName,
+            path.substring(path.lastIndexOf('/') + 1),
+            'HarmonyOS 本机摄像头'
+          );
+        }
         await this.displayJpeg(jpeg);
         this.refreshPhotos();
         this.status = `本机拍摄已保存 · ${path.substring(path.lastIndexOf('/') + 1)}`;
@@ -10260,6 +10434,8 @@ struct Index {
     }
     if (!this.connected && this.wifiConnected && !this.busy) {
       await this.runBusy('正在通过 Wi‑Fi 触发相机快门…', async (): Promise<void> => {
+        // E5 1.5.9：Wi‑Fi PTP 拍照不生成 live 图切片——原片在相机
+        // 存储卡内，本地无照片文件可配对，切片会导致孤儿 AVI。
         await this.wifiCamera.capture();
         this.status = `${this.wifiCameraName} 已收到拍摄指令 · 原片保存在相机存储卡`;
       });
@@ -10277,6 +10453,11 @@ struct Index {
       if (this.locationTaggingEnabled) {
         await this.locationTagging?.refresh();
       }
+      // E5 1.5.9：live 图——先 reserve base，照片与切片 AVI 同 base 配对。
+      const baseName: string = workflow.reserveBaseName(this.cameraName);
+      const liveClip: string | undefined = this.livePhotoEnabled
+        ? this.captureLivePhotoSlice()
+        : undefined;
       const jpeg: Uint8Array = await this.camera.capture();
       const location: CaptureLocation | undefined =
         this.locationTagging?.snapshot();
@@ -10284,9 +10465,20 @@ struct Index {
         jpeg,
         'capture.jpg',
         this.cameraName,
-        undefined,
-        location
+        baseName,
+        location,
+        // 仅当切片实际生成（开关开且取景帧已入环）才写配对标记，
+        // 避免 XMP 指向不存在的 AVI。
+        liveClip === undefined ? undefined : `${baseName}_live.avi`
       );
+      if (liveClip !== undefined) {
+        await workflow.storeLivePhotoClip(
+          liveClip,
+          baseName,
+          path.substring(path.lastIndexOf('/') + 1),
+          this.cameraName
+        );
+      }
       this.diagnostics?.info(
         'capture',
         `拍摄完成；文件=${path.substring(path.lastIndexOf('/') + 1)}` +

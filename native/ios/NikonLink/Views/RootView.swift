@@ -9327,6 +9327,50 @@ private struct AppSettingsSheet: View {
                         VStack(alignment: .leading, spacing: 12) {
                             Toggle(
                                 isOn: Binding(
+                                    get: { model.livePhotoEnabled },
+                                    set: { model.setLivePhotoEnabled($0) }
+                                )
+                            ) {
+                                Label("live 图拍摄", systemImage: "livephoto")
+                            }
+                            RuntimeLocalizedText(
+                                model.livePhotoEnabled
+                                    ? "已开启 · 快门附带最近 \(Int(model.livePhotoSeconds)) 秒取景切片"
+                                    : "已关闭 · 快门仅保存照片"
+                            )
+                                .font(.caption)
+                                .foregroundStyle(IPalette.muted)
+                            Text("取景开启时环形缓存取景帧；快门触发后以照片同文件名保存最近 N 秒切片（AVI），XMP 写入配对标记。")
+                                .font(.caption)
+                                .foregroundStyle(IPalette.muted)
+
+                            if model.livePhotoEnabled {
+                                Divider()
+                                HStack {
+                                    Text("切片时长")
+                                    Spacer()
+                                    Picker(
+                                        "切片时长",
+                                        selection: Binding(
+                                            get: { model.livePhotoSeconds },
+                                            set: { model.setLivePhotoSeconds($0) }
+                                        )
+                                    ) {
+                                        ForEach([1.0, 3.0, 5.0, 10.0, 15.0], id: \.self) { seconds in
+                                            Text("\(Int(seconds)) 秒").tag(seconds)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                }
+                                Text("快门前的取景秒数（1–15 秒）")
+                                    .font(.caption)
+                                    .foregroundStyle(IPalette.muted)
+                            }
+
+                            Divider()
+
+                            Toggle(
+                                isOn: Binding(
                                     get: { model.bluetoothRemote.enabled },
                                     set: { model.bluetoothRemote.setEnabled($0) }
                                 )

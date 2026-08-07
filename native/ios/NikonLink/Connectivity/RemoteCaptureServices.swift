@@ -1193,6 +1193,11 @@ final class WifiCameraService: ObservableObject {
 
     var onShutterTriggered: (() -> Void)?
 
+    /// E5 1.5.9：live 图（路线 B）——Wi‑Fi PTP 取景帧的 JPEG 喂帧回调，
+    /// 由宿主端（iOS/macOS）注入 LivePhotoClipRecorder 的环形缓冲。
+    /// TBC-awaiting-hardware。
+    var livePhotoFrameSink: ((Data) -> Void)?
+
     private let session = PTPIPSession()
     private var connectionTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
@@ -1487,6 +1492,8 @@ final class WifiCameraService: ObservableObject {
                     let jpeg = try await self.session.getLiveViewFrame(
                         vendor: vendor
                     )
+                    // E5 1.5.9：live 图环形缓冲喂帧（宿主端注入，仅当开关开启）。
+                    self.livePhotoFrameSink?(jpeg)
                     if let frame = Self.decodeLiveViewJPEG(jpeg) {
                         self.liveViewFrame = frame
                     }

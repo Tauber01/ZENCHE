@@ -106,6 +106,22 @@ final class CaptureWorkflow {
             String cameraName,
             String reservedBaseName,
             LocationTaggingController.Snapshot location) throws Exception {
+        return store(
+                bytes,
+                originalFilename,
+                cameraName,
+                reservedBaseName,
+                location,
+                null);
+    }
+
+    synchronized File store(
+            byte[] bytes,
+            String originalFilename,
+            String cameraName,
+            String reservedBaseName,
+            LocationTaggingController.Snapshot location,
+            String pairedWithFilename) throws Exception {
         ensureDirectories();
         String extension = extension(originalFilename);
         String base = reservedBaseName == null
@@ -116,8 +132,31 @@ final class CaptureWorkflow {
             output.write(bytes);
             output.getFD().sync();
         }
-        finalizeFile(destination, location);
+        finalizeFile(destination, location, pairedWithFilename);
         status = "已写入会话 · " + destination.getName();
+        return destination;
+    }
+
+    /** E5 live 图：把快门切片 AVI 以照片同 base 存入会话，
+     *  XMP sidecar 写配对标记（指向配对照片），双备份/SHA-256 全复用。
+     *  TBC-awaiting-hardware。 */
+    synchronized File storeLivePhotoClip(
+            File source,
+            String baseName,
+            String pairedPhotoFilename,
+            String cameraName) throws Exception {
+        ensureDirectories();
+        File destination = uniqueFile(
+                primaryDirectory(),
+                sanitize(baseName) + "_live",
+                "avi");
+        if (destination.exists()) destination.delete();
+        if (!source.renameTo(destination)) {
+            copy(source, destination);
+            source.delete();
+        }
+        finalizeFile(destination, null, pairedPhotoFilename);
+        status = "live 图视频已写入会话 · " + destination.getName();
         return destination;
     }
 
@@ -177,11 +216,18 @@ final class CaptureWorkflow {
     private void finalizeFile(
             File primary,
             LocationTaggingController.Snapshot location) throws Exception {
-        if (!active && location == null) return;
+        finalizeFile(primary, location, null);
+    }
+
+    private void finalizeFile(
+            File primary,
+            LocationTaggingController.Snapshot location,
+            String pairedWithFilename) throws Exception {
+        if (!active && location == null && pairedWithFilename == null) return;
         File sidecar = new File(
                 primary.getParentFile(),
                 stem(primary.getName()) + ".xmp");
-        writeText(sidecar, xmp(primary.getName(), location));
+        writeText(sidecar, xmp(primary.getName(), location, pairedWithFilename));
         File backupDirectory = active ? backupDirectory() : null;
         if (active && backupDirectory != null) {
             File backup = new File(backupDirectory, primary.getName());
@@ -295,7 +341,18 @@ final class CaptureWorkflow {
     private String xmp(
             String filename,
             LocationTaggingController.Snapshot location) {
+        return xmp(filename, location, null);
+    }
+
+    private String xmp(
+            String filename,
+            LocationTaggingController.Snapshot location,
+            String pairedWithFilename) {
         String gps = location == null ? "" : gpsAttributes(location);
+        String pairing = pairedWithFilename == null
+                ? ""
+                : "\n              xmp:Label=\"live-photo\"\n"
+                        + "              dc:relation=\"" + xml(pairedWithFilename) + "\"";
         return "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
                 + "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF "
                 + "xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
@@ -304,7 +361,7 @@ final class CaptureWorkflow {
                 + "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
                 + "xmlns:exif=\"http://ns.adobe.com/exif/1.0/\" "
                 + "xmp:Rating=\"" + configuration.rating + "\""
-                + gps + ">"
+                + gps + pairing + ">"
                 + "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">"
                 + xml(configuration.name)
                 + "</rdf:li></rdf:Alt></dc:title>"

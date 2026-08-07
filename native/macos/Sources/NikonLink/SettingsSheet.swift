@@ -180,6 +180,8 @@ struct SettingsSheet: View {
     @Binding var themeRaw: String
     @ObservedObject var bluetoothRemote: BluetoothRemoteService
     @ObservedObject var locationTagging: LocationTaggingService
+    @Binding var livePhotoEnabled: Bool
+    @Binding var livePhotoSeconds: Double
     @Environment(\.dismiss) private var dismiss
     @State private var showDonation = false
     @State private var showLogViewer = false
@@ -306,6 +308,51 @@ struct SettingsSheet: View {
                     ))
                     .labelsHidden()
                     .toggleStyle(.switch)
+                }
+
+                Divider()
+
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        RuntimeLocalizedText("live 图拍摄")
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
+                        RuntimeLocalizedText(
+                            livePhotoEnabled
+                                ? "已开启 · 快门附带最近 \(Int(livePhotoSeconds)) 秒取景切片"
+                                : "已关闭 · 快门仅保存照片"
+                        )
+                            .font(.system(size: TypeScale.body))
+                            .foregroundStyle(SettingsPalette.muted)
+                        RuntimeLocalizedText("取景开启时环形缓存取景帧；快门触发后以照片同文件名保存最近 N 秒切片（AVI），XMP 写入配对标记。")
+                            .font(.system(size: TypeScale.caption))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $livePhotoEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                if livePhotoEnabled {
+                    HStack(alignment: .top, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            RuntimeLocalizedText("切片时长")
+                                .font(.system(size: TypeScale.emphasis, weight: .semibold))
+                            RuntimeLocalizedText("快门前的取景秒数（1–15 秒）")
+                                .font(.system(size: TypeScale.caption))
+                                .foregroundStyle(SettingsPalette.muted)
+                        }
+                        Spacer()
+                        Picker("", selection: $livePhotoSeconds) {
+                            ForEach([1.0, 3.0, 5.0, 10.0, 15.0], id: \.self) { seconds in
+                                Text("\(Int(seconds)) 秒").tag(seconds)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .fixedSize()
+                    }
                 }
 
                 Divider()

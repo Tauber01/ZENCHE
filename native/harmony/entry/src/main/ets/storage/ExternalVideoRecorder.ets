@@ -60,12 +60,13 @@ export class ExternalVideoRecorder {
     this.index = [];
   }
 
-  appendJpeg(jpeg: Uint8Array): void {
+  appendJpeg(jpeg: Uint8Array, throttle: boolean = true): void {
     if (!this.isRecording || jpeg.byteLength === 0) {
       return;
     }
     const now: number = Date.now();
     if (
+      throttle &&
       this.lastFrameAt > 0 &&
       now - this.lastFrameAt < 1000 / this.frameRate
     ) {
