@@ -990,3 +990,26 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   （CFBundleShortVersionString 1.5.9/CFBundleVersion 36 实测）；Windows dotnet
   publish 0 错误 + NSIS 成功（含 BasedOn 崩溃修复后构建）。
 - 验证：6/6 shasum -c OK。
+
+## 12.41 U2-R1 圆角令牌化·iOS+macOS（2026-08-07，kimi 派工，事件 5dc9c351）
+
+- 背景：U1（3ba985d）收口颜色/字号并立 design.md 为唯一基准；U2 批把五端圆角
+  字面量全量令牌化。本批苹果双端：iOS 116 处（RootView.swift）、macOS 110 处
+  （main.swift 86 + SettingsSheet.swift 24）。
+- 令牌：两端各建 `enum RadiusToken`（iOS RootView.swift FontToken 附近、macOS
+  main.swift Palette 之后，module 级共享给 SettingsSheet.swift）——覆盖 design.md
+  Spacing 坡道全档：zero(0) / r5-r8（5–8 小控件与滑杆部件）/ r10-r12（10–12 按钮
+  与输入）/ r14（fig1 深色面卡片）/ r16-r20（16–20 浮层卡片与 sheet）；capsule 档
+  用既有 Capsule() 表达不占 cornerRadius 数值。
+- 映射（越界就近收敛、坡道内保留原值）：
+  - iOS：2/3/4→r5、9→r8、15→r14、22/24→r20；5/6/7/8/10/12/14/16/18/20 保留。
+  - macOS：2→r5、9→r8、13→r12、15→r14、24→r20；5/6/7/8/10/11/12/14/16/20 保留。
+  - 替换后源码 cornerRadius 字面量归零（仅令牌定义处含坡道数值）。
+- 契约测试：native-ios-design-unify.test.mjs + native-macos-design-unify.test.mjs
+  各加 1 用例——断言 RadiusToken 全档定义 + 源码 cornerRadius 数字字面量残留为 0
+  + 坡道外值（1-4/9/13/15/21-23）不出现在 cornerRadius 使用处。npm test
+  357/357 全绿（355 基线 + 2 新）。
+- 构建：macOS typecheck 0 error（build-macos.sh 同口径源列表，含 SettingsSheet
+  引用 module 级 RadiusToken）；iOS xcodebuild BUILD SUCCEEDED（模拟器 Debug）。
+- 范围：只动圆角字面量；间距（U2-S）/颜色字号（U1 已闭环）/功能逻辑零改动。
+- 纪律：未 git push；未动生产服务器。

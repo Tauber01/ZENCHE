@@ -166,6 +166,27 @@ private enum IPalette {
 }
 
 // ===== v1.5.6 FontToken（对齐 Android/Harmony TypeScale 5 档）=====
+
+// ===== U2 R1 圆角令牌（design.md Spacing 坡道：0 / 5–8 小控件 / 10–12 按钮输入
+// / 14 fig1 卡片 / 16–20 浮层 / capsule 状态 pill 与 HUD chip——capsule 用
+// Capsule() 表达不占 cornerRadius 数值）=====
+enum RadiusToken {
+    static let zero: CGFloat = 0
+    static let r5: CGFloat = 5
+    static let r6: CGFloat = 6
+    static let r7: CGFloat = 7
+    static let r8: CGFloat = 8
+    static let r10: CGFloat = 10
+    static let r11: CGFloat = 11
+    static let r12: CGFloat = 12
+    static let r14: CGFloat = 14
+    static let r16: CGFloat = 16
+    static let r17: CGFloat = 17
+    static let r18: CGFloat = 18
+    static let r19: CGFloat = 19
+    static let r20: CGFloat = 20
+}
+
 enum FontToken {
     static let caption: CGFloat = 11     // 辅助说明/状态
     static let body: CGFloat = 12        // 正文/标签
@@ -210,7 +231,7 @@ private struct SplashView: View {
             IPalette.paper.ignoresSafeArea()
             VStack(spacing: 28) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 24)
+                    RoundedRectangle(cornerRadius: RadiusToken.r20)
                         .fill(
                             LinearGradient(
                                 colors: [IPalette.cobalt, IPalette.cobalt.opacity(0.82)],
@@ -445,7 +466,7 @@ private struct SideNavigation: View {
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                RoundedRectangle(cornerRadius: 9)
+                RoundedRectangle(cornerRadius: RadiusToken.r8)
                     .fill(
                         LinearGradient(
                             colors: [IPalette.cobalt, IPalette.cobalt.opacity(0.82)],
@@ -498,7 +519,7 @@ private struct SideNavigation: View {
             .foregroundStyle(active ? accent : IPalette.muted)
             .frame(width: 82, height: 64)
             .background(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: RadiusToken.r16)
                     .fill(active ? IPalette.surface : .clear)
                     .shadow(
                         color: active ? IPalette.shadow.opacity(0.65) : .clear,
@@ -590,7 +611,7 @@ private struct BottomNavigation: View {
         .frame(minHeight: 50)
         .background(
             active ? accent.opacity(0.09) : Color.clear,
-            in: RoundedRectangle(cornerRadius: 12)
+            in: RoundedRectangle(cornerRadius: RadiusToken.r12)
         )
         .overlay(alignment: .top) {
             Capsule()
@@ -679,7 +700,7 @@ private struct MyDevicesPage: View {
                     .frame(maxWidth: .infinity, minHeight: 360)
                     .background(
                         IPalette.surface,
-                        in: RoundedRectangle(cornerRadius: 22)
+                        in: RoundedRectangle(cornerRadius: RadiusToken.r20)
                     )
                 } else {
                     LazyVGrid(columns: cardColumns, spacing: 16) {
@@ -778,10 +799,10 @@ private struct RememberedDeviceCard: View {
             }
             .padding(16)
         }
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 20))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r20))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: RadiusToken.r20)
                 .stroke(isConnected ? IPalette.positive : IPalette.rule, lineWidth: 1)
         )
         .shadow(color: IPalette.shadow.opacity(0.45), radius: 10, y: 4)
@@ -1919,7 +1940,7 @@ private struct ImageEditorPage: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: 42, height: 30)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r5))
                 } else {
                     Image(systemName: "photo.on.rectangle")
                 }
@@ -1944,7 +1965,7 @@ private struct ImageEditorPage: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: 48, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r5))
                 } else {
                     Image(systemName: "photo")
                         .frame(width: 48, height: 34)
@@ -2347,8 +2368,8 @@ private struct ImageEditorPage: View {
                 .foregroundStyle(IPalette.muted)
                 .lineLimit(2)
         }
-        .padding(18).background(IPalette.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).stroke(IPalette.rule) }
+        .padding(18).background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
+        .overlay { RoundedRectangle(cornerRadius: RadiusToken.r14).stroke(IPalette.rule) }
     }
 
     private var aiModules: [(String, [String])] {
@@ -2506,9 +2527,9 @@ private struct ImageEditorPage: View {
             }
         }
         .padding(16)
-        .background(IPalette.cobaltSoft.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
+        .background(IPalette.cobaltSoft.opacity(0.6), in: RoundedRectangle(cornerRadius: RadiusToken.r12))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
                 .stroke(IPalette.cobalt.opacity(0.32))
         }
     }
@@ -2525,7 +2546,7 @@ private struct ImageEditorPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 9)
         .frame(minHeight: 44)
-        .background(IPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 8))
+        .background(IPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: RadiusToken.r8))
     }
 
     private var editorToolbar: some View {
@@ -2629,9 +2650,9 @@ private struct ImageEditorPage: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 44)
-        .background(IPalette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+        .background(IPalette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: RadiusToken.r10))
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: RadiusToken.r10)
                 .stroke(IPalette.cobalt.opacity(0.28))
         }
     }
@@ -2646,7 +2667,7 @@ private struct ImageEditorPage: View {
                 imageSize: image?.size
             )
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: RadiusToken.r18)
                     .fill(IPalette.graphite)
                 if let image {
                     Image(uiImage: image)
@@ -2859,10 +2880,10 @@ private struct ImageEditorPage: View {
         .padding(16)
         .background(
             IPalette.surface,
-            in: RoundedRectangle(cornerRadius: 16)
+            in: RoundedRectangle(cornerRadius: RadiusToken.r16)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: RadiusToken.r16)
                 .stroke(IPalette.rule)
         }
     }
@@ -2910,8 +2931,8 @@ private struct ImageEditorPage: View {
                     }
                 }
                 .background(IPalette.graphite)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay { RoundedRectangle(cornerRadius: 8).stroke(IPalette.rule) }
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
+                .overlay { RoundedRectangle(cornerRadius: RadiusToken.r8).stroke(IPalette.rule) }
                 .contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0)
@@ -2957,10 +2978,10 @@ private struct ImageEditorPage: View {
             Text("颜色取样器")
                 .font(.subheadline.weight(.semibold))
             HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: RadiusToken.r8)
                     .fill(pickerColor)
                     .frame(width: 48, height: 48)
-                    .overlay { RoundedRectangle(cornerRadius: 8).stroke(IPalette.rule) }
+                    .overlay { RoundedRectangle(cornerRadius: RadiusToken.r8).stroke(IPalette.rule) }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(pickerSample).font(.caption.monospaced())
                     Text("从当前照片中心读取 RGB")
@@ -3023,9 +3044,9 @@ private struct ImageEditorPage: View {
                                 ? IPalette.cobalt.opacity(0.12)
                                 : IPalette.surface
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
                         .overlay {
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: RadiusToken.r10)
                                 .stroke(
                                     settings.activeMaskLayerID == layer.id
                                         ? IPalette.cobalt.opacity(0.45)
@@ -4530,7 +4551,7 @@ private struct ControlStatusCardGrid: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
     }
 
     private var storageCard: some View {
@@ -4564,9 +4585,9 @@ private struct ControlStatusCardGrid: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(IPalette.uiAccent, lineWidth: 1)
         }
     }
@@ -4731,9 +4752,9 @@ private struct ControlParameterGrid: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 14))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .opacity(editing && hidden ? 0.35 : 1)
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
         .onTapGesture {
             guard editing else { return }
             if hidden {
@@ -4790,7 +4811,7 @@ private struct ControlCaptureDock: View {
                     }
                 }
                 .frame(width: 46, height: 46)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
                 Text(
                     RuntimeLocalization.format(
                         "%lld 个文件",
@@ -4884,7 +4905,7 @@ private struct ControlCaptureDock: View {
                 .frame(width: 46, height: 46)
                 .background(
                     IPalette.uiSecondary,
-                    in: RoundedRectangle(cornerRadius: 10)
+                    in: RoundedRectangle(cornerRadius: RadiusToken.r10)
                 )
         }
         .buttonStyle(.plain)
@@ -4912,10 +4933,10 @@ private struct CaptureScopeBar: View {
         .padding(5)
         .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
-            RoundedRectangle(cornerRadius: 5)
+            RoundedRectangle(cornerRadius: RadiusToken.r5)
                 .stroke(IPalette.whiteMist, lineWidth: 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r5))
         .allowsHitTesting(false)
         .accessibilityLabel(Text("RGB 波形"))
     }
@@ -4928,7 +4949,7 @@ private struct CameraStage: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: RadiusToken.r20)
                 .fill(Color.black)
 
             if model.wifiCamera.isConnected {
@@ -4936,7 +4957,7 @@ private struct CameraStage: View {
                     Image(decorative: frame, scale: 1)
                         .resizable()
                         .scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
                 } else {
                     VStack(spacing: 13) {
                         Image(systemName: "wifi")
@@ -4955,14 +4976,14 @@ private struct CameraStage: View {
                     session: model.camera.session,
                     focusHandler: { model.camera.focus(at: $0) }
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
 
                 if (model.section == .monitor || model.monitorNikonCloudPreset != nil),
                    let overlay = model.camera.monitorOverlay {
                     Image(decorative: overlay, scale: 1)
                         .resizable()
                         .scaledToFill()
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
                         .allowsHitTesting(false)
                 }
 
@@ -4972,7 +4993,7 @@ private struct CameraStage: View {
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: RadiusToken.r10)
                         .stroke(Color.yellow.opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [7]))
                         .padding(30)
                         .allowsHitTesting(false)
@@ -5126,7 +5147,7 @@ private struct ImmersiveCameraView: View {
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: RadiusToken.r8)
                         .stroke(
                             Color.yellow.opacity(0.72),
                             style: StrokeStyle(lineWidth: 1, dash: [8])
@@ -5286,7 +5307,7 @@ private struct ImmersiveCameraView: View {
                 : "—")
                 .font(.title2.weight(.bold))
                 .frame(width: 52, height: 52)
-                .background(IPalette.hudBgSoft, in: RoundedRectangle(cornerRadius: 12))
+                .background(IPalette.hudBgSoft, in: RoundedRectangle(cornerRadius: RadiusToken.r12))
 
             Button {
                 model.camera.setZoomFactor(max(1, model.camera.zoomFactor - 0.5))
@@ -5370,7 +5391,7 @@ private struct ImmersiveCameraView: View {
             .background(IPalette.uiSecondary.opacity(0.82))
         }
         .frame(height: 50)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r5))
         .opacity(connected ? 1 : 0.55)
         .accessibilityElement(children: .combine)
     }
@@ -5411,10 +5432,10 @@ private struct ImmersiveCameraView: View {
         .padding(5)
         .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
-            RoundedRectangle(cornerRadius: 5)
+            RoundedRectangle(cornerRadius: RadiusToken.r5)
                 .stroke(IPalette.whiteMist, lineWidth: 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r5))
         .allowsHitTesting(false)
     }
 
@@ -5470,7 +5491,7 @@ private struct ImmersiveCameraView: View {
         }
         .padding(5)
         .background(IPalette.uiCard.opacity(0.78))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
     }
 
     private var portraitCaptureShelf: some View {
@@ -5928,9 +5949,9 @@ private struct ImmersiveParameterStepper: View {
         }
         .buttonStyle(ImmersiveControlStyle())
         .padding(2)
-        .background(IPalette.uiCard.opacity(0.88), in: RoundedRectangle(cornerRadius: 7))
+        .background(IPalette.uiCard.opacity(0.88), in: RoundedRectangle(cornerRadius: RadiusToken.r7))
         .overlay {
-            RoundedRectangle(cornerRadius: 7)
+            RoundedRectangle(cornerRadius: RadiusToken.r7)
                 .stroke(
                     enabled ? IPalette.uiAccent.opacity(0.48) : IPalette.uiSecondary,
                     lineWidth: 1
@@ -5950,7 +5971,7 @@ private struct ImmersiveControlStyle: ButtonStyle {
             .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
             .background(
                 active ? IPalette.uiAccent : IPalette.hudBgSoft,
-                in: RoundedRectangle(cornerRadius: 12)
+                in: RoundedRectangle(cornerRadius: RadiusToken.r12)
             )
             .opacity(configuration.isPressed ? 0.68 : 1)
     }
@@ -6026,8 +6047,8 @@ private struct CaptureParameterDeck: View {
 
         }
         .padding(18)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
+        .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
     }
 }
 
@@ -6091,8 +6112,8 @@ private struct ShootingTaskCard: View {
             .disabled(model.camera.state != .ready && !model.shootingTaskRunning)
         }
         .padding(18)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
+        .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
     }
 }
 
@@ -6133,7 +6154,7 @@ private struct NikonCloudMonitorBar: View {
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(Color.white)
                     .frame(width: 40, height: 40)
-                    .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: 12))
+                    .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: RadiusToken.r12))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("尼康云创监看")
@@ -6189,10 +6210,10 @@ private struct NikonCloudMonitorBar: View {
             usesDarkSurface
                 ? IPalette.uiCard
                 : IPalette.cobaltSoft,
-            in: RoundedRectangle(cornerRadius: 14)
+            in: RoundedRectangle(cornerRadius: RadiusToken.r14)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(
                     usesDarkSurface
                         ? IPalette.uiSecondary
@@ -6459,7 +6480,7 @@ private struct MonitorConsolePage: View {
                         .allowsHitTesting(false)
                 }
                 if model.showSafeGuide {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: RadiusToken.r5)
                         .stroke(Color.yellow.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [7]))
                         .padding(width * 0.075)
                         .allowsHitTesting(false)
@@ -6533,7 +6554,7 @@ private struct MonitorConsolePage: View {
                         .frame(width: 51, height: 51)
                         .overlay {
                             if model.isRecording {
-                                RoundedRectangle(cornerRadius: 3)
+                                RoundedRectangle(cornerRadius: RadiusToken.r5)
                                     .fill(.white)
                                     .frame(width: 15, height: 15)
                             }
@@ -6729,12 +6750,12 @@ private struct MonitorConsolePage: View {
         }
         .padding(.horizontal, 14)
         .frame(width: 286, height: 91)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 9))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r8))
         .overlay(alignment: .leading) {
             Rectangle()
                 .fill(IPalette.whiteWash)
                 .frame(width: 62)
-                .clipShape(RoundedRectangle(cornerRadius: 9))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
         }
         .foregroundStyle(.white)
     }
@@ -7094,7 +7115,7 @@ private struct MonitorConsoleStepper: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(enabled ? .white : IPalette.whiteGhost)
-        .background(IPalette.hudBgMid, in: RoundedRectangle(cornerRadius: 8))
+        .background(IPalette.hudBgMid, in: RoundedRectangle(cornerRadius: RadiusToken.r8))
         .disabled(!enabled)
     }
 }
@@ -7242,7 +7263,7 @@ private struct WifiMonitorParameterCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 16))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
 
     private var wifiParamsEnabled: Bool {
@@ -7437,7 +7458,7 @@ private struct MonitorParameterDeck: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: 16))
+        .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
 
     private var shutterSpeedOptions: [Double] {
@@ -7561,7 +7582,7 @@ private struct MonitorOutputDeck: View {
                     .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页读数改纯白
             }
             .padding(8)
-            .background(Color.black, in: RoundedRectangle(cornerRadius: 10))
+            .background(Color.black, in: RoundedRectangle(cornerRadius: RadiusToken.r10))
 
             Text("H.264、H.265 与设备公开的 ProRes 编码会直接应用到系统录制输出。N-RAW 与 N-Log 需要兼容 Nikon 机身控制；当前 iOS/UVC 来源不支持时会锁定并给出原因。")
                 .font(.caption)
@@ -7570,7 +7591,7 @@ private struct MonitorOutputDeck: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: 16))
+        .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
 
 }
@@ -7621,8 +7642,8 @@ private struct CaptureSessionCard: View {
             .font(.headline)
         }
         .padding(18)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
+        .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
         .onAppear(perform: loadConfiguration)
     }
 
@@ -7877,10 +7898,10 @@ private struct LibraryBranchRow: View {
                     : IPalette.paperSecondary.opacity(
                         depth == 0 ? 0.64 : 0.36
                     ),
-                in: RoundedRectangle(cornerRadius: 10)
+                in: RoundedRectangle(cornerRadius: RadiusToken.r10)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: RadiusToken.r10)
                     .stroke(
                         isDropTarget ? IPalette.cobalt : IPalette.rule,
                         lineWidth: isDropTarget ? 2 : 0.5
@@ -7971,7 +7992,7 @@ private struct LibraryBranchFileRow: View {
                 }
             }
             .frame(width: 68, height: 48)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
             Text(item.filename)
                 .font(.caption.monospaced())
                 .lineLimit(1)
@@ -7985,10 +8006,10 @@ private struct LibraryBranchFileRow: View {
         .frame(minHeight: 58)
         .background(
             selected ? IPalette.cobaltSoft : IPalette.surface,
-            in: RoundedRectangle(cornerRadius: 9)
+            in: RoundedRectangle(cornerRadius: RadiusToken.r8)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 9)
+            RoundedRectangle(cornerRadius: RadiusToken.r8)
                 .stroke(selected ? IPalette.cobalt : IPalette.rule)
         }
         .contentShape(Rectangle())
@@ -8003,7 +8024,7 @@ private struct LibraryBranchFileRow: View {
             Label(item.filename, systemImage: "arrow.up.and.down.and.arrow.left.and.right")
                 .font(.caption.weight(.semibold))
                 .padding(10)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: RadiusToken.r10))
         }
         .accessibilityHint("长按并拖动到其他分支")
     }
@@ -8387,9 +8408,9 @@ private struct LibraryPage: View {
             }
         }
         .padding(16)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: RadiusToken.r18)
                 .stroke(IPalette.rule, lineWidth: 1)
         }
     }
@@ -8528,10 +8549,10 @@ private struct LibraryPage: View {
             .padding(12)
             .background(
                 IPalette.surface,
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: RadiusToken.r16)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: RadiusToken.r16)
                     .stroke(IPalette.cobalt.opacity(0.28))
             }
         } else {
@@ -8546,7 +8567,7 @@ private struct LibraryPage: View {
                     .font(.system(size: 28, weight: .semibold)) // 图标尺寸，不受 FontToken 约束（豁免族）
                     .foregroundStyle(.white)
                     .frame(width: 54, height: 54)
-                    .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: 15))
+                    .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
                 VStack(alignment: .leading, spacing: 3) {
                     Text("分支工作台")
                         .font(.title3.weight(.bold))
@@ -8642,10 +8663,10 @@ private struct LibraryPage: View {
                 unclassifiedDropTargeted
                     ? IPalette.cobaltSoft
                     : IPalette.paperSecondary,
-                in: RoundedRectangle(cornerRadius: 12)
+                in: RoundedRectangle(cornerRadius: RadiusToken.r12)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: RadiusToken.r12)
                     .stroke(
                         unclassifiedDropTargeted
                             ? IPalette.cobalt
@@ -8662,15 +8683,15 @@ private struct LibraryPage: View {
             }
         }
         .padding(16)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: RadiusToken.r5)
                 .fill(IPalette.cobalt)
                 .frame(width: 4)
                 .padding(.vertical, 18)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: RadiusToken.r18)
                 .stroke(IPalette.cobalt.opacity(0.22), lineWidth: 1)
         }
     }
@@ -8718,7 +8739,7 @@ private struct LibraryPage: View {
                     .padding(10)
                     .background(
                         .regularMaterial,
-                        in: RoundedRectangle(cornerRadius: 10)
+                        in: RoundedRectangle(cornerRadius: RadiusToken.r10)
                     )
                 }
                 .accessibilityHint("长按并拖动到分支")
@@ -8796,7 +8817,7 @@ private struct CameraStorageItemRow: View {
                 }
             }
             .frame(width: 76, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.filename)
@@ -8812,10 +8833,10 @@ private struct CameraStorageItemRow: View {
         .padding(8)
         .background(
             selected ? IPalette.cobaltSoft : IPalette.paperSecondary,
-            in: RoundedRectangle(cornerRadius: 12)
+            in: RoundedRectangle(cornerRadius: RadiusToken.r12)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
                 .stroke(
                     selected ? IPalette.cobalt : IPalette.rule,
                     lineWidth: selected ? 1.5 : 1
@@ -8885,16 +8906,16 @@ private struct SystemAlbumThumbnail: View {
             }
             .frame(height: 116)
             .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
 
             Text(item.name)
                 .font(.caption2.monospaced())
                 .lineLimit(1)
         }
         .padding(7)
-        .background(IPalette.surfaceRaised, in: RoundedRectangle(cornerRadius: 15))
+        .background(IPalette.surfaceRaised, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay(
-            RoundedRectangle(cornerRadius: 15)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(IPalette.rule, lineWidth: 1)
         )
         .task(id: item.id) {
@@ -9030,7 +9051,7 @@ private struct CloudDriveGuideView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: "externaldrive.connected.to.line.below")
                                     .frame(width: 32, height: 32)
-                                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: RadiusToken.r8))
                                 VStack(alignment: .leading, spacing: 3) {
                                     RuntimeLocalizedText(provider.name)
                                         .font(.headline)
@@ -9169,7 +9190,7 @@ private struct LibraryThumbnail: View {
             .clipped()
             .background(IPalette.graphite)
         .foregroundStyle(IPalette.whiteMid)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
 
             Text(item.filename)
                 .font(.caption2.monospaced())
@@ -9178,11 +9199,11 @@ private struct LibraryThumbnail: View {
         }
         .padding(7)
         .background(
-            RoundedRectangle(cornerRadius: 15)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .fill(selected ? Color.accentColor.opacity(0.16) : IPalette.surfaceRaised)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 15)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(selected ? Color.accentColor : IPalette.rule, lineWidth: 1.5)
         )
     }
@@ -9562,7 +9583,7 @@ private struct AppSettingsSheet: View {
                     SettingsCard {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: "key.fill").font(.system(size: FontToken.title, weight: .semibold)).foregroundStyle(IPalette.cobalt)
-                                .frame(width: 36, height: 36).background(IPalette.cobaltSoft).clipShape(RoundedRectangle(cornerRadius: 8))
+                                .frame(width: 36, height: 36).background(IPalette.cobaltSoft).clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("AI 功能激活").font(.system(size: FontToken.emphasis, weight: .bold))
                                 Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: FontToken.body)).foregroundStyle(IPalette.muted)
@@ -9597,9 +9618,9 @@ private struct AppSettingsSheet: View {
                                         .resizable()
                                         .scaledToFit()
                                         .frame(maxWidth: 280)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 8)
+                                            RoundedRectangle(cornerRadius: RadiusToken.r8)
                                                 .stroke(IPalette.rule, lineWidth: 0.5)
                                         )
                                 }
@@ -9847,7 +9868,7 @@ private struct UpdateSettingsCard: View {
                 .padding(.horizontal, 12)
                 .frame(height: 44)
                 .background(IPalette.paper)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
 
                 HStack {
                     Text("CDK 保存在系统钥匙串中，不会写入诊断日志。")
@@ -9947,9 +9968,9 @@ private struct FastFeedbackCallout: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(IPalette.cobaltSoft, in: RoundedRectangle(cornerRadius: 14))
+        .background(IPalette.cobaltSoft, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(IPalette.cobalt.opacity(0.18), lineWidth: 0.5)
         )
     }
@@ -9969,7 +9990,7 @@ private struct DonationSheet: View {
                             .frame(width: 48, height: 48)
                             .background(
                                 IPalette.cobaltSoft,
-                                in: RoundedRectangle(cornerRadius: 14)
+                                in: RoundedRectangle(cornerRadius: RadiusToken.r14)
                             )
                         VStack(alignment: .leading, spacing: 3) {
                             Text("爱发电赞助")
@@ -9989,9 +10010,9 @@ private struct DonationSheet: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxHeight: 440)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r16))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: RadiusToken.r16)
                                     .stroke(IPalette.rule, lineWidth: 0.5)
                             )
                     } else {
@@ -10063,7 +10084,7 @@ private struct LaunchAnnouncementSheet: View {
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.red.opacity(0.10))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
 
                     VStack(alignment: .leading, spacing: 10) {
                         Label("爱发电赞助", systemImage: "heart.fill")
@@ -10080,13 +10101,13 @@ private struct LaunchAnnouncementSheet: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxHeight: 340)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                         }
                     }
                     .padding(16)
-                    .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: RadiusToken.r16)
                             .stroke(IPalette.rule, lineWidth: 0.5)
                     )
 
@@ -10137,8 +10158,8 @@ private struct SettingsCard<Content: View>: View {
         content
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(IPalette.surface, in: RoundedRectangle(cornerRadius: 18))
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(IPalette.rule, lineWidth: 0.5))
+            .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
+            .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
     }
 }
 
@@ -10209,9 +10230,9 @@ private struct ConnectionSheet: View {
                             .foregroundStyle(IPalette.muted)
                     }
                     .padding(16)
-                    .background(Color.yellow.opacity(0.075), in: RoundedRectangle(cornerRadius: 16))
+                    .background(Color.yellow.opacity(0.075), in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: RadiusToken.r16)
                             .stroke(Color.yellow.opacity(0.22), lineWidth: 1)
                     )
 
@@ -10230,7 +10251,7 @@ private struct ConnectionSheet: View {
                         }
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+                        .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     }
                 }
                 .padding(20)
@@ -10283,10 +10304,10 @@ private struct ConnectionOption: View {
             .padding(16)
             .background(
                 selected ? Color.green.opacity(0.08) : IPalette.surfaceRaised,
-                in: RoundedRectangle(cornerRadius: 16)
+                in: RoundedRectangle(cornerRadius: RadiusToken.r16)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: RadiusToken.r16)
                     .stroke(IPalette.rule, lineWidth: 1)
             )
         }
@@ -10458,7 +10479,7 @@ private struct TimelapseComposerSheet: View {
                                 HStack(spacing: 10) {
                                     TimelapseFrameThumbnail(url: item.url)
                                         .frame(width: 52, height: 40)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r6))
                                     Text(item.filename)
                                         .font(.caption.monospaced())
                                         .lineLimit(1)
@@ -10642,7 +10663,7 @@ private struct FocusStackComposerSheet: View {
                                 HStack(spacing: 10) {
                                     TimelapseFrameThumbnail(url: item.url)
                                         .frame(width: 52, height: 40)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r6))
                                     Text(item.filename)
                                         .font(.caption.monospaced())
                                         .lineLimit(1)
