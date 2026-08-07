@@ -924,3 +924,19 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   0 错误（2 既有警告 CS8629/CS0414）+ NSIS 成功（LANG=en_US.UTF-8 + Nikon/Sony
   SDK env + libusb）。
 - 验证：6/6 shasum -c OK。
+
+## 12.37 v1.5.9 服务器阻塞修复 + backlog 台账补录（2026-08-07，AI审查 门禁收口）
+
+### 阻塞修复（AI审查 发布门禁阻塞项）
+- 更新服务器 server.mjs 静态服务此前对 root 下任意已存在文件无鉴权 GET 放行（:534-555），而 E1 用量数据默认落 root/data（dataDir=join(root,"data")，:433，usage-YYYY-MM-DD.json）——`GET /data/usage-*.json` 无鉴权即可拿到当日全量指纹时间序列，架空 /api/stats 回环+Bearer 门禁。
+- **修法甲**：静态服务解码 pathname 后显式拒绝 `/data` 前缀（403，:534-543）；不触碰 /api/update 等公开端点与正常静态文件（新增行为级用例验证：/data/usage-*.json→403、/data→403、/api/update→200、root 静态页→200）。
+- 验证：npm test 320/320 全绿（基线 318 + 新增 2 安全用例）。
+
+### backlog 台账补录（AI审查 门禁⑤：以下观察项此前仅存于频道消息，仓库零记录——现补录标「非阻塞 backlog」）
+- **E8 applyingGradingCube 实例状态泄漏**（非阻塞）：macOS main.swift:11910 / iOS RootView.swift:3751 读实例轮盘+云创预设而非复制快照；Android 同构（renderEditedBitmap 读实例 selectedNikonCloudPreset）。「复制 AI 后改轮盘/换预设再批量」场景产物偏离复制方案；默认流程（复制→直接批量）正确。建议 TBC 实机验证时一并评估。
+- **E6 Harmony native 理论 UAF 窗口**（非阻塞）：OnStreamChanged 编码器线程回调访问 session->muxer 无锁，CreateEncoder streamCv 5s 超时清理后回调晚到理论 use-after-free（低概率）。实机验证时关注。
+- **E5 连拍混帧**（非阻塞）：captureSlice 后 ring 未清空（仅 disarm 清），连拍间隔 <N 秒时第二张 live 片段混入第一张时刻帧。路线 B 语义，实机评估。
+- **Harmony installId put 后缺 flush()**（非阻塞）：Index.ets:14541，该文件其余 12 处 put 均跟 flush——进程被杀可能丢 installId 致安装数高估，影响统计准确性不影响安全。
+- **E8 编辑副本归集口径五端分裂**（非阻塞）：macOS/iOS 走 CaptureWorkflow.store（XMP+双备份+SHA-256），Windows/Android/Harmony 三端直写（无 XMP/备份/manifest）。既有行为延续非 E8 新引入，建议 backlog 拉齐。
+- **timelapse 五端无专用 xmp:Label**（非阻塞）：live-photo/focus-stack 均有，延时合成视频缺——若产品要可识别需五端同步补。
+- **xmp:Label 理论双写**（非阻塞）：paired+stack 同设会产生非法 XML；当前无触发路径，仅记录。
