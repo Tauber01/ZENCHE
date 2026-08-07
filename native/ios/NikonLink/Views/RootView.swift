@@ -5085,7 +5085,23 @@ private struct ImmersiveCameraView: View {
                 sensorLandscape ?? (proxy.size.width > proxy.size.height)
             ZStack {
                 Color.black.ignoresSafeArea()
-                if model.camera.state == .ready {
+                if model.wifiCamera.isConnected {
+                    // v1.5.9 build 35 修复：Wi-Fi 联机监看全屏黑屏——全屏此前只渲染
+                    // 本机 AVCapture 预览，Wi-Fi 实时取景帧无分支，iPad 联机时全屏纯黑。
+                    if let frame = model.wifiCamera.liveViewFrame {
+                        Image(decorative: frame, scale: 1)
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                    } else {
+                        ContentUnavailableView(
+                            "等待 Wi‑Fi 实时取景…",
+                            systemImage: "wifi",
+                            description: Text(model.wifiCamera.liveViewStatus)
+                        )
+                        .foregroundStyle(.white)
+                    }
+                } else if model.camera.state == .ready {
                     CameraPreview(
                         session: model.camera.session,
                         focusHandler: { model.camera.focus(at: $0) }

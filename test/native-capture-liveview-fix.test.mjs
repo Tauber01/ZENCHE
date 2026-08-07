@@ -132,3 +132,21 @@ test('v1.5.9: 四端顶栏品牌摘除口径一致，Windows 不受影响', asyn
   // Windows 桌面端品牌顶栏保持（恒显，无弹出问题）——断言其仍含品牌文本。
   assert.match(windows, /帧澈 ZENCHE/);
 });
+
+test('iOS: ImmersiveCameraView 全屏渲染 Wi-Fi 实时取景（修全屏黑屏）', async () => {
+  const view = await read('native/ios/NikonLink/Views/RootView.swift');
+  // v1.5.9 build 35 修复（Tauber iPad 实测「全屏会黑屏」）：全屏此前只渲染本机
+  // AVCapture 预览（model.camera.state == .ready 分支），Wi-Fi 联机监看帧
+  // （wifiCamera.liveViewFrame）无分支，iPad 联 Wi-Fi 相机进全屏纯黑。
+  const immersive = view.slice(
+    view.indexOf('private struct ImmersiveCameraView'),
+    view.indexOf('private struct ImmersiveFocusReticle')
+  );
+  // Wi-Fi 分支须在本机预览分支之前（与 CameraStage 口径一致）。
+  const wifiPos = immersive.indexOf('if model.wifiCamera.isConnected {');
+  const localPos = immersive.indexOf('} else if model.camera.state == .ready {');
+  assert.ok(wifiPos > 0, 'ImmersiveCameraView 应有 wifiCamera.isConnected 分支');
+  assert.ok(localPos > wifiPos, 'Wi-Fi 分支应在本机 AVCapture 分支之前');
+  assert.match(immersive, /model\.wifiCamera\.liveViewFrame/);
+  assert.match(immersive, /等待 Wi‑Fi 实时取景…/);
+});
