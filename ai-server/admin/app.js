@@ -364,7 +364,7 @@
         var tr = el("tr", { onclick: function () { openDetail(d.device_id); } }, [
           el("td", { class: "mono" }, [
             document.createTextNode(shortId(d.device_id)),
-            el("div", { class: "sub", text: d.created_at ? "建档 " + fmtExpiry(String(d.created_at).slice(0, 8)) : "建档未知" })
+            el("div", { class: "sub", text: d.created_at ? "建档 " + fmtTs(d.created_at) : "建档未知" })
           ]),
           el("td", { class: "mono", text: d.activation || "—" }),
           el("td", { class: "mono", text: fmtExpiry(d.expiry) }),
@@ -497,6 +497,18 @@
     var d = data;
     var chain = (d.migration_chain && Array.isArray(d.migration_chain)) ? d.migration_chain : [];
     var nodes = chain.length ? chain : [d];
+    var migrateBox = el("div", { class: "migrate" }, [
+      el("h3", { text: "迁移链（" + nodes.length + " 节点）" })
+    ]);
+    nodes.forEach(function (n, idx) {
+      var current = n.device_id === id;
+      migrateBox.appendChild(el("div", { class: "migrate-node" + (current ? " current" : "") }, [
+        el("div", { class: "dir", text: idx === 0 ? "源" : (idx === nodes.length - 1 ? "尾" : "中转") }),
+        el("div", { class: "dev", text: n.device_id }),
+        el("div", { class: "st" }, [statusPill(n.status || "active")]),
+        el("div", { class: "st mono", text: n.migrated_at ? fmtTs(n.migrated_at) : "" })
+      ]));
+    });
     var mask = el("div", { class: "drawer-mask", onclick: function (ev) { if (ev.target === mask) mask.remove(); } }, [
       el("div", { class: "drawer" }, [
         el("button", { class: "btn small close", text: "关闭", onclick: function () { mask.remove(); } }),
@@ -511,18 +523,7 @@
           el("div", { class: "k", text: "建档时间" }), el("div", { class: "v", text: d.created_at ? fmtTs(d.created_at) : "未知（旧记录）" }),
           el("div", { class: "k", text: "备注" }), el("div", { class: "v plain", text: d.note || "—" })
         ]),
-        el("div", { class: "migrate" }, [
-          el("h3", { text: "迁移链（" + nodes.length + " 节点）" }),
-          nodes.forEach(function (n, idx) {
-            var current = n.device_id === id;
-            mask.appendChild(el("div", { class: "migrate-node" + (current ? " current" : "") }, [
-              el("div", { class: "dir", text: idx === 0 ? "源" : (idx === nodes.length - 1 ? "尾" : "中转") }),
-              el("div", { class: "dev", text: n.device_id }),
-              el("div", { class: "st" }, [statusPill(n.status || "active")]),
-              el("div", { class: "st mono", text: n.migrated_at ? fmtTs(n.migrated_at) : "" })
-            ]));
-          })
-        ])
+        migrateBox
       ])
     ]);
     document.body.appendChild(mask);
