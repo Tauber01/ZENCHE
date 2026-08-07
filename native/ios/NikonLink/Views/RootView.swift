@@ -377,7 +377,8 @@ private struct AppHeader: View {
 
     var body: some View {
         HStack(spacing: horizontalSizeClass == .compact ? 8 : 12) {
-            brand
+            // v1.5.9 实测修复：fig1 批次引入 brand 后，非拍照页顶栏冒出多余 logo，
+            // 摘除品牌块（顶栏保留连接胶囊 + 设置钮）。
             Spacer(minLength: horizontalSizeClass == .compact ? 2 : 8)
             connectionButton
             settingsButton
@@ -389,45 +390,6 @@ private struct AppHeader: View {
             Rectangle().fill(IPalette.rule).frame(height: 0.5)
         }
         .shadow(color: IPalette.shadow.opacity(0.28), radius: 8, y: 2)
-    }
-
-    private var brand: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 13)
-                    .fill(
-                        LinearGradient(
-                            colors: [IPalette.cobalt, IPalette.cobalt.opacity(0.82)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                Text("Z")
-                    .font(.system(size: FontToken.display, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-            }
-            .frame(
-                width: horizontalSizeClass == .compact ? 38 : 44,
-                height: horizontalSizeClass == .compact ? 38 : 44
-            )
-            .shadow(color: IPalette.cobalt.opacity(0.18), radius: 8, y: 4)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("帧澈 ZENCHE")
-                    .font(
-                        .system(
-                            size: horizontalSizeClass == .compact ? 15 : 17,
-                            weight: .bold
-                        )
-                    )
-                    .lineLimit(1)
-                if horizontalSizeClass != .compact {
-                    Text("Capture · Connect · Flow")
-                        .font(.caption)
-                        .foregroundStyle(IPalette.muted)
-                }
-            }
-        }
     }
 
     private var connectionButton: some View {
@@ -4298,6 +4260,11 @@ private struct CapturePage: View {
                     }
                     CaptureScopeBar()
                     ControlParameterGrid()
+                    // v1.5.9 实测修复：fig1 批次把 CameraStage 从拍照页删除，
+                    // 恢复监看画面（对齐 Android/Harmony dock→波形→参数格→预览 顺序）。
+                    CameraStage {
+                        showingFullscreen = true
+                    }
                     NikonCloudMonitorBar()
                     CaptureSessionCard()
                     CaptureParameterDeck()

@@ -6301,6 +6301,9 @@ private struct CaptureView: View {
                                 )
                             }
                         }
+                        // v1.5.9 实测修复：fig1 批次删掉拍照页 PreviewStage 后监看
+                        // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
+                        CaptureCompactPreview(model: model)
                         NikonCloudMacMonitorPicker(
                             model: model,
                             darkAppearance: true
@@ -6319,6 +6322,57 @@ private struct CaptureView: View {
         }
         // fig1 控制面恒为深色；强制深色让保留的旧面板在同一页内观感一致。
         .preferredColorScheme(.dark)
+    }
+}
+
+/// v1.5.9 实测修复：拍照页紧凑预览区。帧渲染逻辑与 MonitorView 共享
+/// （model.wifiCamera.liveViewFrame / model.frame Image 分支，见 :6729-6761），
+/// 不复活旧 PreviewStage 整体。fig1 批次删除后监看画面消失，此区恢复。
+private struct CaptureCompactPreview: View {
+    @ObservedObject var model: CameraModel
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if model.wifiCamera.isConnected,
+               let wifiFrame = model.wifiCamera.liveViewFrame {
+                // E3 1.5.9：Wi‑Fi PTP/IP 实时取景帧（CGImage）。
+                Image(decorative: wifiFrame, scale: 1)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+            } else if let frame = model.frame {
+                Image(nsImage: frame)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 42, weight: .light)) // 空态图标尺寸
+                    Text(
+                        model.connected
+                            ? "等待实时取景画面"
+                            : (model.wifiCamera.isConnected
+                                ? "Wi‑Fi 取景准备中…"
+                                : "连接相机后开启实时取景")
+                    )
+                        .font(.system(size: TypeScale.emphasis, weight: .medium))
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(Color.white.opacity(0.75))
+                .frame(maxWidth: .infinity, minHeight: 240)
+            }
+        }
+        .frame(height: 300)
+        .frame(maxWidth: .infinity)
+        .background(Palette.graphite)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Palette.uiLabel.opacity(0.15), lineWidth: 1)
+        )
     }
 }
 

@@ -2814,28 +2814,8 @@ public final class MainActivity extends Activity {
     /** v1.5.5 fig1 standard app bar content (light, logo + connect + settings). */
     private void fillStandardTopBar(LinearLayout top, boolean compact) {
         top.removeAllViews();
-        TextView logo = text("Z", 20, Typeface.BOLD, Color.WHITE);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackground(brandGradient(13));
-        logo.setElevation(dp(5));
-        top.addView(logo, new LinearLayout.LayoutParams(
-                dp(compact ? 38 : 40),
-                dp(compact ? 38 : 40)));
-
-        LinearLayout brand = new LinearLayout(this);
-        brand.setOrientation(LinearLayout.VERTICAL);
-        brand.setPadding(dp(8), 0, 0, 0);
-        brand.addView(text(
-                "帧澈 ZENCHE",
-                compact ? 14 : 15,
-                Typeface.BOLD,
-                INK));
-        if (!compact) {
-            brand.addView(text("Capture · Connect · Flow", 10, Typeface.NORMAL, MUTED));
-        }
-        top.addView(brand, new LinearLayout.LayoutParams(
-                dp(compact ? 112 : 142),
-                dp(44)));
+        // v1.5.9 实测修复：fig1 批次引入品牌块后，非拍照页顶栏冒出多余 logo。
+        // 摘除「Z」标 + 品牌文案两视图（顶栏保留连接胶囊 + 设置钮）。
 
         // v1.5.7 P1：状态点 22dp → 10dp（视觉对齐 macOS 8pt 基准；触控面由 44 高顶栏行保证）
         connectionDot = text("●", 10, Typeface.BOLD, MUTED);
