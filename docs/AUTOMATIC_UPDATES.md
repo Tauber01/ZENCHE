@@ -6,6 +6,41 @@
 继续提供原有静态 Web/PWA 文件服务。生产环境推荐把站点反向代理到
 `https://zenche.top/api/update`；客户端也可使用兼容别名 `/api/updates`。
 
+### 自托管清单模式（UPDATE_RELEASE_MANIFEST）
+
+设置 `UPDATE_RELEASE_MANIFEST=<path release.json>` 后，`/api/update` 完全走
+本地清单，**零 GitHub 请求**（落实「软件更新全都更新到服务器」）；未设置则
+保持原 GitHub 模式（向后兼容）。
+
+**清单形状**：
+
+```json
+{
+  "version": "1.6.0",
+  "title": "v1.6.0",
+  "body": "发布说明",
+  "published_at": "2026-08-07T00:00:00Z",
+  "release_url": "https://zenche.top/releases/v1.6.0",
+  "minimum_supported_version": "1.3.0",
+  "assets": {
+    "windows/x64": { "file": "ZENCHE-1.6.0-Windows-x64.zip", "sha256": "…64hex…" },
+    "windows": { "file": "ZENCHE-1.6.0-Windows-x64-Setup.exe", "sha256": "…" },
+    "macos": { "file": "ZENCHE-1.6.0-macOS-arm64.dmg", "sha256": "…" }
+  }
+}
+```
+
+- **匹配顺序**：`platform/arch` 精确 → `platform` 兜底；无匹配时 `url=null`
+  且 `update_available` 仅按版本比较给出（前端自行处理无包情形）。
+- **url** = `UPDATE_ASSET_BASE_URL + '/' + file`；清单模式下
+  `UPDATE_ASSET_BASE_URL` 缺失 → **503 fail-closed**。
+- **热加载**：清单按 mtime 感知，改文件即生效（无需重启进程）。
+- **错误口径**：清单缺失/JSON 损坏 → **503** 且不外泄内部详情。
+- `channel` 任意值均回同一清单（自托管只有 stable）。
+
+**发布流程**：上传新包到下载目录 → 更新 `release.json`（版本/条目/sha256）
+→ 无需重启（mtime 热加载）→ 客户端下次检查即见新版本。
+
 ### API
 
 ```text

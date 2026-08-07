@@ -275,3 +275,143 @@ test("E1 security: normal static files outside /data still served", async () => 
     },
   );
 });
+
+// ---------- 自托管清单模式（UPDATE_RELEASE_MANIFEST，Tauber「更新全到服务器」） ----------
+
+const sampleManifest = {
+  version: "1.6.0",
+  title: "v1.6.0",
+  body: "自托管清单版本",
+  published_at: "2026-08-07T00:00:00Z",
+  release_url: "https://zenche.top/releases/v1.6.0",
+  minimum_supported_version: "1.3.0",
+  assets: {
+    "windows/x64": { file: "ZENCHE-1.6.0-Windows-x64.zip", sha256: "a".repeat(64) },
+    "windows": { file: "ZENCHE-1.6.0-Windows-x64-Setup.exe", sha256: "b".repeat(64) },
+    "macos": { file: "ZENCHE-1.6.0-macOS-arm64.dmg", sha256: "c".repeat(64) },
+  },
+};
+
+test("selfhost: manifest mode serves local manifest with zero GitHub requests", async () => {
+  let githubCalls = 0;
+  const manifestFile = path.join(os.tmpdir(), "zenche-release.json");
+  fs.writeFileSync(manifestFile, JSON.stringify(sampleManifest));
+  // fetchImpl 计数：manifest 模式不应被调用。
+  const fetchImpl = async () => { githubCalls++; throw new Error("must not call GitHub"); };
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl,
+        manifestPath: manifestFile,
+        assetBaseUrl: "https://zenche.top/downloads",
+      }),
+    },
+    async (base) => {
+      // windows/x64 精确匹配
+      const win = await (await fetch(`${base}/api/update?platform=windows&architecture=x64&current_version=1.5.9`)).json();
+      assert.equal(win.version, "1.6.0");
+      assert.equal(win.url, "https://zenche.top/downloads/ZENCHE-1.6.0-Windows-x64.zip");
+      assert.equal(win.sha256, "a".repeat(64));
+      assert.equal(win.update_available, true);
+      // windows 兜底（无 arch）
+      const winFallback = await (await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`)).json();
+      assert.equal(winFallback.url, "https://zenche.top/downloads/ZENCHE-1.6.0-Windows-x64-Setup.exe");
+      // macos 兜底
+      const mac = await (await fetch(`${base}/api/update?platform=macos&current_version=1.5.9`)).json();
+      assert.equal(mac.url, "https://zenche.top/downloads/ZENCHE-1.6.0-macOS-arm64.dmg");
+      // 版本比较
+      const noUpdate = await (await fetch(`${base}/api/update?platform=windows&current_version=1.6.0`)).json();
+      assert.equal(noUpdate.update_available, false);
+      // 无匹配平台 → url null 但版本仍给
+      const linux = await (await fetch(`${base}/api/update?platform=linux&current_version=1.5.9`)).json();
+      assert.equal(linux.url, null);
+      assert.equal(linux.version, "1.6.0");
+      // channel 任意值均回同一清单
+      const beta = await (await fetch(`${base}/api/update?platform=windows&channel=beta`)).json();
+      assert.equal(beta.version, "1.6.0");
+    },
+  );
+  assert.equal(githubCalls, 0, "manifest mode must make zero GitHub requests");
+  fs.rmSync(manifestFile, { force: true });
+});
+
+test("selfhost: manifest missing or corrupt -> 503 with no detail leak", async () => {
+  const missingPath = path.join(os.tmpdir(), "zenche-missing-release.json");
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl: async () => { throw new Error("must not call GitHub"); },
+        manifestPath: missingPath,
+        assetBaseUrl: "https://zenche.top/downloads",
+      }),
+    },
+    async (base) => {
+      const r = await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`);
+      assert.equal(r.status, 503, "missing manifest -> 503");
+      const body = await r.text();
+      assert.ok(!body.includes("ENOENT"), "no internal detail leak");
+    },
+  );
+  // 损坏 JSON
+  const corruptPath = path.join(os.tmpdir(), "zenche-corrupt-release.json");
+  fs.writeFileSync(corruptPath, "{ not json !!");
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl: async () => { throw new Error("must not call GitHub"); },
+        manifestPath: corruptPath,
+        assetBaseUrl: "https://zenche.top/downloads",
+      }),
+    },
+    async (base) => {
+      const r = await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`);
+      assert.equal(r.status, 503, "corrupt manifest -> 503");
+    },
+  );
+  fs.rmSync(corruptPath, { force: true });
+});
+
+test("selfhost: manifest mode without asset base url -> 503 fail-closed", async () => {
+  const manifestFile = path.join(os.tmpdir(), "zenche-release-nobase.json");
+  fs.writeFileSync(manifestFile, JSON.stringify(sampleManifest));
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl: async () => { throw new Error("must not call GitHub"); },
+        manifestPath: manifestFile,
+        assetBaseUrl: "",
+      }),
+    },
+    async (base) => {
+      const r = await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`);
+      assert.equal(r.status, 503, "missing asset base url -> 503");
+    },
+  );
+  fs.rmSync(manifestFile, { force: true });
+});
+
+test("selfhost: manifest hot-reloads on mtime change without restart", async () => {
+  const manifestFile = path.join(os.tmpdir(), "zenche-release-hot.json");
+  fs.writeFileSync(manifestFile, JSON.stringify({ ...sampleManifest, version: "1.6.0" }));
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl: async () => { throw new Error("must not call GitHub"); },
+        manifestPath: manifestFile,
+        assetBaseUrl: "https://zenche.top/downloads",
+      }),
+    },
+    async (base) => {
+      const v1 = await (await fetch(`${base}/api/update?platform=windows&current_version=1.0.0`)).json();
+      assert.equal(v1.version, "1.6.0");
+      // 改写清单（mtime 变化）→ 热加载新版本
+      fs.writeFileSync(manifestFile, JSON.stringify({ ...sampleManifest, version: "1.7.0" }));
+      // 确保 mtime 变化被感知（部分 FS 秒级粒度，强制 set）
+      const now = new Date();
+      fs.utimesSync(manifestFile, now, new Date(now.getTime() + 2000));
+      const v2 = await (await fetch(`${base}/api/update?platform=windows&current_version=1.0.0`)).json();
+      assert.equal(v2.version, "1.7.0", "hot reload picks up new manifest");
+    },
+  );
+  fs.rmSync(manifestFile, { force: true });
+});

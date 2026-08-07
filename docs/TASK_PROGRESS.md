@@ -990,3 +990,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   （CFBundleShortVersionString 1.5.9/CFBundleVersion 36 实测）；Windows dotnet
   publish 0 错误 + NSIS 成功（含 BasedOn 崩溃修复后构建）。
 - 验证：6/6 shasum -c OK。
+
+## 12.41 v1.5.9 更新服务自托管清单模式（pro 实施，2026-08-07，Tauber 15:19 指令）
+
+- 计划：PLANS/ZENCHE_UPDATE_SELFHOST_PLAN.md 执行项 2，仅改 server.mjs + 测试 + docs/AUTOMATIC_UPDATES.md。
+- **清单模式**：`UPDATE_RELEASE_MANIFEST=<path>` 设置后 /api/update 完全走本地清单、零 GitHub 请求；未设置完全保持 GitHub 模式（向后兼容）。
+- **清单形状**：`{version, title, body, published_at, release_url?, minimum_supported_version?, assets: {"<platform>/<arch>": {file, sha256}, "<platform>": {file, sha256}}}`。
+- **匹配顺序**：platform/arch → platform 兜底；无匹配 url=null 且 update_available 仅按版本比较给出。
+- **fail-closed**：清单模式缺 UPDATE_ASSET_BASE_URL → 503；清单缺失/JSON 损坏 → 503 不外泄详情。
+- **热加载**：按 mtime 感知（无 TTL），改文件即生效无需重启。
+- channel 任意值均回同一清单（自托管只有 stable，docs 注明）。
+- 测试：server-update.test.mjs 新增 4 用例（清单服务零 GitHub 请求/匹配顺序兜底/缺 asset 503/缺失损坏 503/热加载）。npm test 359/359 全绿（基线 355 + 4）；node --check 通过；diff --check 干净。
+- 红线：未 git push；未动生产（部署由 kimi）；/api/stats 与 /data/ 语义零改动。
