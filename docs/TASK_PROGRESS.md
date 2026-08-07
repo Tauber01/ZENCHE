@@ -1013,3 +1013,29 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   引用 module 级 RadiusToken）；iOS xcodebuild BUILD SUCCEEDED（模拟器 Debug）。
 - 范围：只动圆角字面量；间距（U2-S）/颜色字号（U1 已闭环）/功能逻辑零改动。
 - 纪律：未 git push；未动生产服务器。
+
+## 12.42 U2-R3 圆角令牌化·Web+Android 壳（2026-08-07，kimi 派工，事件 59601998）
+
+- 背景：R1（iOS+macOS 圆角令牌化）闭环后接棒；Android 侧 UI = 共享 web 层
+  （styles.css/tokens.css）+ 原生 WebView 壳。基线 ec06d62。
+- **web 层（styles.css）**：勘察发现 54 处 border-radius 声明中 **49 处基线已
+  走 var(--radius-xs/sm/md/lg/round)**（--radius-* 令牌 tokens.css 83-87 行，
+  数值未动）；仅 5 处字面量 = **2 处 `0`**（方形设计意图，tokens.css 无 0 档，
+  与 design.md 坡道 0 档一致）+ **3 处百分比**（scene-object 9%/scene-fruit 48%/
+  scene-leaf 100%，装饰性有机形态非尺寸坡道）。**0 与百分比均无既有令牌档可
+  映射**，强行映射（0→xs 或百分比→固定值）属观感改动违反红线，故保留并在
+  契约测试白名单豁免。核心门=styles.css **禁止 border-radius rem/px 尺寸
+  字面量**（当前零残留，探针实测捕获 0）。
+- **Android 壳**：dialog_surface.xml + night 变体 `android:radius="24dp"` ×2
+  处（派工称 3 处，源码 res 实测 2 文件 2 处）——24 坡道外，就近收敛 **20dp**
+  （浮层卡片档 16-20）。
+- 契约测试：native-android-design-unify.test.mjs 加 2 用例——web 尺寸字面量
+  禁止（单转义 \d 正则，R1 教训）+ 全部 border-radius 声明 ∈ {var(--radius-*),
+  0, 百分比} + Android drawable radius=20dp 且无 24dp。
+- **反证（探针实际输出）**：反证 A——styles.css 注入 `border-radius: 8px` →
+  探针捕获 `['border-radius: 8px']`（1 处）→ 用例变红（pass 5/fail 1）→ 还原
+  全绿；反证 B——dialog_surface.xml 改回 24dp → 探针 radius=24dp → 用例变红
+  → 还原全绿。
+- 验收：npm test **359/359** 全绿（357 基线 + 2 新）；git diff --check 干净。
+- 范围：只动圆角；styles.css 令牌数值未动；间距/颜色/字号/功能零改动。
+- 纪律：未 git push；未动生产服务器。

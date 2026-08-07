@@ -66,3 +66,29 @@ test('android U1: colors.xml files carry dual-track guidance comment', async () 
     assert.match(xml, /<color name="graphite">/);
   }
 });
+
+test('U2 R3 web: styles.css border-radius 无 rem/px 尺寸字面量（仅 var 令牌 + 0 + 装饰百分比）', async () => {
+  const css = await read('styles.css');
+  // 令牌声明存在（tokens.css 数值未动）。
+  assert.match(css, /var\(--radius-(xs|sm|md|lg|round)\)/);
+  // 核心门：border-radius 禁止 rem/px 尺寸字面量（单转义 \d）。
+  const remPx = css.match(/border-radius:\s*\d+(\.\d+)?(rem|px)\b/g) ?? [];
+  assert.equal(remPx.length, 0, `styles.css 不应残留 border-radius 尺寸字面量（残留 ${remPx.length}: ${remPx.join(' | ')}）`);
+  // 全部 border-radius 声明必须 ∈ {var(--radius-*), 0, 百分比}。
+  const decls = css.match(/border-radius:\s*[^;]+/g) ?? [];
+  for (const d of decls) {
+    const allowed = /var\(--radius-[\w-]+\)|\b0\b|\b\d+(\.\d+)?%/.test(d);
+    assert.ok(allowed, `非法 border-radius 声明: ${d}`);
+  }
+});
+
+test('U2 R3 android: drawable corners radius 落在设计坡道档（24→20 收敛）', async () => {
+  const [light, night] = await Promise.all([
+    read('native/android/app/src/main/res/drawable/dialog_surface.xml'),
+    read('native/android/app/src/main/res/drawable-night/dialog_surface.xml'),
+  ]);
+  for (const xml of [light, night]) {
+    assert.match(xml, /<corners android:radius="20dp" \/>/);
+    assert.doesNotMatch(xml, /24dp/);
+  }
+});
