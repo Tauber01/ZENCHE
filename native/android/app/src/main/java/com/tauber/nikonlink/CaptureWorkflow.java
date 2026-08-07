@@ -181,6 +181,29 @@ final class CaptureWorkflow {
         return destination;
     }
 
+    /** E7 焦点合成：把合成好的 JPEG 以新 base 存入会话，
+     *  复用 finalizeFile 全套（XMP sidecar/双备份/SHA-256 清单），
+     *  XMP 写 focus-stack 合成标记 + 源帧数。
+     *  TBC-awaiting-hardware。 */
+    synchronized File storeFocusStack(
+            File source,
+            String cameraName,
+            int stackSourceCount) throws Exception {
+        ensureDirectories();
+        File destination = uniqueFile(
+                primaryDirectory(),
+                reserveBaseName(cameraName),
+                "jpg");
+        if (destination.exists()) destination.delete();
+        if (!source.renameTo(destination)) {
+            copy(source, destination);
+            source.delete();
+        }
+        finalizeFile(destination, null, null, stackSourceCount);
+        status = "焦点合成已写入会话 · " + destination.getName();
+        return destination;
+    }
+
     synchronized File importFile(
             InputStream input,
             String originalFilename,
@@ -244,11 +267,20 @@ final class CaptureWorkflow {
             File primary,
             LocationTaggingController.Snapshot location,
             String pairedWithFilename) throws Exception {
-        if (!active && location == null && pairedWithFilename == null) return;
+        finalizeFile(primary, location, pairedWithFilename, null);
+    }
+
+    private void finalizeFile(
+            File primary,
+            LocationTaggingController.Snapshot location,
+            String pairedWithFilename,
+            Integer stackSourceCount) throws Exception {
+        if (!active && location == null && pairedWithFilename == null
+                && stackSourceCount == null) return;
         File sidecar = new File(
                 primary.getParentFile(),
                 stem(primary.getName()) + ".xmp");
-        writeText(sidecar, xmp(primary.getName(), location, pairedWithFilename));
+        writeText(sidecar, xmp(primary.getName(), location, pairedWithFilename, stackSourceCount));
         File backupDirectory = active ? backupDirectory() : null;
         if (active && backupDirectory != null) {
             File backup = new File(backupDirectory, primary.getName());
@@ -369,11 +401,23 @@ final class CaptureWorkflow {
             String filename,
             LocationTaggingController.Snapshot location,
             String pairedWithFilename) {
+        return xmp(filename, location, pairedWithFilename, null);
+    }
+
+    private String xmp(
+            String filename,
+            LocationTaggingController.Snapshot location,
+            String pairedWithFilename,
+            Integer stackSourceCount) {
         String gps = location == null ? "" : gpsAttributes(location);
         String pairing = pairedWithFilename == null
                 ? ""
                 : "\n              xmp:Label=\"live-photo\"\n"
                         + "              dc:relation=\"" + xml(pairedWithFilename) + "\"";
+        String stack = stackSourceCount == null
+                ? ""
+                : "\n              xmp:Label=\"focus-stack\"\n"
+                        + "              xmp:FocusStackSources=\"" + stackSourceCount + "\"";
         return "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n"
                 + "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF "
                 + "xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">"
@@ -382,7 +426,7 @@ final class CaptureWorkflow {
                 + "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
                 + "xmlns:exif=\"http://ns.adobe.com/exif/1.0/\" "
                 + "xmp:Rating=\"" + configuration.rating + "\""
-                + gps + pairing + ">"
+                + gps + pairing + stack + ">"
                 + "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">"
                 + xml(configuration.name)
                 + "</rdf:li></rdf:Alt></dc:title>"

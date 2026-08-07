@@ -162,6 +162,31 @@ export class CaptureWorkflow {
     return destination;
   }
 
+  /** E7 焦点合成：把合成好的 JPEG 以新 base 存入会话，
+   *  复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单），
+   *  XMP 写 focus-stack 合成标记 + 源帧数。
+   *  TBC-awaiting-hardware。 */
+  async storeFocusStack(
+    source: string,
+    cameraName: string,
+    stackSourceCount: number
+  ): Promise<string> {
+    this.ensureDirectories();
+    const destination: string = this.uniquePath(
+      this.primaryDirectory(),
+      this.reserveBaseName(cameraName),
+      'jpg'
+    );
+    if (fs.accessSync(destination)) {
+      fs.unlinkSync(destination);
+    }
+    fs.copyFileSync(source, destination);
+    fs.unlinkSync(source);
+    await this.finalize(destination, undefined, undefined, stackSourceCount);
+    this.statusValue = `焦点合成已写入会话 · ${filename(destination)}`;
+    return destination;
+  }
+
   async importFromUri(
     uri: string,
     originalFilename: string,
@@ -210,14 +235,15 @@ export class CaptureWorkflow {
   private async finalize(
     primary: string,
     location?: CaptureLocationMetadata,
-    pairedWithFilename?: string
+    pairedWithFilename?: string,
+    stackSourceCount?: number
   ): Promise<void> {
     if (!this.activeValue && location === undefined
-      && pairedWithFilename === undefined) {
+      && pairedWithFilename === undefined && stackSourceCount === undefined) {
       return;
     }
     const sidecar: string = `${withoutExtension(primary)}.xmp`;
-    writeText(sidecar, this.xmp(filename(primary), location, pairedWithFilename));
+    writeText(sidecar, this.xmp(filename(primary), location, pairedWithFilename, stackSourceCount));
     if (!this.activeValue) {
       return;
     }
@@ -357,7 +383,8 @@ export class CaptureWorkflow {
   private xmp(
     mediaName: string,
     location?: CaptureLocationMetadata,
-    pairedWithFilename?: string
+    pairedWithFilename?: string,
+    stackSourceCount?: number
   ): string {
     const gps: string = location === undefined
       ? ''
@@ -366,6 +393,10 @@ export class CaptureWorkflow {
       ? ''
       : `\n              xmp:Label="live-photo"\n` +
         `              dc:relation="${xml(pairedWithFilename)}"`;
+    const stack: string = stackSourceCount === undefined
+      ? ''
+      : `\n              xmp:Label="focus-stack"\n` +
+        `              xmp:FocusStackSources="${stackSourceCount}"`;
     return `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
       `<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF ` +
       `xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">` +
@@ -373,7 +404,7 @@ export class CaptureWorkflow {
       `xmlns:xmp="http://ns.adobe.com/xap/1.0/" ` +
       `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
       `xmlns:exif="http://ns.adobe.com/exif/1.0/" ` +
-      `xmp:Rating="${this.configurationValue.rating}"${gps}${pairing}>` +
+      `xmp:Rating="${this.configurationValue.rating}"${gps}${pairing}${stack}>` +
       `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">` +
       `${xml(this.configurationValue.name)}</rdf:li></rdf:Alt></dc:title>` +
       `<dc:creator><rdf:Seq><rdf:li>` +

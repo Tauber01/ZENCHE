@@ -165,6 +165,25 @@ Record the camera firmware, lens, USB cable and host OS before testing.
       NotifyEndOfStream+EOS 输出在实机上的行为（API 21 移除 ArkTS 低级编解码
       API，本端为唯一 native 路径，与其他四端高级 API 方案不同，需实机回归）。
 
+## 焦点包围合成 — E7 1.5.9（待设备，TBC-awaiting-hardware）
+
+- [ ] **macOS 焦点合成**：文件库入口「焦点合成」→ 预选最近 8 帧（可改选、
+      按文件名排序合成，至少 2 帧）→ 合成 JPEG 产出；逐帧解码→aspect-fit
+      黑底画布→全局亮度归一（clamp(mean0/mean_i, 0.5, 2.0)）→ 3×3 拉普拉斯
+      清晰度测度 → 逐像素取最清晰帧融合正确（前景/背景对焦区域清晰度符合
+      预期）；损坏帧跳过并计数、不整批失败；进度显示 + 可取消；产出走
+      CaptureWorkflow 会话目录 + reserveBaseName + finalize 全套（XMP sidecar
+      写 focus-stack 标记 + 源帧数/双备份/SHA-256 清单）。
+- [ ] **iOS 焦点合成**：入口与合成行为同 macOS；XMP focus-stack 标记一致；
+      取消/进度/损坏帧跳过行为正确。
+- [ ] **Windows 焦点合成**：WinRT BitmapDecoder/Encoder 解码编码链正确；
+      入口/跳过/进度取消/会话入库同口径。
+- [ ] **Android 焦点合成**：BitmapFactory 解码 + 同构算法（I420 无关，纯
+      ARGB 融合）+ JPEG 92 质量输出；入口/跳过/进度取消/会话入库同口径。
+- [ ] **Harmony 焦点合成**：纯 ArkTS 图像栈（image 解码 → 画布 → 融合 →
+      createPixelMap + ImagePacker JPEG）；入口面板/跳过/进度取消/会话入库
+      正确；XMP focus-stack 标记与源帧数写入正确。
+
 ## Android / Harmony PTP/IP 遥控 — E4 1.5.9（待设备，TBC-awaiting-hardware）
 
 - [ ] **Android Wi‑Fi 遥控**：连接尼康/佳能 PTP/IP 相机后自动识别厂商

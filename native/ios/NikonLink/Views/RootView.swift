@@ -7969,6 +7969,8 @@ private struct LibraryPage: View {
     @State private var confirmingCameraStorageDeletion = false
     // ── E6 1.5.9：延时合成视频（帧多选 + 帧率/编码 + 进度/取消）──
     @State private var showingTimelapseComposer = false
+    // ── E7 1.5.9：焦点包围合成（帧多选 + 逐像素清晰度融合 + 进度/取消）──
+    @State private var showingFocusStackComposer = false
 
     var body: some View {
         ScrollView {
@@ -7995,6 +7997,12 @@ private struct LibraryPage: View {
                         showingTimelapseComposer = true
                     } label: {
                         Label("合成延时视频", systemImage: "film.stack")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button {
+                        showingFocusStackComposer = true
+                    } label: {
+                        Label("焦点合成", systemImage: "camera.aperture")
                     }
                     .buttonStyle(.borderedProminent)
                 }
@@ -8084,6 +8092,11 @@ private struct LibraryPage: View {
         .sheet(isPresented: $showingTimelapseComposer) {
             TimelapseComposerSheet(model: model) {
                 showingTimelapseComposer = false
+            }
+        }
+        .sheet(isPresented: $showingFocusStackComposer) {
+            FocusStackComposerSheet(model: model) {
+                showingFocusStackComposer = false
             }
         }
         .alert(
@@ -10489,6 +10502,174 @@ private struct TimelapseComposerSheet: View {
                     model.library.selectedItemID = destination.path
                     resultText =
                         "已合成 \(result.framesWritten) 帧" +
+                        (result.skippedFrames > 0
+                            ? "（跳过 \(result.skippedFrames) 个损坏帧）"
+                            : "") +
+                        " → \(destination.lastPathComponent)"
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    running = false
+                    errorText = "已取消"
+                }
+            } catch {
+                await MainActor.run {
+                    running = false
+                    errorText = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+
+// ── E7 1.5.9：焦点包围合成面板（帧多选 + 逐像素清晰度融合 + 进度/取消）──
+private struct FocusStackComposerSheet: View {
+    @ObservedObject var model: AppModel
+    let dismiss: () -> Void
+
+    @State private var selection: Set<URL> = []
+    @State private var running = false
+    @State private var cancelled = false
+    @State private var processed = 0
+    @State private var resultText: String?
+    @State private var errorText: String?
+
+    private var sortedPhotos: [LibraryItem] {
+        model.library.items
+            .filter { !$0.isVideo }
+            .sorted { $0.filename < $1.filename }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。")
+                    .font(.callout)
+                    .foregroundStyle(IPalette.muted)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(sortedPhotos) { item in
+                            Toggle(isOn: binding(for: item.url)) {
+                                HStack(spacing: 10) {
+                                    TimelapseFrameThumbnail(url: item.url)
+                                        .frame(width: 52, height: 40)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    Text(item.filename)
+                                        .font(.caption.monospaced())
+                                        .lineLimit(1)
+                                }
+                            }
+                            .toggleStyle(.switch)
+                            .disabled(running)
+                        }
+                    }
+                }
+                .frame(minHeight: 220)
+
+                Divider()
+
+                if running {
+                    HStack(spacing: 12) {
+                        ProgressView(
+                            value: Double(processed),
+                            total: Double(max(1, selection.count))
+                        )
+                        .frame(maxWidth: .infinity)
+                        Text("\(processed)/\(selection.count)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(IPalette.muted)
+                        Button("取消") { cancelled = true }
+                            .buttonStyle(.bordered)
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Button {
+                            startCompose()
+                        } label: {
+                            Label("开始合成", systemImage: "camera.aperture")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selection.count < 2)
+                        Button("关闭") { dismiss() }
+                            .buttonStyle(.bordered)
+                    }
+                }
+
+                if let resultText {
+                    Text(resultText)
+                        .font(.callout)
+                        .foregroundStyle(IPalette.positive)
+                }
+                if let errorText {
+                    Text(errorText)
+                        .font(.callout)
+                        .foregroundStyle(IPalette.video)
+                }
+            }
+            .padding(20)
+            .navigationTitle("焦点合成")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func binding(for url: URL) -> Binding<Bool> {
+        Binding(
+            get: { selection.contains(url) },
+            set: { checked in
+                if checked {
+                    selection.insert(url)
+                } else {
+                    selection.remove(url)
+                }
+            }
+        )
+    }
+
+    private func startCompose() {
+        let frames = sortedPhotos
+            .filter { selection.contains($0.url) }
+            .map(\.url)
+        guard frames.count >= 2 else {
+            errorText = "焦点合成需要至少选择两帧。"
+            return
+        }
+        running = true
+        cancelled = false
+        processed = 0
+        resultText = nil
+        errorText = nil
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent("focusstack-\(UUID().uuidString)")
+            .appendingPathExtension("jpg")
+        Task {
+            do {
+                let result = try await FocusStackComposer().compose(
+                    frames: frames,
+                    to: temporary,
+                    isCancelled: { cancelled },
+                    onProgress: { done, _ in
+                        DispatchQueue.main.async { processed = done }
+                    }
+                )
+                let destination = try model.captureWorkflow.storeFocusStack(
+                    from: temporary,
+                    cameraName: "焦点合成",
+                    stackSourceCount: result.sourcesUsed
+                )
+                await MainActor.run {
+                    running = false
+                    model.library.reload()
+                    model.library.selectedItemID = destination.path
+                    resultText =
+                        "已合成 \(result.sourcesUsed) 帧" +
                         (result.skippedFrames > 0
                             ? "（跳过 \(result.skippedFrames) 个损坏帧）"
                             : "") +

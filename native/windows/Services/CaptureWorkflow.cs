@@ -173,6 +173,38 @@ public sealed class CaptureWorkflow
         return destination;
     }
 
+    /// <summary>
+    /// E7 焦点合成：把合成好的 JPEG 以新 base 存入会话，
+    /// 复用 FinalizeAsync 全套（XMP sidecar/双备份/SHA-256 清单），
+    /// XMP 写 focus-stack 合成标记 + 源帧数。
+    /// TBC-awaiting-hardware。
+    /// </summary>
+    public async Task<string> StoreFocusStackAsync(
+        string source,
+        string cameraName,
+        int stackSourceCount,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureDirectories();
+        var destination = UniquePath(
+            PrimaryDirectory,
+            ReserveBaseName(cameraName),
+            ".jpg");
+        if (File.Exists(destination))
+        {
+            File.Delete(destination);
+        }
+        File.Move(source, destination);
+        await FinalizeAsync(
+            destination,
+            cancellationToken,
+            null,
+            null,
+            stackSourceCount);
+        Status = $"焦点合成已写入会话 · {Path.GetFileName(destination)}";
+        return destination;
+    }
+
     public async Task<string> ImportAsync(
         string source,
         string cameraName,
@@ -218,16 +250,17 @@ public sealed class CaptureWorkflow
         string primary,
         CancellationToken cancellationToken,
         CaptureLocation? location,
-        string? pairedWithFilename = null)
+        string? pairedWithFilename = null,
+        int? stackSourceCount = null)
     {
-        if (!IsActive && location is null && pairedWithFilename is null)
+        if (!IsActive && location is null && pairedWithFilename is null && stackSourceCount is null)
         {
             return;
         }
         var sidecar = Path.ChangeExtension(primary, ".xmp");
         await File.WriteAllTextAsync(
             sidecar,
-            Xmp(Path.GetFileName(primary), location, pairedWithFilename),
+            Xmp(Path.GetFileName(primary), location, pairedWithFilename, stackSourceCount),
             Encoding.UTF8,
             cancellationToken);
         if (!IsActive || SessionRoot is null)
@@ -261,12 +294,16 @@ public sealed class CaptureWorkflow
     private string Xmp(
         string filename,
         CaptureLocation? location,
-        string? pairedWithFilename = null)
+        string? pairedWithFilename = null,
+        int? stackSourceCount = null)
     {
         var gps = location is null ? "" : GpsAttributes(location);
         var pairing = pairedWithFilename is null
             ? ""
             : $"\n              xmp:Label=\"live-photo\"\n              dc:relation=\"{Xml(pairedWithFilename)}\"";
+        var stack = stackSourceCount is null
+            ? ""
+            : $"\n              xmp:Label=\"focus-stack\"\n              xmp:FocusStackSources=\"{stackSourceCount}\"";
         return $"""
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
         <x:xmpmeta xmlns:x="adobe:ns:meta/">
@@ -275,7 +312,7 @@ public sealed class CaptureWorkflow
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:exif="http://ns.adobe.com/exif/1.0/"
-              xmp:Rating="{Configuration.Rating}"{gps}{pairing}>
+              xmp:Rating="{Configuration.Rating}"{gps}{pairing}{stack}>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Name)}</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>{Xml(Configuration.Creator)}</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">{Xml(Configuration.Rights)}</rdf:li></rdf:Alt></dc:rights>

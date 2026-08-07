@@ -128,6 +128,12 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('帧率：', 'Frame rate: ', 'フレームレート：'),
   new TranslationEntry('开始合成', 'Start', '合成開始'),
   new TranslationEntry('正在合成…', 'Composing…', '合成中…'),
+  new TranslationEntry('焦点合成', 'Focus Stack', 'フォーカス合成'),
+  new TranslationEntry(
+    '选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。',
+    'Select focus-bracketed frames (composed in filename order; the sharpest pixel from each is fused). Corrupt frames are skipped automatically.',
+    '焦点ブラケットのフレームを選択（ファイル名順で合成、各ピクセルで最もシャープなフレームを融合）。破損フレームは自動的にスキップされます。'
+  ),
   new TranslationEntry('Wi‑Fi 相机未连接', 'Wi‑Fi camera not connected', 'Wi‑Fi カメラ未接続'),
   new TranslationEntry('蓝牙遥控未开启', 'Bluetooth remote is off', 'Bluetooth リモコンはオフです'),
   new TranslationEntry('定位未开启', 'Location is off', '位置情報はオフです'),

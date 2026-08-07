@@ -38,6 +38,7 @@ import {
 } from '../storage/ExternalVideoRecorder';
 import { LivePhotoClipRecorder } from '../storage/LivePhotoClipRecorder';
 import { TimelapseComposer, TimelapseComposerResult } from '../storage/TimelapseComposer';
+import { FocusStackComposer, FocusStackComposerResult } from '../storage/FocusStackComposer';
 import {
   FTP_PORT,
   HTTP_PORT,
@@ -982,6 +983,11 @@ struct Index {
   @State private timelapseRunning: boolean = false;
   @State private timelapseProgressText: string = '';
   @State private timelapseResultText: string = '';
+  @State private focusStackVisible: boolean = false;
+  @State private focusStackSelected: Array<string> = [];
+  @State private focusStackRunning: boolean = false;
+  @State private focusStackProgressText: string = '';
+  @State private focusStackResultText: string = '';
   @State private launchAnnouncementVisible: boolean = false;
   @State private showSplash: boolean = true;
   @State private announcementDoNotRemind: boolean = false;
@@ -1418,6 +1424,9 @@ struct Index {
       }
       if (this.timelapseComposerVisible) {
         this.TimelapseComposerOverlay()
+      }
+      if (this.focusStackVisible) {
+        this.FocusStackComposerOverlay()
       }
       if (this.branchCreatorVisible) {
         this.LibraryBranchCreatorOverlay()
@@ -5572,6 +5581,15 @@ struct Index {
           .onClick((): void => {
             this.openTimelapseComposer();
           })
+        Button(this.tr('焦点合成'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.openFocusStackComposer();
+          })
       }
       .width('100%')
       Row({ space: 8 }) {
@@ -7167,6 +7185,220 @@ struct Index {
   private cancelTimelapseCompose(): void {
     this.timelapseRunning = false;
     this.timelapseProgressText = '已取消';
+  }
+
+
+  /** E7：打开焦点合成面板，预选最近 8 帧并复位状态。 */
+  private openFocusStackComposer(): void {
+    this.focusStackSelected = this.timelapseFrameItems()
+      .slice(0, 8)
+      .map((item: PhotoItem): string => item.path);
+    this.focusStackRunning = false;
+    this.focusStackProgressText = '';
+    this.focusStackResultText = '';
+    this.focusStackVisible = true;
+  }
+
+  private toggleFocusStackFrame(path: string, checked: boolean): void {
+    if (checked) {
+      if (!this.focusStackSelected.includes(path)) {
+        this.focusStackSelected = [...this.focusStackSelected, path];
+      }
+    } else {
+      this.focusStackSelected = this.focusStackSelected.filter(
+        (item: string): boolean => item !== path
+      );
+    }
+  }
+
+  /** E7：后台执行焦点合成 → 入库 → 刷新文件库。 */
+  private async startFocusStackCompose(): Promise<void> {
+    if (this.focusStackRunning || this.focusStackSelected.length < 2) {
+      return;
+    }
+    const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+    const library: PhotoLibrary | undefined = this.library;
+    if (workflow === undefined || library === undefined) {
+      return;
+    }
+    this.focusStackRunning = true;
+    this.focusStackResultText = '';
+    this.focusStackProgressText = '0/' + this.focusStackSelected.length;
+    const frames: Array<string> = [...this.focusStackSelected].sort(
+      (left: string, right: string): number =>
+        left.toLowerCase() < right.toLowerCase() ? -1 : 1
+    );
+    const temporary: string =
+      library.directoryPath + '/.focusstack-' + Date.now() + '.jpg';
+    const composer: FocusStackComposer = new FocusStackComposer();
+    try {
+      const result: FocusStackComposerResult = await composer.compose(
+        frames,
+        temporary,
+        (): boolean => !this.focusStackRunning,
+        (done: number, total: number): void => {
+          this.focusStackProgressText = `${done}/${total}`;
+        }
+      );
+      const destination: string = await workflow.storeFocusStack(
+        temporary,
+        '焦点合成',
+        result.sourcesUsed
+      );
+      this.focusStackProgressText = '';
+      this.focusStackResultText =
+        `已合成 ${result.sourcesUsed} 帧` +
+        (result.skippedFrames > 0
+          ? `（跳过 ${result.skippedFrames} 个损坏帧）`
+          : '') +
+        ` → ${destination.split('/').pop()}`;
+      this.photos = library.list();
+    } catch (error) {
+      this.focusStackResultText =
+        error instanceof Error ? error.message : String(error);
+    } finally {
+      this.focusStackRunning = false;
+      try {
+        if (fs.accessSync(temporary)) {
+          fs.unlinkSync(temporary);
+        }
+      } catch (cleanupError) {
+        // 临时文件清理失败可忽略。
+      }
+    }
+  }
+
+  /** E7：置取消标志；composer 在帧循环内检查后抛 '已取消'。 */
+  private cancelFocusStackCompose(): void {
+    this.focusStackRunning = false;
+    this.focusStackProgressText = '已取消';
+  }
+
+  @Builder
+  private FocusStackComposerOverlay() {
+    Column({ space: 14 }) {
+      Row() {
+        Column({ space: 3 }) {
+          Text(this.tr('焦点合成'))
+            .fontSize(TS_DISPLAY)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(this.tr('选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。'))
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        Blank()
+        Button(this.tr('关闭'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.focusStackVisible = false;
+          })
+      }
+      .width('100%')
+
+      Scroll() {
+        Column({ space: 6 }) {
+          ForEach(
+            this.timelapseFrameItems(),
+            (item: PhotoItem) => {
+              Row({ space: 10 }) {
+                Checkbox()
+                  .select(this.focusStackSelected.includes(item.path))
+                  .selectedColor($r('app.color.accent'))
+                  .onChange((checked: boolean): void => {
+                    this.toggleFocusStackFrame(item.path, checked);
+                  })
+                Text(item.name)
+                  .fontSize(LIBRARY_FS_TITLE)
+                  .fontColor($r('app.color.ink'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .layoutWeight(1)
+                Text(item.detail)
+                  .fontSize(LIBRARY_FS_TINY)
+                  .fontColor($r('app.color.muted'))
+              }
+              .width('100%')
+              .height(40)
+              .padding({ left: 12, right: 12 })
+              .backgroundColor($r('app.color.surface'))
+              .border({
+                width: 1,
+                color: $r('app.color.rule'),
+                radius: 8
+              })
+            },
+            (item: PhotoItem): string => item.path
+          )
+        }
+        .width('100%')
+      }
+      .width('100%')
+      .height(this.isCompact() ? 260 : 320)
+      .backgroundColor($r('app.color.surface'))
+      .border({
+        width: 1,
+        color: $r('app.color.rule'),
+        radius: 8
+      })
+
+      if (this.focusStackRunning) {
+        Row({ space: 10 }) {
+          Text(this.focusStackProgressText)
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.ink'))
+            .layoutWeight(1)
+          Button(this.tr('取消'), { type: ButtonType.Normal })
+            .height(40)
+            .fontColor($r('app.color.video'))
+            .backgroundColor($r('app.color.paper_2'))
+            .borderRadius(6)
+            .onClick((): void => {
+              this.cancelFocusStackCompose();
+            })
+        }
+        .width('100%')
+      } else {
+        Button(this.tr('开始合成'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(6)
+          .enabled(this.focusStackSelected.length >= 2)
+          .onClick((): void => {
+            this.startFocusStackCompose();
+          })
+        Button(this.tr('取消'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(6)
+          .onClick((): void => {
+            this.focusStackVisible = false;
+          })
+      }
+
+      if (this.focusStackResultText !== '') {
+        Text(this.focusStackResultText)
+          .fontSize(TS_BODY)
+          .fontColor($r('app.color.ink'))
+          .width('100%')
+      }
+    }
+    .width('100%')
+    .padding(16)
+    .backgroundColor($r('app.color.paper'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: 12
+    })
   }
 
   @Builder

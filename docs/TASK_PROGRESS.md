@@ -838,3 +838,47 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **docs**：CAMERA_TEST_CHECKLIST 挂 5 条 E6 待设备实机条目（五端延时合成 + Harmony native
   路径实机回归）。
 - 纪律：E6 新代码全部 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。
+
+## 12.34 v1.5.9 E7：焦点包围合成五端（2026-08-07，kimi 04:42 派工，事件 5ba6e86c）
+
+- 背景：E6 合入整合分支 `6025b94` 后接棒（flash 线收官批第二项），闭环完整景深工作流。
+  分支 `agent/1.5.9-e7-focusstack`，基线 `6025b94`。计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E7。
+- **勘察结论**：五端代码中**无独立焦点包围拍摄任务结构**（仅本地化词条「焦点包围/
+  Focus Bracketing」预留），与 E6 同况——入口复用 E6 的「文件库多选序列帧」基建
+  （timelapseFrameItems 帧列表 + 会话目录），不依赖不存在的任务结构。
+- **方案（已定案）**：序列帧（不同对焦距离）→ 逐帧解码 → 统一画布（aspect-fit 黑底）→
+  **全局亮度归一**（以首帧平均亮度为基准，每帧 scale=clamp(mean0/mean_i, 0.5, 2.0)，
+  覆盖手持微抖/曝光微差；亚像素位移对齐工程量过大，列入 backlog）→ **3×3 拉普拉斯核**
+  （全 8 邻域中心 8）作用于归一亮度取绝对响应 → **逐像素取 |lap| 最大帧**融合（边界
+  1px 取首帧）→ JPEG 输出（92 质量）。纯 CPU 零第三方依赖；Apple 端同构未用 vImage
+  （口径一致优先）。**内存优化：两遍式逐帧融合**——峰值仅 2 帧像素 + 全局 best 数组，
+  不保留全部帧（4K×30 帧场景内存可控）。进度/取消/单帧坏跳过计数与 E6 同口径。
+- **产出归集**：五端 `storeFocusStack(from, cameraName, stackSourceCount)`——新 base
+  .jpg 入会话，复用 reserveBaseName + finalize 全套；**XMP 扩展**：finalize/xmpSidecar
+  加可选 `stackSourceCount: Int? = nil`（默认 nil 现有调用零影响），非 nil 写
+  `xmp:Label="focus-stack"` + `xmp:FocusStackSources="N"`（五端口径一致）。
+- **macOS**：FocusStackComposer.swift（CGImageSource 解码 + CGImageDestination JPEG）
+  + 文件库「焦点合成」按钮 + FocusStackComposerSheet（帧多选 ≥2 + 进度/取消）。typecheck 0 error。
+- **iOS**：FocusStackComposer.swift 同构移植（UTType.jpeg）+ pbxproj 注册 +
+  RootView 文件库入口 + Sheet。xcodebuild BUILD SUCCEEDED。
+- **Windows**：FocusStackComposer.cs（WinRT BitmapDecoder 解码 → 手动画布 →
+  同构融合 → BitmapEncoder.JpegEncoderId 输出）+ XAML 按钮 + ComposeFocusStack_Click。
+  dotnet build Release **0 错误 0 警告**（macOS 交叉编译复跑）。
+- **Android**：FocusStackComposer.java（BitmapFactory + 同构 ARGB 融合 +
+  Bitmap.compress JPEG 92）+ 文件库双按钮行 + showComposeFocusStackDialog。
+  compileReleaseJavaWithJavac BUILD SUCCESSFUL。
+- **Harmony**：FocusStackComposer.ets（纯 ArkTS 图像栈：image 解码 → RGBA 画布 →
+  融合 → createPixelMap(buffer) + ImagePacker JPEG；fileIo 写文件）+ Index.ets
+  按钮/overlay/方法（复用 timelapseFrameItems）+ Localization 三语条目。
+  assembleHap BUILD SUCCESSFUL（CompileArkTS ERROR:0，仅 packing deprecation WARN）。
+- **契约锚点**：native-focusstack.test.mjs（新）7 用例——五端 compose 符号 +
+  laplacian 3×3 + 亮度归一 clamp + skipped/isCancelled/onProgress + sourcesUsed≥2 +
+  storeFocusStack + focus-stack XMP + Harmony 入口面板/localization + 五端
+  TBC-awaiting-hardware 一致性。npm test **312/312** 全绿（基线 305 + E7 7）。
+- **构建（本会话复跑）**：macOS typecheck 0 error；iOS xcodebuild SUCCEEDED；
+  Windows dotnet 0 错误；Android compileReleaseJavaWithJavac SUCCESSFUL；
+  Harmony assembleHap SUCCESSFUL；git diff --check 干净；E7 契约 7/7 独立复跑全绿。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 5 条 E7 待设备实机条目（五端焦点合成 +
+  XMP focus-stack 标记验证）。
+- 纪律：E7 新代码全部 TBC-awaiting-hardware 标注；亚像素对齐入 backlog；未建 dist、
+  未推远端；打包听 kimi 调度。

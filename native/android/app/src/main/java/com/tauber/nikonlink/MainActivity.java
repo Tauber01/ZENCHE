@@ -6369,8 +6369,13 @@ public final class MainActivity extends Activity {
         timelapseActions.setOrientation(LinearLayout.HORIZONTAL);
         Button timelapseButton = nativeButton("合成延时视频", true);
         timelapseButton.setOnClickListener(view -> showComposeTimelapseDialog());
+        Button focusStackButton = nativeButton("焦点合成", true);
+        focusStackButton.setOnClickListener(view -> showComposeFocusStackDialog());
         timelapseActions.addView(
                 timelapseButton,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        timelapseActions.addView(
+                focusStackButton,
                 new LinearLayout.LayoutParams(0, dp(48), 1f));
         content.addView(
                 timelapseActions,
@@ -6631,6 +6636,179 @@ public final class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("帧澈 ZENCHE · 合成延时视频")
+                .setView(panel)
+                .setNegativeButton("取消", (dialog, which) ->
+                        cancelled.set(true))
+                .show();
+    }
+
+
+    /** E7：焦点合成对话框——帧多选（按文件名排序）+ 进度/取消 + 结果/错误。 */
+    private void showComposeFocusStackDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        final List<File> frames = timelapseFrameFiles();
+        if (frames.size() < 2) {
+            showToast("文件库照片不足（焦点合成需要至少两帧）。");
+            return;
+        }
+        LinearLayout panel = verticalContainer();
+        panel.setPadding(dp(20), dp(18), dp(20), dp(14));
+        panel.addView(text(
+                "焦点合成",
+                LIBRARY_FS_WORKBENCH,
+                Typeface.BOLD,
+                INK));
+        panel.addView(text(
+                "选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 2, 0, 10));
+
+        final List<CheckBox> checkboxes = new ArrayList<>();
+        LinearLayout listPanel = verticalContainer();
+        for (File frame : frames) {
+            CheckBox check = new CheckBox(this);
+            check.setText(frame.getName());
+            check.setTextSize(13);
+            check.setTextColor(INK);
+            check.setPadding(dp(2), dp(2), dp(2), dp(2));
+            checkboxes.add(check);
+            listPanel.addView(check, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        ScrollView listScroll = new ScrollView(this);
+        listScroll.addView(listPanel, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        listScroll.setBackground(rounded(SURFACE, 12, RULE_STRONG));
+        panel.addView(listScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(240)));
+
+        final ProgressBar progress = new ProgressBar(
+                this,
+                null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        progress.setVisibility(View.GONE);
+        panel.addView(progress, marginParams(-1, dp(18), 0, 10, 0, 4));
+        final TextView progressText = text(
+                "",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED);
+        progressText.setVisibility(View.GONE);
+        panel.addView(progressText);
+        final TextView resultText = text(
+                "",
+                TS_BODY,
+                Typeface.NORMAL,
+                POSITIVE);
+        resultText.setVisibility(View.GONE);
+        panel.addView(resultText);
+        final TextView errorText = text(
+                "",
+                TS_BODY,
+                Typeface.NORMAL,
+                VIDEO);
+        errorText.setVisibility(View.GONE);
+        panel.addView(errorText);
+
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        final AtomicBoolean running = new AtomicBoolean(false);
+        final Button startButton = nativeButton("开始合成", true);
+        startButton.setOnClickListener(view -> {
+            if (running.get()) return;
+            final List<File> selected = new ArrayList<>();
+            for (int i = 0; i < checkboxes.size(); i++) {
+                if (checkboxes.get(i).isChecked()) {
+                    selected.add(frames.get(i));
+                }
+            }
+            if (selected.size() < 2) {
+                errorText.setVisibility(View.VISIBLE);
+                errorText.setText("焦点合成需要至少选择两帧。");
+                return;
+            }
+            running.set(true);
+            startButton.setEnabled(false);
+            cancelled.set(false);
+            errorText.setVisibility(View.GONE);
+            resultText.setVisibility(View.GONE);
+            progress.setVisibility(View.VISIBLE);
+            progress.setProgress(0);
+            progressText.setVisibility(View.VISIBLE);
+            progressText.setText("0/" + selected.size());
+            final File temporary = new File(
+                    getCacheDir(),
+                    "focusstack-" + System.nanoTime() + ".jpg");
+            composeExecutor.execute(() -> {
+                try {
+                    FocusStackComposer composer = new FocusStackComposer();
+                    FocusStackComposer.Result composed = composer.compose(
+                            selected,
+                            temporary,
+                            cancelled::get,
+                            (done, total) -> runOnUiThread(() -> {
+                                progress.setMax(Math.max(1, total));
+                                progress.setProgress(done);
+                                progressText.setText(done + "/" + total);
+                            }));
+                    final File destination =
+                            captureWorkflow.storeFocusStack(
+                                    temporary,
+                                    "焦点合成",
+                                    composed.sourcesUsed);
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setText(
+                                "已合成 " + composed.sourcesUsed + " 帧"
+                                        + (composed.skippedFrames > 0
+                                                ? "（跳过 "
+                                                        + composed.skippedFrames
+                                                        + " 个损坏帧）"
+                                                : "")
+                                        + " → " + destination.getName());
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                    showSection("library");
+                } catch (CancellationException error) {
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setTextColor(VIDEO);
+                        resultText.setText("已取消");
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                } catch (Exception error) {
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setTextColor(VIDEO);
+                        resultText.setText(
+                                "焦点合成失败：" + error.getMessage());
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                } finally {
+                    if (temporary.exists()) temporary.delete();
+                }
+            });
+        });
+        panel.addView(startButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+
+        new AlertDialog.Builder(this)
+                .setTitle("帧澈 ZENCHE · 焦点合成")
                 .setView(panel)
                 .setNegativeButton("取消", (dialog, which) ->
                         cancelled.set(true))

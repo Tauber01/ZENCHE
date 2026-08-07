@@ -189,6 +189,36 @@ final class CaptureWorkflow: ObservableObject {
         return destination
     }
 
+    /// E7 焦点合成：把合成好的 JPEG 以新 base 存入会话，
+    /// 复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单），
+    /// XMP 写 focus-stack 合成标记 + 源帧数。
+    /// TBC-awaiting-hardware。
+    @discardableResult
+    func storeFocusStack(
+        from sourceURL: URL,
+        cameraName: String,
+        stackSourceCount: Int
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let destination = uniqueURL(
+            in: primaryDirectory,
+            base: reserveBaseName(cameraName: cameraName),
+            extension: "jpg"
+        )
+        if fileManager.fileExists(atPath: destination.path) {
+            try? fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: sourceURL, to: destination)
+        try finalize(
+            destination,
+            location: nil,
+            pairedWithFilename: nil,
+            stackSourceCount: stackSourceCount
+        )
+        status = "焦点合成已写入会话 · \(destination.lastPathComponent)"
+        return destination
+    }
+
     @discardableResult
     func replace(
         data: Data,
@@ -267,7 +297,8 @@ final class CaptureWorkflow: ObservableObject {
     private func finalize(
         _ primary: URL,
         location: CaptureLocation?,
-        pairedWithFilename: String? = nil
+        pairedWithFilename: String? = nil,
+        stackSourceCount: Int? = nil
     ) throws {
         var hasher = SHA256()
         let input = try FileHandle(forReadingFrom: primary)
@@ -279,11 +310,12 @@ final class CaptureWorkflow: ObservableObject {
         let digest = hasher.finalize()
             .map { String(format: "%02x", $0) }
             .joined()
-        if isActive || location != nil || pairedWithFilename != nil {
+        if isActive || location != nil || pairedWithFilename != nil || stackSourceCount != nil {
             let xmp = xmpSidecar(
                 for: primary.lastPathComponent,
                 location: location,
-                pairedWithFilename: pairedWithFilename
+                pairedWithFilename: pairedWithFilename,
+                stackSourceCount: stackSourceCount
             )
             let sidecar = primary
                 .deletingPathExtension()
@@ -342,7 +374,8 @@ final class CaptureWorkflow: ObservableObject {
     private func xmpSidecar(
         for filename: String,
         location: CaptureLocation?,
-        pairedWithFilename: String? = nil
+        pairedWithFilename: String? = nil,
+        stackSourceCount: Int? = nil
     ) -> String {
         let title = xmlEscaped(configuration.name)
         let creator = xmlEscaped(configuration.creator)
@@ -350,6 +383,9 @@ final class CaptureWorkflow: ObservableObject {
         let gps = location.map(gpsAttributes) ?? ""
         let pairing = pairedWithFilename.map {
             "\n              xmp:Label=\"live-photo\"\n              dc:relation=\"\(xmlEscaped($0))\""
+        } ?? ""
+        let stack = stackSourceCount.map {
+            "\n              xmp:Label=\"focus-stack\"\n              xmp:FocusStackSources=\"\($0)\""
         } ?? ""
         return """
         <?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
@@ -359,7 +395,7 @@ final class CaptureWorkflow: ObservableObject {
               xmlns:xmp="http://ns.adobe.com/xap/1.0/"
               xmlns:dc="http://purl.org/dc/elements/1.1/"
               xmlns:exif="http://ns.adobe.com/exif/1.0/"
-              xmp:Rating="\(configuration.rating)"\(gps)\(pairing)>
+              xmp:Rating="\(configuration.rating)"\(gps)\(pairing)\(stack)>
               <dc:title><rdf:Alt><rdf:li xml:lang="x-default">\(title)</rdf:li></rdf:Alt></dc:title>
               <dc:creator><rdf:Seq><rdf:li>\(creator)</rdf:li></rdf:Seq></dc:creator>
               <dc:rights><rdf:Alt><rdf:li xml:lang="x-default">\(rights)</rdf:li></rdf:Alt></dc:rights>
