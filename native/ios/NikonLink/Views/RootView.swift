@@ -1886,6 +1886,13 @@ private struct ImageEditorPage: View {
     @State private var settingsBeforeAI: ProfessionalEditSettings?
     @State private var aiAnalysis: EditorAIAnalysis?
     @State private var copiedAISettings: ProfessionalEditSettings?
+    // E8 1.5.9: AI 批量应用（本地渲染，0 服务器消耗）——队列状态。
+    @State private var batchApplying = false
+    @State private var batchProgress = 0
+    @State private var batchTotal = 0
+    @State private var batchSkipped = 0
+    @State private var batchCancelled = false
+    @State private var batchTask: Task<Void, Never>?
     @State private var activeCurvePoint: Int?
     @State private var activeMaskStrokeID: UUID?
     private let context = CIContext()
@@ -2516,6 +2523,24 @@ private struct ImageEditorPage: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(copiedAISettings == nil || selectedItem == nil)
+                    Button {
+                        applyAIBatch()
+                    } label: {
+                        Label(batchApplying ? "批量应用中…" : "批量应用 AI", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(copiedAISettings == nil || batchApplying)
+                    if batchApplying {
+                        ProgressView(value: Double(batchProgress), total: Double(max(1, batchTotal)))
+                            .progressViewStyle(.linear)
+                            .frame(width: 120)
+                        Text("\(batchProgress)/\(batchTotal) · 跳过 \(batchSkipped)")
+                            .font(.caption)
+                            .foregroundStyle(IPalette.muted)
+                        Button("取消") { batchCancelled = true }
+                            .buttonStyle(.bordered)
+                            .font(.caption)
+                    }
                     Text("本地处理 · 可继续微调")
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
@@ -3238,9 +3263,9 @@ private struct ImageEditorPage: View {
         guard var output = source else { return nil }
 
         if !showingOriginal {
-            output = applyTonePipeline(to: output)
-            output = applyGeometry(to: output)
-            output = applyingEditorMask(to: output)
+            output = applyTonePipeline(to: output, using: settings)
+            output = applyGeometry(to: output, using: settings)
+            output = applyingEditorMask(to: output, using: settings)
         }
         let extent = output.extent.integral
         guard let cgImage = context.createCGImage(output, from: extent) else {
@@ -3263,7 +3288,7 @@ private struct ImageEditorPage: View {
                 ?? UIImage(contentsOfFile: selectedItem.url.path)
                     .flatMap({ CIImage(image: $0) })
         else { return nil }
-        let base = applyGeometry(to: applyTonePipeline(to: source))
+        let base = applyGeometry(to: applyTonePipeline(to: source, using: settings), using: settings)
         let extent = base.extent.integral
         guard let mask = editorMaskImage(
             source: base,
@@ -3296,7 +3321,7 @@ private struct ImageEditorPage: View {
         return UIImage(cgImage: cgImage)
     }
 
-    private func applyTonePipeline(to source: CIImage) -> CIImage {
+    private func applyTonePipeline(to source: CIImage, using settings: ProfessionalEditSettings) -> CIImage {
         var output = source
 
         output = filtered(
@@ -3455,7 +3480,8 @@ private struct ImageEditorPage: View {
     }
 
     private func applyingEditorMask(
-        to base: CIImage
+        to base: CIImage,
+        using settings: ProfessionalEditSettings
     ) -> CIImage {
         settings.effectiveMaskLayers()
             .filter { $0.isVisible && !$0.type.isEmpty }
@@ -3762,7 +3788,7 @@ private struct ImageEditorPage: View {
         ])
     }
 
-    private func applyGeometry(to source: CIImage) -> CIImage {
+    private func applyGeometry(to source: CIImage, using settings: ProfessionalEditSettings) -> CIImage {
         var output = source
         if settings.rotation != 0 {
             output = output.transformed(
@@ -3929,6 +3955,73 @@ private struct ImageEditorPage: View {
         settings.temperature = min(max(Double(b - r) / 2.55, -100), 100)
         settings.tint = min(max((Double(g) - Double(r + b) / 2) / 2.55, -100), 100)
         status = "已取样 #\(String(format: "%02X%02X%02X", r, g, b)) · 已微调色温/色调"
+    }
+
+    // ── E8 1.5.9: AI 批量应用（本地渲染，0 服务器消耗）──
+
+    /// 以给定 settings 渲染指定照片为 JPEG 数据（纯本地，不触服务器）。
+    private func renderPhoto(
+        from url: URL,
+        settings: ProfessionalEditSettings
+    ) -> Data? {
+        guard let source =
+            CIImage(contentsOf: url)
+            ?? UIImage(contentsOfFile: url.path)
+                .flatMap({ CIImage(image: $0) })
+        else { return nil }
+        var output = source
+        output = applyTonePipeline(to: output, using: settings)
+        output = applyGeometry(to: output, using: settings)
+        output = applyingEditorMask(to: output, using: settings)
+        let extent = output.extent.integral
+        guard let cgImage = context.createCGImage(output, from: extent) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.95)
+    }
+
+    /// 把当前复制的 AI 调整方案应用到整个选集（照片库可编辑照片），
+    /// 逐张产出非破坏 JPEG 副本（saveEditedImage），进度可见、可取消；
+    /// 单张失败跳过并计数，不整批失败。本地处理零服务器消耗。
+    private func applyAIBatch() {
+        guard let copiedAISettings else { return }
+        let targets = photos
+        guard !targets.isEmpty else {
+            status = "文件库没有可编辑照片"
+            return
+        }
+        batchApplying = true
+        batchProgress = 0
+        batchTotal = targets.count
+        batchSkipped = 0
+        batchCancelled = false
+        status = "批量应用 AI 调整 · 本地处理零消耗 · 共 \(targets.count) 张"
+        batchTask = Task { @MainActor in
+            var skipped = 0
+            for (index, item) in targets.enumerated() {
+                if Task.isCancelled || _batchCancelled.wrappedValue {
+                    _batchApplying.wrappedValue = false
+                    _status.wrappedValue = "批量应用已取消 · 完成 \(index)/\(targets.count)"
+                    return
+                }
+                let data = self.renderPhoto(
+                    from: item.url,
+                    settings: copiedAISettings
+                )
+                var saved = false
+                if let data {
+                    saved = self.model.library.saveEditedImage(
+                        data,
+                        originalFilename: item.filename
+                    ) != nil
+                }
+                if !saved { skipped += 1 }
+                _batchProgress.wrappedValue = index + 1
+                _batchSkipped.wrappedValue = skipped
+            }
+            _batchApplying.wrappedValue = false
+            _status.wrappedValue = "批量应用完成 · \(targets.count - skipped) 张已保存 · 跳过 \(skipped)"
+        }
     }
 
     private func analyzeAI() {

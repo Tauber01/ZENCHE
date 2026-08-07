@@ -1425,6 +1425,24 @@
                                   IsEnabled="False"
                                   Click="PasteEditorAI_Click" />
                         </UniformGrid>
+                        <Button x:Name="BatchEditorAIButton"
+                                Margin="0,8,0,0"
+                                Style="{DynamicResource EditorToolButton}"
+                                Content="批量应用 AI"
+                                IsEnabled="False"
+                                Click="BatchEditorAI_Click" />
+                        <StackPanel x:Name="BatchEditorAIProgress" Margin="0,8,0,0" Visibility="Collapsed">
+                          <ProgressBar x:Name="BatchEditorAIBar" Minimum="0" Maximum="100" Height="6" />
+                          <DockPanel Margin="0,4,0,0">
+                            <Button x:Name="BatchEditorAICancel"
+                                    DockPanel.Dock="Right"
+                                    Content="取消"
+                                    Click="BatchEditorAICancel_Click" />
+                            <TextBlock x:Name="BatchEditorAIStatus"
+                                       Style="{DynamicResource EditorCaption}"
+                                       Text="0/0" />
+                          </DockPanel>
+                        </StackPanel>
                       </StackPanel>
                     </Border>
                   </StackPanel>

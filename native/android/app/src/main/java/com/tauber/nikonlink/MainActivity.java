@@ -1766,6 +1766,12 @@ public final class MainActivity extends Activity {
 
     private EditorAdjustments editorSettingsBeforeAI;
     private EditorAdjustments editorAICopiedSettings;
+    // E8 1.5.9: AI 批量应用（本地渲染，0 服务器消耗）——队列状态。
+    private volatile boolean aiBatchApplying;
+    private volatile boolean aiBatchCancelled;
+    private volatile int aiBatchProgress;
+    private volatile int aiBatchTotal;
+    private volatile int aiBatchSkipped;
     private EditorAIAnalysis editorAIAnalysis;
     private int editorAIIntensity = 72;
     private String editorAISummary = "等待分析当前照片";
@@ -7413,10 +7419,32 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams pasteParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         pasteParams.setMargins(dp(8), 0, 0, 0);
         aiActions.addView(pasteAI, pasteParams);
+        // E8 1.5.9: 批量应用 AI（本地渲染，0 服务器消耗）
+        Button batchAI = nativeButton("批量应用 AI", true);
+        batchAI.setEnabled(editorAICopiedSettings != null && !aiBatchApplying);
+        batchAI.setOnClickListener(view -> applyAIBatch());
+        LinearLayout.LayoutParams batchParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        batchParams.setMargins(dp(8), 0, 0, 0);
+        aiActions.addView(batchAI, batchParams);
         aiActionScroll.addView(aiActions, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
         aiPanel.addView(aiActionScroll);
+        // E8 1.5.9: 批量进度行（进度/跳过/取消）
+        LinearLayout batchProgressRow = new LinearLayout(this);
+        batchProgressRow.setOrientation(LinearLayout.HORIZONTAL);
+        batchProgressRow.setGravity(Gravity.CENTER_VERTICAL);
+        batchProgressRow.setPadding(dp(4), dp(4), dp(4), dp(4));
+        ProgressBar batchBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        batchBar.setMax(100);
+        TextView batchStatus = text("", TS_CAPTION, Typeface.NORMAL, UI_LABEL);
+        Button batchCancel = nativeButton("取消", false);
+        batchCancel.setOnClickListener(view -> aiBatchCancelled = true);
+        batchProgressRow.addView(batchBar, new LinearLayout.LayoutParams(0, dp(18), 1f));
+        batchProgressRow.addView(batchStatus, marginParams(-1, -2, 0, 8, 0, 0));
+        batchProgressRow.addView(batchCancel, new LinearLayout.LayoutParams(dp(56), dp(36)));
+        batchProgressRow.setVisibility(View.GONE);
+        aiPanel.addView(batchProgressRow, marginParams(-1, -2, 0, 0, 0, 8));
         content.addView(
                 aiPanel,
                 marginParams(-1, -2, 0, 0, 0, 12));
@@ -9514,6 +9542,73 @@ public final class MainActivity extends Activity {
 
     private static int editorAIValue(double value, double amount) {
         return (int)Math.round(value * amount);
+    }
+
+    /** E8 1.5.9: 把当前复制的 AI 调整方案批量应用到整个文件库照片，
+     *  逐张本地渲染 + JPEG 副本（0 服务器消耗），进度可见可取消，
+     *  单张失败跳过计数不整批失败。 */
+    private void applyAIBatch() {
+        if (editorAICopiedSettings == null) return;
+        List<File> targets = new ArrayList<>();
+        for (File file : photoFiles()) {
+            if (isEditableImageFile(file)) targets.add(file);
+        }
+        if (targets.isEmpty()) {
+            showToast("文件库没有可编辑照片");
+            return;
+        }
+        aiBatchApplying = true;
+        aiBatchCancelled = false;
+        aiBatchProgress = 0;
+        aiBatchTotal = targets.size();
+        aiBatchSkipped = 0;
+        showToast("批量应用 AI 调整 · 本地处理零消耗 · 共 " + targets.size() + " 张");
+        editorExecutor.execute(() -> {
+            int skipped = 0;
+            for (int index = 0; index < targets.size(); index++) {
+                final int cancelledAt = index;
+                if (aiBatchCancelled) {
+                    mainHandler.post(() -> {
+                        aiBatchApplying = false;
+                        showToast("批量应用已取消 · 完成 " + cancelledAt + "/" + targets.size());
+                    });
+                    return;
+                }
+                File source = targets.get(index);
+                EditorAdjustments saved = editorAICopiedSettings.copy();
+                saved.showingOriginal = false;
+                Bitmap output = renderEditedBitmap(source, saved, 4096);
+                boolean ok = false;
+                if (output != null) {
+                    File destination = uniqueEditedFile(source);
+                    try (FileOutputStream stream =
+                                 new FileOutputStream(destination)) {
+                        ok = output.compress(
+                                Bitmap.CompressFormat.JPEG, 95, stream);
+                    } catch (Exception error) {
+                        diagnostics.error(
+                                "editor-batch",
+                                "批量应用失败：" + error.getMessage());
+                    }
+                    output.recycle();
+                }
+                if (!ok) skipped++;
+                final int done = index + 1;
+                final int skippedSnapshot = skipped;
+                mainHandler.post(() -> {
+                    aiBatchProgress = done;
+                    aiBatchSkipped = skippedSnapshot;
+                });
+            }
+            final int total = targets.size();
+            final int skippedFinal = skipped;
+            mainHandler.post(() -> {
+                aiBatchApplying = false;
+                updateFileCount();
+                showToast("批量应用完成 · "
+                        + (total - skippedFinal) + " 张已保存 · 跳过 " + skippedFinal);
+            });
+        });
     }
 
     private EditorAIAnalysis analyzeEditorPhoto(File file) {

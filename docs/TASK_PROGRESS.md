@@ -882,3 +882,17 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   XMP focus-stack 标记验证）。
 - 纪律：E7 新代码全部 TBC-awaiting-hardware 标注；亚像素对齐入 backlog；未建 dist、
   未推远端；打包听 kimi 调度。
+
+## 12.35 v1.5.9 E8 AI 修图批处理（pro 实施，v1.5.9 收官批，2026-08-07）
+
+- 派工：kimi 06:33（基线对齐 e31636f）+ Tauber「继续推进至交付」。
+- **勘察结论（与派工假设差异）**：全端 AI 分析/渲染均本地（analyzeForAI 采样分析 + applyTonePipeline 本地渲染），批量应用**零服务器消耗**——UI 如实提示「本地处理零消耗」，不涉及次数扣减。
+- **渲染管线参数化（Apple 双端）**：applyTonePipeline/applyGeometry/applyingEditorMask 加 `using settings` 参数，renderedImage 与新增 renderPhoto(from:settings:) 均传参——批量按照片复用同一份复制的 AI 方案。
+- **五端批量应用**（复制 AI 方案 → 逐张本地渲染 → JPEG 副本）：
+  - macOS/iOS：applyAIBatch()（photos 列表 + renderPhoto + saveEditedPhoto/saveEditedImage，Task@MainActor + @State 包装器，进度/取消/跳过）；UI 工具栏「批量应用 AI」按钮 + 线性进度条。
+  - Android：applyAIBatch()（photoFiles() + renderEditedBitmap(4096) + uniqueEditedFile + JPEG 95，editorExecutor 后台 + mainHandler 进度）；UI 按钮 + 进度行。
+  - Harmony：applyAIBatch()（editablePhotos() + captureEditorTone/restoreEditorTone 临时切换 + renderSingleEditedPhoto 复用像素管线 + saveEditedCopy）；UI 按钮。
+  - Windows：BatchEditorAI_Click（_library.List() + RenderEditedBitmap + JpegBitmapEncoder 95 + UniqueEditedPath，Task.Run 后台 + Dispatcher 进度）；XAML 按钮 + 进度条。
+- **契约锚点**：test/native-ai-batch.test.mjs（新）6 用例——五端 compose 符号 + 渲染参数化 + 后台线程 + 进度/取消/跳过 + 本地零消耗。npm test 318/318 全绿（基线 312 + E8 6）。
+- 构建：macOS typecheck 0 error（本机复核）；Windows dotnet Release 0 错误（4 警告=2 既有×2 项目，零新增）；Android assembleDebug BUILD SUCCESSFUL（本机复跑）；Harmony 本机 SDK 缺失未复跑（ArkTS 纯改动，锚点兜底）。
+- 纪律：未建 dist、未推远端。复审由 flash 承担（作者=pro，复审独立性）。
