@@ -17,8 +17,9 @@ const read = async (path) => readFile(new URL(path, root), 'utf8');
 
 test('iOS: CapturePage 恢复 CameraStage 监看画面', async () => {
   const view = await read('native/ios/NikonLink/Views/RootView.swift');
-  // 拍照页视图树（CapturePage）内含 CameraStage（对齐 Android/Harmony
-  // dock→波形→参数格→预览 顺序：ControlParameterGrid 之后）。
+  // 拍照页视图树（CapturePage）内含 CameraStage。v1.5.9 实测（Tauber
+  // 指令）：监看画面移至拍照页顶部——ControlTopBar 与 ControlStatusRow
+  // 之间，不再放在 ControlParameterGrid 之后。
   assert.match(view, /private struct CapturePage: View/);
   const capturePage = view.slice(
     view.indexOf('private struct CapturePage: View'),
@@ -26,6 +27,11 @@ test('iOS: CapturePage 恢复 CameraStage 监看画面', async () => {
   );
   assert.match(capturePage, /ControlParameterGrid\(\)/);
   assert.match(capturePage, /CameraStage \{\s*showingFullscreen = true\s*\}/);
+  assert.ok(
+    capturePage.indexOf('CameraStage {') > capturePage.indexOf('ControlTopBar {') &&
+      capturePage.indexOf('CameraStage {') < capturePage.indexOf('ControlStatusRow()'),
+    'CameraStage 应位于 ControlTopBar 与 ControlStatusRow 之间（顶部）'
+  );
   // 全屏通道保留。
   assert.match(capturePage, /fullScreenCover\(isPresented: \$showingFullscreen\)/);
 });

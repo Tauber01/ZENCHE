@@ -4251,6 +4251,11 @@ private struct CapturePage: View {
                     ControlTopBar {
                         showingFullscreen = true
                     }
+                    // v1.5.9 实测修复（Tauber 指令）：监看画面移至拍照页顶部
+                    // （顶栏之下），不再放在参数格后面。
+                    CameraStage {
+                        showingFullscreen = true
+                    }
                     ControlStatusRow()
                     ControlStatusCardGrid()
                     ControlCaptureDock {
@@ -4260,11 +4265,6 @@ private struct CapturePage: View {
                     }
                     CaptureScopeBar()
                     ControlParameterGrid()
-                    // v1.5.9 实测修复：fig1 批次把 CameraStage 从拍照页删除，
-                    // 恢复监看画面（对齐 Android/Harmony dock→波形→参数格→预览 顺序）。
-                    CameraStage {
-                        showingFullscreen = true
-                    }
                     NikonCloudMonitorBar()
                     CaptureSessionCard()
                     CaptureParameterDeck()
