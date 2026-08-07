@@ -88,6 +88,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.PopupMenu;
+import android.widget.ProgressBar;
 import android.widget.VideoView;
 
 import androidx.core.content.FileProvider;
@@ -121,6 +122,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -1289,6 +1291,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService editorExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService composeExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService activationExecutor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
@@ -6362,6 +6365,17 @@ public final class MainActivity extends Activity {
 
         content.addView(buildCameraStoragePanel());
 
+        LinearLayout timelapseActions = new LinearLayout(this);
+        timelapseActions.setOrientation(LinearLayout.HORIZONTAL);
+        Button timelapseButton = nativeButton("合成延时视频", true);
+        timelapseButton.setOnClickListener(view -> showComposeTimelapseDialog());
+        timelapseActions.addView(
+                timelapseButton,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        content.addView(
+                timelapseActions,
+                marginParams(-1, dp(48), 0, 0, 0, 12));
+
         LinearLayout sourceActions = new LinearLayout(this);
         sourceActions.setOrientation(LinearLayout.HORIZONTAL);
         Button albumButton = nativeButton(
@@ -6430,6 +6444,214 @@ public final class MainActivity extends Activity {
 
         scroll.addView(content);
         return scroll;
+    }
+
+    /** E6 延时合成：文件库入口。帧多选（按文件名排序）+ 帧率 24/25/30
+     *  → TimelapseComposer（MediaCodec H.264 MP4）→ CaptureWorkflow 入库。
+     *  TBC-awaiting-hardware。 */
+    private void showComposeTimelapseDialog() {
+        if (isFinishing() || isDestroyed()) return;
+        final List<File> frames = timelapseFrameFiles();
+        if (frames.isEmpty()) {
+            showToast("文件库暂无照片，请先拍摄或导入。");
+            return;
+        }
+        LinearLayout panel = verticalContainer();
+        panel.setPadding(dp(20), dp(18), dp(20), dp(14));
+        panel.addView(text(
+                "合成延时视频",
+                LIBRARY_FS_WORKBENCH,
+                Typeface.BOLD,
+                INK));
+        panel.addView(text(
+                "选择序列帧（按文件名排序合成）并设置帧率。损坏帧自动跳过。",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 2, 0, 10));
+
+        final List<CheckBox> checkboxes = new ArrayList<>();
+        LinearLayout listPanel = verticalContainer();
+        for (File frame : frames) {
+            CheckBox check = new CheckBox(this);
+            check.setText(frame.getName());
+            check.setTextSize(13);
+            check.setTextColor(INK);
+            check.setPadding(dp(2), dp(2), dp(2), dp(2));
+            checkboxes.add(check);
+            listPanel.addView(check, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+        ScrollView listScroll = new ScrollView(this);
+        listScroll.addView(listPanel, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        listScroll.setBackground(rounded(SURFACE, 12, RULE_STRONG));
+        panel.addView(listScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(240)));
+
+        final int[] frameRates = new int[]{24, 25, 30};
+        String[] rateLabels = new String[]{"24 fps", "25 fps", "30 fps"};
+        Spinner rateSpinner = new Spinner(this);
+        ArrayAdapter<String> rateAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_spinner_item,
+                rateLabels);
+        rateAdapter.setDropDownViewResource(
+                android.R.layout.simple_spinner_dropdown_item);
+        rateSpinner.setAdapter(rateAdapter);
+        rateSpinner.setSelection(0, false);
+        rateSpinner.setBackground(rounded(FIELD_BG, 9, RULE));
+        rateSpinner.setPadding(dp(10), 0, dp(8), 0);
+        LinearLayout rateRow = new LinearLayout(this);
+        rateRow.setOrientation(LinearLayout.HORIZONTAL);
+        rateRow.setGravity(Gravity.CENTER_VERTICAL);
+        rateRow.addView(text(
+                "帧率：",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED));
+        rateRow.addView(rateSpinner, new LinearLayout.LayoutParams(
+                dp(140), dp(44)));
+        panel.addView(rateRow, marginParams(-1, -2, 0, 10, 0, 6));
+
+        final ProgressBar progress = new ProgressBar(
+                this,
+                null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        progress.setVisibility(View.GONE);
+        panel.addView(progress, marginParams(-1, dp(18), 0, 10, 0, 4));
+        final TextView progressText = text(
+                "",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED);
+        progressText.setVisibility(View.GONE);
+        panel.addView(progressText, marginParams(-1, -2, 0, 0, 0, 4));
+        final TextView resultText = text(
+                "",
+                TS_BODY,
+                Typeface.BOLD,
+                INK);
+        resultText.setVisibility(View.GONE);
+        panel.addView(resultText, marginParams(-1, -2, 0, 6, 0, 0));
+
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        final AtomicBoolean running = new AtomicBoolean(false);
+        Button startButton = nativeButton("开始合成", true);
+        startButton.setOnClickListener(view -> {
+            if (running.get()) return;
+            final List<File> selected = new ArrayList<>();
+            for (int i = 0; i < checkboxes.size(); i++) {
+                if (checkboxes.get(i).isChecked()) {
+                    selected.add(frames.get(i));
+                }
+            }
+            if (selected.isEmpty()) {
+                showToast("请至少选择一帧。");
+                return;
+            }
+            running.set(true);
+            cancelled.set(false);
+            startButton.setEnabled(false);
+            progress.setVisibility(View.VISIBLE);
+            progress.setProgress(0);
+            progressText.setVisibility(View.VISIBLE);
+            progressText.setText("0/" + selected.size());
+            resultText.setVisibility(View.GONE);
+            final int fps = frameRates[rateSpinner.getSelectedItemPosition()];
+            final File temporary = new File(
+                    getCacheDir(),
+                    "timelapse-" + System.nanoTime() + ".mp4");
+            composeExecutor.execute(() -> {
+                try {
+                    TimelapseComposer composer = new TimelapseComposer();
+                    TimelapseComposer.Result composed = composer.compose(
+                            selected,
+                            temporary,
+                            new TimelapseComposer.Options(fps),
+                            cancelled::get,
+                            (done, total) -> runOnUiThread(() -> {
+                                progress.setMax(Math.max(1, total));
+                                progress.setProgress(done);
+                                progressText.setText(done + "/" + total);
+                            }));
+                    final File destination =
+                            captureWorkflow.storeTimelapseVideo(
+                                    temporary,
+                                    "延时合成");
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setText(
+                                "已合成 " + composed.framesWritten + " 帧"
+                                        + (composed.skippedFrames > 0
+                                                ? "（跳过 "
+                                                        + composed.skippedFrames
+                                                        + " 个损坏帧）"
+                                                : "")
+                                        + " → " + destination.getName());
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                    showSection("library");
+                } catch (CancellationException error) {
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setTextColor(VIDEO);
+                        resultText.setText("已取消");
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                } catch (Exception error) {
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        progressText.setVisibility(View.GONE);
+                        resultText.setVisibility(View.VISIBLE);
+                        resultText.setTextColor(VIDEO);
+                        resultText.setText(
+                                "视频编码失败：" + error.getMessage());
+                        startButton.setEnabled(true);
+                        running.set(false);
+                    });
+                } finally {
+                    if (temporary.exists()) temporary.delete();
+                }
+            });
+        });
+        panel.addView(startButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+
+        new AlertDialog.Builder(this)
+                .setTitle("帧澈 ZENCHE · 合成延时视频")
+                .setView(panel)
+                .setNegativeButton("取消", (dialog, which) ->
+                        cancelled.set(true))
+                .show();
+    }
+
+    /** E6：文件库内可作延时序列帧的照片（非视频 + 图片扩展名，按文件名排序）。 */
+    private List<File> timelapseFrameFiles() {
+        List<File> result = new ArrayList<>();
+        for (File file : photoFiles()) {
+            String lower = file.getName().toLowerCase(Locale.ROOT);
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")
+                    || lower.endsWith(".png") || lower.endsWith(".heic")
+                    || lower.endsWith(".heif") || lower.endsWith(".tif")
+                    || lower.endsWith(".tiff") || lower.endsWith(".bmp")) {
+                result.add(file);
+            }
+        }
+        result.sort((left, right) ->
+                left.getName().compareToIgnoreCase(right.getName()));
+        return result;
     }
 
     private View buildCameraStoragePanel() {
