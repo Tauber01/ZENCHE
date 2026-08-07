@@ -940,3 +940,31 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **E8 编辑副本归集口径五端分裂**（非阻塞）：macOS/iOS 走 CaptureWorkflow.store（XMP+双备份+SHA-256），Windows/Android/Harmony 三端直写（无 XMP/备份/manifest）。既有行为延续非 E8 新引入，建议 backlog 拉齐。
 - **timelapse 五端无专用 xmp:Label**（非阻塞）：live-photo/focus-stack 均有，延时合成视频缺——若产品要可识别需五端同步补。
 - **xmp:Label 理论双写**（非阻塞）：paired+stack 同设会产生非法 XML；当前无触发路径，仅记录。
+
+## 12.38 v1.5.9 build 35 修正版五端重打包（2026-08-07，kimi 07:41 派工，事件 b6ea2a25）
+
+- 背景：build 34 已交付但含 UI 缺陷（iPad 实测：拍照页监看缺失/非拍照页顶栏
+  多余 logo），修正后重打包。基线整合分支 `agent/1.5.6-ui @ 2b98d92`
+  （合并 127ec5b 拍照页监看恢复 + logo 摘除、46bedad+402e6f6 服务器 /data/
+  403 修复 + backlog 台账补录；合并态 npm test 327/327 绿）。
+- 版本号提交 `92bc14e`：build 34→**35** 五端同步（版本号维持 1.5.9 不变）：
+  Android versionCode 35；Harmony AppScope versionCode 35；iOS
+  CURRENT_PROJECT_VERSION 35 ×2；macOS CFBundleVersion 35；test 断言 35。
+  提交后 npm test 327/327 绿。
+- 产物（dist/，6 包 + 6 shasum + SHA256SUMS，旧 1.5.9/34 六包归档 dist/旧版/）：
+  - `ZENCHE-1.5.9-android.apk` `f06b14f26bb8014d1dedbed0dd355003d259d5ef4778289ed21d8a7c4cbeb80e`
+  - `ZENCHE-1.5.9-ios-unsigned.ipa` `ee8308e73152787e0cd33b7cddac3fb38585e162ccfe9c55a9cca5e61e76f30f`
+  - `ZENCHE-1.5.9-HarmonyOS.hap` `dcd7270e96790270c005e9751c981696840f323759f93453585f528687fb0135`（未签名预期）
+  - `ZENCHE-1.5.9-macOS-arm64.dmg` `4c5eff65937fcb320422fba3f870646939691735eebb3a5af2191ebd1555ddba`（ad-hoc 签名）
+  - `ZENCHE-1.5.9-Windows-x64-Setup.exe` `39f9cf86e5a329ea3b93857fbf4426f5140b24941d5308535c64f67ef2f87822`
+  - `ZENCHE-1.5.9-Windows-x64.zip` `e84223626c9e16f5f5e32d89217915bedd76f181ae403cbf6c8a77ae1c135094`
+- 构建验证：Android assembleDebug BUILD SUCCESSFUL，apksigner 验签
+  SHA-256 `45499c1836…` 与历史一致（签名连续性）；iOS BUILD SUCCEEDED
+  （unsigned ipa 无 _CodeSignature/embedded.mobileprovision）；Harmony
+  release assembleHap BUILD SUCCESSFUL（未签名预期）；macOS dmg 产出 +
+  挂测（/Volumes/帧澈 ZENCHE 1.5.9）+ codesign --deep --strict 通过
+  （CFBundleShortVersionString 1.5.9/CFBundleVersion 35 实测）；Windows
+  dotnet publish 0 错误 + NSIS 成功。
+- 验证：6/6 shasum -c OK。
+- iPad 链路复跑：archive→export signed ipa→devicectl 装到 iPad Pro 11 M5→
+  launch→进程存活复核（Tauber 装修正版实测 UI）。
