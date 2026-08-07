@@ -990,3 +990,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   （CFBundleShortVersionString 1.5.9/CFBundleVersion 36 实测）；Windows dotnet
   publish 0 错误 + NSIS 成功（含 BasedOn 崩溃修复后构建）。
 - 验证：6/6 shasum -c OK。
+
+## 12.40 v1.5.9 Admin 监控系统·后端 API（pro 实施，2026-08-07，Tauber 15:03 指令）
+
+- 计划：PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md「后端契约」10 路由逐条实现，仅改 ai-server/app.mjs + 测试 + ai-server/admin/index.html 占位。
+- **通用约束**：全部 /v1/admin/* 仅当 ZENCHE_AI_ADMIN_SECRET 配置时存在（fail-closed 404）+ loopback + Bearer 常量时间比较；非 GET 变更写审计 JSONL（admin-audit.jsonl，追加+fsync，完整激活码不入日志，设备指纹 12 位截断）。
+- **路由**：1) GET /v1/admin/stats（扩展 expiring7d/exhausted/revoked）2) /stats/history?days=30（每日快照）3) /devices 列表（filter: all/active24h/active7d/expired/expiring7d/exhausted/revoked + query 子串 + cursor 分页 limit≤200）4) /devices/{id} 详情+迁移链 5) reset-usage（迁移链只作用 tail）6) extend-expiry（经回环 signer 签新码，未配置 503）7) revoke/unrevoke 8) note（≤500 字）9) /codes/issue（新码建档，已存在 409，signer 未配置 503）10) /admin/* 静态 SPA（ai-server/admin/，无 token，loopback 天然受限，路径穿越防护同 server.mjs 惯例）。
+- **吊销语义**：consume 与 rebind 入口检查 revoked → 403「该激活码已吊销」；verifyActivation 纯密码学不查库（未改）。
+- **趋势快照**：admin 启用时启动补当日行 + 每 6h 幂等追加 admin-stats-snapshots.jsonl（{date, ...adminStats()}）；写失败仅 console.error 不触发 fail-stop。
+- **设备记录扩展**：created_at（新记录）、revoked/revoked_at、note；旧记录缺省兼容。
+- 测试：test/admin-api.test.mjs（新）9 用例——fail-closed/认证门禁/stats 扩展计数/列表过滤分页查询/迁移链详情/各操作路径/signer 503/吊销后 consume+rebind 403 与 unrevoke 恢复/审计 JSONL 落盘无激活码/快照追加。npm test 364/364 全绿（基线 355 + 9）；node --check 通过。
+- 红线：未 git push；未动生产服务器 101.34.255.115；verifyActivation 密码学逻辑零改动。
+- 前端由 flash admin-web 分支承接（本支已预留 /admin/ 静态路由）。
