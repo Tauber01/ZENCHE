@@ -53,7 +53,7 @@ test('U2 R1 iOS radius: all cornerRadius literals land on the design.md ramp', a
       `RadiusToken must define ramp step ${step}`);
   }
   // Every remaining cornerRadius usage must reference the token — no raw numbers.
-  const literals = ios.match(/cornerRadius: \d+(\\.\d+)?|cornerRadius\\(\d+(\\.\d+)?\\)|\\.cornerRadius\\(\d+(\\.\d+)?\\)/g) ?? [];
+  const literals = ios.match(/cornerRadius: \d+(\.\d+)?|cornerRadius\(\d+(\.\d+)?\)|\.cornerRadius\(\d+(\.\d+)?\)/g) ?? [];
   assert.equal(literals.length, 0, `iOS 不应残留 cornerRadius 数字字面量（残留 ${literals.length}）`);
   // Ramp step values outside allowed set must not appear as literals anywhere else.
   const banned = ios.match(/(?<!r)\\b(?:1|2|3|4|9|13|15|21|22|23)\\b(?![0-9])/);
