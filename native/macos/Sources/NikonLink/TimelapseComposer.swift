@@ -92,11 +92,11 @@ struct TimelapseComposer {
                 try? FileManager.default.removeItem(at: outputURL)
                 throw CancellationError()
             }
-            guard input.isReadyForMoreMediaData else {
-                // 编码器背压：忙等至可继续写。
+            // 编码器背压：忙等至可继续写（上限 20s），期间响应取消。
+            if !input.isReadyForMoreMediaData {
                 var waited = 0
                 while !input.isReadyForMoreMediaData && !isCancelled() {
-                    Thread.sleep(forTimeInterval: 0.01)
+                    try? await Task.sleep(nanoseconds: 10_000_000)
                     waited += 1
                     if waited > 2000 { // 20s 上限
                         break
