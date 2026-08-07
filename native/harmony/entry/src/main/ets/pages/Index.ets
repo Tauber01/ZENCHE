@@ -1699,36 +1699,10 @@ struct Index {
   private TopBar() {
     Row() {
       Row({ space: 12 }) {
-        Row() {
-          Text('Z')
-            .fontSize(22) // TopBar Z 标字号，品牌资产豁免
-            .fontWeight(FontWeight.Bold)
-            .fontColor(Color.White)
-        }
-        .width(this.isCompact() ? 38 : 44)
-        .height(this.isCompact() ? 38 : 44)
-        .justifyContent(FlexAlign.Center)
-        .linearGradient({
-          angle: 135,
-          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
-        })
-        .borderRadius(13)
-        .shadow({
-          radius: 8,
-          color: PHOTO_GLOW,
-          offsetX: 0,
-          offsetY: 4
-        })
+        // v1.5.9 实测修复：fig1 批次引入品牌块后，非拍照页顶栏冒出多余 logo。
+        // 摘除「Z」标 + 品牌文案（保留连接状态行 + 连接/设置钮）。
         Column({ space: 3 }) {
-          Text('帧澈 ZENCHE')
-            .fontSize(this.isCompact() ? 15 : 20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
           if (!this.isCompact()) {
-            Text('Capture · Connect · Flow')
-              .fontSize(10) // TopBar 品牌标语，品牌资产豁免
-              .fontFamily('monospace')
-              .fontColor($r('app.color.muted'))
             Text(
               this.connected
                 ? `${this.cameraName} · USB/PTP`
