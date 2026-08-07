@@ -915,6 +915,11 @@
                 <Button Width="112"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"
+                        Content="焦点合成"
+                        Click="ComposeFocusStack_Click" />
+                <Button Width="112"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource ButtonBase}"
                         Content="打开目录"
                         Click="OpenPhotoFolder_Click" />
               </StackPanel>

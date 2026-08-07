@@ -27,6 +27,7 @@
 		A10000000000000000000026 /* ExternalVideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ExternalVideoRecorder.swift */; };
 		A10000000000000000000027 /* LivePhotoClipRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* LivePhotoClipRecorder.swift */; };
 		A10000000000000000000028 /* TimelapseComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* TimelapseComposer.swift */; };
+		A10000000000000000000029 /* FocusStackComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* FocusStackComposer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +57,7 @@
 		B10000000000000000000026 /* ExternalVideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalVideoRecorder.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 /* LivePhotoClipRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePhotoClipRecorder.swift; sourceTree = "<group>"; };
 		B10000000000000000000028 /* TimelapseComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseComposer.swift; sourceTree = "<group>"; };
+		B10000000000000000000029 /* FocusStackComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStackComposer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -124,6 +126,7 @@
 				B10000000000000000000026 /* ExternalVideoRecorder.swift */,
 				B10000000000000000000027 /* LivePhotoClipRecorder.swift */,
 				B10000000000000000000028 /* TimelapseComposer.swift */,
+				B10000000000000000000029 /* FocusStackComposer.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -252,6 +255,7 @@
 				A10000000000000000000026 /* ExternalVideoRecorder.swift in Sources */,
 				A10000000000000000000027 /* LivePhotoClipRecorder.swift in Sources */,
 				A10000000000000000000028 /* TimelapseComposer.swift in Sources */,
+				A10000000000000000000029 /* FocusStackComposer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

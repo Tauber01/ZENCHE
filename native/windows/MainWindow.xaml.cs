@@ -6074,6 +6074,228 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
     }
 
+
+    /// <summary>
+    /// E7 焦点合成：文件库工具条入口。帧多选（按文件名排序）
+    /// → FocusStackComposer（逐像素清晰度融合 JPEG）→ CaptureWorkflow 入库。
+    /// TBC-awaiting-hardware。
+    /// </summary>
+    private async void ComposeFocusStack_Click(object sender, RoutedEventArgs e)
+    {
+        var photos = _library.List()
+            .Where(item => !item.IsVideo)
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (photos.Count == 0)
+        {
+            OperationStatusText.Text = AppLocalization.T(
+                "文件库暂无照片，请先拍摄或导入。");
+            return;
+        }
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = "焦点合成",
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。",
+            Foreground = (Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 4, 0, 12)
+        });
+
+        var checkboxes = new List<CheckBox>();
+        var listPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        foreach (var photo in photos)
+        {
+            var check = new CheckBox
+            {
+                Content = $"{photo.Name}  ·  {photo.Detail}",
+                IsChecked = false,
+                Margin = new Thickness(0, 3, 0, 3)
+            };
+            checkboxes.Add(check);
+            listPanel.Children.Add(check);
+        }
+        panel.Children.Add(new ScrollViewer
+        {
+            MaxHeight = 320,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = listPanel
+        });
+
+        var progress = new ProgressBar
+        {
+            Height = 18,
+            Minimum = 0,
+            Maximum = 100,
+            Margin = new Thickness(0, 12, 0, 6),
+            Visibility = Visibility.Collapsed
+        };
+        var progressText = new TextBlock
+        {
+            Foreground = (Brush)FindResource("MutedBrush"),
+            Margin = new Thickness(0, 0, 0, 6),
+            Visibility = Visibility.Collapsed
+        };
+        var resultText = new TextBlock
+        {
+            Foreground = (Brush)FindResource("PositiveBrush"),
+            Margin = new Thickness(0, 6, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        var errorText = new TextBlock
+        {
+            Foreground = (Brush)FindResource("DangerBrush"),
+            Margin = new Thickness(0, 6, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        };
+        panel.Children.Add(progress);
+        panel.Children.Add(progressText);
+        panel.Children.Add(resultText);
+        panel.Children.Add(errorText);
+
+        var startButton = new Button
+        {
+            Content = "开始合成",
+            Style = (Style)FindResource("PrimaryButton"),
+            Margin = new Thickness(0, 12, 8, 0),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var cancelButton = new Button
+        {
+            Content = "取消",
+            Style = (Style)FindResource("ButtonBase"),
+            Margin = new Thickness(0, 12, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Visibility = Visibility.Collapsed
+        };
+        var closeButton = new Button
+        {
+            Content = "关闭",
+            Style = (Style)FindResource("ButtonBase"),
+            Margin = new Thickness(8, 12, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        panel.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Children = { startButton, cancelButton, closeButton }
+        });
+
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = "帧澈 ZENCHE · 焦点合成",
+            Width = 640,
+            Height = 580,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = (Brush)FindResource("PaperBrush"),
+            Content = panel
+        };
+        closeButton.Click += (_, _) => dialog.Close();
+
+        var running = false;
+        var cancelled = false;
+        startButton.Click += async (_, _) =>
+        {
+            if (running)
+            {
+                return;
+            }
+            var selected = new List<string>();
+            for (var i = 0; i < checkboxes.Count; i++)
+            {
+                if (checkboxes[i].IsChecked == true)
+                {
+                    selected.Add(photos[i].Path);
+                }
+            }
+            if (selected.Count < 2)
+            {
+                errorText.Text = "焦点合成需要至少选择两帧。";
+                return;
+            }
+            running = true;
+            cancelled = false;
+            progress.Value = 0;
+            progress.Visibility = Visibility.Visible;
+            progressText.Visibility = Visibility.Visible;
+            startButton.Visibility = Visibility.Collapsed;
+            cancelButton.Visibility = Visibility.Visible;
+            resultText.Text = "";
+            errorText.Text = "";
+
+            var temporary = Path.Combine(
+                Path.GetTempPath(),
+                $"focusstack-{Guid.NewGuid():N}.jpg");
+            try
+            {
+                var composer = new FocusStackComposer();
+                var composeResult = await composer.ComposeAsync(
+                    selected,
+                    temporary,
+                    () => cancelled,
+                    (done, total) =>
+                    {
+                        progress.Dispatcher.Invoke(() =>
+                        {
+                            progress.Value = total == 0
+                                ? 0
+                                : done * 100.0 / total;
+                            progressText.Text = $"{done}/{total}";
+                        });
+                    });
+                var destination = await _workflow.StoreFocusStackAsync(
+                    temporary,
+                    "焦点合成",
+                    composeResult.SourcesUsed);
+                RefreshPhotoList();
+                progress.Visibility = Visibility.Collapsed;
+                progressText.Visibility = Visibility.Collapsed;
+                resultText.Text =
+                    $"已合成 {composeResult.SourcesUsed} 帧" +
+                    (composeResult.SkippedFrames > 0
+                        ? $"（跳过 {composeResult.SkippedFrames} 个损坏帧）"
+                        : "") +
+                    $" → {Path.GetFileName(destination)}";
+            }
+            catch (OperationCanceledException)
+            {
+                errorText.Text = "已取消";
+            }
+            catch (Exception error)
+            {
+                errorText.Text = $"焦点合成失败：{error.Message}";
+            }
+            finally
+            {
+                running = false;
+                startButton.Visibility = Visibility.Visible;
+                cancelButton.Visibility = Visibility.Collapsed;
+                try
+                {
+                    if (File.Exists(temporary))
+                    {
+                        File.Delete(temporary);
+                    }
+                }
+                catch (IOException)
+                {
+                    // 临时文件清理失败可忽略。
+                }
+            }
+        };
+        cancelButton.Click += (_, _) => cancelled = true;
+
+        dialog.ShowDialog();
+    }
+
     private void OpenOwnerAlbum_Click(object sender, RoutedEventArgs e)
     {
         RefreshPhotoList();
