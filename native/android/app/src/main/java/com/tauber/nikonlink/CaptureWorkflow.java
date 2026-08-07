@@ -160,6 +160,27 @@ final class CaptureWorkflow {
         return destination;
     }
 
+    /** E6 延时合成：把渲染好的 MP4 以新 base 存入会话，
+     *  复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单）。
+     *  TBC-awaiting-hardware。 */
+    synchronized File storeTimelapseVideo(
+            File source,
+            String cameraName) throws Exception {
+        ensureDirectories();
+        File destination = uniqueFile(
+                primaryDirectory(),
+                reserveBaseName(cameraName),
+                "mp4");
+        if (destination.exists()) destination.delete();
+        if (!source.renameTo(destination)) {
+            copy(source, destination);
+            source.delete();
+        }
+        finalizeFile(destination, null);
+        status = "延时视频已写入会话 · " + destination.getName();
+        return destination;
+    }
+
     synchronized File importFile(
             InputStream input,
             String originalFilename,

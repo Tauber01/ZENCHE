@@ -907,6 +907,11 @@
                         Style="{DynamicResource PrimaryButton}"
                         Content="新建分支"
                         Click="CreateLibraryBranch_Click" />
+                <Button Width="128"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource ButtonBase}"
+                        Content="合成延时视频"
+                        Click="ComposeTimelapse_Click" />
                 <Button Width="112"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"

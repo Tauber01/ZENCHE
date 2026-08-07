@@ -23,6 +23,7 @@ native/windows/obj/
 native/harmony/.hvigor/
 native/harmony/oh_modules/
 native/harmony/entry/build/
+native/harmony/entry/.cxx/
 native/harmony/entry/oh_modules/
 
 # Nikon's proprietary SDK is intentionally not redistributed.

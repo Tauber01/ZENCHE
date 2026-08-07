@@ -7967,6 +7967,8 @@ private struct LibraryPage: View {
     @State private var cameraStorageBusy = false
     @State private var cameraStorageExpanded = true
     @State private var confirmingCameraStorageDeletion = false
+    // ── E6 1.5.9：延时合成视频（帧多选 + 帧率/编码 + 进度/取消）──
+    @State private var showingTimelapseComposer = false
 
     var body: some View {
         ScrollView {
@@ -7989,6 +7991,12 @@ private struct LibraryPage: View {
                         Label("链接网盘", systemImage: "externaldrive.connected.to.line.below")
                     }
                     .buttonStyle(.bordered)
+                    Button {
+                        showingTimelapseComposer = true
+                    } label: {
+                        Label("合成延时视频", systemImage: "film.stack")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
 
                 branchWorkspace
@@ -8071,6 +8079,11 @@ private struct LibraryPage: View {
                 DispatchQueue.main.async {
                     showingCloudImporter = true
                 }
+            }
+        }
+        .sheet(isPresented: $showingTimelapseComposer) {
+            TimelapseComposerSheet(model: model) {
+                showingTimelapseComposer = false
             }
         }
         .alert(
@@ -10307,6 +10320,206 @@ private final class PreviewSurface: UIView {
         }
         if connection.isVideoRotationAngleSupported(angle) {
             connection.videoRotationAngle = angle
+        }
+    }
+}
+
+// ── E6 1.5.9：延时合成视频面板（帧多选 + 帧率/编码 + 进度/取消）──
+private struct TimelapseComposerSheet: View {
+    @ObservedObject var model: AppModel
+    let dismiss: () -> Void
+
+    @State private var selection: Set<URL> = []
+    @State private var frameRate = 24
+    @State private var codec: TimelapseComposer.Codec = .h264
+    @State private var running = false
+    @State private var cancelled = false
+    @State private var processed = 0
+    @State private var resultText: String?
+    @State private var errorText: String?
+
+    private var sortedPhotos: [LibraryItem] {
+        model.library.items
+            .filter { !$0.isVideo }
+            .sorted { $0.filename < $1.filename }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("选择序列帧（按文件名排序合成）并设置帧率与编码。损坏帧自动跳过。")
+                    .font(.callout)
+                    .foregroundStyle(IPalette.muted)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(sortedPhotos) { item in
+                            Toggle(isOn: binding(for: item.url)) {
+                                HStack(spacing: 10) {
+                                    TimelapseFrameThumbnail(url: item.url)
+                                        .frame(width: 52, height: 40)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    Text(item.filename)
+                                        .font(.caption.monospaced())
+                                        .lineLimit(1)
+                                }
+                            }
+                            .toggleStyle(.switch)
+                            .disabled(running)
+                        }
+                    }
+                }
+                .frame(minHeight: 220)
+
+                Divider()
+                HStack(spacing: 16) {
+                    Picker("帧率", selection: $frameRate) {
+                        Text("24 fps").tag(24)
+                        Text("25 fps").tag(25)
+                        Text("30 fps").tag(30)
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("编码", selection: $codec) {
+                        ForEach(TimelapseComposer.Codec.allCases) { item in
+                            Text(item.rawValue).tag(item)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .disabled(running)
+
+                if running {
+                    HStack(spacing: 12) {
+                        ProgressView(
+                            value: Double(processed),
+                            total: Double(max(1, selection.count))
+                        )
+                        .frame(maxWidth: .infinity)
+                        Text("\(processed)/\(selection.count)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(IPalette.muted)
+                        Button("取消") { cancelled = true }
+                            .buttonStyle(.bordered)
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Button {
+                            startCompose()
+                        } label: {
+                            Label("开始合成", systemImage: "film.stack")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selection.isEmpty)
+                        Button("关闭") { dismiss() }
+                            .buttonStyle(.bordered)
+                    }
+                }
+
+                if let resultText {
+                    Text(resultText)
+                        .font(.callout)
+                        .foregroundStyle(IPalette.positive)
+                }
+                if let errorText {
+                    Text(errorText)
+                        .font(.callout)
+                        .foregroundStyle(IPalette.video)
+                }
+            }
+            .padding(20)
+            .navigationTitle("合成延时视频")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func binding(for url: URL) -> Binding<Bool> {
+        Binding(
+            get: { selection.contains(url) },
+            set: { checked in
+                if checked {
+                    selection.insert(url)
+                } else {
+                    selection.remove(url)
+                }
+            }
+        )
+    }
+
+    private func startCompose() {
+        let frames = sortedPhotos
+            .filter { selection.contains($0.url) }
+            .map(\.url)
+        guard !frames.isEmpty else {
+            errorText = "请至少选择一帧。"
+            return
+        }
+        running = true
+        cancelled = false
+        processed = 0
+        resultText = nil
+        errorText = nil
+        let options = TimelapseComposer.Options(frameRate: frameRate, codec: codec)
+        let temporary = FileManager.default.temporaryDirectory
+            .appendingPathComponent("timelapse-\(UUID().uuidString)")
+            .appendingPathExtension(codec.outputExtension)
+        Task {
+            do {
+                let result = try await TimelapseComposer().compose(
+                    frames: frames,
+                    to: temporary,
+                    options: options,
+                    isCancelled: { cancelled },
+                    onProgress: { done, _ in
+                        DispatchQueue.main.async { processed = done }
+                    }
+                )
+                let destination = try model.captureWorkflow.storeTimelapseVideo(
+                    from: temporary,
+                    cameraName: "延时合成"
+                )
+                await MainActor.run {
+                    running = false
+                    model.library.reload()
+                    model.library.selectedItemID = destination.path
+                    resultText =
+                        "已合成 \(result.framesWritten) 帧" +
+                        (result.skippedFrames > 0
+                            ? "（跳过 \(result.skippedFrames) 个损坏帧）"
+                            : "") +
+                        " → \(destination.lastPathComponent)"
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    running = false
+                    errorText = "已取消"
+                }
+            } catch {
+                await MainActor.run {
+                    running = false
+                    errorText = error.localizedDescription
+                }
+            }
+        }
+    }
+}
+
+private struct TimelapseFrameThumbnail: View {
+    let url: URL
+
+    var body: some View {
+        if let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            Rectangle()
+                .fill(IPalette.rule)
         }
     }
 }

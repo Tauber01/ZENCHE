@@ -166,6 +166,29 @@ final class CaptureWorkflow: ObservableObject {
         return destination
     }
 
+    /// E6 延时合成：把渲染好的 MP4 以新 base 存入会话，
+    /// 复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单）。
+    /// TBC-awaiting-hardware。
+    @discardableResult
+    func storeTimelapseVideo(
+        from sourceURL: URL,
+        cameraName: String
+    ) throws -> URL {
+        try ensureSessionDirectories()
+        let destination = uniqueURL(
+            in: primaryDirectory,
+            base: reserveBaseName(cameraName: cameraName),
+            extension: "mp4"
+        )
+        if fileManager.fileExists(atPath: destination.path) {
+            try? fileManager.removeItem(at: destination)
+        }
+        try fileManager.moveItem(at: sourceURL, to: destination)
+        try finalize(destination, location: nil, pairedWithFilename: nil)
+        status = "延时视频已写入会话 · \(destination.lastPathComponent)"
+        return destination
+    }
+
     @discardableResult
     func replace(
         data: Data,

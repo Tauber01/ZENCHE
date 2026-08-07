@@ -797,3 +797,44 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **构建（全部本会话复跑）**：macOS swiftc typecheck 0 error（build-macos.sh 同口径源列表）；iOS xcodebuild Release **BUILD SUCCEEDED**；Windows dotnet build Release **0 错误**；Android `:app:compileDebugJavaWithJavac --rerun-tasks` **BUILD SUCCESSFUL**（强制重编译，非 UP-TO-DATE 缓存）；Harmony 干净 assembleHap **BUILD SUCCESSFUL**。git diff --check 干净。
 - **docs**：CAMERA_TEST_CHECKLIST 挂 5 条 E5 待设备实机条目（macOS/iOS/Windows/Android/Harmony live 图，含 Windows 快门顺修验证）。
 - 纪律：E5 新代码全部 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。
+
+## 12.33 v1.5.9 E6：延时合成视频五端（2026-08-07，kimi 03:34 派工，事件 13ef253e）
+
+- 背景：E5 合入整合分支 `03cccd1` 后接棒（二梯队第一项），「拍—合成—导出」闭环最后一步。
+  分支 `agent/1.5.9-e6-timelapse`，基线 `03cccd1`。计划 PLANS/ZENCHE_V1_5_9_FEATURE_BATCH.md §E6。
+- **方案（已定案）**：序列帧（JPEG/PNG/HEIC/TIFF）→ 逐帧解码 → 统一画布（aspect-fit 黑底）→
+  平台原生编码器 → H.264 MP4；帧率 24/25/30（clamp 1-60）、分辨率默认按源帧（上限源尺寸）；
+  损坏帧跳过并计数（不整批失败）；进度回调 + 取消检查；产出走 CaptureWorkflow 同会话目录 +
+  reserveBaseName 命名 + finalize 全套（XMP sidecar/双备份/SHA-256 清单）。输出 H.264 MP4
+  （ProRes 422 仅 Apple 双端可选）。
+- **macOS**（`27d41df` + 修复 `6bc69e6`）：TimelapseComposer.swift（AVAssetWriter +
+  AVAssetWriterInputPixelBufferAdaptor，Codec 枚举 H.264/ProRes）+ LibraryView 入口 + Sheet；
+  修复 macOS 编码器背压忙等 if 结构 + Task.sleep（xcodebuild 完整编译下 guard else 以 if 结尾
+  属 fall-through 编译错误；Thread.sleep 在 async 上下文 Swift 6 模式是 error）。typecheck/xcodebuild 通过。
+- **iOS**（`dd21d1d`）：TimelapseComposer.swift 移植 + 文件库入口。xcodebuild BUILD SUCCEEDED。
+- **Windows**（`9745c0c`）：TimelapseComposer.cs（MediaClip.CreateFromImageFileAsync 静态帧
+  clip 装入 MediaComposition → RenderToFileAsync H.264 MP4）+ 入口。dotnet build 0 错误。
+- **Android**（`7ea0d3d`）：TimelapseComposer.java（BitmapFactory 解码 → aspect-fit 画布 →
+  MediaCodec H.264 + MediaMuxer MP4，YUV420 I420 输入、bitrate=clamp(w*h*fps*0.07, 1M, 20M)、
+  I 帧间隔 1）+ 文件库入口。compileReleaseJavaWithJavac 通过。
+- **Harmony**（本次，唯一 native 段）：**API 21 已移除 ArkTS 低级编解码 API**
+  （media.VideoEncoder/AVMuxer 等 @since 12 符号在 @ohos.multimedia.media.d.ts 中消失），
+  改走 native C++：`native/harmony/entry/src/main/cpp/timelapse_encoder.cpp`（423 行，
+  OH_VideoEncoder buffer 模式 + OH_AVMuxer，NAPI 四导出 createEncoder/feedFrame/
+  finishEncoder/destroyEncoder，同步 buffer 回调 + NotifyEndOfStream + EOS，输入槽等待 5s
+  限时防 UI 卡死）+ CMakeLists（libnative_media_venc/codecbase/core/avmuxer + libace_napi）；
+  `TimelapseComposer.ets` 保留公开 compose() 表面与解码/画布/NV12 逻辑，编码委托 native
+  （`import timelapse from 'libtimelapse.so'` + cpp/types/libtimelapse/index.d.ts 声明）；
+  Index.ets 入口面板 + CaptureWorkflow.ets `storeTimelapseVideo`。参数对齐 Android
+  （fps clamp、bitrate 公式、NV12 输入）。**与其他四端高级 API 方案不同，已标注待实机回归**。
+- **契约锚点**：native-timelapse.test.mjs（新）8 用例——五端 compose 符号（AVAssetWriter/
+  MediaCodec/MediaComposition/libtimelapse.so）、bitrate 公式、损坏帧跳过、进度/取消、
+  会话入库复用（reserveBaseName + finalize）、Harmony NAPI 导出与 .d.ts、五端全部
+  TBC-awaiting-hardware。npm test **305/305** 全绿（基线 297 + E6 8）。
+- **构建（本会话复跑）**：Harmony 干净 assembleHap（DEVECO_SDK_HOME + DevEco jbr JAVA_HOME）
+  **BUILD SUCCESSFUL**（native C++ 双 ABI 编译 + CompileArkTS ERROR:0，142 条既有 deprecation
+  WARN，unsigned HAP 6,041,739 B；libtimelapse.so arm64-v8a/x86_64 均产出）；
+  git diff --check 干净；E6 契约测试 8/8 独立复跑全绿。
+- **docs**：CAMERA_TEST_CHECKLIST 挂 5 条 E6 待设备实机条目（五端延时合成 + Harmony native
+  路径实机回归）。
+- 纪律：E6 新代码全部 TBC-awaiting-hardware 标注；未建 dist、未推远端；打包听 kimi 调度。

@@ -139,6 +139,29 @@ export class CaptureWorkflow {
     return destination;
   }
 
+  /** E6 延时合成：把渲染好的 MP4 以新 base 存入会话，
+   *  复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单）。
+   *  TBC-awaiting-hardware。 */
+  async storeTimelapseVideo(
+    source: string,
+    cameraName: string
+  ): Promise<string> {
+    this.ensureDirectories();
+    const destination: string = this.uniquePath(
+      this.primaryDirectory(),
+      this.reserveBaseName(cameraName),
+      'mp4'
+    );
+    if (fs.accessSync(destination)) {
+      fs.unlinkSync(destination);
+    }
+    fs.copyFileSync(source, destination);
+    fs.unlinkSync(source);
+    await this.finalize(destination, undefined, undefined);
+    this.statusValue = `延时视频已写入会话 · ${filename(destination)}`;
+    return destination;
+  }
+
   async importFromUri(
     uri: string,
     originalFilename: string,
