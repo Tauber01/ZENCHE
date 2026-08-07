@@ -1094,6 +1094,12 @@ struct Index {
   @State private editorCropRatio: string = 'original';
   @State private editorShowingOriginal: boolean = false;
   @State private editorSaving: boolean = false;
+  // E8 1.5.9: AI 批量应用（本地渲染，0 服务器消耗）——队列状态。
+  @State private aiBatchApplying: boolean = false;
+  @State private aiBatchProgress: number = 0;
+  @State private aiBatchTotal: number = 0;
+  @State private aiBatchSkipped: number = 0;
+  private aiBatchCancelled: boolean = false;
   @State private aiPrompt: string = '';
   @State private aiManualPrompt: string = '';
   @State private aiSelectedPresets: Array<string> = [];
@@ -2521,6 +2527,15 @@ struct Index {
                 this.editorNikonCloudPresetId = '';
                 this.editorAISummary = '已粘贴 AI 调整';
                 this.status = '已粘贴 AI 调整';
+              })
+            Button(this.tr('批量应用 AI'), { type: ButtonType.Normal })
+              .height(48)
+              .layoutWeight(1)
+              .enabled(this.editorAICopiedTone.length > 0 && !this.aiBatchApplying)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .onClick((): void => {
+                this.applyAIBatch();
               })
           }
           .width('100%')
@@ -14036,6 +14051,101 @@ struct Index {
       }
       source?.release();
       this.editorSaving = false;
+    }
+  }
+
+  /** E8 1.5.9: 把当前复制的 AI 调整方案批量应用到整个文件库可编辑照片，
+   *  逐张本地渲染 + JPEG 副本（0 服务器消耗），进度可见可取消，
+   *  单张失败跳过计数不整批失败。 */
+  private async applyAIBatch(): Promise<void> {
+    if (this.editorAICopiedTone.length < 18 || this.library === undefined) {
+      return;
+    }
+    const targets: Array<PhotoItem> = this.editablePhotos();
+    if (targets.length === 0) {
+      this.showError('文件库没有可编辑照片');
+      return;
+    }
+    this.aiBatchApplying = true;
+    this.aiBatchCancelled = false;
+    this.aiBatchProgress = 0;
+    this.aiBatchTotal = targets.length;
+    this.aiBatchSkipped = 0;
+    this.status = `批量应用 AI 调整 · 本地处理零消耗 · 共 ${targets.length} 张`;
+    let skipped: number = 0;
+    for (let index: number = 0; index < targets.length; index++) {
+      if (this.aiBatchCancelled) {
+        this.aiBatchApplying = false;
+        this.status = `批量应用已取消 · 完成 ${index}/${targets.length}`;
+        return;
+      }
+      const item: PhotoItem = targets[index];
+      // 临时切换为复制的 AI 调整方案（渲染后恢复）。
+      const originalTone: Array<EditorToneValue> = this.captureEditorTone();
+      this.restoreEditorTone(this.editorAICopiedTone);
+      const saved: boolean = await this.renderSingleEditedPhoto(item);
+      this.restoreEditorTone(originalTone);
+      if (!saved) {
+        skipped++;
+      }
+      this.aiBatchProgress = index + 1;
+      this.aiBatchSkipped = skipped;
+    }
+    this.aiBatchApplying = false;
+    this.status =
+      `批量应用完成 · ${targets.length - skipped} 张已保存 · 跳过 ${skipped}`;
+  }
+
+  /** 单张渲染 + 保存编辑副本（复用 saveEditedPhoto 的像素管线，不触服务器）。
+   *  返回是否成功。 */
+  private async renderSingleEditedPhoto(item: PhotoItem): Promise<boolean> {
+    const library: PhotoLibrary | undefined = this.library;
+    if (library === undefined) {
+      return false;
+    }
+    let source: image.ImageSource | undefined = undefined;
+    let pixelMap: image.PixelMap | undefined = undefined;
+    let packer: image.ImagePacker | undefined = undefined;
+    try {
+      source = image.createImageSource(`file://${item.path}`);
+      pixelMap = await source.createPixelMap({
+        editable: true,
+        desiredPixelFormat: image.PixelMapFormat.RGBA_8888
+      });
+      const info: image.ImageInfo = await pixelMap.getImageInfo();
+      const buffer: ArrayBuffer = new ArrayBuffer(
+        info.size.width * info.size.height * 4
+      );
+      await pixelMap.readPixelsToBuffer(buffer);
+      const pixels: Uint8Array = new Uint8Array(buffer);
+      this.processEditorPixels(
+        pixels,
+        info.size.width,
+        info.size.height
+      );
+      await pixelMap.writeBufferToPixels(buffer);
+      packer = image.createImagePacker();
+      const packed: image.PackingOption = {
+        format: 'image/jpeg',
+        quality: 95
+      };
+      const data: ArrayBuffer = await packer.packing(pixelMap, packed);
+      const bytes: Uint8Array = new Uint8Array(data);
+      library.saveEditedCopy(item.name, bytes);
+      return true;
+    } catch (error) {
+      this.showError(
+        `批量应用失败：${(error as BusinessError).message}`
+      );
+      return false;
+    } finally {
+      if (packer !== undefined) {
+        await packer.release();
+      }
+      if (pixelMap !== undefined) {
+        pixelMap.release();
+      }
+      source?.release();
     }
   }
 

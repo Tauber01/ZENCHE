@@ -808,6 +808,12 @@ public partial class MainWindow : Window
     private NikonCloudPreset? _editorCloudPresetBeforeAI;
     private EditorAdjustments? _editorSettingsBeforeAI;
     private EditorAdjustments? _editorAICopiedSettings;
+    // E8 1.5.9: AI 批量应用（本地渲染，0 服务器消耗）——队列状态。
+    private bool _aiBatchApplying;
+    private volatile bool _aiBatchCancelled;
+    private int _aiBatchProgress;
+    private int _aiBatchTotal;
+    private int _aiBatchSkipped;
     private EditorAIAnalysis? _editorAIAnalysis;
     private readonly Dictionary<string, Slider> _editorSliders = [];
     private readonly Dictionary<string, Slider> _editorGradeSliders = [];
@@ -9700,6 +9706,7 @@ public partial class MainWindow : Window
     {
         _editorAICopiedSettings = _editorAdjustments.Copy();
         PasteEditorAIButton.IsEnabled = true;
+        BatchEditorAIButton.IsEnabled = true;
         EditorStatusText.Text = AppLocalization.T("已复制 AI 调整，可应用到下一张照片");
     }
 
@@ -9714,6 +9721,107 @@ public partial class MainWindow : Window
         _editorAdjustments.ShowingOriginal = false;
         UpdateEditorPreview();
         EditorStatusText.Text = AppLocalization.T("已粘贴 AI 调整");
+    }
+
+    /// E8 1.5.9: 批量应用 AI（本地渲染，0 服务器消耗）——后台任务逐张
+    /// 渲染 + JPEG 副本，进度可见可取消，单张失败跳过计数不整批失败。
+    private void BatchEditorAI_Click(object sender, RoutedEventArgs e)
+    {
+        if (_editorAICopiedSettings is null || _aiBatchApplying)
+        {
+            return;
+        }
+        var targets = _library.List()
+            .Where(item => !item.IsVideo)
+            .ToList();
+        if (targets.Count == 0)
+        {
+            EditorStatusText.Text = AppLocalization.T("文件库没有可编辑照片");
+            return;
+        }
+        _aiBatchApplying = true;
+        _aiBatchCancelled = false;
+        _aiBatchProgress = 0;
+        _aiBatchTotal = targets.Count;
+        _aiBatchSkipped = 0;
+        BatchEditorAIButton.IsEnabled = false;
+        BatchEditorAIProgress.Visibility = Visibility.Visible;
+        BatchEditorAIStatus.Text = $"{0}/{targets.Count}";
+        EditorStatusText.Text = AppLocalization.T(
+            $"批量应用 AI 调整 · 本地处理零消耗 · 共 {targets.Count} 张");
+        _ = Task.Run(async () =>
+        {
+            int skipped = 0;
+            for (int index = 0; index < targets.Count; index++)
+            {
+                if (_aiBatchCancelled)
+                {
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        FinishAIBatch(index, targets.Count);
+                        EditorStatusText.Text = AppLocalization.T(
+                            $"批量应用已取消 · 完成 {index}/{targets.Count}");
+                    });
+                    return;
+                }
+                var item = targets[index];
+                bool ok = false;
+                try
+                {
+                    var saved = _editorAICopiedSettings.Copy();
+                    saved.ShowingOriginal = false;
+                    var bitmap = RenderEditedBitmap(item.Path, saved, null);
+                    var destination = UniqueEditedPath(item.Path);
+                    var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    using (var stream = File.Create(destination))
+                    {
+                        encoder.Save(stream);
+                    }
+                    ok = true;
+                }
+                catch
+                {
+                    ok = false;
+                }
+                if (!ok)
+                {
+                    skipped++;
+                }
+                int done = index + 1;
+                int skippedSnapshot = skipped;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    _aiBatchProgress = done;
+                    _aiBatchSkipped = skippedSnapshot;
+                    BatchEditorAIBar.Value =
+                        100.0 * done / Math.Max(1, _aiBatchTotal);
+                    BatchEditorAIStatus.Text = $"{done}/{_aiBatchTotal}";
+                });
+            }
+            await Dispatcher.InvokeAsync(() =>
+            {
+                FinishAIBatch(targets.Count, targets.Count);
+                EditorStatusText.Text = AppLocalization.T(
+                    $"批量应用完成 · {targets.Count - skipped} 张已保存 · 跳过 {skipped}");
+            });
+        });
+    }
+
+    private void FinishAIBatch(int done, int total)
+    {
+        _aiBatchApplying = false;
+        BatchEditorAIButton.IsEnabled =
+            _editorAICopiedSettings != null;
+        BatchEditorAIProgress.Visibility = Visibility.Collapsed;
+        RefreshPhotoList();
+        _ = done;
+        _ = total;
+    }
+
+    private void BatchEditorAICancel_Click(object sender, RoutedEventArgs e)
+    {
+        _aiBatchCancelled = true;
     }
 
     private void UpdateEditorAIMetrics()
