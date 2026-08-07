@@ -189,8 +189,8 @@ public final class MainActivity extends Activity {
     private static final int EDITOR_FS_MEDIUM = 14;  // 编辑页副标题（云创预览）
     private static final int EDITOR_FS_HEAD = 16;    // 编辑页小标题（AI 创作）
     // ── v1.5.7 P4: 页面/设备页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
-    private static final int PAGE_FS_HEADING = 30;         // 页面大标题（sectionHeader 共享组件，对标 macOS WorkspaceHeading；值不等 F1 heading 26）
-    private static final int PAGE_FS_HEADING_COMPACT = 25; // 页面大标题（紧凑形态）
+    private static final int PAGE_FS_HEADING = 26;         // 页面大标题（sectionHeader 共享组件，对标 macOS WorkspaceHeading；U1 收口为五端基准 heading=26）
+    private static final int PAGE_FS_HEADING_COMPACT = 26; // 页面大标题（紧凑形态；U1 同收 26，常量名保留）
     private static final int PAGE_FS_SUBTITLE = 14;        // 页面副标题（sectionHeader 共享组件）
     private static final int DEVICE_FS_EMPTY_TITLE = 20;   // 设备页空态标题
     private static final int DEVICE_FS_SUB = 13;           // 设备页次级文本（空态说明、卡 transport）
@@ -207,10 +207,23 @@ public final class MainActivity extends Activity {
     private static final int SCOPE_G = Color.rgb(40, 255, 105);       // RGB parade G
     private static final int SCOPE_B = Color.rgb(34, 64, 255);        // RGB parade B
     private static final int SCOPE_AUDIO = Color.rgb(76, 199, 232);   // #4CC7E8 音频缺失基线
+    private static final int SCOPE_BG = Color.rgb(5, 10, 15);         // #050A0F 示波器画布底（五端基准 SCOPE 通道第五色）
+    // ── v1.5.6 U1: 白色 alpha 八档（对齐 iOS IPalette whiteHi…whiteWash；alpha = round(opacity × 255)）──
+    private static final int WHITE_HI = Color.argb(240, 255, 255, 255);    // whiteHi .94
+    private static final int WHITE_MID = Color.argb(224, 255, 255, 255);   // whiteMid .88
+    private static final int WHITE_LO = Color.argb(191, 255, 255, 255);    // whiteLo .75
+    private static final int WHITE_DIM = Color.argb(153, 255, 255, 255);   // whiteDim .60
+    private static final int WHITE_FAINT = Color.argb(143, 255, 255, 255); // whiteFaint .56
+    private static final int WHITE_GHOST = Color.argb(115, 255, 255, 255); // whiteGhost .45
+    private static final int WHITE_MIST = Color.argb(77, 255, 255, 255);   // whiteMist .30
+    private static final int WHITE_WASH = Color.argb(15, 255, 255, 255);   // whiteWash .06
     // ── v1.5.6 高频内联色归一 ──
     private static int FIELD_BG = Color.rgb(241, 244, 249);     // 表单/输入背景 #F1F4F9
     private static int PAPER_3 = Color.rgb(247, 249, 252);      // 库分支嵌套背景
     private static int STATUS_MUTED = Color.rgb(185, 193, 208); // 连接页状态文字
+    // 监看页 LIVE 指示色（U1 归档：与 VIDEO #D8323A / COBALT #1673E6 均不同值，不强行合并）
+    private static final int VIDEO_LIVE = Color.rgb(235, 40, 55); // #EB2837 录制中 LIVE 红
+    private static final int PHOTO_LIVE = Color.rgb(72, 145, 255); // #4891FF 照片 LIVE 蓝
     // 监看页 HUD 玻璃背景（黑色半透明，同语义遮罩）
     private static final int HUD_BG = Color.argb(175, 0, 0, 0);       // 主 HUD 控件背景
     private static final int HUD_BG_SOFT = Color.argb(155, 0, 0, 0);  // 次要控件背景
@@ -997,7 +1010,7 @@ public final class MainActivity extends Activity {
             paint.setStyle(Paint.Style.FILL);
             paint.setColor(Color.BLACK);
             canvas.drawRect(bounds, paint);
-            paint.setColor(Color.rgb(5, 10, 15));
+            paint.setColor(SCOPE_BG);
             canvas.drawRect(plotBounds, paint);
 
             for (int index = 0; index < values.length; index++) {
@@ -1007,7 +1020,7 @@ public final class MainActivity extends Activity {
 
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dpf(0.72f));
-            paint.setColor(Color.argb(144, 255, 255, 255));
+            paint.setColor(WHITE_FAINT);
             for (int guide = 1; guide < 4; guide++) {
                 float y = plotBounds.top + plotBounds.height() * guide / 4f;
                 canvas.drawLine(plotBounds.left, y, plotBounds.right, y, paint);
@@ -1019,14 +1032,14 @@ public final class MainActivity extends Activity {
                 }
             }
             paint.setStrokeWidth(dpf(1.1f));
-            paint.setColor(Color.argb(240, 255, 255, 255));
+            paint.setColor(WHITE_HI);
             canvas.drawRect(plotBounds, paint);
 
             paint.setStyle(Paint.Style.FILL);
             paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL));
             paint.setTextSize(Math.min(dp(9), footerHeight * 0.68f));
             paint.setTextAlign(Paint.Align.CENTER);
-            paint.setColor(Color.argb(224, 255, 255, 255));
+            paint.setColor(WHITE_MID);
             float baseline = bounds.bottom - Math.max(dpf(1.5f), footerHeight * 0.12f);
             if (parade) {
                 canvas.drawText("R", bounds.left + bounds.width() / 6f, baseline, paint);
@@ -4945,7 +4958,7 @@ public final class MainActivity extends Activity {
                 monitoring ? "视频" : "照片",
                 17,
                 Typeface.BOLD,
-                monitoring ? Color.rgb(235, 40, 55) : Color.rgb(72, 145, 255));
+                monitoring ? VIDEO_LIVE : PHOTO_LIVE);
         section.setGravity(Gravity.CENTER);
         rightRail.addView(section, new LinearLayout.LayoutParams(dp(92), dp(44)));
         Button capture = nativeButton(
@@ -5583,7 +5596,7 @@ public final class MainActivity extends Activity {
                 "峰值覆盖 · " + peakingCoverage + "%",
                 TS_CAPTION,
                 Typeface.NORMAL,
-                Color.argb(190, 255, 255, 255));
+                WHITE_LO);
         peakingCoverageText.setTypeface(Typeface.MONOSPACE);
         scopes.addView(
                 professionalScopeView,
@@ -9087,7 +9100,7 @@ public final class MainActivity extends Activity {
             canvas.drawRoundRect(0, 0, w, h, dp(8), dp(8), paint);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(1));
-            paint.setColor(Color.argb(80, 255, 255, 255));
+            paint.setColor(WHITE_MIST);
             canvas.drawLine(0, h, w, 0, paint);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp(2));

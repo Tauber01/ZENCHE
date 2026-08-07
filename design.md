@@ -77,6 +77,11 @@ may expose equivalent dynamic colours for system dark appearance.
 - Foreground and background always pair by appearance: light text and icons
   on dark surfaces, dark text and icons on light surfaces, drawn from the
   token pairs above — never a hard-coded single-appearance colour.
+- This file is the single source of truth for the five native targets. Every
+  platform token table (iOS `IPalette`, Android `MainActivity` token block,
+  Harmony `color.json` + `Index.ets` constants, macOS `Palette`, Windows
+  `Colors.xaml`) must carry these exact sRGB values; contract tests under
+  `test/` lock the shared values so a platform table cannot drift silently.
 - UI accent, Studio gold, and Editor accent are the only additional accent
   colours. Studio gold marks parameter readouts and in-progress adjustments; it
   never becomes a selection or capture-action accent — selected and active
@@ -107,10 +112,45 @@ Web CSS as a dependency of native implementations.
 - Maximum five text sizes per screen. Body text is never below the platform's
   accessible default.
 
+The shared type scale (six steps, pt/sp/fp; contract-locked across the five
+native targets since v1.5.9 U1):
+
+| Step | Size | Use |
+| --- | --- | --- |
+| Caption | 11 | Field labels, metadata, telemetry |
+| Body | 12 | Default reading text |
+| Emphasis | 15 | Block titles, primary buttons |
+| Title | 18 | Section titles |
+| Display | 24 | Large numerals and readouts |
+| Heading | 26 | One page-level title per screen |
+
+Platform-specific display faces stay platform-native (SF, Roboto/Noto,
+HarmonyOS Sans, Bahnschrift + Segoe UI Variable). Archived page-level sizes
+outside this scale were ruled on in v1.5.9 U1 (F5): page headings converge to
+26 on every platform; remaining archived steps keep their names but must not
+grow new call sites.
+
 ## Spacing
 
 Use a 4-point scale: 4, 8, 12, 16, 20, 24, 32, 40. Touch targets are at least
 44 × 44 points/dp/vp.
+
+Radii and elevation baseline (canonical ramp; platforms tokenize against this
+ramp in the U2 batch — literal corner values must land on these steps):
+
+| Radius | Use |
+| --- | --- |
+| 0 | fig2 editor workbench (deliberately square) |
+| 5–8 | Small controls, scope panels, slider parts |
+| 10–12 | Buttons and inputs |
+| 14 | Cards on the fig1 dark control surface |
+| 16–20 | Raised cards, sheets, device cards |
+| capsule | Status pills and HUD chips |
+
+Elevation: the fig1 capture surface and fig2 editor are flat — no shadows, no
+gradients. On the light management surfaces a single restrained card shadow
+(≈black 12–18% opacity, blur 8–12, y 2–4) is allowed; the Z brand mark keeps
+its reserved photo-accent gradient.
 
 ## Navigation and settings
 

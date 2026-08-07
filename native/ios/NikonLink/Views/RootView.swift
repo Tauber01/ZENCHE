@@ -109,10 +109,6 @@ private enum IPalette {
     static let video = dynamic(light: 0xD8323A, dark: 0xFF5257)
     static let videoSoft = dynamic(light: 0xFBE2E3, dark: 0x3A1B1E)
     static let positive = dynamic(light: 0x1FA869, dark: 0x35C97B)
-    // ZENCHE 1.5.3 studio tokens: STUDIO_CANVAS/PANEL/RAISED/RULE/GOLD 五常量已删
-    // （代码零引用死定义，F2 收口）。native-ui-1.5.3 token 契约断言要求源码含
-    // studioGold/studioPanel 标识符文本，故保留于本注释（值语义：暖金标示参数读数、
-    // 深灰工作台面；iOS 编辑器已迁移至 EDITOR_* token）。
     static let graphite = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let monitorBackground = Color(red: 10 / 255, green: 11 / 255, blue: 13 / 255)
     static let readoutGlow = Color(red: 107 / 255, green: 174 / 255, blue: 255 / 255)
@@ -186,13 +182,13 @@ enum EditorFontSize {
 
 // v1.5.7 P4: 设备页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
 enum DeviceFontSize {
-    static let heading: CGFloat = 30 // 设备页大标题（对标 macOS WorkspaceHeading；值不等 F1 heading 26，收口归 F5）
+    static let heading: CGFloat = 26 // 设备页大标题（F5 落地：统一 TypeScale heading 档 26）
 }
 
-// v1.5.7 P5: 文件库页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）
+// v1.5.7 P5: 文件库页归档档位（F5 落地：页面标题统一 TypeScale heading 档 26）
 enum PageFontSize {
-    static let titleCompact: CGFloat = 25 // 页面大标题（紧凑形态，PageTitle 共享组件）
-    static let titleRegular: CGFloat = 29 // 页面大标题（PageTitle 共享组件）
+    static let titleCompact: CGFloat = 26 // 页面大标题（紧凑形态，PageTitle 共享组件）
+    static let titleRegular: CGFloat = 26 // 页面大标题（PageTitle 共享组件）
 }
 
 // v1.5.7 P6: 设置页归档档位——FontToken 五档之外的既有值（只归档不改值，字号统一收口归 F5）

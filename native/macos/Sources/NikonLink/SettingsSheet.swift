@@ -129,7 +129,9 @@ enum ThemeMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// 设置面板专用色板，与主界面 Palette 一致地随主题动态解析明/暗。
+/// 设置面板专用色板。与主 Palette 重复的 token（ink/muted/cobalt/cobaltSoft/
+/// positive/rule，base 即 Palette.paper）直接转发主 Palette，保持单一来源；
+/// support/supportSoft/card 为设置面板独有，本地保留。
 private enum SettingsPalette {
     private static func dynamic(
         light: (Double, Double, Double),
@@ -142,33 +144,21 @@ private enum SettingsPalette {
         })
     }
 
-    static let ink = dynamic(
-        light: (0.090, 0.110, 0.149), dark: (0.925, 0.933, 0.949))
-    static let muted = dynamic(
-        light: (0.353, 0.380, 0.424), dark: (0.604, 0.631, 0.678))
-    static let cobalt = dynamic(
-        light: (0.086, 0.451, 0.902), dark: (0.180, 0.525, 0.878))
-    static let positive = dynamic(
-        light: (0.039, 0.494, 0.329), dark: (0.204, 0.780, 0.565))
-    static let cobaltSoft = dynamic(
-        light: (0.863, 0.918, 0.992), dark: (0.078, 0.161, 0.243))
+    static var ink: Color { Palette.ink }
+    static var muted: Color { Palette.muted }
+    static var cobalt: Color { Palette.cobalt }
+    static var positive: Color { Palette.positive }
+    static var cobaltSoft: Color { Palette.cobaltSoft }
+    static var rule: Color { Palette.rule }
+    /// 面板底：即主 Palette.paper，用于 Sheet 背景。
+    static var base: Color { Palette.paper }
     static let support = dynamic(
         light: (0.941, 0.451, 0.298), dark: (0.980, 0.560, 0.404))
     static let supportSoft = dynamic(
         light: (1.0, 0.941, 0.902), dark: (0.243, 0.157, 0.110))
-    static let rule = Color(nsColor: NSColor(name: nil) { appearance in
-        let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        return isDark
-            ? NSColor(white: 1, alpha: 0.12)
-            : NSColor(srgbRed: 207.0 / 255.0, green: 214.0 / 255.0,
-                      blue: 223.0 / 255.0, alpha: 1)
-    })
     /// 卡片面：亮色为纯白，暗色为提升面板，替代原先硬编码的 Color.white。
     static let card = dynamic(
         light: (1.0, 1.0, 1.0), dark: (0.137, 0.153, 0.180))
-    /// 面板底：亮色淡灰、暗色应用底，用于 Sheet 背景。
-    static let base = dynamic(
-        light: (0.914, 0.929, 0.949), dark: (0.075, 0.082, 0.098))
 }
 
 private let afdianURL = URL(string: "https://www.ifdian.net/a/Tauber")!

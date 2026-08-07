@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- v1.5.6 dual-appearance tokens (dark) — design.md calibrated table Dark column. -->
+    <!-- ⚠ 双轨说明（U1 收口）：本文件 12 个 token 无 Java 代码消费（MainActivity 零 R.color 引用），
+         实际生效令牌在 MainActivity.java:148-263（PAPER/INK/COBALT/VIDEO/POSITIVE 等常量 +
+         applyAppearanceTokens 运行时双外观赋值）。本文件仅供窗口 chrome 主题（styles.xml @color）引用，
+         新增 token 勿加这里，请加到 MainActivity.java token 定义块。 -->
     <color name="workbench">#131519</color>
     <color name="workbench_secondary">#23272E</color>
     <color name="surface">#1B1E24</color>

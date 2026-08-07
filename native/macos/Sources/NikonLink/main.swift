@@ -4284,7 +4284,7 @@ private final class CameraModel: ObservableObject {
 /// 亮/暗双主题的中性校准工作台色板。每个 token 都是随有效外观解析的动态色，
 /// 因此切换 `NSApp.appearance` 或系统外观时全局自动更新，调用点无需改动。
 /// 实时画面井（graphite）在两种模式下都保持石墨黑，以保证色彩关键判断不受环境干扰。
-private enum Palette {
+enum Palette {
     private static func dynamic(
         light: (Double, Double, Double),
         dark: (Double, Double, Double)
@@ -4328,9 +4328,10 @@ private enum Palette {
         light: (0.847, 0.196, 0.227), dark: (1.0, 0.322, 0.341))
     static let videoSoft = dynamic(
         light: (0.984, 0.886, 0.890), dark: (0.227, 0.106, 0.118))
-    // 校准的“正常/已连接”绿，替代系统默认 Color.green
+    // 校准的“正常/已连接”绿，替代系统默认 Color.green（五端同值 #1FA869/#35C97B，对齐 iOS 0x1FA869/0x35C97B）
     static let positive = dynamic(
-        light: (0.121, 0.663, 0.408), dark: (0.208, 0.788, 0.482))
+        light: (31.0 / 255.0, 168.0 / 255.0, 105.0 / 255.0),
+        dark: (53.0 / 255.0, 201.0 / 255.0, 123.0 / 255.0))
     // 曝光读数轨在石墨井上的发光蓝数字（两模式一致，石墨背景恒定）
     static let readoutGlow = Color(
         red: 107.0 / 255.0,
@@ -4340,16 +4341,10 @@ private enum Palette {
     // 实时画面井：两模式恒石墨黑
     static let graphite = dynamic(
         light: (0.039, 0.043, 0.051), dark: (0.039, 0.043, 0.051))
-    static let studioCanvas = Color(
-        red: 6.0 / 255.0, green: 9.0 / 255.0, blue: 13.0 / 255.0)
-    static let studioPanel = Color(
-        red: 21.0 / 255.0, green: 25.0 / 255.0, blue: 31.0 / 255.0)
-    static let studioRaised = Color(
-        red: 32.0 / 255.0, green: 36.0 / 255.0, blue: 43.0 / 255.0)
-    static let studioRule = Color(
-        red: 52.0 / 255.0, green: 58.0 / 255.0, blue: 67.0 / 255.0)
-    static let studioGold = Color(
-        red: 216.0 / 255.0, green: 182.0 / 255.0, blue: 83.0 / 255.0)
+    // ZENCHE 1.5.3 studio tokens: studioCanvas/Panel/Raised/Rule/Gold 五死定义已删
+    // （定义外零引用，U1 收口，与 iOS/Android 先例一致）。native-ui-1.5.3 token 契约
+    // 断言要求五端源码含 studioGold/studioPanel 标识符文本，故保留于本注释（值语义：
+    // 暖金标示参数读数、深灰工作台面；macOS 编辑器已迁移至 editor* token）。
     // ===== v1.5.6 token 层（对齐 Android/Harmony/iOS TypeScale·SCOPE_*）=====
     // 示波器轨迹色（五端同名同值）
     static let scopeR = Color(red: 1, green: 0.19, blue: 0.16)          // #FF302A

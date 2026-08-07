@@ -107,7 +107,7 @@ const EDITOR_FS_SUB: number = 13;    // 编辑页次级说明（空态、AI 摘�
 const EDITOR_FS_MEDIUM: number = 14; // 编辑页副标题/描述（页头副标题、云创预览、AI 工具描述、提示词输入）
 const EDITOR_FS_HEAD: number = 16;   // 编辑页小标题/强调（工作台标题、选中钩、AI 创作标题）
 // ── v1.5.7 P4: 设备页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
-const DEVICE_FS_HEADING: number = 30;     // 设备页大标题（对标 macOS WorkspaceHeading；值不等 F1 heading 26）
+const DEVICE_FS_HEADING: number = 26;     // 设备页大标题（U1/F5 裁决：对齐五端 heading 26pt 基准）
 const DEVICE_FS_SUBTITLE: number = 14;    // 设备页副标题/空态说明
 const DEVICE_FS_EMPTY_TITLE: number = 21; // 设备页空态标题
 const DEVICE_FS_CARD_TITLE: number = 19;  // 设备卡名称
@@ -134,14 +134,12 @@ const SPACE_32: number = 32;
 const SPACE_40: number = 40;
 
 // design.md 色板（dark 值为主，与 Android/其他端同名同值）
-const INK: string = '#ECEEF2';              // Ink（暗色主文本）
 const MUTED_INK: string = '#9AA1AD';        // Muted ink（暗色次要文本）
 const RULE: string = '#FFFFFF1F';           // Rule（暗色分隔线）
 const PHOTO_ACCENT: string = '#2E86E0';     // Photo accent dark（照片动作/选中）
 const PHOTO_ACCENT_LIGHT: string = '#1673E6'; // Photo accent light（渐变起点）
 const PHOTO_SOFT_BORDER: string = '#FFB6CFF5'; // AI 卡浅蓝边框
 const POSITIVE_SOFT: string = '#E4F7EE';    // 已连接浅绿底
-const READOUT_GLOW: string = '#6BAEFF';     // Readout glow（可写曝光值发光）
 
 // SCOPE_* 示波器轨迹色（五端同名同值）
 const SCOPE_R: string = '#FF302A';          // RGB parade R

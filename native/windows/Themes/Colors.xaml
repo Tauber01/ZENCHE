@@ -193,7 +193,25 @@
   <SolidColorBrush x:Key="EditorAccentHoverBrush" Color="{DynamicResource ColorEditorAccentHover}" />
   <SolidColorBrush x:Key="EditorAccentActiveBrush" Color="{DynamicResource ColorEditorAccentActive}" />
 
+  <!-- SCOPE channel tokens (v1.5.6 U1 unify): same values as iOS/macOS
+       SCOPE_* — #FF302A/#28FF69/#2240FF/#4CC7E8, well background #050A0F.
+       Consumed by Controls/WaveformScope.cs via application resource lookup
+       (token values kept as in-code fallback). -->
+  <Color x:Key="ColorScopeR">#FF302A</Color>
+  <Color x:Key="ColorScopeG">#28FF69</Color>
+  <Color x:Key="ColorScopeB">#2240FF</Color>
+  <Color x:Key="ColorScopeAudio">#4CC7E8</Color>
+  <Color x:Key="ColorScopeBg">#050A0F</Color>
+
+  <SolidColorBrush x:Key="ScopeRBrush" Color="{DynamicResource ColorScopeR}" />
+  <SolidColorBrush x:Key="ScopeGBrush" Color="{DynamicResource ColorScopeG}" />
+  <SolidColorBrush x:Key="ScopeBBrush" Color="{DynamicResource ColorScopeB}" />
+  <SolidColorBrush x:Key="ScopeAudioBrush" Color="{DynamicResource ColorScopeAudio}" />
+  <SolidColorBrush x:Key="ScopeBgBrush" Color="{DynamicResource ColorScopeBg}" />
+
   <FontFamily x:Key="DisplayFont">Bahnschrift</FontFamily>
   <FontFamily x:Key="BodyFont">Segoe UI Variable Text</FontFamily>
   <FontFamily x:Key="MonoFont">Cascadia Mono</FontFamily>
+  <!-- Icon glyph font (⚙/◉ symbols): not covered by Display/Body fonts. -->
+  <FontFamily x:Key="IconFont">Segoe UI Symbol</FontFamily>
 </ResourceDictionary>

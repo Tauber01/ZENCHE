@@ -24,6 +24,12 @@ public sealed class WaveformScope : FrameworkElement
 
     public WaveformScopeMode Mode { get; set; } = WaveformScopeMode.RgbParade;
 
+    // Scope channel colours mirror the ColorScopeR/G/B/Audio/Bg tokens in
+    // Themes/Colors.xaml (same values as iOS/macOS SCOPE_*). Resolved from
+    // application resources at render time; token values kept as fallback.
+    private static Color ScopeColor(string key, byte r, byte g, byte b) =>
+        Application.Current?.TryFindResource(key) is Color color ? color : Color.FromRgb(r, g, b);
+
     public void SetData(
         string red,
         string green,
@@ -55,7 +61,7 @@ public sealed class WaveformScope : FrameworkElement
             bounds,
             "RGB",
             [_red, _green, _blue],
-            [Color.FromRgb(255, 48, 42), Color.FromRgb(40, 255, 105), Color.FromRgb(34, 64, 255)],
+            [ScopeColor("ColorScopeR", 255, 48, 42), ScopeColor("ColorScopeG", 40, 255, 105), ScopeColor("ColorScopeB", 34, 64, 255)],
             parade: false);
     }
 
@@ -78,7 +84,7 @@ public sealed class WaveformScope : FrameworkElement
             null,
             bounds);
         drawingContext.DrawRectangle(
-            new SolidColorBrush(Color.FromRgb(5, 10, 15)),
+            new SolidColorBrush(ScopeColor("ColorScopeBg", 5, 10, 15)),
             null,
             plotBounds);
 
@@ -130,7 +136,7 @@ public sealed class WaveformScope : FrameworkElement
         DrawPanel(drawingContext, bounds, "AUDIO", [], [], parade: false);
         var footerHeight = Math.Min(14, Math.Max(10, bounds.Height * 0.17));
         var plotHeight = bounds.Height - footerHeight;
-        var cyan = Color.FromRgb(76, 199, 232);
+        var cyan = ScopeColor("ColorScopeAudio", 76, 199, 232);
         var start = new Point(bounds.Left + 4, bounds.Top + plotHeight / 2);
         var end = new Point(bounds.Right - 4, bounds.Top + plotHeight / 2);
         drawingContext.DrawLine(

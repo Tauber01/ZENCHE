@@ -76,9 +76,14 @@ test('1.5.3 visual tokens preserve ZENCHE blue and reserve warm gold and red for
     read('native/macos/Sources/NikonLink/main.swift'),
     read('native/windows/Themes/Colors.xaml'),
   ]);
-  for (const source of [ios, android, harmony, macos, colors]) {
+  // U1 design-unify: iOS removed its dead STUDIO_* retention comment; the
+  // identifier assertions below keep covering the platforms that still carry
+  // the studio tokens (macOS/Windows real tokens, Android/Harmony comments).
+  for (const source of [android, harmony, macos, colors]) {
     assert.match(source, /studioGold|STUDIO_GOLD|StudioGold/);
     assert.match(source, /studioPanel|STUDIO_PANEL|StudioPanel/);
+  }
+  for (const source of [ios, android, harmony, macos, colors]) {
     assert.match(source, /cobalt|COBALT|AccentBrush|app\.color\.accent/);
     assert.match(source, /video|VIDEO|Video|RecordBrush/);
   }
