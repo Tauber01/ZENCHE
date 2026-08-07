@@ -146,6 +146,33 @@ public sealed class CaptureWorkflow
         return destination;
     }
 
+    /// <summary>E6 延时合成：把渲染好的 MP4 以新 base 存入会话，
+    /// 复用 finalize 全套（XMP sidecar/双备份/SHA-256 清单）。
+    /// TBC-awaiting-hardware。</summary>
+    public async Task<string> StoreTimelapseVideoAsync(
+        string source,
+        string cameraName,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureDirectories();
+        var destination = UniquePath(
+            PrimaryDirectory,
+            ReserveBaseName(cameraName),
+            ".mp4");
+        if (File.Exists(destination))
+        {
+            File.Delete(destination);
+        }
+        File.Move(source, destination);
+        await FinalizeAsync(
+            destination,
+            cancellationToken,
+            null,
+            null);
+        Status = $"延时视频已写入会话 · {Path.GetFileName(destination)}";
+        return destination;
+    }
+
     public async Task<string> ImportAsync(
         string source,
         string cameraName,
