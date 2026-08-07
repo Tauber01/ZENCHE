@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { readFile } from "node:fs/promises";
 import { createApp, createUpdateService, selectReleaseAsset, createUsageStore } from "../server.mjs";
 
@@ -200,4 +203,50 @@ test("L1: usage files are per-day with tmp→rename durability (source)", async 
   assert.match(source, /fsyncSync/, "durable write path must fsync");
   assert.match(source, /renameSync/, "durable write path must rename");
   assert.match(source, /sha256/, "fingerprint must be hashed");
+});
+
+// ---------- E1 安全修复：静态服务拒绝 /data/ 前缀（AI审查 门禁阻塞项） ----------
+
+test("E1 security: static server rejects /data/ prefix (403) without auth", async () => {
+  // 真实 data 目录落盘，验证 /data/usage-*.json 无鉴权不可达。
+  const dataDir = path.join(os.tmpdir(), "zenche-usage-blocked");
+  await withServer(
+    {
+      updateService: createUpdateService({ fetchImpl: async () => ({ ok: true, json: async () => release }) }),
+      dataDir,
+      adminSecret: "test-stats-secret",
+    },
+    async (base) => {
+      // 造一个真实 usage 文件（无鉴权暴露即漏洞）。
+      const usageStore = createUsageStore({ dataDir, fs: null });
+      usageStore.record("windows", "1.5.9", "install-abc", Date.now());
+      const usageFile = path.join(dataDir, `usage-${new Date().toISOString().slice(0, 10)}.json`);
+      assert.equal(fs.existsSync(usageFile), true, "usage file must exist for the test");
+
+      // /data/usage-*.json 无鉴权 → 403（不得放行）。
+      const leaked = await fetch(`${base}/data/${path.basename(usageFile)}`);
+      assert.equal(leaked.status, 403, "unauthenticated /data/ file must be forbidden");
+
+      // /data 目录本身 → 403。
+      const dir = await fetch(`${base}/data`);
+      assert.equal(dir.status, 403);
+
+      // /api/update 正常端点不受影响。
+      const update = await fetch(`${base}/api/update?platform=windows&architecture=x64&current_version=1.5.8`);
+      assert.equal(update.status, 200, "public /api/update must stay reachable");
+    },
+  );
+});
+
+test("E1 security: normal static files outside /data still served", async () => {
+  await withServer(
+    {
+      updateService: createUpdateService({ fetchImpl: async () => ({ ok: true, json: async () => release }) }),
+    },
+    async (base) => {
+      const rootPage = await fetch(`${base}/`);
+      assert.equal(rootPage.status, 200, "root static page must stay reachable");
+      assert.match(await rootPage.text(), /帧澈 ZENCHE/);
+    },
+  );
 });

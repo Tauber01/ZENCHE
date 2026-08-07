@@ -531,6 +531,15 @@ export function createApp(options = {}) {
       response.end("Bad request");
       return;
     }
+    // E1 安全修复（AI审查 门禁阻塞项）：usage 数据默认落 root/data，
+    // 静态服务此前对 /data/ 下任意文件无鉴权 GET 放行，架空 /api/stats 门禁。
+    // 显式拒绝 /data/ 前缀（403）；不影响 /api/update 等公开端点与正常静态文件。
+    if (pathnameDecoded === "/data" || pathnameDecoded.startsWith("/data/")) {
+      response.statusCode = 403;
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      response.end("Forbidden");
+      return;
+    }
     const safePath = normalize(pathnameDecoded).replace(/^(\.\.[/\\])+/, "");
     let filePath = join(root, safePath === "/" ? "index.html" : safePath);
     if (!filePath.startsWith(root) || !existsSync(filePath)) {
