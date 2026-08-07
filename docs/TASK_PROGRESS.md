@@ -968,3 +968,25 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 验证：6/6 shasum -c OK。
 - iPad 链路复跑：archive→export signed ipa→devicectl 装到 iPad Pro 11 M5→
   launch→进程存活复核（Tauber 装修正版实测 UI）。
+
+## 12.39 v1.5.9 build 36 五端打包交付（2026-08-07，kimi 10:32 派工，事件 625546da）
+
+- 基线整合分支 `agent/1.5.6-ui @ 82541d5`（已推 GitHub main）。与 build 35 的增量：
+  拍照页监看置顶五端同步（69f3e76）、iOS 全屏黑屏修复（33107c5）、Windows
+  BasedOn 崩溃修复（abac445）、版本号 35→36（82541d5）。合并态 npm test
+  338/338 绿。
+- 产物（dist/，6 包 + 6 shasum + SHA256SUMS，旧 1.5.9/34+35 十二文件归档 dist/旧版/）：
+  - `ZENCHE-1.5.9-android.apk` `60f243f6021b0d9cd761c4a839d76e80008b0c3d9e2a07c611ccbaf8518a97b0`
+  - `ZENCHE-1.5.9-ios-unsigned.ipa` `862aa54795df6e4b0ad51e0225f28ee747289c8b7373600fd6f1b25f086ccc21`
+  - `ZENCHE-1.5.9-HarmonyOS.hap` `23f8689db3f3c717d2e9850b5906cf9a04947df4178dcffaa6a9e82b5c42fbb3`（未签名预期）
+  - `ZENCHE-1.5.9-macOS-arm64.dmg` `59339c85a666fd0d406fbbf2f0a027d20820b9adf5fe663d5369626ba540ec5c`（ad-hoc 签名）
+  - `ZENCHE-1.5.9-Windows-x64-Setup.exe` `2063e01325ec006c3962cbc44b9dd6b2fc0c3a0367bcb4bf60f4696a5b05ff8a`
+  - `ZENCHE-1.5.9-Windows-x64.zip` `f2dbcf587aa52fa2cecc6f1a0b0cc784e23d08b8502d798b6f73e6d5d38f978c`
+- 构建验证：Android assembleDebug BUILD SUCCESSFUL（DevEco JBR + ANDROID_HOME），
+  apksigner 验签 SHA-256 `45499c1836…` 与历史一致（签名连续性）；iOS BUILD
+  SUCCEEDED（unsigned ipa 无 _CodeSignature/embedded.mobileprovision）；
+  Harmony release assembleHap BUILD SUCCESSFUL（未签名预期）；macOS dmg 产出 +
+  挂测（/Volumes/帧澈 ZENCHE 1.5.9）+ codesign --deep --strict 通过
+  （CFBundleShortVersionString 1.5.9/CFBundleVersion 36 实测）；Windows dotnet
+  publish 0 错误 + NSIS 成功（含 BasedOn 崩溃修复后构建）。
+- 验证：6/6 shasum -c OK。
