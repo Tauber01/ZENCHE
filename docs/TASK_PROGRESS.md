@@ -896,3 +896,31 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **契约锚点**：test/native-ai-batch.test.mjs（新）6 用例——五端 compose 符号 + 渲染参数化 + 后台线程 + 进度/取消/跳过 + 本地零消耗。npm test 318/318 全绿（基线 312 + E8 6）。
 - 构建：macOS typecheck 0 error（本机复核）；Windows dotnet Release 0 错误（4 警告=2 既有×2 项目，零新增）；Android assembleDebug BUILD SUCCESSFUL（本机复跑）；Harmony 本机 SDK 缺失未复跑（ArkTS 纯改动，锚点兜底）。
 - 纪律：未建 dist、未推远端。复审由 flash 承担（作者=pro，复审独立性）。
+
+## 12.36 v1.5.9 build 34 五端打包（2026-08-07，kimi 07:02 派工，事件 7cfc883e）
+
+- 基线整合分支 `agent/1.5.6-ui @ e8186e6`（E8 已合入，npm test 318/318 绿）。
+  v1.5.9 版本内容 = E1 使用人数监控 + E2 佳能取景拉齐 + E3/E4 PTP/IP 遥控全端化 +
+  E5 live 图五端 + E6 延时合成五端 + E7 焦点包围合成五端 + E8 AI 批处理五端。
+- 版本号提交 `9bcd69a`：1.5.8→**1.5.9**、build 33→**34** 五端一致（沿用 12.27 改动面）：
+  package.json 1.5.9；五个构建脚本 VERSION/PackageVersion 1.5.9；Android versionCode
+  34/versionName 1.5.9；Harmony AppScope versionCode 34/versionName 1.5.9 +
+  oh-package.json5 1.5.9；iOS CURRENT_PROJECT_VERSION 34 ×2 + MARKETING_VERSION
+  1.5.9 ×2；macOS CFBundleVersion 34 + CFBundleShortVersionString 1.5.9；
+  Windows csproj Version 1.5.9；test 断言 buildNumber 34。提交后 npm test 318/318 绿。
+- 产物（dist/，6 包 + 6 shasum + SHA256SUMS，旧版归档 dist/旧版/）：
+  - `ZENCHE-1.5.9-android.apk` `19214b550f731ff246260a9828bfb61f755b5800301a0980e05c586ab0418624`
+  - `ZENCHE-1.5.9-ios-unsigned.ipa` `2d19e5d0d60282115c9052cdc01fd6821c0f13fca0757786c36ab7c5d3a3c8f3`
+  - `ZENCHE-1.5.9-HarmonyOS.hap` `d70232cbebb0f18aca293f8917509a444cda8f6a9ccd7c4ef983c5fb53410198`（未签名预期）
+  - `ZENCHE-1.5.9-macOS-arm64.dmg` `f3673723f9fc96d265f2f25cf6f1cb52f3e6ffdc4a47416167dd908dc42f3af6`（ad-hoc 签名）
+  - `ZENCHE-1.5.9-Windows-x64-Setup.exe` `4b85572fc9068247187961c9cbf2385c83f8d3607a9dfa3c6303baf369b80eb2`
+  - `ZENCHE-1.5.9-Windows-x64.zip` `dc624d7875a9ba77b0e3e2c908f7260222a165357f60a51e1736837dce96a030`
+- 构建验证：Android assembleDebug BUILD SUCCESSFUL（openjdk@17 + ~/Library/Android/sdk），
+  apksigner 验签 SHA-256 `45499c1836…` 与历史一致（签名连续性）；iOS BUILD SUCCEEDED
+  （unsigned ipa：无 _CodeSignature/embedded.mobileprovision）；Harmony release
+  assembleHap BUILD SUCCESSFUL（未签名预期）；macOS dmg 产出 + 挂测
+  （/Volumes/帧澈 ZENCHE 1.5.9）+ codesign --deep --strict 通过
+  （CFBundleShortVersionString 1.5.9/CFBundleVersion 34）；Windows dotnet publish
+  0 错误（2 既有警告 CS8629/CS0414）+ NSIS 成功（LANG=en_US.UTF-8 + Nikon/Sony
+  SDK env + libusb）。
+- 验证：6/6 shasum -c OK。
