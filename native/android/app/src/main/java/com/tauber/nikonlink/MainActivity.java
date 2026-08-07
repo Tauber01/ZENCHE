@@ -3209,6 +3209,9 @@ public final class MainActivity extends Activity {
                 dp(compact ? 12 : 18),
                 dp(compact ? 14 : 20),
                 dp(28));
+        // v1.5.6 拍照页监看画面移至顶部（对齐 iOS 口径）：第一内容区，
+        // 位于功能顶栏之后、状态行之前。
+        content.addView(buildPreviewStage(false));
         content.addView(buildControlStatusRow());
         controlStatusError = text("", TS_BODY, Typeface.NORMAL, VIDEO);
         controlStatusError.setSingleLine(true);
@@ -3224,7 +3227,6 @@ public final class MainActivity extends Activity {
         captureScopeView.setData(redHistogram, greenHistogram, blueHistogram);
         content.addView(captureScopeView, marginParams(-1, dp(78), 0, 4, 0, 12));
         content.addView(buildControlParameterGrid());
-        content.addView(buildPreviewStage(false));
         content.addView(buildNikonCloudMonitorPanel());
         content.addView(buildCaptureSessionPanel());
         content.addView(buildProfessionalControls());

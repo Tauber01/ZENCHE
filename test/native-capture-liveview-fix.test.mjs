@@ -53,11 +53,13 @@ test('iOS: AppHeader 摘除 brand 块（保留连接胶囊 + 设置钮）', asyn
 
 // ── macOS ──────────────────────────────────────────────────────────────
 
-test('macOS: CaptureView 恢复紧凑预览区（CaptureCompactPreview）', async () => {
+test('macOS: CaptureView 紧凑预览区（CaptureCompactPreview）', async () => {
   const main = await read('native/macos/Sources/NikonLink/main.swift');
-  // 拍照页视图树：ControlCaptureDock 之后插入 CaptureCompactPreview。
+  // 拍照页视图树（CaptureView）内含 CaptureCompactPreview。v1.5.9+ 口径
+  // （Tauber 指令）：监看画面移至顶部——ControlPageHeader 与 ControlStatusRow
+  // 之间（新顺序契约见 native-macos-capture-monitor-top.test.mjs）。
   const captureView = main.slice(
-    main.indexOf('ControlCaptureDock('),
+    main.indexOf('private struct CaptureView: View'),
     main.indexOf('private struct ShootingTaskPanel')
   );
   assert.match(captureView, /ControlCaptureDock\(/);

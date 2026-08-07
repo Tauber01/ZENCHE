@@ -301,17 +301,61 @@
         </Grid>
         <Grid x:Name="CapturePanel">
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
+          <!-- v1.5.6: 监看画面移至拍照页第一内容区（状态行 ControlStatusRow 之前，对齐 iPad 口径） -->
+          <Border Grid.Row="0"
+                  Margin="0,0,0,10"
+                  Background="{DynamicResource GraphiteBrush}"
+                  BorderBrush="{DynamicResource GraphiteRuleBrush}"
+                  BorderThickness="1"
+                  CornerRadius="18"
+                  ClipToBounds="True">
+            <Grid>
+              <Image x:Name="PreviewImage"
+                     Stretch="Uniform"
+                     RenderOptions.BitmapScalingMode="HighQuality" />
+              <StackPanel x:Name="PreviewEmpty"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                <TextBlock HorizontalAlignment="Center"
+                           Foreground="{DynamicResource GraphiteInkBrush}"
+                           Style="{DynamicResource CaptureEmptyTitle}"
+                           Text="等待相机画面" />
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="{DynamicResource GraphiteMutedBrush}"
+                           Text="连接相机后开启实时取景" />
+              </StackPanel>
+              <Border HorizontalAlignment="Left"
+                      VerticalAlignment="Top"
+                      Margin="16"
+                      Padding="8,4"
+                      CornerRadius="5"
+                      Background="{DynamicResource Graphite2Brush}">
+                <TextBlock x:Name="LiveBadge"
+                           Style="{DynamicResource MetaText}"
+                           Foreground="{DynamicResource GraphiteMutedBrush}"
+                           Text="LIVE VIEW OFF" />
+              </Border>
+              <Button HorizontalAlignment="Right"
+                      VerticalAlignment="Top"
+                      Width="96"
+                      Height="42"
+                      Margin="16"
+                      Style="{DynamicResource ButtonBase}"
+                      Content="全屏"
+                      Click="FullscreenPreviewButton_Click" />
+            </Grid>
+          </Border>
           <!-- v1.5.5 fig1 control page: status row + status cards (desktop 4-col) -->
           <Border x:Name="ControlStatusRow"
-                  Grid.Row="0"
+                  Grid.Row="1"
                   Margin="0,0,0,10"
                   Padding="14,10"
                   Background="{DynamicResource UiCardBrush}"
@@ -361,7 +405,7 @@
                          Visibility="Collapsed" />
             </Grid>
           </Border>
-          <UniformGrid x:Name="ControlStatusGrid" Grid.Row="1" Columns="4" Margin="0,0,0,10">
+          <UniformGrid x:Name="ControlStatusGrid" Grid.Row="2" Columns="4" Margin="0,0,0,10">
             <Border Margin="0,0,6,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
               <StackPanel>
                 <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="机身" />
@@ -455,48 +499,6 @@
               </Grid>
             </Border>
           </Expander>
-          <Border Grid.Row="2"
-                  Background="{DynamicResource GraphiteBrush}"
-                  BorderBrush="{DynamicResource GraphiteRuleBrush}"
-                  BorderThickness="1"
-                  CornerRadius="18"
-                  ClipToBounds="True">
-            <Grid>
-              <Image x:Name="PreviewImage"
-                     Stretch="Uniform"
-                     RenderOptions.BitmapScalingMode="HighQuality" />
-              <StackPanel x:Name="PreviewEmpty"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center">
-                <TextBlock HorizontalAlignment="Center"
-                           Foreground="{DynamicResource GraphiteInkBrush}"
-                           Style="{DynamicResource CaptureEmptyTitle}"
-                           Text="等待相机画面" />
-                <TextBlock Margin="0,8,0,0"
-                           Foreground="{DynamicResource GraphiteMutedBrush}"
-                           Text="连接相机后开启实时取景" />
-              </StackPanel>
-              <Border HorizontalAlignment="Left"
-                      VerticalAlignment="Top"
-                      Margin="16"
-                      Padding="8,4"
-                      CornerRadius="5"
-                      Background="{DynamicResource Graphite2Brush}">
-                <TextBlock x:Name="LiveBadge"
-                           Style="{DynamicResource MetaText}"
-                           Foreground="{DynamicResource GraphiteMutedBrush}"
-                           Text="LIVE VIEW OFF" />
-              </Border>
-              <Button HorizontalAlignment="Right"
-                      VerticalAlignment="Top"
-                      Width="96"
-                      Height="42"
-                      Margin="16"
-                      Style="{DynamicResource ButtonBase}"
-                      Content="全屏"
-                      Click="FullscreenPreviewButton_Click" />
-            </Grid>
-          </Border>
           <Border x:Name="ControlParameterGrid"
                   Grid.Row="3"
                   Margin="0,14,0,0"

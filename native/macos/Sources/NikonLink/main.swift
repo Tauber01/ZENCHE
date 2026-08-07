@@ -6287,6 +6287,10 @@ private struct CaptureView: View {
                             showConnection: $showConnection,
                             showSettings: $showSettings
                         )
+                        // v1.5.9 实测修复：fig1 批次删掉拍照页 PreviewStage 后监看
+                        // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
+                        // 监看画面为拍照页第一内容区：功能顶栏之后、状态行之前。
+                        CaptureCompactPreview(model: model)
                         ControlStatusRow(model: model) { showConnection = true }
                         ControlStatusCardGrid(model: model)
                         ControlParameterGrid(model: model)
@@ -6301,9 +6305,6 @@ private struct CaptureView: View {
                                 )
                             }
                         }
-                        // v1.5.9 实测修复：fig1 批次删掉拍照页 PreviewStage 后监看
-                        // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
-                        CaptureCompactPreview(model: model)
                         NikonCloudMacMonitorPicker(
                             model: model,
                             darkAppearance: true

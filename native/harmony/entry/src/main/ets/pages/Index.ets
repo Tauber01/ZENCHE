@@ -4201,13 +4201,89 @@ struct Index {
     .constraintSize({ minHeight: 52 })
   }
 
+  // v1.5.6 拍照页监看置顶（Tauber iPad 口径同步五端）：监看画面抽为独立
+  // Builder——拍照页置于 ControlStatusRow 之前（第一内容区），监看/本地预览
+  // 页保持原位置（时间码之后）不变。布局修饰符（含 .layoutWeight(1)）随块走。
+  @Builder
+  private MonitorStage() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      if (this.preview !== undefined) {
+        Image(this.preview)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Contain)
+      } else {
+        Column({ space: 8 }) {
+          Text(this.tr('等待相机画面'))
+            .fontSize(22) // v1.5.7 F4: 空态标题（孤立值，归 F5 数值裁决）
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.graphite_ink'))
+          Text(this.tr('连接相机后开启实时取景'))
+            .fontSize(EDITOR_FS_MEDIUM)
+            .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页空态说明改纯白
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+      }
+      Text(this.liveView ? 'LIVE VIEW ON' : 'LIVE VIEW OFF')
+        .fontSize(EDITOR_FS_SMALL)
+        .fontFamily('monospace')
+        .fontColor(Color.White) // v1.5.7 issue 655a0a14: LIVE 状态字改纯白
+        .backgroundColor($r('app.color.graphite_2'))
+        .borderRadius(5)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .margin(16)
+      if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
+        Text('＋')
+          .fontSize(32) // 对焦框 ＋ 尺寸，图标豁免族
+          .fontColor(PEAKING_AMBER)
+          .position({
+            x: `${this.monitorFocusPointX * 100}%`,
+            y: `${this.monitorFocusPointY * 100}%`
+          })
+      } else if (this.section !== 'monitor') {
+        Button(this.tr('全屏'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor(HUD_BG_SOFT)
+          .borderRadius(12)
+          .align(Alignment.TopEnd)
+          .margin(16)
+          .onClick((): void => {
+            this.openImmersivePreview(false);
+          })
+      }
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .constraintSize({ minHeight: 320 })
+    .backgroundColor($r('app.color.graphite'))
+    .border({
+      width: 1,
+      color: $r('app.color.graphite_rule'),
+      radius: 18
+    })
+    .onTouch((event: TouchEvent): void => {
+      if (this.section !== 'monitor' || event.type !== TouchType.Up) return;
+      const point = event.touches[0];
+      if (point === undefined) return;
+      const normalized = this.normalizeMonitorPoint(point.x, point.y);
+      if (normalized !== undefined) this.focusAtMonitorPoint(normalized[0], normalized[1]);
+    })
+    .onAreaChange((_oldArea: Area, newArea: Area): void => {
+      this.monitorStageWidth = Math.max(1, Number(newArea.width));
+      this.monitorStageHeight = Math.max(1, Number(newArea.height));
+    })
+  }
+
   @Builder
   private CameraWorkspace() {
     Column({ space: 16 }) {
       if (this.section === 'capture') {
-        // v1.5.5 fig1 control page: status row → 2×2 status cards → parameter
-        // grid → capture dock. The preview stage and session/task panels stay
-        // below, exactly like the Android fig1 capture surface.
+        // v1.5.6 拍照页监看置顶：监看画面为拍照页第一内容区（功能顶栏之后、
+        // 状态行之前），随后状态行 → 2×2 状态卡 → 快门 dock → 参数网格。
+        this.MonitorStage()
         this.ControlStatusRow()
         this.ControlStatusGrid()
         this.ControlCaptureDock()
@@ -4233,75 +4309,10 @@ struct Index {
           .width('100%')
           .height(60)
       }
-      Stack({ alignContent: Alignment.TopStart }) {
-        if (this.preview !== undefined) {
-          Image(this.preview)
-            .width('100%')
-            .height('100%')
-            .objectFit(ImageFit.Contain)
-        } else {
-          Column({ space: 8 }) {
-            Text(this.tr('等待相机画面'))
-              .fontSize(22) // v1.5.7 F4: 空态标题（孤立值，归 F5 数值裁决）
-              .fontWeight(FontWeight.Bold)
-              .fontColor($r('app.color.graphite_ink'))
-            Text(this.tr('连接相机后开启实时取景'))
-              .fontSize(EDITOR_FS_MEDIUM)
-              .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页空态说明改纯白
-          }
-          .width('100%')
-          .height('100%')
-          .justifyContent(FlexAlign.Center)
-        }
-        Text(this.liveView ? 'LIVE VIEW ON' : 'LIVE VIEW OFF')
-          .fontSize(EDITOR_FS_SMALL)
-          .fontFamily('monospace')
-          .fontColor(Color.White) // v1.5.7 issue 655a0a14: LIVE 状态字改纯白
-          .backgroundColor($r('app.color.graphite_2'))
-          .borderRadius(5)
-          .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .margin(16)
-        if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
-          Text('＋')
-            .fontSize(32) // 对焦框 ＋ 尺寸，图标豁免族
-            .fontColor(PEAKING_AMBER)
-            .position({
-              x: `${this.monitorFocusPointX * 100}%`,
-              y: `${this.monitorFocusPointY * 100}%`
-            })
-        } else if (this.section !== 'monitor') {
-          Button(this.tr('全屏'), { type: ButtonType.Normal })
-            .height(44)
-            .fontColor(Color.White)
-            .backgroundColor(HUD_BG_SOFT)
-            .borderRadius(12)
-            .align(Alignment.TopEnd)
-            .margin(16)
-            .onClick((): void => {
-              this.openImmersivePreview(false);
-            })
-        }
+      if (this.section !== 'capture') {
+        // 监看/本地预览页：监看画面保持原位置（时间码之后）。
+        this.MonitorStage()
       }
-      .width('100%')
-      .layoutWeight(1)
-      .constraintSize({ minHeight: 320 })
-      .backgroundColor($r('app.color.graphite'))
-      .border({
-        width: 1,
-        color: $r('app.color.graphite_rule'),
-        radius: 18
-      })
-      .onTouch((event: TouchEvent): void => {
-        if (this.section !== 'monitor' || event.type !== TouchType.Up) return;
-        const point = event.touches[0];
-        if (point === undefined) return;
-        const normalized = this.normalizeMonitorPoint(point.x, point.y);
-        if (normalized !== undefined) this.focusAtMonitorPoint(normalized[0], normalized[1]);
-      })
-      .onAreaChange((_oldArea: Area, newArea: Area): void => {
-        this.monitorStageWidth = Math.max(1, Number(newArea.width));
-        this.monitorStageHeight = Math.max(1, Number(newArea.height));
-      })
 
       this.NikonCloudMonitorPicker()
 
