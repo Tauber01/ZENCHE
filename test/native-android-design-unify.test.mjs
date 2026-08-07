@@ -71,14 +71,18 @@ test('U2 R3 web: styles.css border-radius 无 rem/px 尺寸字面量（仅 var �
   const css = await read('styles.css');
   // 令牌声明存在（tokens.css 数值未动）。
   assert.match(css, /var\(--radius-(xs|sm|md|lg|round)\)/);
-  // 核心门：border-radius 禁止 rem/px 尺寸字面量（单转义 \d）。
-  const remPx = css.match(/border-radius:\s*\d+(\.\d+)?(rem|px)\b/g) ?? [];
-  assert.equal(remPx.length, 0, `styles.css 不应残留 border-radius 尺寸字面量（残留 ${remPx.length}: ${remPx.join(' | ')}）`);
-  // 全部 border-radius 声明必须 ∈ {var(--radius-*), 0, 百分比}。
-  const decls = css.match(/border-radius:\s*[^;]+/g) ?? [];
+  // 枚举全部圆角声明：短属性 border-radius + 四个长属性 corner 形式（门禁
+  // 实测 border-top-left-radius 可绕过只认短属性的扫描）。
+  const decls = css.match(/border(-(top|bottom)-(left|right))?-radius:\s*[^;]+/g) ?? [];
+  assert.ok(decls.length >= 54, `圆角声明枚举数异常（${decls.length} < 54），扫描可能失明`);
+  // 逐 token 校验（按空白切分）：每 token 必须 ∈ {已定义 var(--radius-*), 0, N%}。
+  // 「任一命中即放行」会把 border-radius: 0 8px 之类混合多值漏进门（门禁实测）。
+  const tokenOk = /^var\(--radius-(xs|sm|md|lg|round)\)$|^0$|^\d+(\.\d+)?%$/;
   for (const d of decls) {
-    const allowed = /var\(--radius-[\w-]+\)|\b0\b|\b\d+(\.\d+)?%/.test(d);
-    assert.ok(allowed, `非法 border-radius 声明: ${d}`);
+    const value = d.replace(/^border(-(top|bottom)-(left|right))?-radius:\s*/, '');
+    for (const tok of value.split(/\s+/)) {
+      assert.ok(tokenOk.test(tok), `非法 border-radius token: ${tok}（声明: ${d}）`);
+    }
   }
 });
 
