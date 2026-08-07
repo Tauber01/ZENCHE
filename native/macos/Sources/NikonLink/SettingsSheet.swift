@@ -223,7 +223,7 @@ struct SettingsSheet: View {
                                         : Color.clear
                                 )
                                 .clipShape(
-                                    RoundedRectangle(cornerRadius: 6)
+                                    RoundedRectangle(cornerRadius: RadiusToken.r6)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -253,7 +253,7 @@ struct SettingsSheet: View {
                     }
                     .padding(3)
                     .background(SettingsPalette.base)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                     .fixedSize()
                 }
             }
@@ -531,9 +531,9 @@ struct SettingsSheet: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(width: 280)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                                 .overlay {
-                                    RoundedRectangle(cornerRadius: 8)
+                                    RoundedRectangle(cornerRadius: RadiusToken.r8)
                                         .stroke(SettingsPalette.rule, lineWidth: 1)
                                 }
                         }
@@ -634,7 +634,7 @@ struct SettingsSheet: View {
                             .padding(.horizontal, 16)
                             .frame(height: 38)
                             .background(SettingsPalette.support)
-                            .clipShape(RoundedRectangle(cornerRadius: 9))
+                            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                     }
                     .buttonStyle(.plain)
                 }
@@ -741,7 +741,7 @@ struct SettingsSheet: View {
                 .padding(.horizontal, 12)
                 .frame(height: 30)
                 .background(selected ? SettingsPalette.cobaltSoft : Color.clear)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(mode.displayName))
@@ -755,9 +755,9 @@ struct SettingsSheet: View {
         }
         .padding(18)
         .background(SettingsPalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(SettingsPalette.rule, lineWidth: 1)
         }
     }
@@ -772,7 +772,7 @@ struct SettingsSheet: View {
             .foregroundStyle(color)
             .frame(width: 42, height: 42)
             .background(soft)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
     }
 
     private func actionButton(
@@ -786,9 +786,9 @@ struct SettingsSheet: View {
             .padding(.horizontal, 14)
             .frame(height: 36)
             .background(primary ? SettingsPalette.cobalt : SettingsPalette.card)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
             .overlay {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: RadiusToken.r8)
                     .stroke(primary ? Color.clear : SettingsPalette.rule, lineWidth: 1)
             }
             .buttonStyle(.plain)
@@ -877,7 +877,7 @@ private struct DiagnosticLogViewer: View {
                     .padding(14)
             }
             .background(Color.primary.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
         }
         .padding(22)
         .frame(width: 760, height: 520)
@@ -894,7 +894,7 @@ private struct FastFeedbackCallout: View {
                 .foregroundStyle(SettingsPalette.cobalt)
                 .frame(width: 42, height: 42)
                 .background(SettingsPalette.cobaltSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 11))
+                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r11))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text("快速问题反馈")
@@ -914,9 +914,9 @@ private struct FastFeedbackCallout: View {
         }
         .padding(14)
         .background(SettingsPalette.cobaltSoft.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
                 .stroke(SettingsPalette.cobalt.opacity(0.16))
         }
     }
@@ -943,7 +943,7 @@ private struct DonationSheet: View {
                         .foregroundStyle(SettingsPalette.cobalt)
                         .frame(width: 44, height: 44)
                         .background(SettingsPalette.cobaltSoft)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
                     VStack(alignment: .leading, spacing: 3) {
                         Text("爱发电赞助")
                             .font(.system(size: TypeScale.display, weight: .bold))
@@ -964,9 +964,9 @@ private struct DonationSheet: View {
                 Image(nsImage: donationImage)
                     .resizable()
                     .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: RadiusToken.r14)
                             .stroke(SettingsPalette.rule, lineWidth: 1)
                     }
             } else {
@@ -1043,7 +1043,7 @@ struct LaunchAnnouncementSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .background(Color.red.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
 
                     VStack(alignment: .leading, spacing: 10) {
                         Label("爱发电赞助", systemImage: "heart.fill")
@@ -1060,14 +1060,14 @@ struct LaunchAnnouncementSheet: View {
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxWidth: .infinity, maxHeight: 430)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                         }
                     }
                     .padding(18)
                     .background(SettingsPalette.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: RadiusToken.r14)
                             .stroke(SettingsPalette.rule)
                     }
                 }
@@ -1100,9 +1100,9 @@ struct LaunchAnnouncementSheet: View {
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SettingsPalette.card)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .stroke(SettingsPalette.rule)
         }
     }

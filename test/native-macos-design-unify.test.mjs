@@ -46,3 +46,20 @@ test('macOS SettingsPalette forwards duplicated tokens to the main Palette', asy
   assert.match(settings, /static let supportSoft =/);
   assert.match(settings, /static let card =/);
 });
+
+test('U2 R1 macOS radius: all cornerRadius literals land on the design.md ramp', async () => {
+  const main = await read('native/macos/Sources/NikonLink/main.swift');
+  const settings = await read('native/macos/Sources/NikonLink/SettingsSheet.swift');
+  // RadiusToken definition block is the whitelist (ramp steps 0 / 5–8 / 10–12 / 14 / 16–20).
+  assert.match(main, /enum RadiusToken \{/);
+  for (const step of [0, 5, 6, 7, 8, 10, 11, 12, 14, 16, 17, 18, 19, 20]) {
+    assert.match(main, new RegExp(`static let ${step === 0 ? 'zero' : 'r' + step}: CGFloat = ${step}\\b`),
+      `RadiusToken must define ramp step ${step}`);
+  }
+  // main.swift + SettingsSheet.swift both use the shared module-level RadiusToken.
+  for (const source of [main, settings]) {
+    const literals = source.match(/cornerRadius: \\d+(\\.\\d+)?|cornerRadius\\(\\d+(\\.\\d+)?\\)|\\.cornerRadius\\(\\d+(\\.\\d+)?\\)/g) ?? [];
+    assert.equal(literals.length, 0, `macOS 不应残留 cornerRadius 数字字面量（残留 ${literals.length}）`);
+    assert.doesNotMatch(source, /cornerRadius[:(]\s*(?:1|2|3|4|9|13|15|21|22|23)\b/);
+  }
+});
