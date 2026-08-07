@@ -10331,30 +10331,45 @@ private struct CameraPreview: UIViewRepresentable {
     let session: AVCaptureSession
     let focusHandler: (CGPoint) -> Void
 
+    // v1.5.9 实测修复（退出全屏卡死，iPad 0x8BADF00D 现场）：预览层
+    // session 绑定/解绑内部会走 commitConfiguration 并阻塞等待图构建，
+    // 主线程执行时与 CoreMedia 配置通知投递（objc_sync_enter 等同一把
+    // 会话锁）形成环路死锁。统一挪到串行后台队列，主线程永不进
+    // commitConfiguration。
+    private static let sessionBindQueue = DispatchQueue(
+        label: "com.tauber.nikonlink.previewbind"
+    )
+
     func makeCoordinator() -> Coordinator {
         Coordinator(focusHandler: focusHandler)
     }
 
     func makeUIView(context: Context) -> PreviewSurface {
         let view = PreviewSurface()
-        view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
         let recognizer = UITapGestureRecognizer(
             target: context.coordinator,
             action: #selector(Coordinator.handleTap(_:))
         )
         view.addGestureRecognizer(recognizer)
+        Self.bindSession(session, to: view)
         return view
     }
 
     func updateUIView(_ uiView: PreviewSurface, context: Context) {
-        uiView.previewLayer.session = session
+        Self.bindSession(session, to: uiView)
         context.coordinator.focusHandler = focusHandler
     }
 
     static func dismantleUIView(_ uiView: PreviewSurface, coordinator: Coordinator) {
         uiView.gestureRecognizers?.forEach(uiView.removeGestureRecognizer)
-        uiView.previewLayer.session = nil
+        bindSession(nil, to: uiView)
+    }
+
+    private static func bindSession(_ session: AVCaptureSession?, to view: PreviewSurface) {
+        sessionBindQueue.async { [weak view] in
+            view?.previewLayer.session = session
+        }
     }
 
     final class Coordinator: NSObject {
