@@ -58,7 +58,7 @@ test('U2 R1 macOS radius: all cornerRadius literals land on the design.md ramp',
   }
   // main.swift + SettingsSheet.swift both use the shared module-level RadiusToken.
   for (const source of [main, settings]) {
-    const literals = source.match(/cornerRadius: \\d+(\\.\\d+)?|cornerRadius\\(\\d+(\\.\\d+)?\\)|\\.cornerRadius\\(\\d+(\\.\\d+)?\\)/g) ?? [];
+    const literals = source.match(/cornerRadius: \d+(\\.\d+)?|cornerRadius\\(\d+(\\.\d+)?\\)|\\.cornerRadius\\(\d+(\\.\d+)?\\)/g) ?? [];
     assert.equal(literals.length, 0, `macOS 不应残留 cornerRadius 数字字面量（残留 ${literals.length}）`);
     assert.doesNotMatch(source, /cornerRadius[:(]\s*(?:1|2|3|4|9|13|15|21|22|23)\b/);
   }
