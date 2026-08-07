@@ -238,6 +238,31 @@ test("E1 security: static server rejects /data/ prefix (403) without auth", asyn
   );
 });
 
+test("E1 security: uppercase /DATA/ variant forbidden (case-insensitive FS)", async () => {
+  const dataDir = path.join(os.tmpdir(), "zenche-usage-upper");
+  await withServer(
+    {
+      updateService: createUpdateService({ fetchImpl: async () => ({ ok: true, json: async () => release }) }),
+      dataDir,
+      adminSecret: "test-stats-secret",
+    },
+    async (base) => {
+      const usageStore = createUsageStore({ dataDir, fs: null });
+      usageStore.record("windows", "1.5.9", "install-upper", Date.now());
+      const usageFile = path.join(dataDir, `usage-${new Date().toISOString().slice(0, 10)}.json`);
+      assert.equal(fs.existsSync(usageFile), true);
+
+      // APFS 等大小写不敏感 FS 上 /DATA/ 变体此前可绕过 403——统一小写后封死。
+      const upper = await fetch(`${base}/DATA/${path.basename(usageFile)}`);
+      assert.equal(upper.status, 403, "uppercase /DATA/ variant must be forbidden");
+
+      // 混合大小写同样封死。
+      const mixed = await fetch(`${base}/DaTa/${path.basename(usageFile)}`);
+      assert.equal(mixed.status, 403, "mixed-case /DaTa/ variant must be forbidden");
+    },
+  );
+});
+
 test("E1 security: normal static files outside /data still served", async () => {
   await withServer(
     {

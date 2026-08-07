@@ -533,8 +533,10 @@ export function createApp(options = {}) {
     }
     // E1 安全修复（AI审查 门禁阻塞项）：usage 数据默认落 root/data，
     // 静态服务此前对 /data/ 下任意文件无鉴权 GET 放行，架空 /api/stats 门禁。
-    // 显式拒绝 /data/ 前缀（403）；不影响 /api/update 等公开端点与正常静态文件。
-    if (pathnameDecoded === "/data" || pathnameDecoded.startsWith("/data/")) {
+    // 显式拒绝 /data/ 前缀（403，大小写不敏感——APFS 等大小写不敏感 FS 上
+    // /DATA/ 变体可绕过，比较前统一小写）；不影响 /api/update 与正常静态文件。
+    const pathnameLower = pathnameDecoded.toLowerCase();
+    if (pathnameLower === "/data" || pathnameLower.startsWith("/data/")) {
       response.statusCode = 403;
       response.setHeader("Content-Type", "text/plain; charset=utf-8");
       response.end("Forbidden");
