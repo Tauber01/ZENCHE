@@ -990,3 +990,35 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   （CFBundleShortVersionString 1.5.9/CFBundleVersion 36 实测）；Windows dotnet
   publish 0 错误 + NSIS 成功（含 BasedOn 崩溃修复后构建）。
 - 验证：6/6 shasum -c OK。
+
+## 12.40 ZENCHE 后台监控系统·管理台前端（零依赖静态 SPA）（2026-08-07，kimi 派工，事件 e9649f5d/453c4f34）
+
+- 契约：PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md「前端契约」（第 61-68 行）+「后端契约」
+  10 条路由（后端 1f66f32 实现，同文件对照字段）。worktree REPOS/ZENCHE-wt-admin-web，
+  分支 agent/admin-web @ 3ba985d。改动严格限定 ai-server/admin/**（index.html +
+  app.js + styles.css 三件套）。
+- 实现：vanilla 零依赖（无外部资源/字体/CDN/图表库，趋势图为纯 SVG）；中文 UI；
+  深色科技风（色系参照 tokens.css graphite 深色段 oklch + accent/live/peaking 点缀）；
+  token 仅存 sessionStorage，fetch 带 Bearer，401 回登录页（令牌失效自动登出）。
+  - 视图一 总览：六卡（总设备/24h 活跃/7d 活跃/7d 内到期/已用尽/已吊销）+
+    剩余次数分布条形（zero/low1to10/mid11to50/high51to99/full100 五档）+ 30 天
+    活跃趋势（SVG 三序列折线+面积，Y 网格 + 6 刻度日期轴）。
+  - 视图二 账号：搜索（设备 ID/激活码子串，320ms 防抖）+ 过滤下拉（all/
+    active24h/active7d/expired/expiring7d/exhausted/revoked）+ 分页表格
+    （50/页，cursor 分页 + 上一页 pages 栈 + 页码显示）；行内操作：重置次数/
+    延期（弹日期输入校验 YYYYMMDD）/吊销·恢复/备注（≤500 字）；点击行进详情
+    （kv 字段 + 迁移链节点展示，当前节点高亮）。
+  - 视图三 签发：deviceId + 到期日（默认 +365d）→ 展示新激活码 + 一键复制
+    （execCommand + clipboard API 双通道）+ 再签一张。
+  - 全部操作有 confirm 确认 + toast 结果反馈；错误原样展示后端 error 文案。
+- 自测：本地 mock 后端（node 假后端，仅 /tmp 未提交）逐路由走查——stats/
+  history/devices（搜索/过滤/cursor 分页）/详情（迁移链）/reset/extend/revoke/
+  unrevoke/note/issue（含 409）/重复签发 409/路径穿越；headless Chrome 渲染
+  三视图 DOM 断言（总览 6 卡+5 分布条+趋势、账号列表 48 pill+分页信息、
+  签发表单）；再以真后端（1f66f32 临时检出 .scratch 运行，未合入分支）
+  ZENCHE_AI_ADMIN_SECRET 联调——静态三件套 200、devices 契约、未授权 401、
+  路径穿越 404、未配 signer 签发 503「签发服务未配置」全对。
+- 验收：grep 三件套零外部 URL（唯一 http:// 匹配为 SVG 命名空间常量
+  http://www.w3.org/2000/svg，非资源引用）；node --check app.js 过；
+  npm test 355/355 全绿（未动任何被测文件）。
+- 纪律：未 git push；未动 ai-server/app.mjs；未动生产服务器。
