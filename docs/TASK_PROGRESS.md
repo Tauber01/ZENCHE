@@ -1117,3 +1117,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   npm test 355/355 全绿（未动任何被测文件）。
 - 纪律：未 git push；未动 ai-server/app.mjs；未动生产服务器。
 - 门禁返修（30a6bbd）：迁移链 append 目标 + created_at 口径两项必修修复，复审通过。
+
+## 12.49 U2-R2 圆角令牌化·Harmony+Windows（flash 实施，改派自 pro，2026-08-08，合并 0d336e5）
+
+- 分支 agent/u2r2-harmony-windows @ 79f07c5（基 3ba985d），8 文件 +340/-235。Harmony Index.ets 104 处 borderRadius + 71 处 border({radius}) 补充面、Windows XAML 60 处 CornerRadius，全量走坡道令牌；坡道外值就近收敛，视觉意图逐处经 AI审查 核对。
+- 契约测试两端各加用例（扫描断言防失明，注入反证经门禁亲验）。
+- 验证：npm test 357/357 全绿（355 基线 + 2 新）；AI审查 复审放行（aa9fd138）。
+- 范围：只动圆角；间距/颜色/字号/功能零改动。未 git push。
