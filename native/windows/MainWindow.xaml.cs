@@ -2426,7 +2426,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("SurfaceBrush"),
             BorderBrush = (Brush)FindResource("RuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
             Child = root
         };
     }
@@ -2821,7 +2821,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("SurfaceBrush"),
             BorderBrush = (Brush)FindResource("RuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
             Child = grid
         };
     }
@@ -2910,7 +2910,7 @@ public partial class MainWindow : Window
             Height = 84,
             BorderThickness = new Thickness(2),
             BorderBrush = (Brush)FindResource("AccentBorderBrush"),
-            CornerRadius = new CornerRadius(4),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius5"),
             Background = Brushes.Transparent,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
@@ -3227,7 +3227,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("StudioPanelBrush"),
             BorderBrush = (Brush)FindResource("StudioRuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius5"),
             ClipToBounds = true,
             Child = new ScrollViewer
             {
@@ -3319,7 +3319,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("StudioCanvasBrush"),
             BorderBrush = (Brush)FindResource("StudioRuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(5),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius5"),
             Child = row
         };
     }
@@ -3404,7 +3404,7 @@ public partial class MainWindow : Window
                 ? (Brush)FindResource("StudioGoldBrush")
                 : (Brush)FindResource("StudioRuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(7),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius7"),
             Padding = new Thickness(4),
             Margin = new Thickness(4, 0, 4, 0),
             Child = row
@@ -3466,7 +3466,7 @@ public partial class MainWindow : Window
         return new Border
         {
             Background = (Brush)FindResource("ScrimStrongBrush"),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius10"),
             Margin = new Thickness(0, 0, 0, 12),
             Padding = new Thickness(8),
             Height = 58,
@@ -3502,7 +3502,7 @@ public partial class MainWindow : Window
             Margin = new Thickness(4),
             Padding = new Thickness(10),
             Background = (Brush)FindResource("GraphiteScrimBrush"),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius8"),
             Child = new StackPanel
             {
                 Children =
@@ -5478,7 +5478,7 @@ public partial class MainWindow : Window
                 Background = (Brush)FindResource("SurfaceBrush"),
                 BorderBrush = (Brush)FindResource("RuleBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(12),
+                CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
                 Padding = new Thickness(8),
                 Child = new Image
                 {
@@ -5594,7 +5594,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("AccentSoftBrush"),
             BorderBrush = (Brush)FindResource("PhotoSoftBorderBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
             Padding = new Thickness(14),
             Child = grid
         };
@@ -5701,7 +5701,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("WarnBgBrush"),
             BorderBrush = (Brush)FindResource("WarnBgSoftBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
             Padding = new Thickness(16),
             Margin = new Thickness(0, 0, 0, 18),
             Child = warning
@@ -5712,7 +5712,7 @@ public partial class MainWindow : Window
             Background = (Brush)FindResource("SurfaceBrush"),
             BorderBrush = (Brush)FindResource("RuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius12"),
             Padding = new Thickness(16),
             Child = new StackPanel
             {
@@ -8951,7 +8951,7 @@ public partial class MainWindow : Window
                     ? (Brush)FindResource("AccentBrush")
                     : (Brush)FindResource("RuleBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = (CornerRadius)FindResource("CornerRadius8"),
                 Margin = new Thickness(0, 0, 0, 6)
             };
             // Light selection chips keep dark text despite the dark rail.
@@ -11257,7 +11257,7 @@ public partial class MainWindow : Window
             BorderBrush = (Brush)FindResource(
                 current ? "PositiveBrush" : "RuleBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(18),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius18"),
             ClipToBounds = true
         };
         var content = new StackPanel();

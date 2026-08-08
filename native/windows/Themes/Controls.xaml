@@ -159,7 +159,7 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="10"
+                  CornerRadius="{StaticResource CornerRadius10}"
                   SnapsToDevicePixels="True">
             <ContentPresenter
                 Margin="{TemplateBinding Padding}"
@@ -238,7 +238,7 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="16"
+                  CornerRadius="{StaticResource CornerRadius16}"
                   SnapsToDevicePixels="True">
             <ContentPresenter
                 Margin="{TemplateBinding Padding}"
@@ -284,7 +284,7 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="32"
+                  CornerRadius="{StaticResource CornerRadiusCapsule}"
                   SnapsToDevicePixels="True">
             <ContentPresenter
                 Margin="{TemplateBinding Padding}"
@@ -349,7 +349,7 @@
     <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource RuleBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="{StaticResource CornerRadius14}" />
     <Setter Property="Padding" Value="20" />
     <Setter Property="Effect">
       <Setter.Value>
@@ -379,7 +379,7 @@
                   Background="{TemplateBinding Background}"
                   BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}"
-                  CornerRadius="0"
+                  CornerRadius="{StaticResource CornerRadius0}"
                   SnapsToDevicePixels="True">
             <ContentPresenter
                 Margin="{TemplateBinding Padding}"
@@ -497,7 +497,7 @@
                   <RepeatButton.Template>
                     <ControlTemplate TargetType="RepeatButton">
                       <Border Height="4"
-                              CornerRadius="2"
+                              CornerRadius="{StaticResource CornerRadius5}"
                               Background="{DynamicResource EditorAccentBrush}" />
                     </ControlTemplate>
                   </RepeatButton.Template>
@@ -514,7 +514,7 @@
                       <Border x:Name="ThumbBorder"
                               Width="14"
                               Height="14"
-                              CornerRadius="3"
+                              CornerRadius="{StaticResource CornerRadius5}"
                               Background="{DynamicResource EditorAccentBrush}"
                               BorderBrush="{DynamicResource EditorBgBrush}"
                               BorderThickness="1" />
@@ -538,7 +538,7 @@
                   <RepeatButton.Template>
                     <ControlTemplate TargetType="RepeatButton">
                       <Border Height="4"
-                              CornerRadius="2"
+                              CornerRadius="{StaticResource CornerRadius5}"
                               Background="{DynamicResource EditorRuleBrush}" />
                     </ControlTemplate>
                   </RepeatButton.Template>

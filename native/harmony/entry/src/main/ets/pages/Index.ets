@@ -133,6 +133,25 @@ const SPACE_24: number = 24;
 const SPACE_32: number = 32;
 const SPACE_40: number = 40;
 
+// Radius（U2-R2 圆角坡道，design.md Spacing/Radii 唯一基准——R1/R3 同坡道）：
+// 0 fig2 编辑器工作台故意方形 / 5-8 小控件与滑杆部件 / 10-12 按钮与输入
+// / 14 fig1 深色面卡片 / 16-20 浮层卡片与 sheet / capsule(999) 状态 pill、HUD chip 与圆钮
+const RADIUS_0: number = 0;
+const RADIUS_5: number = 5;
+const RADIUS_6: number = 6;
+const RADIUS_7: number = 7;
+const RADIUS_8: number = 8;
+const RADIUS_10: number = 10;
+const RADIUS_11: number = 11;
+const RADIUS_12: number = 12;
+const RADIUS_14: number = 14;
+const RADIUS_16: number = 16;
+const RADIUS_17: number = 17;
+const RADIUS_18: number = 18;
+const RADIUS_19: number = 19;
+const RADIUS_20: number = 20;
+const RADIUS_CAPSULE: number = 999;
+
 // design.md 色板（dark 值为主，与 Android/其他端同名同值）
 const MUTED_INK: string = '#9AA1AD';        // Muted ink（暗色次要文本）
 const RULE: string = '#FFFFFF1F';           // Rule（暗色分隔线）
@@ -1504,7 +1523,7 @@ struct Index {
         }
         .width(80)
         .height(80)
-        .borderRadius(24)
+        .borderRadius(RADIUS_20)
         .linearGradient({
           angle: 135,
           colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
@@ -1597,7 +1616,7 @@ struct Index {
         .fontSize(20) // ☰ 图标尺寸，图标豁免族
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
-        .borderRadius(14)
+        .borderRadius(RADIUS_14)
         .onClick((): void => {
           this.showControlMenuDialog();
         })
@@ -1613,7 +1632,7 @@ struct Index {
         .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
-        .borderRadius(14)
+        .borderRadius(RADIUS_14)
         .margin({ right: 8 })
         .onClick((): void => {
           this.section = 'monitor';
@@ -1624,7 +1643,7 @@ struct Index {
         .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
-        .borderRadius(14)
+        .borderRadius(RADIUS_14)
         .bindMenu([
           { value: this.tr('连接 / 断开相机'), action: (): void => { this.handleControlMenuTarget('connect'); } },
           { value: this.tr('视频监看'), action: (): void => { this.handleControlMenuTarget('monitor'); } },
@@ -1745,7 +1764,7 @@ struct Index {
         })
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
-        .borderRadius(12)
+        .borderRadius(RADIUS_12)
         .enabled(!this.busy)
         .onClick((): void => {
           this.connectionPanelVisible = true;
@@ -1759,7 +1778,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule_strong'),
-          radius: 12
+          radius: RADIUS_12
         })
         .onClick((): void => {
           this.section = 'settings';
@@ -1848,7 +1867,7 @@ struct Index {
       .backgroundColor(
         this.section === target ? NAV_ACTIVE_BG : Color.Transparent
       )
-      .borderRadius(12)
+      .borderRadius(RADIUS_12)
       .flexShrink(0)
       .onClick((): void => {
         if (target === 'editor') {
@@ -1905,7 +1924,7 @@ struct Index {
           .border({
             width: 1,
             color: $r('app.color.rule'),
-            radius: 20
+            radius: RADIUS_20
           })
         } else {
           ForEach(
@@ -1960,7 +1979,7 @@ struct Index {
               .fontColor($r('app.color.positive'))
               .padding({ left: 9, right: 9, top: 5, bottom: 5 })
               .backgroundColor(POSITIVE_SOFT)
-              .borderRadius(14)
+              .borderRadius(RADIUS_14)
           }
         }
         .width('100%')
@@ -1993,7 +2012,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule_strong'),
-              radius: 10
+              radius: RADIUS_10
             })
             .onClick((): void => {
               this.forgetRememberedDevice(device.id);
@@ -2012,9 +2031,9 @@ struct Index {
       color: this.connected && this.cameraName === device.name
         ? $r('app.color.positive')
         : $r('app.color.rule'),
-      radius: 20
+      radius: RADIUS_20
     })
-    .borderRadius(20)
+    .borderRadius(RADIUS_20)
   }
 
   @Builder
@@ -2123,7 +2142,7 @@ struct Index {
       .border({
         width: this.editorWorkbenchToolActive(panel) ? 1 : 0,
         color: this.editorWorkbenchToolActive(panel) ? EDITOR_ACCENT : EDITOR_RULE,
-        radius: 0
+        radius: RADIUS_0
       })
       .onClick((): void => {
         if (panel === 'ai') {
@@ -2283,7 +2302,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 12
+          radius: RADIUS_12
         })
       } else {
         this.EditorPhotoPicker()
@@ -2369,13 +2388,13 @@ struct Index {
             .fontColor(Color.White)
             .padding({ left: 10, right: 10, top: 7, bottom: 7 })
             .backgroundColor($r('app.color.graphite'))
-            .borderRadius(14)
+            .borderRadius(RADIUS_14)
             .position({ x: 12, y: 12 })
         }
         .width('100%')
         .height(this.isCompact() ? 320 : 460)
         .backgroundColor($r('app.color.graphite'))
-        .borderRadius(14)
+        .borderRadius(RADIUS_14)
         .onAreaChange((_oldArea: Area, newArea: Area): void => {
           this.editorPreviewWidth = Math.max(1, Number(newArea.width));
           this.editorPreviewHeight = Math.max(1, Number(newArea.height));
@@ -2408,7 +2427,7 @@ struct Index {
               .fontColor($r('app.color.accent_ink'))
               .padding({ left: 8, right: 8, top: 5, bottom: 5 })
               .backgroundColor($r('app.color.accent_soft'))
-              .borderRadius(12)
+              .borderRadius(RADIUS_12)
             }
           }
           .scrollable(ScrollDirection.Horizontal)
@@ -2518,7 +2537,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.accent'),
-          radius: 12
+          radius: RADIUS_12
         })
         Select(
           [
@@ -2637,7 +2656,7 @@ struct Index {
         .width('100%')
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.surface'))
-        .border({ width: 1, color: $r('app.color.rule'), radius: 8 })
+        .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
         .onClick((): void => {
           this.editorPickerVisible = !this.editorPickerVisible;
         })
@@ -2655,7 +2674,7 @@ struct Index {
         .width('100%')
         .padding(8)
         .backgroundColor($r('app.color.surface'))
-        .border({ width: 1, color: $r('app.color.rule'), radius: 8 })
+        .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
       }
     }
     .width('100%')
@@ -2704,7 +2723,7 @@ struct Index {
               .width(64)
               .height(46)
               .objectFit(ImageFit.Cover)
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
             Text(item.name)
               .fontSize(TS_BODY)
               .fontColor($r('app.color.ink'))
@@ -2724,7 +2743,7 @@ struct Index {
           .backgroundColor(item.path === this.editorSelectedPath
             ? $r('app.color.accent_soft') : $r('app.color.surface'))
           .border({ width: 1, color: item.path === this.editorSelectedPath
-            ? $r('app.color.accent') : $r('app.color.rule'), radius: 6 })
+            ? $r('app.color.accent') : $r('app.color.rule'), radius: RADIUS_6 })
           .onClick((): void => {
             this.editorSelectedPath = item.path;
             this.aiResultPath = '';
@@ -2762,7 +2781,7 @@ struct Index {
     .alignItems(HorizontalAlign.Start)
     .padding({ left: 8, right: 8 })
     .backgroundColor($r('app.color.surface_raised'))
-    .borderRadius(8)
+    .borderRadius(RADIUS_8)
   }
 
   @Builder
@@ -2786,7 +2805,7 @@ struct Index {
         color: this.editorPanel === panel
           ? $r('app.color.accent')
           : $r('app.color.rule'),
-        radius: 22
+        radius: RADIUS_20
       })
       .onClick((): void => {
         this.editorPanel = panel;
@@ -2830,12 +2849,12 @@ struct Index {
           .backgroundColor(this.checkAiActivated()
             ? $r('app.color.accent_soft')
             : $r('app.color.paper_2'))
-          .borderRadius(14)
+          .borderRadius(RADIUS_14)
       }
       .width('100%')
       .padding(12)
       .backgroundColor($r('app.color.surface'))
-      .border({ width: 1, color: $r('app.color.rule'), radius: 12 })
+      .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_12 })
 
       if (this.aiMode === 0 && this.editablePhotos().length > 0) {
         this.EditorPhotoPicker()
@@ -2850,7 +2869,7 @@ struct Index {
             .height(this.isCompact() ? 300 : 420)
             .objectFit(ImageFit.Contain)
             .backgroundColor($r('app.color.graphite'))
-            .borderRadius(14)
+            .borderRadius(RADIUS_14)
             .padding(12)
         }
       }
@@ -2971,7 +2990,7 @@ struct Index {
                 .backgroundColor(this.isAiPresetSelected(module[0], value)
                   ? $r('app.color.accent_soft') : $r('app.color.surface'))
                 .border({ width: 1, color: this.isAiPresetSelected(module[0], value)
-                  ? $r('app.color.accent') : $r('app.color.rule'), radius: 8 })
+                  ? $r('app.color.accent') : $r('app.color.rule'), radius: RADIUS_8 })
                 .padding({ left: 12, right: 12 })
                 .onClick((): void => {
                   this.toggleAiPreset(module[0], value);
@@ -2991,7 +3010,7 @@ struct Index {
           .height(this.isCompact() ? 320 : 460)
           .objectFit(ImageFit.Contain)
           .backgroundColor($r('app.color.graphite'))
-          .borderRadius(14)
+          .borderRadius(RADIUS_14)
           .padding(12)
 
         Button(this.editorSaving ? '正在保存…' : '保存到文件库', { type: ButtonType.Normal })
@@ -3720,7 +3739,7 @@ struct Index {
         }
         .width('100%').height(140)
         .backgroundColor($r('app.color.graphite'))
-        .borderRadius(8)
+        .borderRadius(RADIUS_8)
         .onTouch((event: TouchEvent): void => {
           const point = event.touches[0];
           if (point === undefined || (event.type !== TouchType.Down && event.type !== TouchType.Move)) {
@@ -3807,7 +3826,7 @@ struct Index {
                     ? $r('app.color.paper_2')
                     : $r('app.color.surface')
                 )
-                .borderRadius(9)
+                .borderRadius(RADIUS_8)
                 .border({
                   width: 1,
                   color: layer.id === this.editorActiveMaskLayerId
@@ -4094,7 +4113,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 10
+      radius: RADIUS_10
     })
   }
 
@@ -4229,7 +4248,7 @@ struct Index {
         .fontFamily('monospace')
         .fontColor(Color.White) // v1.5.7 issue 655a0a14: LIVE 状态字改纯白
         .backgroundColor($r('app.color.graphite_2'))
-        .borderRadius(5)
+        .borderRadius(RADIUS_5)
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })
         .margin(16)
       if (this.section === 'monitor' && this.monitorFocusPointX >= 0) {
@@ -4245,7 +4264,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor(HUD_BG_SOFT)
-          .borderRadius(12)
+          .borderRadius(RADIUS_12)
           .align(Alignment.TopEnd)
           .margin(16)
           .onClick((): void => {
@@ -4260,7 +4279,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.graphite_rule'),
-      radius: 18
+      radius: RADIUS_18
     })
     .onTouch((event: TouchEvent): void => {
       if (this.section !== 'monitor' || event.type !== TouchType.Up) return;
@@ -4342,7 +4361,7 @@ struct Index {
             .border({
               width: 1,
               color: UI_SECONDARY,
-              radius: 12
+              radius: RADIUS_12
             })
             .enabled((this.connected || this.wifiConnected) && !this.busy)
             .onClick((): void => {
@@ -4363,7 +4382,7 @@ struct Index {
                 ? UI_VIDEO
                 : UI_ACCENT
             )
-            .borderRadius(12)
+            .borderRadius(RADIUS_12)
             .enabled(
               (this.section === 'monitor'
                 ? (this.connected || this.wifiConnected)
@@ -4381,7 +4400,7 @@ struct Index {
               .height(44)
               .fontColor(Color.White)
               .backgroundColor(UI_SECONDARY)
-              .borderRadius(12)
+              .borderRadius(RADIUS_12)
               .enabled(this.connected && this.liveView && !this.busy)
               .onClick((): void => {
                 this.triggerAutoFocusOn();
@@ -4485,7 +4504,7 @@ struct Index {
           .fontColor(Color.White)
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
           .backgroundColor(UI_SECONDARY)
-          .borderRadius(15)
+          .borderRadius(RADIUS_14)
           .onClick((): void => {
             // fig1: tapping the transport capsule opens the connection panel
             // whenever no camera is live (covers both 待连接 and 重试 states).
@@ -4599,7 +4618,7 @@ struct Index {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(UI_CARD)
-    .borderRadius(15)
+    .borderRadius(RADIUS_14)
     .border({ width: active ? 1 : 0, color: UI_ACCENT })
   }
 
@@ -4684,13 +4703,13 @@ struct Index {
             .width(`${this.storageUsedPercent()}%`)
             .height(4)
             .backgroundColor(UI_ACCENT)
-            .borderRadius(2)
+            .borderRadius(RADIUS_5)
           if (this.storageUsedPercent() < 100) {
             Row()
               .layoutWeight(1)
               .height(4)
               .backgroundColor(UI_SECONDARY)
-              .borderRadius(2)
+              .borderRadius(RADIUS_5)
           }
         }
         .width('100%')
@@ -4700,7 +4719,7 @@ struct Index {
           .width('100%')
           .height(4)
           .backgroundColor(UI_SECONDARY)
-          .borderRadius(2)
+          .borderRadius(RADIUS_5)
           .margin({ top: 2 })
       }
       Text(this.storageHasVolumes()
@@ -4721,7 +4740,7 @@ struct Index {
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Start)
     .backgroundColor(UI_CARD)
-    .borderRadius(15)
+    .borderRadius(RADIUS_14)
   }
 
   /** v1.5.5 fig1 parameter grid: 3-column tiles (4 on wide screens) + 全部/编辑. */
@@ -4793,7 +4812,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? Color.White : $r('app.color.ink'))
           .backgroundColor(this.gridEditMode ? UI_SECONDARY : UI_ACCENT)
-          .borderRadius(16)
+          .borderRadius(RADIUS_16)
           .onClick((): void => {
             this.gridEditMode = false;
             this.gridHiddenTiles = new Array<boolean>(8).fill(false);
@@ -4805,7 +4824,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(this.gridEditMode ? $r('app.color.ink') : Color.White)
           .backgroundColor(this.gridEditMode ? UI_ACCENT : UI_SECONDARY)
-          .borderRadius(16)
+          .borderRadius(RADIUS_16)
           .margin({ left: 8 })
           .onClick((): void => {
             this.gridEditMode = !this.gridEditMode;
@@ -4867,7 +4886,7 @@ struct Index {
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Start)
       .backgroundColor(UI_CARD)
-      .borderRadius(15)
+      .borderRadius(RADIUS_14)
       if (this.gridEditMode) {
         // v1.5.7 P1：×钮宽 22vp → 44vp 触控合规（design.md ≥44×44，高已 44）
         Button('×', { type: ButtonType.Normal })
@@ -4877,7 +4896,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .backgroundColor(UI_SECONDARY)
-          .borderRadius(11)
+          .borderRadius(RADIUS_11)
           .onClick((): void => {
             this.hideControlTile(index);
           })
@@ -4914,7 +4933,7 @@ struct Index {
       .width(56)
       .height(56)
       .backgroundColor(UI_SECONDARY)
-      .borderRadius(10)
+      .borderRadius(RADIUS_10)
       .onClick((): void => {
         this.section = 'library';
       })
@@ -4925,7 +4944,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
-        .borderRadius(16)
+        .borderRadius(RADIUS_16)
         .margin({ left: 8 })
         .onClick((): void => {
           this.triggerAutoFocusOn();
@@ -4937,7 +4956,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(UI_ACCENT)
         .backgroundColor(UI_CARD)
-        .border({ width: 3, color: UI_ACCENT, radius: 37 })
+        .border({ width: 3, color: UI_ACCENT, radius: RADIUS_CAPSULE })
         .margin({ left: 10, right: 10 })
         .enabled(
           (this.connected || this.wifiConnected || this.localCameraSelected) &&
@@ -4953,7 +4972,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(this.shootingTaskRunning ? $r('app.color.ink') : Color.White)
         .backgroundColor(this.shootingTaskRunning ? UI_ACCENT : UI_SECONDARY)
-        .borderRadius(16)
+        .borderRadius(RADIUS_16)
         .onClick((): void => {
           // fig1: INT scrolls the shooting-task panel into view (compact page).
           if (this.isCompact()) {
@@ -4966,7 +4985,7 @@ struct Index {
         .fontSize(TS_TITLE)
         .fontColor(Color.White)
         .backgroundColor(UI_SECONDARY)
-        .borderRadius(14)
+        .borderRadius(RADIUS_14)
         .margin({ left: 8 })
         .accessibilityText(this.tr('切换相机'))
         .onClick((): void => {
@@ -4976,7 +4995,7 @@ struct Index {
     .width('100%')
     .padding(10)
     .backgroundColor(UI_CARD)
-    .borderRadius(16)
+    .borderRadius(RADIUS_16)
   }
 
   @Builder
@@ -4991,7 +5010,7 @@ struct Index {
           .fontColor(WHITE)
           .textAlign(TextAlign.Center)
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(12)
+          .borderRadius(RADIUS_12)
         Column({ space: 2 }) {
           Text(this.tr('尼康云创监看'))
             .fontSize(EDITOR_FS_SUB)
@@ -5053,7 +5072,7 @@ struct Index {
       color: this.section === 'monitor'
         ? CLOUD_CARD_BORDER
         : $r('app.color.accent'),
-      radius: 14
+      radius: RADIUS_14
     })
   }
 
@@ -5079,7 +5098,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底录制钮黑●改白
         .backgroundColor(this.videoRecording ? UI_VIDEO : UI_VIDEO)
-        .borderRadius(48)
+        .borderRadius(RADIUS_CAPSULE)
         .enabled(this.connected && !this.busy)
         .onClick((): void => {
           this.toggleVideoRecording();
@@ -5182,7 +5201,7 @@ struct Index {
       .fontWeight(FontWeight.Bold)
       .fontColor(Color.White)
       .backgroundColor(Color.Transparent)
-      .borderRadius(8)
+      .borderRadius(RADIUS_8)
       .accessibilityText(this.tr(description))
       .onClick((): void => {
         if (index === 0) {
@@ -5290,7 +5309,7 @@ struct Index {
     .height(88)
     .padding(14)
     .backgroundColor(UI_CARD)
-    .borderRadius(15)
+    .borderRadius(RADIUS_14)
   }
 
   private librarySizeText(): string {
@@ -5367,7 +5386,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.graphite_rule'),
-      radius: 14
+      radius: RADIUS_14
     })
   }
 
@@ -5513,7 +5532,7 @@ struct Index {
             ? $r('app.color.video')
             : $r('app.color.accent')
         )
-        .borderRadius(6)
+        .borderRadius(RADIUS_6)
         .enabled(this.connected)
         .onClick((): void => {
           if (this.shootingTaskRunning) {
@@ -5530,7 +5549,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 8
+      radius: RADIUS_8
     })
   }
 
@@ -5575,7 +5594,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.openTimelapseComposer();
           })
@@ -5584,7 +5603,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.openFocusStackComposer();
           })
@@ -5596,7 +5615,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.loadSystemAlbum();
           })
@@ -5605,7 +5624,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.cloudGuideVisible = true;
           })
@@ -5645,7 +5664,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 14
+          radius: RADIUS_14
         })
       } else if (this.systemExpanded) {
         Row({ space: 8 }) {
@@ -5694,7 +5713,7 @@ struct Index {
                         .fontFamily('monospace')
                         .fontColor(Color.White)
                         .backgroundColor(HUD_BG_SOFT)
-                        .borderRadius(12)
+                        .borderRadius(RADIUS_12)
                         .padding({
                           left: 7,
                           right: 7,
@@ -5717,7 +5736,7 @@ struct Index {
                 .border({
                   width: 1,
                   color: $r('app.color.rule'),
-                  radius: 8
+                  radius: RADIUS_8
                 })
                 .gesture(
                   TapGesture({ count: 2 })
@@ -5882,7 +5901,7 @@ struct Index {
                       .width(60)
                       .height(44)
                       .backgroundColor($r('app.color.graphite'))
-                      .borderRadius(6)
+                      .borderRadius(RADIUS_6)
                     Column({ space: 3 }) {
                       Text(item.filename)
                         .fontSize(LIBRARY_FS_TITLE)
@@ -5914,7 +5933,7 @@ struct Index {
                   .border({
                     width: 1,
                     color: $r('app.color.rule'),
-                    radius: 8
+                    radius: RADIUS_8
                   })
                 }
               },
@@ -5939,7 +5958,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 12
+      radius: RADIUS_12
     })
   }
 
@@ -5963,7 +5982,7 @@ struct Index {
           .border({
             width: 1,
             color: $r('app.color.accent'),
-            radius: 12
+            radius: RADIUS_12
           })
           .onClick((): void => {
             this.mobileBranchDrawerExpanded =
@@ -5991,7 +6010,7 @@ struct Index {
           .height(54)
           .textAlign(TextAlign.Center)
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(14)
+          .borderRadius(RADIUS_14)
         Column({ space: 3 }) {
           Text(this.tr('分支工作台'))
             .fontSize(LIBRARY_FS_WORKBENCH)
@@ -6008,7 +6027,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             this.beginCreatingLibraryBranch('', '帧澈 ZENCHE 文件库');
           })
@@ -6035,7 +6054,7 @@ struct Index {
           color: this.libraryDropTargetId === 'unclassified'
             ? $r('app.color.accent')
             : $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         .onClick((): void => {
           this.localUnclassifiedExpanded =
@@ -6078,7 +6097,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.accent'),
-      radius: 16
+      radius: RADIUS_16
     })
   }
 
@@ -6140,13 +6159,13 @@ struct Index {
         .width(68)
         .height(50)
         .backgroundColor($r('app.color.graphite'))
-        .borderRadius(6)
+        .borderRadius(RADIUS_6)
       } else {
         Image(`file://${item.path}`)
           .width(68)
           .height(50)
           .objectFit(ImageFit.Cover)
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
       }
       Column({ space: 4 }) {
         Text(item.name)
@@ -6166,7 +6185,7 @@ struct Index {
         .height(44)
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.paper_2'))
-        .borderRadius(6)
+        .borderRadius(RADIUS_6)
         .onClick((): void => {
           this.previewPhoto(item);
         })
@@ -6174,7 +6193,7 @@ struct Index {
         .height(44)
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.paper_2'))
-        .borderRadius(6)
+        .borderRadius(RADIUS_6)
         .onClick((): void => {
           this.sharePhoto(item);
         })
@@ -6185,7 +6204,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.error'),
-          radius: 6
+          radius: RADIUS_6
         })
         .onClick((): void => {
           this.deletePhoto(item);
@@ -6197,7 +6216,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 8
+      radius: RADIUS_8
     })
     .gesture(
       TapGesture({ count: 2 })
@@ -6318,7 +6337,7 @@ struct Index {
         color: this.libraryDropTargetId === branch.id
           ? $r('app.color.accent')
           : $r('app.color.rule'),
-        radius: 8
+        radius: RADIUS_8
       })
       .onDragEnter((_event: DragEvent): void => {
         this.libraryDropTargetId = branch.id;
@@ -6471,7 +6490,7 @@ struct Index {
         .width('100%')
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
-        .borderRadius(6)
+        .borderRadius(RADIUS_6)
         .onClick((): void => {
           this.toggleCaptureSession();
         })
@@ -6484,7 +6503,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 8
+      radius: RADIUS_8
     })
   }
 
@@ -6517,7 +6536,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .enabled(!this.wifiConnecting && !this.wifiReconnecting && !this.busy)
           .onClick((): void => {
             if (this.wifiConnected) {
@@ -6590,7 +6609,7 @@ struct Index {
           .border({
             width: 1,
             color: $r('app.color.rule'),
-            radius: 8
+            radius: RADIUS_8
           })
           .enabled(!this.busy)
           .onClick((): void => {
@@ -6606,7 +6625,7 @@ struct Index {
           .backgroundColor(
             this.wifiMovieRecording ? $r('app.color.video') : $r('app.color.accent')
           )
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .enabled(this.wifiVendorSupportsRecording() && !this.busy)
           .onClick((): void => {
             this.toggleVideoRecording();
@@ -6671,7 +6690,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         .enabled(!this.busy)
         .onClick((): void => {
@@ -6686,7 +6705,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         .enabled(!this.busy)
         .onClick((): void => {
@@ -6729,7 +6748,7 @@ struct Index {
             .height(44)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
-            .borderRadius(6)
+            .borderRadius(RADIUS_6)
             .onClick((): void => {
               this.toggleWireless();
             })
@@ -6751,7 +6770,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 8
+      radius: RADIUS_8
     })
   }
 
@@ -6774,7 +6793,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             this.connectionPanelVisible = false;
           })
@@ -6805,7 +6824,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .enabled(!this.busy)
           .onClick((): void => {
             if (this.localCameraSelected) {
@@ -6819,7 +6838,7 @@ struct Index {
       .width('100%')
       .padding(14)
       .backgroundColor($r('app.color.accent_soft'))
-      .borderRadius(10)
+      .borderRadius(RADIUS_10)
 
       Row({ space: 12 }) {
         Column({ space: 4 }) {
@@ -6841,7 +6860,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .enabled(!this.busy)
           .onClick((): void => {
             this.toggleCameraConnection();
@@ -6850,7 +6869,7 @@ struct Index {
       .width('100%')
       .padding(14)
       .backgroundColor($r('app.color.paper_2'))
-      .borderRadius(10)
+      .borderRadius(RADIUS_10)
 
     }
     .width('92%')
@@ -6860,7 +6879,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule_strong'),
-      radius: 16
+      radius: RADIUS_16
     })
     .shadow({ radius: 24, color: HUD_SHADOW, offsetY: 10 })
   }
@@ -6873,7 +6892,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor(HUD_BG_MID)
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             this.closeLargePhoto();
           })
@@ -6881,7 +6900,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor(HUD_BG_MID)
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             const item: PhotoItem | undefined = this.photos.find(
               (candidate: PhotoItem): boolean =>
@@ -6898,7 +6917,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             const item: PhotoItem | undefined = this.photos.find(
               (candidate: PhotoItem): boolean =>
@@ -6948,7 +6967,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.timelapseComposerVisible = false;
           })
@@ -6984,7 +7003,7 @@ struct Index {
               .border({
                 width: 1,
                 color: $r('app.color.rule'),
-                radius: 8
+                radius: RADIUS_8
               })
             },
             (item: PhotoItem): string => item.path
@@ -6998,7 +7017,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule'),
-        radius: 8
+        radius: RADIUS_8
       })
 
       Row({ space: 8 }) {
@@ -7019,7 +7038,7 @@ struct Index {
                 ? $r('app.color.accent')
                 : $r('app.color.paper_2')
             )
-            .borderRadius(6)
+            .borderRadius(RADIUS_6)
             .onClick((): void => {
               this.timelapseFrameRate = fps;
             })
@@ -7054,7 +7073,7 @@ struct Index {
         .height(48)
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
-        .borderRadius(8)
+        .borderRadius(RADIUS_8)
         .enabled(!this.timelapseRunning && this.timelapseSelected.length > 0)
         .onClick((): void => {
           this.startTimelapseCompose();
@@ -7065,7 +7084,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(8)
+          .borderRadius(RADIUS_8)
           .onClick((): void => {
             this.cancelTimelapseCompose();
           })
@@ -7078,7 +7097,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule_strong'),
-      radius: 14
+      radius: RADIUS_14
     })
     .shadow({
       radius: 24,
@@ -7291,7 +7310,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.focusStackVisible = false;
           })
@@ -7327,7 +7346,7 @@ struct Index {
               .border({
                 width: 1,
                 color: $r('app.color.rule'),
-                radius: 8
+                radius: RADIUS_8
               })
             },
             (item: PhotoItem): string => item.path
@@ -7341,7 +7360,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule'),
-        radius: 8
+        radius: RADIUS_8
       })
 
       if (this.focusStackRunning) {
@@ -7354,7 +7373,7 @@ struct Index {
             .height(40)
             .fontColor($r('app.color.video'))
             .backgroundColor($r('app.color.paper_2'))
-            .borderRadius(6)
+            .borderRadius(RADIUS_6)
             .onClick((): void => {
               this.cancelFocusStackCompose();
             })
@@ -7366,7 +7385,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .enabled(this.focusStackSelected.length >= 2)
           .onClick((): void => {
             this.startFocusStackCompose();
@@ -7376,7 +7395,7 @@ struct Index {
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.focusStackVisible = false;
           })
@@ -7395,7 +7414,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 12
+      radius: RADIUS_12
     })
   }
 
@@ -7418,7 +7437,7 @@ struct Index {
           .height(44)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
-          .borderRadius(6)
+          .borderRadius(RADIUS_6)
           .onClick((): void => {
             this.cloudGuideVisible = false;
           })
@@ -7464,7 +7483,7 @@ struct Index {
               .border({
                 width: 1,
                 color: $r('app.color.rule'),
-                radius: 8
+                radius: RADIUS_8
               })
               .onClick((): void => {
                 this.openCloudProvider(provider.url);
@@ -7485,7 +7504,7 @@ struct Index {
         .height(48)
         .fontColor($r('app.color.accent_ink'))
         .backgroundColor($r('app.color.accent'))
-        .borderRadius(8)
+        .borderRadius(RADIUS_8)
         .onClick((): void => {
           this.cloudGuideVisible = false;
           this.openCloudDrive();
@@ -7498,7 +7517,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule_strong'),
-      radius: 14
+      radius: RADIUS_14
     })
     .shadow({
       radius: 24,
@@ -7558,7 +7577,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 14
+        radius: RADIUS_14
       })
       .shadow({
         radius: 24,
@@ -7613,7 +7632,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 14
+        radius: RADIUS_14
       })
       .shadow({
         radius: 24,
@@ -7654,7 +7673,7 @@ struct Index {
             .height(44)
             .fontColor($r('app.color.accent_ink'))
             .backgroundColor($r('app.color.accent'))
-            .borderRadius(8)
+            .borderRadius(RADIUS_8)
             .fontWeight(FontWeight.Medium)
             .padding({ left: 18, right: 18 })
             .onClick((): void => {
@@ -7690,7 +7709,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule'),
-              radius: 12
+              radius: RADIUS_12
             })
 
             Column({ space: 8 }) {
@@ -7715,7 +7734,7 @@ struct Index {
             .border({
               width: 1,
               color: WARN_BG_SOFT,
-              radius: 12
+              radius: RADIUS_12
             })
 
             Column({ space: 10 }) {
@@ -7735,7 +7754,7 @@ struct Index {
                 .width('100%')
                 .height(this.isCompact() ? 390 : 460)
                 .objectFit(ImageFit.Contain)
-                .borderRadius(10)
+                .borderRadius(RADIUS_10)
             }
             .width('100%')
             .padding(16)
@@ -7744,7 +7763,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule'),
-              radius: 12
+              radius: RADIUS_12
             })
           }
           .width('100%')
@@ -7777,7 +7796,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 14
+        radius: RADIUS_14
       })
       .shadow({
         radius: 24,
@@ -7826,7 +7845,7 @@ struct Index {
         .width('100%')
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.surface'))
-        .borderRadius(8)
+        .borderRadius(RADIUS_8)
         .border({
           width: 1,
           color: $r('app.color.rule_strong')
@@ -7842,7 +7861,7 @@ struct Index {
     .border({
       width: 1,
       color: PHOTO_SOFT_BORDER,
-      radius: 12
+      radius: RADIUS_12
     })
   }
 
@@ -7864,7 +7883,7 @@ struct Index {
             .height(44)
             .fontColor($r('app.color.ink'))
             .backgroundColor($r('app.color.paper_2'))
-            .borderRadius(8)
+            .borderRadius(RADIUS_8)
             .padding({ left: 16, right: 16 })
             .onClick((): void => {
               this.donationVisible = false;
@@ -7888,7 +7907,7 @@ struct Index {
             .width('100%')
             .layoutWeight(1)
             .objectFit(ImageFit.Contain)
-            .borderRadius(12)
+            .borderRadius(RADIUS_12)
         }
         .width('100%')
         .layoutWeight(1)
@@ -7897,7 +7916,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 12
+          radius: RADIUS_12
         })
         Text(this.tr('赞助不会解锁软件功能，也不影响公开 Issue 的处理。'))
           .fontSize(TS_CAPTION)
@@ -7912,7 +7931,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 14
+        radius: RADIUS_14
       })
       .shadow({
         radius: 24,
@@ -7951,7 +7970,7 @@ struct Index {
         .border({
           width: 2,
           color: ACCENT_SOFT,
-          radius: 4
+          radius: RADIUS_5
         })
       Column() {
         Row({ space: 10 }) {
@@ -7959,7 +7978,7 @@ struct Index {
             .height(44)
             .fontColor(Color.White)
             .backgroundColor(HUD_BG_SOFT)
-            .borderRadius(10)
+            .borderRadius(RADIUS_10)
             .onClick((): void => {
               this.closeImmersivePreview();
             })
@@ -7971,7 +7990,7 @@ struct Index {
             .fontFamily('monospace')
             .fontColor(Color.White)
             .backgroundColor(HUD_BG_SOFT)
-            .borderRadius(22)
+            .borderRadius(RADIUS_20)
             .padding({
               left: 14,
               right: 14,
@@ -7995,7 +8014,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor(Color.White)
           .backgroundColor(HUD_BG_SOFT)
-          .borderRadius(22)
+          .borderRadius(RADIUS_20)
           .padding({
             left: 18,
             right: 18,
@@ -8080,7 +8099,7 @@ struct Index {
     .align(Alignment.Top)
     .margin({ top: 76 })
     .backgroundColor(UI_CARD)
-    .border({ width: 1, color: UI_SECONDARY, radius: 5 })
+    .border({ width: 1, color: UI_SECONDARY, radius: RADIUS_5 })
   }
 
   @Builder
@@ -8129,7 +8148,7 @@ struct Index {
     .align(Alignment.BottomStart)
     .margin({ left: 18, bottom: 170 })
     .backgroundColor(UI_BG)
-    .border({ width: 1, color: UI_SECONDARY, radius: 5 })
+    .border({ width: 1, color: UI_SECONDARY, radius: RADIUS_5 })
   }
 
   @Builder
@@ -8149,7 +8168,7 @@ struct Index {
         .height(56)
         .textAlign(TextAlign.Center)
         .backgroundColor(HUD_BG)
-        .borderRadius(10)
+        .borderRadius(RADIUS_10)
       Button(
         this.tr(this.liveView ? 'LIVE' : '开启取景'),
         { type: ButtonType.Normal }
@@ -8160,7 +8179,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
         .backgroundColor(this.liveView ? UI_ACCENT : HUD_BG)
-        .borderRadius(10)
+        .borderRadius(RADIUS_10)
         .onClick((): void => {
           this.toggleLiveView();
         })
@@ -8171,7 +8190,7 @@ struct Index {
           .fontSize(TS_CAPTION)
           .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
           .backgroundColor(this.focusPeakingEnabled ? UI_ACCENT : HUD_BG)
-          .borderRadius(10)
+          .borderRadius(RADIUS_10)
           .onClick((): void => {
             this.focusPeakingEnabled = !this.focusPeakingEnabled;
           })
@@ -8181,7 +8200,7 @@ struct Index {
           .fontSize(TS_CAPTION)
           .fontColor(Color.White) // v1.5.7 issue 655a0a14: 黄绿底激活钮黑字改白字
           .backgroundColor(this.falseColorEnabled ? UI_ACCENT : HUD_BG)
-          .borderRadius(10)
+          .borderRadius(RADIUS_10)
           .onClick((): void => {
             this.falseColorEnabled = !this.falseColorEnabled;
           })
@@ -8192,7 +8211,7 @@ struct Index {
         .fontSize(TS_CAPTION)
         .fontColor(Color.White)
         .backgroundColor(HUD_BG)
-        .borderRadius(10)
+        .borderRadius(RADIUS_10)
         .enabled(this.connected && this.liveView && !this.busy)
         .onClick((): void => { this.triggerAutoFocusOn(); })
     }
@@ -8215,7 +8234,7 @@ struct Index {
         .fontColor(Color.White)
         .padding({ left: 14, right: 14, top: 8, bottom: 8 })
         .backgroundColor(HUD_BG)
-        .borderRadius(10)
+        .borderRadius(RADIUS_10)
     }
   }
 
@@ -8237,7 +8256,7 @@ struct Index {
           ? UI_VIDEO
           : UI_ACCENT
       )
-      .borderRadius(48)
+      .borderRadius(RADIUS_CAPSULE)
       .enabled(
         (this.connected || this.wifiConnected) && !this.busy
       )
@@ -8270,7 +8289,7 @@ struct Index {
             .fontColor(Color.White)
             .padding({ left: 12, right: 12, top: 8, bottom: 8 })
             .backgroundColor(HUD_BG)
-            .borderRadius(10)
+            .borderRadius(RADIUS_10)
         }
       }
       .padding({ left: 14, right: 14, bottom: 12 })
@@ -8292,7 +8311,7 @@ struct Index {
           .height(44)
           .fontColor(Color.White)
           .backgroundColor(HUD_BG_SOFT)
-          .borderRadius(10)
+          .borderRadius(RADIUS_10)
           .onClick((): void => {
             this.immersiveParametersExpanded =
               !this.immersiveParametersExpanded;
@@ -8313,7 +8332,7 @@ struct Index {
                 ? MORE_ACTIVE_BG
                 : HUD_BG_SOFT
             )
-            .borderRadius(10)
+            .borderRadius(RADIUS_10)
             .onClick((): void => {
               this.immersiveMoreParametersExpanded =
                 !this.immersiveMoreParametersExpanded;
@@ -8376,7 +8395,7 @@ struct Index {
                   .height(44)
                   .fontColor(Color.White)
                   .backgroundColor(UI_SECONDARY)
-                  .borderRadius(10)
+                  .borderRadius(RADIUS_10)
                   .onClick((): void => {
                     this.videoShutterMode =
                       this.videoShutterMode === 'angle' ? 'speed' : 'angle';
@@ -8507,7 +8526,7 @@ struct Index {
         this.camera.canAdjustParameter(this.cameraParameter(parameter))
           ? UI_ACCENT
           : UI_SECONDARY,
-      radius: 7
+      radius: RADIUS_7
     })
   }
 
@@ -8620,7 +8639,7 @@ struct Index {
           .border({
             width: 1,
             color: $r('app.color.rule_strong'),
-            radius: 6
+            radius: RADIUS_6
           })
           .onSelect((index: number): void => {
             const seconds: Array<number> = [1, 3, 5, 10, 15];
@@ -8636,7 +8655,7 @@ struct Index {
     .border({
       width: 1,
       color: $r('app.color.rule'),
-      radius: 8
+      radius: RADIUS_8
     })
   }
 
@@ -8680,7 +8699,7 @@ struct Index {
             .border({
               width: 1,
               color: $r('app.color.rule_strong'),
-              radius: 6
+              radius: RADIUS_6
             })
             .onSelect((index: number): void => {
               const languages: Array<string> = [
@@ -8698,7 +8717,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         this.CaptureAssistSettingsCard()
         Column({ space: 8 }) {
@@ -8724,7 +8743,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         Column({ space: 8 }) {
           Text(this.tr('尼康官方 SDK'))
@@ -8749,7 +8768,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         Column({ space: 12 }) {
           Text('AI 功能激活')
@@ -8811,7 +8830,7 @@ struct Index {
               .fontSize(TS_BODY)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
-              .borderRadius(8)
+              .borderRadius(RADIUS_8)
               .padding({ left: 14, right: 14 })
               .onClick((): void => {
                 this.copyDeviceIdToClipboard();
@@ -8921,7 +8940,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         Column({ space: 12 }) {
           Text(this.tr('软件更新'))
@@ -8974,7 +8993,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.saveMirrorChyanCdk();
               })
@@ -8983,7 +9002,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.openMirrorChyan();
               })
@@ -9002,7 +9021,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .enabled(!this.updateChecking)
               .onClick((): void => {
                 this.checkForUpdates(false);
@@ -9016,7 +9035,7 @@ struct Index {
                 .layoutWeight(1)
                 .fontColor($r('app.color.accent_ink'))
                 .backgroundColor($r('app.color.accent'))
-                .borderRadius(6)
+                .borderRadius(RADIUS_6)
                 .onClick((): void => {
                   this.openUpdate();
                 })
@@ -9031,7 +9050,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         Column({ space: 12 }) {
           Text(this.tr('诊断日志'))
@@ -9051,7 +9070,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.recentLogs =
                   this.diagnostics?.recentText(6000) ?? '日志暂不可用。';
@@ -9061,7 +9080,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.reportIssue();
               })
@@ -9083,7 +9102,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
         Text(this.tr(
           '只有在你检查预填内容并于 GitHub 确认提交后，脱敏日志才会发送。'
@@ -9106,7 +9125,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.accent_ink'))
               .backgroundColor($r('app.color.accent'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.openDonation();
               })
@@ -9115,7 +9134,7 @@ struct Index {
               .layoutWeight(1)
               .fontColor($r('app.color.ink'))
               .backgroundColor($r('app.color.paper_2'))
-              .borderRadius(6)
+              .borderRadius(RADIUS_6)
               .onClick((): void => {
                 this.openAfdian();
               })
@@ -9129,7 +9148,7 @@ struct Index {
         .border({
           width: 1,
           color: $r('app.color.rule'),
-          radius: 8
+          radius: RADIUS_8
         })
       }
       .width('100%')
@@ -9871,7 +9890,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 12
+        radius: RADIUS_12
       })
       .enabled(
         this.connected &&
@@ -9920,7 +9939,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 6
+        radius: RADIUS_6
       })
       .margin({ bottom: 8 })
       .onSelect((index: number): void => {
@@ -9955,7 +9974,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 6
+        radius: RADIUS_6
       })
       .margin({ bottom: 8 })
       .onSelect((index: number): void => {
@@ -9993,7 +10012,7 @@ struct Index {
       .border({
         width: 1,
         color: $r('app.color.rule_strong'),
-        radius: 6
+        radius: RADIUS_6
       })
       .enabled(
         this.connected &&

@@ -58,7 +58,7 @@
           <Border Width="44"
                   Height="44"
                   Background="{DynamicResource UiBlueBrush}"
-                  CornerRadius="13">
+                  CornerRadius="{StaticResource CornerRadius12}">
             <!-- 品牌标 Z 22/品牌名 19：AppBar 品牌区豁免（设计品牌资产，不受 TypeScale 约束） -->
             <TextBlock HorizontalAlignment="Center"
                        VerticalAlignment="Center"
@@ -87,7 +87,7 @@
                 Background="{DynamicResource UiSecondaryBrush}"
                 BorderBrush="{DynamicResource UiSecondaryBrush}"
                 BorderThickness="1"
-                CornerRadius="18">
+                CornerRadius="{StaticResource CornerRadius18}">
           <StackPanel Orientation="Horizontal">
             <Ellipse x:Name="ConnectionDot"
                      Width="8"
@@ -243,7 +243,7 @@
                     Background="{DynamicResource MonitorWellCardBrush}"
                     BorderBrush="{DynamicResource MonitorWellSecondaryBrush}"
                     BorderThickness="1"
-                    CornerRadius="14">
+                    CornerRadius="{StaticResource CornerRadius14}">
               <Grid>
                 <Grid.RowDefinitions>
                   <RowDefinition Height="Auto" />
@@ -254,7 +254,7 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="280" />
                 </Grid.ColumnDefinitions>
-                <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="12">
+                <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="{StaticResource CornerRadius12}">
                   <TextBlock HorizontalAlignment="Center"
                              VerticalAlignment="Center"
                              Style="{DynamicResource CaptureBadge}"
@@ -292,7 +292,7 @@
               <Button x:Name="MonitorLiveViewButton" Style="{DynamicResource MonitorIconButton}" Content="▣\n取景" Click="LiveViewButton_Click" />
             </StackPanel>
           </StackPanel>
-          <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="{DynamicResource MonitorWellCardBrush}" CornerRadius="10">
+          <Border Grid.Row="5" Margin="0,24,0,0" Padding="16" HorizontalAlignment="Center" Background="{DynamicResource MonitorWellCardBrush}" CornerRadius="{StaticResource CornerRadius10}">
             <StackPanel Orientation="Horizontal">
               <TextBlock Style="{DynamicResource MonitorStorageIcon}" Text="▯" VerticalAlignment="Center" />
               <StackPanel Margin="12,0,0,0"><TextBlock x:Name="MonitorStorageFreeText" Text="—" Style="{DynamicResource MonitorReadout}" /><TextBlock x:Name="MonitorStorageDetailText" Text="本地缓存 · 存储状态暂不可用" Style="{DynamicResource MonitorWellLabel}" /></StackPanel>
@@ -315,7 +315,7 @@
                   Background="{DynamicResource GraphiteBrush}"
                   BorderBrush="{DynamicResource GraphiteRuleBrush}"
                   BorderThickness="1"
-                  CornerRadius="18"
+                  CornerRadius="{StaticResource CornerRadius18}"
                   ClipToBounds="True">
             <Grid>
               <Image x:Name="PreviewImage"
@@ -336,7 +336,7 @@
                       VerticalAlignment="Top"
                       Margin="16"
                       Padding="8,4"
-                      CornerRadius="5"
+                      CornerRadius="{StaticResource CornerRadius5}"
                       Background="{DynamicResource Graphite2Brush}">
                 <TextBlock x:Name="LiveBadge"
                            Style="{DynamicResource MetaText}"
@@ -359,7 +359,7 @@
                   Margin="0,0,0,10"
                   Padding="14,10"
                   Background="{DynamicResource UiCardBrush}"
-                  CornerRadius="14">
+                  CornerRadius="{StaticResource CornerRadius14}">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -387,7 +387,7 @@
                       Grid.Column="2"
                       Padding="14,6"
                       Background="{DynamicResource UiSecondaryBrush}"
-                      CornerRadius="15">
+                      CornerRadius="{StaticResource CornerRadius14}">
                 <TextBlock x:Name="ControlStatusRateText"
                            Style="{DynamicResource CaptureSubHint}"
                            FontWeight="Bold"
@@ -406,25 +406,25 @@
             </Grid>
           </Border>
           <UniformGrid x:Name="ControlStatusGrid" Grid.Row="2" Columns="4" Margin="0,0,0,10">
-            <Border Margin="0,0,6,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
+            <Border Margin="0,0,6,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="{StaticResource CornerRadius14}">
               <StackPanel>
                 <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="机身" />
                 <TextBlock x:Name="CaptureDeviceNameText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
-            <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
+            <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="{StaticResource CornerRadius14}">
               <StackPanel>
                 <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="传输" />
                 <TextBlock x:Name="CaptureLinkText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
-            <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
+            <Border Margin="3,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="{StaticResource CornerRadius14}">
               <StackPanel>
                 <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="格式" />
                 <TextBlock x:Name="CaptureOutputText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
               </StackPanel>
             </Border>
-            <Border Margin="6,0,0,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="14">
+            <Border Margin="6,0,0,0" Padding="14,10" Background="{DynamicResource UiCardBrush}" CornerRadius="{StaticResource CornerRadius14}">
               <StackPanel>
                 <TextBlock Style="{DynamicResource CaptureFieldLabel}" Text="文件库" />
                 <TextBlock x:Name="CaptureLibraryText" Margin="0,4,0,0" Style="{DynamicResource CaptureFieldValue}" />
@@ -504,7 +504,7 @@
                   Margin="0,14,0,0"
                   Padding="14"
                   Background="{DynamicResource UiCardBrush}"
-                  CornerRadius="14">
+                  CornerRadius="{StaticResource CornerRadius14}">
             <StackPanel>
               <Grid>
                 <Grid.ColumnDefinitions>
@@ -533,7 +533,7 @@
                         Margin="0,0,6,6"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -559,7 +559,7 @@
                         Margin="3,0,3,6"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -585,7 +585,7 @@
                         Margin="6,0,0,6"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -611,7 +611,7 @@
                         Margin="0,6,6,0"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -637,7 +637,7 @@
                         Margin="3,6,3,0"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -663,7 +663,7 @@
                         Margin="6,6,0,0"
                         Padding="12,10"
                         Background="{DynamicResource UiSecondaryBrush}"
-                        CornerRadius="14">
+                        CornerRadius="{StaticResource CornerRadius14}">
                   <Grid>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="*" />
@@ -713,7 +713,7 @@
                       Background="{DynamicResource UiSecondaryBrush}"
                       BorderBrush="{DynamicResource UiSecondaryBrush}"
                       BorderThickness="1"
-                      CornerRadius="14">
+                      CornerRadius="{StaticResource CornerRadius14}">
                 <Grid>
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -724,7 +724,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="280" />
                   </Grid.ColumnDefinitions>
-                  <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="12">
+                  <Border Width="40" Height="40" Background="{DynamicResource AccentBrush}" CornerRadius="{StaticResource CornerRadius12}">
                     <TextBlock HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Style="{DynamicResource CaptureBadge}"
@@ -839,7 +839,7 @@
                   Background="{DynamicResource AccentSoftBrush}"
                   BorderBrush="{DynamicResource AccentBrush}"
                   BorderThickness="1"
-                  CornerRadius="14">
+                  CornerRadius="{StaticResource CornerRadius14}">
             <StackPanel>
               <TextBlock Style="{DynamicResource DeviceHeaderTitle}"
                          Text="我的设备" />
@@ -885,7 +885,7 @@
                   Background="{DynamicResource AccentSoftBrush}"
                   BorderBrush="{DynamicResource AccentBrush}"
                   BorderThickness="1"
-                  CornerRadius="14">
+                  CornerRadius="{StaticResource CornerRadius14}">
             <Grid>
               <StackPanel>
                 <TextBlock Style="{DynamicResource LibraryHeaderTitle}"
@@ -976,7 +976,7 @@
                         <Border Width="72"
                                 Height="52"
                                 Background="{DynamicResource GraphiteBrush}"
-                                CornerRadius="6">
+                                CornerRadius="{StaticResource CornerRadius6}">
                           <Grid>
                             <Image Source="{Binding Thumbnail}"
                                    Stretch="UniformToFill" />
@@ -1171,7 +1171,7 @@
                   Background="{DynamicResource EditorBgBrush}"
                   BorderBrush="{DynamicResource EditorRuleBrush}"
                   BorderThickness="0,0,0,1"
-                  CornerRadius="0">
+                  CornerRadius="{StaticResource CornerRadius0}">
             <StackPanel>
               <TextBlock x:Name="EditorHeaderTitle"
                          Style="{DynamicResource EditorHeaderTitle}"
@@ -1206,7 +1206,7 @@
                       Background="{DynamicResource EditorPanelBrush}"
                       BorderBrush="{DynamicResource EditorRuleBrush}"
                       BorderThickness="1"
-                      CornerRadius="0">
+                      CornerRadius="{StaticResource CornerRadius0}">
                 <Grid>
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -1241,7 +1241,7 @@
                               Background="{DynamicResource SurfaceBrush}"
                               BorderBrush="{DynamicResource RuleBrush}"
                               BorderThickness="1"
-                              CornerRadius="10">
+                              CornerRadius="{StaticResource CornerRadius10}">
                         <TreeView x:Name="EditorPhotoTree"
                                   SelectedItemChanged="EditorPhotoTree_SelectedItemChanged">
                           <TreeView.ItemContainerStyle>
@@ -1302,7 +1302,7 @@
                       Background="{DynamicResource GraphiteBrush}"
                       BorderBrush="{DynamicResource EditorRuleBrush}"
                       BorderThickness="1"
-                      CornerRadius="0">
+                      CornerRadius="{StaticResource CornerRadius0}">
                 <Grid>
                   <Image x:Name="EditorPreviewImage"
                          Stretch="Uniform"
@@ -1325,7 +1325,7 @@
                       Background="{DynamicResource EditorPanelBrush}"
                       BorderBrush="{DynamicResource EditorRuleBrush}"
                       BorderThickness="1"
-                      CornerRadius="0">
+                      CornerRadius="{StaticResource CornerRadius0}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                   <StackPanel>
                     <StackPanel Margin="0,0,0,12">
@@ -1364,7 +1364,7 @@
                             Background="{DynamicResource EditorRaisedBrush}"
                             BorderBrush="{DynamicResource EditorRuleBrush}"
                             BorderThickness="1"
-                            CornerRadius="0">
+                            CornerRadius="{StaticResource CornerRadius0}">
                       <StackPanel>
                         <DockPanel>
                           <TextBlock FontWeight="SemiBold" Text="AI 智能修图 · 工作台" />
@@ -1465,7 +1465,7 @@
                       Background="{DynamicResource EditorPanelBrush}"
                       BorderBrush="{DynamicResource EditorRuleBrush}"
                       BorderThickness="1"
-                      CornerRadius="0">
+                      CornerRadius="{StaticResource CornerRadius0}">
                 <Grid>
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -1546,7 +1546,7 @@
                       Background="{DynamicResource EditorPanelBrush}"
                       BorderBrush="{DynamicResource EditorRuleBrush}"
                       BorderThickness="1"
-                      CornerRadius="0">
+                      CornerRadius="{StaticResource CornerRadius0}">
                 <Grid>
                   <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -1576,7 +1576,7 @@
                     Background="{DynamicResource GraphiteBrush}"
                     BorderBrush="{DynamicResource GraphiteRuleBrush}"
                     BorderThickness="1"
-                    CornerRadius="16">
+                    CornerRadius="{StaticResource CornerRadius16}">
               <Grid>
                 <Image x:Name="AiPreviewImage"
                        Stretch="Uniform"
@@ -1589,7 +1589,7 @@
                 <StackPanel HorizontalAlignment="Left"
                             VerticalAlignment="Top">
                   <Border Background="{DynamicResource EditorScrimBrush}"
-                          CornerRadius="16"
+                          CornerRadius="{StaticResource CornerRadius16}"
                           Padding="10,6">
                     <TextBlock x:Name="AiPreviewBadge"
                                Style="{DynamicResource AiPreviewBadge}"
@@ -1947,7 +1947,7 @@
                           Background="{DynamicResource AccentSoftBrush}"
                           BorderBrush="{DynamicResource PhotoSoftBorderBrush}"
                           BorderThickness="1"
-                          CornerRadius="12">
+                          CornerRadius="{StaticResource CornerRadius12}">
                     <Grid>
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
