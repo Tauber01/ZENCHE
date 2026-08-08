@@ -1039,3 +1039,23 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 验收：npm test **359/359** 全绿（357 基线 + 2 新）；git diff --check 干净。
 - 范围：只动圆角；styles.css 令牌数值未动；间距/颜色/字号/功能零改动。
 - 纪律：未 git push；未动生产服务器。
+## 12.43 v1.5.9 更新服务自托管清单模式（pro 实施，2026-08-07，Tauber 15:19 指令）
+
+- 计划：PLANS/ZENCHE_UPDATE_SELFHOST_PLAN.md 执行项 2，仅改 server.mjs + 测试 + docs/AUTOMATIC_UPDATES.md。
+- **清单模式**：`UPDATE_RELEASE_MANIFEST=<path>` 设置后 /api/update 完全走本地清单、零 GitHub 请求；未设置完全保持 GitHub 模式（向后兼容）。
+- **清单形状**：`{version, title, body, published_at, release_url?, minimum_supported_version?, assets: {"<platform>/<arch>": {file, sha256}, "<platform>": {file, sha256}}}`。
+- **匹配顺序**：platform/arch → platform 兜底；无匹配 url=null 且 update_available 仅按版本比较给出。
+- **fail-closed**：清单模式缺 UPDATE_ASSET_BASE_URL → 503；清单缺失/JSON 损坏 → 503 不外泄详情。
+- **热加载**：按 mtime 感知（无 TTL），改文件即生效无需重启。
+- channel 任意值均回同一清单（自托管只有 stable，docs 注明）。
+- 测试：server-update.test.mjs 新增 4 用例（清单服务零 GitHub 请求/匹配顺序兜底/缺 asset 503/缺失损坏 503/热加载）。npm test 359/359 全绿（基线 355 + 4）；node --check 通过；diff --check 干净。
+- 红线：未 git push；未动生产（部署由 kimi）；/api/stats 与 /data/ 语义零改动。
+
+## 12.44 更新服务自托管清单门禁返修（kimi 代 pro 接管，AI审查 驳回 2 必修）
+
+- 背景：pro 会话连续两轮 400（context 溢出）停摆，返修由 kimi 直接执行（基 561cfd3）。
+- 必修 1（announcement 字段映射）：buildResponse 清单模式把 version→tag_name、title→name 映射进 releaseAnnouncement——原实现清单 title 被静默丢弃、announcement 输出 0.0.0。补断言：announcement.version/title/body 全核对。
+- 必修 2（minimum_supported_version 生效）：清单字段优先（强制升级闸门），env/options 兜底——原实现只取 env/options、清单写了也回 null。补断言：清单值生效 + 清单缺省时回落 options.minimumVersion（新用例）。
+- 验证：npm test 360/360 全绿（359 + 1）；node --check server.mjs/测试均过。
+- 非阻断观察项（mtime 同值陈旧/死代码/URL 未编码/fetchRelease manifest 分支不可达）入 backlog 不修。
+- 红线：未 git push；未动生产。

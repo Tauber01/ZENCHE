@@ -201,10 +201,44 @@ export function createUpdateService(options = {}) {
   const configuredAnnouncement = options.announcement || parseConfiguredAnnouncement(process.env.UPDATE_ANNOUNCEMENT_JSON);
   const minimumVersion = options.minimumVersion ?? process.env.UPDATE_MINIMUM_SUPPORTED_VERSION ?? null;
   const assetBaseUrl = options.assetBaseUrl ?? process.env.UPDATE_ASSET_BASE_URL ?? "";
+  const manifestPath = options.manifestPath ?? process.env.UPDATE_RELEASE_MANIFEST ?? "";
+  // 清单模式：设置 UPDATE_RELEASE_MANIFEST 后 /api/update 完全走本地清单，零 GitHub 请求。
+  const manifestMode = manifestPath.length > 0;
   const cache = new Map();
   const inFlight = new Map();
+  let manifest = null; // 内存缓存清单（热加载时刷新）
+  let manifestMtime = 0;
+  let manifestError = null;
+
+  // 读取并校验本地清单；文件缺失/JSON 损坏 → 记录错误（getUpdate 抛 503 不外泄详情）。
+  function loadManifest() {
+    try {
+      const stat = statSync(manifestPath);
+      if (stat.mtimeMs === manifestMtime && manifest !== null) {
+        return manifest;
+      }
+      const raw = readFileSync(manifestPath, "utf8");
+      const parsed = JSON.parse(raw);
+      if (typeof parsed !== "object" || parsed === null
+          || typeof parsed.version !== "string"
+          || typeof parsed.assets !== "object" || parsed.assets === null) {
+        throw new Error("invalid manifest shape");
+      }
+      manifest = parsed;
+      manifestMtime = stat.mtimeMs;
+      manifestError = null;
+      return parsed;
+    } catch (error) {
+      manifestError = error;
+      return null;
+    }
+  }
 
   async function fetchRelease(channel) {
+    // 清单模式不发起任何 GitHub 请求。
+    if (manifestMode) {
+      return loadManifest();
+    }
     const url = releaseApiFor(repository, channel, configuredApi);
     const response = await fetchImpl(url, {
       headers: {
@@ -221,6 +255,26 @@ export function createUpdateService(options = {}) {
 
   async function getUpdate(query = {}) {
     const normalized = normalizeQuery(query);
+    // 清单模式：fail-closed——清单缺失/损坏 → 503 不外泄详情；
+    // 缺 UPDATE_ASSET_BASE_URL → 503。
+    if (manifestMode) {
+      if (!assetBaseUrl) {
+        const error = new Error("UPDATE_ASSET_BASE_URL is required in manifest mode");
+        error.status = 503;
+        error.hideDetail = true;
+        throw error;
+      }
+      const release = loadManifest();
+      if (!release) {
+        const error = new Error(manifestError ? "manifest unavailable" : "manifest unavailable");
+        error.status = 503;
+        error.hideDetail = true;
+        throw error;
+      }
+      const timestamp = now();
+      const generatedAt = new Date(timestamp).toISOString();
+      return buildResponse(release, normalized, generatedAt, false);
+    }
     const key = normalized.channel;
     const timestamp = now();
     const previous = cache.get(key);
@@ -243,19 +297,65 @@ export function createUpdateService(options = {}) {
     }
   }
 
+  function manifestAssetFor(release, platform, architecture) {
+    const assets = release.assets || {};
+    // 匹配顺序：platform/arch → platform 兜底。
+    const candidates = [
+      `${platform}/${architecture}`,
+      platform,
+    ];
+    for (const key of candidates) {
+      const asset = assets[key];
+      if (asset && typeof asset === "object" && asset.file) {
+        return asset;
+      }
+    }
+    return null;
+  }
+
   function buildResponse(release, normalized, generatedAt, stale) {
-    const version = normalizeVersion(release.tag_name);
-    const selectedAsset = selectReleaseAsset(release.assets, normalized.platform, normalized.architecture);
-    const url = assetUrlFor(selectedAsset, assetBaseUrl) || releaseUrlFor(repository, release);
-    const checksumAsset = selectedAsset && Array.isArray(release.assets)
-      ? release.assets.find((asset) => new RegExp(`^${safeRegex(selectedAsset.name)}\\.sha256(?:\\.txt)?$`, "i").test(asset?.name || ""))
-      : null;
-    const sha256Source = selectedAsset?.sha256 || selectedAsset?.digest || checksumAsset?.sha256 || checksumAsset?.digest;
-    const sha256 = typeof sha256Source === "string"
-      ? sha256Source.replace(/^sha256:/i, "").toLowerCase()
-      : null;
-    const announcement = releaseAnnouncement(release, configuredAnnouncement);
+    // 清单模式：release 直接带 version/body/published_at；assets 按 platform/arch 键匹配。
+    const isManifest = manifestMode;
+    const version = normalizeVersion(
+      isManifest ? release.version : release.tag_name
+    );
+    const selectedAsset = isManifest
+      ? manifestAssetFor(release, normalized.platform, normalized.architecture)
+      : selectReleaseAsset(release.assets, normalized.platform, normalized.architecture);
+    // 清单模式：url = UPDATE_ASSET_BASE_URL + '/' + file；无匹配时 url=null（前端自行处理无包情形）。
+    let url;
+    let sha256 = null;
+    if (isManifest) {
+      url = selectedAsset ? `${assetBaseUrl.replace(/\/+$/, "")}/${selectedAsset.file}` : null;
+      sha256 = selectedAsset?.sha256
+        ? String(selectedAsset.sha256).replace(/^sha256:/i, "").toLowerCase()
+        : null;
+    } else {
+      url = assetUrlFor(selectedAsset, assetBaseUrl) || releaseUrlFor(repository, release);
+      const checksumAsset = selectedAsset && Array.isArray(release.assets)
+        ? release.assets.find((asset) => new RegExp(`^${safeRegex(selectedAsset.name)}\\.sha256(?:\\.txt)?$`, "i").test(asset?.name || ""))
+        : null;
+      const sha256Source = selectedAsset?.sha256 || selectedAsset?.digest || checksumAsset?.sha256 || checksumAsset?.digest;
+      sha256 = typeof sha256Source === "string"
+        ? sha256Source.replace(/^sha256:/i, "").toLowerCase()
+        : null;
+    }
+    // 清单模式：releaseAnnouncement 读 GitHub 形状的 tag_name/name，
+    // 这里把清单的 version/title 映射进去，避免 announcement 静默退回 0.0.0。
+    const announcement = releaseAnnouncement(
+      isManifest ? { ...release, tag_name: release.version, name: release.title } : release,
+      configuredAnnouncement,
+    );
+    // 清单的 minimum_supported_version 优先（强制升级闸门），env/options 兜底。
+    const effectiveMinimumVersion = isManifest
+      && typeof release.minimum_supported_version === "string"
+      && release.minimum_supported_version.trim()
+      ? release.minimum_supported_version
+      : minimumVersion;
     const updateAvailable = normalized.currentVersion ? compareVersions(version, normalized.currentVersion) > 0 : true;
+    const releaseUrl = isManifest
+      ? (release.release_url || "")
+      : releaseUrlFor(repository, release);
     const response = {
       schema_version: 1,
       product: "ZENCHE",
@@ -265,19 +365,19 @@ export function createUpdateService(options = {}) {
       version,
       url,
       sha256,
-      release_url: releaseUrlFor(repository, release),
-      update_type: release.prerelease ? "preview" : "full",
+      release_url: releaseUrl,
+      update_type: isManifest ? "full" : (release.prerelease ? "preview" : "full"),
       announcement,
-      minimum_supported_version: minimumVersion ? normalizeVersion(minimumVersion) : null,
+      minimum_supported_version: effectiveMinimumVersion ? normalizeVersion(effectiveMinimumVersion) : null,
       generated_at: generatedAt,
       update_available: updateAvailable,
       stale,
       // Compatibility aliases for native clients and older integrations.
       downloadUrl: url,
-      releaseUrl: releaseUrlFor(repository, release),
+      releaseUrl: releaseUrl,
       updateAvailable,
-      minimumVersion: minimumVersion ? normalizeVersion(minimumVersion) : null,
-      asset: selectedAsset ? { name: selectedAsset.name, size: selectedAsset.size ?? null } : null,
+      minimumVersion: effectiveMinimumVersion ? normalizeVersion(effectiveMinimumVersion) : null,
+      asset: selectedAsset ? { name: selectedAsset.file || selectedAsset.name, size: selectedAsset.size ?? null } : null,
     };
     return response;
   }
