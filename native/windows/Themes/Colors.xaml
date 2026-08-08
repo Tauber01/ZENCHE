@@ -214,4 +214,24 @@
   <FontFamily x:Key="MonoFont">Cascadia Mono</FontFamily>
   <!-- Icon glyph font (⚙/◉ symbols): not covered by Display/Body fonts. -->
   <FontFamily x:Key="IconFont">Segoe UI Symbol</FontFamily>
+  <!-- U2-R2 圆角坡道令牌（design.md Spacing/Radii 唯一基准——R1/R3 同坡道）：
+       0 fig2 故意方形 / 5-8 小控件与滑杆部件 / 10-12 按钮与输入 / 14 fig1 深色面卡片
+       / 16-20 浮层卡片与 sheet / capsule(999) 状态 pill、HUD chip 与圆钮。
+       引用一律 StaticResource（BasedOn/动态资源解析坑 abac445）。 -->
+  <CornerRadius x:Key="CornerRadius0">0</CornerRadius>
+  <CornerRadius x:Key="CornerRadius5">5</CornerRadius>
+  <CornerRadius x:Key="CornerRadius6">6</CornerRadius>
+  <CornerRadius x:Key="CornerRadius7">7</CornerRadius>
+  <CornerRadius x:Key="CornerRadius8">8</CornerRadius>
+  <CornerRadius x:Key="CornerRadius10">10</CornerRadius>
+  <CornerRadius x:Key="CornerRadius11">11</CornerRadius>
+  <CornerRadius x:Key="CornerRadius12">12</CornerRadius>
+  <CornerRadius x:Key="CornerRadius14">14</CornerRadius>
+  <CornerRadius x:Key="CornerRadius16">16</CornerRadius>
+  <CornerRadius x:Key="CornerRadius17">17</CornerRadius>
+  <CornerRadius x:Key="CornerRadius18">18</CornerRadius>
+  <CornerRadius x:Key="CornerRadius19">19</CornerRadius>
+  <CornerRadius x:Key="CornerRadius20">20</CornerRadius>
+  <CornerRadius x:Key="CornerRadiusCapsule">999</CornerRadius>
+
 </ResourceDictionary>

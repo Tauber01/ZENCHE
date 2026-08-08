@@ -64,3 +64,39 @@ test('Windows U1: WaveformScope.cs 经资源查找引用 ColorScope* 令牌', as
   // 同值回退保留（资源缺失时观感不变）。
   assert.match(scope, /TryFindResource\(key\) is Color color \? color : Color\.FromRgb/);
 });
+
+test('U2 R2 windows radius: CornerRadius 数字字面量归零，全部走 StaticResource/FindResource 坡道令牌', async () => {
+  const colors = await read('native/windows/Themes/Colors.xaml');
+  const main = await read('native/windows/MainWindow.xaml');
+  const controls = await read('native/windows/Themes/Controls.xaml');
+  const cs = await read('native/windows/MainWindow.xaml.cs');
+  const appcs = await read('native/windows/App.xaml.cs');
+  // 白名单 = Colors.xaml 令牌定义（design.md 圆角坡道：0 / 5-8 / 10-12 / 14 / 16-20 / capsule 999）。
+  assert.match(colors, /<CornerRadius x:Key="CornerRadius0">0<\/CornerRadius>/);
+  for (const step of [5, 6, 7, 8, 10, 11, 12, 14, 16, 17, 18, 19, 20]) {
+    assert.match(colors, new RegExp(`<CornerRadius x:Key="CornerRadius${step}">${step}</CornerRadius>`),
+      `CornerRadius${step} 令牌须定义（坡道档）`);
+  }
+  assert.match(colors, /<CornerRadius x:Key="CornerRadiusCapsule">999<\/CornerRadius>/);
+  const tokenKey = '(?:0|5|6|7|8|10|11|12|14|16|17|18|19|20|Capsule)';
+  // 枚举数断言（防扫描器失明）：XAML 属性引用 >=43、Setter 1 处、C# 引用 >=16。
+  const xaml = main + '\n' + controls;
+  const attrRefs = xaml.match(/CornerRadius="\{StaticResource CornerRadius[A-Za-z0-9]+\}"/g) ?? [];
+  assert.ok(attrRefs.length >= 43, `XAML CornerRadius 引用枚举数异常（${attrRefs.length} < 43）`);
+  assert.match(controls, /<Setter Property="CornerRadius" Value="\{StaticResource CornerRadius14\}" \/>/);
+  const csAll = cs + '\n' + appcs;
+  const csRefs = csAll.match(/\(CornerRadius\)FindResource\("CornerRadius[A-Za-z0-9]+"\)/g) ?? [];
+  assert.ok(csRefs.length >= 16, `C# CornerRadius 引用枚举数异常（${csRefs.length} < 16）`);
+  // 逐 token 校验：每个引用键必须在坡道档集合内（不允许新造坡道外数值）。
+  for (const r of attrRefs) {
+    assert.match(r, new RegExp(`CornerRadius="\\{StaticResource CornerRadius${tokenKey}\\}"`),
+      `非法 CornerRadius 引用: ${r}`);
+  }
+  for (const r of csRefs) {
+    assert.match(r, new RegExp(`CornerRadius${tokenKey}"`), `非法 C# CornerRadius 引用: ${r}`);
+  }
+  // 数字字面量零残留（属性 + Setter + C# 构造）。
+  assert.doesNotMatch(xaml, /CornerRadius="\d+"/, 'XAML 不应残留 CornerRadius 数字字面量');
+  assert.doesNotMatch(controls, /Property="CornerRadius" Value="\d+"/, 'Setter 不应残留数字 Value');
+  assert.doesNotMatch(csAll, /new CornerRadius\(\d+\)/, 'C# 不应残留 new CornerRadius(数字)');
+});

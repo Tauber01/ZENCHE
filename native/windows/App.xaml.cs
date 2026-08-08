@@ -100,7 +100,7 @@ public partial class App : Application
         {
             Width = 80,
             Height = 80,
-            CornerRadius = new CornerRadius(20),
+            CornerRadius = (CornerRadius)FindResource("CornerRadius20"),
             Background = (Brush)FindResource("LogBgBrush"),
             HorizontalAlignment = HorizontalAlignment.Center
         };
@@ -145,7 +145,7 @@ public partial class App : Application
         var bgBorder = new Border
         {
             Background = (Brush)FindResource("SurfaceBrush"),
-            CornerRadius = new CornerRadius(16)
+            CornerRadius = (CornerRadius)FindResource("CornerRadius16")
         };
         bgBorder.Child = grid;
         splash.Content = bgBorder;
