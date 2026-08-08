@@ -63,3 +63,32 @@ test('U2 R1 macOS radius: all cornerRadius literals land on the design.md ramp',
     assert.doesNotMatch(source, /cornerRadius[:(]\s*(?:1|2|3|4|9|13|15|21|22|23)\b/);
   }
 });
+
+test('U2 S macOS spacing: padding/spacing literals land on the 4pt ramp via SpaceToken', async () => {
+  const main = await read('native/macos/Sources/NikonLink/main.swift');
+  const settings = await read('native/macos/Sources/NikonLink/SettingsSheet.swift');
+  // SpaceToken definition block is the whitelist (4pt grid: 0/4/8/12/16/20/24/32/40).
+  assert.match(main, /enum SpaceToken \{/);
+  for (const step of [0, 4, 8, 12, 16, 20, 24, 32, 40]) {
+    assert.match(main, new RegExp(`static let s${step}: CGFloat = ${step}\\b`),
+      `SpaceToken must define ramp step ${step}`);
+  }
+  // 枚举数下限防扫描器失明（派工实测 main 351 + settings 66；令牌引用取 380+）。
+  const mainRefs = main.match(/SpaceToken\.s\d+/g) ?? [];
+  const settingsRefs = settings.match(/SpaceToken\.s\d+/g) ?? [];
+  assert.ok(mainRefs.length >= 300, `main.swift SpaceToken 引用枚举数异常（${mainRefs.length} < 300）`);
+  assert.ok(settingsRefs.length >= 60, `SettingsSheet SpaceToken 引用枚举数异常（${settingsRefs.length} < 60）`);
+  const allowed = new Set(['0','4','8','12','16','20','24','32','40','44','1','2','52','96','108','174','184','208','0.075']);
+  for (const [src, name] of [[main, 'main.swift'], [settings, 'SettingsSheet.swift']]) {
+    const ctx = src.match(/\.padding\([^)]*\)|spacing:\s*[^,\)\s]+/g) ?? [];
+    assert.ok(ctx.length >= (name === 'main.swift' ? 330 : 60),
+      `${name} padding/spacing 上下文枚举数异常（${ctx.length}）`);
+    for (const c of ctx) {
+      for (const num of c.match(/-?\d+(?:\.\d+)?/g) ?? []) {
+        assert.ok(allowed.has(num), `${name} 非法间距字面量 ${num}（上下文: ${c.slice(0, 70)}）`);
+      }
+    }
+    assert.doesNotMatch(src, /\.padding\(\s*(?:3|5|6|7|9|10|13|14|15|17|18|22|26|28|30|36|42)\b/);
+    assert.doesNotMatch(src, /spacing:\s*(?:3|5|6|7|9|10|13|14|15|17|18|22|26|28|30|36|42)\b/);
+  }
+});

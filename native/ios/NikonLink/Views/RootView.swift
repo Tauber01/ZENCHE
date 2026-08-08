@@ -187,6 +187,21 @@ enum RadiusToken {
     static let r20: CGFloat = 20
 }
 
+// ===== U2-S 间距令牌（design.md Spacing 4pt 栅格：4/8/12/16/20/24/32/40；
+// 0 零间距贴靠语义；1-2 细线/分隔偏移非间距语义豁免；≥44 触控目标保留）=====
+enum SpaceToken {
+    static let s0: CGFloat = 0
+    static let s4: CGFloat = 4
+    static let s8: CGFloat = 8
+    static let s12: CGFloat = 12
+    static let s16: CGFloat = 16
+    static let s20: CGFloat = 20
+    static let s24: CGFloat = 24
+    static let s32: CGFloat = 32
+    static let s40: CGFloat = 40
+}
+
+
 enum FontToken {
     static let caption: CGFloat = 11     // 辅助说明/状态
     static let body: CGFloat = 12        // 正文/标签
@@ -229,7 +244,7 @@ private struct SplashView: View {
     var body: some View {
         ZStack {
             IPalette.paper.ignoresSafeArea()
-            VStack(spacing: 28) {
+            VStack(spacing: SpaceToken.s24) {
                 ZStack {
                     RoundedRectangle(cornerRadius: RadiusToken.r20)
                         .fill(
@@ -248,7 +263,7 @@ private struct SplashView: View {
                         .scaleEffect(markScale)
                         .opacity(markOpacity)
                 }
-                VStack(spacing: 6) {
+                VStack(spacing: SpaceToken.s8) {
                     Text("帧澈 ZENCHE")
                         .font(.system(size: 28, weight: .bold)) // 品牌名字号，品牌资产豁免
                         .foregroundStyle(IPalette.ink)
@@ -299,7 +314,7 @@ struct RootView: View {
                     : IPalette.paper)
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
+                VStack(spacing: SpaceToken.s0) {
                     // The compact monitor is a dedicated camera surface, and
                     // capture now renders the fig1 control top bar inside the
                     // page. Keep the shared header for the remaining pages.
@@ -311,7 +326,7 @@ struct RootView: View {
                     }
 
                     if proxy.size.width >= 820 {
-                        HStack(spacing: 0) {
+                        HStack(spacing: SpaceToken.s0) {
                             SideNavigation()
                             Divider().overlay(IPalette.rule)
                             CurrentPage()
@@ -393,14 +408,14 @@ private struct AppHeader: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        HStack(spacing: horizontalSizeClass == .compact ? 8 : 12) {
+        HStack(spacing: horizontalSizeClass == .compact ? SpaceToken.s8 : SpaceToken.s12) {
             // v1.5.9 实测修复：fig1 批次引入 brand 后，非拍照页顶栏冒出多余 logo，
             // 摘除品牌块（顶栏保留连接胶囊 + 设置钮）。
             Spacer(minLength: horizontalSizeClass == .compact ? 2 : 8)
             connectionButton
             settingsButton
         }
-        .padding(.horizontal, horizontalSizeClass == .compact ? 12 : 16)
+        .padding(.horizontal, horizontalSizeClass == .compact ? SpaceToken.s12 : SpaceToken.s16)
         .frame(minHeight: horizontalSizeClass == .compact ? 60 : 68)
         .background(IPalette.surface)
         .overlay(alignment: .bottom) {
@@ -413,7 +428,7 @@ private struct AppHeader: View {
         Button {
             model.showingConnection = true
         } label: {
-            HStack(spacing: 7) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill(connectionColor)
                     .frame(width: 8, height: 8)
@@ -421,7 +436,7 @@ private struct AppHeader: View {
                     .lineLimit(1)
             }
             .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, horizontalSizeClass == .compact ? 10 : 12)
+            .padding(.horizontal, horizontalSizeClass == .compact ? SpaceToken.s8 : SpaceToken.s12)
             .frame(minHeight: 44)
             .background(connectionColor.opacity(0.10), in: Capsule())
             .overlay {
@@ -464,7 +479,7 @@ private struct SideNavigation: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: SpaceToken.s8) {
             ZStack {
                 RoundedRectangle(cornerRadius: RadiusToken.r8)
                     .fill(
@@ -479,19 +494,19 @@ private struct SideNavigation: View {
                     .font(.system(size: 16, weight: .heavy)) // 侧栏 Z 标字号，品牌资产豁免
                     .foregroundStyle(.white)
             }
-            .padding(.bottom, 10)
+            .padding(.bottom, SpaceToken.s8)
             groupLabel("创作")
             navigationButton(.capture)
             navigationButton(.monitor)
             navigationButton(.editor)
-            Divider().padding(.vertical, 6)
+            Divider().padding(.vertical, SpaceToken.s8)
             groupLabel("管理")
             navigationButton(.devices)
             navigationButton(.library)
             Spacer()
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 16)
+        .padding(.horizontal, SpaceToken.s8)
+        .padding(.vertical, SpaceToken.s16)
         .frame(width: 108)
         .background(IPalette.paperSecondary)
     }
@@ -501,7 +516,7 @@ private struct SideNavigation: View {
             .font(.caption2.monospaced().weight(.semibold))
             .foregroundStyle(IPalette.muted)
             .frame(width: 78, alignment: .leading)
-            .padding(.leading, 4)
+            .padding(.leading, SpaceToken.s4)
     }
 
     private func navigationButton(_ section: AppSection) -> some View {
@@ -510,7 +525,7 @@ private struct SideNavigation: View {
         return Button {
             model.section = section
         } label: {
-            VStack(spacing: 7) {
+            VStack(spacing: SpaceToken.s8) {
                 Image(systemName: section.icon)
                     .font(.system(size: 20, weight: active ? .semibold : .medium)) // 导航图标尺寸，图标豁免族
                 RuntimeLocalizedText(section.rawValue)
@@ -549,7 +564,7 @@ private struct BottomNavigation: View {
     }
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: SpaceToken.s4) {
             // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
             // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
             // iOS 宽屏 SideNavigation 的「我的设备」保留。
@@ -558,9 +573,9 @@ private struct BottomNavigation: View {
             navTab(.editor, title: "编辑")
             navTab(.library, title: "分支")
         }
-        .padding(.horizontal, 8)
-        .padding(.top, 7)
-        .padding(.bottom, max(7, bottomInset))
+        .padding(.horizontal, SpaceToken.s8)
+        .padding(.top, SpaceToken.s8)
+        .padding(.bottom, max(SpaceToken.s8, bottomInset))
         .background(
             controlSurface ? IPalette.uiBackground : IPalette.surface
         )
@@ -600,7 +615,7 @@ private struct BottomNavigation: View {
         title: String,
         active: Bool
     ) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: SpaceToken.s4) {
             Image(systemName: icon)
                 .font(.system(size: FontToken.title, weight: active ? .semibold : .medium))
             RuntimeLocalizedText(title)
@@ -631,7 +646,7 @@ private struct GlobalStatusBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpaceToken.s8) {
             Image(systemName: connected ? "link" : "info.circle")
                 .foregroundStyle(connected ? IPalette.positive : IPalette.muted)
             RuntimeLocalizedText(model.statusMessage)
@@ -645,9 +660,9 @@ private struct GlobalStatusBar: View {
         }
         .font(.system(size: FontToken.caption, weight: .medium, design: .monospaced))
         .foregroundStyle(IPalette.ink.opacity(0.8))
-        .padding(.horizontal, 14)
-        .padding(.top, 8)
-        .padding(.bottom, max(8, bottomInset))
+        .padding(.horizontal, SpaceToken.s12)
+        .padding(.top, SpaceToken.s8)
+        .padding(.bottom, max(SpaceToken.s8, bottomInset))
         // Keep the home indicator visible in the light capture shell while
         // still following the monitor's forced dark appearance automatically.
         .background(IPalette.surface)
@@ -677,13 +692,13 @@ private struct MyDevicesPage: View {
     @EnvironmentObject private var model: AppModel
 
     private let cardColumns = [
-        GridItem(.adaptive(minimum: 280, maximum: 420), spacing: 16)
+        GridItem(.adaptive(minimum: 280, maximum: 420), spacing: SpaceToken.s16)
     ]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: SpaceToken.s20) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
                     Text("我的设备")
                         .font(.system(size: DeviceFontSize.heading, weight: .bold))
                         .foregroundStyle(IPalette.ink)
@@ -703,14 +718,14 @@ private struct MyDevicesPage: View {
                         in: RoundedRectangle(cornerRadius: RadiusToken.r20)
                     )
                 } else {
-                    LazyVGrid(columns: cardColumns, spacing: 16) {
+                    LazyVGrid(columns: cardColumns, spacing: SpaceToken.s16) {
                         ForEach(model.rememberedDevices.devices) { device in
                             RememberedDeviceCard(device: device)
                         }
                     }
                 }
             }
-            .padding(22)
+            .padding(SpaceToken.s20)
         }
         .background(IPalette.paper)
     }
@@ -726,7 +741,7 @@ private struct RememberedDeviceCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: SpaceToken.s0) {
             Image(device.imageAssetName)
                 .resizable()
                 .scaledToFill()
@@ -737,13 +752,13 @@ private struct RememberedDeviceCard: View {
                     Text(device.vendor)
                         .font(.caption2.monospaced().weight(.bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, SpaceToken.s8)
+                        .padding(.vertical, SpaceToken.s8)
                         .background(IPalette.hudBgSoft, in: Capsule())
-                        .padding(12)
+                        .padding(SpaceToken.s12)
                 }
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(device.name)
                         .font(.headline)
@@ -759,7 +774,7 @@ private struct RememberedDeviceCard: View {
                 Label("\(device.vendor) · \(device.transport)", systemImage: "cable.connector")
                     .font(.subheadline)
                     .foregroundStyle(IPalette.muted)
-                HStack(spacing: 4) {
+                HStack(spacing: SpaceToken.s4) {
                     Text("最近连接")
                     Text("·")
                     Text(
@@ -772,7 +787,7 @@ private struct RememberedDeviceCard: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(IPalette.muted)
 
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     Button {
                         model.camera.connect(deviceID: device.id)
                     } label: {
@@ -797,7 +812,7 @@ private struct RememberedDeviceCard: View {
                     .accessibilityLabel(Text("忘记设备"))
                 }
             }
-            .padding(16)
+            .padding(SpaceToken.s16)
         }
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r20))
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
@@ -1709,7 +1724,7 @@ private struct EditorMediaRail<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Label("媒体池", systemImage: "photo.stack")
                 .font(.caption.monospaced().weight(.bold))
                 .foregroundStyle(.white)
@@ -1717,7 +1732,7 @@ private struct EditorMediaRail<Content: View>: View {
             content
             Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(SpaceToken.s12)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(IPalette.editorPanel)
         .foregroundStyle(.white)
@@ -1733,14 +1748,14 @@ private struct EditorToolRail<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 Label("检查器", systemImage: "slider.horizontal.3")
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(.white)
                 Rectangle().fill(IPalette.editorRule).frame(height: 1)
                 content
             }
-            .padding(12)
+            .padding(SpaceToken.s12)
         }
         .frame(maxHeight: .infinity)
         .background(IPalette.editorPanel)
@@ -1756,8 +1771,8 @@ private struct EditorScopeDock: View {
     let metrics: String?
 
     var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: SpaceToken.s8) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                 Text("编辑示波器")
                     .font(.system(size: EditorFontSize.tiny, weight: .bold, design: .monospaced))
                     .foregroundStyle(IPalette.whiteFaint)
@@ -1774,7 +1789,7 @@ private struct EditorScopeDock: View {
 
             ScopePlot(label: "RGB", traces: traces)
         }
-        .padding(10)
+        .padding(SpaceToken.s8)
         .background(IPalette.editorPanel)
     }
 }
@@ -1933,7 +1948,7 @@ private struct ImageEditorPage: View {
                 editorBranchMenu(branch, depth: 0)
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 if let item = selectedItem,
                    let image = UIImage(contentsOfFile: item.url.path) {
                     Image(uiImage: image)
@@ -1959,7 +1974,7 @@ private struct ImageEditorPage: View {
         Button {
             selectedItemID = item.id
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 if let image = UIImage(contentsOfFile: item.url.path) {
                     Image(uiImage: image)
                         .resizable()
@@ -2002,7 +2017,7 @@ private struct ImageEditorPage: View {
     var body: some View {
         GeometryReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
                     PageTitle(
                         title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
                         subtitle: selectedSection == .aiTools
@@ -2016,7 +2031,7 @@ private struct ImageEditorPage: View {
                         compactEditorFlow
                     }
                 }
-                .padding(20)
+                .padding(SpaceToken.s20)
             }
         }
         .onAppear {
@@ -2072,7 +2087,7 @@ private struct ImageEditorPage: View {
     /// row, the five-tool rail, and the scope dock between 1px rules on the
     /// shared editor background. No cards, no gradients, square corners.
     private var editorControlStrip: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: SpaceToken.s0) {
             editorMediaRow
                 .frame(height: 52)
             editorHairline
@@ -2090,7 +2105,7 @@ private struct ImageEditorPage: View {
     }
 
     private var editorMediaRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             Text(
                 RuntimeLocalization.format(
                     "媒体池 %lld",
@@ -2113,18 +2128,18 @@ private struct ImageEditorPage: View {
                 .foregroundStyle(IPalette.editorLabel)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, SpaceToken.s12)
     }
 
     private var editorToolStrip: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpaceToken.s8) {
             editorToolButton(.wheels, icon: .colorWheel)
             editorToolButton(.curves, icon: .curve)
             editorToolButton(.mask, icon: .mask)
             editorToolButton(.geometry, icon: .geometry)
             editorToolButton(.aiTools, icon: .ai)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, SpaceToken.s8)
     }
 
     /// fig2 tool rail: five monochrome tools, brand orange marks the active
@@ -2140,7 +2155,7 @@ private struct ImageEditorPage: View {
         return Button {
             selectedSection = section
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: SpaceToken.s4) {
                 EditorToolIconShape(icon: icon)
                     .stroke(
                         tint,
@@ -2190,7 +2205,7 @@ private struct ImageEditorPage: View {
                     .foregroundStyle(IPalette.whiteGhost)
             }
         } canvasArea: {
-            VStack(spacing: 10) {
+            VStack(spacing: SpaceToken.s8) {
                 if selectedSection == .aiTools {
                     aiToolsToolbar
                 } else {
@@ -2200,7 +2215,7 @@ private struct ImageEditorPage: View {
                 preview
                 sectionSelector
             }
-            .padding(10)
+            .padding(SpaceToken.s8)
             .background(IPalette.editorBg)
         } toolRail: {
             EditorToolRail {
@@ -2252,7 +2267,7 @@ private struct ImageEditorPage: View {
     }
 
     private var aiToolsToolbar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             editorPhotoPicker.frame(maxWidth: 340, alignment: .leading)
             Spacer()
             if aiResultImage != nil {
@@ -2264,9 +2279,9 @@ private struct ImageEditorPage: View {
     }
 
     private var aiToolsPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
+            HStack(alignment: .center, spacing: SpaceToken.s8) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Label("AI 创作", systemImage: "sparkles")
                         .font(.headline)
                     Text("修图覆盖原图 · 生图保存新文件")
@@ -2277,14 +2292,14 @@ private struct ImageEditorPage: View {
                 Text(ActivationManager.isActivated ? "已解锁 · 剩余 \(ActivationManager.remainingUsage) 次" : "需要激活")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ActivationManager.isActivated ? IPalette.positive : IPalette.muted)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, SpaceToken.s8)
                     .frame(minHeight: 28)
                     .background(
                         ActivationManager.isActivated ? IPalette.positive.opacity(0.12) : IPalette.paperSecondary,
                         in: Capsule()
                     )
             }
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 ForEach(AiImageMode.allCases) { mode in
                     Button {
                         aiMode = mode
@@ -2299,7 +2314,7 @@ private struct ImageEditorPage: View {
                     .foregroundStyle(aiMode == mode ? Color.white : IPalette.ink)
                 }
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 Text("提示词").font(.subheadline.weight(.semibold))
                 TextField(aiMode == .edit ? "输入修图描述…（可补充）" : "输入生图描述…（可补充）", text: Binding(
                     get: { aiManualPrompt },
@@ -2307,7 +2322,7 @@ private struct ImageEditorPage: View {
                 ), axis: .vertical)
                     .lineLimit(3...6).textFieldStyle(.roundedBorder)
             }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Text("可组合预设").font(.caption.weight(.semibold))
                     Spacer()
@@ -2317,7 +2332,7 @@ private struct ImageEditorPage: View {
                 ForEach(aiModules, id: \.0) { module in
                     Text(module.0).font(.caption2.weight(.semibold)).foregroundStyle(IPalette.muted)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: SpaceToken.s8) {
                             ForEach(module.1, id: \.self) { value in
                                 let key = "\(module.0):\(value)"
                                 Button(value) {
@@ -2336,14 +2351,14 @@ private struct ImageEditorPage: View {
                 }
                 Text("最终提示词：\(aiPrompt.isEmpty ? "—" : aiPrompt)").font(.caption2.monospaced()).foregroundStyle(IPalette.muted).lineLimit(3)
             }
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: SpaceToken.s12) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("宽高比").font(.caption).foregroundStyle(IPalette.muted)
                     Picker("宽高比", selection: $aiRatio) {
                         ForEach(AiAspectRatio.allCases) { r in Text(r.rawValue).tag(r) }
                     }.pickerStyle(.menu)
                 }
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("分辨率").font(.caption).foregroundStyle(IPalette.muted)
                     Picker("分辨率", selection: $aiResolution) {
                         ForEach(AiResolution.allCases) { r in Text(r.rawValue).tag(r) }
@@ -2368,7 +2383,7 @@ private struct ImageEditorPage: View {
                 .foregroundStyle(IPalette.muted)
                 .lineLimit(2)
         }
-        .padding(18).background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
+        .padding(SpaceToken.s16).background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay { RoundedRectangle(cornerRadius: RadiusToken.r14).stroke(IPalette.rule) }
     }
 
@@ -2425,14 +2440,14 @@ private struct ImageEditorPage: View {
         }
     }
     private var aiWorkbench: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+            HStack(spacing: SpaceToken.s8) {
                 Label("AI 智能修图 · 工作台", systemImage: "sparkles")
                     .font(.headline)
                 Text("设备端 · 照片不会上传")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(IPalette.cobalt)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, SpaceToken.s8)
                     .frame(minHeight: 26)
                     .background(IPalette.cobaltSoft, in: Capsule())
                 Spacer()
@@ -2444,14 +2459,14 @@ private struct ImageEditorPage: View {
                 .font(.subheadline)
                 .foregroundStyle(IPalette.muted)
             if let aiAnalysis {
-                HStack(spacing: 8) {
+                HStack(spacing: SpaceToken.s8) {
                     aiMetric("曝光", value: aiAnalysis.meanLuma, suffix: "%")
                     aiMetric("动态范围", value: aiAnalysis.contrast, suffix: "%")
                     aiMetric("色彩", value: aiAnalysis.saturation, suffix: "%")
                     aiMetric("细节", value: aiAnalysis.detail, suffix: "%")
                 }
             }
-            HStack(spacing: 12) {
+            HStack(spacing: SpaceToken.s12) {
                 Image(systemName: "circle.lefthalf.filled")
                     .foregroundStyle(IPalette.muted)
                 Slider(value: $aiIntensity, in: 0.35...1, step: 0.05)
@@ -2460,7 +2475,7 @@ private struct ImageEditorPage: View {
                     .foregroundStyle(IPalette.cobalt)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     Button {
                         analyzeAI()
                     } label: {
@@ -2526,7 +2541,7 @@ private struct ImageEditorPage: View {
                 }
             }
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .background(IPalette.cobaltSoft.opacity(0.6), in: RoundedRectangle(cornerRadius: RadiusToken.r12))
         .overlay {
             RoundedRectangle(cornerRadius: RadiusToken.r12)
@@ -2535,7 +2550,7 @@ private struct ImageEditorPage: View {
     }
 
     private func aiMetric(_ title: String, value: Double, suffix: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: SpaceToken.s4) {
             Text(LocalizedStringKey(title))
                 .font(.caption2)
                 .foregroundStyle(IPalette.muted)
@@ -2544,13 +2559,13 @@ private struct ImageEditorPage: View {
                 .foregroundStyle(IPalette.ink)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 9)
+        .padding(.horizontal, SpaceToken.s8)
         .frame(minHeight: 44)
         .background(IPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: RadiusToken.r8))
     }
 
     private var editorToolbar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             editorPhotoPicker.frame(maxWidth: 340, alignment: .leading)
 
             Menu {
@@ -2631,7 +2646,7 @@ private struct ImageEditorPage: View {
     }
 
     private var nikonCloudPreviewNotice: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             Label("尼康云创预览", systemImage: "camera.filters")
                 .font(.subheadline.weight(.semibold))
             Text(
@@ -2648,7 +2663,7 @@ private struct ImageEditorPage: View {
                 .font(.caption)
                 .foregroundStyle(IPalette.muted)
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, SpaceToken.s12)
         .frame(minHeight: 44)
         .background(IPalette.cobaltSoft.opacity(0.55), in: RoundedRectangle(cornerRadius: RadiusToken.r10))
         .overlay {
@@ -2673,7 +2688,7 @@ private struct ImageEditorPage: View {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .padding(12)
+                        .padding(SpaceToken.s12)
                 } else {
                     ContentUnavailableView(
                         "选择一张照片开始编辑",
@@ -2694,20 +2709,20 @@ private struct ImageEditorPage: View {
                     Text(showingOriginal ? "原图" : "调整后")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, SpaceToken.s8)
                         .frame(minHeight: 30)
                         .background(IPalette.hudBgSoft)
                         .clipShape(Capsule())
-                        .padding(12)
+                        .padding(SpaceToken.s12)
                 } else if image != nil {
                     Text(aiResultImage != nil ? "AI 生成" : "原图")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, SpaceToken.s8)
                         .frame(minHeight: 30)
                         .background(IPalette.hudBgSoft)
                         .clipShape(Capsule())
-                        .padding(12)
+                        .padding(SpaceToken.s12)
                 }
             }
             .coordinateSpace(name: "editorPreview")
@@ -2806,7 +2821,7 @@ private struct ImageEditorPage: View {
 
     private var sectionSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 ForEach(EditorAdjustmentSection.allCases) { section in
                     Button(LocalizedStringKey(section.rawValue)) {
                         selectedSection = section
@@ -2823,7 +2838,7 @@ private struct ImageEditorPage: View {
 
     @ViewBuilder
     private var adjustmentPanel: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SpaceToken.s12) {
             switch selectedSection {
             case .light:
                 editorSlider(
@@ -2877,7 +2892,7 @@ private struct ImageEditorPage: View {
                 EmptyView()
             }
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .background(
             IPalette.surface,
             in: RoundedRectangle(cornerRadius: RadiusToken.r16)
@@ -2889,10 +2904,10 @@ private struct ImageEditorPage: View {
     }
 
     private var colorWheelsPanel: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Text("三向色轮 · Lift / Gamma / Gain")
                 .font(.subheadline.weight(.semibold))
-            HStack(spacing: 12) {
+            HStack(spacing: SpaceToken.s12) {
                 EditorColorWheel(title: "暗部 · Lift", x: $settings.wheelLiftX, y: $settings.wheelLiftY, tint: .blue)
                 EditorColorWheel(title: "中间调 · Gamma", x: $settings.wheelGammaX, y: $settings.wheelGammaY, tint: .green)
                 EditorColorWheel(title: "高光 · Gain", x: $settings.wheelGainX, y: $settings.wheelGainY, tint: .orange)
@@ -2904,7 +2919,7 @@ private struct ImageEditorPage: View {
     }
 
     private var curvesPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Text("主曲线")
                 .font(.subheadline.weight(.semibold))
             GeometryReader { proxy in
@@ -2974,15 +2989,15 @@ private struct ImageEditorPage: View {
     }
 
     private var pickerPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Text("颜色取样器")
                 .font(.subheadline.weight(.semibold))
-            HStack(spacing: 12) {
+            HStack(spacing: SpaceToken.s12) {
                 RoundedRectangle(cornerRadius: RadiusToken.r8)
                     .fill(pickerColor)
                     .frame(width: 48, height: 48)
                     .overlay { RoundedRectangle(cornerRadius: RadiusToken.r8).stroke(IPalette.rule) }
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text(pickerSample).font(.caption.monospaced())
                     Text("从当前照片中心读取 RGB")
                         .font(.caption)
@@ -2998,7 +3013,7 @@ private struct ImageEditorPage: View {
     }
 
     private var maskPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Text("蒙版列表")
                 .font(.subheadline.weight(.semibold))
             if settings.maskLayers.isEmpty {
@@ -3007,10 +3022,10 @@ private struct ImageEditorPage: View {
                     .foregroundStyle(IPalette.muted)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             } else {
-                VStack(spacing: 6) {
+                VStack(spacing: SpaceToken.s8) {
                     ForEach(settings.maskLayers) { layer in
                         let displayed = settings.displayedMaskLayer(layer)
-                        HStack(spacing: 8) {
+                        HStack(spacing: SpaceToken.s8) {
                             Button {
                                 settings.selectMaskLayer(layer.id)
                                 activeMaskStrokeID = nil
@@ -3037,7 +3052,7 @@ private struct ImageEditorPage: View {
                             .labelsHidden()
                             .accessibilityLabel(layer.isVisible ? "隐藏蒙版" : "显示蒙版")
                         }
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, SpaceToken.s8)
                         .frame(minHeight: 48)
                         .background(
                             settings.activeMaskLayerID == layer.id
@@ -3057,7 +3072,7 @@ private struct ImageEditorPage: View {
                     }
                 }
             }
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 Button {
                     settings.createMaskLayer()
                     activeMaskStrokeID = nil
@@ -3078,7 +3093,7 @@ private struct ImageEditorPage: View {
                 .buttonStyle(.bordered)
                 .disabled(!settings.maskEnabled)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 Button {
                     settings.ensureMaskLayer()
                     if settings.maskType.isEmpty {
@@ -3110,8 +3125,8 @@ private struct ImageEditorPage: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(IPalette.muted)
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 104), spacing: 8)],
-                spacing: 8
+                columns: [GridItem(.adaptive(minimum: 104), spacing: SpaceToken.s8)],
+                spacing: SpaceToken.s8
             ) {
                 ForEach(
                     ["智能主体", "智能天空", "智能背景", "智能人物", "智能亮部", "智能暗部"],
@@ -3177,7 +3192,7 @@ private struct ImageEditorPage: View {
     }
 
     private var geometryControls: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             HStack {
                 Text("裁切比例")
                     .font(.subheadline.weight(.semibold))
@@ -3189,7 +3204,7 @@ private struct ImageEditorPage: View {
                 }
                 .pickerStyle(.menu)
             }
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 Button {
                     settings.rotation = (settings.rotation + 90) % 360
                 } label: {
@@ -3211,7 +3226,7 @@ private struct ImageEditorPage: View {
     }
 
     private var editorFooter: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpaceToken.s12) {
             Button("全部重置") {
                 resetAdjustments()
             }
@@ -3827,7 +3842,7 @@ private struct ImageEditorPage: View {
         step: Double,
         formatter: @escaping (Double) -> String
     ) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpaceToken.s12) {
             Text(LocalizedStringKey(title))
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 84, alignment: .leading)
@@ -4183,7 +4198,7 @@ private struct EditorSectionButtonStyle: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(selected ? .white : IPalette.ink)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, SpaceToken.s16)
             .frame(minHeight: 44)
             .background(
                 selected ? IPalette.cobalt : IPalette.surface,
@@ -4218,7 +4233,7 @@ private struct EditorColorWheel: View {
     let tint: Color
 
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: SpaceToken.s4) {
             ZStack {
                 Circle()
                     .stroke(
@@ -4227,7 +4242,7 @@ private struct EditorColorWheel: View {
                     )
                 Circle()
                     .fill(IPalette.graphite)
-                    .padding(8)
+                    .padding(SpaceToken.s8)
                 Circle()
                     .fill(tint)
                     .frame(width: 8, height: 8)
@@ -4264,7 +4279,7 @@ private struct CapturePage: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: SpaceToken.s12) {
                     ControlTopBar {
                         showingFullscreen = true
                     }
@@ -4288,7 +4303,7 @@ private struct CapturePage: View {
                     ShootingTaskCard()
                         .id("captureShootingTasks")
                 }
-                .padding(horizontalSizeClass == .compact ? 16 : 20)
+                .padding(horizontalSizeClass == .compact ? SpaceToken.s16 : SpaceToken.s20)
             }
         }
         .fullScreenCover(isPresented: $showingFullscreen) {
@@ -4304,7 +4319,7 @@ private struct ControlTopBar: View {
     var openFullscreen: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpaceToken.s12) {
             Menu {
                 Button {
                     model.showingConnection = true
@@ -4390,8 +4405,8 @@ private struct ControlStatusRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
@@ -4411,7 +4426,7 @@ private struct ControlStatusRow: View {
                     RuntimeLocalizedText(transportTitle)
                         .font(.system(size: FontToken.body, weight: .semibold))
                         .foregroundStyle(capsuleTint)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, SpaceToken.s12)
                         .frame(height: 44)
                         .background(capsuleTint.opacity(0.14), in: Capsule())
                         .overlay {
@@ -4478,15 +4493,15 @@ private struct ControlStatusCardGrid: View {
             if horizontalSizeClass == .compact {
                 LazyVGrid(
                     columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
+                        GridItem(.flexible(), spacing: SpaceToken.s8),
+                        GridItem(.flexible(), spacing: SpaceToken.s8)
                     ],
-                    spacing: 10
+                    spacing: SpaceToken.s8
                 ) {
                     cards
                 }
             } else {
-                HStack(spacing: 10) { cards }
+                HStack(spacing: SpaceToken.s8) { cards }
             }
         }
     }
@@ -4530,8 +4545,8 @@ private struct ControlStatusCardGrid: View {
         value: String,
         subtitle: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: SpaceToken.s4) {
+            HStack(spacing: SpaceToken.s8) {
                 Image(systemName: icon)
                     .font(.system(size: FontToken.body, weight: .semibold))
                 Text(LocalizedStringKey(title))
@@ -4549,15 +4564,15 @@ private struct ControlStatusCardGrid: View {
                 .foregroundStyle(IPalette.uiLabel)
                 .lineLimit(1)
         }
-        .padding(12)
+        .padding(SpaceToken.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
     }
 
     private var storageCard: some View {
         let info = MonitorStorageInfo.current
-        return VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
+        return VStack(alignment: .leading, spacing: SpaceToken.s4) {
+            HStack(spacing: SpaceToken.s8) {
                 Image(systemName: "externaldrive")
                     .font(.system(size: FontToken.body, weight: .semibold))
                     .foregroundStyle(IPalette.uiAccent)
@@ -4576,14 +4591,14 @@ private struct ControlStatusCardGrid: View {
                 .foregroundStyle(.white)
             ProgressView(value: info.progress)
                 .tint(IPalette.uiAccent)
-            HStack(spacing: 4) {
+            HStack(spacing: SpaceToken.s4) {
                 Text("剩余录制")
                 Text(info.minutesRemaining)
             }
             .font(.system(size: FontToken.caption, weight: .medium))
             .foregroundStyle(IPalette.uiLabel)
         }
-        .padding(12)
+        .padding(SpaceToken.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay {
@@ -4663,8 +4678,8 @@ private struct ControlParameterGrid: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s8) {
                 Text("拍摄参数")
                     .font(.system(size: FontToken.emphasis, weight: .bold))
                     .foregroundStyle(.white)
@@ -4677,7 +4692,7 @@ private struct ControlParameterGrid: View {
                     editing.toggle()
                 }
             }
-            LazyVGrid(columns: columns, spacing: 10) {
+            LazyVGrid(columns: columns, spacing: SpaceToken.s8) {
                 ForEach(visibleTiles) { tile in
                     parameterTile(tile)
                 }
@@ -4687,8 +4702,8 @@ private struct ControlParameterGrid: View {
 
     private var columns: [GridItem] {
         horizontalSizeClass == .compact
-            ? Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-            : [GridItem(.adaptive(minimum: 150), spacing: 10)]
+            ? Array(repeating: GridItem(.flexible(), spacing: SpaceToken.s8), count: 3)
+            : [GridItem(.adaptive(minimum: 150), spacing: SpaceToken.s8)]
     }
 
     private var visibleTiles: [Tile] {
@@ -4704,7 +4719,7 @@ private struct ControlParameterGrid: View {
             Text(LocalizedStringKey(title))
                 .font(.system(size: FontToken.body, weight: .semibold))
                 .foregroundStyle(active ? Color.black : Color.white)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, SpaceToken.s12)
                 .frame(height: 44)
                 .background(
                     active ? IPalette.uiAccent : IPalette.uiSecondary,
@@ -4716,8 +4731,8 @@ private struct ControlParameterGrid: View {
 
     private func parameterTile(_ tile: Tile) -> some View {
         let hidden = hiddenTiles.contains(tile.id)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+        return VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s8) {
                 Image(systemName: tile.symbol)
                     .font(.system(size: FontToken.body, weight: .medium))
                 Text(LocalizedStringKey(tile.id))
@@ -4738,7 +4753,7 @@ private struct ControlParameterGrid: View {
                     Text("AUTO")
                         .font(.system(size: FontToken.caption, weight: .bold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 5)
+                        .padding(.horizontal, SpaceToken.s4)
                         .frame(height: 18)
                         .background(IPalette.uiBlue, in: Capsule())
                 }
@@ -4750,7 +4765,7 @@ private struct ControlParameterGrid: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
         }
-        .padding(12)
+        .padding(SpaceToken.s12)
         .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .opacity(editing && hidden ? 0.35 : 1)
@@ -4786,15 +4801,15 @@ private struct ControlCaptureDock: View {
             Spacer()
             switchCameraButton
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, SpaceToken.s8)
+        .padding(.vertical, SpaceToken.s8)
     }
 
     private var libraryButton: some View {
         Button {
             model.section = .library
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: SpaceToken.s4) {
                 Group {
                     if let item = model.library.items.first,
                        !item.isVideo,
@@ -4839,7 +4854,7 @@ private struct ControlCaptureDock: View {
                         ? IPalette.uiAccent
                         : IPalette.uiLabel
                 )
-                .padding(.horizontal, 14)
+                .padding(.horizontal, SpaceToken.s12)
                 .frame(height: 44)
                 .overlay {
                     Capsule()
@@ -4877,14 +4892,14 @@ private struct ControlCaptureDock: View {
 
     private var intButton: some View {
         Button(action: scrollToTasks) {
-            HStack(spacing: 5) {
+            HStack(spacing: SpaceToken.s4) {
                 Image(systemName: "timer")
                     .font(.system(size: FontToken.body, weight: .semibold))
                 Text("INT")
                     .font(.system(size: SettingsFontSize.linkLabel, weight: .bold)) // v1.5.7 F2: 13 等值映射 SettingsFontSize.linkLabel
             }
             .foregroundStyle(IPalette.uiAccent)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, SpaceToken.s12)
             .frame(height: 44)
             .overlay {
                 Capsule()
@@ -4930,7 +4945,7 @@ private struct CaptureScopeBar: View {
             parade: false
         )
         .frame(height: 78)
-        .padding(5)
+        .padding(SpaceToken.s4)
         .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
             RoundedRectangle(cornerRadius: RadiusToken.r5)
@@ -4959,7 +4974,7 @@ private struct CameraStage: View {
                         .scaledToFill()
                         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
                 } else {
-                    VStack(spacing: 13) {
+                    VStack(spacing: SpaceToken.s12) {
                         Image(systemName: "wifi")
                             .font(.system(size: 46, weight: .light)) // 空态图标尺寸，图标豁免族
                             .foregroundStyle(IPalette.whiteMid)
@@ -4968,7 +4983,7 @@ private struct CameraStage: View {
                              : model.wifiCamera.liveViewStatus)
                             .font(.title3.weight(.semibold))
                     }
-                    .padding(30)
+                    .padding(SpaceToken.s32)
                     .foregroundStyle(Color.white)
                 }
             } else if model.camera.state == .ready {
@@ -4995,11 +5010,11 @@ private struct CameraStage: View {
                 if model.showSafeGuide {
                     RoundedRectangle(cornerRadius: RadiusToken.r10)
                         .stroke(Color.yellow.opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [7]))
-                        .padding(30)
+                        .padding(SpaceToken.s32)
                         .allowsHitTesting(false)
                 }
             } else {
-                VStack(spacing: 13) {
+                VStack(spacing: SpaceToken.s12) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 46, weight: .light)) // 空态图标尺寸，图标豁免族
                         .foregroundStyle(IPalette.whiteMid)
@@ -5014,7 +5029,7 @@ private struct CameraStage: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
-                .padding(30)
+                .padding(SpaceToken.s32)
                 .foregroundStyle(Color.white)
             }
         }
@@ -5023,7 +5038,7 @@ private struct CameraStage: View {
             contentMode: .fit
         )
         .overlay(alignment: .topLeading) {
-            HStack(spacing: 7) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill((model.wifiCamera.isConnected || model.camera.state == .ready)
                           ? Color.green : Color.red)
@@ -5034,11 +5049,11 @@ private struct CameraStage: View {
                     .textCase(.uppercase)
                     .font(.caption2.monospaced().weight(.semibold))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, SpaceToken.s8)
+            .padding(.vertical, SpaceToken.s8)
             .foregroundStyle(Color.white)
             .background(IPalette.hudBgSoft, in: Capsule())
-            .padding(12)
+            .padding(SpaceToken.s12)
         }
         .overlay(alignment: .topTrailing) {
             if let openFullscreen {
@@ -5051,7 +5066,7 @@ private struct CameraStage: View {
                 .buttonStyle(.borderedProminent)
                 .tint(IPalette.hudBg)
                 .foregroundStyle(.white)
-                .padding(12)
+                .padding(SpaceToken.s12)
                 .accessibilityLabel("打开全屏取景")
             }
         }
@@ -5060,10 +5075,10 @@ private struct CameraStage: View {
                 Text("系统视频 · \(model.camera.activeVideoSpecLabel)")
                 .font(.caption2.monospaced().weight(.semibold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页角标改纯白
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.horizontal, SpaceToken.s8)
+                .padding(.vertical, SpaceToken.s8)
                 .background(IPalette.hudBgSoft, in: Capsule())
-                .padding(12)
+                .padding(SpaceToken.s12)
             }
         }
     }
@@ -5169,15 +5184,15 @@ private struct ImmersiveCameraView: View {
                         parameterBar
                         exposureReadout
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, SpaceToken.s20)
+                    .padding(.vertical, SpaceToken.s12)
 
                     HStack {
                         leftRail
                         Spacer()
                         rightRail
                     }
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, SpaceToken.s16)
 
                     VStack {
                         Spacer()
@@ -5185,7 +5200,7 @@ private struct ImmersiveCameraView: View {
                             immersiveScopeDock
                             Spacer()
                         }
-                        .padding(.leading, 18)
+                        .padding(.leading, SpaceToken.s16)
                         .padding(.bottom, 184)
                     }
                 } else {
@@ -5197,14 +5212,14 @@ private struct ImmersiveCameraView: View {
                         exposureReadout
                         portraitCaptureShelf
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, SpaceToken.s12)
+                    .padding(.vertical, SpaceToken.s12)
 
                     HStack {
                         leftRail
                         Spacer()
                     }
-                    .padding(.leading, 14)
+                    .padding(.leading, SpaceToken.s12)
                     .padding(.bottom, 208)
                 }
             }
@@ -5227,7 +5242,7 @@ private struct ImmersiveCameraView: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpaceToken.s12) {
             Button {
                 dismiss()
             } label: {
@@ -5237,7 +5252,7 @@ private struct ImmersiveCameraView: View {
             }
             .buttonStyle(ImmersiveControlStyle())
 
-            HStack(spacing: 7) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill(cameraReady ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
@@ -5245,7 +5260,7 @@ private struct ImmersiveCameraView: View {
                     .lineLimit(1)
             }
             .font(.caption.monospaced().weight(.semibold))
-            .padding(.horizontal, 12)
+            .padding(.horizontal, SpaceToken.s12)
             .frame(height: 44)
             .background(IPalette.hudBgSoft, in: Capsule())
 
@@ -5259,14 +5274,14 @@ private struct ImmersiveCameraView: View {
                     : "暂无图像源"
             )
                 .font(.caption2.monospaced().weight(.semibold))
-                .padding(.horizontal, 12)
+                .padding(.horizontal, SpaceToken.s12)
                 .frame(height: 44)
                 .background(IPalette.hudBgSoft, in: Capsule())
         }
     }
 
     private var portraitTopBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             Button {
                 dismiss()
             } label: {
@@ -5276,7 +5291,7 @@ private struct ImmersiveCameraView: View {
             .buttonStyle(ImmersiveControlStyle())
             .accessibilityLabel("退出全屏")
 
-            HStack(spacing: 7) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill(cameraReady ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
@@ -5284,7 +5299,7 @@ private struct ImmersiveCameraView: View {
                     .lineLimit(1)
             }
             .font(.caption2.monospaced().weight(.semibold))
-            .padding(.horizontal, 10)
+            .padding(.horizontal, SpaceToken.s8)
             .frame(height: 44)
             .background(IPalette.hudBgSoft, in: Capsule())
 
@@ -5294,14 +5309,14 @@ private struct ImmersiveCameraView: View {
                 ? mode == .video ? model.camera.activeVideoSpecLabel : "JPEG"
                 : "—")
                 .font(.caption2.monospaced().weight(.bold))
-                .padding(.horizontal, 10)
+                .padding(.horizontal, SpaceToken.s8)
                 .frame(height: 44)
                 .background(IPalette.hudBgSoft, in: Capsule())
         }
     }
 
     private var leftRail: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SpaceToken.s12) {
             Text(cameraReady
                 ? mode == .photo ? "M" : "\(Int(model.camera.activeFrameRate))P"
                 : "—")
@@ -5338,7 +5353,7 @@ private struct ImmersiveCameraView: View {
     }
 
     private var rightRail: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: SpaceToken.s12) {
             RuntimeLocalizedText(mode.title)
                 .font(.headline)
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 全屏监看标题不再用 mode.accent 彩色
@@ -5407,7 +5422,7 @@ private struct ImmersiveCameraView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, SpaceToken.s8)
         .frame(minWidth: 88, maxHeight: .infinity, alignment: .leading)
         .background(IPalette.uiCard.opacity(0.86))
     }
@@ -5415,7 +5430,7 @@ private struct ImmersiveCameraView: View {
     /// Compact real-data scope dock; histogram traces are sourced from the
     /// active camera and audio truthfully remains a silent baseline.
     private var immersiveScopeDock: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: SpaceToken.s8) {
             ScopePlot(
                 label: "RGB",
                 traces: [
@@ -5429,7 +5444,7 @@ private struct ImmersiveCameraView: View {
             AudioScopePlot(label: "AUDIO")
                 .frame(width: 86, height: 78)
         }
-        .padding(5)
+        .padding(SpaceToken.s4)
         .background(IPalette.uiBackground.opacity(0.86))
         .overlay {
             RoundedRectangle(cornerRadius: RadiusToken.r5)
@@ -5441,7 +5456,7 @@ private struct ImmersiveCameraView: View {
 
     /// Right-side tools stay separate from the red record/shutter action.
     private var immersiveToolRail: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: SpaceToken.s8) {
             Button {
                 model.showGrid.toggle()
             } label: {
@@ -5489,17 +5504,17 @@ private struct ImmersiveCameraView: View {
                 .accessibilityLabel("峰值对焦")
             }
         }
-        .padding(5)
+        .padding(SpaceToken.s4)
         .background(IPalette.uiCard.opacity(0.78))
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
     }
 
     private var portraitCaptureShelf: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: SpaceToken.s8) {
             RuntimeLocalizedText(mode.title)
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 全屏监看标题不再用 mode.accent 彩色
-            HStack(spacing: 24) {
+            HStack(spacing: SpaceToken.s24) {
                 Button {
                     model.showGrid.toggle()
                 } label: {
@@ -5521,7 +5536,7 @@ private struct ImmersiveCameraView: View {
                 )
             }
         }
-        .padding(.top, 4)
+        .padding(.top, SpaceToken.s4)
     }
 
     private var captureButton: some View {
@@ -5564,7 +5579,7 @@ private struct ImmersiveCameraView: View {
 
     private var exposureReadout: some View {
         let connected = model.camera.state == .ready
-        return HStack(spacing: 18) {
+        return HStack(spacing: SpaceToken.s16) {
             Text(connected
                  ? (mode == .video
                     ? String(format: "%.1f°", model.camera.shutterAngle)
@@ -5583,14 +5598,14 @@ private struct ImmersiveCameraView: View {
         }
         .font(.body.monospaced().weight(.semibold))
         .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 全屏监看读数改纯白
-        .padding(.horizontal, 16)
+        .padding(.horizontal, SpaceToken.s16)
         .frame(height: 44)
         .background(IPalette.hudBgSoft, in: Capsule())
     }
 
     private var parameterBar: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s8) {
                 Button {
                     showsParameters.toggle()
                 } label: {
@@ -5637,12 +5652,12 @@ private struct ImmersiveCameraView: View {
             }
         }
         .disabled(!cameraReady)
-        .padding(.bottom, 10)
+        .padding(.bottom, SpaceToken.s8)
     }
 
     @ViewBuilder
     private var primaryParameterControls: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpaceToken.s8) {
             if mode == .video {
                 Picker("视频快门表示", selection: $videoShutterMode) {
                     Text("快门角度").tag("angle")
@@ -5719,13 +5734,13 @@ private struct ImmersiveCameraView: View {
 
     @ViewBuilder
     private var secondaryParameterControls: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpaceToken.s8) {
             Button {
                 model.camera.triggerAutoFocus()
             } label: {
                 Label("AF-ON", systemImage: "viewfinder.circle")
                     .frame(height: 44)
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, SpaceToken.s8)
             }
             .buttonStyle(ImmersiveControlStyle())
             .disabled(model.camera.state != .ready)
@@ -5926,7 +5941,7 @@ private struct ImmersiveParameterStepper: View {
     let increase: () -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: SpaceToken.s8) {
             Button(action: decrease) {
                 Image(systemName: "minus")
                     .frame(width: 44, height: 44)
@@ -5981,14 +5996,14 @@ private struct CaptureParameterDeck: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             Text("拍摄控制")
                 .font(.headline)
 
             Label("曝光", systemImage: "camera.aperture")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页/全屏参数标签改纯白
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label("曝光补偿", systemImage: "plusminus")
                     Spacer()
@@ -6011,7 +6026,7 @@ private struct CaptureParameterDeck: View {
             Label("对焦与构图", systemImage: "viewfinder")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页/全屏参数标签改纯白
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label("本机镜头变焦", systemImage: "plus.magnifyingglass")
                     Spacer()
@@ -6031,9 +6046,9 @@ private struct CaptureParameterDeck: View {
             }
 
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 110), spacing: 10)],
+                columns: [GridItem(.adaptive(minimum: 110), spacing: SpaceToken.s8)],
                 alignment: .leading,
-                spacing: 10
+                spacing: SpaceToken.s8
             ) {
                 CapabilityChip(
                     title: "点按对焦",
@@ -6046,7 +6061,7 @@ private struct CaptureParameterDeck: View {
             }
 
         }
-        .padding(18)
+        .padding(SpaceToken.s16)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
     }
@@ -6056,7 +6071,7 @@ private struct ShootingTaskCard: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             Text("拍摄自动化")
                 .font(.headline)
             Text("间隔、包围与 B 门任务集中管理")
@@ -6111,7 +6126,7 @@ private struct ShootingTaskCard: View {
             .buttonStyle(.borderedProminent)
             .disabled(model.camera.state != .ready && !model.shootingTaskRunning)
         }
-        .padding(18)
+        .padding(SpaceToken.s16)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
     }
@@ -6122,7 +6137,7 @@ private struct CapabilityChip: View {
     let available: Bool
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: SpaceToken.s4) {
             Image(
                 systemName: available
                     ? "checkmark.circle.fill"
@@ -6132,8 +6147,8 @@ private struct CapabilityChip: View {
         }
             .font(.caption.weight(.medium))
             .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 能力角标红绿字改纯白
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, SpaceToken.s8)
+            .padding(.vertical, SpaceToken.s8)
             .background(IPalette.whiteWash, in: Capsule())
     }
 }
@@ -6148,8 +6163,8 @@ private struct NikonCloudMonitorBar: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s12) {
                 Text("NP3")
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(Color.white)
@@ -6204,7 +6219,7 @@ private struct NikonCloudMonitorBar: View {
                 )
                 .lineLimit(2)
         }
-        .padding(12)
+        .padding(SpaceToken.s12)
         .frame(minHeight: 72)
         .background(
             usesDarkSurface
@@ -6268,7 +6283,7 @@ private struct NikonCloudMonitorPresetSheet: View {
                                 model.setMonitorNikonCloudPreset(preset)
                                 dismiss()
                             } label: {
-                                HStack(spacing: 10) {
+                                HStack(spacing: SpaceToken.s8) {
                                     Text(verbatim: preset.name)
                                         .foregroundStyle(IPalette.ink)
                                     Spacer()
@@ -6313,7 +6328,7 @@ private struct MonitorPage: View {
                 MonitorConsolePage()
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s16) {
                         PageTitle(
                             title: "视频监看",
                             subtitle: "系统视频设备预览、监看参数与输出规格。",
@@ -6326,9 +6341,9 @@ private struct MonitorPage: View {
                         NikonCloudMonitorBar()
                         MonitorRecordingBar()
                         LazyVGrid(
-                            columns: [GridItem(.adaptive(minimum: 280), spacing: 14)],
+                            columns: [GridItem(.adaptive(minimum: 280), spacing: SpaceToken.s12)],
                             alignment: .leading,
-                            spacing: 14
+                            spacing: SpaceToken.s12
                         ) {
                             if model.wifiCamera.isConnected {
                                 WifiMonitorParameterCard()
@@ -6337,7 +6352,7 @@ private struct MonitorPage: View {
                             MonitorOutputDeck()
                         }
                     }
-                    .padding(20)
+                    .padding(SpaceToken.s20)
                 }
             }
         }
@@ -6361,7 +6376,7 @@ private struct MonitorConsolePage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            VStack(spacing: 0) {
+            VStack(spacing: SpaceToken.s0) {
                 timecode
                     .frame(height: 102)
                     .frame(maxWidth: .infinity)
@@ -6370,26 +6385,26 @@ private struct MonitorConsolePage: View {
                 preview(width: proxy.size.width)
 
                 NikonCloudMonitorBar()
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                    .padding(.horizontal, SpaceToken.s12)
+                    .padding(.top, SpaceToken.s8)
 
-                VStack(spacing: 0) {
+                VStack(spacing: SpaceToken.s0) {
                     scopeStrip
-                        .padding(.top, 14)
+                        .padding(.top, SpaceToken.s12)
                     readoutStrip
-                        .padding(.top, 13)
+                        .padding(.top, SpaceToken.s12)
                     if model.wifiCamera.isConnected && model.camera.state != .ready {
                         wifiParameterStrip
-                            .padding(.top, 8)
+                            .padding(.top, SpaceToken.s8)
                     } else {
                         parameterStrip
-                            .padding(.top, 8)
+                            .padding(.top, SpaceToken.s8)
                     }
                     toolStrip
-                        .padding(.top, 12)
+                        .padding(.top, SpaceToken.s12)
                     Spacer(minLength: 10)
                     storageReadout
-                        .padding(.bottom, 18)
+                        .padding(.bottom, SpaceToken.s16)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(IPalette.monitorBackground)
@@ -6411,12 +6426,12 @@ private struct MonitorConsolePage: View {
     }
 
     private var timecode: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: SpaceToken.s8) {
             Text(timecodeText)
                 .font(.system(size: 32, weight: .semibold, design: .monospaced)) // v1.5.7 F2: 时间码大读数（孤立值，归 F5 数值裁决）
                 .foregroundStyle(.white)
                 .monospacedDigit()
-            HStack(spacing: 8) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill(model.isRecording ? IPalette.video : IPalette.whiteMist)
                     .frame(width: 7, height: 7)
@@ -6445,7 +6460,7 @@ private struct MonitorConsolePage: View {
                         .resizable()
                         .scaledToFit()
                 } else {
-                    VStack(spacing: 9) {
+                    VStack(spacing: SpaceToken.s8) {
                         Image(systemName: "wifi")
                             .font(.system(size: 34, weight: .light)) // 对焦框符号，图标豁免族
                         Text(model.wifiCamera.liveViewStatus.isEmpty
@@ -6496,7 +6511,7 @@ private struct MonitorConsolePage: View {
                         .allowsHitTesting(false)
                 }
             } else {
-                VStack(spacing: 9) {
+                VStack(spacing: SpaceToken.s8) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 34, weight: .light)) // 对焦框符号，图标豁免族
                     Text("等待相机画面")
@@ -6511,7 +6526,7 @@ private struct MonitorConsolePage: View {
         .aspectRatio(16 / 9, contentMode: .fit)
         .frame(maxWidth: .infinity)
         .overlay(alignment: .topLeading) {
-            HStack(spacing: 6) {
+            HStack(spacing: SpaceToken.s8) {
                 Circle()
                     .fill((model.wifiCamera.isConnected || connected) ? IPalette.positive : IPalette.video)
                     .frame(width: 6, height: 6)
@@ -6520,10 +6535,10 @@ private struct MonitorConsolePage: View {
                     .lineLimit(1)
             }
             .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页角标改纯白
-            .padding(.horizontal, 9)
+            .padding(.horizontal, SpaceToken.s8)
             .frame(height: 28)
             .background(IPalette.hudBgMid, in: Capsule())
-            .padding(10)
+            .padding(SpaceToken.s8)
         }
         .overlay(alignment: .topTrailing) {
             Button { showingFullscreen = true } label: {
@@ -6534,13 +6549,13 @@ private struct MonitorConsolePage: View {
                     .background(IPalette.hudBgMid, in: Circle())
             }
             .buttonStyle(.plain)
-            .padding(10)
+            .padding(SpaceToken.s8)
             .accessibilityLabel("打开全屏取景")
         }
     }
 
     private var scopeStrip: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             RGBWaveformCard()
             Button {
                 model.toggleVideoRecording()
@@ -6566,12 +6581,12 @@ private struct MonitorConsolePage: View {
             .disabled(!model.videoRecordingAvailable)
             AudioWaveformCard()
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, SpaceToken.s16)
         .frame(height: 92)
     }
 
     private var readoutStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: SpaceToken.s0) {
             ConsoleReadout(label: "帧率", value: String(format: "%.0f", model.camera.activeFrameRate))
             ConsoleReadout(label: "快门", value: shutterSpeed)
             ConsoleReadout(label: "光圈", value: model.camera.lensAperture > 0 ? String(format: "f/%.1f", model.camera.lensAperture) : "—", dimmed: model.camera.lensAperture <= 0)
@@ -6580,11 +6595,11 @@ private struct MonitorConsolePage: View {
             ConsoleReadout(label: "编码", value: connected ? model.monitorVideoCodec.shortLabel : "—")
             ConsoleReadout(label: "色调", value: String(format: "%+.0f", model.camera.exposureBias * 50))
         }
-        .padding(.horizontal, 17)
+        .padding(.horizontal, SpaceToken.s16)
     }
 
     private var parameterStrip: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SpaceToken.s8) {
             MonitorConsoleStepper(
                 title: "帧率",
                 value: "\(Int(model.camera.activeFrameRate))p",
@@ -6607,7 +6622,7 @@ private struct MonitorConsolePage: View {
                 increase: { adjustVideoISO(1) }
             )
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, SpaceToken.s16)
     }
 
     /// C3：Wi‑Fi 相机参数卡（ISO/光圈/快门经 PTP/IP 属性读写，
@@ -6615,7 +6630,7 @@ private struct MonitorConsolePage: View {
     private var wifiParameterStrip: some View {
         let enabled = model.wifiCamera.isConnected
             && model.wifiCamera.vendor != .unknown
-        return HStack(spacing: 8) {
+        return HStack(spacing: SpaceToken.s8) {
             MonitorConsoleStepper(
                 title: "快门",
                 value: wifiShutterText,
@@ -6638,7 +6653,7 @@ private struct MonitorConsolePage: View {
                 increase: { model.wifiCamera.stepISO(1) }
             )
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, SpaceToken.s16)
     }
 
     private var wifiShutterText: String {
@@ -6694,7 +6709,7 @@ private struct MonitorConsolePage: View {
     }
 
     private var toolStrip: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: SpaceToken.s0) {
             ConsoleToolButton(title: "AF-ON", icon: "viewfinder.circle", active: model.camera.supportsFocusPoint) {
                 model.camera.triggerAutoFocus()
             }
@@ -6714,17 +6729,17 @@ private struct MonitorConsolePage: View {
                 showingFullscreen = true
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, SpaceToken.s20)
     }
 
     private var storageReadout: some View {
         let info = MonitorStorageInfo.current
-        return HStack(spacing: 13) {
+        return HStack(spacing: SpaceToken.s12) {
             Image(systemName: "iphone")
                 .font(.system(size: 33, weight: .light)) // storage 图标尺寸，图标豁免族
                 .frame(width: 60)
                 .foregroundStyle(IPalette.whiteHi)
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("\(info.minutesRemaining)")
                         .font(.system(size: 25, weight: .bold, design: .monospaced)) // v1.5.7 F2: 剩余录制读数（孤立值，归 F5 数值裁决）
@@ -6748,7 +6763,7 @@ private struct MonitorConsolePage: View {
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页状态文字改纯白
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, SpaceToken.s12)
         .frame(width: 286, height: 91)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r8))
         .overlay(alignment: .leading) {
@@ -6813,7 +6828,7 @@ private struct ScopePlot: View {
             .background(IPalette.scopeBg)
 
             if parade {
-                HStack(spacing: 0) {
+                HStack(spacing: SpaceToken.s0) {
                     Text("R").frame(maxWidth: .infinity)
                     Text("G").frame(maxWidth: .infinity)
                     Text("B").frame(maxWidth: .infinity)
@@ -7085,7 +7100,7 @@ private struct ProfessionalScopeBoard: View {
                 parade: false
             )
         }
-        .padding(4)
+        .padding(SpaceToken.s4)
         .background(Color.black)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("专业波形图，RGB 三通道叠加")
@@ -7100,7 +7115,7 @@ private struct MonitorConsoleStepper: View {
     let increase: () -> Void
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: SpaceToken.s4) {
             Button(action: decrease) {
                 Image(systemName: "minus").frame(width: 30, height: 32)
             }
@@ -7138,7 +7153,7 @@ private struct ConsoleReadout: View {
     var dimmed = false
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: SpaceToken.s8) {
             Text(label)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页读数标签改纯白
@@ -7161,7 +7176,7 @@ private struct ConsoleToolButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: SpaceToken.s4) {
                 Image(systemName: icon)
                     .font(.system(size: FontToken.display, weight: .light))
                     .frame(width: 44, height: 44)
@@ -7226,14 +7241,14 @@ private struct WifiMonitorParameterCard: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             Text("Wi‑Fi 相机参数")
                 .font(.headline)
             Text("ISO / 光圈 / 快门经 PTP/IP 属性读写（0x1015/0x1016），连接后自动读取。")
                 .font(.subheadline)
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
 
-            HStack(spacing: 10) {
+            HStack(spacing: SpaceToken.s8) {
                 MonitorConsoleStepper(
                     title: "快门",
                     value: wifiShutterText,
@@ -7261,7 +7276,7 @@ private struct WifiMonitorParameterCard: View {
                 .font(.caption)
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
@@ -7292,7 +7307,7 @@ private struct MonitorParameterDeck: View {
     @State private var videoShutterMode = "angle"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             Text("参数调节")
                 .font(.headline)
             Text("按当前视频设备公开的能力调整。")
@@ -7314,7 +7329,7 @@ private struct MonitorParameterDeck: View {
             }
             .pickerStyle(.segmented)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label(
                         videoShutterMode == "angle" ? "快门角度" : "快门速度",
@@ -7376,7 +7391,7 @@ private struct MonitorParameterDeck: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label("ISO 感光度", systemImage: "camera.metering.center.weighted")
                     Spacer()
@@ -7411,7 +7426,7 @@ private struct MonitorParameterDeck: View {
                 .font(.caption)
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label("曝光补偿", systemImage: "plusminus")
                     Spacer()
@@ -7430,7 +7445,7 @@ private struct MonitorParameterDeck: View {
                 .disabled(model.camera.state != .ready || !model.camera.supportsExposureBias)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 HStack {
                     Label("本机镜头变焦", systemImage: "plus.magnifyingglass")
                     Spacer()
@@ -7456,7 +7471,7 @@ private struct MonitorParameterDeck: View {
             }
             .toggleStyle(.switch)
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.uiCard, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
@@ -7482,7 +7497,7 @@ private struct MonitorOutputDeck: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             Text("系统视频输出")
                 .font(.headline)
 
@@ -7570,7 +7585,7 @@ private struct MonitorOutputDeck: View {
                 )
             )
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 ProfessionalScopeBoard(
                     red: model.camera.redHistogram,
                     green: model.camera.greenHistogram,
@@ -7581,7 +7596,7 @@ private struct MonitorOutputDeck: View {
                     .font(.caption.monospaced())
                     .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页读数改纯白
             }
-            .padding(8)
+            .padding(SpaceToken.s8)
             .background(Color.black, in: RoundedRectangle(cornerRadius: RadiusToken.r10))
 
             Text("H.264、H.265 与设备公开的 ProRes 编码会直接应用到系统录制输出。N-RAW 与 N-Log 需要兼容 Nikon 机身控制；当前 iOS/UVC 来源不支持时会锁定并给出原因。")
@@ -7589,7 +7604,7 @@ private struct MonitorOutputDeck: View {
                 .foregroundStyle(.white) // v1.5.7 issue 655a0a14: 视频页说明文字改纯白
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.whiteWash, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
     }
@@ -7607,7 +7622,7 @@ private struct CaptureSessionCard: View {
 
     var body: some View {
         DisclosureGroup {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 TextField("项目名称", text: $name)
                 TextField("命名模板", text: $namingTemplate)
                     .font(.body.monospaced())
@@ -7631,7 +7646,7 @@ private struct CaptureSessionCard: View {
                     .buttonStyle(.borderedProminent)
                 }
             }
-            .padding(.top, 12)
+            .padding(.top, SpaceToken.s12)
         } label: {
             Label(
                 "拍前会话与交付",
@@ -7641,7 +7656,7 @@ private struct CaptureSessionCard: View {
             )
             .font(.headline)
         }
-        .padding(18)
+        .padding(SpaceToken.s16)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
         .onAppear(perform: loadConfiguration)
@@ -7844,12 +7859,12 @@ private struct LibraryBranchRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: SpaceToken.s4) {
+            HStack(spacing: SpaceToken.s8) {
                 Button {
                     store.toggle(branch.id)
                 } label: {
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpaceToken.s8) {
                         Image(
                             systemName: store.expandedIDs.contains(branch.id)
                                 ? "chevron.down"
@@ -7891,7 +7906,7 @@ private struct LibraryBranchRow: View {
                 .accessibilityLabel("删除分支 \(branch.name)")
             }
             .frame(minHeight: 52)
-            .padding(.leading, CGFloat(depth) * 16)
+            .padding(.leading, CGFloat(depth) * SpaceToken.s16)
             .background(
                 isDropTarget
                     ? IPalette.cobaltSoft
@@ -7916,7 +7931,7 @@ private struct LibraryBranchRow: View {
             }
 
             if store.expandedIDs.contains(branch.id) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     ForEach(assignedItems) { item in
                         LibraryBranchFileRow(
                             item: item,
@@ -7930,7 +7945,7 @@ private struct LibraryBranchRow: View {
                         Text("拖动文件到这里")
                             .font(.caption)
                             .foregroundStyle(IPalette.muted)
-                            .padding(.leading, CGFloat(depth + 1) * 16 + 44)
+                            .padding(.leading, CGFloat(depth + 1) * SpaceToken.s16 + 44)
                             .frame(minHeight: 32, alignment: .leading)
                     }
                     ForEach(branch.children) { child in
@@ -7951,7 +7966,7 @@ private struct LibraryBranchRow: View {
                     Rectangle()
                         .fill(IPalette.rule)
                         .frame(width: 1)
-                        .padding(.leading, CGFloat(depth + 1) * 16 + 20)
+                        .padding(.leading, CGFloat(depth + 1) * SpaceToken.s16 + SpaceToken.s20)
                 }
             }
         }
@@ -7971,7 +7986,7 @@ private struct LibraryBranchFileRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: SpaceToken.s8) {
             Group {
                 if item.isVideo {
                     ZStack {
@@ -8001,8 +8016,8 @@ private struct LibraryBranchFileRow: View {
                 .foregroundStyle(IPalette.muted)
                 .accessibilityHidden(true)
         }
-        .padding(.leading, CGFloat(depth) * 16 + 28)
-        .padding(.trailing, 12)
+        .padding(.leading, CGFloat(depth) * SpaceToken.s16 + SpaceToken.s24)
+        .padding(.trailing, SpaceToken.s12)
         .frame(minHeight: 58)
         .background(
             selected ? IPalette.cobaltSoft : IPalette.surface,
@@ -8023,7 +8038,7 @@ private struct LibraryBranchFileRow: View {
         .draggable(item.id) {
             Label(item.filename, systemImage: "arrow.up.and.down.and.arrow.left.and.right")
                 .font(.caption.weight(.semibold))
-                .padding(10)
+                .padding(SpaceToken.s8)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: RadiusToken.r10))
         }
         .accessibilityHint("长按并拖动到其他分支")
@@ -8067,7 +8082,7 @@ private struct LibraryPage: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: SpaceToken.s16) {
                 HStack {
                     PageTitle(
                         title: "分支文件库",
@@ -8155,7 +8170,7 @@ private struct LibraryPage: View {
                 }
 
             }
-            .padding(20)
+            .padding(SpaceToken.s20)
         }
         .task {
             await loadSystemAlbum()
@@ -8285,12 +8300,12 @@ private struct LibraryPage: View {
 
     private var cameraStorageWorkspace: some View {
         DisclosureGroup(isExpanded: $cameraStorageExpanded) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 Text(cameraStorageCapacitySummary)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(IPalette.muted)
 
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     Button {
                         Task { await refreshCameraStorage() }
                     } label: {
@@ -8322,7 +8337,7 @@ private struct LibraryPage: View {
                     .disabled(cameraStorageBusy || selectableCameraStorageHandles.isEmpty)
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     Button {
                         Task { await downloadSelectedCameraStorage() }
                     } label: {
@@ -8359,7 +8374,7 @@ private struct LibraryPage: View {
                     )
                     .frame(maxWidth: .infinity, minHeight: 170)
                 } else {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: SpaceToken.s8) {
                         ForEach(cameraStorageSnapshot.items) { item in
                             CameraStorageItemRow(
                                 item: item,
@@ -8394,7 +8409,7 @@ private struct LibraryPage: View {
                     .foregroundStyle(IPalette.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 12)
+            .padding(.top, SpaceToken.s12)
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Label(
@@ -8407,7 +8422,7 @@ private struct LibraryPage: View {
                     .foregroundStyle(IPalette.muted)
             }
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay {
             RoundedRectangle(cornerRadius: RadiusToken.r18)
@@ -8508,13 +8523,13 @@ private struct LibraryPage: View {
     @ViewBuilder
     private var branchWorkspace: some View {
         if horizontalSizeClass == .compact {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         mobileBranchDrawerExpanded.toggle()
                     }
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: SpaceToken.s12) {
                         Image(
                             systemName: mobileBranchDrawerExpanded
                                 ? "chevron.down"
@@ -8546,7 +8561,7 @@ private struct LibraryPage: View {
                         )
                 }
             }
-            .padding(12)
+            .padding(SpaceToken.s12)
             .background(
                 IPalette.surface,
                 in: RoundedRectangle(cornerRadius: RadiusToken.r16)
@@ -8561,14 +8576,14 @@ private struct LibraryPage: View {
     }
 
     private var branchWorkspaceContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+            HStack(spacing: SpaceToken.s12) {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
                     .font(.system(size: 28, weight: .semibold)) // 图标尺寸，不受 FontToken 约束（豁免族）
                     .foregroundStyle(.white)
                     .frame(width: 54, height: 54)
                     .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("分支工作台")
                         .font(.title3.weight(.bold))
                     Text("长按文件并拖到任意分支；拖回“未分类”即可移出分支。")
@@ -8588,7 +8603,7 @@ private struct LibraryPage: View {
                 Text("先建立项目、客户或拍摄日分支，再把本地文件拖入；文件仍保留在原始存储位置。")
                     .font(.subheadline)
                     .foregroundStyle(IPalette.muted)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, SpaceToken.s8)
             } else {
                 ForEach(branchStore.branches) { branch in
                     LibraryBranchRow(
@@ -8658,7 +8673,7 @@ private struct LibraryPage: View {
                     }
                 }
             }
-            .padding(10)
+            .padding(SpaceToken.s8)
             .background(
                 unclassifiedDropTargeted
                     ? IPalette.cobaltSoft
@@ -8682,13 +8697,13 @@ private struct LibraryPage: View {
                 unclassifiedDropTargeted = $0
             }
         }
-        .padding(16)
+        .padding(SpaceToken.s16)
         .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
         .overlay(alignment: .leading) {
             RoundedRectangle(cornerRadius: RadiusToken.r5)
                 .fill(IPalette.cobalt)
                 .frame(width: 4)
-                .padding(.vertical, 18)
+                .padding(.vertical, SpaceToken.s16)
         }
         .overlay {
             RoundedRectangle(cornerRadius: RadiusToken.r18)
@@ -8699,8 +8714,8 @@ private struct LibraryPage: View {
     @ViewBuilder
     private func systemAlbumGrid(_ items: [SystemAlbumItem]) -> some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 140), spacing: 12)],
-            spacing: 12
+            columns: [GridItem(.adaptive(minimum: 140), spacing: SpaceToken.s12)],
+            spacing: SpaceToken.s12
         ) {
             ForEach(items) { item in
                 SystemAlbumThumbnail(item: item)
@@ -8715,8 +8730,8 @@ private struct LibraryPage: View {
     @ViewBuilder
     private func localLibraryGrid(_ items: [LibraryItem]) -> some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 150), spacing: 12)],
-            spacing: 12
+            columns: [GridItem(.adaptive(minimum: 150), spacing: SpaceToken.s12)],
+            spacing: SpaceToken.s12
         ) {
             ForEach(items) { item in
                 LibraryThumbnail(
@@ -8736,7 +8751,7 @@ private struct LibraryPage: View {
                         systemImage: "arrow.up.and.down.and.arrow.left.and.right"
                     )
                     .font(.caption.weight(.semibold))
-                    .padding(10)
+                    .padding(SpaceToken.s8)
                     .background(
                         .regularMaterial,
                         in: RoundedRectangle(cornerRadius: RadiusToken.r10)
@@ -8788,7 +8803,7 @@ private struct CameraStorageItemRow: View {
     @State private var thumbnail: UIImage?
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SpaceToken.s12) {
             Button(action: toggleSelection) {
                 Image(
                     systemName: selected
@@ -8819,7 +8834,7 @@ private struct CameraStorageItemRow: View {
             .frame(width: 76, height: 54)
             .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                 Text(item.filename)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
@@ -8830,7 +8845,7 @@ private struct CameraStorageItemRow: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(8)
+        .padding(SpaceToken.s8)
         .background(
             selected ? IPalette.cobaltSoft : IPalette.paperSecondary,
             in: RoundedRectangle(cornerRadius: RadiusToken.r12)
@@ -8879,7 +8894,7 @@ private struct SystemAlbumThumbnail: View {
     @State private var thumbnail: UIImage?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
             ZStack(alignment: .bottomTrailing) {
                 if let thumbnail {
                     Image(uiImage: thumbnail)
@@ -8898,10 +8913,10 @@ private struct SystemAlbumThumbnail: View {
                     )
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, SpaceToken.s8)
+                    .padding(.vertical, SpaceToken.s4)
                     .background(IPalette.hudBg, in: Capsule())
-                    .padding(7)
+                    .padding(SpaceToken.s8)
                 }
             }
             .frame(height: 116)
@@ -8912,7 +8927,7 @@ private struct SystemAlbumThumbnail: View {
                 .font(.caption2.monospaced())
                 .lineLimit(1)
         }
-        .padding(7)
+        .padding(SpaceToken.s8)
         .background(IPalette.surfaceRaised, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay(
             RoundedRectangle(cornerRadius: RadiusToken.r14)
@@ -8961,7 +8976,7 @@ private struct SystemAlbumPreviewView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .padding(12)
+                    .padding(SpaceToken.s12)
             } else {
                 ProgressView("正在载入照片…")
                     .tint(.white)
@@ -8982,7 +8997,7 @@ private struct SystemAlbumPreviewView: View {
                     Text("系统相册 · \(item.name)")
                         .font(.caption.monospaced())
                         .lineLimit(1)
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, SpaceToken.s12)
                         .frame(height: 38)
                         .background(IPalette.hudBg, in: Capsule())
                 }
@@ -9048,11 +9063,11 @@ private struct CloudDriveGuideView: View {
                         Button {
                             openURL(provider.url)
                         } label: {
-                            HStack(spacing: 12) {
+                            HStack(spacing: SpaceToken.s12) {
                                 Image(systemName: "externaldrive.connected.to.line.below")
                                     .frame(width: 32, height: 32)
                                     .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: RadiusToken.r8))
-                                VStack(alignment: .leading, spacing: 3) {
+                                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                                     RuntimeLocalizedText(provider.name)
                                         .font(.headline)
                                     RuntimeLocalizedText(provider.note)
@@ -9109,7 +9124,7 @@ private struct LibraryLargePhotoView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .padding(12)
+                    .padding(SpaceToken.s12)
             } else {
                 ContentUnavailableView(
                     "无法显示大图",
@@ -9148,7 +9163,7 @@ private struct LibraryLargePhotoView: View {
                 Text(item.filename)
                     .font(.caption.monospaced())
                     .foregroundStyle(.white)
-                    .padding(8)
+                    .padding(SpaceToken.s8)
                     .background(IPalette.hudBg, in: Capsule())
             }
             .padding()
@@ -9166,7 +9181,7 @@ private struct LibraryThumbnail: View {
     let selected: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
             Group {
                 if item.isVideo {
                     ZStack {
@@ -9195,9 +9210,9 @@ private struct LibraryThumbnail: View {
             Text(item.filename)
                 .font(.caption2.monospaced())
                 .lineLimit(1)
-                .padding(.horizontal, 3)
+                .padding(.horizontal, SpaceToken.s4)
         }
-        .padding(7)
+        .padding(SpaceToken.s8)
         .background(
             RoundedRectangle(cornerRadius: RadiusToken.r14)
                 .fill(selected ? Color.accentColor.opacity(0.16) : IPalette.surfaceRaised)
@@ -9214,9 +9229,9 @@ private struct WifiCameraTransferCard: View {
 
     var body: some View {
         SettingsCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Label("Wi‑Fi 相机 · PTP/IP", systemImage: "wifi")
                             .font(.headline)
                         Text("相机控制")
@@ -9256,7 +9271,7 @@ private struct WifiCameraTransferCard: View {
                 RuntimeLocalizedText(model.wifiCamera.connectionMode.guidance)
                     .font(.caption)
                     .foregroundStyle(IPalette.muted)
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     TextField(
                         "相机 IP 地址",
                         text: Binding(
@@ -9318,12 +9333,12 @@ private struct WirelessTransferCard: View {
     @EnvironmentObject private var model: AppModel
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: SpaceToken.s12) {
             WifiCameraTransferCard()
             SettingsCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 HStack {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Label(
                             "多协议无线图片收件箱",
                             systemImage: "tray.and.arrow.down"
@@ -9349,7 +9364,7 @@ private struct WirelessTransferCard: View {
                     .foregroundStyle(IPalette.muted)
 
                 if model.wireless.isRunning {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Text("FTP/PASV  \(model.wireless.hostAddress):\(WirelessTransferServer.port)")
                             .font(.body.monospaced().weight(.semibold))
                             .textSelection(.enabled)
@@ -9408,13 +9423,13 @@ private struct AppSettingsSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
                     SettingsSectionHeader(
                         title: "通用",
                         detail: "界面语言与本地保存偏好"
                     )
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s12) {
                             Label("语言", systemImage: "globe")
                                 .font(.headline)
                             Picker("界面语言", selection: $model.language) {
@@ -9443,7 +9458,7 @@ private struct AppSettingsSheet: View {
                         detail: "蓝牙遥控与拍摄定位"
                     )
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s12) {
                             Toggle(
                                 isOn: Binding(
                                     get: { model.livePhotoEnabled },
@@ -9530,7 +9545,7 @@ private struct AppSettingsSheet: View {
                         detail: "当前平台使用的连接后端"
                     )
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Label("尼康官方 SDK", systemImage: "checkmark.seal")
                                 .font(.headline)
                             Text("官方桌面 SDK 不提供当前平台运行库")
@@ -9542,7 +9557,7 @@ private struct AppSettingsSheet: View {
                     }
 
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Label("索尼官方 SDK", systemImage: "camera.aperture")
                                 .font(.headline)
                             Text("官方桌面 SDK 不提供当前平台运行库")
@@ -9560,17 +9575,17 @@ private struct AppSettingsSheet: View {
                     UpdateSettingsCard(updater: model.updater)
 
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s12) {
                             Label("诊断日志", systemImage: "doc.text.magnifyingglass")
                                 .font(.headline)
                             Text("按日写入、5 MB 滚动并保留 14 天；查询与上传前会自动脱敏。")
                                 .font(.subheadline)
                                 .foregroundStyle(IPalette.muted)
                             ViewThatFits(in: .horizontal) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: SpaceToken.s8) {
                                     logButtons
                                 }
-                                VStack(spacing: 10) {
+                                VStack(spacing: SpaceToken.s8) {
                                     logButtons
                                 }
                             }
@@ -9581,10 +9596,10 @@ private struct AppSettingsSheet: View {
                     }
 
                     SettingsCard {
-                        HStack(alignment: .top, spacing: 10) {
+                        HStack(alignment: .top, spacing: SpaceToken.s8) {
                             Image(systemName: "key.fill").font(.system(size: FontToken.title, weight: .semibold)).foregroundStyle(IPalette.cobalt)
                                 .frame(width: 36, height: 36).background(IPalette.cobaltSoft).clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                                 Text("AI 功能激活").font(.system(size: FontToken.emphasis, weight: .bold))
                                 Text("AI 修图与生图功能需购买激活码解锁，次数由 AI 服务统一统计。").font(.system(size: FontToken.body)).foregroundStyle(IPalette.muted)
                                 if ActivationManager.isActivated {
@@ -9593,7 +9608,7 @@ private struct AppSettingsSheet: View {
                             }
                             Spacer()
                         }
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Button {
                                 UIApplication.shared.open(zencheWebsiteURL)
                             } label: {
@@ -9639,7 +9654,7 @@ private struct AppSettingsSheet: View {
                                 .font(.caption2)
                                 .foregroundStyle(IPalette.muted)
                         }
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             HStack {
                                 Text("我的设备 ID")
                                     .font(.system(size: FontToken.body, weight: .semibold))
@@ -9672,7 +9687,7 @@ private struct AppSettingsSheet: View {
                             }.buttonStyle(.borderedProminent)
                         }
                         Divider()
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Text("恢复设备码")
                                 .font(.system(size: SettingsFontSize.linkLabel, weight: .semibold))
                             TextField("旧设备 ID", text: $oldDeviceId)
@@ -9697,11 +9712,11 @@ private struct AppSettingsSheet: View {
                     }
 
                     SettingsCard {
-                        HStack(spacing: 14) {
+                        HStack(spacing: SpaceToken.s12) {
                             Image(systemName: "cup.and.saucer.fill")
                                 .font(.title2)
                                 .foregroundStyle(.orange)
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                                 Text("喜欢 帧澈 ZENCHE？")
                                     .font(.headline)
                                 Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
@@ -9718,7 +9733,7 @@ private struct AppSettingsSheet: View {
                     }
 
                     SettingsCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Label("隐私", systemImage: "lock.shield")
                                 .font(.headline)
                             Text("帧澈 ZENCHE 不上传照片，也不包含分析服务。只有你点击上传并在 GitHub 确认时，预览中的脱敏日志才会发送。")
@@ -9727,7 +9742,7 @@ private struct AppSettingsSheet: View {
                         }
                     }
                 }
-                .padding(20)
+                .padding(SpaceToken.s20)
             }
             .background(IPalette.paper)
             .navigationTitle(
@@ -9832,14 +9847,14 @@ private struct SettingsSectionHeader: View {
     let detail: LocalizedStringKey
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: SpaceToken.s4) {
             Text(title)
                 .font(.title3.weight(.bold))
             Text(detail)
                 .font(.subheadline)
                 .foregroundStyle(IPalette.muted)
         }
-        .padding(.top, 8)
+        .padding(.top, SpaceToken.s8)
     }
 }
 
@@ -9848,7 +9863,7 @@ private struct UpdateSettingsCard: View {
 
     var body: some View {
         SettingsCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 Toggle(isOn: $updater.automaticallyChecksForUpdates) {
                     Label("自动检查更新", systemImage: "arrow.triangle.2.circlepath")
                         .font(.headline)
@@ -9865,7 +9880,7 @@ private struct UpdateSettingsCard: View {
                 .textContentType(.password)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .padding(.horizontal, 12)
+                .padding(.horizontal, SpaceToken.s12)
                 .frame(height: 44)
                 .background(IPalette.paper)
                 .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
@@ -9881,7 +9896,7 @@ private struct UpdateSettingsCard: View {
                     .buttonStyle(.borderless)
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     RuntimeLocalizedText(updater.statusText)
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
@@ -9917,7 +9932,7 @@ private struct DiagnosticLogViewer: View {
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
+                    .padding(SpaceToken.s16)
             }
             .background(IPalette.paper)
             .navigationTitle("最近诊断日志")
@@ -9939,13 +9954,13 @@ private struct FastFeedbackCallout: View {
     let openAfdian: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(alignment: .top, spacing: SpaceToken.s12) {
                 Image(systemName: "bolt.horizontal.circle.fill")
                     .font(.title2)
                     .foregroundStyle(IPalette.cobalt)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("快速问题反馈")
                         .font(.headline)
                     Text("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。")
@@ -9966,7 +9981,7 @@ private struct FastFeedbackCallout: View {
             }
             .buttonStyle(.bordered)
         }
-        .padding(14)
+        .padding(SpaceToken.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(IPalette.cobaltSoft, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay(
@@ -9982,8 +9997,8 @@ private struct DonationSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
+                    HStack(spacing: SpaceToken.s12) {
                         Image(systemName: "heart.fill")
                             .font(.title2)
                             .foregroundStyle(IPalette.cobalt)
@@ -9992,7 +10007,7 @@ private struct DonationSheet: View {
                                 IPalette.cobaltSoft,
                                 in: RoundedRectangle(cornerRadius: RadiusToken.r14)
                             )
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s4) {
                             Text("爱发电赞助")
                                 .font(.title2.bold())
                             Text("扫描二维码，或打开爱发电主页支持项目。")
@@ -10023,14 +10038,14 @@ private struct DonationSheet: View {
                         )
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("软件功能永久免费，赞助为自愿行为。")
                         Text("赞助不会解锁软件功能，也不影响公开 Issue 的处理。")
                     }
                     .font(.caption)
                     .foregroundStyle(IPalette.muted)
                 }
-                .padding(20)
+                .padding(SpaceToken.s20)
             }
             .background(IPalette.paper)
             .navigationTitle("爱发电赞助")
@@ -10052,15 +10067,15 @@ private struct LaunchAnnouncementSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
+                    HStack(spacing: SpaceToken.s12) {
                         Image(systemName: "sparkles.rectangle.stack.fill")
                             .font(.title2)
                             .foregroundStyle(Color.accentColor)
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s4) {
                             Text("本次更新")
                                 .font(.title3.bold())
-                            HStack(spacing: 4) {
+                            HStack(spacing: SpaceToken.s4) {
                                 Text("当前版本")
                                 Text(version)
                             }
@@ -10073,7 +10088,7 @@ private struct LaunchAnnouncementSheet: View {
                     .font(.subheadline)
                     .lineSpacing(5)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Label("谨防诈骗", systemImage: "exclamationmark.shield.fill")
                             .font(.headline)
                             .foregroundStyle(.red)
@@ -10081,12 +10096,12 @@ private struct LaunchAnnouncementSheet: View {
                         .font(.subheadline.weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(16)
+                    .padding(SpaceToken.s16)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.red.opacity(0.10))
                     .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Label("爱发电赞助", systemImage: "heart.fill")
                             .font(.headline)
                             .foregroundStyle(IPalette.cobalt)
@@ -10104,7 +10119,7 @@ private struct LaunchAnnouncementSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                         }
                     }
-                    .padding(16)
+                    .padding(SpaceToken.s16)
                     .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     .overlay(
                         RoundedRectangle(cornerRadius: RadiusToken.r16)
@@ -10114,7 +10129,7 @@ private struct LaunchAnnouncementSheet: View {
                     Button {
                         doNotRemind.toggle()
                     } label: {
-                        HStack(spacing: 10) {
+                        HStack(spacing: SpaceToken.s8) {
                             Image(
                                 systemName: doNotRemind
                                     ? "checkmark.square.fill"
@@ -10133,7 +10148,7 @@ private struct LaunchAnnouncementSheet: View {
                         .buttonStyle(.borderedProminent)
                         .frame(maxWidth: .infinity)
                 }
-                .padding(20)
+                .padding(SpaceToken.s20)
             }
             .background(IPalette.paper)
             .navigationTitle("更新公告")
@@ -10156,7 +10171,7 @@ private struct SettingsCard<Content: View>: View {
 
     var body: some View {
         content
-            .padding(18)
+            .padding(SpaceToken.s16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
             .overlay(RoundedRectangle(cornerRadius: RadiusToken.r18).stroke(IPalette.rule, lineWidth: 0.5))
@@ -10170,8 +10185,8 @@ private struct ConnectionSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Text("本机摄像头与 UVC")
                             .font(.headline)
 
@@ -10213,7 +10228,7 @@ private struct ConnectionSheet: View {
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         HStack {
                             Image(systemName: "camera.aperture")
                                 .font(.title2)
@@ -10229,7 +10244,7 @@ private struct ConnectionSheet: View {
                             .font(.subheadline)
                             .foregroundStyle(IPalette.muted)
                     }
-                    .padding(16)
+                    .padding(SpaceToken.s16)
                     .background(Color.yellow.opacity(0.075), in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     .overlay(
                         RoundedRectangle(cornerRadius: RadiusToken.r16)
@@ -10237,7 +10252,7 @@ private struct ConnectionSheet: View {
                     )
 
                     if model.camera.state == .ready {
-                        VStack(alignment: .leading, spacing: 7) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s8) {
                             Label(model.camera.deviceName, systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .font(.headline)
@@ -10249,12 +10264,12 @@ private struct ConnectionSheet: View {
                             .font(.subheadline)
                             .foregroundStyle(IPalette.muted)
                         }
-                        .padding(16)
+                        .padding(SpaceToken.s16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color.green.opacity(0.08), in: RoundedRectangle(cornerRadius: RadiusToken.r16))
                     }
                 }
-                .padding(20)
+                .padding(SpaceToken.s20)
             }
             .background(IPalette.paper)
             .navigationTitle("选择相机")
@@ -10286,11 +10301,11 @@ private struct ConnectionOption: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: SpaceToken.s12) {
                 Image(systemName: icon)
                     .font(.title2)
                     .frame(width: 38)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text(LocalizedStringKey(title))
                         .font(.headline)
                     Text(LocalizedStringKey(subtitle))
@@ -10301,7 +10316,7 @@ private struct ConnectionOption: View {
                 Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
                     .foregroundStyle(selected ? Color.green : Color.secondary)
             }
-            .padding(16)
+            .padding(SpaceToken.s16)
             .background(
                 selected ? Color.green.opacity(0.08) : IPalette.surfaceRaised,
                 in: RoundedRectangle(cornerRadius: RadiusToken.r16)
@@ -10324,12 +10339,12 @@ private struct PageTitle: View {
     var accent = IPalette.cobalt
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: SpaceToken.s12) {
             Capsule()
                 .fill(accent)
                 .frame(width: 4, height: 38)
                 .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                 Text(LocalizedStringKey(title))
                     .font(
                         .system(
@@ -10467,16 +10482,16 @@ private struct TimelapseComposerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 Text("选择序列帧（按文件名排序合成）并设置帧率与编码。损坏帧自动跳过。")
                     .font(.callout)
                     .foregroundStyle(IPalette.muted)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         ForEach(sortedPhotos) { item in
                             Toggle(isOn: binding(for: item.url)) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: SpaceToken.s8) {
                                     TimelapseFrameThumbnail(url: item.url)
                                         .frame(width: 52, height: 40)
                                         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r6))
@@ -10493,7 +10508,7 @@ private struct TimelapseComposerSheet: View {
                 .frame(minHeight: 220)
 
                 Divider()
-                HStack(spacing: 16) {
+                HStack(spacing: SpaceToken.s16) {
                     Picker("帧率", selection: $frameRate) {
                         Text("24 fps").tag(24)
                         Text("25 fps").tag(25)
@@ -10510,7 +10525,7 @@ private struct TimelapseComposerSheet: View {
                 .disabled(running)
 
                 if running {
-                    HStack(spacing: 12) {
+                    HStack(spacing: SpaceToken.s12) {
                         ProgressView(
                             value: Double(processed),
                             total: Double(max(1, selection.count))
@@ -10523,7 +10538,7 @@ private struct TimelapseComposerSheet: View {
                             .buttonStyle(.bordered)
                     }
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(spacing: SpaceToken.s12) {
                         Button {
                             startCompose()
                         } label: {
@@ -10547,7 +10562,7 @@ private struct TimelapseComposerSheet: View {
                         .foregroundStyle(IPalette.video)
                 }
             }
-            .padding(20)
+            .padding(SpaceToken.s20)
             .navigationTitle("合成延时视频")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -10651,16 +10666,16 @@ private struct FocusStackComposerSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
                 Text("选择焦点包围序列帧（按文件名排序合成，逐像素取最清晰帧融合）。损坏帧自动跳过。")
                     .font(.callout)
                     .foregroundStyle(IPalette.muted)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         ForEach(sortedPhotos) { item in
                             Toggle(isOn: binding(for: item.url)) {
-                                HStack(spacing: 10) {
+                                HStack(spacing: SpaceToken.s8) {
                                     TimelapseFrameThumbnail(url: item.url)
                                         .frame(width: 52, height: 40)
                                         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r6))
@@ -10679,7 +10694,7 @@ private struct FocusStackComposerSheet: View {
                 Divider()
 
                 if running {
-                    HStack(spacing: 12) {
+                    HStack(spacing: SpaceToken.s12) {
                         ProgressView(
                             value: Double(processed),
                             total: Double(max(1, selection.count))
@@ -10692,7 +10707,7 @@ private struct FocusStackComposerSheet: View {
                             .buttonStyle(.bordered)
                     }
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(spacing: SpaceToken.s12) {
                         Button {
                             startCompose()
                         } label: {
@@ -10716,7 +10731,7 @@ private struct FocusStackComposerSheet: View {
                         .foregroundStyle(IPalette.video)
                 }
             }
-            .padding(20)
+            .padding(SpaceToken.s20)
             .navigationTitle("焦点合成")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
