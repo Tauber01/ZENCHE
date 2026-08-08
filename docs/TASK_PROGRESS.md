@@ -1059,3 +1059,29 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 验证：npm test 360/360 全绿（359 + 1）；node --check server.mjs/测试均过。
 - 非阻断观察项（mtime 同值陈旧/死代码/URL 未编码/fetchRelease manifest 分支不可达）入 backlog 不修。
 - 红线：未 git push；未动生产。
+## 12.45 v1.5.9 Admin 监控系统·后端 API（pro 实施，2026-08-07，Tauber 15:03 指令）
+
+- 计划：PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md「后端契约」10 路由逐条实现，仅改 ai-server/app.mjs + 测试 + ai-server/admin/index.html 占位。
+- **通用约束**：全部 /v1/admin/* 仅当 ZENCHE_AI_ADMIN_SECRET 配置时存在（fail-closed 404）+ loopback + Bearer 常量时间比较；非 GET 变更写审计 JSONL（admin-audit.jsonl，追加+fsync，完整激活码不入日志，设备指纹 12 位截断）。
+- **路由**：1) GET /v1/admin/stats（扩展 expiring7d/exhausted/revoked）2) /stats/history?days=30（每日快照）3) /devices 列表（filter: all/active24h/active7d/expired/expiring7d/exhausted/revoked + query 子串 + cursor 分页 limit≤200）4) /devices/{id} 详情+迁移链 5) reset-usage（迁移链只作用 tail）6) extend-expiry（经回环 signer 签新码，未配置 503）7) revoke/unrevoke 8) note（≤500 字）9) /codes/issue（新码建档，已存在 409，signer 未配置 503）10) /admin/* 静态 SPA（ai-server/admin/，无 token，loopback 天然受限，路径穿越防护同 server.mjs 惯例）。
+- **吊销语义**：consume 与 rebind 入口检查 revoked → 403「该激活码已吊销」；verifyActivation 纯密码学不查库（未改）。
+- **趋势快照**：admin 启用时启动补当日行 + 每 6h 幂等追加 admin-stats-snapshots.jsonl（{date, ...adminStats()}）；写失败仅 console.error 不触发 fail-stop。
+- **设备记录扩展**：created_at（新记录）、revoked/revoked_at、note；旧记录缺省兼容。
+- 测试：test/admin-api.test.mjs（新）9 用例——fail-closed/认证门禁/stats 扩展计数/列表过滤分页查询/迁移链详情/各操作路径/signer 503/吊销后 consume+rebind 403 与 unrevoke 恢复/审计 JSONL 落盘无激活码/快照追加。npm test 364/364 全绿（基线 355 + 9）；node --check 通过。
+- 红线：未 git push；未动生产服务器 101.34.255.115；verifyActivation 密码学逻辑零改动。
+- 前端由 flash admin-web 分支承接（本支已预留 /admin/ 静态路由）。
+
+## 12.46 v1.5.9 admin API 门禁返修（pro，AI审查 门禁驳回 2 必修 + 1 联动必修）
+
+- 必修 1（分页 total 语义）：adminListDevices 改为「先全量匹配收集 → cursor/limit 截断」——total 恒为匹配总数（含 cursor 前页），不再被 limit break 截断。补测试：5 设备 limit=2 三页 total 恒 5。
+- 必修 2（迁移链后向环保护）：migrationChain 后向遍历（migrated_from 回溯）加 seenBack 环保护——成环即终止回溯，防事件循环挂死（DoS）。补测试：migrated_from 成环时详情接口 200 不死循环。
+- 联动必修 3（revoke/reset-usage 迁移 tail）：两操作解析 resolveMigrationTail 作用于 tail 当前记录（对链中间节点操作不再静默无效）；extend-expiry/note 保持操作指定设备（契约语义，PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md 已更新）。补测试：对中间节点 reset/revoke → 返回 tail 设备且 consume 403 验证。
+- 其余非阻断观察项（ADMIN_WEB_DIR 派生/时区/expiring7d 口径/readJsonBody 悬挂/%ZZ 500/issue deviceId 校验）按派工入 backlog 不修。
+- 验证：npm test 367/367 全绿（364 + 3）；node --check 通过；diff --check 干净。
+
+## 12.47 U2-S 间距令牌化·iOS+macOS（flash 实施，2026-08-08，合并 e513cd9）
+
+- 分支 agent/u2s-apple-spacing @ a7df7ad。iOS 394 处 + macOS 398 处（main 332/Settings 66）padding/spacing 字面量全量走 SpaceToken（9 档 4pt 栅格 s0–s40）；越界就近收敛每步漂移 ≤2pt；1-2pt 细线与 ≥44 触控目标豁免（注释注明）。
+- 契约测试两端 design-unify 各加间距用例（逐 token 白名单 + 枚举数下限防失明 + 禁用值裸数字归零）。AI审查 门禁亲验：注入坡道外字面量变红、摘除新用例则防护归零，检出能力属实。
+- 验证：npm test 361/361 全绿；macOS typecheck 0 error；iOS xcodebuild 模拟器 Debug + iphoneos Release 双 BUILD SUCCEEDED。
+- 范围：只动间距；圆角/颜色/字号/功能零改动。未 git push。

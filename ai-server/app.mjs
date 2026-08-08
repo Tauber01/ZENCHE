@@ -445,12 +445,20 @@ export function createApp(opts = {}) {
   function consume(deviceId, activation, expiry) {
     if (storageUnhealthy) return { status: 503, body: { error: "存储异常，服务暂不可用" } };
     const dev = devices[deviceId];
+    // Admin 吊销门禁：revoked 后 consume 必须 403（verifyActivation 是纯密码学不查库，
+    // 吊销检查在此层）。
+    if (dev && dev.revoked) {
+      return { status: 403, body: { error: "该激活码已吊销" } };
+    }
     if (dev && dev.migrated_to) {
       return { status: 409, body: { error: "该激活码已迁移，请使用新设备激活码" } };
     }
     if (!dev || dev.activation !== activation) {
       const failure = durableWrite(() => {
-        devices[deviceId] = { activation, expiry, used: 1, last_seen: Date.now() };
+        devices[deviceId] = {
+          activation, expiry, used: 1, last_seen: Date.now(),
+          created_at: Date.now(),
+        };
       });
       if (failure) return failure;
       return { allowed: true, used: 1, remaining: maxUsage - 1 };
@@ -521,6 +529,7 @@ export function createApp(opts = {}) {
     const tailSeen = new Map(); // tail -> newest last_seen
     const remaining = new Map(); // tail -> remaining (min across merged records)
     const tails = new Set();
+    const tailRecord = new Map(); // tail -> latest tail record (revoked/expiry)
     for (const [deviceId, record] of Object.entries(devices)) {
       if (!record || typeof record !== "object") continue;
       const tail = resolveMigrationTail(devices, deviceId);
@@ -530,6 +539,7 @@ export function createApp(opts = {}) {
       const rem = Math.max(0, maxUsage - (Number(record.used) || 0));
       const current = remaining.get(tail);
       if (current === undefined || rem < current) remaining.set(tail, rem);
+      if (deviceId === tail) tailRecord.set(tail, record);
     }
     const active24h = [...tailSeen.values()].filter((ts) => now - ts <= dayMs).length;
     const active7d = [...tailSeen.values()].filter((ts) => now - ts <= 7 * dayMs).length;
@@ -540,6 +550,10 @@ export function createApp(opts = {}) {
       high51to99: 0,
       full100: 0,
     };
+    let expiring7d = 0;
+    let exhausted = 0;
+    let revoked = 0;
+    const startOfToday = startOfTodayMs();
     for (const rem of remaining.values()) {
       if (rem <= 0) buckets.zero += 1;
       else if (rem <= 10) buckets.low1to10 += 1;
@@ -547,13 +561,43 @@ export function createApp(opts = {}) {
       else if (rem < maxUsage) buckets.high51to99 += 1;
       else buckets.full100 += 1;
     }
+    for (const [tail, record] of tailRecord.entries()) {
+      if (record.revoked) {
+        revoked += 1;
+        continue;
+      }
+      const rem = remaining.get(tail) ?? 0;
+      if (rem <= 0) exhausted += 1;
+      if (isExpiringWithinDays(record.expiry, 7, startOfToday)) expiring7d += 1;
+    }
     return {
       totalDevices: tails.size,
       active24h,
       active7d,
+      expiring7d,
+      exhausted,
+      revoked,
       remainingDistribution: buckets,
       generated_at: new Date(now).toISOString(),
     };
+  }
+
+  // 本地时区当日零点（与过期判定同一口径）。
+  function startOfTodayMs() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+
+  // 到期日在 [today, today+days) 区间（未过期但临近）返回 true。
+  function isExpiringWithinDays(expiry, days, startOfToday) {
+    if (!isValidExpiryDate(expiry)) return false;
+    const exp = new Date(
+      Number(expiry.slice(0, 4)),
+      Number(expiry.slice(4, 6)) - 1,
+      Number(expiry.slice(6, 8))
+    ).getTime();
+    const horizon = startOfToday + days * 24 * 60 * 60 * 1000;
+    return exp >= startOfToday && exp < horizon;
   }
 
   function auditRebind(oldDeviceId, newDeviceId, activation, ip, result) {
@@ -592,6 +636,235 @@ export function createApp(opts = {}) {
       return forwarded.split(",", 1)[0].trim().slice(0, 128);
     }
     return remote;
+  }
+
+  // ── Admin 审计日志（JSONL 追加 + fsync；完整激活码不入日志）──
+
+  function adminAudit(op, params = {}, result) {
+    try {
+      const line = JSON.stringify({
+        ts: new Date().toISOString(),
+        op,
+        device_id_fp: params.device_id ? fingerprint(params.device_id) : undefined,
+        params: params.note ? { note_len: String(params.note).length } : (params.expiry ? { expiry: params.expiry } : {}),
+        result,
+      });
+      const dir = DB_DIR;
+      F.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, "admin-audit.jsonl");
+      const fd = F.openSync(file, "a", 0o600);
+      try {
+        F.writeSync(fd, line + "\n");
+        F.fsyncSync(fd);
+      } finally {
+        F.closeSync(fd);
+      }
+    } catch (err) {
+      console.error("[ai-server][admin] 审计日志写入失败", err.message);
+    }
+  }
+
+  // ── Admin 设备视图 ──
+
+  function deviceStatus(record) {
+    if (record.revoked) return "revoked";
+    const expiry = record.expiry;
+    if (isValidExpiryDate(expiry)) {
+      const exp = new Date(
+        Number(expiry.slice(0, 4)),
+        Number(expiry.slice(4, 6)) - 1,
+        Number(expiry.slice(6, 8))
+      );
+      if (exp < startOfTodayMs()) return "expired";
+    }
+    if ((Number(record.used) || 0) >= maxUsage) return "exhausted";
+    return "active";
+  }
+
+  function deviceView(deviceId, record) {
+    return {
+      device_id: deviceId,
+      activation: record.activation,
+      expiry: record.expiry,
+      used: Number(record.used) || 0,
+      remaining: Math.max(0, maxUsage - (Number(record.used) || 0)),
+      last_seen: record.last_seen,
+      created_at: record.created_at,
+      revoked: !!record.revoked,
+      note: record.note || "",
+      migrated_to: record.migrated_to,
+      migrated_from: record.migrated_from,
+      status: deviceStatus(record),
+    };
+  }
+
+  // 迁移链双向展开（沿 migrated_to/from 收集节点，含当前设备）。
+  function migrationChain(deviceId) {
+    const chain = [];
+    // 向后（源头方向）：从当前设备的 migrated_from 链收集前驱（不含自身）。
+    // seen 环保护：migrated_from 成环时不得挂死（前向遍历同款写法）。
+    const backward = [];
+    const seenBack = new Set();
+    let origin = deviceId;
+    while (devices[origin] && devices[origin].migrated_from) {
+      origin = devices[origin].migrated_from;
+      if (!devices[origin]) break;
+      if (seenBack.has(origin)) break; // 成环：终止回溯
+      seenBack.add(origin);
+      backward.push(origin);
+    }
+    for (let i = backward.length - 1; i >= 0; i--) {
+      chain.push(deviceView(backward[i], devices[backward[i]]));
+    }
+    // 主链（deviceId → tail）。
+    let node = deviceId;
+    const seen = new Set();
+    while (node && !seen.has(node) && devices[node]) {
+      seen.add(node);
+      chain.push(deviceView(node, devices[node]));
+      node = devices[node].migrated_to;
+    }
+    return chain;
+  }
+
+  // ── Admin 设备列表（过滤 + 分页 + 查询） ──
+
+  function deviceMatchesFilter(record, tail, filter, now) {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const status = deviceStatus(record);
+    switch (filter) {
+      case "active24h":
+        return status === "active" && (Number(record.last_seen) || 0) >= now - dayMs;
+      case "active7d":
+        return status === "active" && (Number(record.last_seen) || 0) >= now - 7 * dayMs;
+      case "expired":
+        return status === "expired";
+      case "expiring7d":
+        return status === "active"
+          && isExpiringWithinDays(record.expiry, 7, startOfTodayMs());
+      case "exhausted":
+        return status === "exhausted";
+      case "revoked":
+        return status === "revoked";
+      default:
+        return true;
+    }
+  }
+
+  function adminListDevices(query, filter, cursor, limit, now = Date.now()) {
+    const all = Object.keys(devices).sort();
+    const q = (query || "").trim().toLowerCase();
+    // 先全量收集匹配项（计数与收集一体），再做 cursor/limit 截断——
+    // total 必须是匹配总数（含 cursor 之前页已返回的项），不得被 limit 截断。
+    const matched = [];
+    for (const deviceId of all) {
+      const record = devices[deviceId];
+      if (!record || typeof record !== "object") continue;
+      if (!deviceMatchesFilter(record, deviceId, filter, now)) continue;
+      if (q && !deviceId.toLowerCase().includes(q)
+          && !String(record.activation || "").toLowerCase().includes(q)) {
+        continue;
+      }
+      matched.push(deviceId);
+    }
+    const total = matched.length;
+    // cursor 语义：上一页末 device_id，本页从 cursor 之后第一条起收集。
+    const startIndex = cursor ? matched.findIndex((id) => id > cursor) : 0;
+    const from = startIndex < 0 ? matched.length : startIndex;
+    const page = matched.slice(from, from + limit);
+    const items = page.map((deviceId) => deviceView(deviceId, devices[deviceId]));
+    const nextCursor = items.length === limit && page.length > 0
+      ? page[page.length - 1]
+      : null;
+    return { items, next_cursor: nextCursor, total };
+  }
+
+  // ── Admin 静态服务（ai-server/admin/ 目录，无 token，loopback 天然受限） ──
+
+  const ADMIN_WEB_DIR = path.join(path.dirname(DB_DIR), "admin");
+
+  function adminStatic(req, res, pathname) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Bad request");
+      return;
+    }
+    const safePath = path.normalize(decoded).replace(/^(\.\.[/\\])+/, "");
+    let filePath = path.join(ADMIN_WEB_DIR, safePath === "/" ? "index.html" : safePath);
+    if (!filePath.startsWith(ADMIN_WEB_DIR) || !F.existsSync(filePath)) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Not found");
+      return;
+    }
+    if (F.statSync(filePath).isDirectory()) filePath = path.join(filePath, "index.html");
+    const contentTypes = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".svg": "image/svg+xml",
+      ".png": "image/png",
+    };
+    res.writeHead(200, {
+      "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream",
+      "Cache-Control": "no-cache",
+    });
+    res.end(F.readFileSync(filePath));
+  }
+
+  // ── 趋势快照（每日一行 JSONL；写失败仅 console.error 不 fail-stop） ──
+
+  function snapshotToday() {
+    const d = new Date();
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { date: key, ...adminStats() };
+  }
+
+  function ensureSnapshotFile() {
+    try {
+      const file = path.join(DB_DIR, "admin-stats-snapshots.jsonl");
+      F.mkdirSync(DB_DIR, { recursive: true });
+      const today = snapshotToday();
+      let line = today.date;
+      let needsAppend = false;
+      if (F.existsSync(file)) {
+        const content = F.readFileSync(file, "utf8");
+        needsAppend = !content.split("\n").some((l) => l.startsWith(`{"date":"${today.date}"`));
+      } else {
+        needsAppend = true;
+      }
+      if (needsAppend) {
+        const fd = F.openSync(file, "a", 0o600);
+        try {
+          F.writeSync(fd, JSON.stringify(today) + "\n");
+          F.fsyncSync(fd);
+        } finally {
+          F.closeSync(fd);
+        }
+      }
+      return today;
+    } catch (err) {
+      // 非关键路径：快照写失败不触发 fail-stop。
+      console.error("[ai-server][admin] 快照写入失败", err.message);
+      return null;
+    }
+  }
+
+  function readSnapshotHistory(days) {
+    try {
+      const file = path.join(DB_DIR, "admin-stats-snapshots.jsonl");
+      if (!F.existsSync(file)) return [];
+      const lines = F.readFileSync(file, "utf8").split("\n").filter(Boolean);
+      const tail = lines.slice(-Math.max(1, Math.min(365, days || 30)));
+      return tail.map((l) => {
+        try { return JSON.parse(l); } catch { return null; }
+      }).filter(Boolean);
+    } catch {
+      return [];
+    }
   }
 
   function beginInflight(deviceId) {
@@ -636,6 +909,11 @@ export function createApp(opts = {}) {
     if (!old || old.activation !== activation) {
       auditRebind(oldDeviceId, newDeviceId, activation, ip, "binding-not-found");
       return { status: 403, body: { error: "设备码与激活码未绑定，无法迁移" } };
+    }
+    // Admin 吊销门禁：revoked 后 rebind 必须 403。
+    if (old.revoked) {
+      auditRebind(oldDeviceId, newDeviceId, activation, ip, "revoked");
+      return { status: 403, body: { error: "该激活码已吊销" } };
     }
     if (oldDeviceId === newDeviceId) {
       auditRebind(oldDeviceId, newDeviceId, activation, ip, "idempotent-same-device");
@@ -710,6 +988,185 @@ export function createApp(opts = {}) {
 
   const draw = drawImageImpl || makeUpstreamDraw({ endpoint, model, replyType, maxUpstreamJsonBytes, maxImageBytes });
 
+  // ── Admin API 路由分发（认证已在 handle 前置门禁完成） ──
+
+  function readJsonBody(req) {
+    return new Promise((resolve) => {
+      const chunks = [];
+      let total = 0;
+      let tooLarge = false;
+      req.on("data", (chunk) => {
+        total += chunk.length;
+        if (total > 64 * 1024) {
+          tooLarge = true;
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on("end", () => {
+        if (tooLarge) { resolve({ error: "请求体过大" }); return; }
+        const raw = Buffer.concat(chunks).toString("utf8");
+        if (!raw.trim()) { resolve({}); return; }
+        try { resolve(JSON.parse(raw)); }
+        catch { resolve({ error: "无效的 JSON" }); }
+      });
+      req.on("error", () => resolve({ error: "请求体读取失败" }));
+    });
+  }
+
+  async function handleAdmin(req, res, route) {
+    // 1. GET /v1/admin/stats（扩展）
+    if (route === "/v1/admin/stats" && req.method === "GET") {
+      return reply(res, 200, adminStats());
+    }
+    // 2. GET /v1/admin/stats/history?days=30
+    if (route === "/v1/admin/stats/history" && req.method === "GET") {
+      const days = Math.max(1, Math.min(365, Number(new URL(req.url, "http://x").searchParams.get("days") || 30) || 30));
+      const history = readSnapshotHistory(days);
+      if (history.length === 0) {
+        // 无历史行时先补当日快照，保证至少一行。
+        ensureSnapshotFile();
+      }
+      return reply(res, 200, {
+        days,
+        snapshots: history.length === 0 ? [snapshotToday()] : history,
+      });
+    }
+    // 3. GET /v1/admin/devices?query=&filter=&cursor=&limit=
+    if (route === "/v1/admin/devices" && req.method === "GET") {
+      const params = new URL(req.url, "http://x").searchParams;
+      const limit = Math.max(1, Math.min(200, Number(params.get("limit") || 50) || 50));
+      const filter = params.get("filter") || "all";
+      const items = adminListDevices(
+        params.get("query") || "",
+        filter,
+        params.get("cursor") || "",
+        limit
+      );
+      return reply(res, 200, items);
+    }
+    // 4. GET /v1/admin/devices/{deviceId}
+    const deviceMatch = route.match(/^\/v1\/admin\/devices\/([^/]+)$/);
+    if (deviceMatch && req.method === "GET") {
+      const deviceId = decodeURIComponent(deviceMatch[1]);
+      const record = devices[deviceId];
+      if (!record) return reply(res, 404, { error: "设备不存在" });
+      return reply(res, 200, {
+        device: deviceView(deviceId, record),
+        chain: migrationChain(deviceId),
+      });
+    }
+    // 5-8. 设备操作（POST）：reset-usage / extend-expiry / revoke / unrevoke / note
+    const opMatch = route.match(/^\/v1\/admin\/devices\/([^/]+)\/(reset-usage|extend-expiry|revoke|unrevoke|note)$/);
+    if (opMatch && req.method === "POST") {
+      const deviceId = decodeURIComponent(opMatch[1]);
+      const op = opMatch[2];
+      const record = devices[deviceId];
+      if (!record) return reply(res, 404, { error: "设备不存在" });
+      const body = await readJsonBody(req);
+      if (body.error) return reply(res, 400, { error: body.error });
+      // 联动必修（AI审查 门禁）：reset-usage/revoke/unrevoke 解析迁移 tail——
+      // 对链中间节点操作必须作用于 tail 当前记录（契约语义，前端据此明确交互）。
+      // extend-expiry/note 保持操作指定设备（extend 经 signer 绑定该 deviceId；
+      // note 是管理备注可记任意节点）。
+      const tailDeviceId = (op === "reset-usage" || op === "revoke" || op === "unrevoke")
+        ? resolveMigrationTail(devices, deviceId)
+        : deviceId;
+      const tailRecord = tailDeviceId === deviceId ? record : devices[tailDeviceId];
+      if (!tailRecord) return reply(res, 404, { error: "迁移链尾设备不存在" });
+
+      if (op === "reset-usage") {
+        // 迁移链只作用 tail 当前记录。
+        const failure = durableWrite(() => { tailRecord.used = 0; });
+        if (failure) return reply(res, failure.status, failure.body);
+        adminAudit("reset-usage", { device_id: tailDeviceId }, "ok");
+        return reply(res, 200, deviceView(tailDeviceId, tailRecord));
+      }
+      if (op === "extend-expiry") {
+        const expiry = String(body.expiry || "").trim();
+        if (!isValidExpiryDate(expiry)) {
+          return reply(res, 400, { error: "expiry 必须是有效 YYYYMMDD" });
+        }
+        if (!signNewCode) {
+          return reply(res, 503, { error: "签发服务未配置" });
+        }
+        try {
+          const signed = await signNewCode(deviceId, expiry);
+          if (!signed || !signed.code) {
+            return reply(res, 503, { error: "签发服务未配置" });
+          }
+          const failure = durableWrite(() => {
+            record.activation = signed.code;
+            record.expiry = expiry;
+          });
+          if (failure) return reply(res, failure.status, failure.body);
+          adminAudit("extend-expiry", { device_id: deviceId, expiry }, "ok");
+          return reply(res, 200, { ...deviceView(deviceId, record), new_code: signed.code });
+        } catch (err) {
+          adminAudit("extend-expiry", { device_id: deviceId, expiry }, "signer-error");
+          return reply(res, 503, { error: "签发服务不可用" });
+        }
+      }
+      if (op === "revoke" || op === "unrevoke") {
+        const revoked = op === "revoke";
+        const failure = durableWrite(() => {
+          tailRecord.revoked = revoked;
+          if (revoked) tailRecord.revoked_at = Date.now();
+          else delete tailRecord.revoked_at;
+        });
+        if (failure) return reply(res, failure.status, failure.body);
+        adminAudit(op, { device_id: tailDeviceId }, revoked ? "revoked" : "unrevoked");
+        return reply(res, 200, deviceView(tailDeviceId, tailRecord));
+      }
+      if (op === "note") {
+        const note = String(body.note || "").slice(0, 500);
+        const failure = durableWrite(() => { record.note = note; });
+        if (failure) return reply(res, failure.status, failure.body);
+        adminAudit("note", { device_id: deviceId, note }, "ok");
+        return reply(res, 200, deviceView(deviceId, record));
+      }
+    }
+    // 9. POST /v1/admin/codes/issue
+    if (route === "/v1/admin/codes/issue" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      if (body.error) return reply(res, 400, { error: body.error });
+      const deviceId = String(body.device_id || "").trim();
+      const expiry = String(body.expiry || "").trim();
+      if (!deviceId || !isValidExpiryDate(expiry)) {
+        return reply(res, 400, { error: "device_id 与有效 expiry(YYYYMMDD) 必填" });
+      }
+      if (devices[deviceId]) {
+        return reply(res, 409, { error: "设备已存在" });
+      }
+      if (!signNewCode) {
+        return reply(res, 503, { error: "签发服务未配置" });
+      }
+      try {
+        const signed = await signNewCode(deviceId, expiry);
+        if (!signed || !signed.code) {
+          return reply(res, 503, { error: "签发服务未配置" });
+        }
+        const failure = durableWrite(() => {
+          devices[deviceId] = {
+            activation: signed.code,
+            expiry,
+            used: 0,
+            last_seen: Date.now(),
+            created_at: Date.now(),
+          };
+        });
+        if (failure) return reply(res, failure.status, failure.body);
+        adminAudit("issue", { device_id: deviceId, expiry }, "ok");
+        return reply(res, 200, { code: signed.code, device_id: deviceId, expiry });
+      } catch (err) {
+        adminAudit("issue", { device_id: deviceId, expiry }, "signer-error");
+        return reply(res, 503, { error: "签发服务不可用" });
+      }
+    }
+    return reply(res, 404, { error: "Not found" });
+  }
+
   function handle(req, res) {
     const doHandle = async () => {
       // R6 fail-stop gate: once storage is unhealthy every request returns 503
@@ -720,11 +1177,12 @@ export function createApp(opts = {}) {
       const route = req.url.split("?")[0];
       const isAi = route === "/v1/ai";
       const isRebind = enableRebind && route === "/v1/ai/rebind";
-      const isAdminStats = route === "/v1/admin/stats";
-      // L0: operator-only usage stats — loopback + constant-time bearer secret.
-      // The route only exists when an admin secret is configured (fail-closed).
-      if (isAdminStats) {
-        if (!adminSecret || req.method !== "GET") {
+      const isAdmin = route.startsWith("/v1/admin/");
+      const isAdminStatic = route.startsWith("/admin/") || route === "/admin";
+      // Admin API：全部 /v1/admin/* 仅当配置 adminSecret 时存在（fail-closed），
+      // 仅 loopback + Bearer 常量时间比较；非 GET 变更一律写审计日志。
+      if (isAdmin) {
+        if (!adminSecret) {
           return reply(res, 404, { error: "Not found" });
         }
         if (!isLoopback(req)) {
@@ -734,7 +1192,18 @@ export function createApp(opts = {}) {
         if (!token || !constantTimeEqual(token, adminSecret)) {
           return reply(res, 401, { error: "未授权" }, { "WWW-Authenticate": "Bearer" });
         }
-        return reply(res, 200, adminStats());
+        return handleAdmin(req, res, route);
+      }
+      // Admin 静态 SPA（ai-server/admin/）：纯静态无秘密，仅 loopback 绑定天然受限。
+      if (isAdminStatic) {
+        if (!isLoopback(req)) {
+          return reply(res, 403, { error: "Forbidden" });
+        }
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          return reply(res, 405, { error: "method_not_allowed" });
+        }
+        adminStatic(req, res, route === "/admin" ? "/" : route.slice("/admin".length));
+        return;
       }
       if (req.method !== "POST" || (!isAi && !isRebind)) {
         return reply(res, 404, { error: "Not found" });
@@ -838,8 +1307,26 @@ export function createApp(opts = {}) {
 
   const server = http.createServer(handle);
 
+  // Admin 启用时：进程内每日快照定时器（UTC 日切点对齐；写失败仅 console.error
+  // 不触发 fail-stop）。启动时若当日缺行即补。
+  if (adminSecret) {
+    ensureSnapshotFile();
+    const snapshotTimer = setInterval(() => {
+      ensureSnapshotFile();
+    }, 6 * 60 * 60 * 1000); // 每 6h 检查一次（覆盖 UTC 日边界，幂等补行）
+    if (snapshotTimer.unref) snapshotTimer.unref();
+  }
+
   // Test helpers (not part of production surface)
   const snapshot = () => ({ devices: JSON.parse(JSON.stringify(devices)), dbFile: DB_FILE });
+  // Test-only：直接改写服务端活状态上的设备记录（snapshot() 是 JSON 深拷贝，
+  // 改副本到不了活状态——迁移环类测试必须经此 mutator 真实构环）。
+  const mutateDevice = (deviceId, patch) => {
+    const record = devices[deviceId];
+    if (!record || typeof record !== "object" || !patch || typeof patch !== "object") return false;
+    Object.assign(record, patch);
+    return true;
+  };
 
   return new Promise((resolve) => {
     server.listen(port, host, () => resolve({
@@ -848,6 +1335,7 @@ export function createApp(opts = {}) {
       host: server.address().address,
       dbFile: DB_FILE,
       snapshot,
+      mutateDevice,
       persistDurably,
       recoverPersistFailure,
       isStorageUnhealthy: () => storageUnhealthy,
