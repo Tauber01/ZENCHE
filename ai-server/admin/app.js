@@ -28,7 +28,14 @@
     currentDevice: null,
     siteDays: 7,
     site: null,
-    siteError: null
+    siteError: null,
+    accounts: [],
+    acctTotal: 0,
+    acctCursor: null,
+    acctPages: [],
+    acctPageIndex: 0,
+    acctStartCursor: null,
+    acctQuery: ""
   };
 
   /* ── 工具 ──────────────────────────────────────── */
@@ -135,12 +142,13 @@
     render();
     if (v === "overview") loadOverview();
     else if (v === "devices") { state.pages = []; state.pageIndex = 0; state.cursor = null; loadDevices(); }
+    else if (v === "accounts") { state.acctPages = []; state.acctPageIndex = 0; state.acctCursor = null; loadAccounts(); }
     else if (v === "site") loadSite();
   }
 
   function viewFromHash() {
     var h = (location.hash || "").replace(/^#\//, "").replace(/^#/, "");
-    return (h === "devices" || h === "issue" || h === "site") ? h : "overview";
+    return (h === "devices" || h === "issue" || h === "site" || h === "accounts") ? h : "overview";
   }
 
   function logout(expired) {
@@ -595,6 +603,160 @@
     return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate());
   }
 
+  /* ── 账号（W13-b）────────────────────────────────
+   * 契约：kimi W13-b 派工。GET /v1/admin/accounts?query=&cursor=&limit=
+   * 返回 {items:[{email, createdAt, status, verified, deviceCount}],
+   * next_cursor, total}；操作 POST /v1/admin/accounts/{email}/
+   * disable|enable|force-logout（email 必须 encodeURIComponent）。 */
+  function acctErrMsg(result) {
+    var msg = "";
+    if (result && result.data && typeof result.data === "object" && result.data.error) msg = String(result.data.error);
+    else if (result && result.data && typeof result.data === "object" && result.data.message) msg = String(result.data.message);
+    else msg = "请求失败";
+    return "HTTP " + (result ? result.status : "?") + "：" + msg;
+  }
+
+  function acctStatusPill(st) {
+    if (st === "disabled") return el("span", { class: "pill disabled", text: "已禁用" });
+    return el("span", { class: "pill active", text: "正常" });
+  }
+
+  function acctVerifiedPill(v) {
+    if (v) return el("span", { class: "pill verified", text: "已验证" });
+    return el("span", { class: "pill unverified", text: "未验证" });
+  }
+
+  function loadAccounts() {
+    state.acctStartCursor = state.acctCursor;
+    var params = new URLSearchParams();
+    params.set("limit", String(PAGE_SIZE));
+    if (state.acctQuery) params.set("query", state.acctQuery);
+    if (state.acctCursor) params.set("cursor", state.acctCursor);
+    var box = document.getElementById("accounts-card");
+    if (box && !box.querySelector(".loading")) {
+      box.insertBefore(el("div", { class: "loading", text: "加载中…" }), box.firstChild.nextSibling);
+    }
+    api("/accounts?" + params.toString()).then(function (result) {
+      var b = document.getElementById("accounts-card");
+      if (b) { var l = b.querySelector(".loading"); if (l) l.remove(); }
+      if (!result.ok || !result.data) { toast("加载账号列表失败：" + acctErrMsg(result), false); return; }
+      state.accounts = result.data.items || [];
+      state.acctTotal = result.data.total || 0;
+      state.acctCursor = result.data.next_cursor || null;
+      if (state.acctPages.length === state.acctPageIndex) state.acctPages.push(state.acctStartCursor);
+      else state.acctPages[state.acctPageIndex] = state.acctStartCursor;
+      renderAccounts();
+    }).catch(function (e) { if (state.token) toast(e.message, false); });
+  }
+
+  function renderAccounts() {
+    var body = document.getElementById("accounts-body");
+    if (!body) return;
+    body.innerHTML = "";
+    if (!state.accounts.length) {
+      body.appendChild(el("tr", {}, [el("td", { colspan: "6", class: "empty", text: "无匹配账号" })]));
+    } else {
+      state.accounts.forEach(function (a) {
+        body.appendChild(el("tr", {}, [
+          el("td", { class: "mono acct-email", text: a.email }),
+          el("td", { class: "mono", text: a.createdAt ? fmtTs(a.createdAt) : "—" }),
+          el("td", { class: "mono", text: String(a.deviceCount == null ? 0 : a.deviceCount) }),
+          el("td", {}, [acctStatusPill(a.status)]),
+          el("td", {}, [acctVerifiedPill(a.verified)]),
+          el("td", { class: "row-actions" }, [
+            a.status === "disabled"
+              ? el("button", { class: "btn small", text: "启用", title: "解除禁用", onclick: function () { acctEnable(a); } })
+              : el("button", { class: "btn small danger", text: "禁用", title: "禁用后该账号全部会话即时失效", onclick: function () { acctDisable(a); } }),
+            el("button", { class: "btn small warn", text: "强制登出", title: "吊销该账号全部会话", onclick: function () { acctForceLogout(a); } })
+          ])
+        ]));
+      });
+    }
+    var info = document.getElementById("acct-pager-info");
+    if (info) info.textContent = "共 " + state.acctTotal + " 条 · 每页 " + PAGE_SIZE + " · 第 " + (state.acctPageIndex + 1) + " 页";
+    var prev = document.getElementById("acct-pager-prev");
+    var next = document.getElementById("acct-pager-next");
+    if (prev) prev.disabled = state.acctPageIndex === 0;
+    if (next) next.disabled = !state.acctCursor;
+  }
+
+  function acctDisable(a) {
+    if (!confirm("确认禁用账号 " + a.email + "？禁用后该账号全部会话将立即失效，登录将被拒绝。")) return;
+    api("/accounts/" + encodeURIComponent(a.email) + "/disable", { method: "POST", body: {} }).then(function (r) {
+      if (r.ok) { toast("已禁用 " + a.email, true); loadAccounts(); }
+      else toast("禁用失败：" + acctErrMsg(r), false);
+    });
+  }
+
+  function acctEnable(a) {
+    if (!confirm("确认启用账号 " + a.email + "？")) return;
+    api("/accounts/" + encodeURIComponent(a.email) + "/enable", { method: "POST", body: {} }).then(function (r) {
+      if (r.ok) { toast("已启用 " + a.email, true); loadAccounts(); }
+      else toast("启用失败：" + acctErrMsg(r), false);
+    });
+  }
+
+  function acctForceLogout(a) {
+    if (!confirm("确认强制登出账号 " + a.email + "？将吊销其全部会话，该账号所有端立即退出。")) return;
+    api("/accounts/" + encodeURIComponent(a.email) + "/force-logout", { method: "POST", body: {} }).then(function (r) {
+      if (r.ok) {
+        var n = (r.data && r.data.sessions_revoked != null) ? r.data.sessions_revoked : 0;
+        toast("已强制登出 " + a.email + "（吊销 " + n + " 个会话）", true);
+      } else toast("强制登出失败：" + acctErrMsg(r), false);
+    });
+  }
+
+  function accountsPage() {
+    var search = el("input", { type: "search", id: "account-search", placeholder: "搜索邮箱…", value: state.acctQuery });
+    var debounce = null;
+    search.addEventListener("input", function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        state.acctQuery = search.value.trim();
+        state.acctPages = [];
+        state.acctPageIndex = 0;
+        state.acctCursor = null;
+        loadAccounts();
+      }, 300);
+    });
+
+    return el("div", {}, [
+      el("div", { class: "page-head" }, [
+        el("h1", { text: "账号" }),
+        el("div", { class: "desc", text: "邮箱注册账号管理：搜索、分页、禁用/启用与强制登出" })
+      ]),
+      el("div", { class: "card", id: "accounts-card" }, [
+        el("div", { class: "toolbar" }, [
+          search,
+          el("span", { class: "count", id: "acct-pager-info", text: "—" })
+        ]),
+        el("div", { style: "overflow-x:auto" }, [
+          el("table", {}, [
+            el("thead", {}, [el("tr", {}, [
+              el("th", { text: "邮箱" }), el("th", { text: "注册时间" }), el("th", { text: "设备数" }),
+              el("th", { text: "状态" }), el("th", { text: "验证" }), el("th", { text: "操作" })
+            ])]),
+            el("tbody", { id: "accounts-body" })
+          ])
+        ]),
+        el("div", { class: "pager" }, [
+          el("button", { class: "btn", id: "acct-pager-prev", text: "← 上一页", onclick: function () {
+            if (state.acctPageIndex === 0) return;
+            state.acctPageIndex -= 1;
+            state.acctCursor = state.acctPages[state.acctPageIndex];
+            loadAccounts();
+          } }),
+          el("button", { class: "btn", id: "acct-pager-next", text: "下一页 →", onclick: function () {
+            if (!state.acctCursor) return;
+            state.acctPageIndex += 1;
+            state.acctCursor = state.acctCursor; // 本页 next_cursor 即下一页起点
+            loadAccounts();
+          } })
+        ])
+      ])
+    ]);
+  }
+
   /* ── 官网访问统计 ────────────────────────────────
    * 契约：PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md「二期追加：官网访问统计」。
    * GET /v1/admin/site/stats?days=N；503 站点日志不可读 → 提示条 + 重试。 */
@@ -916,6 +1078,7 @@
       { key: "overview", label: "总览", icon: "◉" },
       { key: "devices", label: "账号列表", icon: "☰" },
       { key: "issue", label: "签发新码", icon: "＋" },
+      { key: "accounts", label: "账号", icon: "@" },
       { key: "site", label: "官网", icon: "◈" }
     ];
     var navEl = el("div", { class: "sidebar" }, [
@@ -951,6 +1114,7 @@
     var content;
     if (state.view === "overview") content = placeholder("overview");
     else if (state.view === "devices") content = devicesPage();
+    else if (state.view === "accounts") content = accountsPage();
     else if (state.view === "site") content = placeholder("site");
     else content = renderIssue();
     mount(el("div", { class: "shell" }, [nav(), el("div", { class: "main" }, [content])]));
@@ -1045,12 +1209,13 @@
   render();
   if (state.token) {
     if (state.view === "devices") loadDevices();
+    else if (state.view === "accounts") loadAccounts();
     else if (state.view === "site") loadSite();
     else if (state.view === "issue") { /* 静态表单 */ }
     else loadOverview();
   }
   window.addEventListener("hashchange", function () {
     var v = viewFromHash();
-    if (v !== state.view) { state.view = v; render(); if (v === "devices") loadDevices(); else if (v === "overview") loadOverview(); else if (v === "site") loadSite(); }
+    if (v !== state.view) { state.view = v; render(); if (v === "devices") loadDevices(); else if (v === "overview") loadOverview(); else if (v === "accounts") loadAccounts(); else if (v === "site") loadSite(); }
   });
 })();
