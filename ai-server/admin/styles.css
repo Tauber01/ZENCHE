@@ -302,6 +302,54 @@ td .sub { font-size: 11px; color: var(--muted); }
 .code-result .meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
 .copied { color: var(--success); font-size: 12px; min-height: 18px; }
 
+/* ── 官网访问统计 ─────────────────────────────────── */
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.card-head h2 { margin-bottom: 0; }
+
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.seg-btn {
+  background: transparent; border: none; padding: 5px 14px;
+  font-size: 12px; color: var(--muted); cursor: pointer;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--rule); }
+.seg-btn:hover { color: var(--ink); }
+.seg-btn.active { background: oklch(30% 0.05 256); color: var(--ink); }
+
+.site-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 900px) { .site-cols { grid-template-columns: 1fr; } }
+.site-cols .card { margin-top: 0; }
+
+.src-label { width: 92px; }
+.dist-fill.src-0 { background: oklch(66% 0.14 256); }
+.dist-fill.src-1 { background: oklch(70% 0.15 245); }
+.dist-fill.src-2 { background: oklch(74% 0.13 230); }
+.dist-fill.src-3 { background: oklch(62% 0.2 25); }
+.dist-fill.src-4 { background: oklch(78% 0.14 88); }
+.dist-fill.src-5 { background: oklch(70% 0.13 155); }
+.dist-fill.src-6 { background: oklch(78% 0.12 78); }
+.dist-fill.src-7 { background: oklch(64% 0.18 25); }
+
+.plain-table tbody tr { cursor: default; }
+.plain-table .rank { width: 40px; color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+.plain-table td.path { word-break: break-all; max-width: 420px; }
+
+.notice {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--error-soft); border: 1px solid oklch(50% 0.12 25);
+  border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px;
+}
+.notice .nt-ico { font-size: 16px; line-height: 1.3; }
+.notice .nt-body { flex: 1; }
+.notice .nt-title { color: var(--error); font-weight: 600; font-size: 13px; }
+.notice .nt-sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.notice .btn { align-self: center; }
+
+.site-meta { margin-top: 14px; font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+
+
 /* ── 通用反馈 ─────────────────────────────────────── */
 .toast {
   position: fixed; right: 22px; bottom: 22px; z-index: 60;
