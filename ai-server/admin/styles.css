@@ -198,6 +198,10 @@ td .sub { font-size: 11px; color: var(--muted); }
 .pill.expired { background: var(--warning-soft); color: var(--warning); }
 .pill.exhausted { background: var(--live-soft); color: var(--live); }
 .pill.revoked { background: var(--error-soft); color: var(--error); }
+.pill.disabled { background: oklch(30% 0.02 260); color: oklch(75% 0.02 258); border: 1px solid var(--rule-strong); }
+.pill.verified { background: oklch(26% 0.05 155); color: var(--success); }
+.pill.unverified { background: oklch(30% 0.05 78); color: var(--warning); }
+.acct-email { word-break: break-all; max-width: 340px; }
 
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn {
