@@ -13,6 +13,7 @@ import https from "node:https";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { createAuthSystem, createSmtpClient } from "./auth.mjs";
 
 export function resolveMigrationTail(devices, deviceId) {
   let current = deviceId;
@@ -284,6 +285,11 @@ export function createApp(opts = {}) {
     auditLogImpl = (line) => console.log(line),
     fsAdapter = null, // injectable fs adapter (R6 fault injection; tests only)
     onUnrecoverableStorage = null, // injectable fail-stop policy; CLI supplies the exit strategy
+    // ── 邮箱账号系统（W13-a）──
+    smtpConfig = null, // {host, port, user, password, from}；未配置时 POST /v1/auth/email-code 503
+    smtpSendImpl = null, // 测试注入 fake transport；生产默认走内置 minimal SMTP 客户端
+    authClock = () => Date.now(), // 测试注入时钟（验证码 TTL / 登录锁定 / session 过期）
+    authRequireEmailCode = true, // 目标态 1：注册必须验证码；显式 false（env ZENCHE_AUTH_REQUIRE_EMAIL_CODE=0）过渡期免码
   } = opts;
 
   if (!publicKeyPem) throw new Error("createApp requires publicKeyPem (test key or production key)");
@@ -643,11 +649,17 @@ export function createApp(opts = {}) {
 
   function adminAudit(op, params = {}, result) {
     try {
+      // 安全白名单：note 只记长度、device 只记指纹；account 操作记邮箱
+      // （管理台审计本地 JSONL 0600，管理员可见级别，与操作对象同级）。
+      let safeParams = {};
+      if (params.note) safeParams = { note_len: String(params.note).length };
+      else if (params.expiry) safeParams = { expiry: params.expiry };
+      else if (params.account) safeParams = { account: params.account };
       const line = JSON.stringify({
         ts: new Date().toISOString(),
         op,
         device_id_fp: params.device_id ? fingerprint(params.device_id) : undefined,
-        params: params.note ? { note_len: String(params.note).length } : (params.expiry ? { expiry: params.expiry } : {}),
+        params: safeParams,
         result,
       });
       const dir = DB_DIR;
@@ -666,6 +678,24 @@ export function createApp(opts = {}) {
   }
 
   // ── Admin 设备视图 ──
+
+  // ── 邮箱账号系统（W13-a）：auth.mjs 工厂实例化 ──
+  // SMTP：优先测试注入的 smtpSendImpl；否则按 smtpConfig 组装内置客户端；
+  // 两者皆无 → smtpSendImpl = null → email-code 503（fail-closed）。
+  let smtpSend = opts.smtpSendImpl || null;
+  if (!smtpSend && smtpConfig) {
+    const client = createSmtpClient(smtpConfig);
+    if (client.isConfigured) smtpSend = (mail) => client.sendMail(mail);
+  }
+  const auth = createAuthSystem({
+    dbDir: DB_DIR,
+    F,
+    clock: authClock,
+    smtpSendImpl: smtpSend,
+    adminAudit,
+    requireEmailCode: authRequireEmailCode,
+    log: console,
+  });
 
   function deviceStatus(record) {
     if (record.revoked) return "revoked";
@@ -1386,6 +1416,65 @@ export function createApp(opts = {}) {
       if (stats.error) return reply(res, 503, { error: stats.error });
       return reply(res, 200, stats);
     }
+    // 12. GET /v1/admin/accounts?query=&cursor=&limit=（邮箱账号列表；GET 只读）
+    if (route === "/v1/admin/accounts" && req.method === "GET") {
+      const params = new URL(req.url, "http://x").searchParams;
+      const limit = Math.max(1, Math.min(200, Number(params.get("limit") || 50) || 50));
+      const items = auth.adminListAccounts({
+        query: params.get("query") || "",
+        cursor: params.get("cursor") || "",
+        limit,
+      });
+      return reply(res, 200, items);
+    }
+    // 13. POST /v1/admin/accounts/{email}/disable|enable|force-logout
+    const accountOpMatch = route.match(/^\/v1\/admin\/accounts\/([^/]+)\/(disable|enable|force-logout)$/);
+    if (accountOpMatch && req.method === "POST") {
+      const email = decodeURIComponent(accountOpMatch[1]).toLowerCase();
+      const op = accountOpMatch[2];
+      const r = op === "disable" ? auth.adminDisableAccount(email)
+        : op === "enable" ? auth.adminEnableAccount(email)
+        : auth.adminForceLogout(email);
+      return reply(res, r.status, r.body, r.headers);
+    }
+    return reply(res, 404, { error: "Not found" });
+  }
+
+  // ── /v1/auth/* 路由编排（邮箱账号系统 W13-a） ──
+  // email-code/register/login/logout 为 POST（小 body，走 readJsonBody 64KiB 上限）；
+  // me 为 GET（Bearer）。auth 内部已做限流/校验/防枚举；响应统一 {status, body[, headers]}。
+  async function handleAuth(req, res, route) {
+    const token = bearerToken(req);
+    const ip = clientIp(req);
+    if (route === "/v1/auth/email-code" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      if (body.error) return reply(res, 400, { error: body.error });
+      const r = await auth.emailCode({ email: body.email, purpose: body.purpose, ip });
+      return reply(res, r.status, r.body, r.headers);
+    }
+    if (route === "/v1/auth/register" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      if (body.error) return reply(res, 400, { error: body.error });
+      const r = auth.register({ email: body.email, password: body.password, code: body.code, ip });
+      return reply(res, r.status, r.body, r.headers);
+    }
+    if (route === "/v1/auth/login" && req.method === "POST") {
+      const body = await readJsonBody(req);
+      if (body.error) return reply(res, 400, { error: body.error });
+      const r = auth.login({ email: body.email, password: body.password, ip });
+      return reply(res, r.status, r.body, r.headers);
+    }
+    if (route === "/v1/auth/logout" && req.method === "POST") {
+      const r = auth.logout(token);
+      return reply(res, r.status, r.body, r.headers);
+    }
+    if (route === "/v1/auth/me" && req.method === "GET") {
+      const r = auth.me(token);
+      return reply(res, r.status, r.body, r.headers);
+    }
+    if (route.startsWith("/v1/auth/")) {
+      return reply(res, 405, { error: "method_not_allowed" });
+    }
     return reply(res, 404, { error: "Not found" });
   }
 
@@ -1400,6 +1489,7 @@ export function createApp(opts = {}) {
       const isAi = route === "/v1/ai";
       const isRebind = enableRebind && route === "/v1/ai/rebind";
       const isAdmin = route.startsWith("/v1/admin/");
+      const isAuth = route.startsWith("/v1/auth/");
       const isAdminStatic = route.startsWith("/admin/") || route === "/admin";
       // Admin API：全部 /v1/admin/* 仅当配置 adminSecret 时存在（fail-closed），
       // 仅 loopback + Bearer 常量时间比较；非 GET 变更一律写审计日志。
@@ -1415,6 +1505,10 @@ export function createApp(opts = {}) {
           return reply(res, 401, { error: "未授权" }, { "WWW-Authenticate": "Bearer" });
         }
         return handleAdmin(req, res, route);
+      }
+      // /v1/auth/*：邮箱账号系统（注册/登录/登出/me/验证码）。
+      if (isAuth) {
+        return handleAuth(req, res, route);
       }
       // Admin 静态 SPA（ai-server/admin/）：纯静态无秘密，仅 loopback 绑定天然受限。
       if (isAdminStatic) {
@@ -1500,6 +1594,18 @@ export function createApp(opts = {}) {
       if (use.status) return reply(res, use.status, use.body);  // R6: persist failure response (500/503)
       if (!use.allowed) return reply(res, 403, { error: "该激活码次数已用完", used: use.used, remaining: 0 });
 
+      // W13-a：激活成功时若请求带有效 Bearer session，记录 accountId↔deviceId↔激活码
+      // 三元组（2A 裁决）。无 token / token 无效 / 绑定写盘失败均不破坏主流程——
+      // 存量无 token 设备照常工作，绑定是可补的派生信息。
+      const aiToken = bearerToken(req);
+      if (aiToken) {
+        try {
+          auth.linkActivation(aiToken, deviceId, String(activationCode).trim());
+        } catch (err) {
+          console.error("[ai-server] 激活绑定账号失败:", err.message);
+        }
+      }
+
       beginInflight(deviceId);
       try {
         const imageBase64 = await draw(apiKey, prompt, size, reference);
@@ -1562,6 +1668,7 @@ export function createApp(opts = {}) {
       recoverPersistFailure,
       isStorageUnhealthy: () => storageUnhealthy,
       concurrencySnapshot: () => ({ inflight: new Map(inflight), rebinding: new Set(rebinding) }),
+      authSnapshot: () => auth.snapshot(),
       handle,
     }));
   });
@@ -1591,6 +1698,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     redeemEndpoint: process.env.ZENCHE_REDEEM_ENDPOINT || "http://127.0.0.1:8899/issue-migrated",
     rebindSecret: process.env.ZENCHE_REBIND_SECRET || "",
     adminSecret: process.env.ZENCHE_AI_ADMIN_SECRET || "", // enables loopback-only /v1/admin/stats
+    // 邮箱账号系统：SMTP 凭据只来自 env（ZENCHE_SMTP_*）。host 未配置 → smtpConfig
+    // 为 null → email-code 503（fail-closed）。FROM 默认 no-reply@mail.zenche.top，
+    // ZENCHE_SMTP_FROM 可覆盖。注册开关仅字符串 "0" 关闭（过渡期免码），其余一律目标态。
+    smtpConfig: process.env.ZENCHE_SMTP_HOST ? {
+      host: process.env.ZENCHE_SMTP_HOST,
+      port: Number(process.env.ZENCHE_SMTP_PORT || 465),
+      user: process.env.ZENCHE_SMTP_USER || "",
+      password: process.env.ZENCHE_SMTP_PASSWORD || "",
+      from: process.env.ZENCHE_SMTP_FROM || "no-reply@mail.zenche.top",
+    } : null,
+    authRequireEmailCode: process.env.ZENCHE_AUTH_REQUIRE_EMAIL_CODE !== "0",
     // R6 fail-stop policy: on unrecoverable storage, shut the service down so
     // the supervisor (nohup wrapper / systemd) restarts it for operator review.
     onUnrecoverableStorage: (err) => {
