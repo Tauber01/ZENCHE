@@ -280,6 +280,7 @@ export function createApp(opts = {}) {
     rebindActivationLimit = 3,
     rebindLimiterMaxKeys = 10_000,
     adminSecret = "", // loopback-only /v1/admin/stats bearer secret (constant-time compare)
+    siteLogPath = process.env.ZENCHE_AI_SITE_LOG || "/var/log/nginx/zenche-top.access.log",
     auditLogImpl = (line) => console.log(line),
     fsAdapter = null, // injectable fs adapter (R6 fault injection; tests only)
     onUnrecoverableStorage = null, // injectable fail-stop policy; CLI supplies the exit strategy
@@ -1015,6 +1016,216 @@ export function createApp(opts = {}) {
     });
   }
 
+  // ── 官网访问统计（二期：ZENCHE_ADMIN_MONITOR_PLAN「官网访问统计」契约）──
+  // nginx combined 日志解析聚合，零客户端改动。读取一律走 F（fsAdapter），测试
+  // 经 siteLogPath + fsAdapter 注入样例日志；mtime+size 缓存变化才重析；
+  // >50MB 只解析尾部 50MB；文件不可读 → {error:"站点日志不可读"}（503）。
+
+  const SITE_MONTH_INDEX = {
+    Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+    Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+  };
+  const SITE_RESOURCE_EXT_RE = /\.(?:css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|map|txt|xml|json)$/i;
+  const SITE_BOT_UA_RE = /spider|bot|crawler|curl|wget|python|scrapy/i;
+  const SITE_MAX_TAIL_BYTES = 50 * 1024 * 1024; // 性能上限：>50MB 只解析尾部 50MB
+  let siteLogCache = null; // { key: `${mtimeMs}:${size}`, payload }；变化才重析
+
+  // "10/Oct/2026:13:55:36 +0800" → "2026-10-10"
+  function siteLogDate(tag) {
+    const m = /^(\d{2})\/([A-Za-z]{3})\/(\d{4}):/.exec(tag);
+    if (!m) return null;
+    const mon = SITE_MONTH_INDEX[m[2]];
+    if (!mon) return null;
+    return `${m[3]}-${mon}-${m[1]}`;
+  }
+
+  // 同一 tag → 毫秒时间戳（日分桶与 lastSeen 排序用；时区偏移忽略，仅小时级差异）。
+  function siteLogTs(tag) {
+    const m = /^(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})/.exec(tag);
+    if (!m) return 0;
+    const mon = SITE_MONTH_INDEX[m[2]];
+    if (!mon) return 0;
+    return Date.UTC(+m[3], +mon - 1, +m[1], +m[4], +m[5], +m[6]);
+  }
+
+  // combined 一行：ip - - [time] "METHOD path HTTP/x" status size "referer" "ua"
+  function parseSiteLogLine(line) {
+    const m = /^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) [^"]*" (\d{3}) \S+ "([^"]*)" "([^"]*)"$/.exec(line);
+    if (!m) return null;
+    const date = siteLogDate(m[2]);
+    const ts = siteLogTs(m[2]);
+    if (!date) return null;
+    return { ip: m[1], date, ts, method: m[3], path: m[4], status: Number(m[5]), referer: m[6], ua: m[7] };
+  }
+
+  // 页面判定（path 已剥离 query）："/"、".html" 结尾、或无扩展名 → 页面；
+  // 资源扩展剔除。
+  function isSitePagePath(path) {
+    if (SITE_RESOURCE_EXT_RE.test(path)) return false;
+    if (path === "/" || path.endsWith(".html")) return true;
+    const last = path.split("/").pop();
+    return !/\.[a-zA-Z0-9]+$/.test(last);
+  }
+
+  // 来源分类（按 Referer 主机名；空/本站 → direct）
+  function classifySiteSource(referer) {
+    if (!referer || referer === "-") return "direct";
+    let host = "";
+    const m = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(referer);
+    if (m) host = m[1].toLowerCase().split(":")[0];
+    else host = referer.toLowerCase(); // 无协议兜底
+    if (!host || host === "zenche.top" || host === "www.zenche.top") return "direct";
+    if (host === "baidu.com" || host.endsWith(".baidu.com")) return "baidu";
+    if (host === "sogou.com" || host.endsWith(".sogou.com")) return "sogou";
+    if (host === "so.com" || host.endsWith(".so.com")) return "so360";
+    if (host === "bing.com" || host.endsWith(".bing.com")) return "bing";
+    if (/google\./.test(host)) return "google"; // *.google.*
+    if (host === "weixin.qq.com" || host.endsWith(".qq.com")) return "tencent";
+    return "otherExternal";
+  }
+
+  function refererHost(referer) {
+    if (!referer || referer === "-") return null;
+    const m = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(referer);
+    return m ? m[1].toLowerCase().split(":")[0] : null;
+  }
+
+  function ensureSiteDay(perDay, date) {
+    let d = perDay.get(date);
+    if (!d) {
+      d = { pv: 0, uv: new Set(), downloads: 0, botPv: 0 };
+      perDay.set(date, d);
+    }
+    return d;
+  }
+
+  // 读文件 + 原始聚合（结果缓存；days 窗口组帧在 buildSiteStats 按需执行）
+  function parseSiteLogFile(size) {
+    let text;
+    let logBytes;
+    try {
+      if (size > SITE_MAX_TAIL_BYTES) {
+        const fd = F.openSync(siteLogPath, "r");
+        try {
+          const buf = Buffer.alloc(SITE_MAX_TAIL_BYTES);
+          const read = F.readSync(fd, buf, 0, SITE_MAX_TAIL_BYTES, size - SITE_MAX_TAIL_BYTES);
+          logBytes = read;
+          text = buf.toString("utf8", 0, read);
+        } finally {
+          F.closeSync(fd);
+        }
+      } else {
+        text = F.readFileSync(siteLogPath, "utf8");
+        logBytes = Buffer.byteLength(text, "utf8");
+      }
+    } catch {
+      return { error: "站点日志不可读" };
+    }
+    const perDay = new Map(); // date -> {pv, uv:Set, downloads, botPv}
+    const sources = { direct: 0, baidu: 0, sogou: 0, so360: 0, bing: 0, google: 0, tencent: 0, otherExternal: 0 };
+    const referers = new Map(); // host -> pv
+    const ips = new Map(); // ip -> {pv, lastSeen}
+    const pages = new Map(); // path -> pv
+    for (const line of text.split("\n")) {
+      const entry = parseSiteLogLine(line);
+      if (!entry) continue;
+      // bot UA：单列 botPv，不计 PV/UV/downloads/来源/排行
+      if (SITE_BOT_UA_RE.test(entry.ua)) {
+        ensureSiteDay(perDay, entry.date).botPv += 1;
+        continue;
+      }
+      if ((entry.method !== "GET" && entry.method !== "HEAD")
+          || (entry.status !== 200 && entry.status !== 304)) continue;
+      const pathOnly = entry.path.split("?")[0];
+      // /downloads/* 不计 PV，单列 downloads
+      if (pathOnly.startsWith("/downloads/")) {
+        ensureSiteDay(perDay, entry.date).downloads += 1;
+        continue;
+      }
+      if (!isSitePagePath(pathOnly)) continue;
+      // 页面请求：PV + 当日 UV + 全周期来源/排行聚合
+      ensureSiteDay(perDay, entry.date).pv += 1;
+      ensureSiteDay(perDay, entry.date).uv.add(entry.ip);
+      const src = classifySiteSource(entry.referer);
+      sources[src] += 1;
+      // direct（空/本站）不计外部来源排行
+      const host = src === "direct" ? null : refererHost(entry.referer);
+      if (host) referers.set(host, (referers.get(host) || 0) + 1);
+      const ipRec = ips.get(entry.ip) || { pv: 0, lastSeen: 0 };
+      ipRec.pv += 1;
+      if (entry.ts > ipRec.lastSeen) ipRec.lastSeen = entry.ts;
+      ips.set(entry.ip, ipRec);
+      pages.set(pathOnly, (pages.get(pathOnly) || 0) + 1);
+    }
+    return { perDay, sources, referers, ips, pages, logBytes };
+  }
+
+  function localDateStr(d) {
+    const p2 = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  }
+
+  // 窗口组帧：range=[today-(days-1), today]；days 逐日含零值；today 独立四卡。
+  function buildSiteStats(p, days) {
+    const now = new Date();
+    const toStr = localDateStr(now);
+    const toMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const fromMid = new Date(toMid.getTime() - (days - 1) * 86400000);
+    const fromStr = localDateStr(fromMid);
+    const dayList = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(fromMid.getTime() + i * 86400000);
+      const ds = localDateStr(d);
+      const rec = p.perDay.get(ds);
+      dayList.push({
+        date: ds,
+        pv: rec ? rec.pv : 0,
+        uv: rec ? rec.uv.size : 0,
+        downloads: rec ? rec.downloads : 0,
+      });
+    }
+    const today = p.perDay.get(toStr);
+    const topReferers = [...p.referers.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([host, pv]) => ({ host, pv }));
+    const topIps = [...p.ips.entries()]
+      .sort((a, b) => b[1].pv - a[1].pv).slice(0, 20)
+      .map(([ip, r]) => ({ ip, pv: r.pv, lastSeen: new Date(r.lastSeen).toISOString() }));
+    const topPages = [...p.pages.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([path, pv]) => ({ path, pv }));
+    return {
+      range: { from: fromStr, to: toStr },
+      today: {
+        date: toStr,
+        pv: today ? today.pv : 0,
+        uv: today ? today.uv.size : 0,
+        downloads: today ? today.downloads : 0,
+        botPv: today ? today.botPv : 0,
+      },
+      days: dayList,
+      sources: { ...p.sources },
+      topReferers,
+      topIps,
+      topPages,
+      logBytes: p.logBytes,
+      generated_at: new Date().toISOString(),
+    };
+  }
+
+  function siteStats(days) {
+    let stat;
+    try { stat = F.statSync(siteLogPath); }
+    catch { return { error: "站点日志不可读" }; }
+    const key = `${stat.mtimeMs}:${stat.size}`;
+    if (!siteLogCache || siteLogCache.key !== key) {
+      const parsed = parseSiteLogFile(stat.size);
+      if (parsed.error) return parsed;
+      siteLogCache = { key, payload: parsed };
+    }
+    return buildSiteStats(siteLogCache.payload, days);
+  }
+
   async function handleAdmin(req, res, route) {
     // 1. GET /v1/admin/stats（扩展）
     if (route === "/v1/admin/stats" && req.method === "GET") {
@@ -1163,6 +1374,13 @@ export function createApp(opts = {}) {
         adminAudit("issue", { device_id: deviceId, expiry }, "signer-error");
         return reply(res, 503, { error: "签发服务不可用" });
       }
+    }
+    // 11. GET /v1/admin/site/stats?days=N（官网访问统计，二期；GET 只读，不写审计）
+    if (route === "/v1/admin/site/stats" && req.method === "GET") {
+      const days = Math.max(1, Math.min(365, Number(new URL(req.url, "http://x").searchParams.get("days") || 7) || 7));
+      const stats = siteStats(days);
+      if (stats.error) return reply(res, 503, { error: stats.error });
+      return reply(res, 200, stats);
     }
     return reply(res, 404, { error: "Not found" });
   }
