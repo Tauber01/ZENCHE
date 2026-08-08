@@ -313,6 +313,13 @@ test("selfhost: manifest mode serves local manifest with zero GitHub requests", 
       assert.equal(win.url, "https://zenche.top/downloads/ZENCHE-1.6.0-Windows-x64.zip");
       assert.equal(win.sha256, "a".repeat(64));
       assert.equal(win.update_available, true);
+      // 门禁必修 1：清单 version/title 必须映射进 announcement（不得静默退回 0.0.0）。
+      assert.equal(win.announcement.version, "1.6.0");
+      assert.equal(win.announcement.title, "v1.6.0");
+      assert.equal(win.announcement.body, "自托管清单版本");
+      // 门禁必修 2：清单 minimum_supported_version 必须生效（强制升级闸门）。
+      assert.equal(win.minimum_supported_version, "1.3.0");
+      assert.equal(win.minimumVersion, "1.3.0");
       // windows 兜底（无 arch）
       const winFallback = await (await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`)).json();
       assert.equal(winFallback.url, "https://zenche.top/downloads/ZENCHE-1.6.0-Windows-x64-Setup.exe");
@@ -411,6 +418,28 @@ test("selfhost: manifest hot-reloads on mtime change without restart", async () 
       fs.utimesSync(manifestFile, now, new Date(now.getTime() + 2000));
       const v2 = await (await fetch(`${base}/api/update?platform=windows&current_version=1.0.0`)).json();
       assert.equal(v2.version, "1.7.0", "hot reload picks up new manifest");
+    },
+  );
+  fs.rmSync(manifestFile, { force: true });
+});
+
+test("selfhost: manifest without minimum_supported_version falls back to env/options", async () => {
+  const manifestFile = path.join(os.tmpdir(), "zenche-release-nomin.json");
+  const { minimum_supported_version: _omitted, ...manifestNoMin } = sampleManifest;
+  fs.writeFileSync(manifestFile, JSON.stringify(manifestNoMin));
+  await withServer(
+    {
+      updateService: createUpdateService({
+        fetchImpl: async () => { throw new Error("must not call GitHub"); },
+        manifestPath: manifestFile,
+        assetBaseUrl: "https://zenche.top/downloads",
+        minimumVersion: "1.4.0",
+      }),
+    },
+    async (base) => {
+      const r = await (await fetch(`${base}/api/update?platform=windows&current_version=1.5.9`)).json();
+      assert.equal(r.minimum_supported_version, "1.4.0", "env/options minimum applies when manifest omits it");
+      assert.equal(r.minimumVersion, "1.4.0");
     },
   );
   fs.rmSync(manifestFile, { force: true });

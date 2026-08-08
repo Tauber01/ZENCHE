@@ -340,7 +340,18 @@ export function createUpdateService(options = {}) {
         ? sha256Source.replace(/^sha256:/i, "").toLowerCase()
         : null;
     }
-    const announcement = releaseAnnouncement(release, configuredAnnouncement);
+    // 清单模式：releaseAnnouncement 读 GitHub 形状的 tag_name/name，
+    // 这里把清单的 version/title 映射进去，避免 announcement 静默退回 0.0.0。
+    const announcement = releaseAnnouncement(
+      isManifest ? { ...release, tag_name: release.version, name: release.title } : release,
+      configuredAnnouncement,
+    );
+    // 清单的 minimum_supported_version 优先（强制升级闸门），env/options 兜底。
+    const effectiveMinimumVersion = isManifest
+      && typeof release.minimum_supported_version === "string"
+      && release.minimum_supported_version.trim()
+      ? release.minimum_supported_version
+      : minimumVersion;
     const updateAvailable = normalized.currentVersion ? compareVersions(version, normalized.currentVersion) > 0 : true;
     const releaseUrl = isManifest
       ? (release.release_url || "")
@@ -357,7 +368,7 @@ export function createUpdateService(options = {}) {
       release_url: releaseUrl,
       update_type: isManifest ? "full" : (release.prerelease ? "preview" : "full"),
       announcement,
-      minimum_supported_version: minimumVersion ? normalizeVersion(minimumVersion) : null,
+      minimum_supported_version: effectiveMinimumVersion ? normalizeVersion(effectiveMinimumVersion) : null,
       generated_at: generatedAt,
       update_available: updateAvailable,
       stale,
@@ -365,7 +376,7 @@ export function createUpdateService(options = {}) {
       downloadUrl: url,
       releaseUrl: releaseUrl,
       updateAvailable,
-      minimumVersion: minimumVersion ? normalizeVersion(minimumVersion) : null,
+      minimumVersion: effectiveMinimumVersion ? normalizeVersion(effectiveMinimumVersion) : null,
       asset: selectedAsset ? { name: selectedAsset.file || selectedAsset.name, size: selectedAsset.size ?? null } : null,
     };
     return response;
