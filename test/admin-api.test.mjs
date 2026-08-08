@@ -284,17 +284,19 @@ test("admin: pagination total is matched count, not page count", async (t) => {
   assert.equal(p3.next_cursor, null, "no more pages");
 });
 
-test("admin: migration chain guards against cycles in migrated_from", async (t) => {
+test("admin: migration chain guards against cycles in migrated_from", { timeout: 10_000 }, async (t) => {
   const app = await start();
   t.after(() => close(app));
   const base = `http://127.0.0.1:${app.port}`;
   await activate(app, "dev-cyc-a");
   await activate(app, "dev-cyc-b");
-  // 直接构造成环（migrated_from 环），详情接口必须不死循环。
-  const snap = app.snapshot();
-  snap.devices["dev-cyc-a"].migrated_from = "dev-cyc-b";
-  snap.devices["dev-cyc-b"].migrated_from = "dev-cyc-a";
-  // 通过真实接口触发 migrationChain（前向 migrated_to 无环、后向 migrated_from 成环）。
+  // 经 test-only mutator 在服务端活状态上真实构环（migrated_from 环）。
+  // 不得用 app.snapshot()：它是 JSON 深拷贝（app.mjs Test helpers），改副本到不了
+  // 活状态，GET 在无环状态下 200 属平凡通过——那正是本测试此前空转的根因。
+  assert.equal(app.mutateDevice("dev-cyc-a", { migrated_from: "dev-cyc-b" }), true);
+  assert.equal(app.mutateDevice("dev-cyc-b", { migrated_from: "dev-cyc-a" }), true);
+  // 通过真实接口触发 migrationChain（前向 migrated_to 无环、后向 migrated_from 成环）；
+  // 无守卫时后向 while 同步死循环，事件循环被阻塞，请求永不返回（挂起判红）。
   const r = await adminGet(base, "/v1/admin/devices/dev-cyc-a");
   assert.equal(r.status, 200, "cycle must not hang the handler");
   const body = await r.json();

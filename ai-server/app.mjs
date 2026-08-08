@@ -1319,6 +1319,14 @@ export function createApp(opts = {}) {
 
   // Test helpers (not part of production surface)
   const snapshot = () => ({ devices: JSON.parse(JSON.stringify(devices)), dbFile: DB_FILE });
+  // Test-only：直接改写服务端活状态上的设备记录（snapshot() 是 JSON 深拷贝，
+  // 改副本到不了活状态——迁移环类测试必须经此 mutator 真实构环）。
+  const mutateDevice = (deviceId, patch) => {
+    const record = devices[deviceId];
+    if (!record || typeof record !== "object" || !patch || typeof patch !== "object") return false;
+    Object.assign(record, patch);
+    return true;
+  };
 
   return new Promise((resolve) => {
     server.listen(port, host, () => resolve({
@@ -1327,6 +1335,7 @@ export function createApp(opts = {}) {
       host: server.address().address,
       dbFile: DB_FILE,
       snapshot,
+      mutateDevice,
       persistDurably,
       recoverPersistFailure,
       isStorageUnhealthy: () => storageUnhealthy,
