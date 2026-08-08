@@ -702,11 +702,15 @@ export function createApp(opts = {}) {
   function migrationChain(deviceId) {
     const chain = [];
     // 向后（源头方向）：从当前设备的 migrated_from 链收集前驱（不含自身）。
+    // seen 环保护：migrated_from 成环时不得挂死（前向遍历同款写法）。
     const backward = [];
+    const seenBack = new Set();
     let origin = deviceId;
     while (devices[origin] && devices[origin].migrated_from) {
       origin = devices[origin].migrated_from;
       if (!devices[origin]) break;
+      if (seenBack.has(origin)) break; // 成环：终止回溯
+      seenBack.add(origin);
       backward.push(origin);
     }
     for (let i = backward.length - 1; i >= 0; i--) {
@@ -750,11 +754,10 @@ export function createApp(opts = {}) {
   function adminListDevices(query, filter, cursor, limit, now = Date.now()) {
     const all = Object.keys(devices).sort();
     const q = (query || "").trim().toLowerCase();
-    const items = [];
-    let total = 0;
-    let collecting = !cursor;
+    // 先全量收集匹配项（计数与收集一体），再做 cursor/limit 截断——
+    // total 必须是匹配总数（含 cursor 之前页已返回的项），不得被 limit 截断。
+    const matched = [];
     for (const deviceId of all) {
-      if (cursor && deviceId <= cursor) continue;
       const record = devices[deviceId];
       if (!record || typeof record !== "object") continue;
       if (!deviceMatchesFilter(record, deviceId, filter, now)) continue;
@@ -762,14 +765,16 @@ export function createApp(opts = {}) {
           && !String(record.activation || "").toLowerCase().includes(q)) {
         continue;
       }
-      // 到达 cursor 后的第一条起收集（cursor 语义：上一页末 device_id，下一页从其后开始）。
-      total += 1;
-      collecting = true;
-      items.push(deviceView(deviceId, record));
-      if (items.length >= limit) break;
+      matched.push(deviceId);
     }
-    const nextCursor = items.length === limit && items.length > 0
-      ? items[items.length - 1].device_id
+    const total = matched.length;
+    // cursor 语义：上一页末 device_id，本页从 cursor 之后第一条起收集。
+    const startIndex = cursor ? matched.findIndex((id) => id > cursor) : 0;
+    const from = startIndex < 0 ? matched.length : startIndex;
+    const page = matched.slice(from, from + limit);
+    const items = page.map((deviceId) => deviceView(deviceId, devices[deviceId]));
+    const nextCursor = items.length === limit && page.length > 0
+      ? page[page.length - 1]
       : null;
     return { items, next_cursor: nextCursor, total };
   }
@@ -1061,13 +1066,22 @@ export function createApp(opts = {}) {
       if (!record) return reply(res, 404, { error: "设备不存在" });
       const body = await readJsonBody(req);
       if (body.error) return reply(res, 400, { error: body.error });
+      // 联动必修（AI审查 门禁）：reset-usage/revoke/unrevoke 解析迁移 tail——
+      // 对链中间节点操作必须作用于 tail 当前记录（契约语义，前端据此明确交互）。
+      // extend-expiry/note 保持操作指定设备（extend 经 signer 绑定该 deviceId；
+      // note 是管理备注可记任意节点）。
+      const tailDeviceId = (op === "reset-usage" || op === "revoke" || op === "unrevoke")
+        ? resolveMigrationTail(devices, deviceId)
+        : deviceId;
+      const tailRecord = tailDeviceId === deviceId ? record : devices[tailDeviceId];
+      if (!tailRecord) return reply(res, 404, { error: "迁移链尾设备不存在" });
 
       if (op === "reset-usage") {
         // 迁移链只作用 tail 当前记录。
-        const failure = durableWrite(() => { record.used = 0; });
+        const failure = durableWrite(() => { tailRecord.used = 0; });
         if (failure) return reply(res, failure.status, failure.body);
-        adminAudit("reset-usage", { device_id: deviceId }, "ok");
-        return reply(res, 200, deviceView(deviceId, record));
+        adminAudit("reset-usage", { device_id: tailDeviceId }, "ok");
+        return reply(res, 200, deviceView(tailDeviceId, tailRecord));
       }
       if (op === "extend-expiry") {
         const expiry = String(body.expiry || "").trim();
@@ -1097,13 +1111,13 @@ export function createApp(opts = {}) {
       if (op === "revoke" || op === "unrevoke") {
         const revoked = op === "revoke";
         const failure = durableWrite(() => {
-          record.revoked = revoked;
-          if (revoked) record.revoked_at = Date.now();
-          else delete record.revoked_at;
+          tailRecord.revoked = revoked;
+          if (revoked) tailRecord.revoked_at = Date.now();
+          else delete tailRecord.revoked_at;
         });
         if (failure) return reply(res, failure.status, failure.body);
-        adminAudit(op, { device_id: deviceId }, revoked ? "revoked" : "unrevoked");
-        return reply(res, 200, deviceView(deviceId, record));
+        adminAudit(op, { device_id: tailDeviceId }, revoked ? "revoked" : "unrevoked");
+        return reply(res, 200, deviceView(tailDeviceId, tailRecord));
       }
       if (op === "note") {
         const note = String(body.note || "").slice(0, 500);

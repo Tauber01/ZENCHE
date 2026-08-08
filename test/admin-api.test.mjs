@@ -263,3 +263,70 @@ test("admin: snapshot appended daily, history readable", async (t) => {
   const snapFile = path.join(app.cleanupDir, "data", "admin-stats-snapshots.jsonl");
   assert.ok(fs.existsSync(snapFile), "snapshot file exists");
 });
+
+test("admin: pagination total is matched count, not page count", async (t) => {
+  const app = await start();
+  t.after(() => close(app));
+  const base = `http://127.0.0.1:${app.port}`;
+  for (const d of ["dev-01", "dev-02", "dev-03", "dev-04", "dev-05"]) {
+    await activate(app, d);
+  }
+  // limit=2 每页：total 恒为 5（匹配总数），next_cursor 推进。
+  const p1 = await (await adminGet(base, "/v1/admin/devices?limit=2")).json();
+  assert.equal(p1.total, 5, "page 1 total = matched count");
+  assert.equal(p1.items.length, 2);
+  const p2 = await (await adminGet(base, `/v1/admin/devices?limit=2&cursor=${p1.next_cursor}`)).json();
+  assert.equal(p2.total, 5, "page 2 total = matched count");
+  assert.equal(p2.items.length, 2);
+  const p3 = await (await adminGet(base, `/v1/admin/devices?limit=2&cursor=${p2.next_cursor}`)).json();
+  assert.equal(p3.total, 5, "page 3 total = matched count");
+  assert.equal(p3.items.length, 1, "last page has remainder");
+  assert.equal(p3.next_cursor, null, "no more pages");
+});
+
+test("admin: migration chain guards against cycles in migrated_from", async (t) => {
+  const app = await start();
+  t.after(() => close(app));
+  const base = `http://127.0.0.1:${app.port}`;
+  await activate(app, "dev-cyc-a");
+  await activate(app, "dev-cyc-b");
+  // 直接构造成环（migrated_from 环），详情接口必须不死循环。
+  const snap = app.snapshot();
+  snap.devices["dev-cyc-a"].migrated_from = "dev-cyc-b";
+  snap.devices["dev-cyc-b"].migrated_from = "dev-cyc-a";
+  // 通过真实接口触发 migrationChain（前向 migrated_to 无环、后向 migrated_from 成环）。
+  const r = await adminGet(base, "/v1/admin/devices/dev-cyc-a");
+  assert.equal(r.status, 200, "cycle must not hang the handler");
+  const body = await r.json();
+  assert.ok(Array.isArray(body.chain), "chain still returned");
+});
+
+test("admin: reset-usage and revoke on migrated middle node act on tail", async (t) => {
+  const app = await start({ maxUsage: 2 });
+  t.after(() => close(app));
+  const base = `http://127.0.0.1:${app.port}`;
+  const code = makeCode("dev-old2");
+  await fetch(`${base}/v1/ai`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activationCode: code, deviceId: "dev-old2", prompt: "x" }),
+  });
+  // 迁移到 dev-new2（dev-old2 成为链中间节点）
+  const rb = await fetch(`${base}/v1/ai/rebind`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activationCode: code, oldDeviceId: "dev-old2", newDeviceId: "dev-new2" }),
+  });
+  assert.equal(rb.status, 200);
+  // 对中间节点 dev-old2 reset-usage → 作用于 tail dev-new2
+  const reset = await (await adminPost(base, "/v1/admin/devices/dev-old2/reset-usage")).json();
+  assert.equal(reset.device_id, "dev-new2", "reset acts on tail");
+  assert.equal(reset.used, 0);
+  // 对中间节点 dev-old2 revoke → 作用于 tail dev-new2（consume 403 验证）
+  const rev = await (await adminPost(base, "/v1/admin/devices/dev-old2/revoke")).json();
+  assert.equal(rev.device_id, "dev-new2", "revoke acts on tail");
+  assert.equal(rev.status, "revoked");
+  const consume = await fetch(`${base}/v1/ai`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ activationCode: code, deviceId: "dev-new2", prompt: "x" }),
+  });
+  assert.equal(consume.status, 403, "revoked tail rejects consume");
+});

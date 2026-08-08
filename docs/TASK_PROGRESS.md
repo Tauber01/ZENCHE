@@ -1002,3 +1002,11 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 测试：test/admin-api.test.mjs（新）9 用例——fail-closed/认证门禁/stats 扩展计数/列表过滤分页查询/迁移链详情/各操作路径/signer 503/吊销后 consume+rebind 403 与 unrevoke 恢复/审计 JSONL 落盘无激活码/快照追加。npm test 364/364 全绿（基线 355 + 9）；node --check 通过。
 - 红线：未 git push；未动生产服务器 101.34.255.115；verifyActivation 密码学逻辑零改动。
 - 前端由 flash admin-web 分支承接（本支已预留 /admin/ 静态路由）。
+
+## 12.42 v1.5.9 admin API 门禁返修（pro，AI审查 门禁驳回 2 必修 + 1 联动必修）
+
+- 必修 1（分页 total 语义）：adminListDevices 改为「先全量匹配收集 → cursor/limit 截断」——total 恒为匹配总数（含 cursor 前页），不再被 limit break 截断。补测试：5 设备 limit=2 三页 total 恒 5。
+- 必修 2（迁移链后向环保护）：migrationChain 后向遍历（migrated_from 回溯）加 seenBack 环保护——成环即终止回溯，防事件循环挂死（DoS）。补测试：migrated_from 成环时详情接口 200 不死循环。
+- 联动必修 3（revoke/reset-usage 迁移 tail）：两操作解析 resolveMigrationTail 作用于 tail 当前记录（对链中间节点操作不再静默无效）；extend-expiry/note 保持操作指定设备（契约语义，PLANS/ZENCHE_ADMIN_MONITOR_PLAN.md 已更新）。补测试：对中间节点 reset/revoke → 返回 tail 设备且 consume 403 验证。
+- 其余非阻断观察项（ADMIN_WEB_DIR 派生/时区/expiring7d 口径/readJsonBody 悬挂/%ZZ 500/issue deviceId 校验）按派工入 backlog 不修。
+- 验证：npm test 367/367 全绿（364 + 3）；node --check 通过；diff --check 干净。
