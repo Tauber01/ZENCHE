@@ -1062,24 +1062,20 @@ export function createApp(opts = {}) {
   // 资源扩展剔除。
   function isSitePagePath(path) {
     if (SITE_RESOURCE_EXT_RE.test(path)) return false;
-    if (path === "/" || path.endsWith(".html")) return true;
+    if (path === "/" || /\.html$/i.test(path)) return true;
     const last = path.split("/").pop();
     return !/\.[a-zA-Z0-9]+$/.test(last);
   }
 
-  // 来源分类（按 Referer 主机名；空/本站 → direct）
+  // 来源分类（按 Referer 主机名；空/本站 → direct）。无协议 referrer 也提取主机名。
   function classifySiteSource(referer) {
-    if (!referer || referer === "-") return "direct";
-    let host = "";
-    const m = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(referer);
-    if (m) host = m[1].toLowerCase().split(":")[0];
-    else host = referer.toLowerCase(); // 无协议兜底
+    const host = refererHost(referer);
     if (!host || host === "zenche.top" || host === "www.zenche.top") return "direct";
     if (host === "baidu.com" || host.endsWith(".baidu.com")) return "baidu";
     if (host === "sogou.com" || host.endsWith(".sogou.com")) return "sogou";
     if (host === "so.com" || host.endsWith(".so.com")) return "so360";
     if (host === "bing.com" || host.endsWith(".bing.com")) return "bing";
-    if (/google\./.test(host)) return "google"; // *.google.*
+    if (host === "google.com" || host.startsWith("google.") || host.includes(".google.")) return "google"; // *.google.*（不含 notgoogle.com 类）
     if (host === "weixin.qq.com" || host.endsWith(".qq.com")) return "tencent";
     return "otherExternal";
   }
@@ -1087,7 +1083,10 @@ export function createApp(opts = {}) {
   function refererHost(referer) {
     if (!referer || referer === "-") return null;
     const m = /^[a-z][a-z0-9+.-]*:\/\/([^/]+)/i.exec(referer);
-    return m ? m[1].toLowerCase().split(":")[0] : null;
+    if (m) return m[1].toLowerCase().split(":")[0];
+    // 无协议：取首个 / ? 或空白前的部分作主机名
+    const raw = String(referer).toLowerCase().split(/[/?]/)[0].trim();
+    return raw || null;
   }
 
   function ensureSiteDay(perDay, date) {
@@ -1111,6 +1110,11 @@ export function createApp(opts = {}) {
           const read = F.readSync(fd, buf, 0, SITE_MAX_TAIL_BYTES, size - SITE_MAX_TAIL_BYTES);
           logBytes = read;
           text = buf.toString("utf8", 0, read);
+          // 截尾切割点不可控：丢弃首个换行符之前的半行，避免幽灵记录
+          // （半截行可能恰好满足行正则；AI审查 实测切割点落在 IP 字段内
+          // 会注入假 IP 之类假数据）。无换行符兜底：整块即半行，弃之。
+          const nl = text.indexOf("\n");
+          text = nl === -1 ? "" : text.slice(nl + 1);
         } finally {
           F.closeSync(fd);
         }

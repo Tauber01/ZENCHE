@@ -38,8 +38,11 @@ function logLine({
 }
 
 // 内存 fsAdapter：把 siteLogPath 的 stat/read 映射到可变的样例内容（真实 fs 之外零落盘）。
+// state.hugeSize 设置后模拟 >50MB 大文件：statSync 报 hugeSize，readSync 走截尾路径，
+// content 视为"文件尾部 50MB 内容"（position 偏移按 hugeSize - contentLen 换算）。
+const LOG_FD = 999;
 function memSiteLog(initial = "") {
-  const state = { content: initial, mtimeMs: 1_700_000_000_000, exists: true };
+  const state = { content: initial, mtimeMs: 1_700_000_000_000, exists: true, hugeSize: null };
   const isLog = (p) => state.exists && String(p).endsWith("access.log");
   const adapter = {
     ...fs,
@@ -47,7 +50,7 @@ function memSiteLog(initial = "") {
       if (isLog(p)) {
         return {
           mtimeMs: state.mtimeMs,
-          size: Buffer.byteLength(state.content, "utf8"),
+          size: state.hugeSize ?? Buffer.byteLength(state.content, "utf8"),
           isFile: () => true, isDirectory: () => false, isSymbolicLink: () => false,
         };
       }
@@ -57,6 +60,20 @@ function memSiteLog(initial = "") {
         throw err;
       }
       return fs.statSync(p);
+    },
+    openSync: (p, flags) => (isLog(p) ? LOG_FD : fs.openSync(p, flags)),
+    closeSync: (fd) => { if (fd !== LOG_FD) fs.closeSync(fd); },
+    readSync: (fd, buffer, offset, length, position) => {
+      if (fd === LOG_FD) {
+        const contentBuf = Buffer.from(state.content, "utf8");
+        // content 起点在"文件"中的偏移 = hugeSize - contentLen；position 换算为 content 内下标
+        const start = position - (state.hugeSize - contentBuf.length);
+        const from = Math.max(0, start);
+        const slice = contentBuf.subarray(from, from + length);
+        slice.copy(buffer, offset);
+        return slice.length;
+      }
+      return fs.readSync(fd, buffer, offset, length, position);
     },
     readFileSync: (p, enc) => {
       if (isLog(p)) return state.content;
@@ -278,4 +295,45 @@ test("site stats: top lists capped at 10/20/10 and sorted desc", async (t) => {
   // 总 PV = 3 + 21
   assert.equal(body.today.pv, 24);
   assert.equal(body.today.uv, 22, "uv = 22 distinct IPs");
+});
+
+test("site stats: >50MB tail cut discards the leading partial line (no ghost records)", async (t) => {
+  const today = dayStr(0);
+  // 构造 >50MB 大文件：content 视为尾部 50MB，第一行是被切割点截断的半行
+  // （切割点落在 IP 字段内：完整行 "111.222.333.444 - - ..." 被切成 "111." + 其余），
+  // 半行后缀 222.333.444 恰好满足行正则，若无丢弃逻辑会被解析成幽灵记录。
+  const ghostLine = `222.333.444 - - [${tag(today)}] "GET /phantom HTTP/1.1" 200 512 "-" "Mozilla/5.0"`;
+  const fullLine = logLine({ ip: "5.0.0.1", date: today, path: "/" });
+  const content = ghostLine + "\n" + fullLine + "\n";
+  const app = await start({ siteLogContent: content });
+  app.logState.hugeSize = 55 * 1024 * 1024; // >50MB 触发截尾路径
+  t.after(() => close(app));
+  const body = await (await siteGet(app, 7)).json();
+  // 半行必须被整体丢弃：无幽灵 IP/PV/页面
+  assert.equal(body.today.pv, 1, "only the complete line counts");
+  assert.equal(body.today.uv, 1);
+  assert.ok(!body.topIps.some((x) => x.ip === "222.333.444"), "no ghost IP from partial line");
+  assert.ok(!body.topPages.some((x) => x.path === "/phantom"), "no ghost page from partial line");
+  assert.deepEqual(body.topIps[0], { ip: "5.0.0.1", pv: 1, lastSeen: body.topIps[0].lastSeen });
+  assert.deepEqual(body.topPages, [{ path: "/", pv: 1 }]);
+});
+
+test("site stats: P3 — .html case-insensitive, google subdomain exact, protocol-less referer", async (t) => {
+  const today = dayStr(0);
+  const content = [
+    logLine({ ip: "6.0.0.1", date: today, path: "/INDEX.HTML" }),                        // .HTML 大写 → 页面
+    logLine({ ip: "6.0.0.2", date: today, path: "/data.JSON" }),                         // 资源扩展大小写不敏感剔除
+    logLine({ ip: "6.0.0.3", date: today, path: "/", referer: "https://www.google.com.hk/search?q=zenche" }), // google
+    logLine({ ip: "6.0.0.4", date: today, path: "/", referer: "https://notgoogle.com/x" }),   // 非 google（P3 防误伤）
+    logLine({ ip: "6.0.0.5", date: today, path: "/", referer: "www.baidu.com/s?wd=zenche" }), // 无协议 referrer → baidu
+  ].join("\n") + "\n";
+  const app = await start({ siteLogContent: content });
+  t.after(() => close(app));
+  const body = await (await siteGet(app, 7)).json();
+  assert.equal(body.today.pv, 4, "/INDEX.HTML + 3 page views (google/notgoogle/baidu)");
+  assert.equal(body.sources.google, 1, "www.google.com.hk -> google");
+  assert.equal(body.sources.otherExternal, 1, "notgoogle.com -> otherExternal (no false google)");
+  assert.equal(body.sources.baidu, 1, "protocol-less www.baidu.com -> baidu");
+  assert.equal(body.sources.direct, 1, "/INDEX.HTML has '-' referer -> direct");
+  assert.ok(body.topPages.some((x) => x.path === "/INDEX.HTML"), "case-insensitive .html counted as page");
 });
