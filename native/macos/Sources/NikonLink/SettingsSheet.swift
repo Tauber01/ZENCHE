@@ -184,12 +184,12 @@ struct SettingsSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: SpaceToken.s20) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("设置")
                         .font(.system(size: TypeScale.heading, weight: .bold))
-                    HStack(spacing: 4) {
+                    HStack(spacing: SpaceToken.s4) {
                         Text("帧澈 ZENCHE")
                         Text(updater.currentVersion)
                     }
@@ -199,7 +199,7 @@ struct SettingsSheet: View {
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Spacer()
-                HStack(spacing: 4) {
+                HStack(spacing: SpaceToken.s4) {
                     Image(systemName: "globe")
                         .foregroundStyle(SettingsPalette.muted)
                     ForEach(InterfaceLanguage.allCases) { language in
@@ -215,7 +215,7 @@ struct SettingsSheet: View {
                                             : .medium
                                     )
                                 )
-                                .padding(.horizontal, 7)
+                                .padding(.horizontal, SpaceToken.s8)
                                 .frame(height: 28)
                                 .background(
                                     language.rawValue == languageRaw
@@ -235,9 +235,9 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
                     settingIcon("circle.lefthalf.filled", color: SettingsPalette.cobalt)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText("外观")
                             .font(.system(size: TypeScale.title, weight: .bold))
                         RuntimeLocalizedText("选择界面主题。跟随系统会随 macOS 明暗外观自动切换；实时画面区在任一主题下都保持石墨黑以保证取景判断。")
@@ -246,12 +246,12 @@ struct SettingsSheet: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
-                    HStack(spacing: 4) {
+                    HStack(spacing: SpaceToken.s4) {
                         ForEach(ThemeMode.allCases) { mode in
                             themeButton(mode)
                         }
                     }
-                    .padding(3)
+                    .padding(SpaceToken.s4)
                     .background(SettingsPalette.base)
                     .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                     .fixedSize()
@@ -259,12 +259,12 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
                     settingIcon(
                         "dot.radiowaves.left.and.right",
                         color: SettingsPalette.cobalt
                     )
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText("拍摄辅助")
                             .font(.system(size: TypeScale.title, weight: .bold))
                         RuntimeLocalizedText("蓝牙遥控与拍摄定位")
@@ -275,8 +275,8 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText("蓝牙遥控拍摄")
                             .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         RuntimeLocalizedText(bluetoothRemote.status)
@@ -302,8 +302,8 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText("live 图拍摄")
                             .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         RuntimeLocalizedText(
@@ -325,8 +325,8 @@ struct SettingsSheet: View {
                 }
 
                 if livePhotoEnabled {
-                    HStack(alignment: .top, spacing: 14) {
-                        VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: SpaceToken.s12) {
+                        VStack(alignment: .leading, spacing: SpaceToken.s4) {
                             RuntimeLocalizedText("切片时长")
                                 .font(.system(size: TypeScale.emphasis, weight: .semibold))
                             RuntimeLocalizedText("快门前的取景秒数（1–15 秒）")
@@ -347,8 +347,8 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                HStack(alignment: .top, spacing: 14) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText("拍摄位置")
                             .font(.system(size: TypeScale.emphasis, weight: .semibold))
                         RuntimeLocalizedText(locationTagging.status)
@@ -370,9 +370,9 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
                     settingIcon("arrow.triangle.2.circlepath", color: SettingsPalette.cobalt)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("自动更新")
                             .font(.system(size: TypeScale.title, weight: .bold))
                         Text("启动时优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases。")
@@ -391,7 +391,7 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                HStack(spacing: 12) {
+                HStack(spacing: SpaceToken.s12) {
                     SecureField(
                         "Mirror酱 CDK（可选）",
                         text: $updater.mirrorChyanCDK
@@ -408,11 +408,11 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: SpaceToken.s12) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         RuntimeLocalizedText(updater.statusText)
                             .font(.system(size: TypeScale.body, weight: .semibold))
-                        HStack(spacing: 4) {
+                        HStack(spacing: SpaceToken.s4) {
                             Text("当前版本")
                             Text(updater.currentVersion)
                         }
@@ -442,12 +442,12 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
                     settingIcon(
                         "doc.text.magnifyingglass",
                         color: SettingsPalette.cobalt
                     )
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("诊断日志")
                             .font(.system(size: TypeScale.title, weight: .bold))
                         Text("记录相机连接、USB/PTP 命令、实时取景重试及错误详情，默认保留 14 天。")
@@ -463,11 +463,11 @@ struct SettingsSheet: View {
 
                 Divider()
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
                     Text("导出和提交前会自动隐藏相机序列号和用户名路径；在 GitHub 确认后才会提交。")
                         .font(.system(size: TypeScale.body))
                         .foregroundStyle(SettingsPalette.muted)
-                    HStack(spacing: 10) {
+                    HStack(spacing: SpaceToken.s8) {
                         Spacer()
                         actionButton("查询日志") {
                             showLogViewer = true
@@ -487,9 +487,9 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(alignment: .top, spacing: 14) {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
                     settingIcon("key.fill", color: SettingsPalette.cobalt)
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("AI 功能激活").font(.system(size: TypeScale.title, weight: .bold))
                         Text("AI 修图与生图功能需购买激活码解锁。每个激活码可使用 100 次，绑定当前设备。")
                             .font(.system(size: TypeScale.body)).foregroundStyle(SettingsPalette.muted).fixedSize(horizontal: false, vertical: true)
@@ -501,7 +501,7 @@ struct SettingsSheet: View {
                     Spacer()
                 }
                 Divider()
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
                     Button {
                         NSWorkspace.shared.open(zencheWebsiteURL)
                     } label: {
@@ -551,8 +551,8 @@ struct SettingsSheet: View {
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Divider()
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
+                    HStack(spacing: SpaceToken.s8) {
                         Text("我的设备 ID").font(.system(size: TypeScale.body, weight: .semibold))
                         Spacer()
                         Button("复制") {
@@ -573,11 +573,11 @@ struct SettingsSheet: View {
                         .foregroundStyle(SettingsPalette.muted)
                 }
                 Divider()
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
                     Text("激活码").font(.system(size: TypeScale.body, weight: .semibold))
                     TextField("输入激活码", text: $activationCode).textFieldStyle(.roundedBorder)
                 }
-                HStack(spacing: 10) {
+                HStack(spacing: SpaceToken.s8) {
                     Spacer()
                     if !activationStatus.isEmpty { Text(activationStatus).font(.system(size: TypeScale.caption)).foregroundStyle(SettingsPalette.muted) }
                     actionButton("购买激活码") { NSWorkspace.shared.open(URL(string: "https://www.ifdian.net/a/Tauber")!) }
@@ -589,7 +589,7 @@ struct SettingsSheet: View {
                     }
                 }
                 Divider()
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: SpaceToken.s8) {
                     Text("恢复设备码")
                         .font(.system(size: TypeScale.body, weight: .semibold))
                     TextField("旧设备 ID", text: $oldDeviceId)
@@ -611,13 +611,13 @@ struct SettingsSheet: View {
             }
 
             settingsCard {
-                HStack(spacing: 14) {
+                HStack(spacing: SpaceToken.s12) {
                     settingIcon(
                         "cup.and.saucer.fill",
                         color: SettingsPalette.support,
                         soft: SettingsPalette.supportSoft
                     )
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("喜欢 帧澈 ZENCHE？")
                             .font(.system(size: TypeScale.title, weight: .bold))
                         Text("请作者喝杯奶茶，支持后续维护与新机型适配。")
@@ -631,7 +631,7 @@ struct SettingsSheet: View {
                         Label("请作者喝奶茶", systemImage: "heart.fill")
                             .font(.system(size: TypeScale.body, weight: .bold))
                             .foregroundStyle(Color.white)
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, SpaceToken.s16)
                             .frame(height: 38)
                             .background(SettingsPalette.support)
                             .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
@@ -651,7 +651,7 @@ struct SettingsSheet: View {
                     .foregroundStyle(SettingsPalette.muted)
             }
             }
-            .padding(26)
+            .padding(SpaceToken.s24)
         }
         .frame(width: 620)
         .sheet(isPresented: $showDonation) {
@@ -738,7 +738,7 @@ struct SettingsSheet: View {
                 .foregroundStyle(
                     selected ? SettingsPalette.cobalt : SettingsPalette.muted
                 )
-                .padding(.horizontal, 12)
+                .padding(.horizontal, SpaceToken.s12)
                 .frame(height: 30)
                 .background(selected ? SettingsPalette.cobaltSoft : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
@@ -750,10 +750,10 @@ struct SettingsSheet: View {
     private func settingsCard<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             content()
         }
-        .padding(18)
+        .padding(SpaceToken.s16)
         .background(SettingsPalette.card)
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
         .overlay {
@@ -783,7 +783,7 @@ struct SettingsSheet: View {
         Button(LocalizedStringKey(title), action: action)
             .font(.system(size: TypeScale.body, weight: .semibold))
             .foregroundStyle(primary ? Color.white : SettingsPalette.ink)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, SpaceToken.s12)
             .frame(height: 36)
             .background(primary ? SettingsPalette.cobalt : SettingsPalette.card)
             .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
@@ -852,9 +852,9 @@ private struct DiagnosticLogViewer: View {
     )
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("诊断日志查询")
                         .font(.system(size: TypeScale.title, weight: .bold))
                     Text("显示近期脱敏日志；刷新可读取最新记录。")
@@ -874,12 +874,12 @@ private struct DiagnosticLogViewer: View {
                     .font(.system(size: TypeScale.caption, design: .monospaced))
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(14)
+                    .padding(SpaceToken.s12)
             }
             .background(Color.primary.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
         }
-        .padding(22)
+        .padding(SpaceToken.s20)
         .frame(width: 760, height: 520)
     }
 }
@@ -888,7 +888,7 @@ private struct FastFeedbackCallout: View {
     let openAfdian: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: SpaceToken.s12) {
             Image(systemName: "bolt.horizontal.circle.fill")
                 .font(.system(size: 22, weight: .semibold)) // 图标尺寸，不受 TypeScale 约束
                 .foregroundStyle(SettingsPalette.cobalt)
@@ -896,7 +896,7 @@ private struct FastFeedbackCallout: View {
                 .background(SettingsPalette.cobaltSoft)
                 .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r11))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
                 Text("快速问题反馈")
                     .font(.system(size: TypeScale.emphasis, weight: .bold))
                 Text("公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。")
@@ -912,7 +912,7 @@ private struct FastFeedbackCallout: View {
             Button("打开爱发电", action: openAfdian)
                 .buttonStyle(.bordered)
         }
-        .padding(14)
+        .padding(SpaceToken.s12)
         .background(SettingsPalette.cobaltSoft.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
         .overlay {
@@ -935,16 +935,16 @@ private struct DonationSheet: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             HStack {
-                HStack(spacing: 12) {
+                HStack(spacing: SpaceToken.s12) {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 20, weight: .bold)) // 图标尺寸，不受 TypeScale 约束
                         .foregroundStyle(SettingsPalette.cobalt)
                         .frame(width: 44, height: 44)
                         .background(SettingsPalette.cobaltSoft)
                         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
                         Text("爱发电赞助")
                             .font(.system(size: TypeScale.display, weight: .bold))
                         Text("扫描二维码，或打开爱发电主页支持项目。")
@@ -982,7 +982,7 @@ private struct DonationSheet: View {
                 .font(.system(size: TypeScale.caption))
                 .foregroundStyle(SettingsPalette.muted)
         }
-        .padding(24)
+        .padding(SpaceToken.s24)
         .frame(width: 520, height: 760)
         .background(SettingsPalette.cobaltSoft.opacity(0.18))
     }
@@ -1004,12 +1004,12 @@ struct LaunchAnnouncementSheet: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: SpaceToken.s16) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("更新公告")
                         .font(.system(size: TypeScale.heading, weight: .bold))
-                    HStack(spacing: 4) {
+                    HStack(spacing: SpaceToken.s4) {
                         Text("当前版本")
                         Text(version)
                     }
@@ -1022,7 +1022,7 @@ struct LaunchAnnouncementSheet: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: SpaceToken.s16) {
                     settingsSection(
                         title: "本次更新",
                         icon: "sparkles.rectangle.stack.fill",
@@ -1045,7 +1045,7 @@ struct LaunchAnnouncementSheet: View {
                     .background(Color.red.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Label("爱发电赞助", systemImage: "heart.fill")
                             .font(.system(size: TypeScale.title, weight: .bold))
                             .foregroundStyle(SettingsPalette.cobalt)
@@ -1063,7 +1063,7 @@ struct LaunchAnnouncementSheet: View {
                                 .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                         }
                     }
-                    .padding(18)
+                    .padding(SpaceToken.s16)
                     .background(SettingsPalette.card)
                     .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
                     .overlay {
@@ -1071,7 +1071,7 @@ struct LaunchAnnouncementSheet: View {
                             .stroke(SettingsPalette.rule)
                     }
                 }
-                .padding(.trailing, 4)
+                .padding(.trailing, SpaceToken.s4)
             }
 
             Toggle(
@@ -1080,7 +1080,7 @@ struct LaunchAnnouncementSheet: View {
             )
             .toggleStyle(.checkbox)
         }
-        .padding(24)
+        .padding(SpaceToken.s24)
         .frame(width: 620, height: 780)
         .background(SettingsPalette.cobaltSoft.opacity(0.22))
     }
@@ -1091,13 +1091,13 @@ struct LaunchAnnouncementSheet: View {
         color: Color,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
             Label(title, systemImage: icon)
                 .font(.system(size: TypeScale.title, weight: .bold))
                 .foregroundStyle(color)
             content()
         }
-        .padding(18)
+        .padding(SpaceToken.s16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(SettingsPalette.card)
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))

@@ -61,3 +61,29 @@ test('U2 R1 iOS radius: all cornerRadius literals land on the design.md ramp', a
   // sanity check that banned step values are absent from cornerRadius usage.
   assert.doesNotMatch(ios, /cornerRadius[:(]\s*(?:1|2|3|4|9|13|15|21|22|23)\b/);
 });
+
+test('U2 S iOS spacing: padding/spacing literals land on the 4pt ramp via SpaceToken', async () => {
+  const ios = await read('native/ios/NikonLink/Views/RootView.swift');
+  // SpaceToken definition block is the whitelist (4pt grid: 0/4/8/12/16/20/24/32/40).
+  assert.match(ios, /enum SpaceToken \{/);
+  for (const step of [0, 4, 8, 12, 16, 20, 24, 32, 40]) {
+    assert.match(ios, new RegExp(`static let s${step}: CGFloat = ${step}\\b`),
+      `SpaceToken must define ramp step ${step}`);
+  }
+  // 枚举数下限防扫描器失明（派工实测 413 处；令牌引用含表达式多令牌，取 380+）。
+  const refs = ios.match(/SpaceToken\.s\d+/g) ?? [];
+  assert.ok(refs.length >= 380, `SpaceToken 引用枚举数异常（${refs.length} < 380）`);
+  // 允许字面量集合：坡道档 + 豁免（1/2 细线分隔偏移、44 触控下限、沉浸大留白、动态比例）。
+  const allowed = new Set(['0','4','8','12','16','20','24','32','40','44','1','2','52','96','108','174','184','208','0.075']);
+  // 逐 token 校验所有 padding/spacing 上下文里的裸数字（表达式内的数字也算）。
+  const ctx = ios.match(/\.padding\([^)]*\)|spacing:\s*[^,\)\s]+/g) ?? [];
+  assert.ok(ctx.length >= 400, `padding/spacing 上下文枚举数异常（${ctx.length} < 400）`);
+  for (const c of ctx) {
+    for (const num of c.match(/-?\d+(?:\.\d+)?/g) ?? []) {
+      assert.ok(allowed.has(num), `iOS 非法间距字面量 ${num}（上下文: ${c.slice(0, 70)}）`);
+    }
+  }
+  // 禁用值不得以裸数字出现（3/5/6/7/9/10/13/14/15/17/18/22/26/28/30/36/42 已收敛）。
+  assert.doesNotMatch(ios, /\.padding\(\s*(?:3|5|6|7|9|10|13|14|15|17|18|22|26|28|30|36|42)\b/);
+  assert.doesNotMatch(ios, /spacing:\s*(?:3|5|6|7|9|10|13|14|15|17|18|22|26|28|30|36|42)\b/);
+});
