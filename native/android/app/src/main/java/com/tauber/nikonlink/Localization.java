@@ -886,17 +886,17 @@ final class Localization {
                         + "• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n"
                         + "• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n"
                         + "• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n"
-                        + "• 官网自动更新升级到 1.5.10；安装前可按发布说明核对 SHA‑256，签名状态保持如实披露。",
+                        + "• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。",
                 "• iOS / iPadOS adds a trusted-LAN camera bridge: Sony's official Camera Remote SDK runs on the macOS bridge, while Nikon uses an explicitly identified PTP-compatible bridge.\n"
                         + "• All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter.\n"
                         + "• Disabling monitoring now clears cached frames immediately and shows an explicit empty state; Android's disabled state is localized in all three languages.\n"
                         + "• Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available; see the usage guide for compatibility and hardware-test limits.\n"
-                        + "• The official update feed moves to 1.5.10. Verify SHA-256 before installing; package signing status remains explicitly disclosed.",
+                        + "• When updating to 1.5.10 through the official feed, verify SHA-256 before installing; package signing status remains explicitly disclosed.",
                 "• iOS / iPadOS に信頼済み LAN 向けカメラブリッジを追加。Sony 公式 Camera Remote SDK は macOS ブリッジ側で動作し、Nikon は明示された PTP 互換ブリッジを使用します。\n"
                         + "• 5 端末の撮影画面に「ライブモニター」スイッチを追加。オフにしてもカメラ接続とシャッターは維持し、プレビュー取得だけを停止します。\n"
                         + "• モニターをオフにするとキャッシュ済み画像を直ちに消去し、明確な空状態を表示。Android のオフ状態も 3 言語に対応しました。\n"
                         + "• システムカメラ、UVC、USB/PTP、Wi-Fi PTP/IP の既存経路は維持。互換性と実機検証の制約は使用ガイドを参照してください。\n"
-                        + "• 公式更新フィードを 1.5.10 に更新。インストール前に SHA-256 を確認でき、各パッケージの署名状態は引き続き明示します。");
+                        + "• 公式更新フィードから 1.5.10 に更新する場合は、インストール前に SHA-256 を確認してください。各パッケージの署名状態も引き続き明示します。");
     }
 
     private Localization() {}

@@ -92,7 +92,7 @@ test('W14 monitoring switch stops live view but keeps capture connection paths i
     read(IOS_MODEL), read(MAC_MAIN), read(ANDROID), read(HARMONY), read(WINDOWS_CODE)
   ]);
   assert.match(ios, /func setLiveMonitoringEnabled[\s\S]{0,520}stopLiveViewIfNeeded\(\)/);
-  assert.match(mac, /func setLiveMonitoringEnabled[\s\S]{0,520}toggleLiveView\(\)/);
+  assert.match(mac, /func setLiveMonitoringEnabled[\s\S]{0,800}toggleLiveView\(\)/);
   assert.match(android, /private void toggleLiveView\(\)[\s\S]{0,1000}stopLiveView\(\)/);
   assert.match(harmony, /private async toggleLiveView\(\)[\s\S]{0,750}stopLiveView\(\)/);
   assert.match(windows, /LiveViewButton_Click[\s\S]{0,2200}StopLiveViewAsync/);
@@ -120,6 +120,36 @@ test('W14 Android, HarmonyOS and Windows clear stale preview frames when monitor
     /if \(!live\)[\s\S]{0,260}PreviewImage\.Source = null;[\s\S]{0,260}PreviewEmpty\.Visibility = Visibility\.Visible;/
   );
   assert.match(windows, /live && MonitorPreviewImage\.Source is not null/);
+});
+
+test('W14 macOS ignores cached frames and gates bridge JPEG when monitoring stops', async () => {
+  const [mac, remote] = await Promise.all([read(MAC_MAIN), read(IOS_REMOTE)]);
+  assert.match(
+    mac,
+    /func toggleLiveView\(\)[\s\S]{0,520}liveViewEnabled = false[\s\S]{0,120}clearLiveMonitoringFrames\(\)/
+  );
+  assert.match(
+    mac,
+    /private func clearLiveMonitoringFrames\(\)[\s\S]{0,160}frame = nil[\s\S]{0,100}sourceFrame = nil[\s\S]{0,100}zebraMask = nil/
+  );
+  assert.match(
+    mac,
+    /private func cameraBridgeLiveViewJPEG\(\) -> Data\? \{\s*guard onMainThread\(\{ isLiveMonitoringActive \}\) else \{ return nil \}/
+  );
+  const compactPreview = mac.slice(
+    mac.indexOf('private struct CaptureCompactPreview: View'),
+    mac.indexOf('private struct ShootingTaskPanel')
+  );
+  assert.match(compactPreview, /if !model\.isLiveMonitoringActive \{/);
+  assert.ok(
+    compactPreview.indexOf('if !model.isLiveMonitoringActive')
+      < compactPreview.indexOf('wifiCamera.liveViewFrame'),
+    'macOS off state must take precedence over cached Wi-Fi and local frames'
+  );
+  assert.match(
+    remote,
+    /func stopLiveViewIfNeeded\(\)[\s\S]{0,120}liveViewTask = nil[\s\S]{0,80}liveViewFrame = nil/
+  );
 });
 
 test('W14 live-monitoring label and off state are localized on all five targets', async () => {

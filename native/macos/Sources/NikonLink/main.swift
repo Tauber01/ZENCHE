@@ -2570,7 +2570,7 @@ private final class CameraModel: ObservableObject {
                 "backend": backend,
                 "officialSDK": official,
                 "nikonRuntimeDetected": nikonOfficialSDK.remoteLoaded,
-                "monitoring": liveViewEnabled || wifiCamera.liveViewFrame != nil
+                "monitoring": isLiveMonitoringActive
             ]
         }
         guard let data = try? JSONSerialization.data(
@@ -2583,6 +2583,7 @@ private final class CameraModel: ObservableObject {
     }
 
     private func cameraBridgeLiveViewJPEG() -> Data? {
+        guard onMainThread({ isLiveMonitoringActive }) else { return nil }
         if sonyOfficialSDK.isConnected {
             return try? sonyOfficialSDK.liveViewImage()
         }
@@ -2637,6 +2638,16 @@ private final class CameraModel: ObservableObject {
         if localCameraConnected { return localCamera.deviceName }
         if wifiCamera.isConnected { return wifiCamera.cameraName }
         return cameraName ?? "相机"
+    }
+
+    var isLiveMonitoringActive: Bool {
+        liveViewEnabled || wifiCamera.isLiveViewActive
+    }
+
+    private func clearLiveMonitoringFrames() {
+        frame = nil
+        sourceFrame = nil
+        zebraMask = nil
     }
 
     // E3 1.5.9：Wi‑Fi PTP/IP 参数显示辅助（快门秒→分数、光圈 F 值）。
@@ -3103,6 +3114,7 @@ private final class CameraModel: ObservableObject {
                 clearPendingPreviewProcessing()
                 localCamera.stopLiveView()
                 liveViewEnabled = false
+                clearLiveMonitoringFrames()
                 syncLivePhotoRing()
                 detail = "本机摄像头 · 取景已停止"
             } else {
@@ -3130,6 +3142,7 @@ private final class CameraModel: ObservableObject {
             previewToken = UUID()
             clearPendingPreviewProcessing()
             liveViewEnabled = false
+            clearLiveMonitoringFrames()
             syncLivePhotoRing()
             cameraQueue.async { [weak self] in self?.camera.stopLiveView() }
         } else {
@@ -3157,6 +3170,11 @@ private final class CameraModel: ObservableObject {
     }
 
     func setLiveMonitoringEnabled(_ enabled: Bool) {
+        if !enabled {
+            previewToken = UUID()
+            clearPendingPreviewProcessing()
+            clearLiveMonitoringFrames()
+        }
         if wifiCamera.isConnected {
             enabled
                 ? wifiCamera.startLiveViewIfNeeded()
@@ -6511,7 +6529,7 @@ private struct MacLiveMonitoringToggle: View {
     @ObservedObject var model: CameraModel
 
     private var enabled: Bool {
-        model.liveViewEnabled || model.wifiCamera.liveViewFrame != nil
+        model.isLiveMonitoringActive
     }
 
     var body: some View {
@@ -6558,9 +6576,7 @@ private struct CaptureCompactPreview: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if (model.connected || model.localCameraConnected || model.wifiCamera.isConnected),
-               !model.liveViewEnabled,
-               model.wifiCamera.liveViewFrame == nil {
+            if !model.isLiveMonitoringActive {
                 VStack(spacing: SpaceToken.s12) {
                     Image(systemName: "eye.slash")
                         .font(.system(size: 42, weight: .light))

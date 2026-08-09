@@ -1066,7 +1066,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        RuntimeLocalizedText("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n• 官网自动更新升级到 1.5.10；安装前可按发布说明核对 SHA‑256，签名状态保持如实披露。")
+                        RuntimeLocalizedText("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。")
                             .font(.system(size: TypeScale.body))
                             .lineSpacing(5)
                     }

@@ -99,7 +99,7 @@ test('version 1.5.10 launch announcements describe W14 on every target', async (
     assert.match(announcement, /五端拍照页新增“实时监看”开关/);
     assert.match(announcement, /关闭监看后立即清除缓存画面并显示明确空态/);
     assert.match(announcement, /系统相机、UVC、USB\/PTP 与 Wi‑Fi PTP\/IP/);
-    assert.match(announcement, /官网自动更新升级到 1\.5\.10/);
+    assert.match(announcement, /通过官网更新到 1\.5\.10 时/);
   }
 
   assert.match(announcements[1], /tr\("• iOS \/ iPadOS 新增可信局域网相机桥接/);

@@ -1530,6 +1530,7 @@ final class WifiCameraService: ObservableObject {
     }
 
     var isConnected: Bool { state == .ready }
+    var isLiveViewActive: Bool { liveViewTask != nil }
 
     func connect() {
         guard state != .connecting else { return }
@@ -1809,11 +1810,11 @@ final class WifiCameraService: ObservableObject {
     func stopLiveViewIfNeeded() {
         liveViewTask?.cancel()
         liveViewTask = nil
+        liveViewFrame = nil
         let vendor = self.vendor
         Task { [weak self] in
             guard let self else { return }
             await self.session.endLiveView(vendor: vendor)
-            self.liveViewFrame = nil
         }
     }
 
