@@ -16,7 +16,7 @@
 - 标准标语：连接相机，也连接完整工作流
 - 当前源码版本：1.5.10
 - 当前原生构建号：37
-- 发布状态：v1.5.3 仍是 [GitHub 公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新当前仍发布 1.5.9 / build 36。W14 的 1.5.10 / build 37 打包源码固定于 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`，五端包和自托管清单已就绪，等待最终审查与生产切换；未 push、未创建 Git 标签或 GitHub Release
+- 发布状态：v1.5.3 仍是 [GitHub 公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新已发布 W14 的 1.5.10 / build 37。打包源码固定于 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`，五端公网响应与六个公开包 SHA-256 回归已通过；该分支未 push，未创建 Git 标签或 GitHub Release
 
 W14 为五端拍照页增加实时监看开关，并在 iOS / iPadOS 增加可信局域网 Mac 相机桥接。Sony 官方 Camera Remote SDK 在 Mac 端执行，Nikon 使用明确标注的 PTP 兼容路径。关闭开关只停止取景帧并清空缓存画面，不断开相机或禁用快门。1.5.10 六个本地交付文件已逐个通过 SHA-256 和结构校验；完整文件表、签名边界与使用限制见 `docs/releases/v1.5.10.md` 和 `docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md`。
 

@@ -1,7 +1,7 @@
 # 实时监看与 iOS 相机桥接使用说明
 
 > 适用版本：帧澈 ZENCHE 1.5.10 / build 37（W14）
-> 状态：1.5.10 / build 37 官网更新候选；生产切换和厂商相机实测尚待完成。
+> 状态：1.5.10 / build 37 官网自动更新已生效；厂商相机实测尚待完成。
 
 ## 1. 功能说明
 
@@ -22,7 +22,7 @@ iPhone / iPad 还可以通过同一可信局域网连接 Mac 端相机桥接。�
 
 Sony 与 Nikon 当前公开的桌面 Remote SDK 均不提供可直接嵌入 iOS 的版本。因此 iOS 没有嵌入或改写桌面 SDK；Sony 的官方 SDK 调用发生在 Mac，Nikon 不会被标记成官方 SDK 控制。只有 Nikon 正式提供 iOS SDK 或授权控制接口后，才会切换该标记。
 
-桌面厂商运行时的获取、使用与再分发须遵守各自 SDK 协议及支持机型范围；本候选包仅供已获授权的开发验证。官方入口：[Sony Camera Remote SDK](https://support.d-imaging.sony.co.jp/app/sdk/l/index.php)、[Nikon SDK](https://sdk.nikonimaging.com/information/en/)。
+桌面厂商运行时的获取、使用与再分发须遵守各自 SDK 协议及支持机型范围；只有已取得相应许可的用户才应安装和使用厂商运行时。官方入口：[Sony Camera Remote SDK](https://support.d-imaging.sony.co.jp/app/sdk/l/index.php)、[Nikon SDK](https://sdk.nikonimaging.com/information/en/)。
 
 ## 3. 在 Mac 上准备桥接
 

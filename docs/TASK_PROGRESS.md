@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-09（Asia/Shanghai）
+> 快照时间：2026-08-10（Asia/Shanghai）
 > 当前打包源码：`agent/1.5.6-ui` 的代码提交 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`，1.5.10 / build 37
-> 公开稳定版：GitHub v1.5.3（发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`）；官网自动更新当前仍为 1.5.9 / build 36，W14 的 1.5.10 / build 37 正在完成最终审查与生产切换
+> 公开状态：GitHub v1.5.3 仍为公开稳定版；官网自动更新已发布 W14 的 1.5.10 / build 37
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,12 +18,12 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前打包源码为 **1.5.10 / build 37**，固定于提交 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新当前仍是 1.5.9 / build 36。W14 五端包、自托管清单和发布说明已经形成，正在完成最终审查与生产切换，未 push、未创建 Git 标签或 GitHub Release。
+- 当前打包源码为 **1.5.10 / build 37**，固定于提交 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新已发布 1.5.10 / build 37，并完成五端 API 与六个公开包的公网回归。该分支仍未 push，未创建 Git 标签或 GitHub Release。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
-- v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查、生产更新切换、公网逐端回归仍在进行。
+- v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0 已作为历史 GitHub Release 保留；当前 GitHub 公开稳定版为 v1.5.3。生产下载服务器保留旧版本资产，并继续提供 1.5.9 / build 36 更新；1.5.10 使用新文件名部署，不覆盖旧包，以便回滚。
+- v1.5.0 已作为历史 GitHub Release 保留；当前 GitHub 公开稳定版为 v1.5.3。官网生产更新已提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
 - 最大未闭环风险仍是跨 46 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -35,7 +35,7 @@
 - 本轮设备码与兑换入口恢复已完成：五端 AI 激活卡均显示并支持复制当前设备 ID，保留激活码输入、验证和旧购买入口；新增显眼的 `https://zenche.top` 官网兑换按钮、兑换步骤说明，以及“在爱发电购买兑换码”提示、可点击二维码和购买按钮。兑换码仅用于 AI 云服务次数，未改变帧澈本体免费开源属性。
 - 本轮服务器端自动更新系统已实现：`server.mjs` 新增 `/api/update`、`/api/updates` 和 `/healthz`，按 platform/architecture/channel 解析 GitHub Release 完整包，提供 SHA-256、公告、最低支持版本、版本比较、ETag/CORS、安全响应头、5 分钟缓存与 stale 回退；五端客户端默认接入 `https://zenche.top/api/update`，服务异常继续 MirrorChyan → GitHub 回退。
 - 本轮五端外录已实现：照片直接进入当前设备文件库；Android、HarmonyOS、macOS、Windows 将 PTP/本机实时取景流式封装为 MJPEG AVI，iOS / iPadOS 本机与 UVC 继续以 MOV 外录。PTP 机身录制可与设备外录并行，停止、断开和写入失败会安全完成已写入帧；AVI 已纳入四端媒体库视频分类，会话命名、双目标备份与 SHA-256 同步生效。
-- 本轮官网更新准备已完成：`zenche-update.service` 在 `101.34.255.115` 的 `127.0.0.1:4174` 运行，Nginx 公网提供 `/api/update`、`/api/updates`、`/healthz` 和 `/downloads/`。1.5.9 / build 36 的五端响应、下载和 SHA-256 均已公网复验；1.5.10 / build 37 六包、侧车校验、服务端、自托管清单与带回滚发布脚本已上传独立暂存目录，服务器端六包校验通过，但生产清单尚未切换。
+- 本轮官网更新已完成：`zenche-update.service` 在 `101.34.255.115` 的 `127.0.0.1:4174` 运行，Nginx 公网提供 `/api/update`、`/api/updates`、`/healthz` 和 `/downloads/`。1.5.10 / build 37 已于 2026-08-10（Asia/Shanghai）切入自托管生产清单；1.5.9 请求在五端均返回 1.5.10、`update_available=true`、`stale=false` 和正确 URL/SHA-256，1.5.10 请求不重复提示，六个公开包均完成流式 SHA-256 回验。旧服务与清单备份位于 `/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
 
 ## 3. 能力进度
 
@@ -55,7 +55,7 @@
 | **AI 修图与生图** | **已实现待验收** | 五端 AI 工作台与联网 AI 面板、分析指标、AI 调整复制/粘贴、12 预设、提示词/比例/分辨率；既有设备激活与 AI 代理转发链路已验证 | W13 有效激活码的账号绑定与真实 AI 生成、各平台真机 UI、服务器容灾、激活码发放流程 |
 | **Sony / Canon 相机适配** | **已实现待验收** | Nikon 20 款、Sony 12 款、Canon 14 款，共 46 款注册表静态覆盖；vendor ID 过滤、macOS detection tokens、Windows PTP vendor ops | Sony/Canon 真机 PTP、实时取景、参数写入和不同固件验证 |
 | 三语本地化 | 已实现待验收 | 简中/英/日资源与动态状态测试通过 | 人工校对、截断、窄屏与新增文案持续同步 |
-| 更新与公告 | 已实现待验收 | 自有 `/api/update` + MirrorChyan + GitHub fallback；服务端缓存/资产选择/API 路由测试通过；五端源码契约对齐；服务器本机 API/静态资产/SHA-256 验证通过 | 将 DNS/CDN 切换到 `101.34.255.115`，再实测公网下载、公告、断网 stale 回退和各平台安装流程 |
+| 更新与公告 | 已实现待验收 | 自有 `/api/update` + MirrorChyan + GitHub fallback；1.5.10 五端公网响应、兼容路由与六个公开包 SHA-256 已通过 | 各平台真实安装、断网 stale 回退和签名后正式分发验收 |
 | 诊断与隐私 | 已实现待验收 | 脱敏日志和预填 Issue 实现存在 | 敏感信息专项审计与异常日志压力测试 |
 | 正式签名分发 | 进行中 | 已有多平台打包脚本与 CI | 见“签名与发布状态” |
 
@@ -77,8 +77,8 @@
 - **五端接入**：iOS、Android、HarmonyOS、macOS、Windows 默认请求 `https://zenche.top/api/update`，校验 `schema_version/product` 后使用结果；不可用时仍按 MirrorChyan → GitHub 回退。
 - **测试**：1.5.10 打包源码 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410` 完整 `npm test` 483/483、W14 专项 12/12 通过；新增生产清单契约逐个模拟五端真实 platform/architecture 查询，防止规范化键返回空资产。
 - **本机交付物**：1.5.10 / build 37 的 Android APK、iOS unsigned IPA、HarmonyOS HAP、macOS arm64 DMG、Windows x64 Setup/便携 ZIP 及侧车校验均已生成；文件大小、SHA-256 和签名状态见 `docs/releases/v1.5.10.md`。
-- **部署边界**：生产当前仍返回 1.5.9 / build 36；最终 1.5.10 文件只在 `/home/ubuntu/zenche-1.5.10-staging-r2/` 暂存，六包已在服务器端回验，独立 4199 端口五平台更新冒烟通过，尚未影响公网接口。切换脚本会先备份服务端、systemd 有效配置、旧 API 响应和 `SHA256SUMS`，失败时自动恢复旧服务与清单配置。
-- **下一步**：双终审通过后执行原子切换，再从公网逐端验证 1.5.9 用户看到更新、1.5.10 用户不重复提示、下载 HTTP 200 与 SHA-256 完全一致。
+- **生产部署**：1.5.10 自托管清单已生效；切换前备份服务端、systemd 有效配置、旧 API 响应和 `SHA256SUMS`，备份路径为 `/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。本机与公网五端响应、兼容路由、1.5.10 不重复提示、六个公开包 HTTP 200 与 SHA-256 均通过。
+- **下一步**：在取得正式签名与兼容相机后，补做五端真实安装、Sony/Nikon 桥接、快门、断线恢复、弱网延迟与辅助功能真机验收。
 
 以下内容来自 2026-08-01 的 `git status` 与 diff，只表示当前本地工作现场，不等同于已经提交或发布：
 

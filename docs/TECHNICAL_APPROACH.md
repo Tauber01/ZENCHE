@@ -22,6 +22,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 官网更新使用 `UPDATE_RELEASE_MANIFEST=/opt/zenche-update/release.json` 切入自托管清单模式；`UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 生成下载地址。发布顺序固定为上传带版本号的新资产、校验服务器 SHA-256、原子替换清单、验证五端 API，再允许旧客户端发现更新。
 - 清单只发布完整安装包及其 SHA-256，不执行静默覆盖。iOS / HarmonyOS 未签名、macOS ad-hoc 未公证、Windows 无 Authenticode、Android Debug 证书的边界必须随包披露。
 - 1.5.10 / build 37 打包源码为 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`；交付表与生产回滚口径见 `docs/releases/v1.5.10.md`。
+- 官网自托管清单已于 2026-08-10（Asia/Shanghai）切入生产，五端公网更新响应、兼容路由与六个公开包 SHA-256 均通过；回滚备份位于 `/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
 
 ## 0.1. 1.4.1 原生监看约定
 

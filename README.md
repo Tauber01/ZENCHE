@@ -47,7 +47,7 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。
 - 五端拍照页新增“实时监看”开关。关闭只停止取景帧，不断开相机，也不影响快门；关闭后会立即清除缓存画面并显示明确空态。
 - 系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径保持可用；兼容范围、部署步骤与真机限制见[实时监看与 iOS 相机桥接使用说明](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md)。
-- 官网更新清单已准备 1.5.10 / build 37 完整安装包与 SHA-256，生产切换和公网回归完成后生效；应用不会静默覆盖自身，仍交由各平台安装流程处理。
+- 官网更新清单已发布 1.5.10 / build 37，五端更新响应与六个公开下载包的 SHA-256 均已完成公网回归；应用不会静默覆盖自身，仍交由各平台安装流程处理。
 
 ### v1.5.7 更新
 
@@ -249,9 +249,9 @@ Mirror酱增量包；仅接受完整安装包并交给各平台原生安装流�
 `UPDATE_CORS_ORIGIN`、`UPDATE_ASSET_BASE_URL`、`UPDATE_MINIMUM_SUPPORTED_VERSION` 和
 `UPDATE_ANNOUNCEMENT_JSON`；详见 [服务端自动更新部署说明](docs/AUTOMATIC_UPDATES.md)。
 当前生产实例运行于 `101.34.255.115`，由 `zenche-update.service` 监听
-`127.0.0.1:4174`，安装包位于 `/var/www/zenche.top/downloads/`。公网接口与既有
-1.5.9 / build 36 资产可用；1.5.10 / build 37 的自托管清单、安装包和 SHA-256
-已形成发布候选，待生产切换与逐端公网回归后正式生效。
+`127.0.0.1:4174`，安装包位于 `/var/www/zenche.top/downloads/`。公网接口已提供
+1.5.10 / build 37 的自托管清单、安装包和 SHA-256 已在生产生效，并完成逐端
+公网更新响应与六个公开下载包的哈希回归；1.5.9 / build 36 资产继续保留用于回滚。
 
 ## USB 快速开始
 
@@ -430,7 +430,7 @@ in a local library for review and export.
 - iOS / iPadOS adds a trusted-LAN camera bridge. Sony's official Camera Remote SDK runs on the macOS bridge; Nikon uses an explicitly identified PTP-compatible bridge.
 - All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter, clears cached frames immediately, and shows an explicit empty state.
 - Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available. See the [Live Monitoring and iOS camera bridge guide](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md) for compatibility, setup, and hardware-test limits.
-- The 1.5.10 / build 37 full packages and SHA-256 manifest are ready for the official feed and will take effect after the production switch and public regression checks. Clients do not silently overwrite themselves; each package is handed to the platform installation flow.
+- The official feed now serves the 1.5.10 / build 37 full packages. All five update responses and the SHA-256 of all six public downloads passed public regression checks. Clients do not silently overwrite themselves; each package is handed to the platform installation flow.
 
 ### What's new in v1.5.7
 
@@ -621,9 +621,9 @@ and the last cache is served with `stale: true` during upstream outages. Configu
 `PORT`, `UPDATE_REPOSITORY`, `UPDATE_RELEASE_API_URL`, `UPDATE_CACHE_TTL_MS`,
 `UPDATE_CORS_ORIGIN`, `UPDATE_ASSET_BASE_URL`, `UPDATE_MINIMUM_SUPPORTED_VERSION`, and
 `UPDATE_ANNOUNCEMENT_JSON`; see [server deployment details](docs/AUTOMATIC_UPDATES.md).
-The public feed and its existing 1.5.9 / build 36 assets are currently available. The
-1.5.10 / build 37 self-hosted manifest and packages are a release candidate pending the
-production switch and per-platform public regression checks.
+The public feed now serves the 1.5.10 / build 37 self-hosted manifest and packages. All five
+platform update responses and all six public download hashes passed public regression checks;
+the 1.5.9 / build 36 assets remain available for rollback.
 
 ### USB quick start
 
@@ -753,7 +753,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - iOS / iPadOS に信頼済み LAN 向けカメラブリッジを追加。Sony 公式 Camera Remote SDK は macOS ブリッジ側で動作し、Nikon は明示された PTP 互換ブリッジを使用します。
 - 5 端末の撮影画面に「ライブモニター」スイッチを追加。オフにしてもカメラ接続とシャッターは維持し、キャッシュ済み画像を直ちに消去して明確な空状態を表示します。
 - システムカメラ、UVC、USB/PTP、Wi-Fi PTP/IP の既存経路は維持。互換性、設定、実機検証の制約は[ライブモニターと iOS カメラブリッジの使用ガイド](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md)を参照してください。
-- 1.5.10 / build 37 の完全パッケージと SHA-256 マニフェストは公式更新フィード向けに準備済みで、本番切り替えと公開環境での回帰確認後に有効になります。クライアントはアプリ自身をサイレント上書きせず、各 OS の標準インストール手順に引き渡します。
+- 公式更新フィードでは 1.5.10 / build 37 の完全パッケージを配信しています。5 端末の更新応答と、公開中の 6 パッケージすべての SHA-256 は公開環境で確認済みです。クライアントはアプリ自身をサイレント上書きせず、各 OS の標準インストール手順に引き渡します。
 
 ### v1.5.7 の更新
 
@@ -941,9 +941,9 @@ HarmonyOS ではアプリの非公開設定に保存され、診断ログには�
 `UPDATE_ANNOUNCEMENT_JSON` を設定でき、詳細は[サーバー配備説明](docs/AUTOMATIC_UPDATES.md)
 を参照してください。現在の本番インスタンスは `101.34.255.115` の
 `zenche-update.service`（`127.0.0.1:4174`）で稼働し、パッケージを
-`/var/www/zenche.top/downloads/` から配信します。公開フィードと既存の
-1.5.9 / build 36 アセットは利用可能です。1.5.10 / build 37 の自社サーバー上のマニフェストと
-パッケージは、本番切り替えとプラットフォーム別の公開環境での回帰確認を待つ候補です。
+`/var/www/zenche.top/downloads/` から配信します。公開フィードでは
+1.5.10 / build 37 の自社サーバー上のマニフェストとパッケージは本番環境で配信中です。
+5 端末の更新応答と公開中の 6 パッケージのハッシュを確認済みで、1.5.9 / build 36 のアセットはロールバック用に保持しています。
 
 ### USB クイックスタート
 
