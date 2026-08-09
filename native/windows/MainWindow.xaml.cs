@@ -10,6 +10,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -1399,6 +1400,7 @@ public partial class MainWindow : Window
             _diagnostics.DirectoryPath;
         CurrentVersionText.Text = AppLocalization.T(
             $"当前版本 {_updateService.CurrentVersion} · 优先通过 Mirror酱检查更新，无可用 CDN 下载地址时自动回退 GitHub Releases");
+        SidebarVersionText.Text = $"ZENCHE {_updateService.CurrentVersion}";
         MirrorChyanCdkBox.Password = _updateService.LoadMirrorChyanCdk();
         _externalRecordToDevice = LoadExternalRecordingPreference();
         _wifiConnectionMode = LoadWifiConnectionModePreference();
@@ -1420,6 +1422,7 @@ public partial class MainWindow : Window
             _ => 0
         };
         AppLocalization.Apply(this);
+        UpdateAuthLocalizedText();
         _initializing = false;
         UpdateExposureReadout();
         UpdateControlStatusRow();
@@ -1488,8 +1491,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        _authService.ClearSession();
-        ShowAuthForm(result.Message);
+        var cleared = _authService.ClearSession();
+        ShowAuthForm(
+            cleared ? result.Message : AuthService.LocalCleanupFailureMessage);
     }
 
     private async Task EnterSignedInStateAsync()
@@ -1564,6 +1568,14 @@ public partial class MainWindow : Window
         AuthSendCodeButton.Content = _authCodeCountdown > 0
             ? AppLocalization.T("重新获取") + $" ({_authCodeCountdown}s)"
             : AppLocalization.T("获取验证码");
+        AutomationProperties.SetName(AuthWall, AppLocalization.T("账号登录"));
+        AutomationProperties.SetName(AuthEmailBox, AppLocalization.T("邮箱"));
+        AutomationProperties.SetName(
+            AuthPasswordBox,
+            AppLocalization.T("密码（至少 8 位）"));
+        AutomationProperties.SetName(
+            AuthCodeBox,
+            AppLocalization.T("6 位验证码"));
     }
 
     private void SetAuthBusy(bool busy)
@@ -1636,7 +1648,9 @@ public partial class MainWindow : Window
             AuthErrorText.Text = AppLocalization.T("密码至少需要 8 位");
             return;
         }
-        if (_authRegisterMode && _authCodeRequired && code.Length != 6)
+        if (_authRegisterMode &&
+            _authCodeRequired &&
+            (code.Length != 6 || code.Any(character => !char.IsDigit(character))))
         {
             AuthErrorText.Text = AppLocalization.T("请输入 6 位验证码");
             return;
@@ -1684,29 +1698,78 @@ public partial class MainWindow : Window
     {
         foreach (var owned in OwnedWindows.Cast<Window>().ToArray())
         {
-            owned.Close();
+            TryAuthCleanupStep("关闭附属窗口", owned.Close);
         }
-        StopWifiMonitoring();
-        StopWifiPreviewLoop();
+        TryAuthCleanupStep("停止 Wi-Fi 监控", StopWifiMonitoring);
+        TryAuthCleanupStep("停止 Wi-Fi 预览", StopWifiPreviewLoop);
         if (_immersivePreviewWindow is { } immersive)
         {
-            CloseImmersivePreview(immersive);
+            TryAuthCleanupStep(
+                "关闭沉浸式预览",
+                () => CloseImmersivePreview(immersive));
         }
+
+        await TryAuthCleanupStepAsync(
+            "结束外部录制",
+            FinishExternalRecordingForDisconnectAsync);
+        await TryAuthCleanupStepAsync("停止预览循环", StopPreviewLoopAsync);
+        await TryAuthCleanupStepAsync(
+            "停止无线服务",
+            async () =>
+            {
+                if (_wirelessServer.IsRunning) await _wirelessServer.StopAsync();
+            });
+        TryAuthCleanupStep("停止蓝牙遥控", _bluetoothRemote.Stop);
+        await TryAuthCleanupStepAsync(
+            "停止定位标记",
+            async () =>
+            {
+                if (_locationTagging.Enabled)
+                    await _locationTagging.SetEnabledAsync(false);
+            });
+        await TryAuthCleanupStepAsync(
+            "断开本机摄像头",
+            async () =>
+            {
+                if (_localCamera.IsConnected) await _localCamera.DisconnectAsync();
+            });
+        await TryAuthCleanupStepAsync(
+            "断开 Wi-Fi 相机",
+            async () =>
+            {
+                if (_wifiCamera.IsConnected) await _wifiCamera.DisconnectAsync();
+            });
+        await TryAuthCleanupStepAsync(
+            "断开 USB/PTP 相机",
+            async () =>
+            {
+                if (_camera.IsConnected) await _camera.DisconnectAsync();
+            });
+    }
+
+    private void TryAuthCleanupStep(string step, Action cleanup)
+    {
         try
         {
-            await FinishExternalRecordingForDisconnectAsync();
-            await StopPreviewLoopAsync();
-            if (_wirelessServer.IsRunning) await _wirelessServer.StopAsync();
-            _bluetoothRemote.Stop();
-            if (_locationTagging.Enabled)
-                await _locationTagging.SetEnabledAsync(false);
-            if (_localCamera.IsConnected) await _localCamera.DisconnectAsync();
-            if (_wifiCamera.IsConnected) await _wifiCamera.DisconnectAsync();
-            if (_camera.IsConnected) await _camera.DisconnectAsync();
+            cleanup();
         }
         catch (Exception error)
         {
-            _diagnostics.Warning("auth", $"退出登录时清理连接状态失败：{error.Message}");
+            _diagnostics.Warning(
+                "auth", $"退出登录时{step}失败：{error.Message}");
+        }
+    }
+
+    private async Task TryAuthCleanupStepAsync(string step, Func<Task> cleanup)
+    {
+        try
+        {
+            await cleanup();
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "auth", $"退出登录时{step}失败：{error.Message}");
         }
     }
 

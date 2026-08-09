@@ -411,6 +411,7 @@ private struct LoginView: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(minHeight: 44)
+        .accessibilityLabel(Text("登录或注册"))
     }
 
     private var formCard: some View {
@@ -601,7 +602,7 @@ private struct LoginView: View {
             return
         }
         if mode == .register && codeRequired {
-            guard code.count == 6 else {
+            guard code.count == 6, code.allSatisfy(\.isNumber) else {
                 errorMessage = AuthError.invalidCode.errorDescription ?? "请输入 6 位验证码"
                 return
             }
@@ -661,7 +662,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.3"
+        ) as? String ?? "1.5.9"
     }
 
     var body: some View {
@@ -735,14 +736,20 @@ struct RootView: View {
     }
 
     private func applyAuthState(_ state: AuthService.State) {
-        guard state == .signedIn else {
+        if state != .signedIn {
             model.showingConnection = false
             model.showingSettings = false
             showingLaunchAnnouncement = false
-            model.camera.suspend()
-            model.wireless.stop()
+            if state == .signedOut {
+                model.closeAuthSensitiveState()
+            } else {
+                // checking 只阻断工作区；等 /me 结论后再决定是否彻底断开。
+                model.camera.suspend()
+                model.wireless.stop()
+            }
             return
         }
+        model.prepareSignedInState()
         model.updater.checkAutomaticallyIfNeeded()
         showingLaunchAnnouncement =
             dismissedAnnouncementVersion != Self.appVersion

@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using NikonLink.Windows.Services;
@@ -101,9 +102,12 @@ public partial class App : Application
             Width = 80,
             Height = 80,
             CornerRadius = (CornerRadius)FindResource("CornerRadius20"),
-            Background = (Brush)FindResource("LogBgBrush"),
-            HorizontalAlignment = HorizontalAlignment.Center
+            Background = (Brush)FindResource("GraphiteBrush"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            RenderTransformOrigin = new Point(0.5, 0.5)
         };
+        var markScale = new ScaleTransform(1, 1);
+        markBorder.RenderTransform = markScale;
         markBorder.Child = new TextBlock
         {
             Text = "Z",
@@ -144,7 +148,7 @@ public partial class App : Application
 
         var bgBorder = new Border
         {
-            Background = (Brush)FindResource("SurfaceBrush"),
+            Background = (Brush)FindResource("SplashPaperBrush"),
             CornerRadius = (CornerRadius)FindResource("CornerRadius16")
         };
         bgBorder.Child = grid;
@@ -152,15 +156,55 @@ public partial class App : Application
 
         splash.Show();
 
+        var animationsEnabled = SystemParameters.ClientAreaAnimation;
+        if (animationsEnabled)
+        {
+            markScale.ScaleX = 0.72;
+            markScale.ScaleY = 0.72;
+            var spring = new ElasticEase
+            {
+                EasingMode = EasingMode.EaseOut,
+                Oscillations = 1,
+                Springiness = 7
+            };
+            var scaleAnimation = new DoubleAnimation
+            {
+                To = 1,
+                Duration = TimeSpan.FromMilliseconds(600),
+                EasingFunction = spring
+            };
+            markScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnimation);
+            markScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnimation);
+
+            brandStack.Opacity = 0;
+            brandStack.BeginAnimation(
+                UIElement.OpacityProperty,
+                new DoubleAnimation
+                {
+                    To = 1,
+                    BeginTime = TimeSpan.FromMilliseconds(500),
+                    Duration = TimeSpan.FromMilliseconds(400),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+        }
+
         var timer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(2500)
+            Interval = TimeSpan.FromMilliseconds(animationsEnabled ? 2200 : 1200)
         };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            splash.Close();
+            var fade = new DoubleAnimation
+            {
+                To = 0,
+                Duration = TimeSpan.FromMilliseconds(animationsEnabled ? 500 : 200),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            fade.Completed += (_, _) => splash.Close();
+            splash.BeginAnimation(Window.OpacityProperty, fade);
         };
+        splash.Closed += (_, _) => timer.Stop();
         timer.Start();
     }
 

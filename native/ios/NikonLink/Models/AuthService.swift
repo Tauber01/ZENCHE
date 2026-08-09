@@ -254,7 +254,7 @@ final class AuthService: ObservableObject {
             switch error {
             case .sessionInvalid:
                 if !clearSession() {
-                    localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+                    localCleanupMessage = "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"
                 }
                 state = .signedOut
             case .network:
@@ -266,13 +266,13 @@ final class AuthService: ObservableObject {
                 restoreCachedAccount()
             default:
                 if !clearSession() {
-                    localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+                    localCleanupMessage = "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"
                 }
                 state = .signedOut
             }
         } catch {
             if !clearSession() {
-                localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+                localCleanupMessage = "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"
             }
             state = .signedOut
         }
@@ -320,7 +320,7 @@ final class AuthService: ObservableObject {
             _ = try? await request(path: "/v1/auth/logout", method: "POST", token: token, body: nil)
         }
         if !clearSession() {
-            localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+            localCleanupMessage = "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"
         }
         state = .signedOut
         account = nil
@@ -353,7 +353,7 @@ final class AuthService: ObservableObject {
         AuthTokenStore.writeEmail(nil)
         account = nil
         if !cleared {
-            localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+            localCleanupMessage = "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"
         }
         return cleared
     }

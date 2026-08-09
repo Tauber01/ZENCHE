@@ -25,7 +25,14 @@ public sealed record AuthResult(
     /// </summary>
     public bool IsProtocolError { get; init; }
 
-    public bool IsSuccess => !IsProtocolError && Status is >= 200 and < 300;
+    /// <summary>
+    /// 服务器响应成功但本地安全存储失败。此类结果必须与协议失败一样阻断登录墙，
+    /// 且不得被 5xx/网络失败的离线容忍分支吞掉。
+    /// </summary>
+    public bool LocalPersistenceFailed { get; init; }
+
+    public bool IsSuccess =>
+        !IsProtocolError && !LocalPersistenceFailed && Status is >= 200 and < 300;
 
     public bool IsNetworkFailure => Status == 0 && !IsProtocolError;
 
@@ -38,7 +45,7 @@ public sealed record AuthResult(
     /// 注意：email-code 的 503 是「免码过渡态」专用结果，不属此列。
     /// </summary>
     public bool IsOfflineTolerable =>
-        !IsProtocolError && (Status == 0 || Status >= 500);
+        !IsProtocolError && !LocalPersistenceFailed && (Status == 0 || Status >= 500);
 
     /// <summary>退出登录时本地会话文件清理失败（需 UI 提示重试，避免假登录态残留）。</summary>
     public bool LocalCleanupFailed { get; init; }
@@ -53,7 +60,7 @@ public sealed record AuthResult(
 /// <summary>
 /// W13-e 邮箱账号系统客户端认证核心（Windows，纯服务层，无任何 UI 依赖）。
 ///
-/// 服务端契约（W13-a，生产已上线，账号请求固定走官网 HTTPS 反代）：
+/// 候选服务端契约（W13-a；官网 HTTPS 反代仍待生产验收）：
 ///   POST /v1/auth/email-code {email, purpose:"register"} → 200 / 503(邮件服务未配置)
 ///   POST /v1/auth/register  {email, password, code?}     → 200 {token, account} / 400 / 409
 ///   POST /v1/auth/login     {email, password}            → 200 {token, account} / 401 / 403
@@ -80,6 +87,9 @@ public sealed record AuthResult(
 public sealed class AuthService
 {
     public const string AuthServerUrl = "https://zenche.top/api";
+    public const string ProtocolFailureMessage = "账号服务响应异常，请稍后重试";
+    public const string LocalCleanupFailureMessage =
+        "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。";
 
     private const string SessionFileName = "auth-session.dat";
     private const string SignedOutMarkerFileName = "auth-signed-out.dat";
@@ -352,7 +362,7 @@ public sealed class AuthService
             return result with
             {
                 LocalCleanupFailed = true,
-                Message = "本地登录状态清理失败，请重试"
+                Message = LocalCleanupFailureMessage
             };
         }
         return result;
@@ -381,7 +391,14 @@ public sealed class AuthService
             cancellationToken);
         if (result.IsSuccess && !string.IsNullOrEmpty(result.Email))
         {
-            SaveSession(token, result.Email!);
+            if (!SaveSession(token, result.Email!))
+            {
+                return result with
+                {
+                    LocalPersistenceFailed = true,
+                    Message = "无法安全保存登录状态"
+                };
+            }
         }
         return result;
     }
@@ -392,7 +409,7 @@ public sealed class AuthService
         var token = result.Token;
         if (string.IsNullOrEmpty(token))
         {
-            return new AuthResult(500, "服务器未返回登录态", null, null, null);
+            return AuthResult.Protocol(ProtocolFailureMessage, result.Status);
         }
         var email = string.IsNullOrEmpty(result.Email)
             ? NormalizeEmail(fallbackEmail)
@@ -461,7 +478,7 @@ public sealed class AuthService
             if (truncated)
             {
                 // 超限响应（无论 2xx/5xx）都是协议异常：失败关闭，不进离线容忍。
-                return AuthResult.Protocol("服务器响应体过大", status);
+                return AuthResult.Protocol(ProtocolFailureMessage, status);
             }
 
             // 服务端契约：成功与错误响应体统一 JSON（{"error": ...}）。
@@ -479,7 +496,7 @@ public sealed class AuthService
             if (!isJson)
             {
                 // 非 JSON 错误体（如网关/反代 HTML）：非真实服务端错误，判协议失败。
-                return AuthResult.Protocol("服务器返回了非 JSON 错误响应", status);
+                return AuthResult.Protocol(ProtocolFailureMessage, status);
             }
             return new AuthResult(
                 status,
@@ -512,11 +529,11 @@ public sealed class AuthService
     {
         if (!isJson)
         {
-            return AuthResult.Protocol("服务器响应格式异常（非 JSON）", status);
+            return AuthResult.Protocol(ProtocolFailureMessage, status);
         }
         if (string.IsNullOrEmpty(text))
         {
-            return AuthResult.Protocol("服务器响应为空", status);
+            return AuthResult.Protocol(ProtocolFailureMessage, status);
         }
 
         JsonDocument document;
@@ -526,7 +543,7 @@ public sealed class AuthService
         }
         catch (JsonException)
         {
-            return AuthResult.Protocol("服务器响应 JSON 格式异常", status);
+            return AuthResult.Protocol(ProtocolFailureMessage, status);
         }
         using (document)
         {
@@ -552,16 +569,14 @@ public sealed class AuthService
                     // login/register：缺 token 或缺 account.email 都不能建立会话。
                     if (string.IsNullOrEmpty(token) || string.IsNullOrEmpty(email))
                     {
-                        return AuthResult.Protocol(
-                            "服务器响应缺少登录态字段", status);
+                        return AuthResult.Protocol(ProtocolFailureMessage, status);
                     }
                     break;
                 case RequiredShape.Email:
                     // /me：缺 account.email 不能确认有效会话（避免 UI 误判）。
                     if (string.IsNullOrEmpty(email))
                     {
-                        return AuthResult.Protocol(
-                            "服务器响应缺少账号信息", status);
+                        return AuthResult.Protocol(ProtocolFailureMessage, status);
                     }
                     break;
                 case RequiredShape.None:

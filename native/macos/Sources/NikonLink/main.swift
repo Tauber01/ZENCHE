@@ -2485,6 +2485,7 @@ private final class CameraModel: ObservableObject {
 
     private let camera = GPhotoCamera()
     private let externalVideoRecorder = ExternalVideoRecorder()
+    private var authSensitiveStateClosed = false
     let localCamera = LocalCameraService()
     let wifiCamera = WifiCameraService()
     let bluetoothRemote = BluetoothRemoteService()
@@ -4269,16 +4270,33 @@ private final class CameraModel: ObservableObject {
         }
     }
 
-    func shutdown() {
-        logger.info("app", "正在停止相机与传输服务")
+    func closeAuthSensitiveState() {
+        guard !authSensitiveStateClosed else { return }
+        authSensitiveStateClosed = true
+        logger.info("auth", "正在清理账号关联的设备与传输状态")
+        if shootingTaskRunning {
+            cancelShootingTask()
+        }
         previewToken = UUID()
         clearPendingPreviewProcessing()
+        finishExternalRecordingForDisconnect()
         wirelessTransfer.stop()
         wifiCamera.disconnect()
         localCamera.disconnect()
         bluetoothRemote.stop()
         locationTagging.setEnabled(false)
         camera.disconnect()
+    }
+
+    func prepareSignedInState() {
+        authSensitiveStateClosed = false
+    }
+
+    func shutdown() {
+        logger.info("app", "正在停止相机与传输服务")
+        // 终止阶段始终再执行一次，覆盖此前登出清理中的瞬时失败。
+        authSensitiveStateClosed = false
+        closeAuthSensitiveState()
     }
 }
 
@@ -13564,17 +13582,20 @@ private struct LoginView: View {
         .labelsHidden()
         .frame(maxWidth: 420)
         .frame(minHeight: 44)
+        .accessibilityLabel(Text("登录或注册"))
     }
 
     private var formCard: some View {
         VStack(spacing: SpaceToken.s12) {
             TextField("邮箱", text: $email)
                 .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 44)
                 .autocorrectionDisabled()
                 .focused($focusedField, equals: .email)
                 .onSubmit { focusedField = .password }
             SecureField("密码（至少 8 位）", text: $password)
                 .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 44)
                 .focused($focusedField, equals: .password)
                 .onSubmit {
                     if mode == .register && !codeHidden {
@@ -13595,6 +13616,7 @@ private struct LoginView: View {
                 HStack(spacing: SpaceToken.s8) {
                     TextField("6 位验证码", text: $code)
                         .textFieldStyle(.roundedBorder)
+                        .frame(minHeight: 44)
                         .focused($focusedField, equals: .code)
                         .onSubmit { submit() }
                     Button {
@@ -13698,7 +13720,7 @@ private struct LoginView: View {
             return
         }
         if mode == .register && codeRequired {
-            guard code.count == 6 else {
+            guard code.count == 6, code.allSatisfy(\.isNumber) else {
                 errorMessage = AuthError.invalidCode.errorDescription ?? "请输入 6 位验证码"
                 return
             }
@@ -13792,7 +13814,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.3"
+        ) as? String ?? "1.5.9"
     }
 
     var body: some View {
@@ -13900,15 +13922,29 @@ private struct RootView: View {
     }
 
     private func applyAuthState(_ state: AuthService.State) {
-        guard state == .signedIn else {
+        updateWindowMinimumSize(for: state)
+        if state != .signedIn {
             showConnection = false
             showSettings = false
             showLaunchAnnouncement = false
+            if state == .signedOut {
+                model.closeAuthSensitiveState()
+            }
             return
         }
+        model.prepareSignedInState()
         updater.checkAutomaticallyIfNeeded()
         showLaunchAnnouncement =
             dismissedAnnouncementVersion != Self.appVersion
+    }
+
+    private func updateWindowMinimumSize(for state: AuthService.State) {
+        let minimum = state == .signedIn
+            ? NSSize(width: 1040, height: 700)
+            : NSSize(width: 320, height: 420)
+        DispatchQueue.main.async {
+            (NSApp.mainWindow ?? NSApp.keyWindow ?? NSApp.windows.first)?.minSize = minimum
+        }
     }
 
     /// 登录后的主工作区（W13-c 前 RootView 的原始内容）。
@@ -13981,7 +14017,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.title = "帧澈 ZENCHE"
         window.titlebarAppearsTransparent = true
-        window.minSize = NSSize(width: 1040, height: 700)
+        // 未完成认证前允许登录墙按 320×420 窄窗验收；登录成功后 RootView
+        // 会把工作台最小尺寸恢复为 1040×700。
+        window.minSize = NSSize(width: 320, height: 420)
         window.contentView = hostingView
         window.center()
         window.makeKeyAndOrderFront(nil)

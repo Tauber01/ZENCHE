@@ -138,7 +138,9 @@
               BorderThickness="0,0,1,0">
         <DockPanel Margin="18">
           <StackPanel DockPanel.Dock="Bottom">
-            <TextBlock Style="{DynamicResource MetaText}" Text="ZENCHE 1.5.3" />
+            <TextBlock x:Name="SidebarVersionText"
+                       Style="{DynamicResource MetaText}"
+                       Text="ZENCHE" />
             <TextBlock Margin="0,4,0,0"
                        Style="{DynamicResource SidebarHint}"
                        Text="照片保存在“图片\帧澈 ZENCHE”" />
@@ -2243,8 +2245,7 @@
     <Border x:Name="AuthWall"
             Grid.RowSpan="3"
             Panel.ZIndex="100"
-            Background="{DynamicResource PaperBrush}"
-            AutomationProperties.Name="账号登录">
+            Background="{DynamicResource PaperBrush}">
       <ScrollViewer VerticalScrollBarVisibility="Auto"
                     HorizontalScrollBarVisibility="Disabled">
         <Grid MinWidth="320" MinHeight="560">
@@ -2323,13 +2324,11 @@
               <TextBox x:Name="AuthEmailBox"
                        Height="44"
                        Padding="12,9"
-                       AutomationProperties.Name="邮箱"
                        KeyDown="AuthEmailBox_KeyDown" />
               <TextBlock Margin="0,12,0,4" Text="密码（至少 8 位）" />
               <PasswordBox x:Name="AuthPasswordBox"
                            Height="44"
                            Padding="12,9"
-                           AutomationProperties.Name="密码（至少 8 位）"
                            KeyDown="AuthPasswordBox_KeyDown" />
 
               <StackPanel x:Name="AuthCodePanel" Margin="0,12,0,0" Visibility="Collapsed">
@@ -2342,7 +2341,6 @@
                   <TextBox x:Name="AuthCodeBox"
                            Height="44"
                            Padding="12,9"
-                           AutomationProperties.Name="6 位验证码"
                            KeyDown="AuthCodeBox_KeyDown" />
                   <Button x:Name="AuthSendCodeButton"
                           Grid.Column="1"
@@ -2357,7 +2355,7 @@
               <TextBlock x:Name="AuthErrorText"
                          MinHeight="20"
                          Margin="0,12,0,0"
-                         Foreground="{DynamicResource VideoBrush}"
+                         Foreground="{DynamicResource ErrorBrush}"
                          TextWrapping="Wrap"
                          AutomationProperties.LiveSetting="Assertive" />
               <Button x:Name="AuthSubmitButton"

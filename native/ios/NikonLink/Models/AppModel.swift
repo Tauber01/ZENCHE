@@ -515,6 +515,7 @@ final class AppModel: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
     private var shootingTask: Task<Void, Never>?
     private var taskCaptureContinuation: CheckedContinuation<URL, Error>?
+    private var authSensitiveStateClosed = false
 
     init() {
         language = AppLanguage(
@@ -828,10 +829,33 @@ final class AppModel: ObservableObject {
     }
 
     func disconnectAllCameras() {
-        if camera.state == .ready {
-            camera.disconnect()
-        }
+        // 即使仍在权限请求/连接中也要排队拆除 session，避免授权回调在
+        // 登录墙出现后重新建立相机状态。
+        camera.disconnect()
         wifiCamera.disconnect()
+    }
+
+    /// 登录墙前的统一设备/后台态清理。幂等，避免 onAppear、bootstrap 与
+    /// auth.state 变更重复触发时反复排队断开任务。
+    func closeAuthSensitiveState() {
+        guard !authSensitiveStateClosed else { return }
+        authSensitiveStateClosed = true
+        if shootingTaskRunning {
+            cancelShootingTask()
+        }
+        if camera.isRecording {
+            // stop 与 disconnect 共用 sessionQueue，按提交顺序先完成封装再拆会话。
+            camera.stopVideoRecording()
+        }
+        livePhotoClipRecorder.disarm()
+        disconnectAllCameras()
+        wireless.stop()
+        bluetoothRemote.setEnabled(false)
+        locationTagging.setEnabled(false)
+    }
+
+    func prepareSignedInState() {
+        authSensitiveStateClosed = false
     }
 
     func setMonitorVideoCodec(_ codec: MonitorVideoCodec) {

@@ -799,6 +799,67 @@ final class Localization {
         add("假色", "False Color", "フォルスカラー");
         add("本机摄像头", "Local Camera", "内蔵カメラ");
         add("Wi‑Fi 相机", "Wi‑Fi Camera", "Wi‑Fi カメラ");
+        // W13：账号登录墙。认证服务返回的稳定中文错误也必须经过此表，避免
+        // 英文/日文界面在失败路径回落为中文。
+        add("登录", "Sign In", "ログイン");
+        add("注册", "Create Account", "新規登録");
+        add("账号", "Account", "アカウント");
+        add("邮箱", "Email", "メールアドレス");
+        add("密码（至少 8 位）", "Password (8 characters minimum)", "パスワード（8文字以上）");
+        add("验证码", "Verification Code", "認証コード");
+        add("获取验证码", "Send Code", "認証コードを送信");
+        add("重新获取", "Send Again", "再送信");
+        add("正在发送…", "Sending…", "送信中…");
+        add("登录后使用拍摄、编辑与 AI 功能",
+                "Sign in to use capture, editing, and AI features",
+                "撮影、編集、AI 機能を利用するにはログインしてください");
+        add("还没有账号？切换到「注册」即可创建",
+                "New to ZENCHE? Choose Create Account.",
+                "アカウントをお持ちでない場合は「新規登録」を選択してください。");
+        add("已有账号？切换到「登录」",
+                "Already have an account? Choose Sign In.",
+                "アカウントをお持ちの場合は「ログイン」を選択してください。");
+        add("正在验证登录状态…", "Checking your session…", "ログイン状態を確認しています…");
+        add("正在验证登录状态，请稍候", "Checking your session. Please wait.", "ログイン状態を確認しています。しばらくお待ちください。");
+        add("请输入邮箱", "Enter your email address", "メールアドレスを入力してください");
+        add("邮箱格式不正确", "Enter a valid email address", "有効なメールアドレスを入力してください");
+        add("请输入密码", "Enter your password", "パスワードを入力してください");
+        add("密码至少 8 位", "Password must be at least 8 characters", "パスワードは8文字以上で入力してください");
+        add("请先获取验证码", "Request a verification code first", "先に認証コードを取得してください");
+        add("请输入 6 位验证码", "Enter the 6-digit verification code", "6桁の認証コードを入力してください");
+        add("验证码已发送至", "Verification code sent to", "認証コードの送信先：");
+        add("邮件服务暂未配置，将免验证码注册", "Email verification is unavailable. You can create the account without a code.", "メール認証は利用できません。コードなしで登録できます。");
+        add("正在登录…", "Signing in…", "ログインしています…");
+        add("正在注册…", "Creating account…", "登録しています…");
+        add("正在退出…", "Signing out…", "ログアウトしています…");
+        add("欢迎，", "Welcome, ", "ようこそ、");
+        add("未登录", "Not signed in", "未ログイン");
+        add("退出登录", "Sign Out", "ログアウト");
+        add("登录后可跨设备同步激活绑定；退出后需重新登录才能使用全部功能。",
+                "Sign in to sync activation bindings across devices. After signing out, sign in again to use all features.",
+                "ログインするとアクティベーション情報をデバイス間で同期できます。ログアウト後は、すべての機能を利用するために再ログインしてください。");
+        add("账号服务响应格式错误", "The account service returned an invalid response", "アカウントサービスから無効な応答が返されました");
+        add("账号服务需要安全连接", "A secure connection is required for the account service", "アカウントサービスには安全な接続が必要です");
+        add("未登录或登录已过期", "You are not signed in, or your session has expired", "ログインしていないか、セッションの有効期限が切れています");
+        add("登录已过期，请重新登录", "Your session has expired. Sign in again.", "セッションの有効期限が切れました。もう一度ログインしてください。");
+        add("请先登录", "Sign in first", "先にログインしてください");
+        add("邮箱或密码错误", "Incorrect email or password", "メールアドレスまたはパスワードが正しくありません");
+        add("账号已禁用", "This account has been disabled", "このアカウントは無効です");
+        add("该邮箱已注册", "This email is already registered", "このメールアドレスはすでに登録されています");
+        add("验证码已过期，请重新获取", "The verification code has expired. Send a new code.", "認証コードの有効期限が切れました。新しいコードを取得してください。");
+        add("验证码错误次数过多，请重新获取", "Too many incorrect attempts. Send a new verification code.", "認証コードの入力回数が上限に達しました。新しいコードを取得してください。");
+        add("验证码错误", "Incorrect verification code", "認証コードが正しくありません");
+        add("请求参数有误", "Check the information you entered and try again", "入力内容を確認して、もう一度お試しください");
+        add("接口不存在", "The requested account service is unavailable", "要求されたアカウントサービスは利用できません");
+        add("API 服务返回错误", "The account service returned an error", "アカウントサービスからエラーが返されました");
+        add("请求过于频繁，请稍后再试", "Too many requests. Try again later.", "リクエストが多すぎます。しばらくしてからもう一度お試しください。");
+        add("邮件服务未配置", "Email service is not configured", "メールサービスが設定されていません");
+        add("网络连接失败，请检查网络后重试", "Network connection failed. Check your connection and try again.", "ネットワーク接続に失敗しました。接続を確認してもう一度お試しください。");
+        add("无法安全保存登录状态", "Unable to save your sign-in securely", "ログイン情報を安全に保存できませんでした");
+        add("操作失败，请稍后重试", "The operation failed. Try again later.", "操作に失敗しました。しばらくしてからもう一度お試しください。");
+        add("已退出，但本机登录信息未完全清除。请重新登录后再退出一次。",
+                "You’re signed out, but some sign-in data remains on this device. Sign in and sign out again.",
+                "ログアウトしましたが、端末にログイン情報が残っています。再度ログインして、もう一度ログアウトしてください。");
         add("媒体池", "Media Pool", "メディアプール");
         add("工具轨", "Tool Rail", "ツールレール");
         add("编辑示波器", "Editor Scopes", "編集スコープ");

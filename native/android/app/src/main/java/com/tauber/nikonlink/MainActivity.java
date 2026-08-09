@@ -1312,6 +1312,7 @@ public final class MainActivity extends Activity {
     private FrameLayout authWallHost;
     private boolean authChecking;
     private boolean loginWallVisible;
+    private boolean authSensitiveStateClosed;
     private String authMode = "login";           // "login" | "register"
     private boolean authCodeRequired = true;     // 严态=true；email-code 503（SMTP 未配）后=false 走免码注册
     private int authCountdown;
@@ -1975,8 +1976,6 @@ public final class MainActivity extends Activity {
             showLoginWall();
         }
         updateConnectionUi();
-        if (bluetoothRemoteEnabled) bluetoothRemote.start();
-        if (locationTaggingEnabled) locationTagging.start();
         showLaunchAnnouncementIfNeeded();
         if (getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getBoolean(AUTOMATIC_UPDATE_KEY, true)) {
@@ -11745,7 +11744,7 @@ public final class MainActivity extends Activity {
                 authChecking = false;
                 if (invalid) {
                     authPersistentError = cleanupFailed
-                            ? tr("已退出，但本地登录信息未能完全清理。请重试登录后再次退出。")
+                            ? tr("已退出，但本机登录信息未完全清除。请重新登录后再退出一次。")
                             : "";
                     showLoginWall();
                 } else {
@@ -11781,6 +11780,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showLoginWall() {
+        closeAuthSensitiveState();
         authChecking = false;
         loginWallVisible = true;
         dismissConnectionDialog();
@@ -11818,7 +11818,11 @@ public final class MainActivity extends Activity {
         content.addView(brandTitle, marginParams(-1, -2, 0, 18, 0, 0));
         TextView brandSub = text("Capture · Connect · Flow", 13, Typeface.NORMAL, MUTED);
         brandSub.setGravity(Gravity.CENTER);
-        content.addView(brandSub, marginParams(-1, -2, 0, 6, 0, 24));
+        content.addView(brandSub, marginParams(-1, -2, 0, 6, 0, 8));
+        TextView brandPrompt = text(
+                "登录后使用拍摄、编辑与 AI 功能", 14, Typeface.NORMAL, MUTED);
+        brandPrompt.setGravity(Gravity.CENTER);
+        content.addView(brandPrompt, marginParams(-1, -2, 0, 0, 0, 24));
 
         // 登录 / 注册 切换
         LinearLayout modeRow = new LinearLayout(this);
@@ -11857,6 +11861,13 @@ public final class MainActivity extends Activity {
                     0, dp(44), 1f));
         }
         content.addView(modeRow, marginParams(-1, dp(52), 0, 0, 0, 20));
+        TextView modeHint = text(
+                "register".equals(authMode)
+                        ? "已有账号？切换到「登录」"
+                        : "还没有账号？切换到「注册」即可创建",
+                13, Typeface.NORMAL, MUTED);
+        modeHint.setGravity(Gravity.CENTER);
+        content.addView(modeHint, marginParams(-1, -2, 0, 0, 0, 14));
 
         // 邮箱
         authEmailInput = new EditText(this);
@@ -11969,12 +11980,83 @@ public final class MainActivity extends Activity {
     }
 
     private void hideLoginWall() {
+        authSensitiveStateClosed = false;
         loginWallVisible = false;
         cancelCodeCountdown();
         if (authWallHost != null) {
             authWallHost.removeAllViews();
             authWallHost.setVisibility(View.GONE);
         }
+        // 有缓存会话且 /me 校验成功时，恢复用户此前启用的后台偏好；显式登出
+        // 会在 closeAuthSensitiveState 中把这些偏好关闭，不会自动复活。
+        if (bluetoothRemoteEnabled) bluetoothRemote.start();
+        if (locationTaggingEnabled) locationTagging.start();
+    }
+
+    /** 登录墙前统一清理相机、外录、网络回调与后台服务；幂等。 */
+    private void closeAuthSensitiveState() {
+        dismissConnectionDialog();
+        if (authSensitiveStateClosed) return;
+        authSensitiveStateClosed = true;
+
+        if (nikonCloudPresetDialog != null) {
+            nikonCloudPresetDialog.dismiss();
+            nikonCloudPresetDialog = null;
+        }
+        if (immersiveDialog != null) {
+            closeImmersivePreview(immersiveDialog);
+        }
+
+        wirelessRequested = false;
+        wirelessServer.stop();
+        setBluetoothRemoteEnabled(false);
+        setLocationTaggingEnabled(false);
+        mainHandler.removeCallbacks(wifiHeartbeatRunnable);
+        mainHandler.removeCallbacks(wifiReconnectRunnable);
+        unregisterWifiNetworkCallback();
+
+        previewGeneration++;
+        wifiPreviewGeneration++;
+        pendingPreview.set(null);
+        connected = false;
+        connecting = false;
+        wifiConnected = false;
+        wifiConnecting = false;
+        wifiReconnecting = false;
+        wifiManualDisconnect = true;
+        wifiLiveView = false;
+        wifiMovieRecording = false;
+        localCameraConnected = false;
+        localCameraConnecting = false;
+        liveViewEnabled = false;
+        videoRecording = false;
+        capturing = false;
+        recordingStartedAt = 0;
+        latestFrame = null;
+        latestSourceFrame = null;
+        latestZebraMask = null;
+
+        cameraExecutor.submit(() -> {
+            finishExternalRecordingForDisconnect();
+            try {
+                if (wifiCamera.isMovieRecording()) wifiCamera.stopMovieRecording();
+            } catch (Exception ignored) {
+            }
+            try {
+                wifiCamera.stopLiveView();
+            } catch (Exception ignored) {
+            }
+            wifiCamera.close();
+            localCamera.close();
+            try {
+                if (camera.isMovieRecording()) camera.stopMovieRecording();
+            } catch (Exception ignored) {
+            }
+            camera.disconnect();
+        });
+        updateConnectionUi();
+        updateRecordingButtons();
+        updateWirelessUi();
     }
 
     /** 验证码行显隐：注册模式且 authCodeRequired（严态）时显示。 */
@@ -12041,7 +12123,7 @@ public final class MainActivity extends Activity {
                 } else {
                     authCodeButton.setEnabled(true);
                     authCodeButton.setText(tr("获取验证码"));
-                    authErrorText.setText(result.message);
+                    authErrorText.setText(tr(result.message));
                 }
             });
         });
@@ -12051,7 +12133,7 @@ public final class MainActivity extends Activity {
         cancelCodeCountdown();
         authCountdown = 60;
         authCodeButton.setEnabled(false);
-        authCodeButton.setText("重新发送 (" + authCountdown + "s)");
+        authCodeButton.setText(tr("重新获取") + " (" + authCountdown + "s)");
         authCountdownTask = new Runnable() {
             @Override
             public void run() {
@@ -12062,7 +12144,7 @@ public final class MainActivity extends Activity {
                     authCodeButton.setText(tr("获取验证码"));
                     authCountdownTask = null;
                 } else {
-                    authCodeButton.setText("重新发送 (" + authCountdown + "s)");
+                    authCodeButton.setText(tr("重新获取") + " (" + authCountdown + "s)");
                     mainHandler.postDelayed(this, 1000);
                 }
             }
@@ -12094,8 +12176,8 @@ public final class MainActivity extends Activity {
         if (password == null || password.isEmpty()) return tr("请输入密码");
         if (password.length() < 8) return tr("密码至少 8 位");
         if ("register".equals(authMode) && authCodeRequired
-                && (code == null || code.trim().isEmpty())) {
-            return tr("请先获取验证码");
+                && (code == null || !code.trim().matches("\\d{6}"))) {
+            return tr("请输入 6 位验证码");
         }
         return null;
     }
@@ -12134,7 +12216,7 @@ public final class MainActivity extends Activity {
                     authErrorText.setText(
                             result.message == null || result.message.isEmpty()
                                     ? tr("操作失败，请稍后重试")
-                                    : result.message);
+                                    : tr(result.message));
                 }
             });
         });
@@ -13322,6 +13404,18 @@ public final class MainActivity extends Activity {
                     wifiNetworkCallback);
         } catch (Exception ignored) {
             wifiNetworkCallback = null;
+        }
+    }
+
+    private void unregisterWifiNetworkCallback() {
+        ConnectivityManager.NetworkCallback callback = wifiNetworkCallback;
+        wifiNetworkCallback = null;
+        if (callback == null) return;
+        try {
+            ConnectivityManager manager = (ConnectivityManager)
+                    getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (manager != null) manager.unregisterNetworkCallback(callback);
+        } catch (Exception ignored) {
         }
     }
 
@@ -15234,9 +15328,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.3" : version;
+            return version == null || version.isEmpty() ? "1.5.9" : version;
         } catch (Exception error) {
-            return "1.5.3";
+            return "1.5.9";
         }
     }
 
@@ -15604,17 +15698,7 @@ public final class MainActivity extends Activity {
         bluetoothRemote.stop();
         locationTagging.stop();
         wifiCamera.close();
-        if (wifiNetworkCallback != null) {
-            try {
-                ConnectivityManager manager = (ConnectivityManager)
-                        getSystemService(Context.CONNECTIVITY_SERVICE);
-                if (manager != null) {
-                    manager.unregisterNetworkCallback(wifiNetworkCallback);
-                }
-            } catch (Exception ignored) {
-            }
-            wifiNetworkCallback = null;
-        }
+        unregisterWifiNetworkCallback();
         localCamera.close();
         finishExternalRecordingForDisconnect();
         cameraExecutor.submit(camera::disconnect);

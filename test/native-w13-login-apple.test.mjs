@@ -155,19 +155,56 @@ test('W13-c bootstrap: 无令牌→signedOut；/me 401/403→清令牌回登录�
 
 test('W13-c 未鉴权隔离: checking 不挂载工作区，登出关闭功能浮层并停止后台服务', async () => {
   const ios = await read(iOS_ROOT);
+  const iosModel = await read(iOS_MODEL);
   const mac = await read(MAC_MAIN);
   assert.match(ios, /case \.checking:\s*Color\.clear/);
-  assert.match(ios, /guard state == \.signedIn else \{/);
+  assert.match(ios, /if state != \.signedIn \{/);
   assert.match(ios, /model\.showingConnection = false/);
   assert.match(ios, /model\.showingSettings = false/);
   assert.match(ios, /model\.camera\.suspend\(\)/);
   assert.match(ios, /model\.wireless\.stop\(\)/);
+  assert.match(ios, /if state == \.signedOut \{\n\s*model\.closeAuthSensitiveState\(\)/);
+  assert.match(ios, /model\.prepareSignedInState\(\)/);
+  for (const boundary of [
+    'cancelShootingTask()',
+    'camera.stopVideoRecording()',
+    'livePhotoClipRecorder.disarm()',
+    'disconnectAllCameras()',
+    'wireless.stop()',
+    'bluetoothRemote.setEnabled(false)',
+    'locationTagging.setEnabled(false)'
+  ]) {
+    assert.ok(iosModel.includes(boundary), `iOS 登录墙清理链缺少 ${boundary}`);
+  }
+  assert.match(
+    iosModel,
+    /func disconnectAllCameras\(\) \{\n(?:\s*\/\/[^\n]*\n)*\s*camera\.disconnect\(\)\n\s*wifiCamera\.disconnect\(\)\n\s*\}/
+  );
   assert.match(mac, /case \.checking:\s*Color\.clear/);
   assert.match(mac, /showConnection = false/);
   assert.match(mac, /showSettings = false/);
   assert.match(mac, /showLaunchAnnouncement = false/);
+  assert.match(mac, /if state == \.signedOut \{\n\s*model\.closeAuthSensitiveState\(\)/);
+  assert.match(mac, /model\.prepareSignedInState\(\)/);
+  for (const boundary of [
+    'cancelShootingTask()',
+    'finishExternalRecordingForDisconnect()',
+    'wirelessTransfer.stop()',
+    'wifiCamera.disconnect()',
+    'localCamera.disconnect()',
+    'bluetoothRemote.stop()',
+    'locationTagging.setEnabled(false)',
+    'camera.disconnect()'
+  ]) {
+    assert.ok(mac.includes(boundary), `macOS 登录墙清理链缺少 ${boundary}`);
+  }
   assert.match(ios, /\.frame\(minHeight: 44\)/);
-  assert.match(mac, /\.frame\(minHeight: 44\)/);
+  assert.ok(
+    (mac.match(/\.frame\(minHeight: 44\)/g) ?? []).length >= 4,
+    'macOS 登录墙切换、邮箱、密码和验证码控件均需 44pt 最小高度'
+  );
+  assert.match(mac, /state == \.signedIn[\s\S]{0,120}NSSize\(width: 1040, height: 700\)[\s\S]{0,120}NSSize\(width: 320, height: 420\)/);
+  assert.match(mac, /window\.minSize = NSSize\(width: 320, height: 420\)/);
 });
 
 test('W13-c 认证动作: 两端均实现 register/login/logout/sendEmailCode + 服务端路径', async () => {
@@ -210,6 +247,8 @@ test('W13-c LoginView: iOS 品牌头/登录注册切换/邮箱密码验证码/60
   assert.match(r, /countdown = 60/);                 // 60s 倒计时
   assert.match(r, /isWorking/);                      // 加载态
   assert.match(r, /weakPassword|密码至少需要 8 位/); // 表单校验
+  assert.match(r, /code\.count == 6, code\.allSatisfy\(\\\.isNumber\)/);
+  assert.match(r, /accessibilityLabel\(Text\("登录或注册"\)\)/);
 });
 
 test('W13-c LoginView: macOS 同款两态 + 倒计时 + 加载态', async () => {
@@ -219,6 +258,8 @@ test('W13-c LoginView: macOS 同款两态 + 倒计时 + 加载态', async () => 
   assert.match(m, /auth\.emailCodeMode == \.notRequired/);
   assert.match(m, /countdown = 60/);
   assert.match(m, /isWorking/);
+  assert.match(m, /code\.count == 6, code\.allSatisfy\(\\\.isNumber\)/);
+  assert.match(m, /accessibilityLabel\(Text\("登录或注册"\)\)/);
 });
 
 // ---------- 设置页账号区 ----------
@@ -276,14 +317,22 @@ test('W13-c 本地化: 三语 .strings 均含登录墙新键，en 有真翻译�
   const zh = await read('native/ios/NikonLink/zh-Hans.lproj/Localizable.strings');
   const en = await read('native/ios/NikonLink/en.lproj/Localizable.strings');
   const ja = await read('native/ios/NikonLink/ja.lproj/Localizable.strings');
-  for (const key of ['登录', '注册', '邮箱', '账号', '当前账号', '退出登录', '获取验证码', '邮箱或密码错误']) {
+  for (const key of [
+    '登录', '注册', '登录或注册', '邮箱', '账号', '当前账号', '退出登录',
+    '获取验证码', '邮箱或密码错误', '验证码错误', '账号服务响应格式错误',
+    '已退出，但本机登录信息未完全清除。请重新登录后再退出一次。'
+  ]) {
     assert.match(zh, new RegExp(`"${key}" = "`));
     assert.match(en, new RegExp(`"${key}" = "`));
     assert.match(ja, new RegExp(`"${key}" = "`));
   }
   // en 恒等映射硬约束：zh 源串不得直接等于 en 值（必须有真翻译）
-  assert.match(en, /"登录" = "Log In";/);
+  assert.match(en, /"登录" = "Sign In";/);
+  assert.match(en, /"注册" = "Create Account";/);
+  assert.match(en, /"重新获取" = "Send Again";/);
   assert.match(en, /"退出登录" = "Log Out";/);
+  assert.match(ja, /"注册" = "新規登録";/);
+  assert.match(ja, /"还没有账号？切换到「注册」即可创建" = "アカウントがなければ「新規登録」に切り替えて作成";/);
   // macOS 构建时复用 iOS 的 Localizable.strings（build-macos.sh 拷贝），键位即两端生效
   const build = await read('scripts/build-macos.sh');
   assert.match(build, /Localizable\.strings/);

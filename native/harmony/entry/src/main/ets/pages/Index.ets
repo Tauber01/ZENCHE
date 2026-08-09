@@ -603,7 +603,8 @@ function delay(milliseconds: number): Promise<void> {
   });
 }
 
-const CURRENT_VERSION: string = '1.5.3';
+// 与 AppScope/app.json5 的 versionName 同步；发布构建以该清单为版本源。
+const CURRENT_VERSION: string = '1.5.9';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -860,6 +861,7 @@ struct Index {
   private diagnostics?: DiagnosticLogger;
   private settingsPreferences?: preferences.Preferences;
   private previewGeneration: number = 0;
+  private authSensitiveStateClosed: boolean = false;
   private previewAnalysisSequence: number = 0;
   private externalVideoRecorder: ExternalVideoRecorder =
     new ExternalVideoRecorder();
@@ -1611,6 +1613,10 @@ struct Index {
             Text('Capture · Connect · Flow')
               .fontSize(13)
               .fontColor($r('app.color.muted'))
+            Text(this.tr('登录后使用拍摄、编辑与 AI 功能'))
+              .fontSize(14)
+              .fontColor($r('app.color.muted'))
+              .textAlign(TextAlign.Center)
           }
           .width('100%')
           .margin({ top: 40, bottom: SPACE_8 })
@@ -1626,6 +1632,15 @@ struct Index {
           .borderRadius(RADIUS_12)
           .backgroundColor($r('app.color.paper_2'))
           .margin({ top: SPACE_12, bottom: SPACE_8 })
+
+          Text(this.authMode === 'register'
+            ? this.tr('已有账号？切换到「登录」')
+            : this.tr('还没有账号？切换到「注册」即可创建'))
+            .fontSize(13)
+            .fontColor($r('app.color.muted'))
+            .textAlign(TextAlign.Center)
+            .width('100%')
+            .margin({ bottom: SPACE_8 })
 
           TextInput({ text: this.authEmail, placeholder: this.tr('邮箱') })
             .type(InputType.Email)
@@ -1696,7 +1711,7 @@ struct Index {
                 this.submitAuthForm();
               })
             Button(this.authCodeCountdown > 0
-              ? '重新发送 (' + this.authCodeCountdown.toString() + 's)'
+              ? this.tr('重新获取') + ' (' + this.authCodeCountdown.toString() + 's)'
               : this.tr('获取验证码'))
               .type(ButtonType.Normal)
               .width('100%')
@@ -1809,7 +1824,7 @@ struct Index {
       this.authCodeRequired = false;
       this.authError = this.tr('邮件服务暂未配置，将免验证码注册');
     } else {
-      this.authError = result.message;
+      this.authError = this.tr(result.message);
     }
   }
 
@@ -1836,8 +1851,10 @@ struct Index {
       this.authError = this.tr('密码至少 8 位');
       return;
     }
-    if (this.authMode === 'register' && this.authCodeRequired && code.length === 0) {
-      this.authError = this.tr('请先获取验证码');
+    if (this.authMode === 'register'
+      && this.authCodeRequired
+      && !/^\d{6}$/.test(code)) {
+      this.authError = this.tr('请输入 6 位验证码');
       return;
     }
     this.authSubmitting = true;
@@ -1848,6 +1865,7 @@ struct Index {
       : await manager.register(email, password, this.authCodeRequired ? code : '');
     this.authSubmitting = false;
     if (result.status === 200) {
+      this.authSensitiveStateClosed = false;
       this.accountEmail = result.email.length > 0 ? result.email : email;
       this.authChecking = false;
       this.loginWallVisible = false;
@@ -1859,7 +1877,7 @@ struct Index {
       promptAction.showToast({ message: this.tr('欢迎，') + this.accountEmail });
     } else {
       this.authError = result.message.length > 0
-        ? result.message
+        ? this.tr(result.message)
         : this.tr('操作失败，请稍后重试');
     }
   }
@@ -1869,12 +1887,14 @@ struct Index {
     this.authChecking = true;
     const manager: AuthManager | undefined = this.authManager;
     if (!manager) {
+      await this.closeAuthSensitiveState();
       this.loginWallVisible = true;
       this.authChecking = false;
       return;
     }
     try {
       if (!(await manager.hasSession())) {
+        await this.closeAuthSensitiveState();
         this.loginWallVisible = true;
         return;
       }
@@ -1883,13 +1903,15 @@ struct Index {
         || (result.status !== 200 && result.status !== 0 && result.status < 500);
       if (invalid) {
         const cleared: boolean = await manager.clearSession();
+        await this.closeAuthSensitiveState();
         this.authError = cleared
           ? ''
-          : this.tr('已退出，但本地登录信息未能完全清理。请重试登录后再次退出。');
+          : this.tr('已退出，但本机登录信息未完全清除。请重新登录后再退出一次。');
         this.accountEmail = '';
         this.connectionPanelVisible = false;
         this.loginWallVisible = true;
       } else {
+        this.authSensitiveStateClosed = false;
         this.loginWallVisible = false;
       }
       // 仅 200 / 真实网络失败 status=0 / JSON 服务端 5xx 离线容忍；
@@ -1909,6 +1931,7 @@ struct Index {
       cleanupFailed = result.localCleanupFailed;
       cleanupMessage = result.message;
     }
+    await this.closeAuthSensitiveState();
     this.authError = cleanupFailed
       ? this.tr(cleanupMessage)
       : '';
@@ -1918,6 +1941,87 @@ struct Index {
     this.launchAnnouncementVisible = false;
     this.loginWallVisible = true;
     this.section = 'capture';
+  }
+
+  /** 登录墙前统一清理设备、外录与后台服务；每个边界独立失败关闭。 */
+  private async closeAuthSensitiveState(): Promise<void> {
+    if (this.authSensitiveStateClosed) return;
+    this.authSensitiveStateClosed = true;
+    this.stopImmersiveOrientationTracking();
+    this.immersivePreviewVisible = false;
+    this.previewGeneration++;
+    this.shootingTaskGeneration++;
+
+    try {
+      await this.finishExternalRecordingForDisconnect();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'auth-cleanup',
+        `外录清理失败：${(error as Error).message}`
+      );
+    }
+    try {
+      await this.camera.stopLiveView();
+    } catch (_) {
+    }
+    try {
+      await this.camera.disconnect();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'auth-cleanup',
+        `相机断开失败：${(error as Error).message}`
+      );
+    }
+
+    this.stopWifiHeartbeat();
+    this.stopWifiReconnect();
+    this.unregisterWifiNetConnection();
+    try {
+      await this.wifiCamera.disconnect();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'auth-cleanup',
+        `Wi-Fi 相机断开失败：${(error as Error).message}`
+      );
+    }
+    this.bluetoothRemote?.stop();
+    this.locationTagging?.setEnabled(false);
+    if (this.wireless !== undefined) {
+      try {
+        await this.wireless.stop();
+      } catch (error) {
+        this.diagnostics?.warning(
+          'auth-cleanup',
+          `无线服务停止失败：${(error as Error).message}`
+        );
+      }
+    }
+
+    this.connected = false;
+    this.wifiConnected = false;
+    this.wifiConnecting = false;
+    this.wifiLiveView = false;
+    this.wifiMovieRecording = false;
+    this.wifiReconnecting = false;
+    this.wifiManualDisconnect = true;
+    this.localCameraSelected = false;
+    this.liveView = false;
+    this.videoRecording = false;
+    this.bluetoothRemoteEnabled = false;
+    this.bluetoothRemoteConnected = false;
+    this.locationTaggingEnabled = false;
+    this.wirelessRunning = false;
+    this.wirelessAddress = '—';
+    this.connectionPanelVisible = false;
+
+    if (this.preview !== undefined) {
+      this.preview.release();
+      this.preview = undefined;
+    }
+    if (this.largePreview !== undefined) {
+      this.largePreview.release();
+      this.largePreview = undefined;
+    }
   }
 
   @Builder
@@ -2225,7 +2329,7 @@ struct Index {
       this.NavButton('我的设备', 'devices')
       this.NavButton('分支', 'library')
       Blank()
-      Text('ZENCHE 1.5.3')
+      Text(`ZENCHE ${CURRENT_VERSION}`)
         .fontSize(EDITOR_FS_SMALL)
         .fontFamily('monospace')
         .fontColor($r('app.color.muted'))

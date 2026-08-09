@@ -137,6 +137,70 @@ internal static class AppLocalization
             ["未登录"] = new("Not signed in", "未ログイン"),
             ["退出登录"] = new("Sign Out", "ログアウト"),
             ["正在退出…"] = new("Signing out…", "ログアウトしています…"),
+            ["账号服务响应无效"] = new(
+                "The account service returned an invalid response",
+                "アカウントサービスから無効な応答が返されました"),
+            ["账号服务响应异常，请稍后重试"] = new(
+                "The account service returned an unexpected response. Try again later.",
+                "アカウントサービスから予期しない応答が返されました。しばらくしてからもう一度お試しください。"),
+            ["账号服务需要安全连接"] = new(
+                "A secure connection is required for the account service",
+                "アカウントサービスには安全な接続が必要です"),
+            ["邮箱或密码错误"] = new(
+                "Incorrect email or password",
+                "メールアドレスまたはパスワードが正しくありません"),
+            ["未登录或登录已过期"] = new(
+                "You are not signed in, or your session has expired",
+                "ログインしていないか、セッションの有効期限が切れています"),
+            ["登录已过期，请重新登录"] = new(
+                "Your session has expired. Sign in again.",
+                "セッションの有効期限が切れました。もう一度ログインしてください。"),
+            ["请先登录"] = new("Sign in first", "先にログインしてください"),
+            ["账号已禁用"] = new(
+                "This account has been disabled",
+                "このアカウントは無効です"),
+            ["该邮箱已注册"] = new(
+                "This email is already registered",
+                "このメールアドレスはすでに登録されています"),
+            ["验证码已过期，请重新获取"] = new(
+                "The verification code has expired. Send a new code.",
+                "認証コードの有効期限が切れました。新しいコードを取得してください。"),
+            ["验证码错误次数过多，请重新获取"] = new(
+                "Too many incorrect attempts. Send a new verification code.",
+                "認証コードの入力回数が上限に達しました。新しいコードを取得してください。"),
+            ["验证码错误"] = new(
+                "Incorrect verification code",
+                "認証コードが正しくありません"),
+            ["请求参数有误"] = new(
+                "Check the information you entered and try again",
+                "入力内容を確認して、もう一度お試しください"),
+            ["接口不存在"] = new(
+                "The requested account service is unavailable",
+                "要求されたアカウントサービスは利用できません"),
+            ["请求过于频繁，请稍后再试"] = new(
+                "Too many requests. Try again later.",
+                "リクエストが多すぎます。しばらくしてからもう一度お試しください。"),
+            ["邮件服务未配置"] = new(
+                "Email verification is unavailable",
+                "メール認証は利用できません"),
+            ["请求已取消"] = new(
+                "The request was cancelled",
+                "リクエストはキャンセルされました"),
+            ["网络连接失败，请检查网络后重试"] = new(
+                "Network connection failed. Check your connection and try again.",
+                "ネットワーク接続に失敗しました。接続を確認してもう一度お試しください。"),
+            ["API 服务返回错误"] = new(
+                "The account service returned an error",
+                "アカウントサービスからエラーが返されました"),
+            ["无法连接账号服务"] = new(
+                "Unable to reach the account service",
+                "アカウントサービスに接続できません"),
+            ["无法安全保存登录状态"] = new(
+                "Unable to save your sign-in securely",
+                "ログイン情報を安全に保存できませんでした"),
+            ["已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"] = new(
+                "You’re signed out, but some sign-in data remains on this device. Sign in and sign out again.",
+                "ログアウトしましたが、端末にログイン情報が残っています。再度ログインして、もう一度ログアウトしてください。"),
             ["相机连接"] = new("Camera Connections", "カメラ接続"),
             ["本机摄像头、USB/PTP 与官方 SDK"] = new(
                 "Local camera, USB/PTP, and official SDKs",

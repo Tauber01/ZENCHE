@@ -72,8 +72,8 @@ test('windows auth: 临时文件→原子替换，写入失败无半态且阻断
   assert.match(source, /return false;/);
   // 登录/注册成功但落盘失败 → 500，不得放行登录墙
   assert.match(source, /"无法安全保存登录状态"/);
-  // 服务器未返回 token → 500
-  assert.match(source, /"服务器未返回登录态"/);
+  // 服务器未返回 token → 稳定协议错误，不能泄露中文技术细节
+  assert.match(source, /string\.IsNullOrEmpty\(token\)[\s\S]{0,140}AuthResult\.Protocol\(ProtocolFailureMessage, result\.Status\)/);
 });
 
 test('windows auth: 清理失败可观测（返回 false + 日志），退出登录残留态可提示', async () => {
@@ -85,7 +85,7 @@ test('windows auth: 清理失败可观测（返回 false + 日志），退出登
   assert.match(source, /return false;/);
   // LogoutAsync 清理失败 → LocalCleanupFailed 标记 + 可观测文案
   assert.match(source, /LocalCleanupFailed = true/);
-  assert.match(source, /"本地登录状态清理失败，请重试"/);
+  assert.match(source, /"已退出，但本机登录信息未完全清除。请重新登录后再退出一次。"/);
 });
 
 test('windows auth: 认证网络层——超时/取消/响应体上限/GET 无 body/Bearer/禁重定向', async () => {
@@ -115,7 +115,7 @@ test('windows auth: 错误映射——message 直达、401/403 会话失效、�
   // 401/403 标会话失效（路由守卫据此清 token 回登录墙）
   assert.match(source, /IsSessionInvalid => Status == 401 \|\| Status == 403/);
   // 网络失败(0)/5xx 离线容忍（不清会话）；协议失败明确排除
-  assert.match(source, /IsOfflineTolerable =>\n\s*!IsProtocolError && \(Status == 0 \|\| Status >= 500\)/);
+  assert.match(source, /IsOfflineTolerable =>\n\s*!IsProtocolError && !LocalPersistenceFailed && \(Status == 0 \|\| Status >= 500\)/);
   // fallback 映射不互相吞掉
   assert.match(source, /401 => fallback401,/);
   assert.match(source, /403 => "账号已禁用",/);
@@ -156,8 +156,10 @@ test('windows auth: logout 无论服务端成败都清本地态；me() 200 刷�
   assert.match(source, /"\/v1\/auth\/logout",\n\s*"\{\}",\n\s*token,/);
   // 无论服务端成败都清本地登录态
   assert.match(source, /var cleared = ClearSession\(\);/);
-  // me() 200 刷新本地邮箱（不触碰 token）
-  assert.match(source, /if \(result\.IsSuccess && !string\.IsNullOrEmpty\(result\.Email\)\)\n\s*\{\n\s*SaveSession\(token, result\.Email!\);/);
+  // me() 200 刷新本地邮箱；安全存储失败不得放行登录墙
+  assert.match(source, /if \(!SaveSession\(token, result\.Email!\)\)/);
+  assert.match(source, /LocalPersistenceFailed = true/);
+  assert.match(source, /!IsProtocolError && !LocalPersistenceFailed && Status is >= 200 and < 300/);
 });
 
 test('windows auth: 协议失败关闭——HTML/畸形 JSON/缺字段不算成功也不算离线容忍', async () => {
@@ -165,21 +167,20 @@ test('windows auth: 协议失败关闭——HTML/畸形 JSON/缺字段不算成�
 
   // IsProtocolError 语义：既不算成功，也不算离线容忍
   assert.match(source, /public bool IsProtocolError \{ get; init; \}/);
-  assert.match(source, /IsSuccess => !IsProtocolError && Status is >= 200 and < 300/);
-  assert.match(source, /IsOfflineTolerable =>\n\s*!IsProtocolError && \(Status == 0 \|\| Status >= 500\)/);
+  assert.match(source, /!IsProtocolError && !LocalPersistenceFailed && Status is >= 200 and < 300/);
+  assert.match(source, /IsOfflineTolerable =>\n\s*!IsProtocolError && !LocalPersistenceFailed && \(Status == 0 \|\| Status >= 500\)/);
   // Protocol 构造
   assert.match(source, /public static AuthResult Protocol\(string message, int status\)/);
   assert.match(source, /IsProtocolError = true/);
   // 现网反代 200 HTML 场景：Content-Type 校验
   assert.match(source, /response\.Content\.Headers\.ContentType\?\.MediaType/);
   assert.match(source, /"application\/json"/);
-  assert.match(source, /服务器响应格式异常（非 JSON）/);
-  assert.match(source, /服务器响应 JSON 格式异常/);
-  assert.match(source, /服务器响应为空/);
-  // 非 JSON 错误体（如网关 HTML 502）→ 协议失败，不能当真实 5xx 容忍
-  assert.match(source, /服务器返回了非 JSON 错误响应/);
-  // 响应体超限 → 协议失败
-  assert.match(source, /服务器响应体过大/);
+  assert.match(source, /ProtocolFailureMessage = "账号服务响应异常，请稍后重试"/);
+  assert.ok(
+    (source.match(/AuthResult\.Protocol\(ProtocolFailureMessage, status\)/g) ?? []).length >= 7,
+    '所有协议失败分支应收敛到稳定的用户文案键'
+  );
+  // 非 JSON / 空正文 / 畸形 JSON / HTML 错误体 / 响应超限都返回稳定协议错误键。
   assert.match(source, /\(string Text, bool Truncated\)/);
   assert.match(source, /return \("", true\);/);
 });
@@ -193,9 +194,9 @@ test('windows auth: 2xx 必填业务字段校验（login/register=token+email，
   assert.match(source, /RequiredShape\.Email/);
   assert.match(source, /RequiredShape\.None/);
   // login/register：缺 token 或缺 account.email 判协议失败（不能建立会话）
-  assert.match(source, /服务器响应缺少登录态字段/);
+  assert.match(source, /string\.IsNullOrEmpty\(token\) \|\| string\.IsNullOrEmpty\(email\)/);
   // /me：缺 account.email 判协议失败（避免 UI 误判有效会话）
-  assert.match(source, /服务器响应缺少账号信息/);
+  assert.match(source, /case RequiredShape\.Email:[\s\S]{0,220}string\.IsNullOrEmpty\(email\)/);
   // 解析出 email 的路径
   assert.match(source, /TryGetProperty\("email", out var emailNode\)/);
 });

@@ -13,6 +13,8 @@ const AUTH_MANAGER =
     'native/harmony/entry/src/main/ets/auth/AuthManager.ets';
 const INDEX =
     'native/harmony/entry/src/main/ets/pages/Index.ets';
+const HARMONY_LOCALIZATION =
+    'native/harmony/entry/src/main/ets/localization/Localization.ets';
 
 test('harmony auth: AuthManager 存在且实现 5 个认证 API', async () => {
   const source = await read(AUTH_MANAGER);
@@ -113,18 +115,30 @@ test('harmony auth: forced-signed-out 两阶段提交优先拦截残留 token', 
 
 test('harmony auth: 登录墙双态——验证码 60s 倒计时 + SMTP 未配 503 免码注册', async () => {
   const source = await read(INDEX);
+  const authManager = await read(AUTH_MANAGER);
+  const localization = await read(HARMONY_LOCALIZATION);
 
   assert.match(source, /private LoginWall\(\)/);
   assert.match(source, /if \(this\.authMode === 'register' && this\.authCodeRequired\)/);
   // 60s 倒计时
   assert.match(source, /this\.authCodeCountdown = 60;/);
   assert.match(source, /setInterval\(/);
-  assert.match(source, /'重新发送 \(' \+ this\.authCodeCountdown\.toString\(\) \+ 's\)'/);
+  assert.match(source, /this\.tr\('重新获取'\) \+ ' \(' \+ this\.authCodeCountdown\.toString\(\) \+ 's\)'/);
   // 过渡态：503 → 隐藏验证码框免码注册
   assert.match(source, /result\.status === 503/);
   assert.match(source, /this\.authCodeRequired = false;/);
   assert.match(source, /邮件服务暂未配置，将免验证码注册/);
   assert.match(source, /\.height\(52\)\n\s*\.padding\(SPACE_4\)/);
+  assert.match(source, /this\.authError = this\.tr\(result\.message\)/);
+  assert.match(localization, /new TranslationEntry\('邮箱或密码错误', 'Incorrect email or password', 'メールアドレスまたはパスワードが正しくありません'\)/);
+  for (const key of ['请求参数有误', '接口不存在', 'API 服务返回错误']) {
+    assert.match(authManager, new RegExp(key));
+    assert.match(localization, new RegExp(`new TranslationEntry\\('${key}',`));
+  }
+  assert.doesNotMatch(authManager, /生产已上线/);
+  assert.match(localization, /new TranslationEntry\('已退出，但本机登录信息未完全清除。请重新登录后再退出一次。',[^\n]*'ログアウトしましたが/);
+  assert.match(source, /this\.tr\('登录后使用拍摄、编辑与 AI 功能'\)/);
+  assert.match(source, /this\.tr\('还没有账号？切换到「注册」即可创建'\)/);
 });
 
 test('harmony auth: 表单校验与防重复提交', async () => {
@@ -132,7 +146,8 @@ test('harmony auth: 表单校验与防重复提交', async () => {
 
   assert.match(source, /private isValidEmail\(email: string\): boolean/);
   assert.match(source, /密码至少 8 位/);
-  assert.match(source, /请先获取验证码/);
+  assert.match(source, /!\/\^\\d\{6\}\$\/\.test\(code\)/);
+  assert.match(source, /请输入 6 位验证码/);
   assert.match(source, /this\.authSubmitting = true;/);
   assert.match(source, /正在登录…/);
   assert.match(source, /正在注册…/);
@@ -147,6 +162,20 @@ test('harmony auth: 设置页账号区（邮箱 + 退出登录）', async () => 
   assert.match(source, /private async performLogout\(\): Promise<void>/);
   assert.match(source, /await manager\.logout\(\);/);
   assert.match(source, /cleanupFailed = result\.localCleanupFailed/);
+  assert.match(source, /await this\.closeAuthSensitiveState\(\);/);
+  assert.match(source, /private async closeAuthSensitiveState\(\): Promise<void>/);
+  for (const boundary of [
+    'await this.finishExternalRecordingForDisconnect()',
+    'await this.camera.disconnect()',
+    'this.unregisterWifiNetConnection()',
+    'await this.wifiCamera.disconnect()',
+    'this.bluetoothRemote?.stop()',
+    'this.locationTagging?.setEnabled(false)',
+    'await this.wireless.stop()'
+  ]) {
+    assert.ok(source.includes(boundary), `登录墙清理链缺少 ${boundary}`);
+  }
+  assert.match(source, /this\.authSensitiveStateClosed = false;[\s\S]{0,180}this\.loginWallVisible = false/);
 });
 
 test('harmony auth: AI 激活仅在 HTTPS 请求带 Bearer（服务端三元组）', async () => {

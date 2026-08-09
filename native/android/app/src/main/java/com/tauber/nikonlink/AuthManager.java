@@ -34,7 +34,7 @@ import javax.crypto.spec.GCMParameterSpec;
  * 系统 Keystore 密钥加密，密钥不出安全硬件/系统级存储），且 minSdk 26 原生
  * 支持，不动 build.gradle 依赖面。
  *
- * 服务端契约（W13-a，生产已上线，账号请求固定走官网 HTTPS 反代）：
+ * 候选服务端契约（W13-a；官网 HTTPS 反代仍待生产验收）：
  *   POST /v1/auth/email-code {email, purpose:"register"}  → 200 / 503(邮件服务未配置)
  *   POST /v1/auth/register  {email, password, code?}      → 200 {token, account} / 400 / 409
  *   POST /v1/auth/login     {email, password}             → 200 {token, account} / 401 / 403
@@ -101,7 +101,7 @@ public final class AuthManager {
         AuthResult withLocalCleanupFailure() {
             return new AuthResult(
                     status,
-                    "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。",
+                    "已退出，但本机登录信息未完全清除。请重新登录后再退出一次。",
                     token,
                     email,
                     json,

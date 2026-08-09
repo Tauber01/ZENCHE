@@ -18,6 +18,7 @@ public sealed record UpdateCheckResult(
 
 public sealed class UpdateService
 {
+    private const string FallbackVersion = "1.5.9";
     private const string DefaultMirrorChyanResourceId = "ZENCHE";
     private const string LatestReleaseApi =
         "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";
@@ -59,7 +60,7 @@ public sealed class UpdateService
     }
 
     public string CurrentVersion { get; } =
-        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "1.5.3";
+        Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? FallbackVersion;
 
     public string MirrorChyanWebsiteUrl
     {
@@ -369,7 +370,11 @@ public sealed class UpdateService
         };
         client.DefaultRequestHeaders.Accept.ParseAdd(
             "application/json");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.3");
+        var currentVersion =
+            Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3)
+            ?? FallbackVersion;
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"ZENCHE-Windows/{currentVersion}");
         return client;
     }
 

@@ -4,6 +4,7 @@
 
   <!-- Calibrated workbench tokens shared by all native targets. -->
   <Color x:Key="ColorPaper">#E9EDF2</Color>
+  <Color x:Key="ColorSplashPaper">#F7F9FC</Color>
   <Color x:Key="ColorPaper2">#E4E9EF</Color>
   <Color x:Key="ColorPaper3">#DCE2E9</Color>
   <Color x:Key="ColorSurface">#F8FAFC</Color>
@@ -77,6 +78,7 @@
   <Color x:Key="ColorWheelGain">#FFD36A</Color>
 
   <SolidColorBrush x:Key="PaperBrush" Color="{DynamicResource ColorPaper}" />
+  <SolidColorBrush x:Key="SplashPaperBrush" Color="{DynamicResource ColorSplashPaper}" />
   <SolidColorBrush x:Key="Paper2Brush" Color="{DynamicResource ColorPaper2}" />
   <SolidColorBrush x:Key="Paper3Brush" Color="{DynamicResource ColorPaper3}" />
   <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource ColorSurface}" />

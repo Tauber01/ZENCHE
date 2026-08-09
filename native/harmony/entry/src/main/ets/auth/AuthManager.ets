@@ -22,7 +22,7 @@ export class AuthResult {
  * 对等物）AES-256-GCM 加解密，密钥不出系统安全存储；密文
  * base64(iv || ciphertext || tag) 落 preferences。零新增依赖。
  *
- * 服务端契约（W13-a，生产已上线，账号请求固定走官网 HTTPS 反代）：
+ * 候选服务端契约（W13-a；官网 HTTPS 反代仍待生产验收）：
  *   POST /v1/auth/email-code {email, purpose:"register"} → 200 / 503(邮件服务未配置)
  *   POST /v1/auth/register  {email, password, code?}     → 200 {token, account} / 400 / 409
  *   POST /v1/auth/login     {email, password}            → 200 {token, account} / 401 / 403
@@ -399,7 +399,7 @@ export class AuthManager {
     }
     if (!(await this.clearSession())) {
       result.localCleanupFailed = true;
-      result.message = '已退出，但本地登录信息未能完全清理。请重试登录后再次退出。';
+      result.message = '已退出，但本机登录信息未完全清除。请重新登录后再退出一次。';
     }
     return result;
   }

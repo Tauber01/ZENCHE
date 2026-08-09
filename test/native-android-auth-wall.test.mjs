@@ -14,6 +14,8 @@ const AUTH_MANAGER =
     'native/android/app/src/main/java/com/tauber/nikonlink/AuthManager.java';
 const ANDROID_MAIN =
     'native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java';
+const ANDROID_LOCALIZATION =
+    'native/android/app/src/main/java/com/tauber/nikonlink/Localization.java';
 
 test('android auth: AuthManager 存在且实现 5 个认证 API', async () => {
   const source = await read(AUTH_MANAGER);
@@ -111,6 +113,8 @@ test('android auth: 登出标记优先于残留 token，保存失败回滚进程
 
 test('android auth: 登录墙双态——验证码框 60s 倒计时 + SMTP 未配 503 免码注册', async () => {
   const source = await read(ANDROID_MAIN);
+  const authManager = await read(AUTH_MANAGER);
+  const localization = await read(ANDROID_LOCALIZATION);
 
   assert.match(source, /private void showLoginWall\(\)/);
   assert.match(source, /private void hideLoginWall\(\)/);
@@ -118,7 +122,7 @@ test('android auth: 登录墙双态——验证码框 60s 倒计时 + SMTP 未�
   assert.match(source, /boolean visible = "register"\.equals\(authMode\) && authCodeRequired/);
   // 60s 倒计时
   assert.match(source, /authCountdown = 60;/);
-  assert.match(source, /"重新发送 \(" \+ authCountdown \+ "s\)"/);
+  assert.match(source, /tr\("重新获取"\) \+ " \(" \+ authCountdown \+ "s\)"/);
   assert.match(source, /mainHandler\.postDelayed\(this, 1000\)/);
   // 过渡态：email-code 503 → 隐藏验证码框免码注册
   assert.match(source, /result\.status == 503/);
@@ -126,6 +130,18 @@ test('android auth: 登录墙双态——验证码框 60s 倒计时 + SMTP 未�
   assert.match(source, /邮件服务暂未配置，将免验证码注册/);
   assert.match(source, /inputMethod\.restartInput\(authPasswordInput\)/);
   assert.match(source, /actionId == EditorInfo\.IME_ACTION_NEXT[\s\S]{0,240}submitAuthForm\(\)/);
+  assert.match(source, /authErrorText\.setText\(tr\(result\.message\)\)/);
+  assert.match(localization, /add\("邮箱或密码错误", "Incorrect email or password", "メールアドレスまたはパスワードが正しくありません"\)/);
+  assert.match(source, /tr\("正在发送…"\)/);
+  assert.match(localization, /add\("正在发送…", "Sending…", "送信中…"\)/);
+  for (const key of ['请求参数有误', '接口不存在', 'API 服务返回错误']) {
+    assert.match(authManager, new RegExp(key));
+    assert.match(localization, new RegExp(`add\\("${key}",`));
+  }
+  assert.doesNotMatch(authManager, /生产已上线/);
+  assert.match(localization, /add\("已退出，但本机登录信息未完全清除。请重新登录后再退出一次。",[\s\S]{0,260}"ログアウトしましたが/);
+  assert.match(source, /登录后使用拍摄、编辑与 AI 功能/);
+  assert.match(source, /还没有账号？切换到「注册」即可创建/);
 });
 
 test('android auth: 表单校验与防重复提交', async () => {
@@ -134,7 +150,8 @@ test('android auth: 表单校验与防重复提交', async () => {
   assert.match(source, /private String validateAuthForm\(/);
   assert.match(source, /邮箱格式不正确/);
   assert.match(source, /密码至少 8 位/);
-  assert.match(source, /请先获取验证码/);
+  assert.match(source, /code == null \|\| !code\.trim\(\)\.matches\("\\\\d\{6\}"\)/);
+  assert.match(source, /请输入 6 位验证码/);
   // 提交时禁用按钮 + 文案切换（加载态禁重复提交）
   assert.match(source, /authSubmitButton\.setEnabled\(false\);/);
   assert.match(source, /"正在登录…"/);
@@ -153,6 +170,22 @@ test('android auth: 设置页账号区（邮箱 + 退出登录）', async () => 
   assert.match(source, /nativeButton\("退出登录", false\)/);
   assert.match(source, /private void performLogout\(final Button logoutButton\)/);
   assert.match(source, /authManager\.logout\(\);/);
+  // 登出、会话失效和无会话都经 showLoginWall 进入同一幂等清理链。
+  assert.match(source, /private void showLoginWall\(\) \{\n\s*closeAuthSensitiveState\(\);/);
+  assert.match(source, /private void closeAuthSensitiveState\(\)/);
+  for (const boundary of [
+    'wirelessServer.stop()',
+    'setBluetoothRemoteEnabled(false)',
+    'setLocationTaggingEnabled(false)',
+    'unregisterWifiNetworkCallback()',
+    'finishExternalRecordingForDisconnect()',
+    'wifiCamera.close()',
+    'localCamera.close()',
+    'camera.disconnect()'
+  ]) {
+    assert.ok(source.includes(boundary), `登录墙清理链缺少 ${boundary}`);
+  }
+  assert.match(source, /private void hideLoginWall\(\) \{\n\s*authSensitiveStateClosed = false;/);
 });
 
 test('android auth: AI 激活仅在 HTTPS 请求带 Bearer（服务端三元组）', async () => {
