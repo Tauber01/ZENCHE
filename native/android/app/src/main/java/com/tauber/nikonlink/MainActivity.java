@@ -4261,7 +4261,7 @@ public final class MainActivity extends Activity {
         boolean showPreviewPlaceholder = !liveViewEnabled || previewFrame == null;
         previewPlaceholder = text(
                 !liveViewEnabled
-                        ? "实时监看已关闭"
+                        ? tr("实时监看已关闭")
                         : connected || localCameraConnected
                                 ? "等待实时取景画面"
                                 : "连接外接相机或本机摄像头后开启实时取景",

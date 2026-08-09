@@ -158,8 +158,10 @@ test('W14 live-monitoring label and off state are localized on all five targets'
   }
   const appleEnglish = await read(applePaths[1]);
   const appleJapanese = await read(applePaths[2]);
+  const android = await read(ANDROID);
   assert.match(appleEnglish, /Live Monitoring|Live monitoring/);
   assert.match(appleJapanese, /ライブモニター/);
+  assert.match(android, /!liveViewEnabled\s*\? tr\("实时监看已关闭"\)/);
   for (const path of runtimeTablePaths) {
     const source = await read(path);
     assert.match(source, /Live Monitoring|Live monitoring/);
