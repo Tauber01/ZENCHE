@@ -20,6 +20,9 @@ internal static class AppLocalization
     private static readonly Dictionary<string, Translation> Strings =
         new(StringComparer.Ordinal)
         {
+            ["实时监看"] = new("Live Monitoring", "ライブモニター"),
+            ["显示相机实时画面"] = new("Show the live camera feed", "カメラのライブ映像を表示"),
+            ["实时监看已关闭"] = new("Live monitoring is off", "ライブモニターはオフです"),
             ["尼康云创"] = new("Nikon Imaging Cloud", "Nikon Imaging Cloud"),
             ["尼康云创预览"] = new("Nikon Imaging Cloud Preview", "Nikon Imaging Cloud プレビュー"),
             ["选择尼康云创预设"] = new("Choose a Nikon Cloud Preset", "Nikon Cloud プリセットを選択"),

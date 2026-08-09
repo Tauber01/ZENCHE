@@ -24,6 +24,9 @@ final class Localization {
     private static final Map<String, Entry> STRINGS = new LinkedHashMap<>();
 
     static {
+        add("实时监看", "Live Monitoring", "ライブモニター");
+        add("显示相机实时画面", "Show the live camera feed", "カメラのライブ映像を表示");
+        add("实时监看已关闭", "Live monitoring is off", "ライブモニターはオフです");
         add("尼康云创", "Nikon Imaging Cloud", "Nikon Imaging Cloud");
         add("尼康云创预览", "Nikon Imaging Cloud Preview", "Nikon Imaging Cloud プレビュー");
         add("选择尼康云创预设", "Choose a Nikon Cloud Preset", "Nikon Cloud プリセットを選択");

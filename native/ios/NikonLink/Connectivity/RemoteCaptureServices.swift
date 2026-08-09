@@ -411,6 +411,307 @@ enum PTPIPCameraVendor: Equatable {
     case sony
 }
 
+@MainActor
+final class VendorSDKBridgeService: ObservableObject {
+    private enum BridgeError: LocalizedError {
+        case invalidEndpoint
+        case responseTooLarge
+        case http(Int)
+        case invalidContent
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidEndpoint:
+                return "Mac 相机桥接地址或端口无效"
+            case .responseTooLarge:
+                return "桥接响应超过安全上限"
+            case .http(let code):
+                return "桥接返回 HTTP \(code)"
+            case .invalidContent:
+                return "桥接返回了无效内容"
+            }
+        }
+    }
+
+    enum State: Equatable {
+        case disconnected
+        case connecting
+        case ready
+        case failed(String)
+    }
+
+    private struct BridgeStatus: Decodable {
+        let connected: Bool
+        let camera: String
+        let backend: String
+        let officialSDK: Bool
+        let nikonRuntimeDetected: Bool
+        let monitoring: Bool
+    }
+
+    @Published private(set) var state: State = .disconnected
+    @Published private(set) var status = "Mac 相机桥接未连接"
+    @Published private(set) var cameraName = "—"
+    @Published private(set) var backend = "—"
+    @Published private(set) var officialSDK = false
+    @Published private(set) var nikonRuntimeDetected = false
+    @Published private(set) var liveViewFrame: CGImage?
+    @Published var host: String {
+        didSet { UserDefaults.standard.set(host, forKey: "vendorSDKBridgeHost") }
+    }
+    @Published var portText: String {
+        didSet { UserDefaults.standard.set(portText, forKey: "vendorSDKBridgePort") }
+    }
+    @Published var pairingCode = ""
+
+    private let session: URLSession
+    private var liveViewTask: Task<Void, Never>?
+
+    init() {
+        host = UserDefaults.standard.string(forKey: "vendorSDKBridgeHost")
+            ?? "192.168.1.2"
+        portText = UserDefaults.standard.string(forKey: "vendorSDKBridgePort")
+            ?? "8080"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 5
+        configuration.timeoutIntervalForResource = 8
+        configuration.waitsForConnectivity = false
+        session = URLSession(configuration: configuration)
+    }
+
+    var isConnected: Bool { state == .ready }
+
+    func connect(monitoringEnabled: Bool) {
+        guard state != .connecting else { return }
+        guard Self.isPrivateLANHost(host), endpointURL(path: "status") != nil else {
+            state = .failed("仅支持可信局域网地址")
+            status = "请输入 Mac 的局域网 IP 或 .local 地址"
+            return
+        }
+        guard pairingCode.trimmingCharacters(in: .whitespacesAndNewlines).count == 12 else {
+            state = .failed("配对码无效")
+            status = "请输入 Mac 端显示的 12 位本次配对码"
+            return
+        }
+        state = .connecting
+        status = "正在连接 Mac 相机桥接…"
+        liveViewTask?.cancel()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let bridge: BridgeStatus = try await self.requestJSON(
+                    path: "status",
+                    method: "GET"
+                )
+                self.apply(bridge)
+                self.state = .ready
+                self.status = bridge.connected
+                    ? self.backendDescription(bridge)
+                    : "桥接已连接 · 请先在 Mac 端连接相机"
+                await self.setMonitoring(monitoringEnabled)
+            } catch {
+                self.state = .failed(error.localizedDescription)
+                self.status = error.localizedDescription
+            }
+        }
+    }
+
+    func disconnect() {
+        liveViewTask?.cancel()
+        liveViewTask = nil
+        liveViewFrame = nil
+        state = .disconnected
+        cameraName = "—"
+        backend = "—"
+        officialSDK = false
+        nikonRuntimeDetected = false
+        status = "Mac 相机桥接未连接"
+    }
+
+    func setMonitoring(_ enabled: Bool) async {
+        guard isConnected else { return }
+        do {
+            let _: [String: Bool] = try await requestJSON(
+                path: "monitor?enabled=\(enabled ? 1 : 0)",
+                method: "POST"
+            )
+            if enabled {
+                startLiveViewLoop()
+            } else {
+                liveViewTask?.cancel()
+                liveViewTask = nil
+                liveViewFrame = nil
+                status = "桥接已连接 · 实时监看已关闭"
+            }
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    func capture() {
+        guard isConnected else {
+            status = "请先连接 Mac 相机桥接"
+            return
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let response: [String: JSONValue] = try await self.requestJSON(
+                    path: "capture",
+                    method: "POST"
+                )
+                self.status = response["message"]?.stringValue
+                    ?? "快门请求已提交"
+            } catch {
+                self.status = error.localizedDescription
+            }
+        }
+    }
+
+    private func startLiveViewLoop() {
+        liveViewTask?.cancel()
+        liveViewTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled, self.isConnected {
+                do {
+                    let data = try await self.requestData(
+                        path: "live.jpg",
+                        method: "GET",
+                        expectedContentType: "image/jpeg",
+                        limit: 12 * 1024 * 1024
+                    )
+                    if let source = CGImageSourceCreateWithData(data as CFData, nil),
+                       let image = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+                        self.liveViewFrame = image
+                        self.status = self.officialSDK
+                            ? "Sony Camera Remote SDK · 实时监看中"
+                            : "PTP 兼容桥接 · 实时监看中"
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                } catch {
+                    if Task.isCancelled { return }
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                }
+            }
+        }
+    }
+
+    private func apply(_ status: BridgeStatus) {
+        cameraName = status.camera
+        backend = status.backend
+        officialSDK = status.officialSDK
+        nikonRuntimeDetected = status.nikonRuntimeDetected
+    }
+
+    private func backendDescription(_ status: BridgeStatus) -> String {
+        if status.officialSDK, status.backend == "sony-camera-remote-sdk" {
+            return "已连接 \(status.camera) · Sony Camera Remote SDK"
+        }
+        if status.backend == "nikon-ptp-compatible" {
+            return "已连接 \(status.camera) · Nikon PTP 兼容桥接"
+        }
+        return "已连接 \(status.camera) · \(status.backend)"
+    }
+
+    private func requestJSON<T: Decodable>(
+        path: String,
+        method: String
+    ) async throws -> T {
+        let data = try await requestData(
+            path: path,
+            method: method,
+            expectedContentType: "application/json",
+            limit: 1024 * 1024
+        )
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func requestData(
+        path: String,
+        method: String,
+        expectedContentType: String,
+        limit: Int
+    ) async throws -> Data {
+        guard let url = endpointURL(path: path) else {
+            throw BridgeError.invalidEndpoint
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue(Self.authorization, forHTTPHeaderField: "Authorization")
+        request.setValue(
+            pairingCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+            forHTTPHeaderField: "X-Zenche-Bridge-Token"
+        )
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await session.data(for: request)
+        guard data.count <= limit else {
+            throw BridgeError.responseTooLarge
+        }
+        guard let http = response as? HTTPURLResponse,
+              (200..<300).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw BridgeError.http(code)
+        }
+        guard http.value(forHTTPHeaderField: "Content-Type")?
+            .lowercased().hasPrefix(expectedContentType) == true else {
+            throw BridgeError.invalidContent
+        }
+        return data
+    }
+
+    private func endpointURL(path: String) -> URL? {
+        guard let port = UInt16(portText) else { return nil }
+        var components = URLComponents()
+        components.scheme = "http"
+        components.host = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        components.port = Int(port)
+        components.path = "/sdk-bridge/" + path.components(separatedBy: "?")[0]
+        if let query = path.firstIndex(of: "?") {
+            components.percentEncodedQuery = String(path[path.index(after: query)...])
+        }
+        return components.url
+    }
+
+    private static var authorization: String {
+        let encoded = Data("nikonlink:nikonlink".utf8).base64EncodedString()
+        return "Basic \(encoded)"
+    }
+
+    private static func isPrivateLANHost(_ input: String) -> Bool {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if value == "localhost" || value.hasSuffix(".local") { return true }
+        if value.hasPrefix("10.") || value.hasPrefix("192.168.") ||
+            value.hasPrefix("169.254.") { return true }
+        let pieces = value.split(separator: ".")
+        if pieces.count == 4, pieces[0] == "172",
+           let second = Int(pieces[1]), (16...31).contains(second) {
+            return true
+        }
+        return false
+    }
+}
+
+private enum JSONValue: Decodable {
+    case string(String)
+    case bool(Bool)
+    case number(Double)
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        else { self = .number(try container.decode(Double.self)) }
+    }
+
+    var stringValue: String? {
+        if case .string(let value) = self { return value }
+        return nil
+    }
+}
+
 private actor PTPIPSession {
     private var command: NWConnection?
     private var event: NWConnection?

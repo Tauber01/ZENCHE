@@ -2515,14 +2515,127 @@ private final class CameraModel: ObservableObject {
     private let photoDirectory: URL
     lazy var captureWorkflow = CaptureWorkflow(rootDirectory: photoDirectory)
     lazy var wirelessTransfer = WirelessTransferServer(
-        directory: photoDirectory
+        directory: photoDirectory,
+        cameraBridge: WirelessCameraBridge(
+            statusJSON: { [weak self] in
+                self?.cameraBridgeStatusJSON()
+                    ?? "{\"connected\":false,\"backend\":\"unavailable\"}"
+            },
+            liveViewJPEG: { [weak self] in
+                self?.cameraBridgeLiveViewJPEG()
+            },
+            captureJSON: { [weak self] in
+                self?.cameraBridgeCaptureJSON()
+                    ?? "{\"accepted\":false,\"message\":\"桥接不可用\"}"
+            },
+            setMonitoringJSON: { [weak self] enabled in
+                self?.cameraBridgeSetMonitoringJSON(enabled)
+                    ?? "{\"enabled\":false,\"message\":\"桥接不可用\"}"
+            }
+        )
     ) { [weak self] _ in
         self?.reloadPhotos()
         self?.selectedPhoto = self?.photos.first
     }
 
+    private func cameraBridgeStatusJSON() -> String {
+        let snapshot: [String: Any] = onMainThread {
+            let backend: String
+            let official: Bool
+            if sonyOfficialSDK.isConnected {
+                backend = "sony-camera-remote-sdk"
+                official = true
+            } else if connected {
+                let vendor = SupportedCamera.matching(
+                    detection: cameraName ?? ""
+                )?.vendorName ?? ""
+                backend = vendor == "Nikon"
+                    ? "nikon-ptp-compatible"
+                    : "usb-ptp-compatible"
+                official = false
+            } else if wifiCamera.isConnected {
+                backend = "ptp-ip-compatible"
+                official = false
+            } else if localCameraConnected {
+                backend = "avfoundation"
+                official = false
+            } else {
+                backend = "none"
+                official = false
+            }
+            return [
+                "service": "ZENCHE Camera SDK Bridge",
+                "connected": hasAnyCameraConnection,
+                "camera": activeCameraName,
+                "backend": backend,
+                "officialSDK": official,
+                "nikonRuntimeDetected": nikonOfficialSDK.remoteLoaded,
+                "monitoring": liveViewEnabled || wifiCamera.liveViewFrame != nil
+            ]
+        }
+        guard let data = try? JSONSerialization.data(
+            withJSONObject: snapshot,
+            options: [.sortedKeys]
+        ) else {
+            return "{\"connected\":false,\"backend\":\"invalid-status\"}"
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private func cameraBridgeLiveViewJPEG() -> Data? {
+        if sonyOfficialSDK.isConnected {
+            return try? sonyOfficialSDK.liveViewImage()
+        }
+        let image: NSImage? = onMainThread {
+            if let cgImage = wifiCamera.liveViewFrame {
+                return NSImage(
+                    cgImage: cgImage,
+                    size: NSSize(width: cgImage.width, height: cgImage.height)
+                )
+            }
+            return frame
+        }
+        guard let image,
+              let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(
+            using: .jpeg,
+            properties: [.compressionFactor: 0.82]
+        )
+    }
+
+    private func cameraBridgeCaptureJSON() -> String {
+        let accepted = onMainThread { hasAnyCameraConnection }
+        guard accepted else {
+            return "{\"accepted\":false,\"message\":\"请先在 Mac 端连接相机\"}"
+        }
+        DispatchQueue.main.async { [weak self] in self?.capture() }
+        return "{\"accepted\":true,\"message\":\"快门请求已提交\"}"
+    }
+
+    private func cameraBridgeSetMonitoringJSON(_ enabled: Bool) -> String {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.wifiCamera.isConnected {
+                enabled
+                    ? self.wifiCamera.startLiveViewIfNeeded()
+                    : self.wifiCamera.stopLiveViewIfNeeded()
+            } else if self.connected || self.localCameraConnected,
+                      self.liveViewEnabled != enabled {
+                self.toggleLiveView()
+            }
+        }
+        return "{\"enabled\":\(enabled ? "true" : "false")}"
+    }
+
+    private func onMainThread<T>(_ operation: () -> T) -> T {
+        if Thread.isMainThread { return operation() }
+        return DispatchQueue.main.sync(execute: operation)
+    }
+
     var activeCameraName: String {
         if localCameraConnected { return localCamera.deviceName }
+        if wifiCamera.isConnected { return wifiCamera.cameraName }
         return cameraName ?? "相机"
     }
 
@@ -3040,6 +3153,23 @@ private final class CameraModel: ObservableObject {
                     }
                 }
             }
+        }
+    }
+
+    func setLiveMonitoringEnabled(_ enabled: Bool) {
+        if wifiCamera.isConnected {
+            enabled
+                ? wifiCamera.startLiveViewIfNeeded()
+                : wifiCamera.stopLiveViewIfNeeded()
+            detail = enabled ? "Wi‑Fi 实时监看已开启" : "实时监看已关闭"
+            return
+        }
+        guard connected || localCameraConnected else {
+            detail = "连接相机后可开启实时监看"
+            return
+        }
+        if liveViewEnabled != enabled {
+            toggleLiveView()
         }
     }
 
@@ -6341,6 +6471,7 @@ private struct CaptureView: View {
                         // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
                         // 监看画面为拍照页第一内容区：功能顶栏之后、状态行之前。
                         CaptureCompactPreview(model: model)
+                        MacLiveMonitoringToggle(model: model)
                         ControlStatusRow(model: model) { showConnection = true }
                         ControlStatusCardGrid(model: model)
                         ControlParameterGrid(model: model)
@@ -6376,6 +6507,49 @@ private struct CaptureView: View {
     }
 }
 
+private struct MacLiveMonitoringToggle: View {
+    @ObservedObject var model: CameraModel
+
+    private var enabled: Bool {
+        model.liveViewEnabled || model.wifiCamera.liveViewFrame != nil
+    }
+
+    var body: some View {
+        HStack(spacing: SpaceToken.s12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                Text("实时监看")
+                    .font(.system(size: TypeScale.emphasis, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(enabled ? "显示相机实时画面" : "实时监看已关闭")
+                    .font(.system(size: TypeScale.caption))
+                    .foregroundStyle(Palette.uiLabel)
+            }
+            Spacer()
+            Toggle(
+                "实时监看",
+                isOn: Binding(
+                    get: { enabled },
+                    set: { model.setLiveMonitoringEnabled($0) }
+                )
+            )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .help("关闭后停止相机实时取景，不会断开相机。")
+                .accessibilityLabel("实时监看")
+        }
+        .padding(.horizontal, SpaceToken.s12)
+        .frame(minHeight: 52)
+        .background(
+            Palette.uiCard,
+            in: RoundedRectangle(cornerRadius: RadiusToken.r12)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
+                .stroke(Palette.uiSecondary, lineWidth: 1)
+        }
+    }
+}
+
 /// v1.5.9 实测修复：拍照页紧凑预览区。帧渲染逻辑与 MonitorView 共享
 /// （model.wifiCamera.liveViewFrame / model.frame Image 分支，见 :6729-6761），
 /// 不复活旧 PreviewStage 整体。fig1 批次删除后监看画面消失，此区恢复。
@@ -6384,7 +6558,20 @@ private struct CaptureCompactPreview: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            if model.wifiCamera.isConnected,
+            if (model.connected || model.localCameraConnected || model.wifiCamera.isConnected),
+               !model.liveViewEnabled,
+               model.wifiCamera.liveViewFrame == nil {
+                VStack(spacing: SpaceToken.s12) {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 42, weight: .light))
+                    Text("实时监看已关闭")
+                        .font(.system(size: TypeScale.emphasis, weight: .medium))
+                    Text("打开开关即可恢复实时画面")
+                        .font(.system(size: TypeScale.body))
+                }
+                .foregroundStyle(Color.white.opacity(0.75))
+                .frame(maxWidth: .infinity, minHeight: 240)
+            } else if model.wifiCamera.isConnected,
                let wifiFrame = model.wifiCamera.liveViewFrame {
                 // E3 1.5.9：Wi‑Fi PTP/IP 实时取景帧（CGImage）。
                 Image(decorative: wifiFrame, scale: 1)
@@ -12955,7 +13142,14 @@ private struct TransferView: View {
                         "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/"
                     )
 
-                    Text("相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。首次启动时请允许 macOS 接受传入网络连接。")
+                    Divider()
+                    transferRow(
+                        "iOS 相机桥接",
+                        "http://\(wireless.hostAddress):\(WirelessTransferServer.httpPort)/sdk-bridge/status"
+                    )
+                    transferRow("本次配对码", wireless.bridgeToken)
+
+                    Text("相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。")
                         .font(.system(size: TypeScale.body))
                         .foregroundStyle(Palette.muted)
                         .fixedSize(horizontal: false, vertical: true)

@@ -3192,8 +3192,31 @@ public partial class MainWindow : Window
     private async void LiveViewButton_Click(object sender, RoutedEventArgs e)
     {
         if (_operationInProgress ||
-            (!_camera.IsConnected && !_localCamera.IsConnected))
+            (!_camera.IsConnected && !_localCamera.IsConnected &&
+             !_wifiCamera.IsConnected))
         {
+            return;
+        }
+        if (_wifiCamera.IsConnected && !_camera.IsConnected && !_localCamera.IsConnected)
+        {
+            if (_wifiCamera.IsLiveView)
+            {
+                await RunOperationAsync("正在停止 Wi‑Fi 实时取景…", async token =>
+                {
+                    await _wifiCamera.StopLiveViewAsync(token);
+                    StopWifiPreviewLoop();
+                    UpdateLiveViewState();
+                });
+            }
+            else
+            {
+                await RunOperationAsync("正在开启 Wi‑Fi 实时取景…", async token =>
+                {
+                    await _wifiCamera.StartLiveViewAsync(token);
+                    StartWifiPreviewLoop();
+                    UpdateLiveViewState();
+                });
+            }
             return;
         }
         if (_localCamera.IsConnected)
@@ -7687,7 +7710,8 @@ public partial class MainWindow : Window
     private void UpdateEnabledState()
     {
         var connected = _camera.IsConnected && !_operationInProgress;
-        var liveViewReady = (_camera.IsConnected || _localCamera.IsConnected) &&
+        var liveViewReady = (_camera.IsConnected || _localCamera.IsConnected ||
+            _wifiCamera.IsConnected) &&
             !_operationInProgress;
         var photoCaptureReady =
             (_camera.IsConnected || _localCamera.IsConnected || _wifiCamera.IsConnected) &&
@@ -7700,6 +7724,7 @@ public partial class MainWindow : Window
               !_operationInProgress));
         ConnectButton.IsEnabled = !_operationInProgress;
         LiveViewButton.IsEnabled = liveViewReady;
+        LiveMonitoringToggle.IsEnabled = liveViewReady;
         ShutterButton.IsEnabled = _videoMode
             ? videoRecordReady || (liveViewReady && _externalRecordToDevice)
             : photoCaptureReady;
@@ -7897,8 +7922,13 @@ public partial class MainWindow : Window
     {
         var live = _camera.IsLiveView || _localCamera.IsLiveView ||
             _wifiCamera.IsLiveView;
+        LiveMonitoringToggle.Content = AppLocalization.T("实时监看");
+        AutomationProperties.SetName(
+            LiveMonitoringToggle,
+            AppLocalization.T("实时监看"));
         LiveViewButton.Content =
             AppLocalization.T(live ? "停止取景" : "开启取景");
+        LiveMonitoringToggle.IsChecked = live;
         LiveBadge.Text = live ? "LIVE VIEW ON" : "LIVE VIEW OFF";
         LiveBadge.Foreground = live
             ? (Brush)FindResource("AccentInkBrush")

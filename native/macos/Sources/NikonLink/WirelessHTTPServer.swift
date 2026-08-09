@@ -1,6 +1,13 @@
 import Darwin
 import Foundation
 
+struct WirelessCameraBridge {
+    let statusJSON: () -> String
+    let liveViewJPEG: () -> Data?
+    let captureJSON: () -> String
+    let setMonitoringJSON: (Bool) -> String
+}
+
 final class WirelessHTTPServer {
     static let port: UInt16 = 8080
 
@@ -11,6 +18,8 @@ final class WirelessHTTPServer {
     }
 
     private let directory: URL
+    private let bridgeToken: String
+    private let cameraBridge: WirelessCameraBridge?
     private let onStatus: (String) -> Void
     private let onReceive: (URL) -> Void
     private let queue = DispatchQueue(
@@ -23,10 +32,14 @@ final class WirelessHTTPServer {
 
     init(
         directory: URL,
+        bridgeToken: String,
+        cameraBridge: WirelessCameraBridge?,
         onStatus: @escaping (String) -> Void,
         onReceive: @escaping (URL) -> Void
     ) {
         self.directory = directory
+        self.bridgeToken = bridgeToken
+        self.cameraBridge = cameraBridge
         self.onStatus = onStatus
         self.onReceive = onReceive
     }
@@ -135,6 +148,11 @@ final class WirelessHTTPServer {
             return
         }
 
+        if request.target.hasPrefix("/sdk-bridge/") {
+            handleCameraBridge(request, from: descriptor)
+            return
+        }
+
         switch request.method {
         case "OPTIONS":
             respond(
@@ -185,6 +203,88 @@ final class WirelessHTTPServer {
                 headers: [
                     "Allow": "OPTIONS, GET, PUT, POST, MKCOL, PROPFIND"
                 ],
+                to: descriptor
+            )
+        }
+    }
+
+    private func handleCameraBridge(_ request: Request, from descriptor: Int32) {
+        guard request.headers["x-zenche-bridge-token"] == bridgeToken else {
+            respond(
+                403,
+                "Forbidden",
+                body: "{\"error\":\"配对码无效\"}",
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+            return
+        }
+        guard let cameraBridge else {
+            respond(
+                503,
+                "Service Unavailable",
+                body: "{\"error\":\"相机桥接未启用\"}",
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+            return
+        }
+
+        let path = URLComponents(string: request.target)?.path ?? request.target
+        switch (request.method, path) {
+        case ("GET", "/sdk-bridge/status"):
+            respond(
+                200,
+                "OK",
+                body: cameraBridge.statusJSON(),
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+        case ("GET", "/sdk-bridge/live.jpg"):
+            guard let jpeg = cameraBridge.liveViewJPEG(), !jpeg.isEmpty else {
+                respond(
+                    409,
+                    "Conflict",
+                    body: "{\"error\":\"实时监看尚无画面\"}",
+                    headers: ["Content-Type": "application/json; charset=utf-8"],
+                    to: descriptor
+                )
+                return
+            }
+            respond(
+                200,
+                "OK",
+                data: jpeg,
+                headers: [
+                    "Content-Type": "image/jpeg",
+                    "Cache-Control": "no-store"
+                ],
+                to: descriptor
+            )
+        case ("POST", "/sdk-bridge/capture"):
+            respond(
+                202,
+                "Accepted",
+                body: cameraBridge.captureJSON(),
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+        case ("POST", "/sdk-bridge/monitor"):
+            let enabled = URLComponents(string: request.target)?.queryItems?
+                .first(where: { $0.name == "enabled" })?.value == "1"
+            respond(
+                200,
+                "OK",
+                body: cameraBridge.setMonitoringJSON(enabled),
+                headers: ["Content-Type": "application/json; charset=utf-8"],
+                to: descriptor
+            )
+        default:
+            respond(
+                404,
+                "Not Found",
+                body: "{\"error\":\"桥接接口不存在\"}",
+                headers: ["Content-Type": "application/json; charset=utf-8"],
                 to: descriptor
             )
         }
@@ -352,6 +452,24 @@ final class WirelessHTTPServer {
         head += "\r\n"
         send(Data(head.utf8), to: descriptor)
         send(content, to: descriptor)
+    }
+
+    private func respond(
+        _ status: Int,
+        _ reason: String,
+        data: Data,
+        headers: [String: String] = [:],
+        to descriptor: Int32
+    ) {
+        var head = "HTTP/1.1 \(status) \(reason)\r\n"
+        head += "Connection: close\r\n"
+        head += "Content-Length: \(data.count)\r\n"
+        for (name, value) in headers {
+            head += "\(name): \(value)\r\n"
+        }
+        head += "\r\n"
+        send(Data(head.utf8), to: descriptor)
+        send(data, to: descriptor)
     }
 
     private func send(_ data: Data, to descriptor: Int32) {

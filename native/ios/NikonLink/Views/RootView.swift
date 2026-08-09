@@ -1048,7 +1048,8 @@ private struct GlobalStatusBar: View {
     let bottomInset: CGFloat
 
     private var connected: Bool {
-        model.camera.state == .ready || model.wifiCamera.isConnected
+        model.camera.state == .ready || model.wifiCamera.isConnected ||
+            model.sdkBridge.isConnected
     }
 
     var body: some View {
@@ -4700,6 +4701,7 @@ private struct CapturePage: View {
                     CameraStage {
                         showingFullscreen = true
                     }
+                    ControlLiveMonitoringToggle()
                     ControlStatusRow()
                     ControlStatusCardGrid()
                     ControlCaptureDock {
@@ -4720,6 +4722,51 @@ private struct CapturePage: View {
         }
         .fullScreenCover(isPresented: $showingFullscreen) {
             ImmersiveCameraView(mode: .photo)
+        }
+    }
+}
+
+private struct ControlLiveMonitoringToggle: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        HStack(spacing: SpaceToken.s12) {
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                RuntimeLocalizedText("实时监看")
+                    .font(.system(size: FontToken.body, weight: .semibold))
+                    .foregroundStyle(.white)
+                RuntimeLocalizedText(
+                    model.liveMonitoringEnabled
+                        ? "显示相机实时画面"
+                        : "实时监看已关闭"
+                )
+                    .font(.system(size: SettingsFontSize.linkLabel))
+                    .foregroundStyle(IPalette.uiLabel)
+            }
+            Spacer()
+            Toggle(
+                "实时监看",
+                isOn: Binding(
+                    get: { model.liveMonitoringEnabled },
+                    set: { model.setLiveMonitoringEnabled($0) }
+                )
+            )
+                .labelsHidden()
+                .tint(IPalette.uiAccent)
+                .accessibilityLabel(Text("实时监看"))
+                .accessibilityHint(
+                    Text("关闭后停止远程拉帧；本机相机仍可拍照。")
+                )
+        }
+        .padding(.horizontal, SpaceToken.s12)
+        .frame(minHeight: 52)
+        .background(
+            IPalette.uiCard,
+            in: RoundedRectangle(cornerRadius: RadiusToken.r12)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
+                .stroke(IPalette.uiSecondary, lineWidth: 1)
         }
     }
 }
@@ -4870,6 +4917,9 @@ private struct ControlStatusRow: View {
     }
 
     private var transportTitle: String {
+        if model.sdkBridge.isConnected {
+            return model.sdkBridge.officialSDK ? "SONY SDK" : "MAC BRIDGE"
+        }
         if model.wifiCamera.state.isReconnecting { return "重连中" }
         if model.wifiCamera.isConnected { return "Wi-Fi" }
         switch model.camera.state {
@@ -5379,7 +5429,38 @@ private struct CameraStage: View {
             RoundedRectangle(cornerRadius: RadiusToken.r20)
                 .fill(Color.black)
 
-            if model.wifiCamera.isConnected {
+            if !model.liveMonitoringEnabled {
+                VStack(spacing: SpaceToken.s12) {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 46, weight: .light))
+                        .foregroundStyle(IPalette.whiteMid)
+                    RuntimeLocalizedText("实时监看已关闭")
+                        .font(.title3.weight(.semibold))
+                    RuntimeLocalizedText("打开开关即可恢复实时画面")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                }
+                .padding(SpaceToken.s32)
+                .foregroundStyle(Color.white)
+            } else if model.sdkBridge.isConnected {
+                if let frame = model.sdkBridge.liveViewFrame {
+                    Image(decorative: frame, scale: 1)
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r20))
+                } else {
+                    VStack(spacing: SpaceToken.s12) {
+                        Image(systemName: "desktopcomputer.and.arrow.down")
+                            .font(.system(size: 46, weight: .light))
+                            .foregroundStyle(IPalette.whiteMid)
+                        RuntimeLocalizedText(model.sdkBridge.status)
+                            .font(.title3.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(SpaceToken.s32)
+                    .foregroundStyle(Color.white)
+                }
+            } else if model.wifiCamera.isConnected {
                 if let frame = model.wifiCamera.liveViewFrame {
                     Image(decorative: frame, scale: 1)
                         .resizable()
@@ -5452,12 +5533,16 @@ private struct CameraStage: View {
         .overlay(alignment: .topLeading) {
             HStack(spacing: SpaceToken.s8) {
                 Circle()
-                    .fill((model.wifiCamera.isConnected || model.camera.state == .ready)
+                    .fill((model.sdkBridge.isConnected || model.wifiCamera.isConnected || model.camera.state == .ready)
                           ? Color.green : Color.red)
                     .frame(width: 7, height: 7)
-                RuntimeLocalizedText(model.wifiCamera.isConnected
-                                     ? model.wifiCamera.cameraName
-                                     : model.camera.deviceName)
+                RuntimeLocalizedText(
+                    model.sdkBridge.isConnected
+                        ? model.sdkBridge.cameraName
+                        : model.wifiCamera.isConnected
+                            ? model.wifiCamera.cameraName
+                            : model.camera.deviceName
+                )
                     .textCase(.uppercase)
                     .font(.caption2.monospaced().weight(.semibold))
             }
@@ -5514,6 +5599,7 @@ private enum ImmersiveCameraMode {
 private struct ImmersiveCameraView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @State private var showsParameters = true
     @State private var showsMoreParameters = false
     @State private var videoShutterMode = "angle"
@@ -5529,7 +5615,33 @@ private struct ImmersiveCameraView: View {
                 sensorLandscape ?? (proxy.size.width > proxy.size.height)
             ZStack {
                 Color.black.ignoresSafeArea()
-                if model.wifiCamera.isConnected {
+                if !model.liveMonitoringEnabled {
+                    ContentUnavailableView(
+                        "实时监看已关闭",
+                        systemImage: "eye.slash",
+                        description: Text("显示相机实时画面")
+                    )
+                    .foregroundStyle(.white)
+                } else if model.sdkBridge.isConnected {
+                    if let frame = model.sdkBridge.liveViewFrame {
+                        Image(decorative: frame, scale: 1)
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                    } else {
+                        ContentUnavailableView(
+                            "等待 Mac 桥接画面…",
+                            systemImage: "macbook.and.iphone",
+                            description: Text(
+                                RuntimeLocalization.text(
+                                    model.sdkBridge.status,
+                                    locale: locale
+                                )
+                            )
+                        )
+                        .foregroundStyle(.white)
+                    }
+                } else if model.wifiCamera.isConnected {
                     // v1.5.9 build 35 修复：Wi-Fi 联机监看全屏黑屏——全屏此前只渲染
                     // 本机 AVCapture 预览，Wi-Fi 实时取景帧无分支，iPad 联机时全屏纯黑。
                     if let frame = model.wifiCamera.liveViewFrame {
@@ -6866,7 +6978,29 @@ private struct MonitorConsolePage: View {
     private func preview(width: CGFloat) -> some View {
         ZStack {
             Color.black
-            if model.wifiCamera.isConnected {
+            if !model.liveMonitoringEnabled {
+                VStack(spacing: SpaceToken.s8) {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 34, weight: .light))
+                    Text("实时监看已关闭")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+            } else if model.sdkBridge.isConnected {
+                if let frame = model.sdkBridge.liveViewFrame {
+                    Image(decorative: frame, scale: 1)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    VStack(spacing: SpaceToken.s8) {
+                        Image(systemName: "macbook.and.iphone")
+                            .font(.system(size: 34, weight: .light))
+                        RuntimeLocalizedText(model.sdkBridge.status)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                }
+            } else if model.wifiCamera.isConnected {
                 if let frame = model.wifiCamera.liveViewFrame {
                     Image(decorative: frame, scale: 1)
                         .resizable()
@@ -10683,19 +10817,104 @@ private struct ConnectionSheet: View {
                         }
                     }
 
+                    VStack(alignment: .leading, spacing: SpaceToken.s12) {
+                        HStack {
+                            Image(systemName: "desktopcomputer")
+                                .font(.title2)
+                                .foregroundStyle(IPalette.cobalt)
+                            VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                                RuntimeLocalizedText("Mac 相机桥接")
+                                    .font(.headline)
+                                RuntimeLocalizedText(
+                                    "Sony 由 Mac 端 Camera Remote SDK 驱动；Nikon 使用明确标注的 PTP 兼容路径。"
+                                )
+                                    .font(.caption)
+                                    .foregroundStyle(IPalette.muted)
+                            }
+                            Spacer()
+                        }
+                        HStack(spacing: SpaceToken.s8) {
+                            TextField(
+                                "Mac 局域网地址",
+                                text: Binding(
+                                    get: { model.sdkBridge.host },
+                                    set: { model.sdkBridge.host = $0 }
+                                )
+                            )
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .textFieldStyle(.roundedBorder)
+                            TextField(
+                                "端口",
+                                text: Binding(
+                                    get: { model.sdkBridge.portText },
+                                    set: { model.sdkBridge.portText = $0 }
+                                )
+                            )
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 82)
+                        }
+                        TextField(
+                            "12 位本次配对码",
+                            text: Binding(
+                                get: { model.sdkBridge.pairingCode },
+                                set: { model.sdkBridge.pairingCode = $0.uppercased() }
+                            )
+                        )
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .textFieldStyle(.roundedBorder)
+                        RuntimeLocalizedText(model.sdkBridge.status)
+                            .font(.caption)
+                            .foregroundStyle(
+                                model.sdkBridge.isConnected
+                                    ? Color.green
+                                    : IPalette.muted
+                            )
+                        Button {
+                            model.sdkBridge.isConnected
+                                ? model.sdkBridge.disconnect()
+                                : model.sdkBridge.connect(
+                                    monitoringEnabled: model.liveMonitoringEnabled
+                                )
+                        } label: {
+                            Label(
+                                model.sdkBridge.isConnected
+                                    ? "断开 Mac 相机桥接"
+                                    : "连接 Mac 相机桥接",
+                                systemImage: model.sdkBridge.isConnected
+                                    ? "desktopcomputer.trianglebadge.exclamationmark"
+                                    : "desktopcomputer.and.arrow.down"
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(model.sdkBridge.state == .connecting)
+                    }
+                    .padding(SpaceToken.s16)
+                    .background(
+                        IPalette.surfaceRaised,
+                        in: RoundedRectangle(cornerRadius: RadiusToken.r16)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: RadiusToken.r16)
+                            .stroke(IPalette.rule, lineWidth: 1)
+                    }
+
                     VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         HStack {
                             Image(systemName: "camera.aperture")
                                 .font(.title2)
                                 .foregroundStyle(.yellow)
-                            Text("Nikon USB / PTP")
+                            Text("Nikon 官方 iOS SDK")
                                 .font(.headline)
                             Spacer()
-                            Text("等待授权接口")
+                            Text("厂商未公开")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.yellow)
                         }
-                        Text("iOS 没有向普通应用开放通用 USB/PTP 相机控制。要控制 帧澈 ZENCHE 已适配的 EXPEED 6 / 7 相机并下载原图，需要 Nikon 提供 iOS 协议授权或官方 SDK。这里不会把普通视频连接伪装成 Nikon 原生控制。")
+                        Text("Nikon 当前没有公开可嵌入 iOS 的 Remote SDK。可通过上方 Mac 桥接使用明确标注的 PTP 兼容控制；只有厂商正式提供 iOS SDK 或授权接口后，才会标记为 Nikon 官方 SDK 控制。")
                             .font(.subheadline)
                             .foregroundStyle(IPalette.muted)
                     }

@@ -157,6 +157,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 账号绑定要求 AI 请求携带 Bearer，但只有 AI endpoint 本身是 HTTPS 时才可附加；历史 HTTP AI 地址继续兼容匿名旧流程，不能携带账号 token。2026-08-09 官网 Nginx 已将 `/api/v1/auth/` 前缀映射到回环 `/v1/auth/`，并将 `/api/v1/ai` 精确映射到回环 `/v1/ai`；认证请求体限制 64 KiB，AI 请求体限制 64 MiB，原配置备份在 `/etc/nginx/sites-available/zenche.top.bak-20260809T154854+0800`。公网账号完整冒烟与无效激活 JSON 路由已通过，临时冒烟账号已禁用且未绑定设备；有效激活码的真实 AI 生成和五端真机矩阵仍须完成，W13 客户端在此之前不得进入发布分支。
 - 管理台总览的“总用户”必须读取账号注册表总数，未验证、已禁用、未绑定设备的账号都计入；`totalDevices` 继续单独表示迁移链折叠后的激活设备。候选 `adf310d` 在 `/v1/admin/stats` 增加 `totalAccounts`，返修 `9d9ce1e` 将总览说明明确为“含未验证、已禁用、未绑定设备账号”，不能再用已激活设备数代替用户数。2026-08-09 已按冻结哈希部署 `app.mjs`、`auth.mjs` 与 `admin/app.js`，旧文件备份在 `/opt/ai-server-backups/w13-admin-users-20260809T172051+0800`；重启后服务 active，回环管理 API 验证 `totalAccounts` 与账号列表总数同为 2，`totalDevices=11`，公网认证与 AI 路由仍为 JSON 401/400。
 
+## 0.17. W14 实时监看开关与 iOS 相机桥接（未发布候选）
+
+- 五端拍照页均使用显式“实时监看”开关。关闭会停止当前 USB/PTP、Wi-Fi/PTP-IP、本机相机或桥接帧循环，但保留连接与快门路径；打开后按原传输后端恢复实时取景。
+- iOS / iPadOS 新增 `VendorSDKBridgeService`，仅允许 RFC1918、链路本地、`localhost` 与 `.local` 主机，使用 ephemeral `URLSession`、响应类型/大小校验、5/8 秒超时和 12 位本次配对码。主机与端口可保存，配对码不落盘。
+- macOS 复用无线收件箱的 `8080` 端口，新增 `/sdk-bridge/status`、`live.jpg`、`capture` 与 `monitor`；既有 Basic Auth 之外还必须提供每次启动随机生成的 `X-Zenche-Bridge-Token`。关闭监看停止客户端拉帧，不会把相机断开。
+- Sony 相机仅在 Mac 端 `SonyOfficialSDKService` 真正连接 Sony Camera Remote SDK 时返回 `officialSDK=true`；Nikon 返回 `nikon-ptp-compatible` 与 `officialSDK=false`。Sony 与 Nikon 当前公开的桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本，iOS 没有加载桌面 Mach-O 运行时，Nikon 也不宣称官方 SDK 控制。
+- 使用步骤、网络边界与故障排查见 `docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md`。当前静态编译与契约不等同于 Sony/Nikon 真机或长时间网络验收。
+
 ## 1. 总体原则
 
 

@@ -108,15 +108,35 @@ if ($LASTEXITCODE -ne 0) {
 
 Copy-Item -LiteralPath $ResolvedLibUsb `
     -Destination (Join-Path $PublishDirectory "libusb-1.0.dll")
-& $PrepareNikonSdk -OutputDirectory $NikonSdkRoot
-if ($LASTEXITCODE -ne 0) {
-    throw "Preparing the Nikon SDK runtime failed with exit code $LASTEXITCODE."
+$NikonImageArchive = if ([string]::IsNullOrWhiteSpace($env:NIKON_IMAGE_SDK_ZIP)) {
+    Join-Path $ProjectRoot "S-SDKNEF-001BF-ALLIN.zip"
+} else { $env:NIKON_IMAGE_SDK_ZIP }
+$NikonRemoteArchive = if ([string]::IsNullOrWhiteSpace($env:NIKON_REMOTE_SDK_ZIP)) {
+    Join-Path $ProjectRoot "S-SDKZ-200BF-ALLIN.zip"
+} else { $env:NIKON_REMOTE_SDK_ZIP }
+if ((Test-Path -LiteralPath $NikonImageArchive -PathType Leaf) -and
+    (Test-Path -LiteralPath $NikonRemoteArchive -PathType Leaf)) {
+    & $PrepareNikonSdk -OutputDirectory $NikonSdkRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Preparing the Nikon SDK runtime failed with exit code $LASTEXITCODE."
+    }
+} elseif (-not (Test-Path -LiteralPath (Join-Path $NikonSdkRoot "Image/NkImgSDK.dll") -PathType Leaf) -or
+          -not (Test-Path -LiteralPath (Join-Path $NikonSdkRoot "Remote/ControlServiceLayer.dll") -PathType Leaf)) {
+    throw "Nikon SDK archives and prepared Windows runtime are both unavailable."
 }
 Copy-Item -LiteralPath $NikonSdkRoot `
     -Destination (Join-Path $PublishDirectory "NikonSDK") -Recurse -Force
-& $PrepareSonySdk -OutputDirectory $SonySdkRoot
-if ($LASTEXITCODE -ne 0) {
-    throw "Preparing the Sony Camera Remote SDK runtime failed with exit code $LASTEXITCODE."
+$SonyArchive = if ([string]::IsNullOrWhiteSpace($env:SONY_CRSDK_WIN64_ZIP)) {
+    Join-Path $ProjectRoot "CrSDK_v2.02.00_20260610a_Win64.zip"
+} else { $env:SONY_CRSDK_WIN64_ZIP }
+if (Test-Path -LiteralPath $SonyArchive -PathType Leaf) {
+    & $PrepareSonySdk -OutputDirectory $SonySdkRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Preparing the Sony Camera Remote SDK runtime failed with exit code $LASTEXITCODE."
+    }
+} elseif (-not (Test-Path -LiteralPath (Join-Path $SonySdkRoot "Cr_Core.dll") -PathType Leaf) -or
+          -not (Test-Path -LiteralPath (Join-Path $SonySdkRoot "CrAdapter/Cr_PTP_USB.dll") -PathType Leaf)) {
+    throw "Sony SDK archive and prepared Windows runtime are both unavailable."
 }
 Get-ChildItem -LiteralPath $SonySdkRoot -Filter "*.dll" -File |
     Copy-Item -Destination $PublishDirectory -Force

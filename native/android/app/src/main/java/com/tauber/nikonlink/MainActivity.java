@@ -1391,6 +1391,9 @@ public final class MainActivity extends Activity {
     private Button checkUpdateButton;
     private Button openUpdateButton;
     private Switch lutSwitch;
+    private Switch liveMonitoringSwitch;
+    private TextView liveMonitoringDetail;
+    private boolean syncingLiveMonitoringSwitch;
     private SeekBar zebraThresholdControl;
     private Bitmap latestFrame;
     private Bitmap latestSourceFrame;
@@ -3156,6 +3159,8 @@ public final class MainActivity extends Activity {
         zebraThresholdControl = null;
         lutStatusText = null;
         lutSwitch = null;
+        liveMonitoringSwitch = null;
+        liveMonitoringDetail = null;
         contentHost.removeAllViews();
         View content;
         switch (section) {
@@ -3271,6 +3276,7 @@ public final class MainActivity extends Activity {
         // v1.5.6 拍照页监看画面移至顶部（对齐 iOS 口径）：第一内容区，
         // 位于功能顶栏之后、状态行之前。
         content.addView(buildPreviewStage(false));
+        content.addView(buildLiveMonitoringSwitch());
         content.addView(buildControlStatusRow());
         controlStatusError = text("", TS_BODY, Typeface.NORMAL, VIDEO);
         controlStatusError.setSingleLine(true);
@@ -3293,6 +3299,41 @@ public final class MainActivity extends Activity {
         scroll.addView(content);
         refreshControlStatusRow();
         return scroll;
+    }
+
+    private View buildLiveMonitoringSwitch() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), 0, dp(12), 0);
+        row.setBackground(rounded(UI_CARD, 12, UI_SECONDARY));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        TextView title = text(tr("实时监看"), TS_BODY, Typeface.BOLD, Color.WHITE);
+        liveMonitoringDetail = text(
+                tr(liveViewEnabled ? "显示相机实时画面" : "实时监看已关闭"),
+                TS_CAPTION,
+                Typeface.NORMAL,
+                UI_LABEL);
+        labels.addView(title);
+        labels.addView(liveMonitoringDetail);
+        row.addView(labels, new LinearLayout.LayoutParams(0, dp(52), 1f));
+
+        liveMonitoringSwitch = new Switch(this);
+        liveMonitoringSwitch.setText("");
+        liveMonitoringSwitch.setChecked(liveViewEnabled);
+        liveMonitoringSwitch.setEnabled(
+                connected || localCameraConnected || wifiConnected);
+        liveMonitoringSwitch.setContentDescription(tr("实时监看"));
+        liveMonitoringSwitch.setOnCheckedChangeListener((button, enabled) -> {
+            if (syncingLiveMonitoringSwitch || enabled == liveViewEnabled) return;
+            toggleLiveView();
+        });
+        row.addView(liveMonitoringSwitch, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(52)));
+        return row;
     }
 
     /** v1.5.5 fig1 status row: ● state + transport capsule, tap to connect. */
@@ -14517,6 +14558,16 @@ public final class MainActivity extends Activity {
         if (liveViewButton != null) {
             liveViewButton.setText(
                     tr(liveViewEnabled ? "停止实时取景" : "开启实时取景"));
+        }
+        if (liveMonitoringSwitch != null) {
+            syncingLiveMonitoringSwitch = true;
+            liveMonitoringSwitch.setChecked(liveViewEnabled);
+            liveMonitoringSwitch.setEnabled(anyCamera);
+            syncingLiveMonitoringSwitch = false;
+        }
+        if (liveMonitoringDetail != null) {
+            liveMonitoringDetail.setText(tr(
+                    liveViewEnabled ? "显示相机实时画面" : "实时监看已关闭"));
         }
         updateCameraControls();
         updateRecordingButtons();

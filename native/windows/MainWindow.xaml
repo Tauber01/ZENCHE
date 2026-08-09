@@ -707,9 +707,26 @@
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center">
-              <TextBlock x:Name="PreviewDetailText"
-                         Foreground="{DynamicResource UiLabelBrush}"
-                         Text="相机原生 JPEG · 本地预览" />
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="PreviewDetailText"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource UiLabelBrush}"
+                           Text="相机原生 JPEG · 本地预览" />
+                <CheckBox x:Name="LiveMonitoringToggle"
+                          Grid.Column="1"
+                          MinWidth="120"
+                          MinHeight="44"
+                          Margin="16,0,0,0"
+                          VerticalContentAlignment="Center"
+                          Content="实时监看"
+                          AutomationProperties.Name="实时监看"
+                          IsEnabled="False"
+                          Click="LiveViewButton_Click" />
+              </Grid>
               <Border Margin="0,8,0,0"
                       Padding="12,10"
                       Background="{DynamicResource UiSecondaryBrush}"

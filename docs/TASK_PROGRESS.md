@@ -21,6 +21,7 @@
 - 当前源码候选为 **1.5.9 / build 36**，W13 原生客户端候选仅保留在本地分支，未 push、未部署、未发布。公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；生产账号 HTTPS 路由与管理台总用户统计已完成独立服务端部署，不改变客户端公开版本。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W13 代码候选 `c661f7f` 已完成 468/468、五端编译、AI审查 原生视觉/交互静态门禁和 GPT5.6luna 用户可见内容静态门禁。生产 HTTPS 路由及账号冒烟已通过；有效激活 AI、真机/窗口、安装签名与完整发布验收仍未闭环，不能据此宣称可发布。
+- W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
 - v1.5.0 已作为历史 GitHub Release 保留；当前公开稳定版为 v1.5.3。生产下载服务器仍保留既有 v1.4.1 六包，W13 未改变生产下载或发布状态。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
@@ -46,6 +47,7 @@
 | 参数控制与 B 门 | 已实现待验收 | 快门回退、B 门释放、模式控制回归存在 | 扩大机型/拍摄模式 writable 属性验证 |
 | 自动拍摄任务 | 已实现待验收 | 五端间隔、曝光包围、焦点包围、B 门静态测试通过 | 长任务、取消、断线、存储不足实测 |
 | 专业监看 | 已实现待验收 | 直方图、波形、矢量、峰值对焦、假色等五端检查通过 | 性能、色彩准确性和长时间运行验证 |
+| 实时监看开关与 iOS 相机桥接 | 已实现待验收 | 五端开关、Sony Camera Remote SDK 的 Mac 桥接、Nikon PTP 兼容桥接与局域网配对契约 | Sony/Nikon 真机、弱网、发热、长时间拉流和 iOS/macOS 联调 |
 | 无线收图 | 已实现待验收 | 五端 FTP/HTTP/WebDAV 源码与文档存在 | 大文件、中断、并发、端口释放和相机 FTP 实测 |
 | 拍摄会话与交付 | 已实现待验收 | 命名、配对、评级、双备份、SHA-256 五端检查通过 | 恢复、磁盘异常、跨卷和大量文件压力测试 |
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
@@ -1142,3 +1144,11 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 新契约创建两个未绑定设备的免码账号并禁用其中一个，验证 `totalAccounts=2`、`totalDevices=0`；另锁住总览文案与每日快照字段。返修后管理台专项 14/14、完整 `npm test` 470/470，`node --check ai-server/admin/app.js` 与 `git diff --check` 通过；源码候选未 push。
 - Tauber 在 Buzz 事件 `c963135a…171a76` 指示继续推进至完成后，2026-08-09 将冻结候选部署到生产 `/opt/ai-server`。切换前远端三文件 SHA-256 与已知基线一致；旧文件备份至 `/opt/ai-server-backups/w13-admin-users-20260809T172051+0800`。部署后 SHA-256：`app.mjs d20b7635e2cdc192aa4a2588b30fa8cd759a3399514123e559516283836413c6`、`auth.mjs e49220fc261b991511a9ddb8dcebe920dddf0e20c7e46abec09455d8f0b008ff`、`admin/app.js 0503fab58df61dacb731d1c74f608b4ce0ae576d2e207b744b2ad02863ce5c4b`。
 - `zenche-ai-server.service` 重启后为 active/running；回环管理 API 返回 `statsStatus=200`、`accountsStatus=200`、`totalAccounts=2`、账号注册表总数 2、`totalDevices=11`，管理台静态脚本显示“总用户 / 含未验证、已禁用、未绑定设备账号”。公网 `/api/v1/auth/me` 保持 HTTP/2 401 JSON，`/api/v1/ai` 空请求保持 HTTP/2 400 JSON。该部署不放行 W13 客户端发布，剩余有效激活 AI、真机/安装/签名与交付包门禁不变。
+
+## 12.52 W14 五端实时监看开关与 iOS 相机桥接（2026-08-09，GPT5.6）
+
+- 五端拍照界面均加入“实时监看”开关和关闭空态，保留原拍照、参数与连接流程。关闭会停止当前实时取景或远程帧循环，但不会断开相机，也不影响快门路径；iOS 全屏拍照/视频监看同步遵循该状态。
+- iOS / iPadOS 新增局域网 Mac 相机桥接：主机白名单限定可信内网，使用 ephemeral `URLSession`、响应类型与上限校验、短超时、Basic Auth 和不落盘的 12 位本次配对码。macOS 新增状态、JPEG、快门和监看控制端点，并在无线传输页显示地址与本次配对码。
+- 能力边界：Sony 通过 Mac 端 Sony Camera Remote SDK 2.02.00 提供实时取景与快门；Nikon 当前为 PTP 兼容桥接，虽可检测 Mac 上的 Nikon Remote SDK 运行时，但未在缺少公开控制 ABI 时冒充官方 SDK 控制。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本，因此 iOS 端不包含桌面 SDK 二进制。
+- 冻结验证：W14 专项 10/10、Apple 登录墙 + W14 联动 30/30、完整 `npm test` 480/480；三语 Apple strings 均通过 `plutil -lint`，`git diff --check` 通过。iOS generic/device Release unsigned `xcodebuild` BUILD SUCCEEDED；Android `assembleDebug`、HarmonyOS Release HAP、macOS 原生打包和 Windows x64 publish/NSIS 均成功。现有 Apple 并发/弃用、Android API 弃用与 Windows `PtpCamera` nullable/既有字段警告未由 W14 新增。
+- 本地交付物已生成并逐一通过 SHA-256 回验：Android debug-signed APK、HarmonyOS unsigned HAP、iOS unsigned IPA、macOS arm64 ad-hoc signed DMG，以及 Windows x64 安装包和便携 ZIP。macOS/Windows 包继续携带已校验的 Nikon/Sony 桌面 SDK 运行时；iOS 包不含不兼容的桌面二进制。Sony/Nikon 实机的桥接连接、实时取景、快门、断线恢复与延迟仍需在持有兼容相机的环境验收，不能由编译或静态契约替代。使用说明见 `docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md`。

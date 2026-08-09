@@ -475,6 +475,7 @@ final class AppModel: ObservableObject {
     @Published var autoSaveToPhotos = false
     @Published var showGrid = false
     @Published var showSafeGuide = false
+    @Published var liveMonitoringEnabled = true
     @Published var monitorVideoVendor: MonitorVideoVendor = .system
     @Published var monitorVideoCodec: MonitorVideoCodec = .automatic
     @Published var monitorNLogEnabled = false
@@ -504,6 +505,7 @@ final class AppModel: ObservableObject {
 
     let camera: CameraService
     let wifiCamera: WifiCameraService
+    let sdkBridge: VendorSDKBridgeService
     let bluetoothRemote: BluetoothRemoteService
     let locationTagging: LocationTaggingService
     let library: MediaLibrary
@@ -547,6 +549,7 @@ final class AppModel: ObservableObject {
         }
         let camera = CameraService()
         let wifiCamera = WifiCameraService()
+        let sdkBridge = VendorSDKBridgeService()
         let bluetoothRemote = BluetoothRemoteService()
         let locationTagging = LocationTaggingService()
         let library = MediaLibrary()
@@ -555,6 +558,7 @@ final class AppModel: ObservableObject {
         let auth = AuthService()
         self.camera = camera
         self.wifiCamera = wifiCamera
+        self.sdkBridge = sdkBridge
         self.bluetoothRemote = bluetoothRemote
         self.locationTagging = locationTagging
         self.library = library
@@ -566,6 +570,12 @@ final class AppModel: ObservableObject {
             library?.selectedItemID = url.path
             library?.message = "已无线接收 \(url.lastPathComponent)"
         }
+        if UserDefaults.standard.object(forKey: "liveMonitoringEnabled") != nil {
+            liveMonitoringEnabled = UserDefaults.standard.bool(
+                forKey: "liveMonitoringEnabled"
+            )
+        }
+        wifiCamera.autoStartLiveViewOnConnect = liveMonitoringEnabled
         if !availableRecordingCodecs.contains(monitorVideoCodec) {
             monitorVideoCodec = availableRecordingCodecs.first ?? .automatic
         }
@@ -602,6 +612,9 @@ final class AppModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         wifiCamera.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
+        sdkBridge.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         bluetoothRemote.objectWillChange
@@ -774,14 +787,19 @@ final class AppModel: ObservableObject {
     }
 
     var isCaptureReady: Bool {
-        camera.state == .ready || wifiCamera.isConnected
+        camera.state == .ready || wifiCamera.isConnected || sdkBridge.isConnected
     }
 
     var hasAnyCameraConnection: Bool {
-        camera.state == .ready || wifiCamera.isConnected
+        camera.state == .ready || wifiCamera.isConnected || sdkBridge.isConnected
     }
 
     var connectionTitle: String {
+        if sdkBridge.isConnected {
+            return sdkBridge.officialSDK
+                ? "Sony 官方 SDK 已连接"
+                : "相机桥接已连接"
+        }
         if wifiCamera.isConnected {
             return "Wi‑Fi 已连接"
         }
@@ -812,7 +830,12 @@ final class AppModel: ObservableObject {
 
     func capturePhoto(source: String = "界面") {
         locationTagging.refresh()
-        if camera.state == .ready {
+        if sdkBridge.isConnected {
+            statusMessage = source == "蓝牙遥控"
+                ? "已收到蓝牙快门 · 正在通过 Mac 桥接触发…"
+                : "正在通过 Mac 桥接触发快门…"
+            sdkBridge.capture()
+        } else if camera.state == .ready {
             statusMessage = source == "蓝牙遥控"
                 ? "已收到蓝牙快门 · 正在拍摄…"
                 : "正在拍摄…"
@@ -833,6 +856,22 @@ final class AppModel: ObservableObject {
         // 登录墙出现后重新建立相机状态。
         camera.disconnect()
         wifiCamera.disconnect()
+        sdkBridge.disconnect()
+    }
+
+    func setLiveMonitoringEnabled(_ enabled: Bool) {
+        liveMonitoringEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "liveMonitoringEnabled")
+        wifiCamera.autoStartLiveViewOnConnect = enabled
+        if wifiCamera.isConnected {
+            enabled
+                ? wifiCamera.startLiveViewIfNeeded()
+                : wifiCamera.stopLiveViewIfNeeded()
+        }
+        if sdkBridge.isConnected {
+            Task { await sdkBridge.setMonitoring(enabled) }
+        }
+        statusMessage = enabled ? "实时监看已开启" : "实时监看已关闭"
     }
 
     /// 登录墙前的统一设备/后台态清理。幂等，避免 onAppear、bootstrap 与

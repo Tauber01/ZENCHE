@@ -12,9 +12,13 @@ final class WirelessTransferServer: ObservableObject {
     @Published private(set) var status = "无线收件箱未开启"
     @Published private(set) var hostAddress = "未检测到 Wi-Fi 地址"
     @Published private(set) var receivedCount = 0
+    let bridgeToken = String(
+        UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(12)
+    ).uppercased()
 
     private let directory: URL
     private let onReceive: (URL) -> Void
+    private let cameraBridge: WirelessCameraBridge?
     private let acceptQueue = DispatchQueue(
         label: "com.tauber.nikonlink.wireless.ftp",
         qos: .userInitiated
@@ -24,6 +28,8 @@ final class WirelessTransferServer: ObservableObject {
     private var controlConnections: Set<Int32> = []
     private lazy var httpServer = WirelessHTTPServer(
         directory: directory,
+        bridgeToken: bridgeToken,
+        cameraBridge: cameraBridge,
         onStatus: { [weak self] status in
             guard let self, self.isRunning else { return }
             self.status = status
@@ -36,8 +42,13 @@ final class WirelessTransferServer: ObservableObject {
         }
     )
 
-    init(directory: URL, onReceive: @escaping (URL) -> Void) {
+    init(
+        directory: URL,
+        cameraBridge: WirelessCameraBridge? = nil,
+        onReceive: @escaping (URL) -> Void
+    ) {
         self.directory = directory
+        self.cameraBridge = cameraBridge
         self.onReceive = onReceive
         refreshAddress()
     }

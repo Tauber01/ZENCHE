@@ -4821,6 +4821,7 @@ struct Index {
         // v1.5.6 拍照页监看置顶：监看画面为拍照页第一内容区（功能顶栏之后、
         // 状态行之前），随后状态行 → 2×2 状态卡 → 快门 dock → 参数网格。
         this.MonitorStage()
+        this.LiveMonitoringToggle()
         this.ControlStatusRow()
         this.ControlStatusGrid()
         this.ControlCaptureDock()
@@ -4942,6 +4943,40 @@ struct Index {
         ? UI_BG
         : $r('app.color.paper')
     )
+  }
+
+  @Builder
+  private LiveMonitoringToggle() {
+    Row({ space: 12 }) {
+      Column({ space: 4 }) {
+        Text(this.tr('实时监看'))
+          .fontSize(TS_BODY)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(Color.White)
+        Text(this.tr(this.liveView ? '显示相机实时画面' : '实时监看已关闭'))
+          .fontSize(TS_CAPTION)
+          .fontColor(UI_LABEL)
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      Toggle({
+        type: ToggleType.Switch,
+        isOn: this.liveView
+      })
+        .selectedColor(UI_ACCENT)
+        .enabled((this.connected || this.wifiConnected) && !this.busy)
+        .accessibilityText(this.tr('实时监看'))
+        .onChange((enabled: boolean): void => {
+          if (enabled !== this.liveView) {
+            this.toggleLiveView();
+          }
+        })
+    }
+    .width('100%')
+    .height(52)
+    .padding({ left: 12, right: 12 })
+    .backgroundColor(UI_CARD)
+    .border({ width: 1, color: UI_SECONDARY, radius: RADIUS_12 })
   }
 
   // ── v1.5.5 fig1 control page: status row / 2×2 cards / parameter grid / dock ──

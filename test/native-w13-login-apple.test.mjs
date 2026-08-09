@@ -178,7 +178,7 @@ test('W13-c 未鉴权隔离: checking 不挂载工作区，登出关闭功能浮
   }
   assert.match(
     iosModel,
-    /func disconnectAllCameras\(\) \{\n(?:\s*\/\/[^\n]*\n)*\s*camera\.disconnect\(\)\n\s*wifiCamera\.disconnect\(\)\n\s*\}/
+    /func disconnectAllCameras\(\) \{\n(?:\s*\/\/[^\n]*\n)*\s*camera\.disconnect\(\)\n\s*wifiCamera\.disconnect\(\)\n\s*sdkBridge\.disconnect\(\)\n\s*\}/
   );
   assert.match(mac, /case \.checking:\s*Color\.clear/);
   assert.match(mac, /showConnection = false/);

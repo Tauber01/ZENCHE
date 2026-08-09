@@ -34,8 +34,23 @@ mkdir -p "$CONTENTS/MacOS" "$RESOURCES/bin" "$RESOURCES/lib" \
   "$RESOURCES/camlibs" "$RESOURCES/iolibs" "$CONTENTS/Frameworks" \
   "$DIST_ROOT"
 
-"$PROJECT_ROOT/scripts/prepare-nikon-sdk.sh" >/dev/null
-"$PROJECT_ROOT/scripts/prepare-sony-sdk.sh" >/dev/null
+if [[ -f "$PROJECT_ROOT/S-SDKNEF-001BF-ALLIN.zip" &&
+      -f "$PROJECT_ROOT/S-SDKZ-200BF-ALLIN.zip" ]]; then
+  "$PROJECT_ROOT/scripts/prepare-nikon-sdk.sh" >/dev/null
+elif [[ ! -d "$SDK_ROOT/Image/Frameworks" ||
+        ! -d "$SDK_ROOT/Remote/Frameworks" ||
+        ! -f "$SDK_ROOT/Image/Resources/prm.bin" ]]; then
+  print -u2 "Nikon SDK archives and prepared runtime are both unavailable."
+  exit 1
+fi
+
+if [[ -f "$PROJECT_ROOT/CrSDK_v2.02.00_20260610a_Mac.zip" ]]; then
+  "$PROJECT_ROOT/scripts/prepare-sony-sdk.sh" >/dev/null
+elif [[ ! -f "$SONY_SDK_ROOT/include/CRSDK/CameraRemote_SDK.h" ||
+        ! -f "$SONY_SDK_ROOT/runtime/libCr_Core.dylib" ]]; then
+  print -u2 "Sony SDK archive and prepared runtime are both unavailable."
+  exit 1
+fi
 
 xcrun clang++ -std=c++17 -O2 -fvisibility=hidden \
   -c "$PROJECT_ROOT/native/macos/Sources/NikonLink/NikonSDKBridge.cpp" \
@@ -52,6 +67,7 @@ xcrun clang++ -std=c++17 -O2 -fvisibility=hidden \
   -o "$BUILD_ROOT/SonySDKBridge.o"
 
 xcrun swiftc -swift-version 5 -O \
+  -module-cache-path "$BUILD_ROOT/ModuleCache" \
   -framework AppKit -framework SwiftUI -framework Photos -framework AVKit \
   -framework AVFoundation -framework CoreImage \
   -framework Network -framework CoreBluetooth -framework CoreLocation \
