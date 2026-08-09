@@ -635,6 +635,10 @@ export function createAuthSystem({
 
   // ── 管理台账号操作（由 app.mjs 的 handleAdmin 守卫链保护） ──
 
+  function adminTotalAccounts() {
+    return Object.keys(accounts).length;
+  }
+
   function adminListAccounts({ query = "", cursor = "", limit = 50 }) {
     const q = String(query).trim().toLowerCase();
     const all = Object.keys(accounts).sort();
@@ -737,6 +741,7 @@ export function createAuthSystem({
     login,
     logout,
     me,
+    adminTotalAccounts,
     adminListAccounts,
     adminDisableAccount,
     adminEnableAccount,

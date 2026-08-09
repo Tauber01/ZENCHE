@@ -176,7 +176,7 @@
   function renderOverview() {
     var s = state.stats;
     var cards = [
-      { label: "总设备", value: s.totalDevices, sub: "已激活设备数", cls: "accent" },
+      { label: "总用户", value: s.totalAccounts, sub: "含未验证与已禁用账号", cls: "accent" },
       { label: "24h 活跃", value: s.active24h, sub: "最近 24 小时", cls: "live" },
       { label: "7d 活跃", value: s.active7d, sub: "最近 7 天", cls: "live" },
       { label: "7d 内到期", value: s.expiring7d, sub: "到期 ≤ 7 天", cls: "warning" },
@@ -223,7 +223,7 @@
     var root = el("div", {}, [
       el("div", { class: "page-head" }, [
         el("h1", { text: "总览" }),
-        el("div", { class: "desc", text: "激活设备使用人数与账号状态概览" })
+        el("div", { class: "desc", text: "注册用户与激活设备状态概览" })
       ]),
       grid,
       el("div", {}, [distCard]),

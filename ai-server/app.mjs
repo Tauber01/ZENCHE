@@ -578,6 +578,8 @@ export function createApp(opts = {}) {
       if (isExpiringWithinDays(record.expiry, 7, startOfToday)) expiring7d += 1;
     }
     return {
+      // 全部注册账号都计入用户数；未验证、已禁用、未绑定设备均不排除。
+      totalAccounts: auth.adminTotalAccounts(),
       totalDevices: tails.size,
       active24h,
       active7d,

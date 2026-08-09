@@ -82,10 +82,38 @@ test("admin: stats requires valid bearer, rejects wrong token", async (t) => {
   const ok = await adminGet(base, "/v1/admin/stats");
   assert.equal(ok.status, 200);
   const body = await ok.json();
+  assert.equal(body.totalAccounts, 0, "empty account registry -> zero users");
   assert.ok("totalDevices" in body);
   assert.ok("expiring7d" in body, "expiring7d added");
   assert.ok("exhausted" in body, "exhausted added");
   assert.ok("revoked" in body, "revoked added");
+});
+
+test("admin: stats counts every registered account, not only activated devices", async (t) => {
+  const app = await start({ authRequireEmailCode: false });
+  t.after(() => close(app));
+  const base = `http://127.0.0.1:${app.port}`;
+  for (const email of ["active-no-device@test.com", "disabled-no-device@test.com"]) {
+    const registered = await fetch(`${base}/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: "password123" }),
+    });
+    assert.equal(registered.status, 200);
+  }
+  const disabled = await adminPost(base, "/v1/admin/accounts/disabled-no-device%40test.com/disable");
+  assert.equal(disabled.status, 200);
+
+  const stats = await (await adminGet(base, "/v1/admin/stats")).json();
+  assert.equal(stats.totalAccounts, 2, "active + disabled, unverified accounts are all users");
+  assert.equal(stats.totalDevices, 0, "user count must not fall back to activated device count");
+});
+
+test("admin UI overview labels the all-account metric as total users", () => {
+  const source = fs.readFileSync(new URL("../ai-server/admin/app.js", import.meta.url), "utf8");
+  assert.match(source, /label:\s*"总用户",\s*value:\s*s\.totalAccounts/);
+  assert.match(source, /sub:\s*"含未验证与已禁用账号"/);
+  assert.doesNotMatch(source, /label:\s*"总设备",\s*value:\s*s\.totalDevices/);
 });
 
 test("admin: stats counts revoked/exhausted", async (t) => {
@@ -259,6 +287,7 @@ test("admin: snapshot appended daily, history readable", async (t) => {
   assert.ok(hist.snapshots.length >= 1, "at least today snapshot");
   assert.ok(hist.snapshots[0].date, "snapshot has date");
   assert.ok("totalDevices" in hist.snapshots[0], "snapshot has stats");
+  assert.ok("totalAccounts" in hist.snapshots[0], "snapshot has all-account total");
   // 快照文件落盘
   const snapFile = path.join(app.cleanupDir, "data", "admin-stats-snapshots.jsonl");
   assert.ok(fs.existsSync(snapFile), "snapshot file exists");
