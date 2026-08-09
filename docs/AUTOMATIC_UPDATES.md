@@ -101,10 +101,9 @@ PORT=4173 HOST=127.0.0.1 npm start
 `zenche-update.service`，监听 `127.0.0.1:4174`；Nginx 将 `/api/update`、
 `/api/updates` 和 `/healthz` 反代到该服务，并将 `/downloads/` 映射到
 `/var/www/zenche.top/downloads/`。`UPDATE_ASSET_BASE_URL` 已设置为
-`https://zenche.top/downloads`，服务器目录包含 v1.4.1 的六个安装包和六个
-`.sha256` 文件。服务器本机回源验证通过；截至 2026-08-02，`zenche.top` 公网 DNS
-仍解析到 `45.207.210.254`，尚未切换到 `101.34.255.115`，因此 DNS/CDN 切换完成前，
-公网客户端仍会看到旧站点响应。
+`https://zenche.top/downloads`。截至 2026-08-09，公网健康检查、五端更新接口与
+1.5.9 / build 36 安装包均可访问；1.5.10 / build 37 的清单和安装包已形成候选，
+待生产备份、清单模式切换和逐端公网回归。
 
 ## English
 
@@ -148,9 +147,10 @@ are restricted to the configured HTTPS repository API.
 
 The production instance runs as `zenche-update.service` on `101.34.255.115` at
 `127.0.0.1:4174`. Nginx proxies the API routes and serves `/downloads/` from
-`/var/www/zenche.top/downloads/`. The origin was verified locally on 2026-08-02, but the
-public `zenche.top` DNS still resolved to `45.207.210.254` at that time; switch DNS/CDN to
-`101.34.255.115` before expecting public clients to receive this feed.
+`/var/www/zenche.top/downloads/`. As of 2026-08-09, the public health endpoint, all five
+update responses, and the existing 1.5.9 / build 36 packages are reachable. The 1.5.10 /
+build 37 manifest and packages are a release candidate pending the production backup,
+manifest-mode switch, and per-platform public regression checks.
 
 ## 日本語
 
@@ -195,8 +195,8 @@ channel ごとにキャッシュされ、GitHub が一時停止しても古い�
 API に限定され、任意 URL のプロキシにはなりません。
 
 本番インスタンスは `101.34.255.115` の `zenche-update.service` として稼働し、
-`127.0.0.1:4174` を待ち受けます。Nginx は API ルートを反転プロキシし、
-`/var/www/zenche.top/downloads/` から `/downloads/` を配信します。2026-08-02 に
-オリジンでの応答を確認しましたが、公開 DNS の `zenche.top` はまだ
-`45.207.210.254` を返していたため、公開クライアントへ反映する前に DNS/CDN を
-`101.34.255.115` へ切り替える必要があります。
+`127.0.0.1:4174` を待ち受けます。Nginx は API ルートをリバースプロキシし、
+`/var/www/zenche.top/downloads/` から `/downloads/` を配信します。2026-08-09 時点で
+公開ヘルスチェック、5 プラットフォームの更新応答、既存の 1.5.9 / build 36
+パッケージを確認済みです。1.5.10 / build 37 のマニフェストとパッケージは、本番バックアップ、
+マニフェストモード切り替え、プラットフォーム別公開回帰確認を待つ候補です。

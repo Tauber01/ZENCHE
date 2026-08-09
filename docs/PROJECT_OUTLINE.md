@@ -14,9 +14,11 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.9
-- 当前原生构建号：36
-- 发布状态：v1.5.3 已发布为[公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，注释标签 `v1.5.3` 解析到发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；当前本地 `main`、`origin/main` 与 `v1.5.9` 标签均解析到 1.5.9 / build 36 提交 `8bd995cb29b4d9e03ac3152ba0cdd34393371e1b`，W13 代码候选 `c661f7f` 未发布
+- 当前源码版本：1.5.10
+- 当前原生构建号：37
+- 发布状态：v1.5.3 仍是 [GitHub 公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新当前仍发布 1.5.9 / build 36。W14 的 1.5.10 / build 37 代码候选固定于 `5488dbd084200693d24554ef004cca38099a1cdb`，五端包和自托管清单已就绪，等待最终审查与生产切换；未 push、未创建 Git 标签或 GitHub Release
+
+W14 为五端拍照页增加实时监看开关，并在 iOS / iPadOS 增加可信局域网 Mac 相机桥接。Sony 官方 Camera Remote SDK 在 Mac 端执行，Nikon 使用明确标注的 PTP 兼容路径。关闭开关只停止取景帧并清空缓存画面，不断开相机或禁用快门。1.5.10 六个本地交付文件已逐个通过 SHA-256 和结构校验；完整文件表、签名边界与使用限制见 `docs/releases/v1.5.10.md` 和 `docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md`。
 
 v1.4.0 已完成 AI 原图上传、服务器次数扣减/失败回滚、修图覆盖原图与生图另存的五端行为对齐；包与签名状态详见 `docs/releases/v1.4.0.md`。发布提交为 `8a13c0b`，标签为 `v1.4.0`，Release 为 [GitHub v1.4.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。
 

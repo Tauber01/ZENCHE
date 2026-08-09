@@ -1,0 +1,29 @@
+{
+  "version": "1.5.10",
+  "title": "帧澈 ZENCHE 1.5.10",
+  "body": "新增五端实时监看开关，以及 iPhone / iPad 通过可信局域网连接 Mac 相机桥接。Sony 官方 Camera Remote SDK 在 Mac 端运行；Nikon 使用明确标注的 PTP 兼容桥接。",
+  "published_at": "2026-08-09T15:32:11Z",
+  "release_url": "https://zenche.top/",
+  "assets": {
+    "android": {
+      "file": "ZENCHE-1.5.10-android.apk",
+      "sha256": "ba0f91428ef41eff87abb5878816d6d00c3038211f575e9a8b98283ed57ab3f5"
+    },
+    "ios": {
+      "file": "ZENCHE-1.5.10-ios-unsigned.ipa",
+      "sha256": "5a103f63586881ac3a11266923414a1eefa6478b2d94d5238a7cdc9cddfcee8e"
+    },
+    "harmonyos": {
+      "file": "ZENCHE-1.5.10-HarmonyOS.hap",
+      "sha256": "b49ea6f12db79be01e25cf6b3cb6c215d579a5eb3c7ace3dbf026d540eac9732"
+    },
+    "macos": {
+      "file": "ZENCHE-1.5.10-macOS-arm64.dmg",
+      "sha256": "29b9eda5b6e414b92e7b6eada6078b10033f57cda3cbba031c8af11d4d62a6fa"
+    },
+    "windows": {
+      "file": "ZENCHE-1.5.10-Windows-x64-Setup.exe",
+      "sha256": "eeead276690300e5e0d824269836a06ef2a4a2b3bba2973b3dcdc52090fc4aa2"
+    }
+  }
+}

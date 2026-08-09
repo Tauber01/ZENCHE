@@ -292,6 +292,35 @@ const sampleManifest = {
   },
 };
 
+test("selfhost: v1.5.10 production manifest resolves all five native clients", async () => {
+  const manifestPath = path.resolve("docs/releases/v1.5.10.json");
+  const service = createUpdateService({
+    fetchImpl: async () => { throw new Error("must not call GitHub"); },
+    manifestPath,
+    assetBaseUrl: "https://zenche.top/downloads",
+  });
+  const expected = [
+    ["android", "arm64", "ZENCHE-1.5.10-android.apk", "ba0f91428ef41eff87abb5878816d6d00c3038211f575e9a8b98283ed57ab3f5"],
+    ["ios", "arm64", "ZENCHE-1.5.10-ios-unsigned.ipa", "5a103f63586881ac3a11266923414a1eefa6478b2d94d5238a7cdc9cddfcee8e"],
+    ["harmony", "arm64", "ZENCHE-1.5.10-HarmonyOS.hap", "b49ea6f12db79be01e25cf6b3cb6c215d579a5eb3c7ace3dbf026d540eac9732"],
+    ["macos", "arm64", "ZENCHE-1.5.10-macOS-arm64.dmg", "29b9eda5b6e414b92e7b6eada6078b10033f57cda3cbba031c8af11d4d62a6fa"],
+    ["windows", "x64", "ZENCHE-1.5.10-Windows-x64-Setup.exe", "eeead276690300e5e0d824269836a06ef2a4a2b3bba2973b3dcdc52090fc4aa2"],
+  ];
+
+  for (const [platform, architecture, file, sha256] of expected) {
+    const response = await service.getUpdate({
+      platform,
+      architecture,
+      current_version: "1.5.9",
+    });
+    assert.equal(response.version, "1.5.10");
+    assert.equal(response.url, `https://zenche.top/downloads/${file}`);
+    assert.equal(response.sha256, sha256);
+    assert.equal(response.update_available, true);
+    assert.equal(response.stale, false);
+  }
+});
+
 test("selfhost: manifest mode serves local manifest with zero GitHub requests", async () => {
   let githubCalls = 0;
   const manifestFile = path.join(os.tmpdir(), "zenche-release.json");
