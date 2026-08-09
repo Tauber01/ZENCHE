@@ -1133,4 +1133,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 统一验证（代码候选 `c661f7f` 的同内容冻结状态）：W13 定向 58/58、`npm test` 468/468；iOS generic/device Release unsigned `xcodebuild` BUILD SUCCEEDED；macOS 全源 `swiftc -typecheck` exit 0；Android 离线 `:app:compileDebugJavaWithJavac` BUILD SUCCESSFUL；HarmonyOS release `assembleHap` BUILD SUCCESSFUL（未签名属项目常态）；Windows Release `dotnet build` 0 错误、0 警告；`git diff --check` 通过。Android 的 3 个 Java 8 警告及 Apple/HarmonyOS 的现有弃用、并发或 SDK 警告未由 W13 新增。
 - 视觉门禁：AI审查 第四轮严格只读复审（Buzz `906c8c87…39d39`）签发认证/契约/构建与原生视觉/交互代码静态 PASS，代码 P0/P1/P2 均为 0；审查同时明确该结论不覆盖真机截图、安装或生产验收。当前环境无可用 iOS Simulator、adb、hdc 或 Windows 实机，真机/窗口截图矩阵仍是明确阻塞。
 - 文案门禁：GPT5.6luna 第四轮五端终审（Buzz `bffb38f8…38e8d`）签发用户可见内容/去 AI 痕迹静态 PASS；随后对 iOS 日文「新規登録」精确返修的窄范围复核（Buzz `dc411ea6…8abeb`）确认 PASS 继续有效。该结论同样不扩大为真机、安装或生产 PASS。
-- 生产阻塞：2026-08-09 只读探测确认 `https://zenche.top/api/v1/auth/me` 与 `/api/v1/ai` 返回 HTTP 200 站点 HTML，而旧公网 HTTP API 仍返回 JSON。客户端已按协议失败关闭；在官网 HTTPS 反代、五端真实注册/登录/`me`/登出/AI 绑定与真机矩阵完成前，不得 push、部署或发布 W13。
+- 生产进展：2026-08-09 为官网 Nginx 补齐 `/api/v1/auth/` 与 `/api/v1/ai` 精确反代；原配置备份为 `/etc/nginx/sites-available/zenche.top.bak-20260809T154854+0800`，隔离与全局 `nginx -t` 均通过后 reload。公网 `/auth/me` 无 token 返回 JSON 401，`/ai` 空请求返回 JSON 400；免码过渡态真实发码 503、注册 200、登录 200、`me` 200、登出 200、登出后 `me` 401 均通过。无效激活携带账号 Bearer 返回 JSON 403，未调用上游；临时账号 `w13-route-smoke-1786261936353@example.com` 已由回环管理 API 禁用，verified=false、deviceCount=0。
+- 剩余发布阻塞：有效激活码的真实 AI 生成与账号绑定尚未执行，SMTP/SES 严格验证码仍未启用，五端真机/窗口截图、安装、无障碍、连接态登出矩阵及版本化交付包/SHA-256/正式签名仍缺。W13 客户端继续保持未 push、未部署、未发布。
+
+## 12.51 管理台总用户口径修正（2026-08-09，GPT5.6）
+
+- Tauber 更正统计口径：目标是管理后台总览，不是官网；“总用户”必须统计全部注册账号，不能使用已激活设备数代替。候选提交 `adf310d1dbb636a5522ccc4713471b8758afc2be` 为认证系统新增专用账号计数入口，`/v1/admin/stats` 返回 `totalAccounts`，管理台卡片改为“总用户 / 含未验证与已禁用账号”；设备、活跃、到期、用尽与吊销指标保持原口径。
+- 新契约创建两个未绑定设备的免码账号并禁用其中一个，验证 `totalAccounts=2`、`totalDevices=0`；另锁住总览文案与每日快照字段。账号/管理 API 定向 34/34；完整 `npm test` 两轮均为 470/470，代码提交后与文档更新状态的最终一轮运行前后 HEAD 均为 `adf310d`；`node --check ai-server/admin/app.js` 与 `git diff --check` 也通过。该提交尚未部署生产，未 push。
