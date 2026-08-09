@@ -91,6 +91,52 @@ internal static class AppLocalization
             ["可连接"] = new("Available", "接続可能"),
             ["正被占用"] = new("In use", "使用中"),
             ["连接管理"] = new("Connection Manager", "接続管理"),
+            ["账号登录"] = new("Account Sign In", "アカウントログイン"),
+            ["账号"] = new("Account", "アカウント"),
+            ["登录"] = new("Sign In", "ログイン"),
+            ["注册"] = new("Create Account", "新規登録"),
+            ["邮箱"] = new("Email", "メールアドレス"),
+            ["密码（至少 8 位）"] = new(
+                "Password (8 characters minimum)",
+                "パスワード（8文字以上）"),
+            ["6 位验证码"] = new("6-digit verification code", "6桁の認証コード"),
+            ["获取验证码"] = new("Send Code", "認証コードを送信"),
+            ["重新获取"] = new("Send Again", "再送信"),
+            ["正在验证登录状态…"] = new(
+                "Checking your session…",
+                "ログイン状態を確認しています…"),
+            ["登录后使用拍摄、编辑与 AI 功能"] = new(
+                "Sign in to use capture, editing, and AI features",
+                "撮影、編集、AI 機能を利用するにはログインしてください"),
+            ["还没有账号？切换到「注册」即可创建"] = new(
+                "New to ZENCHE? Choose Create Account.",
+                "アカウントをお持ちでない場合は「新規登録」を選択してください。"),
+            ["已有账号？切换到「登录」"] = new(
+                "Already have an account? Choose Sign In.",
+                "アカウントをお持ちの場合は「ログイン」を選択してください。"),
+            ["正在登录…"] = new("Signing in…", "ログインしています…"),
+            ["正在注册…"] = new("Creating account…", "登録しています…"),
+            ["请输入有效的邮箱地址"] = new(
+                "Enter a valid email address",
+                "有効なメールアドレスを入力してください"),
+            ["密码至少需要 8 位"] = new(
+                "Password must be at least 8 characters",
+                "パスワードは8文字以上で入力してください"),
+            ["请输入 6 位验证码"] = new(
+                "Enter the 6-digit verification code",
+                "6桁の認証コードを入力してください"),
+            ["验证码已发送至"] = new(
+                "Verification code sent to",
+                "認証コードの送信先："),
+            ["邮箱验证暂不可用，可直接注册"] = new(
+                "Email verification is temporarily unavailable. You can create the account without a code.",
+                "メール認証は一時的に利用できません。コードなしで登録できます。"),
+            ["登录后可跨设备同步激活绑定；退出后需重新登录才能使用全部功能。"] = new(
+                "Sign in to keep activation bindings in sync across devices. After signing out, you must sign in again to use all features.",
+                "ログインするとアクティベーション情報をデバイス間で同期できます。ログアウト後は、すべての機能を利用するために再ログインが必要です。"),
+            ["未登录"] = new("Not signed in", "未ログイン"),
+            ["退出登录"] = new("Sign Out", "ログアウト"),
+            ["正在退出…"] = new("Signing out…", "ログアウトしています…"),
             ["相机连接"] = new("Camera Connections", "カメラ接続"),
             ["本机摄像头、USB/PTP 与官方 SDK"] = new(
                 "Local camera, USB/PTP, and official SDKs",

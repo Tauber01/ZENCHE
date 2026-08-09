@@ -719,6 +719,7 @@ public partial class MainWindow : Window
     private readonly WirelessTransferServer _wirelessServer;
     private readonly DiagnosticLogger _diagnostics = DiagnosticLogger.Shared;
     private readonly UpdateService _updateService = new();
+    private readonly AuthService _authService = new();
     private readonly List<LibraryBranch> _libraryBranches;
     private readonly Dictionary<string, string> _libraryFileAssignments;
     private readonly List<RememberedCameraDevice> _rememberedDevices;
@@ -736,6 +737,15 @@ public partial class MainWindow : Window
     private bool[] _gridHiddenTiles = new bool[6];
     private bool _initializing = true;
     private bool _shutdownStarted;
+    private bool _signedInServicesInitialized;
+    private bool _authRegisterMode;
+    private bool _authCodeRequired = true;
+    private bool _authBusy;
+    private int _authCodeCountdown;
+    private readonly System.Windows.Threading.DispatcherTimer _authCodeTimer = new()
+    {
+        Interval = TimeSpan.FromSeconds(1)
+    };
     private bool _configuringVideoControls;
     private bool _videoMode;
     private bool _videoRecording;
@@ -1214,6 +1224,13 @@ public partial class MainWindow : Window
             request.Content.Headers.ContentType =
                 new System.Net.Http.Headers.MediaTypeHeaderValue(
                     "application/json");
+            var accountToken = _authService.GetToken();
+            if (!string.IsNullOrWhiteSpace(accountToken))
+            {
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", accountToken);
+            }
             using var response = await client.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead);
@@ -1310,6 +1327,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _authCodeTimer.Tick += AuthCodeTimer_Tick;
         CameraStorageList.ItemsSource = _cameraStorageRows;
         _monitorTimecodeTimer.Tick += (_, _) => UpdateMonitorTimecode();
         _monitorTimecodeTimer.Start();
@@ -1446,10 +1464,292 @@ public partial class MainWindow : Window
                 $"Windows 分享面板初始化失败：{error.Message}");
         }
 #endif
+        await BootstrapAuthAsync();
+    }
+
+    // ── W13-e Windows 邮箱账号登录墙 ──────────────────────────────────────
+
+    private async Task BootstrapAuthAsync()
+    {
+        AuthWall.Visibility = Visibility.Visible;
+        AuthCheckingPanel.Visibility = Visibility.Visible;
+        AuthFormPanel.Visibility = Visibility.Collapsed;
+        AuthCheckingText.Text = AppLocalization.T("正在验证登录状态…");
+        if (!_authService.HasSession())
+        {
+            ShowAuthForm();
+            return;
+        }
+
+        var result = await _authService.MeAsync();
+        if (result.IsSuccess || result.IsOfflineTolerable)
+        {
+            await EnterSignedInStateAsync();
+            return;
+        }
+
+        _authService.ClearSession();
+        ShowAuthForm(result.Message);
+    }
+
+    private async Task EnterSignedInStateAsync()
+    {
+        AuthWall.Visibility = Visibility.Collapsed;
+        AuthCheckingPanel.Visibility = Visibility.Collapsed;
+        AuthFormPanel.Visibility = Visibility.Collapsed;
+        AccountEmailText.Text = string.IsNullOrWhiteSpace(_authService.GetEmail())
+            ? AppLocalization.T("未登录")
+            : _authService.GetEmail();
+        LogoutButton.IsEnabled = true;
+        if (_signedInServicesInitialized) return;
+        _signedInServicesInitialized = true;
         ShowLaunchAnnouncementIfNeeded();
         await RefreshNikonOfficialSdkAsync(allowRemoteProbe: !_camera.IsConnected);
         await RefreshSonyOfficialSdkAsync(allowEnumeration: !_camera.IsConnected);
         await CheckForUpdatesAsync(silent: true);
+    }
+
+    private void ShowAuthForm(string? message = null)
+    {
+        foreach (var owned in OwnedWindows.Cast<Window>().ToArray())
+        {
+            owned.Close();
+        }
+        _authBusy = false;
+        _authCodeRequired = true;
+        _authCodeTimer.Stop();
+        _authCodeCountdown = 0;
+        AuthWall.Visibility = Visibility.Visible;
+        AuthCheckingPanel.Visibility = Visibility.Collapsed;
+        AuthFormPanel.Visibility = Visibility.Visible;
+        AuthEmailBox.IsEnabled = true;
+        AuthPasswordBox.IsEnabled = true;
+        AuthCodeBox.IsEnabled = true;
+        AuthSendCodeButton.IsEnabled = true;
+        SetAuthMode(register: false);
+        AuthErrorText.Text = string.IsNullOrWhiteSpace(message)
+            ? ""
+            : AppLocalization.T(message);
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            () => AuthEmailBox.Focus());
+    }
+
+    private void SetAuthMode(bool register)
+    {
+        _authRegisterMode = register;
+        AuthLoginModeButton.Style = (Style)FindResource(
+            register ? "ButtonBase" : "PrimaryButton");
+        AuthRegisterModeButton.Style = (Style)FindResource(
+            register ? "PrimaryButton" : "ButtonBase");
+        AuthCodePanel.Visibility = register && _authCodeRequired
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        UpdateAuthLocalizedText();
+        AuthErrorText.Text = "";
+    }
+
+    private void UpdateAuthLocalizedText()
+    {
+        AuthLoginModeButton.Content = AppLocalization.T("登录");
+        AuthRegisterModeButton.Content = AppLocalization.T("注册");
+        AuthSubmitButton.Content = AppLocalization.T(
+            _authBusy
+                ? _authRegisterMode ? "正在注册…" : "正在登录…"
+                : _authRegisterMode ? "注册" : "登录");
+        AuthModeHintText.Text = AppLocalization.T(
+            _authRegisterMode
+                ? "已有账号？切换到「登录」"
+                : "还没有账号？切换到「注册」即可创建");
+        AuthSendCodeButton.Content = _authCodeCountdown > 0
+            ? AppLocalization.T("重新获取") + $" ({_authCodeCountdown}s)"
+            : AppLocalization.T("获取验证码");
+    }
+
+    private void SetAuthBusy(bool busy)
+    {
+        _authBusy = busy;
+        AuthEmailBox.IsEnabled = !busy;
+        AuthPasswordBox.IsEnabled = !busy;
+        AuthCodeBox.IsEnabled = !busy;
+        AuthLoginModeButton.IsEnabled = !busy;
+        AuthRegisterModeButton.IsEnabled = !busy;
+        AuthSubmitButton.IsEnabled = !busy;
+        AuthSendCodeButton.IsEnabled = !busy && _authCodeCountdown == 0;
+        UpdateAuthLocalizedText();
+    }
+
+    private void AuthLoginMode_Click(object sender, RoutedEventArgs e) =>
+        SetAuthMode(register: false);
+
+    private void AuthRegisterMode_Click(object sender, RoutedEventArgs e) =>
+        SetAuthMode(register: true);
+
+    private async void AuthSendCode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_authBusy) return;
+        var email = AuthEmailBox.Text.Trim();
+        if (!IsValidAuthEmail(email))
+        {
+            AuthErrorText.Text = AppLocalization.T("请输入有效的邮箱地址");
+            return;
+        }
+        SetAuthBusy(true);
+        AuthErrorText.Text = "";
+        var result = await _authService.RequestEmailCodeAsync(email);
+        SetAuthBusy(false);
+        if (result.IsSuccess)
+        {
+            _authCodeRequired = true;
+            AuthCodePanel.Visibility = Visibility.Visible;
+            _authCodeCountdown = 60;
+            _authCodeTimer.Start();
+            AuthSendCodeButton.IsEnabled = false;
+            AuthErrorText.Text = AppLocalization.T("验证码已发送至") + " " + email;
+            UpdateAuthLocalizedText();
+        }
+        else if (result.Status == 503 && !result.IsProtocolError)
+        {
+            _authCodeRequired = false;
+            AuthCodePanel.Visibility = Visibility.Collapsed;
+            AuthErrorText.Text = AppLocalization.T("邮箱验证暂不可用，可直接注册");
+        }
+        else
+        {
+            AuthErrorText.Text = AppLocalization.T(result.Message);
+        }
+    }
+
+    private async void AuthSubmit_Click(object sender, RoutedEventArgs e)
+    {
+        if (_authBusy) return;
+        var email = AuthEmailBox.Text.Trim();
+        var password = AuthPasswordBox.Password;
+        var code = AuthCodeBox.Text.Trim();
+        if (!IsValidAuthEmail(email))
+        {
+            AuthErrorText.Text = AppLocalization.T("请输入有效的邮箱地址");
+            return;
+        }
+        if (password.Length < 8)
+        {
+            AuthErrorText.Text = AppLocalization.T("密码至少需要 8 位");
+            return;
+        }
+        if (_authRegisterMode && _authCodeRequired && code.Length != 6)
+        {
+            AuthErrorText.Text = AppLocalization.T("请输入 6 位验证码");
+            return;
+        }
+
+        SetAuthBusy(true);
+        AuthErrorText.Text = "";
+        var result = _authRegisterMode
+            ? await _authService.RegisterAsync(
+                email,
+                password,
+                _authCodeRequired ? code : null)
+            : await _authService.LoginAsync(email, password);
+        SetAuthBusy(false);
+        if (result.IsSuccess)
+        {
+            AuthPasswordBox.Clear();
+            AuthCodeBox.Clear();
+            _authCodeTimer.Stop();
+            await EnterSignedInStateAsync();
+        }
+        else
+        {
+            AuthErrorText.Text = AppLocalization.T(result.Message);
+        }
+    }
+
+    private async void LogoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_authBusy) return;
+        LogoutButton.IsEnabled = false;
+        LogoutButton.Content = AppLocalization.T("正在退出…");
+        AuthWall.Visibility = Visibility.Visible;
+        AuthFormPanel.Visibility = Visibility.Collapsed;
+        AuthCheckingPanel.Visibility = Visibility.Visible;
+        AuthCheckingText.Text = AppLocalization.T("正在退出…");
+        await CloseAuthSensitiveStateAsync();
+        var result = await _authService.LogoutAsync();
+        AccountEmailText.Text = AppLocalization.T("未登录");
+        LogoutButton.Content = AppLocalization.T("退出登录");
+        ShowAuthForm(result.LocalCleanupFailed ? result.Message : null);
+    }
+
+    private async Task CloseAuthSensitiveStateAsync()
+    {
+        foreach (var owned in OwnedWindows.Cast<Window>().ToArray())
+        {
+            owned.Close();
+        }
+        StopWifiMonitoring();
+        StopWifiPreviewLoop();
+        if (_immersivePreviewWindow is { } immersive)
+        {
+            CloseImmersivePreview(immersive);
+        }
+        try
+        {
+            await FinishExternalRecordingForDisconnectAsync();
+            await StopPreviewLoopAsync();
+            if (_wirelessServer.IsRunning) await _wirelessServer.StopAsync();
+            _bluetoothRemote.Stop();
+            if (_locationTagging.Enabled)
+                await _locationTagging.SetEnabledAsync(false);
+            if (_localCamera.IsConnected) await _localCamera.DisconnectAsync();
+            if (_wifiCamera.IsConnected) await _wifiCamera.DisconnectAsync();
+            if (_camera.IsConnected) await _camera.DisconnectAsync();
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning("auth", $"退出登录时清理连接状态失败：{error.Message}");
+        }
+    }
+
+    private void AuthCodeTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_authCodeCountdown > 0) _authCodeCountdown--;
+        if (_authCodeCountdown <= 0)
+        {
+            _authCodeTimer.Stop();
+            AuthSendCodeButton.IsEnabled = !_authBusy;
+        }
+        UpdateAuthLocalizedText();
+    }
+
+    private static bool IsValidAuthEmail(string email)
+    {
+        var at = email.IndexOf('@');
+        var dot = email.LastIndexOf('.');
+        return at > 0 && dot > at + 1 && dot < email.Length - 1;
+    }
+
+    private void AuthEmailBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        AuthPasswordBox.Focus();
+    }
+
+    private void AuthPasswordBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        if (_authRegisterMode && _authCodeRequired)
+            AuthCodeBox.Focus();
+        else
+            AuthSubmit_Click(sender, new RoutedEventArgs());
+    }
+
+    private void AuthCodeBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        AuthSubmit_Click(sender, new RoutedEventArgs());
     }
 
     private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
@@ -4845,6 +5145,10 @@ public partial class MainWindow : Window
         };
         AppLocalization.SetLanguage(language);
         AppLocalization.Apply(this);
+        UpdateAuthLocalizedText();
+        AccountEmailText.Text = string.IsNullOrWhiteSpace(_authService.GetEmail())
+            ? AppLocalization.T("未登录")
+            : _authService.GetEmail();
         UpdateExposureReadout();
     }
 
@@ -8351,7 +8655,22 @@ public partial class MainWindow : Window
                 JsonSerializer.Serialize(body),
                 System.Text.Encoding.UTF8,
                 "application/json");
-            var response = await client.PostAsync(endpoint, content);
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = content
+            };
+            var accountToken = _authService.GetToken();
+            if (Uri.TryCreate(endpoint, UriKind.Absolute, out var aiEndpoint)
+                && aiEndpoint.Scheme.Equals(
+                    Uri.UriSchemeHttps,
+                    StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(accountToken))
+            {
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", accountToken);
+            }
+            using var response = await client.SendAsync(request);
             var serverRemaining = ReadServerRemainingUsage(response);
             if (!response.IsSuccessStatusCode)
             {

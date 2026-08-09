@@ -1719,6 +1719,32 @@
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Margin="0,0,18,0">
+                    <TextBlock Style="{DynamicResource SectionTitle}" Text="账号" />
+                    <TextBlock Margin="0,4,0,8"
+                               Foreground="{DynamicResource MutedBrush}"
+                               TextWrapping="Wrap"
+                               Text="登录后可跨设备同步激活绑定；退出后需重新登录才能使用全部功能。" />
+                    <TextBlock x:Name="AccountEmailText"
+                               FontFamily="{DynamicResource MonoFont}"
+                               Text="未登录" />
+                  </StackPanel>
+                  <Button x:Name="LogoutButton"
+                          Grid.Column="1"
+                          MinWidth="112"
+                          Height="44"
+                          VerticalAlignment="Center"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="退出登录"
+                          Click="LogoutButton_Click" />
+                </Grid>
+              </Border>
+              <Border Margin="0,0,0,20" Style="{DynamicResource PanelCard}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="220" />
                   </Grid.ColumnDefinitions>
                   <StackPanel>
@@ -2211,6 +2237,144 @@
                    Style="{DynamicResource CaptureSessionHint}"
                    Text="0 张照片" />
       </Grid>
+    </Border>
+
+    <!-- W13-e：账号路由守卫。checking/login 均为顶层整屏阻断，不挂出任何可交互工作区。 -->
+    <Border x:Name="AuthWall"
+            Grid.RowSpan="3"
+            Panel.ZIndex="100"
+            Background="{DynamicResource PaperBrush}"
+            AutomationProperties.Name="账号登录">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <Grid MinWidth="320" MinHeight="560">
+          <StackPanel Width="520"
+                      MaxWidth="520"
+                      Margin="24,40"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+            <Border Width="72"
+                    Height="72"
+                    HorizontalAlignment="Center"
+                    CornerRadius="{StaticResource CornerRadius20}">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                  <GradientStop Offset="0" Color="{DynamicResource ColorAccent}" />
+                  <GradientStop Offset="1" Color="{DynamicResource ColorUiBlue}" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <TextBlock HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         FontFamily="{DynamicResource DisplayFont}"
+                         FontSize="36"
+                         FontWeight="Bold"
+                         Foreground="White"
+                         Text="Z" />
+            </Border>
+            <TextBlock Margin="0,16,0,0"
+                       HorizontalAlignment="Center"
+                       FontFamily="{DynamicResource DisplayFont}"
+                       FontSize="26"
+                       FontWeight="Bold"
+                       Foreground="{DynamicResource InkBrush}"
+                       Text="帧澈 ZENCHE" />
+            <TextBlock Margin="0,8,0,24"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource MutedBrush}"
+                       Text="登录后使用拍摄、编辑与 AI 功能" />
+
+            <StackPanel x:Name="AuthCheckingPanel"
+                        Margin="0,24,0,0"
+                        AutomationProperties.LiveSetting="Polite">
+              <ProgressBar Width="220"
+                           Height="4"
+                           IsIndeterminate="True" />
+              <TextBlock x:Name="AuthCheckingText"
+                         Margin="0,16,0,0"
+                         HorizontalAlignment="Center"
+                         FontWeight="SemiBold"
+                         Text="正在验证登录状态…" />
+            </StackPanel>
+
+            <StackPanel x:Name="AuthFormPanel" Visibility="Collapsed">
+              <Grid Height="52"
+                    Margin="0,0,0,16"
+                    Background="{DynamicResource Paper2Brush}">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="AuthLoginModeButton"
+                        Height="44"
+                        Margin="4"
+                        Style="{DynamicResource PrimaryButton}"
+                        Content="登录"
+                        Click="AuthLoginMode_Click" />
+                <Button x:Name="AuthRegisterModeButton"
+                        Grid.Column="1"
+                        Height="44"
+                        Margin="4"
+                        Style="{DynamicResource ButtonBase}"
+                        Content="注册"
+                        Click="AuthRegisterMode_Click" />
+              </Grid>
+
+              <TextBlock Margin="0,0,0,4" Text="邮箱" />
+              <TextBox x:Name="AuthEmailBox"
+                       Height="44"
+                       Padding="12,9"
+                       AutomationProperties.Name="邮箱"
+                       KeyDown="AuthEmailBox_KeyDown" />
+              <TextBlock Margin="0,12,0,4" Text="密码（至少 8 位）" />
+              <PasswordBox x:Name="AuthPasswordBox"
+                           Height="44"
+                           Padding="12,9"
+                           AutomationProperties.Name="密码（至少 8 位）"
+                           KeyDown="AuthPasswordBox_KeyDown" />
+
+              <StackPanel x:Name="AuthCodePanel" Margin="0,12,0,0" Visibility="Collapsed">
+                <TextBlock Margin="0,0,0,4" Text="6 位验证码" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="156" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox x:Name="AuthCodeBox"
+                           Height="44"
+                           Padding="12,9"
+                           AutomationProperties.Name="6 位验证码"
+                           KeyDown="AuthCodeBox_KeyDown" />
+                  <Button x:Name="AuthSendCodeButton"
+                          Grid.Column="1"
+                          Height="44"
+                          Margin="10,0,0,0"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="获取验证码"
+                          Click="AuthSendCode_Click" />
+                </Grid>
+              </StackPanel>
+
+              <TextBlock x:Name="AuthErrorText"
+                         MinHeight="20"
+                         Margin="0,12,0,0"
+                         Foreground="{DynamicResource VideoBrush}"
+                         TextWrapping="Wrap"
+                         AutomationProperties.LiveSetting="Assertive" />
+              <Button x:Name="AuthSubmitButton"
+                      Height="44"
+                      Margin="0,12,0,0"
+                      Style="{DynamicResource PrimaryButton}"
+                      Content="登录"
+                      Click="AuthSubmit_Click" />
+              <TextBlock x:Name="AuthModeHintText"
+                         Margin="0,12,0,0"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource MutedBrush}"
+                         Text="还没有账号？切换到「注册」即可创建" />
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
     </Border>
   </Grid>
 </Window>
