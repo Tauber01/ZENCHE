@@ -1306,6 +1306,21 @@ public final class MainActivity extends Activity {
     private final ExecutorService storageExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService composeExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService activationExecutor = Executors.newSingleThreadExecutor();
+    // ── W13-d 邮箱账号系统登录墙（3A：启动即登录墙）──
+    private AuthManager authManager;
+    private FrameLayout authWallHost;
+    private boolean loginWallVisible;
+    private String authMode = "login";           // "login" | "register"
+    private boolean authCodeRequired = true;     // 严态=true；email-code 503（SMTP 未配）后=false 走免码注册
+    private int authCountdown;
+    private Runnable authCountdownTask;
+    private EditText authEmailInput;
+    private EditText authPasswordInput;
+    private EditText authCodeInput;
+    private LinearLayout authCodeRow;
+    private Button authCodeButton;
+    private TextView authErrorText;
+    private Button authSubmitButton;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
     private final AtomicBoolean previewWorkerRunning = new AtomicBoolean();
@@ -1943,7 +1958,16 @@ public final class MainActivity extends Activity {
 
         setContentView(buildApplication());
         showSplash();
-        showSection("capture");
+        authManager = new AuthManager(this);
+        // W13-d 3A 启动路由守卫：无 token → 登录墙（不登录任何功能不可用）；
+        // 有 token → 后台 /v1/auth/me 校验（401/403 清 token 回登录墙，网络失败离线容忍）。
+        if (authManager.hasSession()) {
+            showSection("capture");
+            validateSessionAsync();
+        } else {
+            showSection("capture");
+            showLoginWall();
+        }
         updateConnectionUi();
         if (bluetoothRemoteEnabled) bluetoothRemote.start();
         if (locationTaggingEnabled) locationTagging.start();
@@ -2713,6 +2737,9 @@ public final class MainActivity extends Activity {
 
     private View buildApplication() {
         boolean compact = isCompactPhone();
+        // W13-d：外层 FrameLayout 承载登录墙 overlay（线性布局子视图顺序排列，
+        // 无法叠加覆盖层；FrameLayout 顶层 authWallHost 可整屏盖住主界面）。
+        FrameLayout applicationFrame = new FrameLayout(this);
         LinearLayout root = new LinearLayout(this);
         applicationRoot = root;
         root.setOrientation(LinearLayout.VERTICAL);
@@ -2741,7 +2768,16 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 dp(30)));
         applySystemBarInsets(root, topBar, bottomNavigation, statusBar);
-        return root;
+        applicationFrame.addView(root, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        authWallHost = new FrameLayout(this);
+        authWallHost.setBackgroundColor(PAPER);
+        authWallHost.setVisibility(View.GONE);
+        applicationFrame.addView(authWallHost, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        return applicationFrame;
     }
 
     private void applySystemBarInsets(
@@ -8719,6 +8755,12 @@ public final class MainActivity extends Activity {
                 (java.net.HttpURLConnection) endpoint.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
+        // W13-d 2A：AI 激活请求带有效 session 则加 Bearer（服务端记录账号↔设备↔激活码三元组）；
+        // 无 token 不影响存量流程。
+        String authToken = authManager == null ? null : authManager.getToken();
+        if (authToken != null && !authToken.isEmpty()) {
+            conn.setRequestProperty("Authorization", "Bearer " + authToken);
+        }
         conn.setConnectTimeout(15_000);
         // Leave headroom around the proxy's polling and image-download
         // windows so a successful long-running job is not abandoned early.
@@ -11675,6 +11717,325 @@ public final class MainActivity extends Activity {
         return remoteCard;
     }
 
+    // ── W13-d 登录墙（3A：启动即登录墙）──────────────────────────────────────
+
+    /** 启动路由守卫：有 token 时后台校验 /v1/auth/me；401/403 清 token 回登录墙。 */
+    private void validateSessionAsync() {
+        activationExecutor.execute(() -> {
+            AuthManager.AuthResult result = authManager.me();
+            boolean invalid = result.status == 401 || result.status == 403;
+            if (invalid) {
+                authManager.clearSession();
+                mainHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    showLoginWall();
+                });
+            }
+            // 其余（200 / 网络失败 status=0 / 5xx）：保留本地缓存态（离线容忍）。
+        });
+    }
+
+    private void showLoginWall() {
+        loginWallVisible = true;
+        if (authWallHost == null) return;
+        cancelCodeCountdown();
+        authWallHost.removeAllViews();
+        authWallHost.setVisibility(View.VISIBLE);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout content = verticalContainer();
+        content.setPadding(dp(28), dp(48), dp(28), dp(36));
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        // 品牌区（design.md splash 品牌资产：几何 Z 标 + 双语 lockup）
+        FrameLayout markBox = new FrameLayout(this);
+        markBox.setBackground(brandGradient(20));
+        markBox.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(64)));
+        TextView markText = new TextView(this);
+        markText.setText("Z");
+        markText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 32);
+        markText.setTypeface(Typeface.DEFAULT_BOLD);
+        markText.setTextColor(Color.WHITE);
+        markText.setGravity(Gravity.CENTER);
+        markText.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        markBox.addView(markText);
+        LinearLayout.LayoutParams markParams =
+                new LinearLayout.LayoutParams(dp(64), dp(64));
+        content.addView(markBox, markParams);
+
+        TextView brandTitle = text("帧澈 ZENCHE", 26, Typeface.BOLD, INK);
+        brandTitle.setGravity(Gravity.CENTER);
+        content.addView(brandTitle, marginParams(-1, -2, 0, 18, 0, 0));
+        TextView brandSub = text("Capture · Connect · Flow", 13, Typeface.NORMAL, MUTED);
+        brandSub.setGravity(Gravity.CENTER);
+        content.addView(brandSub, marginParams(-1, -2, 0, 6, 0, 24));
+
+        // 登录 / 注册 切换
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        modeRow.setBackground(rounded(PAPER_2, 12, RULE));
+        modeRow.setPadding(dp(4), dp(4), dp(4), dp(4));
+        for (String mode : new String[]{"login", "register"}) {
+            boolean selected = authMode.equals(mode);
+            Button modeButton = new Button(this);
+            modeButton.setText(tr("login".equals(mode) ? "登录" : "注册"));
+            modeButton.setTextSize(14);
+            modeButton.setTypeface(Typeface.create("sans", Typeface.BOLD));
+            modeButton.setTextColor(selected ? Color.WHITE : MUTED);
+            modeButton.setAllCaps(false);
+            modeButton.setGravity(Gravity.CENTER);
+            modeButton.setMinHeight(dp(42));
+            modeButton.setPadding(dp(12), 0, dp(12), 0);
+            modeButton.setBackground(selected
+                    ? rounded(COBALT, 10, 0)
+                    : rounded(0, 10, 0));
+            modeButton.setStateListAnimator(null);
+            modeButton.setOnClickListener(view -> {
+                if (!authMode.equals(mode)) {
+                    // 切模式保留已输入邮箱/密码
+                    String email = authEmailInput == null ? ""
+                            : authEmailInput.getText().toString();
+                    String password = authPasswordInput == null ? ""
+                            : authPasswordInput.getText().toString();
+                    authMode = mode;
+                    showLoginWall();
+                    if (authEmailInput != null) authEmailInput.setText(email);
+                    if (authPasswordInput != null) authPasswordInput.setText(password);
+                }
+            });
+            modeRow.addView(modeButton, new LinearLayout.LayoutParams(
+                    0, dp(42), 1f));
+        }
+        content.addView(modeRow, marginParams(-1, dp(50), 0, 0, 0, 20));
+
+        // 邮箱
+        authEmailInput = new EditText(this);
+        authEmailInput.setHint(tr("邮箱"));
+        authEmailInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        authEmailInput.setSingleLine(true);
+        authEmailInput.setTextSize(15);
+        authEmailInput.setTextColor(INK);
+        authEmailInput.setHintTextColor(MUTED);
+        authEmailInput.setBackground(rounded(PAPER_2, 10, RULE));
+        authEmailInput.setPadding(dp(14), 0, dp(14), 0);
+        content.addView(authEmailInput, marginParams(-1, dp(50), 0, 0, 0, 10));
+
+        // 密码
+        authPasswordInput = new EditText(this);
+        authPasswordInput.setHint(tr("密码（至少 8 位）"));
+        authPasswordInput.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        authPasswordInput.setSingleLine(true);
+        authPasswordInput.setTextSize(15);
+        authPasswordInput.setTextColor(INK);
+        authPasswordInput.setHintTextColor(MUTED);
+        authPasswordInput.setBackground(rounded(PAPER_2, 10, RULE));
+        authPasswordInput.setPadding(dp(14), 0, dp(14), 0);
+        content.addView(authPasswordInput, marginParams(-1, dp(50), 0, 0, 0, 10));
+
+        // 验证码行（注册模式 + authCodeRequired 时显示）
+        authCodeRow = verticalContainer();
+        authCodeInput = new EditText(this);
+        authCodeInput.setHint(tr("验证码"));
+        authCodeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        authCodeInput.setSingleLine(true);
+        authCodeInput.setTextSize(15);
+        authCodeInput.setTextColor(INK);
+        authCodeInput.setHintTextColor(MUTED);
+        authCodeInput.setBackground(rounded(PAPER_2, 10, RULE));
+        authCodeInput.setPadding(dp(14), 0, dp(14), 0);
+        authCodeRow.addView(authCodeInput,
+                marginParams(-1, dp(50), 0, 0, 0, 8));
+        authCodeButton = nativeButton("获取验证码", false);
+        authCodeButton.setOnClickListener(view -> requestAuthCode());
+        authCodeRow.addView(authCodeButton,
+                marginParams(-1, dp(44), 0, 0, 0, 8));
+        content.addView(authCodeRow, marginParams(-1, -2, 0, 0, 0, 0));
+        updateAuthCodeRowVisibility();
+
+        // 错误提示（红色，服务端 message 直达）
+        authErrorText = text("", 13, Typeface.NORMAL, VIDEO);
+        authErrorText.setGravity(Gravity.CENTER);
+        content.addView(authErrorText, marginParams(-1, -2, 0, 4, 0, 10));
+
+        // 主操作按钮
+        authSubmitButton = nativeButton(
+                "login".equals(authMode) ? "登录" : "注册", true);
+        authSubmitButton.setTextSize(15);
+        authSubmitButton.setOnClickListener(view -> submitAuthForm());
+        content.addView(authSubmitButton,
+                marginParams(-1, dp(50), 0, 0, 0, 14));
+
+        authWallHost.addView(scroll, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void hideLoginWall() {
+        loginWallVisible = false;
+        cancelCodeCountdown();
+        if (authWallHost != null) {
+            authWallHost.removeAllViews();
+            authWallHost.setVisibility(View.GONE);
+        }
+    }
+
+    /** 验证码行显隐：注册模式且 authCodeRequired（严态）时显示。 */
+    private void updateAuthCodeRowVisibility() {
+        if (authCodeRow == null) return;
+        boolean visible = "register".equals(authMode) && authCodeRequired;
+        authCodeRow.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    /** POST /v1/auth/email-code：200 显示验证码框并启动 60s 倒计时；503 免码注册。 */
+    private void requestAuthCode() {
+        String email = authEmailInput == null ? ""
+                : authEmailInput.getText().toString().trim();
+        if (email.isEmpty()) {
+            authErrorText.setText(tr("请输入邮箱"));
+            return;
+        }
+        if (!isValidEmail(email)) {
+            authErrorText.setText(tr("邮箱格式不正确"));
+            return;
+        }
+        authCodeButton.setEnabled(false);
+        authCodeButton.setText(tr("正在发送…"));
+        authErrorText.setText("");
+        activationExecutor.execute(() -> {
+            AuthManager.AuthResult result = authManager.requestEmailCode(email);
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (result.status == 200) {
+                    authCodeRequired = true;
+                    updateAuthCodeRowVisibility();
+                    authErrorText.setText(tr("验证码已发送至 ") + email);
+                    startCodeCountdown();
+                } else if (result.status == 503) {
+                    // 过渡态：SMTP 未配置 → 隐藏验证码框，走免码注册
+                    authCodeRequired = false;
+                    updateAuthCodeRowVisibility();
+                    authCodeButton.setEnabled(true);
+                    authCodeButton.setText(tr("获取验证码"));
+                    authErrorText.setText(tr("邮件服务暂未配置，将免验证码注册"));
+                } else {
+                    authCodeButton.setEnabled(true);
+                    authCodeButton.setText(tr("获取验证码"));
+                    authErrorText.setText(result.message);
+                }
+            });
+        });
+    }
+
+    private void startCodeCountdown() {
+        cancelCodeCountdown();
+        authCountdown = 60;
+        authCodeButton.setEnabled(false);
+        authCodeButton.setText("重新发送 (" + authCountdown + "s)");
+        authCountdownTask = new Runnable() {
+            @Override
+            public void run() {
+                if (authCodeButton == null) return;
+                authCountdown--;
+                if (authCountdown <= 0) {
+                    authCodeButton.setEnabled(true);
+                    authCodeButton.setText(tr("获取验证码"));
+                    authCountdownTask = null;
+                } else {
+                    authCodeButton.setText("重新发送 (" + authCountdown + "s)");
+                    mainHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+        mainHandler.postDelayed(authCountdownTask, 1000);
+    }
+
+    private void cancelCodeCountdown() {
+        if (authCountdownTask != null) {
+            mainHandler.removeCallbacks(authCountdownTask);
+            authCountdownTask = null;
+        }
+    }
+
+    private boolean isValidEmail(String email) {
+        if (email == null) return false;
+        String trimmed = email.trim();
+        int at = trimmed.indexOf('@');
+        if (at <= 0 || at == trimmed.length() - 1) return false;
+        String domain = trimmed.substring(at + 1);
+        int dot = domain.indexOf('.');
+        return dot > 0 && dot < domain.length() - 1;
+    }
+
+    /** 表单校验（邮箱格式 / 密码≥8 / 严态注册须先获取验证码）。 */
+    private String validateAuthForm(String email, String password, String code) {
+        if (email == null || email.trim().isEmpty()) return tr("请输入邮箱");
+        if (!isValidEmail(email.trim())) return tr("邮箱格式不正确");
+        if (password == null || password.isEmpty()) return tr("请输入密码");
+        if (password.length() < 8) return tr("密码至少 8 位");
+        if ("register".equals(authMode) && authCodeRequired
+                && (code == null || code.trim().isEmpty())) {
+            return tr("请先获取验证码");
+        }
+        return null;
+    }
+
+    private void submitAuthForm() {
+        final String email = authEmailInput == null ? ""
+                : authEmailInput.getText().toString().trim();
+        final String password = authPasswordInput == null ? ""
+                : authPasswordInput.getText().toString();
+        final String code = authCodeInput == null ? ""
+                : authCodeInput.getText().toString().trim();
+        String validationError = validateAuthForm(email, password, code);
+        if (validationError != null) {
+            authErrorText.setText(validationError);
+            return;
+        }
+        final boolean isLogin = "login".equals(authMode);
+        authSubmitButton.setEnabled(false);
+        authSubmitButton.setText(isLogin ? tr("正在登录…") : tr("正在注册…"));
+        authErrorText.setText("");
+        activationExecutor.execute(() -> {
+            AuthManager.AuthResult result = isLogin
+                    ? authManager.login(email, password)
+                    : authManager.register(
+                            email, password, authCodeRequired ? code : null);
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                authSubmitButton.setEnabled(true);
+                authSubmitButton.setText(isLogin ? tr("登录") : tr("注册"));
+                if (result.status == 200) {
+                    hideLoginWall();
+                    showSection("capture");
+                    showToast(tr("欢迎，") + (result.email == null ? email : result.email));
+                } else {
+                    authErrorText.setText(
+                            result.message == null || result.message.isEmpty()
+                                    ? tr("操作失败，请稍后重试")
+                                    : result.message);
+                }
+            });
+        });
+    }
+
+    /** 设置页「退出登录」：调 logout（尽力而为）+ 清本地登录态回登录墙。 */
+    private void performLogout(final Button logoutButton) {
+        logoutButton.setEnabled(false);
+        logoutButton.setText(tr("正在退出…"));
+        activationExecutor.execute(() -> {
+            authManager.logout();
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                showLoginWall();
+            });
+        });
+    }
+
     private View buildSettingsView() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
@@ -11683,6 +12044,52 @@ public final class MainActivity extends Activity {
                 "设置",
                 "通用、拍摄辅助、更新、诊断与支持。",
                 COBALT));
+
+        // W13-d：账号区（显示邮箱 + 退出登录）
+        LinearLayout accountPanel = panel();
+        accountPanel.addView(text("账号", TS_TITLE, Typeface.BOLD, INK));
+        accountPanel.addView(text(
+                "登录后可跨设备同步激活绑定；退出后需重新登录才能使用全部功能。",
+                TS_BODY,
+                Typeface.NORMAL,
+                MUTED),
+                marginParams(-1, -2, 0, 5, 0, 10));
+        String accountEmail = authManager == null ? ""
+                : authManager.getEmail();
+        TextView accountEmailValue = new TextView(this);
+        accountEmailValue.setText(
+                accountEmail == null || accountEmail.isEmpty()
+                        ? tr("未登录")
+                        : accountEmail);
+        accountEmailValue.setTextSize(TS_BODY);
+        accountEmailValue.setTextColor(INK);
+        accountEmailValue.setTypeface(Typeface.create(
+                Typeface.MONOSPACE, Typeface.NORMAL));
+        accountEmailValue.setGravity(Gravity.CENTER_VERTICAL);
+        accountEmailValue.setTextIsSelectable(true);
+        accountPanel.addView(accountEmailValue,
+                marginParams(-1, -2, 0, 0, 0, 12));
+        Button logoutButton = nativeButton("退出登录", false);
+        logoutButton.setOnClickListener(view -> {
+            if (accountEmail == null || accountEmail.isEmpty()) {
+                // 理论上 3A 下不会出现；兜底直接回登录墙
+                showLoginWall();
+                return;
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle(tr("退出登录"))
+                    .setMessage(tr("确定退出当前账号 ") + accountEmail + " 吗？")
+                    .setPositiveButton(tr("退出"), (dialog, which) -> {
+                        performLogout(logoutButton);
+                    })
+                    .setNegativeButton(tr("取消"), null)
+                    .show();
+        });
+        accountPanel.addView(logoutButton,
+                marginParams(-1, dp(44), 0, 0, 0, 0));
+        content.addView(
+                accountPanel,
+                marginParams(-1, -2, 0, 18, 0, 0));
 
         LinearLayout languagePanel = panel();
         languagePanel.addView(text("语言", TS_TITLE, Typeface.BOLD, INK));
@@ -14125,6 +14532,9 @@ public final class MainActivity extends Activity {
         navigationButtons.clear();
         setContentView(buildApplication());
         showSection(destination);
+        if (loginWallVisible) {
+            showLoginWall();
+        }
         updateConnectionUi();
         updateWirelessUi();
         refreshUpdateUi();

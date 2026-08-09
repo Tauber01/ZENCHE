@@ -45,6 +45,7 @@ import {
   WirelessTransferServer
 } from '../transfer/WirelessTransferServer';
 import { DiagnosticLogger } from '../diagnostics/DiagnosticLogger';
+import { AuthManager, AuthResult } from '../auth/AuthManager';
 import {
   CaptureSessionConfiguration,
   CaptureWorkflow
@@ -866,6 +867,19 @@ struct Index {
     new LivePhotoClipRecorder();
 
   @State private section: string = 'capture';
+  // ── W13-d 邮箱账号系统登录墙（3A：启动即登录墙）──
+  private authManager?: AuthManager;
+  @State private loginWallVisible: boolean = false;
+  @State private authMode: string = 'login';          // 'login' | 'register'
+  @State private authEmail: string = '';
+  @State private authPassword: string = '';
+  @State private authCode: string = '';
+  @State private authCodeRequired: boolean = true;    // 严态=true；email-code 503（SMTP 未配）后=false 免码注册
+  @State private authError: string = '';
+  @State private authSubmitting: boolean = false;
+  @State private authCodeCountdown: number = 0;       // >0：获取验证码按钮倒计时（秒）
+  @State private accountEmail: string = '';
+  private authCountdownTimer: number = -1;
   @State private language: string = LANGUAGE_SIMPLIFIED_CHINESE;
   @State private connected: boolean = false;
   @State private localCameraSelected: boolean = false;
@@ -1165,6 +1179,9 @@ struct Index {
     const context: common.UIAbilityContext =
       getContext(this) as common.UIAbilityContext;
     this.loadLanguage(context);
+    this.authManager = new AuthManager(context);
+    this.accountEmail = this.authManager.getEmail();
+    this.bootstrapAuthGuard();
     this.diagnostics = new DiagnosticLogger(context);
     this.diagnostics.startSession();
     this.library = new PhotoLibrary(context);
@@ -1472,6 +1489,9 @@ struct Index {
       if (this.showSplash) {
         this.SplashOverlay()
       }
+      if (this.loginWallVisible) {
+        this.LoginWall()
+      }
     }
     .width('100%')
     .height('100%')
@@ -1509,6 +1529,309 @@ struct Index {
     .height(44)
     .padding({ left: 14, right: 14 })
     .backgroundColor(UI_BG)
+  }
+
+  // ── W13-d 登录墙（3A：启动即登录墙）──────────────────────────────────────
+
+  @Builder
+  private ModeButton(mode: string) {
+    Button(this.tr(mode === 'login' ? '登录' : '注册'))
+      .type(ButtonType.Normal)
+      .width('50%')
+      .height(42)
+      .fontSize(TS_EMPHASIS)
+      .fontWeight(FontWeight.Bold)
+      .fontColor(this.authMode === mode ? Color.White : $r('app.color.muted'))
+      .backgroundColor(this.authMode === mode ? PHOTO_ACCENT : Color.Transparent)
+      .borderRadius(RADIUS_10)
+      .onClick(() => {
+        if (this.authMode !== mode) {
+          this.authMode = mode;
+          this.authError = '';
+          if (mode === 'register') {
+            this.authCodeRequired = true;
+          }
+        }
+      })
+  }
+
+  /** 登录墙：整屏覆盖主界面（品牌区 + 登录/注册表单），未登录不可进入任何功能。 */
+  @Builder
+  private LoginWall() {
+    Column() {
+      Scroll() {
+        Column({ space: SPACE_12 }) {
+          // 品牌区（design.md splash 品牌资产：几何 Z 标 + 双语 lockup）
+          Column({ space: SPACE_8 }) {
+            Row() {
+              Text('Z')
+                .fontSize(32) // 品牌标 Z 字号，品牌资产豁免
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Color.White)
+            }
+            .width(64)
+            .height(64)
+            .borderRadius(RADIUS_16)
+            .linearGradient({
+              angle: 135,
+              colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
+            })
+            .justifyContent(FlexAlign.Center)
+            Text('帧澈 ZENCHE')
+              .fontSize(26) // 品牌名字号，品牌资产豁免
+              .fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.ink'))
+              .margin({ top: SPACE_12 })
+            Text('Capture · Connect · Flow')
+              .fontSize(13)
+              .fontColor($r('app.color.muted'))
+          }
+          .width('100%')
+          .margin({ top: 40, bottom: SPACE_8 })
+
+          // 登录 / 注册 切换
+          Row() {
+            this.ModeButton('login')
+            this.ModeButton('register')
+          }
+          .width('100%')
+          .height(50)
+          .padding(SPACE_4)
+          .borderRadius(RADIUS_12)
+          .backgroundColor($r('app.color.paper_2'))
+          .margin({ top: SPACE_12, bottom: SPACE_8 })
+
+          TextInput({ text: this.authEmail, placeholder: this.tr('邮箱') })
+            .type(InputType.Email)
+            .height(50)
+            .fontSize(15)
+            .fontColor($r('app.color.ink'))
+            .placeholderColor($r('app.color.muted'))
+            .placeholderFont({ size: 15 })
+            .backgroundColor($r('app.color.paper_2'))
+            .borderRadius(RADIUS_10)
+            .onChange((value: string) => {
+              this.authEmail = value;
+            })
+
+          TextInput({ text: this.authPassword, placeholder: this.tr('密码（至少 8 位）') })
+            .type(InputType.Password)
+            .height(50)
+            .fontSize(15)
+            .fontColor($r('app.color.ink'))
+            .placeholderColor($r('app.color.muted'))
+            .placeholderFont({ size: 15 })
+            .backgroundColor($r('app.color.paper_2'))
+            .borderRadius(RADIUS_10)
+            .onChange((value: string) => {
+              this.authPassword = value;
+            })
+
+          // 验证码区（注册模式且严态时显示；email-code 503 后隐藏走免码注册）
+          if (this.authMode === 'register' && this.authCodeRequired) {
+            TextInput({ text: this.authCode, placeholder: this.tr('验证码') })
+              .type(InputType.Number)
+              .height(50)
+              .fontSize(15)
+              .fontColor($r('app.color.ink'))
+              .placeholderColor($r('app.color.muted'))
+              .placeholderFont({ size: 15 })
+              .backgroundColor($r('app.color.paper_2'))
+              .borderRadius(RADIUS_10)
+              .onChange((value: string) => {
+                this.authCode = value;
+              })
+            Button(this.authCodeCountdown > 0
+              ? '重新发送 (' + this.authCodeCountdown.toString() + 's)'
+              : this.tr('获取验证码'))
+              .type(ButtonType.Normal)
+              .width('100%')
+              .height(44)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.authCodeCountdown > 0 ? $r('app.color.muted') : PHOTO_ACCENT)
+              .backgroundColor(Color.Transparent)
+              .border({
+                width: 1,
+                color: this.authCodeCountdown > 0 ? $r('app.color.rule') : PHOTO_ACCENT
+              })
+              .borderRadius(RADIUS_10)
+              .enabled(this.authCodeCountdown === 0)
+              .onClick(() => {
+                this.requestAuthCode();
+              })
+          }
+
+          // 错误提示（红色，服务端 message 直达）
+          if (this.authError.length > 0) {
+            Text(this.authError)
+              .fontSize(13)
+              .fontColor($r('app.color.video'))
+              .width('100%')
+              .textAlign(TextAlign.Center)
+              .margin({ top: SPACE_4 })
+          }
+
+          Button(this.authSubmitting
+            ? (this.authMode === 'login' ? this.tr('正在登录…') : this.tr('正在注册…'))
+            : (this.authMode === 'login' ? this.tr('登录') : this.tr('注册')))
+            .type(ButtonType.Normal)
+            .width('100%')
+            .height(50)
+            .fontSize(TS_EMPHASIS)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(Color.White)
+            .backgroundColor(PHOTO_ACCENT)
+            .borderRadius(RADIUS_12)
+            .enabled(!this.authSubmitting)
+            .onClick(() => {
+              this.submitAuthForm();
+            })
+            .margin({ top: SPACE_8 })
+        }
+        .width('100%')
+        .padding({ left: 28, right: 28, top: 16, bottom: 36 })
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor($r('app.color.paper'))
+  }
+
+  private isValidEmail(email: string): boolean {
+    const trimmed: string = email.trim();
+    const at: number = trimmed.indexOf('@');
+    if (at <= 0 || at === trimmed.length - 1) return false;
+    const domain: string = trimmed.substring(at + 1);
+    const dot: number = domain.indexOf('.');
+    return dot > 0 && dot < domain.length - 1;
+  }
+
+  private stopAuthCodeCountdown(): void {
+    if (this.authCountdownTimer >= 0) {
+      clearInterval(this.authCountdownTimer);
+      this.authCountdownTimer = -1;
+    }
+  }
+
+  private startAuthCodeCountdown(): void {
+    this.stopAuthCodeCountdown();
+    this.authCodeCountdown = 60;
+    this.authCountdownTimer = setInterval((): void => {
+      this.authCodeCountdown--;
+      if (this.authCodeCountdown <= 0) {
+        this.stopAuthCodeCountdown();
+      }
+    }, 1000);
+  }
+
+  /** POST /v1/auth/email-code：200 显示验证码框并启动 60s 倒计时；503 免码注册。 */
+  private async requestAuthCode(): Promise<void> {
+    const manager: AuthManager | undefined = this.authManager;
+    if (!manager) return;
+    const email: string = this.authEmail.trim();
+    if (email.length === 0) {
+      this.authError = this.tr('请输入邮箱');
+      return;
+    }
+    if (!this.isValidEmail(email)) {
+      this.authError = this.tr('邮箱格式不正确');
+      return;
+    }
+    this.authError = '';
+    const result: AuthResult = await manager.requestEmailCode(email);
+    if (result.status === 200) {
+      this.authCodeRequired = true;
+      this.authError = this.tr('验证码已发送至 ') + email;
+      this.startAuthCodeCountdown();
+    } else if (result.status === 503) {
+      // 过渡态：SMTP 未配置 → 隐藏验证码框，走免码注册
+      this.authCodeRequired = false;
+      this.authError = this.tr('邮件服务暂未配置，将免验证码注册');
+    } else {
+      this.authError = result.message;
+    }
+  }
+
+  /** 表单校验（邮箱格式 / 密码≥8 / 严态注册须先获取验证码），随后提交。 */
+  private async submitAuthForm(): Promise<void> {
+    const manager: AuthManager | undefined = this.authManager;
+    if (!manager || this.authSubmitting) return;
+    const email: string = this.authEmail.trim();
+    const password: string = this.authPassword;
+    const code: string = this.authCode.trim();
+    if (email.length === 0) {
+      this.authError = this.tr('请输入邮箱');
+      return;
+    }
+    if (!this.isValidEmail(email)) {
+      this.authError = this.tr('邮箱格式不正确');
+      return;
+    }
+    if (password.length === 0) {
+      this.authError = this.tr('请输入密码');
+      return;
+    }
+    if (password.length < 8) {
+      this.authError = this.tr('密码至少 8 位');
+      return;
+    }
+    if (this.authMode === 'register' && this.authCodeRequired && code.length === 0) {
+      this.authError = this.tr('请先获取验证码');
+      return;
+    }
+    this.authSubmitting = true;
+    this.authError = '';
+    const isLogin: boolean = this.authMode === 'login';
+    const result: AuthResult = isLogin
+      ? await manager.login(email, password)
+      : await manager.register(email, password, this.authCodeRequired ? code : '');
+    this.authSubmitting = false;
+    if (result.status === 200) {
+      this.accountEmail = result.email.length > 0 ? result.email : email;
+      this.loginWallVisible = false;
+      this.section = 'capture';
+      this.authEmail = '';
+      this.authPassword = '';
+      this.authCode = '';
+      this.stopAuthCodeCountdown();
+      promptAction.showToast({ message: this.tr('欢迎，') + this.accountEmail });
+    } else {
+      this.authError = result.message.length > 0
+        ? result.message
+        : this.tr('操作失败，请稍后重试');
+    }
+  }
+
+  /** W13-d 3A 启动路由守卫：无 token → 登录墙；有 token → /v1/auth/me 校验。 */
+  private async bootstrapAuthGuard(): Promise<void> {
+    const manager: AuthManager | undefined = this.authManager;
+    if (!manager) return;
+    if (!(await manager.hasSession())) {
+      this.loginWallVisible = true;
+      return;
+    }
+    const result: AuthResult = await manager.me();
+    if (result.status === 401 || result.status === 403) {
+      manager.clearSession();
+      this.accountEmail = '';
+      this.loginWallVisible = true;
+    }
+    // 其余（200 / 网络失败 status=0 / 5xx）：保留本地缓存态（离线容忍）。
+  }
+
+  /** 设置页「退出登录」：调 logout（尽力而为）+ 清本地登录态回登录墙。 */
+  private async performLogout(): Promise<void> {
+    const manager: AuthManager | undefined = this.authManager;
+    if (manager) {
+      await manager.logout();
+    }
+    this.accountEmail = '';
+    this.loginWallVisible = true;
+    this.section = 'capture';
   }
 
   @Builder
@@ -3158,13 +3481,23 @@ struct Index {
           throw new Error('无法读取原图，未发送 AI 修图请求');
         }
       }
+      // W13-d 2A：AI 激活请求带有效 session 则加 Bearer（服务端记录账号↔设备↔激活码三元组）；
+      // 无 token 不影响存量流程。
+      const aiAuthHeader: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      const authManagerRef: AuthManager | undefined = this.authManager;
+      if (authManagerRef) {
+        const authToken: string = await authManagerRef.getToken();
+        if (authToken.length > 0) {
+          aiAuthHeader['Authorization'] = `Bearer ${authToken}`;
+        }
+      }
       const response = await httpRequest.request(
         endpoint,
         {
           method: http.RequestMethod.POST,
-          header: {
-            'Content-Type': 'application/json',
-          },
+          header: aiAuthHeader,
           // Send explicit JSON so the reference image is not dropped by the
           // HTTP client while coercing a Record into request data.
           extraData: JSON.stringify(body),
@@ -8672,6 +9005,39 @@ struct Index {
           .fontSize(SETTINGS_FS_TITLE)
           .fontColor($r('app.color.muted'))
           .width('100%')
+        // W13-d：账号区（显示邮箱 + 退出登录）
+        Column({ space: 12 }) {
+          Text(this.tr('账号'))
+            .fontSize(TS_TITLE)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Text(this.tr('登录后可跨设备同步激活绑定；退出后需重新登录才能使用全部功能。'))
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.muted'))
+            .width('100%')
+          Text(this.accountEmail.length > 0 ? this.accountEmail : this.tr('未登录'))
+            .fontSize(TS_BODY)
+            .fontWeight(FontWeight.Medium)
+            .fontColor($r('app.color.ink'))
+            .width('100%')
+          Button(this.tr('退出登录'))
+            .type(ButtonType.Normal)
+            .width('100%')
+            .height(44)
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper'))
+            .border({
+              width: 1,
+              color: $r('app.color.rule')
+            })
+            .borderRadius(RADIUS_12)
+            .onClick(() => {
+              this.performLogout();
+            })
+        }
+        .width('100%')
         Column({ space: 12 }) {
           Text(this.tr('语言'))
             .fontSize(TS_TITLE)
