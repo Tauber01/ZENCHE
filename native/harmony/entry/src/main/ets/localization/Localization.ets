@@ -19,6 +19,11 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('实时监看', 'Live Monitoring', 'ライブモニター'),
   new TranslationEntry('显示相机实时画面', 'Show the live camera feed', 'カメラのライブ映像を表示'),
   new TranslationEntry('实时监看已关闭', 'Live monitoring is off', 'ライブモニターはオフです'),
+  new TranslationEntry(
+    '打开开关即可恢复实时画面',
+    'Turn on the switch to restore the live feed',
+    'スイッチをオンにするとライブ映像を再開します'
+  ),
   new TranslationEntry('尼康云创', 'Nikon Imaging Cloud', 'Nikon Imaging Cloud'),
   new TranslationEntry('尼康云创预览', 'Nikon Imaging Cloud Preview', 'Nikon Imaging Cloud プレビュー'),
   new TranslationEntry('选择尼康云创预设', 'Choose a Nikon Cloud Preset', 'Nikon Cloud プリセットを選択'),

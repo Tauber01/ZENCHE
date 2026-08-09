@@ -326,11 +326,13 @@
               <StackPanel x:Name="PreviewEmpty"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center">
-                <TextBlock HorizontalAlignment="Center"
+                <TextBlock x:Name="CapturePreviewEmptyTitle"
+                           HorizontalAlignment="Center"
                            Foreground="{DynamicResource GraphiteInkBrush}"
                            Style="{DynamicResource CaptureEmptyTitle}"
                            Text="等待相机画面" />
-                <TextBlock Margin="0,8,0,0"
+                <TextBlock x:Name="CapturePreviewEmptyDetail"
+                           Margin="0,8,0,0"
                            Foreground="{DynamicResource GraphiteMutedBrush}"
                            Text="连接相机后开启实时取景" />
               </StackPanel>

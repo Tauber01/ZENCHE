@@ -913,4 +913,12 @@
 "已连接" = "已连接";
 "Nikon PTP 兼容桥接" = "Nikon PTP 兼容桥接";
 "实时监看已开启" = "实时监看已开启";
+"Sony 官方 SDK 已连接" = "Sony 官方 SDK 已连接";
+"相机桥接已连接" = "相机桥接已连接";
+"已收到蓝牙快门 · 正在通过 Mac 桥接触发…" = "已收到蓝牙快门 · 正在通过 Mac 桥接触发…";
+"正在通过 Mac 桥接触发快门…" = "正在通过 Mac 桥接触发快门…";
+"Wi‑Fi 实时监看已开启" = "Wi‑Fi 实时监看已开启";
+"连接相机后可开启实时监看" = "连接相机后可开启实时监看";
+"桥接不可用" = "桥接不可用";
+"请先在 Mac 端连接相机" = "请先在 Mac 端连接相机";
 "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。" = "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。";

@@ -93,12 +93,33 @@ test('W14 monitoring switch stops live view but keeps capture connection paths i
   ]);
   assert.match(ios, /func setLiveMonitoringEnabled[\s\S]{0,520}stopLiveViewIfNeeded\(\)/);
   assert.match(mac, /func setLiveMonitoringEnabled[\s\S]{0,520}toggleLiveView\(\)/);
-  assert.match(android, /private void toggleLiveView\(\)[\s\S]{0,650}stopLiveView\(\)/);
+  assert.match(android, /private void toggleLiveView\(\)[\s\S]{0,1000}stopLiveView\(\)/);
   assert.match(harmony, /private async toggleLiveView\(\)[\s\S]{0,750}stopLiveView\(\)/);
   assert.match(windows, /LiveViewButton_Click[\s\S]{0,2200}StopLiveViewAsync/);
   for (const source of [ios, mac, android, harmony, windows]) {
     assert.match(source, /capture|Capture|快门/, 'camera capture path must remain present');
   }
+});
+
+test('W14 Android, HarmonyOS and Windows clear stale preview frames when monitoring stops', async () => {
+  const [android, harmony, windows] = await Promise.all([
+    read(ANDROID), read(HARMONY), read(WINDOWS_CODE)
+  ]);
+  assert.match(
+    android,
+    /if \(liveViewEnabled\)[\s\S]{0,520}latestFrame = null;[\s\S]{0,180}previewImage\.setImageDrawable\(null\)/
+  );
+  assert.match(android, /boolean showPreviewPlaceholder = !liveViewEnabled \|\| previewFrame == null/);
+  assert.match(
+    harmony,
+    /if \(this\.liveView\)[\s\S]{0,720}this\.preview\.release\(\);[\s\S]{0,80}this\.preview = undefined;/
+  );
+  assert.match(harmony, /if \(this\.liveView && this\.preview !== undefined\)/);
+  assert.match(
+    windows,
+    /if \(!live\)[\s\S]{0,260}PreviewImage\.Source = null;[\s\S]{0,260}PreviewEmpty\.Visibility = Visibility\.Visible;/
+  );
+  assert.match(windows, /live && MonitorPreviewImage\.Source is not null/);
 });
 
 test('W14 live-monitoring label and off state are localized on all five targets', async () => {
@@ -122,6 +143,18 @@ test('W14 live-monitoring label and off state are localized on all five targets'
     assert.ok(source.includes('等待 Mac 桥接画面…'), `${path} missing bridge wait state`);
     assert.ok(source.includes('桥接返回 HTTP'), `${path} missing bridge HTTP error`);
     assert.ok(source.includes('Mac 相机桥接还需要上方本次配对码'), `${path} missing bridge pairing help`);
+    for (const status of [
+      'Sony 官方 SDK 已连接',
+      '相机桥接已连接',
+      '已收到蓝牙快门 · 正在通过 Mac 桥接触发…',
+      '正在通过 Mac 桥接触发快门…',
+      'Wi‑Fi 实时监看已开启',
+      '连接相机后可开启实时监看',
+      '桥接不可用',
+      '请先在 Mac 端连接相机'
+    ]) {
+      assert.ok(source.includes(status), `${path} missing runtime status: ${status}`);
+    }
   }
   const appleEnglish = await read(applePaths[1]);
   const appleJapanese = await read(applePaths[2]);
@@ -131,6 +164,7 @@ test('W14 live-monitoring label and off state are localized on all five targets'
     const source = await read(path);
     assert.match(source, /Live Monitoring|Live monitoring/);
     assert.match(source, /ライブモニター/);
+    assert.ok(source.includes('打开开关即可恢复实时画面'));
   }
 });
 

@@ -915,4 +915,12 @@
 "已连接" = "接続済み";
 "Nikon PTP 兼容桥接" = "Nikon PTP 互換ブリッジ";
 "实时监看已开启" = "ライブモニターをオンにしました";
+"Sony 官方 SDK 已连接" = "Sony 公式 SDK 接続済み";
+"相机桥接已连接" = "カメラブリッジ接続済み";
+"已收到蓝牙快门 · 正在通过 Mac 桥接触发…" = "Bluetooth シャッターを受信 · Mac ブリッジ経由で作動中…";
+"正在通过 Mac 桥接触发快门…" = "Mac ブリッジ経由でシャッターを作動中…";
+"Wi‑Fi 实时监看已开启" = "Wi‑Fi ライブモニターをオンにしました";
+"连接相机后可开启实时监看" = "カメラを接続するとライブモニターを使用できます";
+"桥接不可用" = "ブリッジを利用できません";
+"请先在 Mac 端连接相机" = "先に Mac でカメラを接続してください";
 "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。" = "カメラ側で FTP を選択し、PASV を有効にします。HTTP/WebDAV は同じアカウントの Basic 認証を使用し、PUT/POST 要求には Content-Length が必要です。iPhone/iPad の Mac カメラブリッジでは、上に表示されたセッションコードも使用します。Sony は Mac 側の Camera Remote SDK で動作し、Nikon は iOS SDK が提供されるまで PTP 互換経路と明示して使用します。macOS の初回確認では、受信ネットワーク接続を許可してください。";

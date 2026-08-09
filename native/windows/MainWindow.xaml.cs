@@ -7933,13 +7933,37 @@ public partial class MainWindow : Window
         LiveBadge.Foreground = live
             ? (Brush)FindResource("AccentInkBrush")
             : (Brush)FindResource("GraphiteMutedBrush");
+        CapturePreviewEmptyTitle.Text = AppLocalization.T(
+            live ? "等待相机画面" : "实时监看已关闭");
+        CapturePreviewEmptyDetail.Text = AppLocalization.T(
+            live
+                ? "连接相机后开启实时取景"
+                : "打开开关即可恢复实时画面");
+        if (!live)
+        {
+            PreviewImage.Source = null;
+            MonitorPreviewImage.Source = null;
+            _lastPreviewSource = null;
+            PreviewEmpty.Visibility = Visibility.Visible;
+            MonitorPreviewEmpty.Visibility = Visibility.Visible;
+            if (_immersivePreviewImage is not null)
+            {
+                _immersivePreviewImage.Source = null;
+            }
+        }
+        else
+        {
+            PreviewEmpty.Visibility = PreviewImage.Source is null
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
         if (MonitorLiveStatusText is not null)
         {
             MonitorLiveStatusText.Text = live ? "LIVE" : "NO SOURCE";
             // v1.5.7 issue 655a0a14: LIVE/NO SOURCE 绿/灰状态字改纯白（视频井恒深）
             MonitorLiveStatusText.Foreground =
                 (Brush)FindResource("MonitorWellTextBrush");
-            MonitorPreviewEmpty.Visibility = live || MonitorPreviewImage.Source is not null
+            MonitorPreviewEmpty.Visibility = live && MonitorPreviewImage.Source is not null
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         }

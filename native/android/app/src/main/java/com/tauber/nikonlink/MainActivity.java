@@ -4258,15 +4258,18 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        boolean showPreviewPlaceholder = !liveViewEnabled || previewFrame == null;
         previewPlaceholder = text(
-                connected || localCameraConnected
-                        ? "等待实时取景画面"
-                        : "连接外接相机或本机摄像头后开启实时取景",
+                !liveViewEnabled
+                        ? "实时监看已关闭"
+                        : connected || localCameraConnected
+                                ? "等待实时取景画面"
+                                : "连接外接相机或本机摄像头后开启实时取景",
                 TS_EMPHASIS,
                 Typeface.NORMAL,
                 Color.WHITE); // v1.5.7 issue 655a0a14: 视频页空态文字改纯白（取景井恒深 GRAPHITE）
         previewPlaceholder.setGravity(Gravity.CENTER);
-        previewPlaceholder.setVisibility(latestFrame == null ? View.VISIBLE : View.GONE);
+        previewPlaceholder.setVisibility(showPreviewPlaceholder ? View.VISIBLE : View.GONE);
         stage.addView(previewPlaceholder, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
@@ -13595,6 +13598,15 @@ public final class MainActivity extends Activity {
             pendingPreview.set(null);
             liveViewEnabled = false;
             if (wifiSourceActive()) wifiLiveView = false;
+            latestFrame = null;
+            latestSourceFrame = null;
+            latestZebraMask = null;
+            if (previewImage != null) previewImage.setImageDrawable(null);
+            if (zebraImage != null) zebraImage.setImageDrawable(null);
+            if (previewPlaceholder != null) {
+                previewPlaceholder.setText(tr("实时监看已关闭"));
+                previewPlaceholder.setVisibility(View.VISIBLE);
+            }
             cameraExecutor.submit(() -> {
                 if (wifiSourceActive()) wifiCamera.stopLiveView();
                 else if (localCameraConnected) localCamera.stopLiveView();

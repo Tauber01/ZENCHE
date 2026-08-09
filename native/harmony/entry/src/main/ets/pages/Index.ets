@@ -4744,18 +4744,22 @@ struct Index {
   @Builder
   private MonitorStage() {
     Stack({ alignContent: Alignment.TopStart }) {
-      if (this.preview !== undefined) {
+      if (this.liveView && this.preview !== undefined) {
         Image(this.preview)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Contain)
       } else {
         Column({ space: 8 }) {
-          Text(this.tr('等待相机画面'))
+          Text(this.tr(this.liveView ? '等待相机画面' : '实时监看已关闭'))
             .fontSize(22) // v1.5.7 F4: 空态标题（孤立值，归 F5 数值裁决）
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.graphite_ink'))
-          Text(this.tr('连接相机后开启实时取景'))
+          Text(this.tr(
+            this.liveView
+              ? '连接相机后开启实时取景'
+              : '打开开关即可恢复实时画面'
+          ))
             .fontSize(EDITOR_FS_MEDIUM)
             .fontColor(Color.White) // v1.5.7 issue 655a0a14: 视频页空态说明改纯白
         }
@@ -11386,6 +11390,10 @@ struct Index {
           await this.camera.stopLiveView();
         }
         this.liveView = false;
+        if (this.preview !== undefined) {
+          this.preview.release();
+          this.preview = undefined;
+        }
         this.status = '实时取景已停止';
       });
       return;

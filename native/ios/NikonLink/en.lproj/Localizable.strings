@@ -915,4 +915,12 @@
 "已连接" = "Connected";
 "Nikon PTP 兼容桥接" = "Nikon PTP-compatible bridge";
 "实时监看已开启" = "Live monitoring is on";
+"Sony 官方 SDK 已连接" = "Sony Official SDK Connected";
+"相机桥接已连接" = "Camera Bridge Connected";
+"已收到蓝牙快门 · 正在通过 Mac 桥接触发…" = "Bluetooth shutter received · Triggering via Mac Bridge…";
+"正在通过 Mac 桥接触发快门…" = "Triggering the shutter via Mac Bridge…";
+"Wi‑Fi 实时监看已开启" = "Wi‑Fi live monitoring is on";
+"连接相机后可开启实时监看" = "Connect a camera to enable live monitoring";
+"桥接不可用" = "Bridge unavailable";
+"请先在 Mac 端连接相机" = "Connect a camera on the Mac first";
 "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。" = "On the camera, select FTP and enable PASV. HTTP/WebDAV uses the same account’s Basic Auth, and PUT/POST requests must include Content-Length. The iPhone/iPad Mac Camera Bridge also requires the session code shown above: Sony is driven by Camera Remote SDK on the Mac; Nikon uses a clearly labeled PTP-compatible path until Nikon provides an iOS SDK. Allow incoming network connections when macOS first prompts.";
