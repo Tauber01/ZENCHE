@@ -28,7 +28,7 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - 最新正式版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 当前源码版本：**1.5.7 / build 32**
+- 当前源码版本：**1.5.10 / build 37**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
@@ -39,8 +39,15 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - 官方 QQ 群：**165315727**
 
 > [!IMPORTANT]
-> 已发布版本和实际可下载文件以 GitHub Releases 为准。项目仍在扩大实机验证范围；
+> GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.10 官网更新
+
+- iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。
+- 五端拍照页新增“实时监看”开关。关闭只停止取景帧，不断开相机，也不影响快门；关闭后会立即清除缓存画面并显示明确空态。
+- 系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径保持可用；兼容范围、部署步骤与真机限制见[实时监看与 iOS 相机桥接使用说明](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md)。
+- 官网更新接口发布 1.5.10 / build 37 完整安装包与 SHA-256；应用不会静默覆盖自身，仍交由各平台安装流程处理。
 
 ### v1.5.7 更新
 
@@ -402,7 +409,7 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - Latest stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
-- Source version: **1.5.7 / build 32**
+- Source version: **1.5.10 / build 37**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
@@ -413,9 +420,17 @@ in a local library for review and export.
 - Hardware validation: [Camera test checklist](docs/CAMERA_TEST_CHECKLIST.md)
 
 > [!IMPORTANT]
-> Published versions and downloadable files are defined by GitHub Releases.
+> Verify the public GitHub stable release and the official website update feed
+> against their respective release notes and SHA-256 manifests.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### Official website update in v1.5.10
+
+- iOS / iPadOS adds a trusted-LAN camera bridge. Sony's official Camera Remote SDK runs on the macOS bridge; Nikon uses an explicitly identified PTP-compatible bridge.
+- All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter, clears cached frames immediately, and shows an explicit empty state.
+- Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available. See the [Live Monitoring and iOS camera bridge guide](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md) for compatibility, setup, and hardware-test limits.
+- The official update feed publishes the 1.5.10 / build 37 full packages and SHA-256 values. Clients do not silently overwrite themselves; each package is handed to the platform installation flow.
 
 ### What's new in v1.5.7
 
@@ -719,7 +734,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - 最新安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 現在のソースバージョン：**1.5.7 / build 32**
+- 現在のソースバージョン：**1.5.10 / build 37**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
@@ -730,9 +745,16 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - 実機検証：[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
 
 > [!IMPORTANT]
-> 公開済みバージョンと実際にダウンロードできるファイルは GitHub Releases を
-> 正とします。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
+> GitHub 公開安定版と公式サイトの自動更新版は、それぞれのリリースノートと
+> SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.10 公式サイト更新
+
+- iOS / iPadOS に信頼済み LAN 向けカメラブリッジを追加。Sony 公式 Camera Remote SDK は macOS ブリッジ側で動作し、Nikon は明示された PTP 互換ブリッジを使用します。
+- 5 端末の撮影画面に「ライブモニター」スイッチを追加。オフにしてもカメラ接続とシャッターは維持し、キャッシュ済み画像を直ちに消去して明確な空状態を表示します。
+- システムカメラ、UVC、USB/PTP、Wi-Fi PTP/IP の既存経路は維持。互換性、設定、実機検証の制約は[ライブモニターと iOS カメラブリッジの使用ガイド](docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md)を参照してください。
+- 公式更新フィードは 1.5.10 / build 37 の完全パッケージと SHA-256 を配信します。クライアントは自身を無断で上書きせず、各 OS のインストール手順へ渡します。
 
 ### v1.5.7 の更新
 

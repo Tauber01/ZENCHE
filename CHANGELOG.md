@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.5.10] - 2026-08-09
+
+### Added
+
+- Added a trusted-LAN iOS / iPadOS camera bridge. Sony's official Camera Remote SDK runs on the macOS bridge; Nikon uses an explicitly identified PTP-compatible bridge.
+- Added a Live Monitoring switch to the capture screen on iOS / iPadOS, Android, HarmonyOS, macOS, and Windows.
+- Added official-website manifest updates for version 1.5.10 / build 37 with per-platform SHA-256 metadata.
+
+### Changed
+
+- Turning Live Monitoring off now stops preview frames without disconnecting the camera or disabling the shutter.
+- Disabled monitoring clears cached preview frames immediately and presents an explicit localized empty state.
+- Updated five-platform launch announcements and the Simplified Chinese, English, and Japanese release documentation.
+
+### Known limitations
+
+- Sony and Nikon bridge behavior still requires compatible-camera hardware validation, including live view, capture, recovery, latency, and long-session testing.
+- iOS / HarmonyOS packages are unsigned, macOS is ad-hoc signed and not notarized, Windows has no Authenticode signature, and Android uses the existing debug certificate.
+
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 the project uses semantic versioning.
 

@@ -15391,9 +15391,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.9" : version;
+            return version == null || version.isEmpty() ? "1.5.10" : version;
         } catch (Exception error) {
-            return "1.5.9";
+            return "1.5.10";
         }
     }
 
@@ -15541,11 +15541,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        "• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n"
-                                + "• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n"
-                                + "• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n"
-                                + "• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n"
-                                + "• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。",
+                        tr("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n"
+                                + "• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n"
+                                + "• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n"
+                                + "• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n"
+                                + "• 官网自动更新升级到 1.5.10；安装前可按发布说明核对 SHA‑256，签名状态保持如实披露。"),
                         14,
                         Typeface.NORMAL,
                         INK),

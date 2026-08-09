@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.3 launch announcements describe the three redesigned workspaces on every target', async () => {
+test('version 1.5.10 launch announcements describe W14 on every target', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,10 +95,12 @@ test('version 1.5.3 launch announcements describe the three redesigned workspace
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /全屏监看改为影像优先的专业 HUD/);
-    assert.match(announcement, /参数与拍摄页重构为设备摘要/);
-    assert.match(announcement, /编辑器改为媒体池、中央预览、工具检查器和分析示波器/);
-    assert.match(announcement, /统一五端深色工作台视觉/);
-    assert.match(announcement, /相机、AI 与传输能力保持兼容/);
+    assert.match(announcement, /Sony 官方 Camera Remote SDK 在 macOS 桥接端运行/);
+    assert.match(announcement, /五端拍照页新增“实时监看”开关/);
+    assert.match(announcement, /关闭监看后立即清除缓存画面并显示明确空态/);
+    assert.match(announcement, /系统相机、UVC、USB\/PTP 与 Wi‑Fi PTP\/IP/);
+    assert.match(announcement, /官网自动更新升级到 1\.5\.10/);
   }
+
+  assert.match(announcements[1], /tr\("• iOS \/ iPadOS 新增可信局域网相机桥接/);
 });

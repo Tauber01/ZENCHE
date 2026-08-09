@@ -1146,21 +1146,21 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '調整は常に新しいコピーへ保存され、元のファイルは変更されません。'
   ),
   new TranslationEntry(
-    '• 全屏监看改为影像优先的专业 HUD：顶部遥测、焦点十字、工具轨、真实 RGB 示波器与静音音频基线、底部参数托盘。\n' +
-      '• 参数与拍摄页重构为设备摘要、自适应参数卡和常驻拍摄操作区，连接、输出和文件库状态一屏可见。\n' +
-      '• 编辑器改为媒体池、中央预览、工具检查器和分析示波器协作布局；所有调整继续非破坏保存为新副本。\n' +
-      '• 统一五端深色工作台视觉：ZENCHE 蓝用于主操作，暖金只标示参数读数，红色只用于录制与危险操作。\n' +
-      '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows 五端同步更新；相机、AI 与传输能力保持兼容。',
-    '• Full-screen monitoring now uses an image-first professional HUD with top telemetry, a focus reticle, tool rail, real RGB scopes, an explicit silent-audio baseline, and a bottom parameter tray.\n' +
-      '• Capture and controls now combine a device summary, adaptive parameter cards, and a persistent capture dock so connection, output, and library state stay visible.\n' +
-      '• The editor now coordinates a media pool, central preview, tool inspector, and analysis scopes; every adjustment still saves non-destructively as a new copy.\n' +
-      '• A unified dark studio system spans all five clients: ZENCHE blue marks primary actions, warm gold is reserved for parameter readouts, and red is reserved for recording and destructive actions.\n' +
-      '• iOS / iPadOS, Android, HarmonyOS, macOS, and Windows are updated together while camera, AI, and transfer capabilities remain compatible.',
-    '• フルスクリーンモニターを映像優先のプロ HUD へ刷新。上部テレメトリ、フォーカスレティクル、ツールレール、実測 RGB スコープ、無音オーディオ基準線、下部パラメータトレイを配置しました。\n' +
-      '• 撮影・設定画面をデバイス概要、可変パラメータカード、常設撮影ドックで再構成し、接続、出力、ライブラリ状態を一画面で確認できます。\n' +
-      '• エディタはメディアプール、中央プレビュー、ツールインスペクタ、解析スコープが連携する構成へ刷新。すべての調整は引き続き非破壊で新しいコピーへ保存します。\n' +
-      '• 5 クライアントで共通のダークスタジオ表現を採用。ZENCHE ブルーは主要操作、ウォームゴールドはパラメータ値、赤は収録と危険操作に限定します。\n' +
-      '• iOS / iPadOS、Android、HarmonyOS、macOS、Windows を同時更新し、カメラ、AI、転送機能の互換性を維持します。'
+    '• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n' +
+      '• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n' +
+      '• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n' +
+      '• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n' +
+      '• 官网自动更新升级到 1.5.10；安装前可按发布说明核对 SHA‑256，签名状态保持如实披露。',
+    '• iOS / iPadOS adds a trusted-LAN camera bridge: Sony\'s official Camera Remote SDK runs on the macOS bridge, while Nikon uses an explicitly identified PTP-compatible bridge.\n' +
+      '• All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter.\n' +
+      '• Disabling monitoring now clears cached frames immediately and shows an explicit empty state; Android\'s disabled state is localized in all three languages.\n' +
+      '• Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available; see the usage guide for compatibility and hardware-test limits.\n' +
+      '• The official update feed moves to 1.5.10. Verify SHA-256 before installing; package signing status remains explicitly disclosed.',
+    '• iOS / iPadOS に信頼済み LAN 向けカメラブリッジを追加。Sony 公式 Camera Remote SDK は macOS ブリッジ側で動作し、Nikon は明示された PTP 互換ブリッジを使用します。\n' +
+      '• 5 端末の撮影画面に「ライブモニター」スイッチを追加。オフにしてもカメラ接続とシャッターは維持し、プレビュー取得だけを停止します。\n' +
+      '• モニターをオフにするとキャッシュ済み画像を直ちに消去し、明確な空状態を表示。Android のオフ状態も 3 言語に対応しました。\n' +
+      '• システムカメラ、UVC、USB/PTP、Wi-Fi PTP/IP の既存経路は維持。互換性と実機検証の制約は使用ガイドを参照してください。\n' +
+      '• 公式更新フィードを 1.5.10 に更新。インストール前に SHA-256 を確認でき、各パッケージの署名状態は引き続き明示します。'
   )
 ];
 
