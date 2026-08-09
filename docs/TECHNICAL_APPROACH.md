@@ -334,18 +334,16 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 更新检查优先 MirrorChyan，资源不可用、CDK 无效或无完整安装包时回退 GitHub Releases。
 - 更新服务现在增加自有元数据入口：五端默认请求 `https://zenche.top/api/update`（可通过
   `ZENCHE_UPDATE_ENDPOINT` 覆盖），查询 `platform`、`arch`、`current_version` 和
-  `channel=stable`。`server.mjs` 同时保留 `/api/updates` 兼容别名与 `/healthz`，从
-  GitHub Releases 选择完整安装包并返回 `schema_version: 1`、`url`、`sha256`、
-  `release_url`、`announcement`、`minimum_supported_version` 和 `update_available`。
-  服务端按 channel 缓存 5 分钟，GitHub 暂不可用时返回最近缓存并标记 `stale`；没有
-  缓存则返回 503。客户端校验 product/schema 后才使用结果，服务不可用仍按
-  MirrorChyan → GitHub 顺序回退。生产实例已部署到 `ubuntu@101.34.255.115`：
-  `zenche-update.service` 监听 `127.0.0.1:4174`，Nginx 反代 API 并从
-  `/var/www/zenche.top/downloads/` 提供 v1.4.1 六个官方安装包和六份 `.sha256`；
-  `UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 使 `url` 指向服务器资产，
-  `release_url` 保留 GitHub 页面。服务器本机五平台回源、静态下载和 SHA-256 已验证。
-  截至 2026-08-02，公网 DNS 仍解析到 `45.207.210.254`，切换 DNS/CDN 到
-  `101.34.255.115` 后才可进行公网闭环验收。部署参数和反向代理要求见
+  `channel=stable`。`server.mjs` 同时保留 `/api/updates` 兼容别名与 `/healthz`，返回
+  `schema_version: 1`、`url`、`sha256`、`release_url`、`announcement`、
+  `minimum_supported_version` 和 `update_available`。设置 `UPDATE_RELEASE_MANIFEST` 后，
+  服务完全读取本地清单且不请求 GitHub；未设置时保留 GitHub Release 缓存/stale 模式。
+  客户端校验 product/schema 后才使用结果，服务不可用仍按 MirrorChyan → GitHub 顺序回退。
+  生产实例位于 `ubuntu@101.34.255.115`：`zenche-update.service` 监听 `127.0.0.1:4174`，
+  Nginx 反代 API 并从 `/var/www/zenche.top/downloads/` 公网提供版本化资产；
+  `UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 使清单 URL 指向官网。2026-08-09
+  已确认公网 1.5.9 / build 36 五端响应、下载与 SHA-256 正常；1.5.10 / build 37 发布文件
+  已在独立目录完成服务器端暂存和复验，等待最终门禁后切换清单。部署参数和反向代理要求见
   `docs/AUTOMATIC_UPDATES.md`。
 - 敏感 CDK 不进入诊断日志；各平台使用对应安全存储。
 - 诊断日志需要限量滚动、保留周期、隐私脱敏和可操作错误上下文。

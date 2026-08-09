@@ -20,7 +20,7 @@
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
 - 当前源码候选为 **1.5.10 / build 37**，固定于提交 `5488dbd084200693d24554ef004cca38099a1cdb`。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；官网自动更新当前仍是 1.5.9 / build 36。W14 五端包、自托管清单和发布说明已经形成，正在完成最终审查与生产切换，未 push、未创建 Git 标签或 GitHub Release。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
-- v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 代码候选已完成完整 `npm test` 481/481、专项 18/18 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查、生产更新切换、公网逐端回归仍在进行。
+- v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 代码候选已完成完整 `npm test` 482/482、专项 18/18 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查、生产更新切换、公网逐端回归仍在进行。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
 - v1.5.0 已作为历史 GitHub Release 保留；当前 GitHub 公开稳定版为 v1.5.3。生产下载服务器保留旧版本资产，并继续提供 1.5.9 / build 36 更新；1.5.10 使用新文件名部署，不覆盖旧包，以便回滚。
@@ -35,7 +35,7 @@
 - 本轮设备码与兑换入口恢复已完成：五端 AI 激活卡均显示并支持复制当前设备 ID，保留激活码输入、验证和旧购买入口；新增显眼的 `https://zenche.top` 官网兑换按钮、兑换步骤说明，以及“在爱发电购买兑换码”提示、可点击二维码和购买按钮。兑换码仅用于 AI 云服务次数，未改变帧澈本体免费开源属性。
 - 本轮服务器端自动更新系统已实现：`server.mjs` 新增 `/api/update`、`/api/updates` 和 `/healthz`，按 platform/architecture/channel 解析 GitHub Release 完整包，提供 SHA-256、公告、最低支持版本、版本比较、ETag/CORS、安全响应头、5 分钟缓存与 stale 回退；五端客户端默认接入 `https://zenche.top/api/update`，服务异常继续 MirrorChyan → GitHub 回退。
 - 本轮五端外录已实现：照片直接进入当前设备文件库；Android、HarmonyOS、macOS、Windows 将 PTP/本机实时取景流式封装为 MJPEG AVI，iOS / iPadOS 本机与 UVC 继续以 MOV 外录。PTP 机身录制可与设备外录并行，停止、断开和写入失败会安全完成已写入帧；AVI 已纳入四端媒体库视频分类，会话命名、双目标备份与 SHA-256 同步生效。
-- 本轮服务器部署已完成：使用 `/Users/tauber/Downloads/key2.pem` 以 `ubuntu@101.34.255.115` 登录；`zenche-update.service` 运行于 `127.0.0.1:4174`，Nginx 反代 `/api/update`、`/api/updates`、`/healthz` 并静态提供 `/downloads/`。v1.4.1 六个官方 Release 包及六份 `.sha256` 已上传到 `/var/www/zenche.top/downloads/`，`UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 已启用；服务器本机五平台 API、下载响应和 SHA-256 均验证通过。公网 DNS 当前仍指向 `45.207.210.254`，需切换到 `101.34.255.115` 后公网客户端才会命中本部署。
+- 本轮官网更新准备已完成：`zenche-update.service` 在 `101.34.255.115` 的 `127.0.0.1:4174` 运行，Nginx 公网提供 `/api/update`、`/api/updates`、`/healthz` 和 `/downloads/`。1.5.9 / build 36 的五端响应、下载和 SHA-256 均已公网复验；1.5.10 / build 37 六包、侧车校验、服务端、自托管清单与带回滚发布脚本已上传独立暂存目录，服务器端六包校验通过，但生产清单尚未切换。
 
 ## 3. 能力进度
 
@@ -73,13 +73,12 @@
 
 ### 4.1 服务器端自动更新系统
 
-- **源码**：已实现 `server.mjs` 的 `/api/update`、`/api/updates`、`/healthz`，包含 GitHub Release 资产选择、SHA-256、公告、最低支持版本、版本比较、缓存/stale 回退、ETag、CORS 与安全响应头。
+- **源码**：已实现 `server.mjs` 的 `/api/update`、`/api/updates`、`/healthz`，包含自托管 `UPDATE_RELEASE_MANIFEST`、GitHub 兼容模式、SHA-256、公告、最低支持版本、版本比较、缓存/stale 回退、ETag、CORS 与安全响应头。
 - **五端接入**：iOS、Android、HarmonyOS、macOS、Windows 默认请求 `https://zenche.top/api/update`，校验 `schema_version/product` 后使用结果；不可用时仍按 MirrorChyan → GitHub 回退。
-- **测试**：`node --test` 75/75 通过；`git diff --check` 通过。
-- **本机交付物**：Android、iOS unsigned、Windows x64 Setup/ZIP 已由本轮源码生成并写入 `dist/`；SHA-256 分别为 Android `d4bcbfc0fa1bac599a739e85879299f1fdb0a34d53535d929f7895d5a569ea7a`、iOS `4e4bfe7d414f8baef44396504f3123ed5f3b919a350f1ed9dd10e0e869254599`、Windows Setup `5ab10ca284f65c71f0328fdad7ca2ca7467112d853ae20b15eb1b39833fc658f`、Windows ZIP `513c6b2820ff28026aa5657057ada4e5752a75b8b8f8d501eba7b6cb0bea8e11`；macOS 仅完成 Swift 编译，因缺少本机 `libexif.12.dylib` 未生成可信本轮 DMG；HarmonyOS 因既有 ArkTS 错误未生成可信本轮 HAP。
-- **部署边界**：生产反向代理、进程托管、资产上传和服务器本机验证已完成；公网 DNS/CDN 切换、HTTPS 公网验收和客户端闭环仍待完成。Android 构建曾遇到 SDK manifest 网络握手警告但最终成功；iOS unsigned 构建成功。Windows 使用本机 PowerShell/.NET/NSIS 生成未签名安装器与便携包。
-- **部署状态**：上述生产反向代理、进程守护、资产上传和服务器本机下载验证已完成；公网 DNS/CDN 切换仍是唯一未闭环项。
-- **下一步**：将 `zenche.top` DNS/CDN 指向 `101.34.255.115`，实测公网五端下载 URL、公告、SHA-256、ETag、断网 stale 回退及安装流程。
+- **测试**：1.5.10 exact HEAD 完整 `npm test` 482/482 通过；新增生产清单契约逐个模拟五端真实 platform/architecture 查询，防止规范化键返回空资产。
+- **本机交付物**：1.5.10 / build 37 的 Android APK、iOS unsigned IPA、HarmonyOS HAP、macOS arm64 DMG、Windows x64 Setup/便携 ZIP 及侧车校验均已生成；文件大小、SHA-256 和签名状态见 `docs/releases/v1.5.10.md`。
+- **部署边界**：生产当前仍返回 1.5.9 / build 36；1.5.10 文件只在 `/home/ubuntu/zenche-1.5.10-staging/` 暂存，六包已在服务器端回验，尚未影响公网接口。切换脚本会先备份服务端、systemd 有效配置、旧 API 响应和 `SHA256SUMS`，失败时自动恢复旧服务与清单配置。
+- **下一步**：双终审通过后执行原子切换，再从公网逐端验证 1.5.9 用户看到更新、1.5.10 用户不重复提示、下载 HTTP 200 与 SHA-256 完全一致。
 
 以下内容来自 2026-08-01 的 `git status` 与 diff，只表示当前本地工作现场，不等同于已经提交或发布：
 

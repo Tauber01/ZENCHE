@@ -623,11 +623,6 @@ and the last cache is served with `stale: true` during upstream outages. Configu
 The public feed and its existing 1.5.9 / build 36 assets are currently available. The
 1.5.10 / build 37 self-hosted manifest and packages are a release candidate pending the
 production switch and per-platform public regression checks.
-The production instance runs on `101.34.255.115` as `zenche-update.service` at
-`127.0.0.1:4174` and serves packages from `/var/www/zenche.top/downloads/`. The origin
-was verified locally, but as of 2026-08-02 public DNS still resolved `zenche.top` to
-`45.207.210.254`; switch DNS/CDN to `101.34.255.115` before public clients can use the
-self-hosted asset URLs.
 
 ### USB quick start
 
