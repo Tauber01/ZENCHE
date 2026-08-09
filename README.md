@@ -224,9 +224,9 @@ Get-FileHash .\ZENCHE-1.5.3-Windows-x64-Setup.exe -Algorithm SHA256
 
 ### 自动更新与 Mirror酱
 
-五个原生客户端会在启用“启动时自动检查更新”后优先请求
-[Mirror酱](https://mirrorchyan.com)，并在服务不可用、CDK 无效或没有可直接安装的
-完整包时自动回退 GitHub Releases。设置页可填写可选 CDK；iOS / iPadOS 与 macOS
+五个原生客户端会在启用“启动时自动检查更新”后优先请求官网更新接口；官网不可用时
+再请求 [Mirror酱](https://mirrorchyan.com)，Mirror酱不可用、CDK 无效或没有可直接
+安装的完整包时继续回退 GitHub Releases。设置页可填写可选 CDK；iOS / iPadOS 与 macOS
 保存到系统钥匙串，Android 使用 Android Keystore，Windows 使用 DPAPI，
 HarmonyOS 保存到应用私有设置，所有平台都不会把 CDK 写入诊断日志。
 
@@ -592,9 +592,10 @@ import. See [HarmonyOS build and deployment](docs/HARMONY_BUILD.md) and
 ### Automatic updates and MirrorChyan
 
 When **Automatically check for updates at launch** is enabled, all five native
-clients query [MirrorChyan](https://mirrorchyan.com) first and fall back to
-GitHub Releases when the service is unavailable, the CDK is invalid, or no
-directly installable full package is returned. The optional CDK is stored in
+clients query the official update endpoint first. If it is unavailable, they try
+[MirrorChyan](https://mirrorchyan.com), then fall back to GitHub Releases when
+MirrorChyan is unavailable, the CDK is invalid, or no directly installable full
+package is returned. The optional CDK is stored in
 the Apple Keychain on iOS, iPadOS, and macOS, Android Keystore on Android,
 DPAPI on Windows, and private app settings on HarmonyOS. It is never written
 to diagnostic logs.
@@ -911,9 +912,10 @@ Windows ではカメラの PTP インターフェースを WinUSB に割り当�
 ### 自動更新と MirrorChyan
 
 「起動時にアップデートを自動確認」を有効にすると、5 つのネイティブクライアントは
-まず [MirrorChyan](https://mirrorchyan.com) を確認し、サービスを利用できない場合、
+まず公式更新エンドポイントを確認します。利用できない場合は
+[MirrorChyan](https://mirrorchyan.com) を試し、MirrorChyan を利用できない場合、
 CDK が無効な場合、または直接インストールできる完全パッケージが返らない場合に
-GitHub Releases へ自動的に切り替えます。任意の CDK は iOS / iPadOS と macOS
+GitHub Releases へ切り替えます。任意の CDK は iOS / iPadOS と macOS
 では Apple Keychain、Android では Android Keystore、Windows では DPAPI、
 HarmonyOS ではアプリの非公開設定に保存され、診断ログには記録されません。
 
