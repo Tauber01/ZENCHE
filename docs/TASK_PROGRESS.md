@@ -2,7 +2,7 @@
 
 > 快照时间：2026-08-09（Asia/Shanghai）
 > 当前源码候选：`agent/1.5.6-ui` 的代码提交 `c661f7f`，1.5.9 / build 36
-> 公开稳定版：v1.5.3（发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`）；W13 候选未 push、未部署、未发布
+> 公开稳定版：v1.5.3（发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`）；W13 原生客户端候选未 push、未部署、未发布，账号/管理服务端已按本文件记录部署
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,7 +18,7 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码候选为 **1.5.9 / build 36**，W13 候选仅保留在本地分支，未 push、未部署、未发布。公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；生产服务未因 W13 变更。
+- 当前源码候选为 **1.5.9 / build 36**，W13 原生客户端候选仅保留在本地分支，未 push、未部署、未发布。公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；生产账号 HTTPS 路由与管理台总用户统计已完成独立服务端部署，不改变客户端公开版本。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W13 代码候选 `c661f7f` 已完成 468/468、五端编译、AI审查 原生视觉/交互静态门禁和 GPT5.6luna 用户可见内容静态门禁。生产 HTTPS 路由及账号冒烟已通过；有效激活 AI、真机/窗口、安装签名与完整发布验收仍未闭环，不能据此宣称可发布。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
@@ -1139,4 +1139,6 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 ## 12.51 管理台总用户口径修正（2026-08-09，GPT5.6）
 
 - Tauber 更正统计口径：目标是管理后台总览，不是官网；“总用户”必须统计全部注册账号，不能使用已激活设备数代替。候选 `adf310d1dbb636a5522ccc4713471b8758afc2be` 为认证系统新增专用账号计数入口，`/v1/admin/stats` 返回 `totalAccounts`；返修 `9d9ce1e` 将卡片说明收紧为“总用户 / 含未验证、已禁用、未绑定设备账号”。设备、活跃、到期、用尽与吊销指标保持原口径。
-- 新契约创建两个未绑定设备的免码账号并禁用其中一个，验证 `totalAccounts=2`、`totalDevices=0`；另锁住总览文案与每日快照字段。返修后管理台专项 14/14、完整 `npm test` 470/470，`node --check ai-server/admin/app.js` 与 `git diff --check` 通过。统计候选尚未部署生产，未 push。
+- 新契约创建两个未绑定设备的免码账号并禁用其中一个，验证 `totalAccounts=2`、`totalDevices=0`；另锁住总览文案与每日快照字段。返修后管理台专项 14/14、完整 `npm test` 470/470，`node --check ai-server/admin/app.js` 与 `git diff --check` 通过；源码候选未 push。
+- Tauber 在 Buzz 事件 `c963135a…171a76` 指示继续推进至完成后，2026-08-09 将冻结候选部署到生产 `/opt/ai-server`。切换前远端三文件 SHA-256 与已知基线一致；旧文件备份至 `/opt/ai-server-backups/w13-admin-users-20260809T172051+0800`。部署后 SHA-256：`app.mjs d20b7635e2cdc192aa4a2588b30fa8cd759a3399514123e559516283836413c6`、`auth.mjs e49220fc261b991511a9ddb8dcebe920dddf0e20c7e46abec09455d8f0b008ff`、`admin/app.js 0503fab58df61dacb731d1c74f608b4ce0ae576d2e207b744b2ad02863ce5c4b`。
+- `zenche-ai-server.service` 重启后为 active/running；回环管理 API 返回 `statsStatus=200`、`accountsStatus=200`、`totalAccounts=2`、账号注册表总数 2、`totalDevices=11`，管理台静态脚本显示“总用户 / 含未验证、已禁用、未绑定设备账号”。公网 `/api/v1/auth/me` 保持 HTTP/2 401 JSON，`/api/v1/ai` 空请求保持 HTTP/2 400 JSON。该部署不放行 W13 客户端发布，剩余有效激活 AI、真机/安装/签名与交付包门禁不变。
