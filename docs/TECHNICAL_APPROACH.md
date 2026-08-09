@@ -154,8 +154,8 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - iOS/macOS 的 session token 使用 Keychain `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，forced-signed-out 标记使用 Application Support 原子文件；Android 使用 AndroidKeyStore AES-256-GCM 与 no-backup tombstone；HarmonyOS 使用 HUKS AES-256-GCM 与 preferences 两阶段标记；Windows 使用 DPAPI CurrentUser 单一会话包与原子 tombstone。安全存储写入、标记清除或本地清理失败必须保持登录墙并显示错误，不能伪装成登录或登出成功。
 - `/v1/auth/me` 的 401 与 403 都代表本地会话不可继续，必须清 session 回登录墙；启动校验期间不得挂载或暴露主工作区。登出同时关闭连接 dialog/sheet/overlay，并停止相机、无线、蓝牙、定位与外录等后台态。
 - `email-code` 的 503 是 SMTP 未配置的专用过渡态：客户端隐藏验证码并允许服务端按免码开关裁决；严格态仍要求 6 位数字验证码。五端表单提供 60 秒倒计时、44pt/dp/px 触控目标、键盘/焦点链、错误播报与桌面/平板内容宽度上限。
-- 账号绑定要求 AI 请求携带 Bearer，但只有 AI endpoint 本身是 HTTPS 时才可附加；历史 HTTP AI 地址继续兼容匿名旧流程，不能携带账号 token。2026-08-09 官网 Nginx 已将 `/api/v1/auth/` 前缀映射到回环 `/v1/auth/`，并将 `/api/v1/ai` 精确映射到回环 `/v1/ai`；认证请求体限制 64 KiB，AI 请求体限制 64 MiB，原配置备份在 `/etc/nginx/sites-available/zenche.top.bak-20260809T154854+0800`。公网账号完整冒烟与无效激活 JSON 路由已通过；有效激活码的真实 AI 生成和五端真机矩阵仍须完成，W13 客户端在此之前不得进入发布分支。
-- 管理台总览的“总用户”必须读取账号注册表总数，未验证、已禁用、未绑定设备的账号都计入；`totalDevices` 继续单独表示迁移链折叠后的激活设备。候选 `adf310d` 在 `/v1/admin/stats` 增加 `totalAccounts` 并更新总览卡片，不能再用已激活设备数代替用户数。
+- 账号绑定要求 AI 请求携带 Bearer，但只有 AI endpoint 本身是 HTTPS 时才可附加；历史 HTTP AI 地址继续兼容匿名旧流程，不能携带账号 token。2026-08-09 官网 Nginx 已将 `/api/v1/auth/` 前缀映射到回环 `/v1/auth/`，并将 `/api/v1/ai` 精确映射到回环 `/v1/ai`；认证请求体限制 64 KiB，AI 请求体限制 64 MiB，原配置备份在 `/etc/nginx/sites-available/zenche.top.bak-20260809T154854+0800`。公网账号完整冒烟与无效激活 JSON 路由已通过，临时冒烟账号已禁用且未绑定设备；有效激活码的真实 AI 生成和五端真机矩阵仍须完成，W13 客户端在此之前不得进入发布分支。
+- 管理台总览的“总用户”必须读取账号注册表总数，未验证、已禁用、未绑定设备的账号都计入；`totalDevices` 继续单独表示迁移链折叠后的激活设备。候选 `adf310d` 在 `/v1/admin/stats` 增加 `totalAccounts`，返修 `9d9ce1e` 将总览说明明确为“含未验证、已禁用、未绑定设备账号”，不能再用已激活设备数代替用户数；该统计候选尚未部署生产。
 
 ## 1. 总体原则
 
