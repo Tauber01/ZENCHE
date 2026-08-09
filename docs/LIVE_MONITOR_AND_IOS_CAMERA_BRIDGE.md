@@ -77,4 +77,4 @@ iOS 仅接受 `10.x`、`172.16–31.x`、`192.168.x`、`169.254.x`、`localhost`
 
 ## 7. 安装与签名说明
 
-本轮交付包按当前开发环境生成：Android 为调试签名、HarmonyOS 与 iOS 为未签名候选、macOS 为 ad-hoc 签名、Windows 为未做 Authenticode 的候选包。未签名包仅供开发验证，不等同于商店或正式生产发布版本。
+本轮已上线的包按当前开发环境生成：Android 为调试签名、HarmonyOS 与 iOS 为未签名开发验证包、macOS 为 ad-hoc 签名、Windows 未做 Authenticode。未签名包仅供开发验证，不等同于商店或正式签名发布版本。

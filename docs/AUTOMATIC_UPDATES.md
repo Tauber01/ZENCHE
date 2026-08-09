@@ -101,9 +101,10 @@ PORT=4173 HOST=127.0.0.1 npm start
 `zenche-update.service`，监听 `127.0.0.1:4174`；Nginx 将 `/api/update`、
 `/api/updates` 和 `/healthz` 反代到该服务，并将 `/downloads/` 映射到
 `/var/www/zenche.top/downloads/`。`UPDATE_ASSET_BASE_URL` 已设置为
-`https://zenche.top/downloads`。截至 2026-08-09，公网健康检查、五端更新接口与
-1.5.9 / build 36 安装包均可访问；1.5.10 / build 37 的清单和安装包已形成候选，
-待生产备份、清单模式切换和逐端公网回归。
+`https://zenche.top/downloads`。截至 2026-08-10，1.5.10 / build 37 自托管清单
+已在生产生效；公网健康检查、五端更新响应、兼容路由与六个公开包的 SHA-256 均已
+回归通过。1.5.9 / build 36 资产继续保留用于回滚，生产备份位于
+`/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
 
 ## English
 
@@ -147,10 +148,11 @@ are restricted to the configured HTTPS repository API.
 
 The production instance runs as `zenche-update.service` on `101.34.255.115` at
 `127.0.0.1:4174`. Nginx proxies the API routes and serves `/downloads/` from
-`/var/www/zenche.top/downloads/`. As of 2026-08-09, the public health endpoint, all five
-update responses, and the existing 1.5.9 / build 36 packages are reachable. The 1.5.10 /
-build 37 manifest and packages are a release candidate pending the production backup,
-manifest-mode switch, and per-platform public regression checks.
+`/var/www/zenche.top/downloads/`. As of 2026-08-10, the 1.5.10 / build 37 self-hosted
+manifest is active in production. The public health endpoint, all five update responses,
+the compatibility route, and the SHA-256 of all six public packages passed regression checks.
+The 1.5.9 / build 36 assets remain available for rollback; the production backup is stored at
+`/opt/zenche-update-backups/20260809T163105Z-v1510-r2`.
 
 ## 日本語
 
@@ -196,7 +198,8 @@ API に限定され、任意 URL のプロキシにはなりません。
 
 本番インスタンスは `101.34.255.115` の `zenche-update.service` として稼働し、
 `127.0.0.1:4174` を待ち受けます。Nginx は API ルートをリバースプロキシし、
-`/var/www/zenche.top/downloads/` から `/downloads/` を配信します。2026-08-09 時点で
-公開ヘルスチェック、5 プラットフォームの更新応答、既存の 1.5.9 / build 36
-パッケージを確認済みです。1.5.10 / build 37 のマニフェストとパッケージは、本番バックアップ、
-マニフェストモード切り替え、プラットフォーム別の公開環境での回帰確認を待つ候補です。
+`/var/www/zenche.top/downloads/` から `/downloads/` を配信します。2026-08-10 時点で、
+1.5.10 / build 37 の自社サーバー上のマニフェストは本番環境で有効です。公開ヘルスチェック、
+5 プラットフォームの更新応答、互換ルート、公開中の 6 パッケージすべての SHA-256 を確認済みです。
+1.5.9 / build 36 のアセットはロールバック用に保持し、本番バックアップは
+`/opt/zenche-update-backups/20260809T163105Z-v1510-r2` に保存しています。

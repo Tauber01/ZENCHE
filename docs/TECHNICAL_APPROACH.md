@@ -166,7 +166,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 账号绑定要求 AI 请求携带 Bearer，但只有 AI endpoint 本身是 HTTPS 时才可附加；历史 HTTP AI 地址继续兼容匿名旧流程，不能携带账号 token。2026-08-09 官网 Nginx 已将 `/api/v1/auth/` 前缀映射到回环 `/v1/auth/`，并将 `/api/v1/ai` 精确映射到回环 `/v1/ai`；认证请求体限制 64 KiB，AI 请求体限制 64 MiB，原配置备份在 `/etc/nginx/sites-available/zenche.top.bak-20260809T154854+0800`。公网账号完整冒烟与无效激活 JSON 路由已通过，临时冒烟账号已禁用且未绑定设备；有效激活码的真实 AI 生成和五端真机矩阵仍须完成，W13 客户端在此之前不得进入发布分支。
 - 管理台总览的“总用户”必须读取账号注册表总数，未验证、已禁用、未绑定设备的账号都计入；`totalDevices` 继续单独表示迁移链折叠后的激活设备。候选 `adf310d` 在 `/v1/admin/stats` 增加 `totalAccounts`，返修 `9d9ce1e` 将总览说明明确为“含未验证、已禁用、未绑定设备账号”，不能再用已激活设备数代替用户数。2026-08-09 已按冻结哈希部署 `app.mjs`、`auth.mjs` 与 `admin/app.js`，旧文件备份在 `/opt/ai-server-backups/w13-admin-users-20260809T172051+0800`；重启后服务 active，回环管理 API 验证 `totalAccounts` 与账号列表总数同为 2，`totalDevices=11`，公网认证与 AI 路由仍为 JSON 401/400。
 
-## 0.17. W14 实时监看开关与 iOS 相机桥接（未发布候选）
+## 0.17. W14 实时监看开关与 iOS 相机桥接（官网已发布，真机待验收）
 
 - 五端拍照页均使用显式“实时监看”开关。关闭会停止当前 USB/PTP、Wi-Fi/PTP-IP、本机相机或桥接帧循环，但保留连接与快门路径；打开后按原传输后端恢复实时取景。
 - iOS / iPadOS 新增 `VendorSDKBridgeService`，仅允许 RFC1918、链路本地、`localhost` 与 `.local` 主机，使用 ephemeral `URLSession`、响应类型/大小校验、5/8 秒超时和 12 位本次配对码。主机与端口可保存，配对码不落盘。
@@ -342,9 +342,9 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
   客户端校验 product/schema 后才使用结果，服务不可用仍按 MirrorChyan → GitHub 顺序回退。
   生产实例位于 `ubuntu@101.34.255.115`：`zenche-update.service` 监听 `127.0.0.1:4174`，
   Nginx 反代 API 并从 `/var/www/zenche.top/downloads/` 公网提供版本化资产；
-  `UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 使清单 URL 指向官网。2026-08-09
-  已确认公网 1.5.9 / build 36 五端响应、下载与 SHA-256 正常；1.5.10 / build 37 发布文件
-  已在独立目录完成服务器端暂存和复验，等待最终门禁后切换清单。部署参数和反向代理要求见
+  `UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 使清单 URL 指向官网。2026-08-10
+  已将 1.5.10 / build 37 自托管清单切入生产，五端公网更新响应、兼容路由、1.5.10
+  不重复提示与六个公开包 SHA-256 均通过；1.5.9 资产继续保留用于回滚。部署参数和反向代理要求见
   `docs/AUTOMATIC_UPDATES.md`。
 - 敏感 CDK 不进入诊断日志；各平台使用对应安全存储。
 - 诊断日志需要限量滚动、保留周期、隐私脱敏和可操作错误上下文。

@@ -249,9 +249,9 @@ Mirror酱增量包；仅接受完整安装包并交给各平台原生安装流�
 `UPDATE_CORS_ORIGIN`、`UPDATE_ASSET_BASE_URL`、`UPDATE_MINIMUM_SUPPORTED_VERSION` 和
 `UPDATE_ANNOUNCEMENT_JSON`；详见 [服务端自动更新部署说明](docs/AUTOMATIC_UPDATES.md)。
 当前生产实例运行于 `101.34.255.115`，由 `zenche-update.service` 监听
-`127.0.0.1:4174`，安装包位于 `/var/www/zenche.top/downloads/`。公网接口已提供
-1.5.10 / build 37 的自托管清单、安装包和 SHA-256 已在生产生效，并完成逐端
-公网更新响应与六个公开下载包的哈希回归；1.5.9 / build 36 资产继续保留用于回滚。
+`127.0.0.1:4174`，安装包位于 `/var/www/zenche.top/downloads/`。公网接口已在
+生产生效，提供 1.5.10 / build 37 的自托管清单、安装包和 SHA-256，并已完成逐端
+更新响应与六个公开下载包的哈希回归；1.5.9 / build 36 资产继续保留用于回滚。
 
 ## USB 快速开始
 
