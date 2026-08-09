@@ -45,6 +45,37 @@ test('W13-c Keychain: macOS AuthTokenStore 同款 Security API', async () => {
   assert.match(s, /com\.tauber\.nikonlink\.auth-session/);
 });
 
+test('W13-c 安全边界: 账号认证固定走官网 HTTPS，Keychain 写入失败不得进入已登录态', async () => {
+  for (const s of [await read(iOS_AUTH), await read(MAC_AUTH)]) {
+    assert.match(s, /private static let serverURL = "https:\/\/zenche\.top\/api"/);
+    assert.doesNotMatch(s, /serverURL[\s\S]{0,160}http:\/\//);
+    assert.match(s, /url\.scheme\?\.lowercased\(\) == "https"/);
+    assert.match(s, /guard AuthTokenStore\.writeToken\(token\) else/);
+    assert.match(s, /throw AuthError\.secureStorage/);
+    assert.match(s, /forcedSignedOutMarkerURL/);
+    assert.match(s, /writeForcedSignedOutMarker\(\)/);
+    assert.match(s, /Data\("signed-out"\.utf8\)\.write\(to: url, options: \.atomic\)/);
+    assert.match(s, /return marked && deleted/);
+    assert.match(s, /localCleanupMessage/);
+    assert.match(s, /if !clearSession\(\)/);
+  }
+});
+
+test('W13-c 网络失败关闭: 禁重定向、限响应体、只接受官网 JSON 对象与有效账号', async () => {
+  for (const s of [await read(iOS_AUTH), await read(MAC_AUTH)]) {
+    assert.match(s, /final class AuthRedirectBlocker/);
+    assert.match(s, /completionHandler\(nil\)/);
+    assert.match(s, /maximumResponseBytes = 64 \* 1024/);
+    assert.match(s, /http\.url\?\.host\?\.lowercased\(\) == "zenche\.top"/);
+    assert.match(s, /case protocolFailure/);
+    assert.match(s, /throw AuthError\.protocolFailure/);
+    assert.match(s, /contentType\.contains\("application\/json"\)/);
+    assert.match(s, /账号服务响应格式错误/);
+    assert.match(s, /账号服务响应缺少有效账号/);
+    assert.doesNotMatch(s, /case 200\.\.<300:\s*return object \?\? \[:\]/);
+  }
+});
+
 // ---------- 状态机与验证码两态 ----------
 
 test('W13-c 状态机: 两端 AuthService 均含 checking/signedOut/signedIn 且初态 checking', async () => {
@@ -70,6 +101,11 @@ test('W13-c 验证码两态: emailCodeMode 三态枚举 + 503→notRequired / �
     // 503 映射为 emailCodeUnavailable（禁 fail-open，由服务端裁决）
     assert.match(s, /case 503 where path == "\/v1\/auth\/email-code"/);
     assert.match(s, /emailCodeUnavailable/);
+    assert.ok(
+      s.indexOf('case 503 where path == "/v1/auth/email-code"')
+        < s.indexOf('case 404, 500..<600'),
+      '503 发码服务不可用必须先于通用 5xx 映射'
+    );
   }
 });
 
@@ -80,7 +116,8 @@ test('W13-c 路由守卫: iOS body 按 auth.state 三路分发 + .task bootstrap
   assert.match(r, /switch model\.auth\.state \{/);
   assert.match(r, /case \.signedOut:/);
   assert.match(r, /LoginView\(\)/);
-  assert.match(r, /case \.checking, \.signedIn:/);
+  assert.match(r, /case \.checking:\s*Color\.clear/);
+  assert.match(r, /case \.signedIn:\s*mainWorkspace/);
   assert.match(r, /mainWorkspace/);
   assert.match(r, /await model\.auth\.bootstrap\(\)/);
 });
@@ -90,7 +127,8 @@ test('W13-c 路由守卫: macOS body 按 auth.state 三路分发 + .task bootstr
   assert.match(m, /switch model\.auth\.state \{/);
   assert.match(m, /case \.signedOut:/);
   assert.match(m, /LoginView\(auth: model\.auth\)/);
-  assert.match(m, /case \.checking, \.signedIn:/);
+  assert.match(m, /case \.checking:\s*Color\.clear/);
+  assert.match(m, /case \.signedIn:\s*mainWorkspace/);
   assert.match(m, /mainWorkspace/);
   assert.match(m, /await model\.auth\.bootstrap\(\)/);
 });
@@ -104,12 +142,32 @@ test('W13-c bootstrap: 无令牌→signedOut；/me 401/403→清令牌回登录�
     assert.match(s, /"\/v1\/auth\/me"/);
     // 401/403 → 清令牌 + 回登录墙
     assert.match(s, /case \.sessionInvalid:/);
+    assert.match(s, /case 403:\s*throw path == "\/v1\/auth\/me" \? AuthError\.sessionInvalid : AuthError\.accountDisabled/);
     assert.match(s, /AuthTokenStore\.writeToken\(nil\)/);
     assert.match(s, /state = \.signedOut/);
     // 网络失败 → signedIn 离线容忍
     assert.match(s, /case \.network/);
     assert.match(s, /state = \.signedIn/);
+    assert.match(s, /case \.server\(let status, _\) where status >= 500/);
+    assert.match(s, /default:[\s\S]{0,220}state = \.signedOut/);
   }
+});
+
+test('W13-c 未鉴权隔离: checking 不挂载工作区，登出关闭功能浮层并停止后台服务', async () => {
+  const ios = await read(iOS_ROOT);
+  const mac = await read(MAC_MAIN);
+  assert.match(ios, /case \.checking:\s*Color\.clear/);
+  assert.match(ios, /guard state == \.signedIn else \{/);
+  assert.match(ios, /model\.showingConnection = false/);
+  assert.match(ios, /model\.showingSettings = false/);
+  assert.match(ios, /model\.camera\.suspend\(\)/);
+  assert.match(ios, /model\.wireless\.stop\(\)/);
+  assert.match(mac, /case \.checking:\s*Color\.clear/);
+  assert.match(mac, /showConnection = false/);
+  assert.match(mac, /showSettings = false/);
+  assert.match(mac, /showLaunchAnnouncement = false/);
+  assert.match(ios, /\.frame\(minHeight: 44\)/);
+  assert.match(mac, /\.frame\(minHeight: 44\)/);
 });
 
 test('W13-c 认证动作: 两端均实现 register/login/logout/sendEmailCode + 服务端路径', async () => {
@@ -188,16 +246,16 @@ test('W13-c 设置页: macOS SettingsSheet 收 auth 参数 + 账号卡（邮箱 
 
 // ---------- AI 激活 Bearer（2A：三元组） ----------
 
-test('W13-c AI Bearer: iOS AiImageService.generate 有 token 时附加 Authorization', async () => {
+test('W13-c AI Bearer: iOS 仅在 HTTPS endpoint 且有 token 时附加 Authorization', async () => {
   const r = await read(iOS_ROOT);
-  assert.match(r, /if let token = AuthTokenStore\.readToken\(\) \{/);
+  assert.match(r, /if url\.scheme\?\.lowercased\(\) == "https",\s*let token = AuthTokenStore\.readToken\(\) \{/);
   assert.match(r, /"Bearer \\\(token\)"/);
   assert.match(r, /账号↔设备↔激活码 三元组/);
 });
 
-test('W13-c AI Bearer: macOS AiImageService.generate 同款 Bearer 头', async () => {
+test('W13-c AI Bearer: macOS 同款 HTTPS 限制与 Bearer 头', async () => {
   const m = await read(MAC_MAIN);
-  assert.match(m, /if let token = AuthTokenStore\.readToken\(\) \{/);
+  assert.match(m, /if url\.scheme\?\.lowercased\(\) == "https",\s*let token = AuthTokenStore\.readToken\(\) \{/);
   assert.match(m, /"Bearer \\\(token\)"/);
   assert.match(m, /账号↔设备↔激活码 三元组/);
 });

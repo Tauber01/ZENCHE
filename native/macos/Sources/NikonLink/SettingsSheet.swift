@@ -253,7 +253,10 @@ struct SettingsSheet: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    Task { await auth.logout() }
+                    Task {
+                        await auth.logout()
+                        dismiss()
+                    }
                 } label: {
                     Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                         .font(.system(size: TypeScale.body, weight: .semibold))

@@ -247,13 +247,7 @@ private struct SplashView: View {
             VStack(spacing: SpaceToken.s24) {
                 ZStack {
                     RoundedRectangle(cornerRadius: RadiusToken.r20)
-                        .fill(
-                            LinearGradient(
-                                colors: [IPalette.cobalt, IPalette.cobalt.opacity(0.82)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(IPalette.graphite)
                         .frame(width: 80, height: 80)
                         .scaleEffect(markScale)
                         .opacity(markOpacity)
@@ -305,6 +299,12 @@ private enum AuthFormMode: String, CaseIterable, Identifiable {
 /// - notRequired：过渡态，发码 503（SMTP 未配）→ 隐藏验证码框，免码注册
 /// - unknown：未探测，注册按无码发送、由服务端裁决（严态下返回 400 并提示）
 private struct LoginView: View {
+    private enum Field: Hashable {
+        case email
+        case password
+        case code
+    }
+
     @EnvironmentObject private var model: AppModel
     @Environment(\.locale) private var locale
 
@@ -316,6 +316,7 @@ private struct LoginView: View {
     @State private var errorMessage = ""
     @State private var countdown = 0
     @State private var countdownTask: Task<Void, Never>?
+    @FocusState private var focusedField: Field?
 
     private var trimmedEmail: String {
         email.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -342,6 +343,10 @@ private struct LoginView: View {
         model.auth.emailCodeMode == .notRequired
     }
 
+    private var visibleErrorMessage: String {
+        errorMessage.isEmpty ? model.auth.localCleanupMessage : errorMessage
+    }
+
     var body: some View {
         ZStack {
             IPalette.paper.ignoresSafeArea()
@@ -351,6 +356,8 @@ private struct LoginView: View {
                     modePicker
                     formCard
                 }
+                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, SpaceToken.s24)
                 .padding(.top, SpaceToken.s40)
                 .padding(.bottom, SpaceToken.s40)
@@ -359,6 +366,13 @@ private struct LoginView: View {
         .onDisappear {
             countdownTask?.cancel()
             countdownTask = nil
+        }
+        .onChange(of: visibleErrorMessage) { _, message in
+            guard !message.isEmpty else { return }
+            UIAccessibility.post(
+                notification: .announcement,
+                argument: RuntimeLocalization.text(message, locale: locale)
+            )
         }
     }
 
@@ -389,12 +403,14 @@ private struct LoginView: View {
     }
 
     private var modePicker: some View {
-        Picker("", selection: $mode) {
+        Picker("登录或注册", selection: $mode) {
             ForEach(AuthFormMode.allCases) { mode in
                 RuntimeLocalizedText(mode.rawValue).tag(mode)
             }
         }
         .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(minHeight: 44)
     }
 
     private var formCard: some View {
@@ -408,7 +424,10 @@ private struct LoginView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .focused($focusedField, equals: .email)
                     .submitLabel(.next)
+                    .onSubmit { focusedField = .password }
             }
             .padding(.horizontal, SpaceToken.s16)
             .frame(height: 44)
@@ -427,8 +446,18 @@ private struct LoginView: View {
                     .foregroundStyle(IPalette.muted)
                     .frame(width: SpaceToken.s20)
                 SecureField("密码（至少 8 位）", text: $password)
-                    .submitLabel(.done)
-                    .onSubmit { submit() }
+                    .textContentType(.password)
+                    .focused($focusedField, equals: .password)
+                    .submitLabel(
+                        mode == .register && !codeHidden ? .next : .done
+                    )
+                    .onSubmit {
+                        if mode == .register && !codeHidden {
+                            focusedField = .code
+                        } else {
+                            submit()
+                        }
+                    }
             }
             .padding(.horizontal, SpaceToken.s16)
             .frame(height: 44)
@@ -456,6 +485,10 @@ private struct LoginView: View {
                         .frame(width: SpaceToken.s20)
                     TextField("6 位验证码", text: $code)
                         .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .focused($focusedField, equals: .code)
+                        .submitLabel(.done)
+                        .onSubmit { submit() }
                     Button {
                         sendCode()
                     } label: {
@@ -479,12 +512,16 @@ private struct LoginView: View {
                 )
             }
 
-            if !errorMessage.isEmpty {
-                Text(RuntimeLocalization.text(errorMessage, locale: locale))
+            if !visibleErrorMessage.isEmpty {
+                Text(RuntimeLocalization.text(visibleErrorMessage, locale: locale))
                     .font(.system(size: FontToken.caption))
                     .foregroundStyle(IPalette.video)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(
+                        RuntimeLocalization.text(visibleErrorMessage, locale: locale)
+                    )
+                    .accessibilityIdentifier("auth-error")
             }
 
             Button {
@@ -633,7 +670,9 @@ struct RootView: View {
             case .signedOut:
                 // W13-c 登录墙（3A：不登录任何功能不可用）
                 LoginView()
-            case .checking, .signedIn:
+            case .checking:
+                Color.clear
+            case .signedIn:
                 mainWorkspace
             }
         }
@@ -671,12 +710,13 @@ struct RootView: View {
             .presentationCornerRadius(28)
         }
         .onAppear {
-            model.updater.checkAutomaticallyIfNeeded()
-            showingLaunchAnnouncement =
-                dismissedAnnouncementVersion != Self.appVersion
+            applyAuthState(model.auth.state)
+        }
+        .onChange(of: model.auth.state) { _, state in
+            applyAuthState(state)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            if phase == .active && model.auth.state == .signedIn {
                 DiagnosticLogger.shared.info("app", "应用进入前台")
                 model.camera.refreshDevices()
                 model.camera.resume()
@@ -690,6 +730,25 @@ struct RootView: View {
             // W13-c 启动路由守卫：无令牌 → 登录墙；有令牌 → /me 校验，
             // 401/403 清令牌回登录墙；网络失败放行本地缓存态（离线容忍）。
             await model.auth.bootstrap()
+            applyAuthState(model.auth.state)
+        }
+    }
+
+    private func applyAuthState(_ state: AuthService.State) {
+        guard state == .signedIn else {
+            model.showingConnection = false
+            model.showingSettings = false
+            showingLaunchAnnouncement = false
+            model.camera.suspend()
+            model.wireless.stop()
+            return
+        }
+        model.updater.checkAutomaticallyIfNeeded()
+        showingLaunchAnnouncement =
+            dismissedAnnouncementVersion != Self.appVersion
+        if scenePhase == .active {
+            model.camera.refreshDevices()
+            model.camera.resume()
         }
     }
 
@@ -1550,7 +1609,8 @@ private final class AiImageService {
         r.timeoutInterval = Self.requestTimeout
         // W13-c：登录墙下 AI 激活请求带上会话令牌，服务端记录 账号↔设备↔激活码 三元组；
         // 无令牌（存量流程/异常态）不影响既有请求。
-        if let token = AuthTokenStore.readToken() {
+        if url.scheme?.lowercased() == "https",
+           let token = AuthTokenStore.readToken() {
             r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         r.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -9796,7 +9856,10 @@ private struct AppSettingsSheet: View {
                             }
                             Divider()
                             Button(role: .destructive) {
-                                Task { await model.auth.logout() }
+                                Task {
+                                    await model.auth.logout()
+                                    dismiss()
+                                }
                             } label: {
                                 Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
                                     .frame(maxWidth: .infinity)

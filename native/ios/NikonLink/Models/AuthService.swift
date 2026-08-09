@@ -11,8 +11,49 @@ enum AuthTokenStore {
     private static let service = "com.tauber.nikonlink.auth-session"
     private static let tokenAccount = "session_token"
     private static let emailDefaultsKey = "auth_account_email"
+    private static var forcedSignedOutMarkerURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?
+            .appendingPathComponent("ZENCHE", isDirectory: true)
+            .appendingPathComponent("auth-signed-out", isDirectory: false)
+    }
+
+    private static func isForcedSignedOut() -> Bool {
+        guard let url = forcedSignedOutMarkerURL else { return true }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    private static func writeForcedSignedOutMarker() -> Bool {
+        guard let url = forcedSignedOutMarkerURL else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try Data("signed-out".utf8).write(to: url, options: .atomic)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static func clearForcedSignedOutMarker() -> Bool {
+        guard let url = forcedSignedOutMarkerURL else { return false }
+        guard FileManager.default.fileExists(atPath: url.path) else { return true }
+        do {
+            try FileManager.default.removeItem(at: url)
+            return true
+        } catch {
+            return false
+        }
+    }
 
     static func readToken() -> String? {
+        // Keychain 删除失败时也必须立即退出。该标记先于删除写入，确保旧令牌
+        // 即使仍残留在 Keychain 中也不会在下次启动被重新接受。
+        guard !isForcedSignedOut() else {
+            return nil
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -30,25 +71,32 @@ enum AuthTokenStore {
         return token
     }
 
-    static func writeToken(_ token: String?) {
+    @discardableResult
+    static func writeToken(_ token: String?) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: tokenAccount
         ]
         guard let token, !token.isEmpty else {
-            SecItemDelete(query as CFDictionary)
-            return
+            let marked = writeForcedSignedOutMarker()
+            let status = SecItemDelete(query as CFDictionary)
+            let deleted = status == errSecSuccess || status == errSecItemNotFound
+            return marked && deleted
         }
         let data = Data(token.utf8)
         let attributes: [String: Any] = [kSecValueData as String: data]
-        if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecItemNotFound {
             var newItem = query
             newItem[kSecValueData as String] = data
             newItem[kSecAttrAccessible as String] =
                 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            SecItemAdd(newItem as CFDictionary, nil)
+            let succeeded = SecItemAdd(newItem as CFDictionary, nil) == errSecSuccess
+            return succeeded && clearForcedSignedOutMarker()
         }
+        let succeeded = updateStatus == errSecSuccess
+        return succeeded && clearForcedSignedOutMarker()
     }
 
     static func readEmail() -> String? {
@@ -62,6 +110,35 @@ enum AuthTokenStore {
             UserDefaults.standard.removeObject(forKey: emailDefaultsKey)
         }
     }
+}
+
+private final class AuthRedirectBlocker: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        // 认证请求携带密码或 Bearer；禁止自动跟随任何重定向，避免凭据被带到
+        // 非预期主机，也避免官网 SPA 回退被误当成 API 成功响应。
+        completionHandler(nil)
+    }
+}
+
+private enum AuthNetwork {
+    static let maximumResponseBytes = 64 * 1024
+    private static let redirectBlocker = AuthRedirectBlocker()
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpShouldSetCookies = false
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(
+            configuration: configuration,
+            delegate: redirectBlocker,
+            delegateQueue: nil
+        )
+    }()
 }
 
 // MARK: - 账号与错误模型
@@ -98,6 +175,8 @@ enum AuthError: LocalizedError, Equatable {
     case emailRegistered        // 409
     case accountDisabled        // 403：账号已禁用
     case sessionInvalid         // /me 401/403：令牌失效
+    case secureStorage          // Keychain 写入失败：禁止假登录
+    case protocolFailure        // 非官网 HTTPS、超限或非 JSON：禁止离线放行
     case server(Int, String)    // 其他 4xx/5xx，携带服务端 message
     case network                // 网络层失败
 
@@ -111,6 +190,8 @@ enum AuthError: LocalizedError, Equatable {
         case .emailRegistered: return "该邮箱已注册，请直接登录"
         case .accountDisabled: return "账号已禁用，请联系开发者"
         case .sessionInvalid: return "登录已失效，请重新登录"
+        case .secureStorage: return "无法安全保存登录状态"
+        case .protocolFailure: return "账号服务响应格式错误"
         case .server(_, let message): return message.isEmpty ? "服务暂不可用，请稍后重试" : message
         case .network: return "网络连接失败，请检查网络后重试"
         }
@@ -142,11 +223,10 @@ final class AuthService: ObservableObject {
     @Published private(set) var state: State = .checking
     @Published private(set) var account: AuthAccount?
     @Published private(set) var emailCodeMode: EmailCodeMode = .unknown
+    @Published private(set) var localCleanupMessage = ""
 
-    private static var serverURL: String {
-        UserDefaults.standard.string(forKey: "aiServerURL")
-            ?? "http://101.34.255.115:8787"
-    }
+    // 账号凭据与会话令牌只允许走官网 HTTPS 反代；不得复用历史 AI 明文地址。
+    private static let serverURL = "https://zenche.top/api"
 
     var token: String? { AuthTokenStore.readToken() }
 
@@ -166,23 +246,35 @@ final class AuthService: ObservableObject {
                 token: token,
                 body: nil
             )
-            let account = decodeAccount(me)
+            let account = try decodeAccount(me)
             self.account = account
             AuthTokenStore.writeEmail(account.email)
             state = .signedIn
         } catch let error as AuthError {
             switch error {
             case .sessionInvalid:
-                clearSession()
+                if !clearSession() {
+                    localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+                }
                 state = .signedOut
-            default:
-                // 服务端异常（5xx）按离线容忍放行，保住本地登录态。
+            case .network:
+                // 仅真实网络不可达时离线容忍；格式错误、重定向和 4xx 一律失败关闭。
                 state = .signedIn
                 restoreCachedAccount()
+            case .server(let status, _) where status >= 500:
+                state = .signedIn
+                restoreCachedAccount()
+            default:
+                if !clearSession() {
+                    localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+                }
+                state = .signedOut
             }
         } catch {
-            state = .signedIn
-            restoreCachedAccount()
+            if !clearSession() {
+                localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+            }
+            state = .signedOut
         }
     }
 
@@ -227,7 +319,9 @@ final class AuthService: ObservableObject {
             // 尽力而为：服务端吊销失败不阻塞本地登出。
             _ = try? await request(path: "/v1/auth/logout", method: "POST", token: token, body: nil)
         }
-        clearSession()
+        if !clearSession() {
+            localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+        }
         state = .signedOut
         account = nil
     }
@@ -238,32 +332,51 @@ final class AuthService: ObservableObject {
         guard let token = json["token"] as? String, !token.isEmpty else {
             throw AuthError.server(200, "服务端未返回会话令牌")
         }
-        let account = decodeAccount(json)
-        AuthTokenStore.writeToken(token)
+        let account = try decodeAccount(json)
+        guard AuthTokenStore.writeToken(token) else {
+            throw AuthError.secureStorage
+        }
         AuthTokenStore.writeEmail(account.email)
         self.account = account
+        localCleanupMessage = ""
         state = .signedIn
     }
 
-    private func clearSession() {
-        AuthTokenStore.writeToken(nil)
+    @discardableResult
+    private func clearSession() -> Bool {
+        var cleared = AuthTokenStore.writeToken(nil)
+        if !cleared {
+            // 瞬时 Keychain 错误允许一次同步重试；无论结果如何，forced-signed-out
+            // 标记仍优先于残留 token，当前进程继续保持登录墙。
+            cleared = AuthTokenStore.writeToken(nil)
+        }
         AuthTokenStore.writeEmail(nil)
         account = nil
+        if !cleared {
+            localCleanupMessage = "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。"
+        }
+        return cleared
     }
 
-    private func decodeAccount(_ json: [String: Any]) -> AuthAccount {
+    private func decodeAccount(_ json: [String: Any]) throws -> AuthAccount {
         if let account = json["account"] as? [String: Any],
            let email = account["email"] as? String, !email.isEmpty {
             return AuthAccount(
                 email: email,
-                createdAt: account["createdAt"] as? String,
+                createdAt: stringValue(account["createdAt"]),
                 verified: account["verified"] as? Bool
             )
         }
         if let email = json["email"] as? String, !email.isEmpty {
             return AuthAccount(email: email, createdAt: nil, verified: nil)
         }
-        return AuthAccount(email: "", createdAt: nil, verified: nil)
+        throw AuthError.server(200, "账号服务响应缺少有效账号")
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        if let value = value as? String { return value }
+        if let value = value as? NSNumber { return value.stringValue }
+        return nil
     }
 
     // MARK: - 网络
@@ -275,45 +388,55 @@ final class AuthService: ObservableObject {
         body: [String: Any]?
     ) async throws -> [String: Any] {
         let base = Self.serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: base + path) else {
-            throw AuthError.network
+        guard let url = URL(string: base + path),
+              url.scheme?.lowercased() == "https",
+              url.host != nil else {
+            throw AuthError.protocolFailure
         }
         var r = URLRequest(url: url)
         r.httpMethod = method
         r.timeoutInterval = 15
-        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.setValue("application/json", forHTTPHeaderField: "Accept")
         if let token {
             r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         if let body {
+            r.setValue("application/json", forHTTPHeaderField: "Content-Type")
             r.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: r)
+            (data, response) = try await AuthNetwork.session.data(for: r)
         } catch {
             throw AuthError.network
         }
-        guard let http = response as? HTTPURLResponse else {
-            throw AuthError.network
+        guard let http = response as? HTTPURLResponse,
+              http.url?.scheme?.lowercased() == "https",
+              http.url?.host?.lowercased() == "zenche.top",
+              data.count <= AuthNetwork.maximumResponseBytes else {
+            throw AuthError.protocolFailure
         }
+        let contentType = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
         let object = (try? JSONSerialization.jsonObject(with: data))
             .flatMap { $0 as? [String: Any] }
-        let message = object?["error"] as? String ?? object?["message"] as? String ?? ""
+        guard contentType.contains("application/json"), let object else {
+            throw AuthError.protocolFailure
+        }
+        let message = object["error"] as? String ?? object["message"] as? String ?? ""
         switch http.statusCode {
         case 200..<300:
-            return object ?? [:]
+            return object
         case 401:
             throw path == "/v1/auth/me" ? AuthError.sessionInvalid : AuthError.invalidCredentials
         case 403:
-            throw AuthError.accountDisabled
-        case 404, 500..<600:
-            throw AuthError.server(http.statusCode, message)
+            throw path == "/v1/auth/me" ? AuthError.sessionInvalid : AuthError.accountDisabled
         case 409:
             throw AuthError.emailRegistered
         case 503 where path == "/v1/auth/email-code":
             throw AuthError.emailCodeUnavailable
+        case 404, 500..<600:
+            throw AuthError.server(http.statusCode, message)
         default:
             throw AuthError.server(http.statusCode, message)
         }

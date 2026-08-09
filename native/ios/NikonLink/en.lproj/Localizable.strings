@@ -860,6 +860,8 @@
 "登录已失效，请重新登录" = "Your session has expired. Please log in again.";
 "服务暂不可用，请稍后重试" = "Service is temporarily unavailable. Please try again later.";
 "网络连接失败，请检查网络后重试" = "Network connection failed. Please check your network and retry.";
+"无法安全保存登录状态" = "Unable to save your sign-in securely.";
+"已退出，但本地登录信息未能完全清理。请重试登录后再次退出。" = "You’re signed out, but some local sign-in data could not be removed. Sign in and try signing out again.";
 "账号" = "Account";
 "登录状态与账户管理" = "Sign-in status and account management";
 "当前账号" = "Current Account";
