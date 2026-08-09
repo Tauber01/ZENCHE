@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-04（Asia/Shanghai）
+> 最近核对：2026-08-09（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -146,6 +146,15 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - STUDIO_* 清理判据修正：引用计数=1（仅定义处）即死；**有实际使用的必须保留**（Harmony STUDIO_CANVAS 两处沉浸 HUD 底使用，故仅删 PANEL/RAISED/RULE/GOLD 四死定义，与 F3 Android 全删差异源于真实使用情况）。
 - MonitorScopeRail 契约：monitor 区三件套（RGB 波形 + 中间录制钮 + 音频波形）五端统一；录制钮交互参照 ImmersiveCaptureButton（■/● + UI_VIDEO + toggleVideoRecording）。
 - 动态字档计数口径：标识符出现数 ≠ 实际调用数（iOS .font() 249 出现 / 115 实际调用），报告时双口径并陈。
+
+## 0.16. W13 邮箱账号客户端安全边界（未发布候选）
+
+- 认证 API 基址固定为 `https://zenche.top/api`，再拼接 `/v1/auth/*`；认证请求不得读取或继承历史 AI 服务器偏好。构造请求后仍须校验 HTTPS scheme 与官网 host，禁止自动重定向，并限制响应体大小。
+- HTTP 响应必须是 JSON Content-Type、可解析对象且包含接口所需字段：登录/注册需要非空 token 与 account.email，`/me` 需要非空 account.email。HTML、畸形 JSON、字段缺失、响应超限或终点异常均属于协议失败，不得进入离线容忍；只有真实网络失败与格式正确的服务端 5xx 可保留缓存登录态。
+- iOS/macOS 的 session token 使用 Keychain `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，forced-signed-out 标记使用 Application Support 原子文件；Android 使用 AndroidKeyStore AES-256-GCM 与 no-backup tombstone；HarmonyOS 使用 HUKS AES-256-GCM 与 preferences 两阶段标记；Windows 使用 DPAPI CurrentUser 单一会话包与原子 tombstone。安全存储写入、标记清除或本地清理失败必须保持登录墙并显示错误，不能伪装成登录或登出成功。
+- `/v1/auth/me` 的 401 与 403 都代表本地会话不可继续，必须清 session 回登录墙；启动校验期间不得挂载或暴露主工作区。登出同时关闭连接 dialog/sheet/overlay，并停止相机、无线、蓝牙、定位与外录等后台态。
+- `email-code` 的 503 是 SMTP 未配置的专用过渡态：客户端隐藏验证码并允许服务端按免码开关裁决；严格态仍要求 6 位数字验证码。五端表单提供 60 秒倒计时、44pt/dp/px 触控目标、键盘/焦点链、错误播报与桌面/平板内容宽度上限。
+- 账号绑定要求 AI 请求携带 Bearer，但只有 AI endpoint 本身是 HTTPS 时才可附加；历史 HTTP AI 地址继续兼容匿名旧流程，不能携带账号 token。代码候选 `c661f7f` 已通过 AI审查 原生视觉/交互与 GPT5.6luna 用户可见内容静态门禁；但公网 `/api/v1/auth/me`、`/api/v1/ai` 的 HTTPS JSON 路由和五端真机矩阵完成并实测前，W13 客户端不得进入发布分支。
 
 ## 1. 总体原则
 

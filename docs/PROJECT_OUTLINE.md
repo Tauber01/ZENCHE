@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 项目大纲
 
 > 文档状态：工作基线
-> 最近核对：2026-08-04（Asia/Shanghai）
+> 最近核对：2026-08-09（Asia/Shanghai）
 > 使用方式：开始产品、界面、技术或发布工作前，先阅读根目录 `AGENTS.md`，再阅读本文、`docs/TECHNICAL_APPROACH.md` 与 `docs/TASK_PROGRESS.md`。
 
 ## 1. 项目定位
@@ -14,9 +14,9 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.3
-- 当前原生构建号：28
-- 发布状态：v1.5.3 已发布为 [GitHub 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，注释标签 `v1.5.3` 与 `main` 均指向发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`
+- 当前源码版本：1.5.9
+- 当前原生构建号：36
+- 发布状态：v1.5.3 已发布为[公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，注释标签 `v1.5.3` 解析到发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；当前本地 `main`、`origin/main` 与 `v1.5.9` 标签均解析到 1.5.9 / build 36 提交 `8bd995cb29b4d9e03ac3152ba0cdd34393371e1b`，W13 代码候选 `c661f7f` 未发布
 
 v1.4.0 已完成 AI 原图上传、服务器次数扣减/失败回滚、修图覆盖原图与生图另存的五端行为对齐；包与签名状态详见 `docs/releases/v1.4.0.md`。发布提交为 `8a13c0b`，标签为 `v1.4.0`，Release 为 [GitHub v1.4.0](https://github.com/Tauber01/ZENCHE/releases/tag/v1.4.0)。
 
@@ -114,6 +114,7 @@ v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8
 - 不在应用内托管第三方网盘账号；导入通过系统文件提供器或对应客户端完成。
 - 重要拍摄必须保留相机存储卡，应用不能被描述为唯一备份。
 - **AI 功能**：开源客户端不内置模型 API 密钥，模型请求由作者维护的代理服务器持有密钥并转发；仅发送用户主动提交的提示词与（修图模式下）当前编辑照片。AI 使用次数在服务器端计数，激活码绑定设备、每码 100 次。
+- **W13 账号系统候选**：五端已接入邮箱注册、登录墙、会话校验与账号绑定，代码候选为 `c661f7f`，但仍未发布。账号密码与 session token 只允许经 `https://zenche.top/api` 访问；历史 `http://101.34.255.115:8787` AI 配置不得作为认证基址，AI endpoint 为 HTTP 时客户端不得附加账号 Bearer。AI审查 与 GPT5.6luna 已分别签发原生视觉/交互、用户可见内容的代码静态 PASS；公网 `/api/v1/auth/me` 与 `/api/v1/ai` 仍返回站点 HTML，真机视觉矩阵与五端真实登录冒烟也未完成，因此该候选不得推送、部署或发布。
 - **服务器端自动更新**：`server.mjs` 提供只读 `GET /api/update`（兼容 `/api/updates`）和 `/healthz`。服务按平台/架构解析 GitHub Release 完整安装包，返回版本、下载 URL、SHA-256、公告、最低支持版本和 `update_available`；元数据按 channel 缓存，上游异常时返回带 `stale: true` 的最近缓存。五端原生客户端默认请求 `https://zenche.top/api/update`，失败后继续 MirrorChyan/GitHub 回退，不直接覆盖应用文件。
 - **生产部署状态**：v1.4.1 六个官方 Release 包和六份 `.sha256` 已上传至 `101.34.255.115:/var/www/zenche.top/downloads/`；`zenche-update.service` 监听 `127.0.0.1:4174`，Nginx 反代更新 API 并提供 `/downloads/` 静态资产，`UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 已启用。服务器本机验证通过；公网 DNS 截至 2026-08-02 仍指向 `45.207.210.254`，DNS/CDN 切换到 `101.34.255.115` 后完成公网验收。
 

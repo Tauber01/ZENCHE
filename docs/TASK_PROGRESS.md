@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-04（Asia/Shanghai）
-> 基线分支：`main@697f3f8`；v1.5.3 已发布为 GitHub 最新稳定版
-> 当前版本：1.5.3 / build 28 已发布；发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；GitHub 最新稳定版为 v1.5.3
+> 快照时间：2026-08-09（Asia/Shanghai）
+> 当前源码候选：`agent/1.5.6-ui` 的代码提交 `c661f7f`，1.5.9 / build 36
+> 公开稳定版：v1.5.3（发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`）；W13 候选未 push、未部署、未发布
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,13 +18,13 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前源码版本为 **1.5.3 / build 28**，已发布为 [GitHub 最新稳定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)；发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`（代码候选 `846e1a0dc49c59b0cc5d032d84f954a98a61add0` + README/CHANGELOG 发布同步），注释标签 `v1.5.3` 指向同一提交；生产服务未变更。
+- 当前源码候选为 **1.5.9 / build 36**，W13 候选仅保留在本地分支，未 push、未部署、未发布。公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，发布提交 `697f3f8d1028426dc5eec430230dcf48754f9b15`；生产服务未因 W13 变更。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
-- 当前门禁证据：`git diff --check`、1.5.3 专项回归 8/8、完整 `npm test` 256/256 均通过；iOS Simulator 无签名 Release、Android Debug、HarmonyOS release HAP、macOS 全 Swift 类型检查、Windows Release XAML/C# 均通过。独立复核已关闭全部 P1，最终结论为 P0/P1 均为 0；新增三语用户文案已完成一致性与自然度校对。七个版本化交付包及同名 SHA-256 已生成并逐个回验。
+- v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W13 代码候选 `c661f7f` 已完成 468/468、五端编译、AI审查 原生视觉/交互静态门禁和 GPT5.6luna 用户可见内容静态门禁。真机/窗口截图矩阵、安装签名与生产 HTTPS API 验收仍未闭环，不能据此宣称可发布。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0 已作为历史 GitHub Release 保留；生产下载服务器仍保留既有 v1.4.1 六包。当前公开稳定版与交付哈希以 v1.5.2 Release 和 `docs/releases/v1.5.2.md` 为准。
+- v1.5.0 已作为历史 GitHub Release 保留；当前公开稳定版为 v1.5.3。生产下载服务器仍保留既有 v1.4.1 六包，W13 未改变生产下载或发布状态。
 - AI 全链路已通过端到端验证：激活码验签 → 服务器计数 → 转发 grsai → 返回图片，计数递减正常。
-- 最大未闭环风险仍是跨 42 款相机的系统实机矩阵、生产签名、公证与商店级分发；Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
+- 最大未闭环风险仍是跨 46 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
 - 本次编辑器迭代已同步五端：AI 工作台增加显式“分析画面”步骤、曝光/动态范围/色彩/细节指标，以及 AI 调整复制/粘贴；原有强度、智能优化、撤销、预设、前后对比和高质量副本保持不变。
 - 本轮增量 UI 修复已完成：五端编辑器主身份恢复为“专业显影”，AI 保留为可选增强区并明确“照片不会上传”；Android 恢复原有底部连接状态与文件计数栏及其更新链路，未删除编辑或拍摄功能。
@@ -51,7 +51,7 @@
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
 | 非破坏性编辑 | 已实现待验收 | 五端主导航、分组参数与导出语义检查通过 | 像素级结果、EXIF、色彩空间和超大图验证 |
 | **AI 修图与生图** | **已实现待验收** | 五端 AI 工作台与联网 AI 面板、分析指标、AI 调整复制/粘贴、12 预设、提示词/比例/分辨率、激活码授权、服务器计数；全链路端到端验证通过 | 各平台真机 UI、服务器容灾、激活码发放流程 |
-| **Sony / Canon 相机适配** | **已实现待验收** | Sony 12 款、Canon 10 款注册表；vendor ID 过滤、macOS detection tokens、Windows PTP vendor ops；42 项测试覆盖 | Sony/Canon 真机 PTP、实时取景、参数写入和不同固件验证 |
+| **Sony / Canon 相机适配** | **已实现待验收** | Nikon 20 款、Sony 12 款、Canon 14 款，共 46 款注册表静态覆盖；vendor ID 过滤、macOS detection tokens、Windows PTP vendor ops | Sony/Canon 真机 PTP、实时取景、参数写入和不同固件验证 |
 | 三语本地化 | 已实现待验收 | 简中/英/日资源与动态状态测试通过 | 人工校对、截断、窄屏与新增文案持续同步 |
 | 更新与公告 | 已实现待验收 | 自有 `/api/update` + MirrorChyan + GitHub fallback；服务端缓存/资产选择/API 路由测试通过；五端源码契约对齐；服务器本机 API/静态资产/SHA-256 验证通过 | 将 DNS/CDN 切换到 `101.34.255.115`，再实测公网下载、公告、断网 stale 回退和各平台安装流程 |
 | 诊断与隐私 | 已实现待验收 | 脱敏日志和预填 Issue 实现存在 | 敏感信息专项审计与异常日志压力测试 |
@@ -75,7 +75,7 @@
 - **五端接入**：iOS、Android、HarmonyOS、macOS、Windows 默认请求 `https://zenche.top/api/update`，校验 `schema_version/product` 后使用结果；不可用时仍按 MirrorChyan → GitHub 回退。
 - **测试**：`node --test` 75/75 通过；`git diff --check` 通过。
 - **本机交付物**：Android、iOS unsigned、Windows x64 Setup/ZIP 已由本轮源码生成并写入 `dist/`；SHA-256 分别为 Android `d4bcbfc0fa1bac599a739e85879299f1fdb0a34d53535d929f7895d5a569ea7a`、iOS `4e4bfe7d414f8baef44396504f3123ed5f3b919a350f1ed9dd10e0e869254599`、Windows Setup `5ab10ca284f65c71f0328fdad7ca2ca7467112d853ae20b15eb1b39833fc658f`、Windows ZIP `513c6b2820ff28026aa5657057ada4e5752a75b8b8f8d501eba7b6cb0bea8e11`；macOS 仅完成 Swift 编译，因缺少本机 `libexif.12.dylib` 未生成可信本轮 DMG；HarmonyOS 因既有 ArkTS 错误未生成可信本轮 HAP。
-- **阻塞**：尚未把服务部署到 `zenche.top` 的生产反向代理；需要服务器 SSH/进程托管/HTTPS 配置权限。Android 构建曾遇到 SDK manifest 网络握手警告但最终成功；iOS unsigned 构建成功。Windows 使用本机 PowerShell/.NET/NSIS 生成未签名安装器与便携包。
+- **部署边界**：生产反向代理、进程托管、资产上传和服务器本机验证已完成；公网 DNS/CDN 切换、HTTPS 公网验收和客户端闭环仍待完成。Android 构建曾遇到 SDK manifest 网络握手警告但最终成功；iOS unsigned 构建成功。Windows 使用本机 PowerShell/.NET/NSIS 生成未签名安装器与便携包。
 - **部署状态**：上述生产反向代理、进程守护、资产上传和服务器本机下载验证已完成；公网 DNS/CDN 切换仍是唯一未闭环项。
 - **下一步**：将 `zenche.top` DNS/CDN 指向 `101.34.255.115`，实测公网五端下载 URL、公告、SHA-256、ETag、断网 stale 回退及安装流程。
 
@@ -1124,3 +1124,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 契约测试两端各加用例（扫描断言防失明，注入反证经门禁亲验）。
 - 验证：npm test 357/357 全绿（355 基线 + 2 新）；AI审查 复审放行（aa9fd138）。
 - 范围：只动圆角；间距/颜色/字号/功能零改动。未 git push。
+
+## 12.50 W13 五端邮箱账号登录墙接管与代码层安全加固（2026-08-09，GPT5.6）
+
+- 接管基线：整合分支 `agent/1.5.6-ui` 基于 `2c7bf50`，W13-a 服务端与 W13-b 管理台已在基线内。五端客户端在首版实现基础上完成安全与视觉加固，代码候选提交为 `c661f7f62e731b36639256aba653a5e0f84b46d1`；提交使用仓库配置的 Tauber `Co-authored-by` 与 `Signed-off-by` trailers，未沿用旧代理签署。
+- 安全边界加固：认证固定 `https://zenche.top/api`，禁重定向、限制响应体、严格 JSON/字段形状，协议失败不得离线放行；AI Bearer 仅随 HTTPS endpoint 发送。五端安全存储均加入 forced-signed-out tombstone、失败重试与可见错误，登录/注册保存失败不放行，登出清理失败继续保持登录墙。
+- 门禁与交互：启动 `/me` 校验期间不挂载工作区；401/403、协议失败与登出统一关闭连接浮层，并完整停止相机、Wi‑Fi/本机相机、外录、无线、蓝牙和定位后台态。Apple、Android、HarmonyOS 已补焦点/IME/错误播报、44pt/dp 触控、窄窗/平板内容宽度、graphite splash；Android 修复夜间重建绕过、503 免码 IME 与分屏宽度；HarmonyOS 修复 splash 层序；macOS 登录态动态使用 320×420 / 1040×700 窗口下限；Windows 新增完整 checking/login wall、设置账号区、三语与 AI Bearer 接线。
+- 统一验证（代码候选 `c661f7f` 的同内容冻结状态）：W13 定向 58/58、`npm test` 468/468；iOS generic/device Release unsigned `xcodebuild` BUILD SUCCEEDED；macOS 全源 `swiftc -typecheck` exit 0；Android 离线 `:app:compileDebugJavaWithJavac` BUILD SUCCESSFUL；HarmonyOS release `assembleHap` BUILD SUCCESSFUL（未签名属项目常态）；Windows Release `dotnet build` 0 错误、0 警告；`git diff --check` 通过。Android 的 3 个 Java 8 警告及 Apple/HarmonyOS 的现有弃用、并发或 SDK 警告未由 W13 新增。
+- 视觉门禁：AI审查 第四轮严格只读复审（Buzz `906c8c87…39d39`）签发认证/契约/构建与原生视觉/交互代码静态 PASS，代码 P0/P1/P2 均为 0；审查同时明确该结论不覆盖真机截图、安装或生产验收。当前环境无可用 iOS Simulator、adb、hdc 或 Windows 实机，真机/窗口截图矩阵仍是明确阻塞。
+- 文案门禁：GPT5.6luna 第四轮五端终审（Buzz `bffb38f8…38e8d`）签发用户可见内容/去 AI 痕迹静态 PASS；随后对 iOS 日文「新規登録」精确返修的窄范围复核（Buzz `dc411ea6…8abeb`）确认 PASS 继续有效。该结论同样不扩大为真机、安装或生产 PASS。
+- 生产阻塞：2026-08-09 只读探测确认 `https://zenche.top/api/v1/auth/me` 与 `/api/v1/ai` 返回 HTTP 200 站点 HTML，而旧公网 HTTP API 仍返回 JSON。客户端已按协议失败关闭；在官网 HTTPS 反代、五端真实注册/登录/`me`/登出/AI 绑定与真机矩阵完成前，不得 push、部署或发布 W13。
