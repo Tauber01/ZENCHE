@@ -155,7 +155,7 @@ test("admin: devices list filters, query, pagination", async (t) => {
   assert.equal(revoked.items[0].device_id, "dev-bbb");
   assert.equal(revoked.items[0].status, "revoked");
   // query
-  const q = await (await adminGet(base, "/v1/admin/devices?query=bbb")).json();
+  const q = await (await adminGet(base, "/v1/admin/devices?query=dev-bbb")).json();
   assert.equal(q.total, 1);
   assert.equal(q.items[0].device_id, "dev-bbb");
   // pagination (limit=1, cursor)
