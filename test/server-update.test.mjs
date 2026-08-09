@@ -300,11 +300,11 @@ test("selfhost: v1.5.10 production manifest resolves all five native clients", a
     assetBaseUrl: "https://zenche.top/downloads",
   });
   const expected = [
-    ["android", "arm64", "ZENCHE-1.5.10-android.apk", "ba0f91428ef41eff87abb5878816d6d00c3038211f575e9a8b98283ed57ab3f5"],
-    ["ios", "arm64", "ZENCHE-1.5.10-ios-unsigned.ipa", "5a103f63586881ac3a11266923414a1eefa6478b2d94d5238a7cdc9cddfcee8e"],
-    ["harmony", "arm64", "ZENCHE-1.5.10-HarmonyOS.hap", "b49ea6f12db79be01e25cf6b3cb6c215d579a5eb3c7ace3dbf026d540eac9732"],
-    ["macos", "arm64", "ZENCHE-1.5.10-macOS-arm64.dmg", "29b9eda5b6e414b92e7b6eada6078b10033f57cda3cbba031c8af11d4d62a6fa"],
-    ["windows", "x64", "ZENCHE-1.5.10-Windows-x64-Setup.exe", "eeead276690300e5e0d824269836a06ef2a4a2b3bba2973b3dcdc52090fc4aa2"],
+    ["android", "arm64", "ZENCHE-1.5.10-android.apk", "dbc10522b49fe760b8b5e377b89a8060808942533944e22b97a59a13f2a4b96a"],
+    ["ios", "arm64", "ZENCHE-1.5.10-ios-unsigned.ipa", "6fc610976147ae6cd38f5b92f97605dbcc7a090ff4b2d04d09ef649b6370679c"],
+    ["harmony", "arm64", "ZENCHE-1.5.10-HarmonyOS.hap", "0bde3fbe6ab07be6247532f076774e65d2d41f1c9c4bf9ff38ac7182808f4989"],
+    ["macos", "arm64", "ZENCHE-1.5.10-macOS-arm64.dmg", "01c68884754f5c9ac87415bb4387ec0d1f1c936bb46ee52565f0865c755b9d56"],
+    ["windows", "x64", "ZENCHE-1.5.10-Windows-x64-Setup.exe", "6466b22519476425a0769a3b543cce27c6766be2c282008be1d0b466ad2c6f43"],
   ];
 
   for (const [platform, architecture, file, sha256] of expected) {
