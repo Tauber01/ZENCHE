@@ -112,7 +112,7 @@ test("admin: stats counts every registered account, not only activated devices",
 test("admin UI overview labels the all-account metric as total users", () => {
   const source = fs.readFileSync(new URL("../ai-server/admin/app.js", import.meta.url), "utf8");
   assert.match(source, /label:\s*"总用户",\s*value:\s*s\.totalAccounts/);
-  assert.match(source, /sub:\s*"含未验证与已禁用账号"/);
+  assert.match(source, /sub:\s*"含未验证、已禁用、未绑定设备账号"/);
   assert.doesNotMatch(source, /label:\s*"总设备",\s*value:\s*s\.totalDevices/);
 });
 

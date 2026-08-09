@@ -176,7 +176,7 @@
   function renderOverview() {
     var s = state.stats;
     var cards = [
-      { label: "总用户", value: s.totalAccounts, sub: "含未验证与已禁用账号", cls: "accent" },
+      { label: "总用户", value: s.totalAccounts, sub: "含未验证、已禁用、未绑定设备账号", cls: "accent" },
       { label: "24h 活跃", value: s.active24h, sub: "最近 24 小时", cls: "live" },
       { label: "7d 活跃", value: s.active7d, sub: "最近 7 天", cls: "live" },
       { label: "7d 内到期", value: s.expiring7d, sub: "到期 ≤ 7 天", cls: "warning" },
