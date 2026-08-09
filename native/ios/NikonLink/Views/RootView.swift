@@ -291,6 +291,327 @@ private struct SplashView: View {
     }
 }
 
+// MARK: - W13-c 登录墙（邮箱账号系统）
+
+private enum AuthFormMode: String, CaseIterable, Identifiable {
+    case login = "登录"
+    case register = "注册"
+    var id: String { rawValue }
+}
+
+/// 登录/注册页：邮箱 + 密码 +（条件显示的）验证码字段 + 获取验证码按钮（60s 倒计时）。
+/// 验证码框两态由 AuthService.emailCodeMode 驱动：
+/// - required：严态，发码成功 → 显示验证码框，注册必须带码
+/// - notRequired：过渡态，发码 503（SMTP 未配）→ 隐藏验证码框，免码注册
+/// - unknown：未探测，注册按无码发送、由服务端裁决（严态下返回 400 并提示）
+private struct LoginView: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.locale) private var locale
+
+    @State private var mode: AuthFormMode = .login
+    @State private var email = ""
+    @State private var password = ""
+    @State private var code = ""
+    @State private var isWorking = false
+    @State private var errorMessage = ""
+    @State private var countdown = 0
+    @State private var countdownTask: Task<Void, Never>?
+
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var emailValid: Bool {
+        let parts = trimmedEmail.split(separator: "@")
+        guard parts.count == 2,
+              !parts[0].isEmpty,
+              !parts[1].hasPrefix("."),
+              !parts[1].hasSuffix("."),
+              parts[1].contains(".") else {
+            return false
+        }
+        return true
+    }
+
+    /// 严态（需验证码）时才要求填码；过渡态/未探测按免码注册交给服务端裁决。
+    private var codeRequired: Bool {
+        model.auth.emailCodeMode == .required
+    }
+
+    private var codeHidden: Bool {
+        model.auth.emailCodeMode == .notRequired
+    }
+
+    var body: some View {
+        ZStack {
+            IPalette.paper.ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: SpaceToken.s20) {
+                    loginHeader
+                    modePicker
+                    formCard
+                }
+                .padding(.horizontal, SpaceToken.s24)
+                .padding(.top, SpaceToken.s40)
+                .padding(.bottom, SpaceToken.s40)
+            }
+        }
+        .onDisappear {
+            countdownTask?.cancel()
+            countdownTask = nil
+        }
+    }
+
+    private var loginHeader: some View {
+        VStack(spacing: SpaceToken.s12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: RadiusToken.r20)
+                    .fill(
+                        LinearGradient(
+                            colors: [IPalette.cobalt, IPalette.cobalt.opacity(0.82)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 72, height: 72)
+                Text("Z")
+                    .font(.system(size: 36, weight: .heavy)) // 品牌标 Z，品牌资产豁免
+                    .foregroundStyle(.white)
+            }
+            Text("帧澈 ZENCHE")
+                .font(.system(size: FontToken.display, weight: .bold))
+                .foregroundStyle(IPalette.ink)
+            RuntimeLocalizedText("登录后使用拍摄、编辑与 AI 功能")
+                .font(.system(size: FontToken.body))
+                .foregroundStyle(IPalette.muted)
+        }
+        .padding(.top, SpaceToken.s24)
+    }
+
+    private var modePicker: some View {
+        Picker("", selection: $mode) {
+            ForEach(AuthFormMode.allCases) { mode in
+                RuntimeLocalizedText(mode.rawValue).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var formCard: some View {
+        VStack(spacing: SpaceToken.s12) {
+            HStack(spacing: SpaceToken.s8) {
+                Image(systemName: "envelope")
+                    .font(.system(size: FontToken.emphasis, weight: .semibold))
+                    .foregroundStyle(IPalette.muted)
+                    .frame(width: SpaceToken.s20)
+                TextField("邮箱", text: $email)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.emailAddress)
+                    .submitLabel(.next)
+            }
+            .padding(.horizontal, SpaceToken.s16)
+            .frame(height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: RadiusToken.r10)
+                    .fill(IPalette.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: RadiusToken.r10)
+                    .stroke(IPalette.rule, lineWidth: 1)
+            )
+
+            HStack(spacing: SpaceToken.s8) {
+                Image(systemName: "lock")
+                    .font(.system(size: FontToken.emphasis, weight: .semibold))
+                    .foregroundStyle(IPalette.muted)
+                    .frame(width: SpaceToken.s20)
+                SecureField("密码（至少 8 位）", text: $password)
+                    .submitLabel(.done)
+                    .onSubmit { submit() }
+            }
+            .padding(.horizontal, SpaceToken.s16)
+            .frame(height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: RadiusToken.r10)
+                    .fill(IPalette.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: RadiusToken.r10)
+                    .stroke(IPalette.rule, lineWidth: 1)
+            )
+
+            if mode == .register && codeHidden {
+                RuntimeLocalizedText("邮箱验证暂不可用，可直接注册")
+                    .font(.system(size: FontToken.caption))
+                    .foregroundStyle(IPalette.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if mode == .register && !codeHidden {
+                HStack(spacing: SpaceToken.s8) {
+                    Image(systemName: "number")
+                        .font(.system(size: FontToken.emphasis, weight: .semibold))
+                        .foregroundStyle(IPalette.muted)
+                        .frame(width: SpaceToken.s20)
+                    TextField("6 位验证码", text: $code)
+                        .keyboardType(.numberPad)
+                    Button {
+                        sendCode()
+                    } label: {
+                        RuntimeLocalizedText(
+                            countdown > 0 ? "重新获取 (\(countdown)s)" : "获取验证码"
+                        )
+                        .font(.system(size: FontToken.body, weight: .semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(countdown > 0 || isWorking)
+                }
+                .padding(.horizontal, SpaceToken.s16)
+                .frame(height: 44)
+                .background(
+                    RoundedRectangle(cornerRadius: RadiusToken.r10)
+                        .fill(IPalette.surface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: RadiusToken.r10)
+                        .stroke(IPalette.rule, lineWidth: 1)
+                )
+            }
+
+            if !errorMessage.isEmpty {
+                Text(RuntimeLocalization.text(errorMessage, locale: locale))
+                    .font(.system(size: FontToken.caption))
+                    .foregroundStyle(IPalette.video)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                submit()
+            } label: {
+                Group {
+                    if isWorking {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        RuntimeLocalizedText(mode == .login ? "登录" : "注册")
+                            .font(.system(size: FontToken.emphasis, weight: .bold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(IPalette.cobalt)
+            .disabled(isWorking)
+
+            RuntimeLocalizedText(mode == .login
+                 ? "还没有账号？切换到「注册」即可创建"
+                 : "已有账号？切换到「登录」")
+                .font(.system(size: FontToken.caption))
+                .foregroundStyle(IPalette.muted)
+        }
+        .padding(SpaceToken.s20)
+        .background(
+            RoundedRectangle(cornerRadius: RadiusToken.r16)
+                .fill(IPalette.surfaceRaised)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: RadiusToken.r16)
+                .stroke(IPalette.rule, lineWidth: 1)
+        )
+        .shadow(color: IPalette.shadow, radius: RadiusToken.r12, y: 4)
+    }
+
+    // MARK: 动作
+
+    private func sendCode() {
+        guard !isWorking, countdown == 0 else { return }
+        guard emailValid else {
+            errorMessage = AuthError.invalidEmail.errorDescription ?? "请输入有效的邮箱地址"
+            return
+        }
+        errorMessage = ""
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            do {
+                try await model.auth.sendEmailCode(email: trimmedEmail)
+                startCountdown()
+                errorMessage = "验证码已发送至 \(trimmedEmail)"
+            } catch let error as AuthError {
+                if error == .emailCodeUnavailable {
+                    // 过渡态：发码 503 → 隐藏验证码框、走免码注册
+                    errorMessage = "邮箱验证暂不可用，可直接注册"
+                } else {
+                    errorMessage = error.errorDescription ?? error.localizedDescription
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func submit() {
+        guard !isWorking else { return }
+        guard emailValid else {
+            errorMessage = AuthError.invalidEmail.errorDescription ?? "请输入有效的邮箱地址"
+            return
+        }
+        guard password.count >= 8 else {
+            errorMessage = AuthError.weakPassword.errorDescription ?? "密码至少需要 8 位"
+            return
+        }
+        if mode == .register && codeRequired {
+            guard code.count == 6 else {
+                errorMessage = AuthError.invalidCode.errorDescription ?? "请输入 6 位验证码"
+                return
+            }
+        }
+        errorMessage = ""
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            do {
+                switch mode {
+                case .login:
+                    try await model.auth.login(
+                        email: trimmedEmail,
+                        password: password
+                    )
+                case .register:
+                    try await model.auth.register(
+                        email: trimmedEmail,
+                        password: password,
+                        code: codeRequired ? code : nil
+                    )
+                }
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+        }
+    }
+
+    private func startCountdown() {
+        countdown = 60
+        countdownTask?.cancel()
+        countdownTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                if countdown > 1 {
+                    countdown -= 1
+                } else {
+                    countdown = 0
+                    return
+                }
+            }
+        }
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.scenePhase) private var scenePhase
@@ -307,52 +628,17 @@ struct RootView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                (model.section == .capture || model.section == .monitor
-                    ? IPalette.uiBackground
-                    : IPalette.paper)
-                    .ignoresSafeArea()
-
-                VStack(spacing: SpaceToken.s0) {
-                    // The compact monitor is a dedicated camera surface, and
-                    // capture now renders the fig1 control top bar inside the
-                    // page. Keep the shared header for the remaining pages.
-                    if model.section != .capture
-                        && !(model.section == .monitor && proxy.size.width < 820)
-                    {
-                        AppHeader()
-                        Divider().overlay(IPalette.rule)
-                    }
-
-                    if proxy.size.width >= 820 {
-                        HStack(spacing: SpaceToken.s0) {
-                            SideNavigation()
-                            Divider().overlay(IPalette.rule)
-                            CurrentPage()
-                        }
-                        GlobalStatusBar(
-                            bottomInset: proxy.safeAreaInsets.bottom
-                        )
-                    } else {
-                        CurrentPage()
-                        Divider().overlay(IPalette.rule)
-                        BottomNavigation(bottomInset: 0)
-                        GlobalStatusBar(
-                            bottomInset: proxy.safeAreaInsets.bottom
-                        )
-                    }
-
-                }
-                .preferredColorScheme(
-                    model.section == .capture || model.section == .monitor
-                        ? .dark
-                        : nil
-                )
+        Group {
+            switch model.auth.state {
+            case .signedOut:
+                // W13-c 登录墙（3A：不登录任何功能不可用）
+                LoginView()
+            case .checking, .signedIn:
+                mainWorkspace
             }
         }
         .overlay {
-            if showSplash {
+            if showSplash || model.auth.state == .checking {
                 SplashView {
                     withAnimation(.easeInOut(duration: 0.6)) {
                         showSplash = false
@@ -398,6 +684,60 @@ struct RootView: View {
                 DiagnosticLogger.shared.info("app", "应用离开前台")
                 model.camera.suspend()
                 model.wireless.stop()
+            }
+        }
+        .task {
+            // W13-c 启动路由守卫：无令牌 → 登录墙；有令牌 → /me 校验，
+            // 401/403 清令牌回登录墙；网络失败放行本地缓存态（离线容忍）。
+            await model.auth.bootstrap()
+        }
+    }
+
+    /// 登录后的主工作区（W13-c 前 RootView 的原始内容）。
+    @ViewBuilder
+    private var mainWorkspace: some View {
+        GeometryReader { proxy in
+            ZStack {
+                (model.section == .capture || model.section == .monitor
+                    ? IPalette.uiBackground
+                    : IPalette.paper)
+                    .ignoresSafeArea()
+
+                VStack(spacing: SpaceToken.s0) {
+                    // The compact monitor is a dedicated camera surface, and
+                    // capture now renders the fig1 control top bar inside the
+                    // page. Keep the shared header for the remaining pages.
+                    if model.section != .capture
+                        && !(model.section == .monitor && proxy.size.width < 820)
+                    {
+                        AppHeader()
+                        Divider().overlay(IPalette.rule)
+                    }
+
+                    if proxy.size.width >= 820 {
+                        HStack(spacing: SpaceToken.s0) {
+                            SideNavigation()
+                            Divider().overlay(IPalette.rule)
+                            CurrentPage()
+                        }
+                        GlobalStatusBar(
+                            bottomInset: proxy.safeAreaInsets.bottom
+                        )
+                    } else {
+                        CurrentPage()
+                        Divider().overlay(IPalette.rule)
+                        BottomNavigation(bottomInset: 0)
+                        GlobalStatusBar(
+                            bottomInset: proxy.safeAreaInsets.bottom
+                        )
+                    }
+
+                }
+                .preferredColorScheme(
+                    model.section == .capture || model.section == .monitor
+                        ? .dark
+                        : nil
+                )
             }
         }
     }
@@ -1208,6 +1548,11 @@ private final class AiImageService {
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
         r.timeoutInterval = Self.requestTimeout
+        // W13-c：登录墙下 AI 激活请求带上会话令牌，服务端记录 账号↔设备↔激活码 三元组；
+        // 无令牌（存量流程/异常态）不影响既有请求。
+        if let token = AuthTokenStore.readToken() {
+            r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         r.httpBody = try JSONSerialization.data(withJSONObject: body)
         let data: Data
         let resp: URLResponse
@@ -9424,6 +9769,46 @@ private struct AppSettingsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SpaceToken.s16) {
+                    // W13-c：账号区（邮箱 + 退出登录；登出后回登录墙）
+                    SettingsSectionHeader(
+                        title: "账号",
+                        detail: "登录状态与账户管理"
+                    )
+                    SettingsCard {
+                        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+                            HStack(spacing: SpaceToken.s12) {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(.system(size: FontToken.title, weight: .semibold))
+                                    .foregroundStyle(IPalette.cobalt)
+                                    .frame(width: 36, height: 36)
+                                    .background(IPalette.cobaltSoft)
+                                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
+                                VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                                    Text("当前账号")
+                                        .font(.system(size: FontToken.body, weight: .semibold))
+                                        .foregroundStyle(IPalette.muted)
+                                    Text(model.auth.account?.email ?? "未登录")
+                                        .font(.system(size: FontToken.emphasis, weight: .bold))
+                                        .foregroundStyle(IPalette.ink)
+                                        .textSelection(.enabled)
+                                }
+                                Spacer()
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                Task { await model.auth.logout() }
+                            } label: {
+                                Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            Text("退出后将清除本机登录令牌，需重新登录才能使用全部功能。")
+                                .font(.caption)
+                                .foregroundStyle(IPalette.muted)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
                     SettingsSectionHeader(
                         title: "通用",
                         detail: "界面语言与本地保存偏好"

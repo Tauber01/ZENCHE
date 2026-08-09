@@ -508,6 +508,7 @@ final class AppModel: ObservableObject {
     let locationTagging: LocationTaggingService
     let library: MediaLibrary
     let rememberedDevices: RememberedDeviceStore
+    let auth: AuthService
     var captureWorkflow: CaptureWorkflow { library.workflow }
     let wireless: WirelessTransferServer
     let updater: UpdateController
@@ -550,6 +551,7 @@ final class AppModel: ObservableObject {
         let library = MediaLibrary()
         let updater = UpdateController()
         let rememberedDevices = RememberedDeviceStore()
+        let auth = AuthService()
         self.camera = camera
         self.wifiCamera = wifiCamera
         self.bluetoothRemote = bluetoothRemote
@@ -557,6 +559,7 @@ final class AppModel: ObservableObject {
         self.library = library
         self.updater = updater
         self.rememberedDevices = rememberedDevices
+        self.auth = auth
         wireless = WirelessTransferServer(directory: library.storageDirectory) { [weak library] url in
             library?.reload()
             library?.selectedItemID = url.path
@@ -653,6 +656,9 @@ final class AppModel: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         updater.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &subscriptions)
+        auth.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &subscriptions)
         wireless.$isRunning

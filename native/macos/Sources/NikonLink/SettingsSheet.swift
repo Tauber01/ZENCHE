@@ -166,6 +166,7 @@ private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 
 struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
+    let auth: AuthService
     @Binding var languageRaw: String
     @Binding var themeRaw: String
     @ObservedObject var bluetoothRemote: BluetoothRemoteService
@@ -232,6 +233,40 @@ struct SettingsSheet: View {
                 .fixedSize()
                 Button("完成") { dismiss() }
                     .buttonStyle(.plain)
+            }
+
+            // W13-c：账号区（邮箱 + 退出登录；登出后回登录墙）
+            settingsCard {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
+                    settingIcon("person.crop.circle.fill", color: SettingsPalette.cobalt)
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                        RuntimeLocalizedText("当前账号")
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
+                        Text(auth.account?.email ?? "未登录")
+                            .font(.system(size: TypeScale.title, weight: .bold))
+                            .foregroundStyle(SettingsPalette.ink)
+                            .textSelection(.enabled)
+                    }
+                    Spacer()
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    Task { await auth.logout() }
+                } label: {
+                    Label("退出登录", systemImage: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: TypeScale.body, weight: .semibold))
+                        .foregroundStyle(SettingsPalette.support)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                }
+                .buttonStyle(.plain)
+
+                RuntimeLocalizedText("退出后将清除本机登录令牌，需重新登录才能使用全部功能。")
+                    .font(.system(size: TypeScale.caption))
+                    .foregroundStyle(SettingsPalette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             settingsCard {

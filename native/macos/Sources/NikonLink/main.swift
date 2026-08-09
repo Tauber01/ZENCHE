@@ -2489,6 +2489,7 @@ private final class CameraModel: ObservableObject {
     let wifiCamera = WifiCameraService()
     let bluetoothRemote = BluetoothRemoteService()
     let locationTagging = LocationTaggingService()
+    let auth = AuthService()
     let nikonOfficialSDK = NikonOfficialSDKService()
     let sonyOfficialSDK = SonyOfficialSDKService.shared
     private let logger = DiagnosticLogger.shared
@@ -9411,7 +9412,13 @@ private final class AiImageService {
         }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.timeoutInterval = 60; r.httpBody = try JSONEncoder().encode(req)
+        r.timeoutInterval = 60
+        // W13-c：登录墙下 AI 激活请求带上会话令牌，服务端记录 账号↔设备↔激活码 三元组；
+        // 无令牌（存量流程/异常态）不影响既有请求。
+        if let token = AuthTokenStore.readToken() {
+            r.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        r.httpBody = try JSONEncoder().encode(req)
         let (data, resp) = try await URLSession.shared.data(for: r)
         guard let hr = resp as? HTTPURLResponse else { throw AiServiceError.networkError }
         guard (200..<300).contains(hr.statusCode) else {
@@ -13436,6 +13443,276 @@ private struct ConnectionSheet: View {
     }
 }
 
+// MARK: - W13-c 登录墙（邮箱账号系统）
+
+private enum AuthFormMode: String, CaseIterable, Identifiable {
+    case login = "登录"
+    case register = "注册"
+    var id: String { rawValue }
+}
+
+/// 登录/注册页：邮箱 + 密码 +（条件显示的）验证码字段 + 获取验证码按钮（60s 倒计时）。
+/// 验证码框两态由 AuthService.emailCodeMode 驱动：
+/// - required：严态，发码成功 → 显示验证码框，注册必须带码
+/// - notRequired：过渡态，发码 503（SMTP 未配）→ 隐藏验证码框，免码注册
+/// - unknown：未探测，注册按无码发送、由服务端裁决（严态下返回 400 并提示）
+private struct LoginView: View {
+    @ObservedObject var auth: AuthService
+    @Environment(\.locale) private var locale
+
+    @State private var mode: AuthFormMode = .login
+    @State private var email = ""
+    @State private var password = ""
+    @State private var code = ""
+    @State private var isWorking = false
+    @State private var errorMessage = ""
+    @State private var countdown = 0
+    @State private var countdownTask: Task<Void, Never>?
+
+    private var trimmedEmail: String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var emailValid: Bool {
+        let parts = trimmedEmail.split(separator: "@")
+        guard parts.count == 2,
+              !parts[0].isEmpty,
+              !parts[1].hasPrefix("."),
+              !parts[1].hasSuffix("."),
+              parts[1].contains(".") else {
+            return false
+        }
+        return true
+    }
+
+    /// 严态（需验证码）时才要求填码；过渡态/未探测按免码注册交给服务端裁决。
+    private var codeRequired: Bool {
+        auth.emailCodeMode == .required
+    }
+
+    private var codeHidden: Bool {
+        auth.emailCodeMode == .notRequired
+    }
+
+    var body: some View {
+        ZStack {
+            Palette.paper.ignoresSafeArea()
+            VStack(spacing: SpaceToken.s24) {
+                loginHeader
+                modePicker
+                formCard
+            }
+            .frame(width: 420)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onDisappear {
+            countdownTask?.cancel()
+            countdownTask = nil
+        }
+    }
+
+    private var loginHeader: some View {
+        VStack(spacing: SpaceToken.s12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: RadiusToken.r20)
+                    .fill(
+                        LinearGradient(
+                            colors: [Palette.cobalt, Palette.cobalt.opacity(0.82)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 72, height: 72)
+                Text("Z")
+                    .font(.system(size: 36, weight: .heavy)) // 品牌标 Z，品牌资产豁免
+                    .foregroundStyle(.white)
+            }
+            Text("帧澈 ZENCHE")
+                .font(.system(size: TypeScale.heading, weight: .bold))
+                .foregroundStyle(Palette.ink)
+            RuntimeLocalizedText("登录后使用拍摄、编辑与 AI 功能")
+                .font(.system(size: TypeScale.body))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(.top, SpaceToken.s40)
+    }
+
+    private var modePicker: some View {
+        Picker("", selection: $mode) {
+            ForEach(AuthFormMode.allCases) { mode in
+                RuntimeLocalizedText(mode.rawValue).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 420)
+    }
+
+    private var formCard: some View {
+        VStack(spacing: SpaceToken.s12) {
+            TextField("邮箱", text: $email)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+            SecureField("密码（至少 8 位）", text: $password)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { submit() }
+
+            if mode == .register && codeHidden {
+                RuntimeLocalizedText("邮箱验证暂不可用，可直接注册")
+                    .font(.system(size: TypeScale.caption))
+                    .foregroundStyle(Palette.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if mode == .register && !codeHidden {
+                HStack(spacing: SpaceToken.s8) {
+                    TextField("6 位验证码", text: $code)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        sendCode()
+                    } label: {
+                        RuntimeLocalizedText(
+                            countdown > 0 ? "重新获取 (\(countdown)s)" : "获取验证码"
+                        )
+                        .font(.system(size: TypeScale.body, weight: .semibold))
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(countdown > 0 || isWorking)
+                }
+            }
+
+            if !errorMessage.isEmpty {
+                Text(RuntimeLocalization.text(errorMessage, locale: locale))
+                    .font(.system(size: TypeScale.caption))
+                    .foregroundStyle(Palette.video)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                submit()
+            } label: {
+                Group {
+                    if isWorking {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        RuntimeLocalizedText(mode == .login ? "登录" : "注册")
+                            .font(.system(size: TypeScale.emphasis, weight: .bold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Palette.cobalt)
+            .disabled(isWorking)
+
+            RuntimeLocalizedText(mode == .login
+                 ? "还没有账号？切换到「注册」即可创建"
+                 : "已有账号？切换到「登录」")
+                .font(.system(size: TypeScale.caption))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(SpaceToken.s20)
+        .background(
+            RoundedRectangle(cornerRadius: RadiusToken.r16)
+                .fill(Palette.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: RadiusToken.r16)
+                .stroke(Palette.rule, lineWidth: 1)
+        )
+        .shadow(color: Palette.shadow, radius: RadiusToken.r12, y: 4)
+    }
+
+    // MARK: 动作
+
+    private func sendCode() {
+        guard !isWorking, countdown == 0 else { return }
+        guard emailValid else {
+            errorMessage = AuthError.invalidEmail.errorDescription ?? "请输入有效的邮箱地址"
+            return
+        }
+        errorMessage = ""
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            do {
+                try await auth.sendEmailCode(email: trimmedEmail)
+                startCountdown()
+                errorMessage = "验证码已发送至 \(trimmedEmail)"
+            } catch let error as AuthError {
+                if error == .emailCodeUnavailable {
+                    // 过渡态：发码 503 → 隐藏验证码框、走免码注册
+                    errorMessage = "邮箱验证暂不可用，可直接注册"
+                } else {
+                    errorMessage = error.errorDescription ?? error.localizedDescription
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func submit() {
+        guard !isWorking else { return }
+        guard emailValid else {
+            errorMessage = AuthError.invalidEmail.errorDescription ?? "请输入有效的邮箱地址"
+            return
+        }
+        guard password.count >= 8 else {
+            errorMessage = AuthError.weakPassword.errorDescription ?? "密码至少需要 8 位"
+            return
+        }
+        if mode == .register && codeRequired {
+            guard code.count == 6 else {
+                errorMessage = AuthError.invalidCode.errorDescription ?? "请输入 6 位验证码"
+                return
+            }
+        }
+        errorMessage = ""
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            do {
+                switch mode {
+                case .login:
+                    try await auth.login(
+                        email: trimmedEmail,
+                        password: password
+                    )
+                case .register:
+                    try await auth.register(
+                        email: trimmedEmail,
+                        password: password,
+                        code: codeRequired ? code : nil
+                    )
+                }
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+        }
+    }
+
+    private func startCountdown() {
+        countdown = 60
+        countdownTask?.cancel()
+        countdownTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                guard !Task.isCancelled else { return }
+                if countdown > 1 {
+                    countdown -= 1
+                } else {
+                    countdown = 0
+                    return
+                }
+            }
+        }
+    }
+}
+
 private struct RootView: View {
     @ObservedObject var model: CameraModel
     @StateObject private var updater = UpdateController()
@@ -13486,51 +13763,18 @@ private struct RootView: View {
     }
 
     var body: some View {
-        VStack(spacing: SpaceToken.s0) {
-            TopBar(
-                model: model,
-                showConnection: $showConnection,
-                showSettings: $showSettings
-            )
-            HStack(spacing: SpaceToken.s0) {
-                Sidebar(model: model)
-                // Keep exactly one workspace mounted while navigating. An
-                // animated Group can retain the previous monitor view during
-                // layout, causing its image to bleed behind the editor.
-                currentWorkspace
-                    .id(model.section)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        Group {
+            switch model.auth.state {
+            case .signedOut:
+                // W13-c 登录墙（3A：不登录任何功能不可用）
+                LoginView(auth: model.auth)
+            case .checking, .signedIn:
+                mainWorkspace
             }
-            HStack {
-                HStack(spacing: SpaceToken.s4) {
-                    Image(
-                        systemName: model.hasAnyCameraConnection
-                            ? "link"
-                            : "link.badge.plus"
-                    )
-                    RuntimeLocalizedText(model.connectionTitle)
-                        .lineLimit(1)
-                }
-                Spacer()
-                RuntimeLocalizedText(model.connectionDetail)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .frame(maxWidth: .infinity)
-                Spacer()
-                Text("文件库 · \(model.photos.count) 个文件")
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-            }
-            .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
-            .foregroundStyle(Palette.whiteLo)
-            .padding(.horizontal, SpaceToken.s16)
-            .frame(height: 32)
-            .background(Palette.graphite)
-            .accessibilityElement(children: .combine)
         }
         .background(Palette.paper)
         .overlay {
-            if showSplash {
+            if showSplash || model.auth.state == .checking {
                 SplashView {
                     withAnimation(.easeInOut(duration: 0.6)) {
                         showSplash = false
@@ -13549,6 +13793,7 @@ private struct RootView: View {
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
                 updater: updater,
+                auth: model.auth,
                 languageRaw: $languageRaw,
                 themeRaw: $themeRaw,
                 bluetoothRemote: model.bluetoothRemote,
@@ -13609,6 +13854,57 @@ private struct RootView: View {
             Button("好") { model.errorMessage = nil }
         } message: {
             RuntimeLocalizedText(model.errorMessage ?? "")
+        }
+        .task {
+            // W13-c 启动路由守卫：无令牌 → 登录墙；有令牌 → /me 校验，
+            // 401/403 清令牌回登录墙；网络失败放行本地缓存态（离线容忍）。
+            await model.auth.bootstrap()
+        }
+    }
+
+    /// 登录后的主工作区（W13-c 前 RootView 的原始内容）。
+    private var mainWorkspace: some View {
+        VStack(spacing: SpaceToken.s0) {
+            TopBar(
+                model: model,
+                showConnection: $showConnection,
+                showSettings: $showSettings
+            )
+            HStack(spacing: SpaceToken.s0) {
+                Sidebar(model: model)
+                // Keep exactly one workspace mounted while navigating. An
+                // animated Group can retain the previous monitor view during
+                // layout, causing its image to bleed behind the editor.
+                currentWorkspace
+                    .id(model.section)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            HStack {
+                HStack(spacing: SpaceToken.s4) {
+                    Image(
+                        systemName: model.hasAnyCameraConnection
+                            ? "link"
+                            : "link.badge.plus"
+                    )
+                    RuntimeLocalizedText(model.connectionTitle)
+                        .lineLimit(1)
+                }
+                Spacer()
+                RuntimeLocalizedText(model.connectionDetail)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+                Text("文件库 · \(model.photos.count) 个文件")
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
+            .foregroundStyle(Palette.whiteLo)
+            .padding(.horizontal, SpaceToken.s16)
+            .frame(height: 32)
+            .background(Palette.graphite)
+            .accessibilityElement(children: .combine)
         }
     }
 
