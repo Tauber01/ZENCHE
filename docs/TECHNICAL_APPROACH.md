@@ -21,7 +21,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - iOS / iPadOS 不嵌入桌面相机 SDK。Sony 官方 Camera Remote SDK 在可信局域网内的 Mac 桥接端运行；Nikon 当前为明确标注的 PTP 兼容桥接。
 - 官网更新使用 `UPDATE_RELEASE_MANIFEST=/opt/zenche-update/release.json` 切入自托管清单模式；`UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 生成下载地址。发布顺序固定为上传带版本号的新资产、校验服务器 SHA-256、原子替换清单、验证五端 API，再允许旧客户端发现更新。
 - 清单只发布完整安装包及其 SHA-256，不执行静默覆盖。iOS / HarmonyOS 未签名、macOS ad-hoc 未公证、Windows 无 Authenticode、Android Debug 证书的边界必须随包披露。
-- 1.5.10 / build 37 代码候选为 `5488dbd084200693d24554ef004cca38099a1cdb`；交付表与生产回滚口径见 `docs/releases/v1.5.10.md`。
+- 1.5.10 / build 37 打包源码为 `a9bb11bc0068920aaa8630ebb14d4ed3126dc410`；交付表与生产回滚口径见 `docs/releases/v1.5.10.md`。
 
 ## 0.1. 1.4.1 原生监看约定
 
