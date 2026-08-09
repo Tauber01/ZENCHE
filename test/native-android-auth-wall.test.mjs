@@ -46,6 +46,26 @@ test('android auth: token 用 AndroidKeyStore AES-GCM 加密（零新增依赖�
   assert.match(source, /\.remove\(PREFS_TOKEN\)\.remove\(PREFS_EMAIL\)/);
 });
 
+test('android auth: 账号认证仅走官网 HTTPS，安全存储失败不得放行登录墙', async () => {
+  const source = await read(AUTH_MANAGER);
+
+  assert.match(source, /AUTH_SERVER_URL = "https:\/\/zenche\.top\/api"/);
+  assert.doesNotMatch(source, /AUTH_SERVER_URL\s*=\s*"http:\/\//);
+  assert.match(source, /"https"\.equalsIgnoreCase\(endpoint\.getProtocol\(\)\)/);
+  assert.match(source, /public boolean saveSession\(String token, String email\)/);
+  assert.match(source, /if \(!saved\) \{/);
+  assert.match(source, /"无法安全保存登录状态"/);
+  assert.match(source, /if \(!"GET"\.equals\(method\) && !"HEAD"\.equals\(method\)\)/);
+  assert.match(source, /setInstanceFollowRedirects\(false\)/);
+  assert.match(source, /MAX_RESPONSE_BYTES = 64 \* 1024/);
+  assert.match(source, /protocolError/);
+  assert.match(source, /contentType\.toLowerCase\(Locale\.ROOT\)\.contains\("application\/json"\)/);
+  assert.match(source, /AuthResult\.protocolFailure\(\)/);
+  assert.match(source, /localCleanupFailed/);
+  assert.match(source, /for \(int attempt = 0; attempt < 2; attempt\+\+\)/);
+  assert.match(source, /return clearSession\(\) \? result : result\.withLocalCleanupFailure\(\)/);
+});
+
 test('android auth: 认证网络层带 Bearer 且错误消息直达服务端 message', async () => {
   const source = await read(AUTH_MANAGER);
 
@@ -66,10 +86,27 @@ test('android auth: 启动路由守卫——无 token 登录墙，有 token 后�
   assert.match(source, /if \(authManager\.hasSession\(\)\) \{/);
   assert.match(source, /showLoginWall\(\);/);
   assert.match(source, /private void validateSessionAsync\(\)/);
-  assert.match(source, /boolean invalid = result\.status == 401 \|\| result\.status == 403/);
+  assert.match(source, /boolean invalid = result\.protocolError/);
+  assert.match(source, /result\.status != 0/);
+  assert.match(source, /result\.status < 500/);
   assert.match(source, /authManager\.clearSession\(\);/);
-  // 离线容忍：非 401/403 不清 token
-  assert.match(source, /保留本地缓存态（离线容忍）/);
+  assert.match(source, /authChecking = true;\n\s*showSection\("capture"\);\n\s*showAuthCheckingWall\(\);/);
+  assert.match(source, /if \(authChecking\) \{\n\s*showAuthCheckingWall\(\);/);
+  assert.match(source, /scroll\.addView\(formHost/);
+  assert.match(source, /dismissConnectionDialog\(\);/);
+  assert.match(source, /boolean cleanupFailed = invalid && !authManager\.clearSession\(\)/);
+  // 离线容忍只允许真实网络失败和 JSON 服务端 5xx；协议错误失败关闭
+  assert.match(source, /仅 200 \/ 真实网络失败 status=0 \/ JSON 服务端 5xx 离线容忍/);
+});
+
+test('android auth: 登出标记优先于残留 token，保存失败回滚进程内缓存', async () => {
+  const source = await read(AUTH_MANAGER);
+  assert.match(source, /SIGNED_OUT_MARKER = "auth-signed-out"/);
+  assert.match(source, /if \(signedOutMarker\(\)\.exists\(\)\) return null/);
+  assert.match(source, /boolean marked = writeSignedOutMarker\(\)/);
+  assert.match(source, /output\.getFD\(\)\.sync\(\)/);
+  assert.match(source, /if \(!saved \|\| !clearSignedOutMarker\(\)\)/);
+  assert.match(source, /remove\(PREFS_TOKEN\)\.remove\(PREFS_EMAIL\)\.commit\(\)/);
 });
 
 test('android auth: 登录墙双态——验证码框 60s 倒计时 + SMTP 未配 503 免码注册', async () => {
@@ -87,6 +124,8 @@ test('android auth: 登录墙双态——验证码框 60s 倒计时 + SMTP 未�
   assert.match(source, /result\.status == 503/);
   assert.match(source, /authCodeRequired = false;/);
   assert.match(source, /邮件服务暂未配置，将免验证码注册/);
+  assert.match(source, /inputMethod\.restartInput\(authPasswordInput\)/);
+  assert.match(source, /actionId == EditorInfo\.IME_ACTION_NEXT[\s\S]{0,240}submitAuthForm\(\)/);
 });
 
 test('android auth: 表单校验与防重复提交', async () => {
@@ -100,6 +139,9 @@ test('android auth: 表单校验与防重复提交', async () => {
   assert.match(source, /authSubmitButton\.setEnabled\(false\);/);
   assert.match(source, /"正在登录…"/);
   assert.match(source, /"正在注册…"/);
+  assert.match(source, /currentAuthViewportWidthPx\(\)/);
+  assert.doesNotMatch(source, /int availableWidth[\s\S]{0,120}widthPixels/);
+  assert.match(source, /marginParams\(-1, dp\(52\), 0, 0, 0, 20\)/);
 });
 
 test('android auth: 设置页账号区（邮箱 + 退出登录）', async () => {
@@ -113,9 +155,10 @@ test('android auth: 设置页账号区（邮箱 + 退出登录）', async () => 
   assert.match(source, /authManager\.logout\(\);/);
 });
 
-test('android auth: AI 激活请求带 Bearer（服务端三元组）', async () => {
+test('android auth: AI 激活仅在 HTTPS 请求带 Bearer（服务端三元组）', async () => {
   const source = await read(ANDROID_MAIN);
 
   assert.match(source, /String authToken = authManager == null \? null : authManager\.getToken\(\);/);
+  assert.match(source, /"https"\.equalsIgnoreCase\(endpoint\.getProtocol\(\)\)/);
   assert.match(source, /setRequestProperty\("Authorization", "Bearer " \+ authToken\)/);
 });

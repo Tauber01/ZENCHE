@@ -1,7 +1,7 @@
 import { preferences } from '@kit.ArkData';
 import { util } from '@kit.ArkTS';
 import { common } from '@kit.AbilityKit';
-import { http } from '@kit.NetworkKit';
+import { rcp } from '@kit.RemoteCommunicationKit';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { huks } from '@kit.UniversalKeystoreKit';
 
@@ -11,6 +11,8 @@ export class AuthResult {
   message: string = '';
   token: string = '';
   email: string = '';
+  protocolError: boolean = false;
+  localCleanupFailed: boolean = false;
 }
 
 /**
@@ -20,7 +22,7 @@ export class AuthResult {
  * 对等物）AES-256-GCM 加解密，密钥不出系统安全存储；密文
  * base64(iv || ciphertext || tag) 落 preferences。零新增依赖。
  *
- * 服务端契约（W13-a，生产已上线，基址沿用现有 AI 服务配置 ai_server_url）：
+ * 服务端契约（W13-a，生产已上线，账号请求固定走官网 HTTPS 反代）：
  *   POST /v1/auth/email-code {email, purpose:"register"} → 200 / 503(邮件服务未配置)
  *   POST /v1/auth/register  {email, password, code?}     → 200 {token, account} / 400 / 409
  *   POST /v1/auth/login     {email, password}            → 200 {token, account} / 401 / 403
@@ -33,12 +35,14 @@ export class AuthManager {
   private static readonly PREFS_NAME: string = 'zenche_ai_settings';
   private static readonly PREFS_TOKEN: string = 'auth_token_enc';
   private static readonly PREFS_EMAIL: string = 'auth_email';
+  private static readonly PREFS_FORCED_SIGNED_OUT: string = 'auth_forced_signed_out';
   private static readonly KEY_ALIAS: string = 'zenche_auth_token_key';
   private static readonly IV_BYTES: number = 12;
   private static readonly TAG_BYTES: number = 16;
-  private static readonly DEFAULT_SERVER_URL: string = 'http://101.34.255.115:8787';
+  private static readonly AUTH_SERVER_URL: string = 'https://zenche.top/api';
   private static readonly CONNECT_TIMEOUT_MS: number = 15000;
   private static readonly READ_TIMEOUT_MS: number = 30000;
+  private static readonly MAX_RESPONSE_BYTES: number = 64 * 1024;
 
   constructor(context: common.UIAbilityContext) {
     this.context = context;
@@ -50,14 +54,7 @@ export class AuthManager {
   }
 
   private serverUrl(): string {
-    try {
-      const url: string =
-        (this.prefs().getSync('ai_server_url', AuthManager.DEFAULT_SERVER_URL) as string)
-        || AuthManager.DEFAULT_SERVER_URL;
-      return url;
-    } catch (_) {
-      return AuthManager.DEFAULT_SERVER_URL;
-    }
+    return AuthManager.AUTH_SERVER_URL;
   }
 
   // ── HUKS AES-256-GCM 加解密 ────────────────────────────────────────────
@@ -145,6 +142,9 @@ export class AuthManager {
   /** 读取当前 session token；无 token 或解密失败返回空串（不抛错）。 */
   async getToken(): Promise<string> {
     try {
+      const forcedSignedOut: boolean =
+        (this.prefs().getSync(AuthManager.PREFS_FORCED_SIGNED_OUT, false) as boolean) || false;
+      if (forcedSignedOut) return '';
       const encoded: string = (this.prefs().getSync(AuthManager.PREFS_TOKEN, '') as string) || '';
       if (encoded.length === 0) return '';
       return await this.decrypt(encoded);
@@ -167,27 +167,46 @@ export class AuthManager {
   }
 
   /** 保存登录态：token HUKS 加密存储，邮箱明文（仅用于设置页展示与离线态）。 */
-  async saveSession(token: string, email: string): Promise<void> {
-    if (!token) return;
+  async saveSession(token: string, email: string): Promise<boolean> {
+    if (!token) return false;
     try {
       const encoded: string = await this.encrypt(token);
       const store = this.prefs();
       store.putSync(AuthManager.PREFS_TOKEN, encoded);
       store.putSync(AuthManager.PREFS_EMAIL, email || '');
-      store.flush();
+      store.putSync(AuthManager.PREFS_FORCED_SIGNED_OUT, false);
+      await store.flush();
+      return true;
     } catch (_) {
-      // HUKS 异常（极少见）：不写任何半态，保持现状。
+      // putSync 已改进程内缓存但 flush 可能失败；回滚并强制登出，禁止假登录。
+      try {
+        const store = this.prefs();
+        store.putSync(AuthManager.PREFS_FORCED_SIGNED_OUT, true);
+        store.deleteSync(AuthManager.PREFS_TOKEN);
+        store.deleteSync(AuthManager.PREFS_EMAIL);
+        await store.flush();
+      } catch (_) {
+      }
+      return false;
     }
   }
 
-  clearSession(): void {
-    try {
-      const store = this.prefs();
-      store.deleteSync(AuthManager.PREFS_TOKEN);
-      store.deleteSync(AuthManager.PREFS_EMAIL);
-      store.flush();
-    } catch (_) {
+  async clearSession(): Promise<boolean> {
+    for (let attempt: number = 0; attempt < 2; attempt++) {
+      try {
+        const store = this.prefs();
+        // 两阶段提交：先持久化登出标记，再删除旧 token。第二阶段失败时旧 token
+        // 即使残留也会被 getToken() 的标记拦截。
+        store.putSync(AuthManager.PREFS_FORCED_SIGNED_OUT, true);
+        await store.flush();
+        store.deleteSync(AuthManager.PREFS_TOKEN);
+        store.deleteSync(AuthManager.PREFS_EMAIL);
+        await store.flush();
+        return true;
+      } catch (_) {
+      }
     }
+    return false;
   }
 
   // ── 认证网络层（全 async，UI 线程可直接 await） ─────────────────────────
@@ -208,15 +227,21 @@ export class AuthManager {
   }
 
   private async request(
-    method: http.RequestMethod,
+    method: rcp.HttpMethod,
     path: string,
     body: Record<string, Object>,
     token: string,
     fallback401: string
   ): Promise<AuthResult> {
+    let session: rcp.Session | undefined = undefined;
     try {
-      const httpRequest = http.createHttp();
       const endpoint: string = `${this.serverUrl()}${path}`;
+      if (!endpoint.toLowerCase().startsWith('https://')) {
+        const unsafeResult = new AuthResult();
+        unsafeResult.status = 0;
+        unsafeResult.message = '账号服务需要安全连接';
+        return unsafeResult;
+      }
       const header: Record<string, string> = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
@@ -224,40 +249,64 @@ export class AuthManager {
       if (token.length > 0) {
         header['Authorization'] = `Bearer ${token}`;
       }
-      const response: http.HttpResponse = await httpRequest.request(endpoint, {
-        method: method,
-        header: header,
-        extraData: JSON.stringify(body),
-        connectTimeout: AuthManager.CONNECT_TIMEOUT_MS,
-        readTimeout: AuthManager.READ_TIMEOUT_MS
-      });
-      httpRequest.destroy();
-      const status: number = response.responseCode;
-      const text: string = (response.result as string) || '';
-      if (status >= 200 && status < 300) {
-        const result = new AuthResult();
-        result.status = status;
-        if (text.length > 0) {
-          try {
-            const json: Record<string, Object> = JSON.parse(text) as Record<string, Object>;
-            result.token = (json['token'] as string) || '';
-            const account = json['account'] as Record<string, Object> | undefined;
-            if (account) {
-              result.email = (account['email'] as string) || '';
-            }
-          } catch (_) {
+      const request = new rcp.Request(endpoint);
+      request.method = method;
+      request.headers = header;
+      if (method !== 'GET' && method !== 'HEAD') {
+        request.content = JSON.stringify(body);
+      }
+      request.configuration = {
+        transfer: {
+          autoRedirect: false,
+          timeout: {
+            connectMs: AuthManager.CONNECT_TIMEOUT_MS,
+            transferMs: AuthManager.READ_TIMEOUT_MS,
+            inactivityMs: AuthManager.READ_TIMEOUT_MS
           }
         }
-        return result;
+      };
+      session = rcp.createSession();
+      const response: rcp.Response = await session.fetch(request);
+      const effectiveUrl: string = response.effectiveUrl?.toString() || endpoint;
+      if (effectiveUrl !== endpoint) {
+        return this.protocolFailure();
       }
-      let message: string = '';
-      if (text.length > 0) {
+      const bodyBytes: Uint8Array = response.body
+        ? new Uint8Array(response.body) : new Uint8Array();
+      if (bodyBytes.length > AuthManager.MAX_RESPONSE_BYTES) {
+        return this.protocolFailure();
+      }
+      const text: string = bodyBytes.length > 0
+        ? new util.TextDecoder().decodeToString(bodyBytes) : '';
+      const contentTypeValue: string | string[] | undefined =
+        response.headers['content-type'];
+      const contentType: string = Array.isArray(contentTypeValue)
+        ? contentTypeValue.join(';') : (contentTypeValue || '');
+      const isJson: boolean = contentType.toLowerCase().includes('application/json');
+      const status: number = response.statusCode;
+      let json: Record<string, Object> | undefined = undefined;
+      if (isJson && text.length > 0) {
         try {
-          const json: Record<string, Object> = JSON.parse(text) as Record<string, Object>;
-          message = (json['error'] as string) || '';
+          json = JSON.parse(text) as Record<string, Object>;
         } catch (_) {
         }
       }
+      if (status >= 200 && status < 300) {
+        if (!isJson || !json) return this.protocolFailure();
+        const result = new AuthResult();
+        result.status = status;
+        result.token = (json['token'] as string) || '';
+        const account = json['account'] as Record<string, Object> | undefined;
+        if (account) {
+          result.email = (account['email'] as string) || '';
+        }
+        return result;
+      }
+      // 非 JSON 网关错误不属于真实服务端 5xx，禁止进入离线容忍。
+      if (!isJson || (text.length > 0 && !json)) {
+        return this.protocolFailure();
+      }
+      let message: string = json ? ((json['error'] as string) || '') : '';
       if (message.length === 0) {
         message = this.fallbackMessage(status, fallback401);
       }
@@ -270,12 +319,22 @@ export class AuthManager {
       result.status = 0;
       result.message = '网络连接失败，请检查网络后重试';
       return result;
+    } finally {
+      session?.close();
     }
+  }
+
+  private protocolFailure(): AuthResult {
+    const result = new AuthResult();
+    result.status = 502;
+    result.message = '账号服务响应格式错误';
+    result.protocolError = true;
+    return result;
   }
 
   /** POST /v1/auth/email-code {email, purpose:"register"}；503 = SMTP 未配置。 */
   async requestEmailCode(email: string): Promise<AuthResult> {
-    return this.request(http.RequestMethod.POST, '/v1/auth/email-code',
+    return this.request('POST', '/v1/auth/email-code',
       { 'email': this.normalizeEmail(email), 'purpose': 'register' },
       '', '请先登录');
   }
@@ -290,11 +349,18 @@ export class AuthManager {
       body['code'] = code;
     }
     const result: AuthResult = await this.request(
-      http.RequestMethod.POST, '/v1/auth/register', body, '', '邮箱或密码错误');
-    if (result.status === 200 && result.token.length > 0) {
-      const accountEmail: string = result.email.length > 0 ? result.email : this.normalizeEmail(email);
-      result.email = accountEmail;
-      await this.saveSession(result.token, accountEmail);
+      'POST', '/v1/auth/register', body, '', '邮箱或密码错误');
+    if (result.status === 200) {
+      if (result.token.length === 0 || result.email.length === 0) {
+        return this.protocolFailure();
+      }
+      const saved: boolean = await this.saveSession(result.token, result.email);
+      if (!saved) {
+        result.status = 500;
+        result.message = '无法安全保存登录状态';
+        result.token = '';
+        result.email = '';
+      }
     }
     return result;
   }
@@ -306,11 +372,18 @@ export class AuthManager {
       'password': password
     };
     const result: AuthResult = await this.request(
-      http.RequestMethod.POST, '/v1/auth/login', body, '', '邮箱或密码错误');
-    if (result.status === 200 && result.token.length > 0) {
-      const accountEmail: string = result.email.length > 0 ? result.email : this.normalizeEmail(email);
-      result.email = accountEmail;
-      await this.saveSession(result.token, accountEmail);
+      'POST', '/v1/auth/login', body, '', '邮箱或密码错误');
+    if (result.status === 200) {
+      if (result.token.length === 0 || result.email.length === 0) {
+        return this.protocolFailure();
+      }
+      const saved: boolean = await this.saveSession(result.token, result.email);
+      if (!saved) {
+        result.status = 500;
+        result.message = '无法安全保存登录状态';
+        result.token = '';
+        result.email = '';
+      }
     }
     return result;
   }
@@ -319,12 +392,15 @@ export class AuthManager {
   async logout(): Promise<AuthResult> {
     const token: string = await this.getToken();
     const result: AuthResult = token.length > 0
-      ? await this.request(http.RequestMethod.POST, '/v1/auth/logout', {}, token, '未登录')
+      ? await this.request('POST', '/v1/auth/logout', {}, token, '未登录')
       : new AuthResult();
     if (token.length === 0) {
       result.status = 200;
     }
-    this.clearSession();
+    if (!(await this.clearSession())) {
+      result.localCleanupFailed = true;
+      result.message = '已退出，但本地登录信息未能完全清理。请重试登录后再次退出。';
+    }
     return result;
   }
 
@@ -341,12 +417,13 @@ export class AuthManager {
       return result;
     }
     const result: AuthResult = await this.request(
-      http.RequestMethod.GET, '/v1/auth/me', {}, token, '登录已过期，请重新登录');
-    if (result.status === 200 && result.email.length > 0) {
+      'GET', '/v1/auth/me', {}, token, '登录已过期，请重新登录');
+    if (result.status === 200) {
+      if (result.email.length === 0) return this.protocolFailure();
       try {
         const store = this.prefs();
         store.putSync(AuthManager.PREFS_EMAIL, result.email);
-        store.flush();
+        await store.flush();
       } catch (_) {
       }
     }

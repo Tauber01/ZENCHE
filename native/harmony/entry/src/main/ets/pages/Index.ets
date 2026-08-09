@@ -869,6 +869,7 @@ struct Index {
   @State private section: string = 'capture';
   // ── W13-d 邮箱账号系统登录墙（3A：启动即登录墙）──
   private authManager?: AuthManager;
+  @State private authChecking: boolean = true;
   @State private loginWallVisible: boolean = false;
   @State private authMode: string = 'login';          // 'login' | 'register'
   @State private authEmail: string = '';
@@ -1486,11 +1487,15 @@ struct Index {
       if (this.connectionPanelVisible) {
         this.ConnectionPanelOverlay()
       }
+      if (this.authChecking && !this.showSplash) {
+        this.AuthCheckingWall()
+      }
+      if (!this.authChecking && this.loginWallVisible) {
+        this.LoginWall()
+      }
+      // Splash 最后绘制，确保冷启动品牌页不会被快速完成的登录墙抢层覆盖。
       if (this.showSplash) {
         this.SplashOverlay()
-      }
-      if (this.loginWallVisible) {
-        this.LoginWall()
       }
     }
     .width('100%')
@@ -1538,7 +1543,7 @@ struct Index {
     Button(this.tr(mode === 'login' ? '登录' : '注册'))
       .type(ButtonType.Normal)
       .width('50%')
-      .height(42)
+      .height(44)
       .fontSize(TS_EMPHASIS)
       .fontWeight(FontWeight.Bold)
       .fontColor(this.authMode === mode ? Color.White : $r('app.color.muted'))
@@ -1553,6 +1558,27 @@ struct Index {
           }
         }
       })
+  }
+
+  /** 缓存会话校验期间保持整屏阻断，避免 /me 返回前露出主工作区。 */
+  @Builder
+  private AuthCheckingWall() {
+    Column({ space: SPACE_16 }) {
+      LoadingProgress()
+        .width(44)
+        .height(44)
+        .color(PHOTO_ACCENT)
+      Text(this.tr('正在验证登录状态…'))
+        .fontSize(TS_EMPHASIS)
+        .fontWeight(FontWeight.Bold)
+        .fontColor($r('app.color.ink'))
+        .accessibilityText(this.tr('正在验证登录状态，请稍候'))
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor($r('app.color.paper'))
   }
 
   /** 登录墙：整屏覆盖主界面（品牌区 + 登录/注册表单），未登录不可进入任何功能。 */
@@ -1595,7 +1621,7 @@ struct Index {
             this.ModeButton('register')
           }
           .width('100%')
-          .height(50)
+          .height(52)
           .padding(SPACE_4)
           .borderRadius(RADIUS_12)
           .backgroundColor($r('app.color.paper_2'))
@@ -1603,6 +1629,9 @@ struct Index {
 
           TextInput({ text: this.authEmail, placeholder: this.tr('邮箱') })
             .type(InputType.Email)
+            .id('auth-email')
+            .enterKeyType(EnterKeyType.Next)
+            .accessibilityText(this.tr('邮箱'))
             .height(50)
             .fontSize(15)
             .fontColor($r('app.color.ink'))
@@ -1613,9 +1642,20 @@ struct Index {
             .onChange((value: string) => {
               this.authEmail = value;
             })
+            .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent) => {
+              event.keepEditableState();
+              focusControl.requestFocus('auth-password');
+            })
 
           TextInput({ text: this.authPassword, placeholder: this.tr('密码（至少 8 位）') })
             .type(InputType.Password)
+            .id('auth-password')
+            .enterKeyType(
+              this.authMode === 'register' && this.authCodeRequired
+                ? EnterKeyType.Next
+                : EnterKeyType.Done
+            )
+            .accessibilityText(this.tr('密码（至少 8 位）'))
             .height(50)
             .fontSize(15)
             .fontColor($r('app.color.ink'))
@@ -1626,11 +1666,22 @@ struct Index {
             .onChange((value: string) => {
               this.authPassword = value;
             })
+            .onSubmit((_enterKey: EnterKeyType, event: SubmitEvent) => {
+              if (this.authMode === 'register' && this.authCodeRequired) {
+                event.keepEditableState();
+                focusControl.requestFocus('auth-code');
+              } else {
+                this.submitAuthForm();
+              }
+            })
 
           // 验证码区（注册模式且严态时显示；email-code 503 后隐藏走免码注册）
           if (this.authMode === 'register' && this.authCodeRequired) {
             TextInput({ text: this.authCode, placeholder: this.tr('验证码') })
               .type(InputType.Number)
+              .id('auth-code')
+              .enterKeyType(EnterKeyType.Done)
+              .accessibilityText(this.tr('验证码'))
               .height(50)
               .fontSize(15)
               .fontColor($r('app.color.ink'))
@@ -1640,6 +1691,9 @@ struct Index {
               .borderRadius(RADIUS_10)
               .onChange((value: string) => {
                 this.authCode = value;
+              })
+              .onSubmit(() => {
+                this.submitAuthForm();
               })
             Button(this.authCodeCountdown > 0
               ? '重新发送 (' + this.authCodeCountdown.toString() + 's)'
@@ -1670,6 +1724,8 @@ struct Index {
               .width('100%')
               .textAlign(TextAlign.Center)
               .margin({ top: SPACE_4 })
+              .accessibilityText(this.authError)
+              .accessibilityLevel('yes')
           }
 
           Button(this.authSubmitting
@@ -1690,6 +1746,7 @@ struct Index {
             .margin({ top: SPACE_8 })
         }
         .width('100%')
+        .constraintSize({ maxWidth: 520 })
         .padding({ left: 28, right: 28, top: 16, bottom: 36 })
       }
       .width('100%')
@@ -1792,6 +1849,7 @@ struct Index {
     this.authSubmitting = false;
     if (result.status === 200) {
       this.accountEmail = result.email.length > 0 ? result.email : email;
+      this.authChecking = false;
       this.loginWallVisible = false;
       this.section = 'capture';
       this.authEmail = '';
@@ -1808,28 +1866,56 @@ struct Index {
 
   /** W13-d 3A 启动路由守卫：无 token → 登录墙；有 token → /v1/auth/me 校验。 */
   private async bootstrapAuthGuard(): Promise<void> {
+    this.authChecking = true;
     const manager: AuthManager | undefined = this.authManager;
-    if (!manager) return;
-    if (!(await manager.hasSession())) {
+    if (!manager) {
       this.loginWallVisible = true;
+      this.authChecking = false;
       return;
     }
-    const result: AuthResult = await manager.me();
-    if (result.status === 401 || result.status === 403) {
-      manager.clearSession();
-      this.accountEmail = '';
-      this.loginWallVisible = true;
+    try {
+      if (!(await manager.hasSession())) {
+        this.loginWallVisible = true;
+        return;
+      }
+      const result: AuthResult = await manager.me();
+      const invalid: boolean = result.protocolError
+        || (result.status !== 200 && result.status !== 0 && result.status < 500);
+      if (invalid) {
+        const cleared: boolean = await manager.clearSession();
+        this.authError = cleared
+          ? ''
+          : this.tr('已退出，但本地登录信息未能完全清理。请重试登录后再次退出。');
+        this.accountEmail = '';
+        this.connectionPanelVisible = false;
+        this.loginWallVisible = true;
+      } else {
+        this.loginWallVisible = false;
+      }
+      // 仅 200 / 真实网络失败 status=0 / JSON 服务端 5xx 离线容忍；
+      // HTML、畸形 JSON、重定向和其他 4xx 均失败关闭。
+    } finally {
+      this.authChecking = false;
     }
-    // 其余（200 / 网络失败 status=0 / 5xx）：保留本地缓存态（离线容忍）。
   }
 
   /** 设置页「退出登录」：调 logout（尽力而为）+ 清本地登录态回登录墙。 */
   private async performLogout(): Promise<void> {
     const manager: AuthManager | undefined = this.authManager;
+    let cleanupFailed: boolean = false;
+    let cleanupMessage: string = '';
     if (manager) {
-      await manager.logout();
+      const result: AuthResult = await manager.logout();
+      cleanupFailed = result.localCleanupFailed;
+      cleanupMessage = result.message;
     }
+    this.authError = cleanupFailed
+      ? this.tr(cleanupMessage)
+      : '';
     this.accountEmail = '';
+    this.authChecking = false;
+    this.connectionPanelVisible = false;
+    this.launchAnnouncementVisible = false;
     this.loginWallVisible = true;
     this.section = 'capture';
   }
@@ -1847,10 +1933,7 @@ struct Index {
         .width(80)
         .height(80)
         .borderRadius(RADIUS_20)
-        .linearGradient({
-          angle: 135,
-          colors: [[PHOTO_ACCENT_LIGHT, 0], [PHOTO_ACCENT, 1]]
-        })
+        .backgroundColor($r('app.color.graphite'))
         .justifyContent(FlexAlign.Center)
         .scale({ x: 1, y: 1 })
         .animation({ duration: 600, curve: Curve.Friction })
@@ -3489,7 +3572,7 @@ struct Index {
       const authManagerRef: AuthManager | undefined = this.authManager;
       if (authManagerRef) {
         const authToken: string = await authManagerRef.getToken();
-        if (authToken.length > 0) {
+        if (endpoint.toLowerCase().startsWith('https://') && authToken.length > 0) {
           aiAuthHeader['Authorization'] = `Bearer ${authToken}`;
         }
       }

@@ -70,6 +70,7 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -1309,6 +1310,7 @@ public final class MainActivity extends Activity {
     // ── W13-d 邮箱账号系统登录墙（3A：启动即登录墙）──
     private AuthManager authManager;
     private FrameLayout authWallHost;
+    private boolean authChecking;
     private boolean loginWallVisible;
     private String authMode = "login";           // "login" | "register"
     private boolean authCodeRequired = true;     // 严态=true；email-code 503（SMTP 未配）后=false 走免码注册
@@ -1321,6 +1323,8 @@ public final class MainActivity extends Activity {
     private Button authCodeButton;
     private TextView authErrorText;
     private Button authSubmitButton;
+    private String authPersistentError = "";
+    private AlertDialog connectionDialog;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicReference<PreviewPacket> pendingPreview = new AtomicReference<>();
     private final AtomicBoolean previewWorkerRunning = new AtomicBoolean();
@@ -1962,7 +1966,9 @@ public final class MainActivity extends Activity {
         // W13-d 3A 启动路由守卫：无 token → 登录墙（不登录任何功能不可用）；
         // 有 token → 后台 /v1/auth/me 校验（401/403 清 token 回登录墙，网络失败离线容忍）。
         if (authManager.hasSession()) {
+            authChecking = true;
             showSection("capture");
+            showAuthCheckingWall();
             validateSessionAsync();
         } else {
             showSection("capture");
@@ -1998,6 +2004,11 @@ public final class MainActivity extends Activity {
             navigationButtons.clear();
             setContentView(buildApplication());
             showSection(destination);
+            if (authChecking) {
+                showAuthCheckingWall();
+            } else if (loginWallVisible) {
+                showLoginWall();
+            }
             updateConnectionUi();
             updateWirelessUi();
             refreshUpdateUi();
@@ -2653,7 +2664,7 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
         FrameLayout markBox = new FrameLayout(this);
-        markBox.setBackground(brandGradient(24));
+        markBox.setBackground(rounded(GRAPHITE, 24, 0));
         int size = dp(80);
         FrameLayout.LayoutParams markParams = new FrameLayout.LayoutParams(size, size);
         markParams.gravity = Gravity.CENTER;
@@ -8758,7 +8769,8 @@ public final class MainActivity extends Activity {
         // W13-d 2A：AI 激活请求带有效 session 则加 Bearer（服务端记录账号↔设备↔激活码三元组）；
         // 无 token 不影响存量流程。
         String authToken = authManager == null ? null : authManager.getToken();
-        if (authToken != null && !authToken.isEmpty()) {
+        if ("https".equalsIgnoreCase(endpoint.getProtocol())
+                && authToken != null && !authToken.isEmpty()) {
             conn.setRequestProperty("Authorization", "Bearer " + authToken);
         }
         conn.setConnectTimeout(15_000);
@@ -11723,20 +11735,55 @@ public final class MainActivity extends Activity {
     private void validateSessionAsync() {
         activationExecutor.execute(() -> {
             AuthManager.AuthResult result = authManager.me();
-            boolean invalid = result.status == 401 || result.status == 403;
-            if (invalid) {
-                authManager.clearSession();
-                mainHandler.post(() -> {
-                    if (isFinishing() || isDestroyed()) return;
+            boolean invalid = result.protocolError
+                    || (result.status != 200
+                    && result.status != 0
+                    && result.status < 500);
+            boolean cleanupFailed = invalid && !authManager.clearSession();
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                authChecking = false;
+                if (invalid) {
+                    authPersistentError = cleanupFailed
+                            ? tr("已退出，但本地登录信息未能完全清理。请重试登录后再次退出。")
+                            : "";
                     showLoginWall();
-                });
-            }
-            // 其余（200 / 网络失败 status=0 / 5xx）：保留本地缓存态（离线容忍）。
+                } else {
+                    hideLoginWall();
+                }
+            });
+            // 仅 200 / 真实网络失败 status=0 / JSON 服务端 5xx 离线容忍；
+            // HTML、畸形 JSON、重定向和其他 4xx 均失败关闭。
         });
     }
 
+    /** 有缓存会话时阻断主工作区，直到 /me 明确完成或进入离线容忍态。 */
+    private void showAuthCheckingWall() {
+        authChecking = true;
+        loginWallVisible = false;
+        dismissConnectionDialog();
+        if (authWallHost == null) return;
+        cancelCodeCountdown();
+        authWallHost.removeAllViews();
+        authWallHost.setVisibility(View.VISIBLE);
+
+        LinearLayout content = verticalContainer();
+        content.setGravity(Gravity.CENTER);
+        ProgressBar progress = new ProgressBar(this);
+        content.addView(progress, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        TextView status = text("正在验证登录状态…", 14, Typeface.BOLD, INK);
+        status.setGravity(Gravity.CENTER);
+        status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        content.addView(status, marginParams(-2, -2, 0, 16, 0, 0));
+        authWallHost.addView(content, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
     private void showLoginWall() {
+        authChecking = false;
         loginWallVisible = true;
+        dismissConnectionDialog();
         if (authWallHost == null) return;
         cancelCodeCountdown();
         authWallHost.removeAllViews();
@@ -11787,7 +11834,7 @@ public final class MainActivity extends Activity {
             modeButton.setTextColor(selected ? Color.WHITE : MUTED);
             modeButton.setAllCaps(false);
             modeButton.setGravity(Gravity.CENTER);
-            modeButton.setMinHeight(dp(42));
+            modeButton.setMinHeight(dp(44));
             modeButton.setPadding(dp(12), 0, dp(12), 0);
             modeButton.setBackground(selected
                     ? rounded(COBALT, 10, 0)
@@ -11807,9 +11854,9 @@ public final class MainActivity extends Activity {
                 }
             });
             modeRow.addView(modeButton, new LinearLayout.LayoutParams(
-                    0, dp(42), 1f));
+                    0, dp(44), 1f));
         }
-        content.addView(modeRow, marginParams(-1, dp(50), 0, 0, 0, 20));
+        content.addView(modeRow, marginParams(-1, dp(52), 0, 0, 0, 20));
 
         // 邮箱
         authEmailInput = new EditText(this);
@@ -11817,6 +11864,13 @@ public final class MainActivity extends Activity {
         authEmailInput.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         authEmailInput.setSingleLine(true);
+        authEmailInput.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        authEmailInput.setContentDescription(tr("邮箱"));
+        authEmailInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_NEXT) return false;
+            authPasswordInput.requestFocus();
+            return true;
+        });
         authEmailInput.setTextSize(15);
         authEmailInput.setTextColor(INK);
         authEmailInput.setHintTextColor(MUTED);
@@ -11830,6 +11884,26 @@ public final class MainActivity extends Activity {
         authPasswordInput.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         authPasswordInput.setSingleLine(true);
+        authPasswordInput.setImeOptions(
+                "register".equals(authMode) && authCodeRequired
+                        ? EditorInfo.IME_ACTION_NEXT
+                        : EditorInfo.IME_ACTION_DONE);
+        authPasswordInput.setContentDescription(tr("密码（至少 8 位）"));
+        authPasswordInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_NEXT) {
+                if (authCodeRow.getVisibility() == View.VISIBLE) {
+                    authCodeInput.requestFocus();
+                } else {
+                    submitAuthForm();
+                }
+                return true;
+            }
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                submitAuthForm();
+                return true;
+            }
+            return false;
+        });
         authPasswordInput.setTextSize(15);
         authPasswordInput.setTextColor(INK);
         authPasswordInput.setHintTextColor(MUTED);
@@ -11843,6 +11917,13 @@ public final class MainActivity extends Activity {
         authCodeInput.setHint(tr("验证码"));
         authCodeInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         authCodeInput.setSingleLine(true);
+        authCodeInput.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        authCodeInput.setContentDescription(tr("验证码"));
+        authCodeInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_DONE) return false;
+            submitAuthForm();
+            return true;
+        });
         authCodeInput.setTextSize(15);
         authCodeInput.setTextColor(INK);
         authCodeInput.setHintTextColor(MUTED);
@@ -11860,6 +11941,8 @@ public final class MainActivity extends Activity {
         // 错误提示（红色，服务端 message 直达）
         authErrorText = text("", 13, Typeface.NORMAL, VIDEO);
         authErrorText.setGravity(Gravity.CENTER);
+        authErrorText.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_ASSERTIVE);
+        authErrorText.setText(authPersistentError);
         content.addView(authErrorText, marginParams(-1, -2, 0, 4, 0, 10));
 
         // 主操作按钮
@@ -11870,6 +11953,16 @@ public final class MainActivity extends Activity {
         content.addView(authSubmitButton,
                 marginParams(-1, dp(50), 0, 0, 0, 14));
 
+        FrameLayout formHost = new FrameLayout(this);
+        int formWidth = Math.min(currentAuthViewportWidthPx(), dp(576));
+        FrameLayout.LayoutParams formParams = new FrameLayout.LayoutParams(
+                formWidth,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        formHost.addView(content, formParams);
+        scroll.addView(formHost, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
         authWallHost.addView(scroll, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
@@ -11889,6 +11982,29 @@ public final class MainActivity extends Activity {
         if (authCodeRow == null) return;
         boolean visible = "register".equals(authMode) && authCodeRequired;
         authCodeRow.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (authPasswordInput != null) {
+            authPasswordInput.setImeOptions(visible
+                    ? EditorInfo.IME_ACTION_NEXT
+                    : EditorInfo.IME_ACTION_DONE);
+            android.view.inputmethod.InputMethodManager inputMethod =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(
+                            INPUT_METHOD_SERVICE);
+            if (inputMethod != null) inputMethod.restartInput(authPasswordInput);
+        }
+    }
+
+    /** 当前应用窗口宽度；分屏/自由窗口下不得使用整块物理屏幕宽度。 */
+    private int currentAuthViewportWidthPx() {
+        int width = authWallHost == null ? 0 : authWallHost.getWidth();
+        if (width <= 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            width = getWindowManager().getCurrentWindowMetrics().getBounds().width();
+        }
+        if (width <= 0) {
+            android.graphics.Point size = new android.graphics.Point();
+            getWindowManager().getDefaultDisplay().getSize(size);
+            width = size.x;
+        }
+        return Math.max(1, width);
     }
 
     /** POST /v1/auth/email-code：200 显示验证码框并启动 60s 倒计时；503 免码注册。 */
@@ -12010,6 +12126,7 @@ public final class MainActivity extends Activity {
                 authSubmitButton.setEnabled(true);
                 authSubmitButton.setText(isLogin ? tr("登录") : tr("注册"));
                 if (result.status == 200) {
+                    authPersistentError = "";
                     hideLoginWall();
                     showSection("capture");
                     showToast(tr("欢迎，") + (result.email == null ? email : result.email));
@@ -12028,9 +12145,13 @@ public final class MainActivity extends Activity {
         logoutButton.setEnabled(false);
         logoutButton.setText(tr("正在退出…"));
         activationExecutor.execute(() -> {
-            authManager.logout();
+            AuthManager.AuthResult result = authManager.logout();
             mainHandler.post(() -> {
                 if (isFinishing() || isDestroyed()) return;
+                authPersistentError = result.localCleanupFailed
+                        ? tr(result.message)
+                        : "";
+                dismissConnectionDialog();
                 showLoginWall();
             });
         });
@@ -12843,11 +12964,22 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.addView(content);
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(tr("连接相机"))
                 .setView(scroll)
                 .setPositiveButton(tr("关闭"), null)
-                .show();
+                .create();
+        connectionDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (connectionDialog == dialog) connectionDialog = null;
+        });
+        dialog.show();
+    }
+
+    private void dismissConnectionDialog() {
+        AlertDialog dialog = connectionDialog;
+        connectionDialog = null;
+        if (dialog != null && dialog.isShowing()) dialog.dismiss();
     }
 
     private void connectWifiCamera(String host, int port, String connectionMode) {

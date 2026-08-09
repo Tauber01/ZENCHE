@@ -9,7 +9,10 @@ import android.util.Base64;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -31,7 +34,7 @@ import javax.crypto.spec.GCMParameterSpec;
  * 系统 Keystore 密钥加密，密钥不出安全硬件/系统级存储），且 minSdk 26 原生
  * 支持，不动 build.gradle 依赖面。
  *
- * 服务端契约（W13-a，生产已上线，基址沿用现有 AI 服务配置 aiServerURL）：
+ * 服务端契约（W13-a，生产已上线，账号请求固定走官网 HTTPS 反代）：
  *   POST /v1/auth/email-code {email, purpose:"register"}  → 200 / 503(邮件服务未配置)
  *   POST /v1/auth/register  {email, password, code?}      → 200 {token, account} / 400 / 409
  *   POST /v1/auth/login     {email, password}             → 200 {token, account} / 401 / 403
@@ -50,7 +53,9 @@ public final class AuthManager {
     private static final int GCM_IV_BYTES = 12;
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 30_000;
-    private static final String DEFAULT_SERVER_URL = "http://101.34.255.115:8787";
+    private static final int MAX_RESPONSE_BYTES = 64 * 1024;
+    private static final String AUTH_SERVER_URL = "https://zenche.top/api";
+    private static final String SIGNED_OUT_MARKER = "auth-signed-out";
 
     /** 认证操作结果：status 为 HTTP 状态码（0 = 网络失败）；message 为用户可读消息。 */
     public static final class AuthResult {
@@ -59,6 +64,8 @@ public final class AuthManager {
         public final String token;
         public final String email;
         public final JSONObject json;
+        public final boolean protocolError;
+        public final boolean localCleanupFailed;
 
         public AuthResult(
                 int status,
@@ -66,11 +73,40 @@ public final class AuthManager {
                 String token,
                 String email,
                 JSONObject json) {
+            this(status, message, token, email, json, false, false);
+        }
+
+        private AuthResult(
+                int status,
+                String message,
+                String token,
+                String email,
+                JSONObject json,
+                boolean protocolError,
+                boolean localCleanupFailed) {
             this.status = status;
             this.message = message;
             this.token = token;
             this.email = email;
             this.json = json;
+            this.protocolError = protocolError;
+            this.localCleanupFailed = localCleanupFailed;
+        }
+
+        static AuthResult protocolFailure() {
+            return new AuthResult(
+                    502, "账号服务响应格式错误", null, null, null, true, false);
+        }
+
+        AuthResult withLocalCleanupFailure() {
+            return new AuthResult(
+                    status,
+                    "已退出，但本地登录信息未能完全清理。请重试登录后再次退出。",
+                    token,
+                    email,
+                    json,
+                    protocolError,
+                    true);
         }
     }
 
@@ -85,9 +121,7 @@ public final class AuthManager {
     }
 
     private String serverUrl() {
-        String url = prefs().getString("aiServerURL", DEFAULT_SERVER_URL);
-        if (url == null || url.trim().isEmpty()) return DEFAULT_SERVER_URL;
-        return url.trim();
+        return AUTH_SERVER_URL;
     }
 
     private static String normalizeEmail(String email) {
@@ -145,6 +179,7 @@ public final class AuthManager {
 
     /** 读取当前 session token；无 token 或解密失败返回 null（不崩溃）。 */
     public String getToken() {
+        if (signedOutMarker().exists()) return null;
         String encoded = prefs().getString(PREFS_TOKEN, "");
         if (encoded == null || encoded.isEmpty()) return null;
         try {
@@ -165,21 +200,57 @@ public final class AuthManager {
     }
 
     /** 保存登录态：token Keystore 加密存储，邮箱明文（仅用于设置页展示与离线态）。 */
-    public void saveSession(String token, String email) {
-        if (token == null || token.isEmpty()) return;
+    public boolean saveSession(String token, String email) {
+        if (token == null || token.isEmpty()) return false;
         try {
             String encoded = encrypt(token);
-            prefs().edit()
+            boolean saved = prefs().edit()
                     .putString(PREFS_TOKEN, encoded)
                     .putString(PREFS_EMAIL, email == null ? "" : email)
                     .commit();
+            if (!saved || !clearSignedOutMarker()) {
+                writeSignedOutMarker();
+                prefs().edit().remove(PREFS_TOKEN).remove(PREFS_EMAIL).commit();
+                return false;
+            }
+            return true;
         } catch (Exception error) {
-            // Keystore 异常（极少见）：不写任何半态，保持现状。
+            // 提交失败后 SharedPreferences 进程内缓存也可能已变更；先写持久
+            // 登出标记再主动回滚，旧 token 即使残留也不能在下次启动复活。
+            writeSignedOutMarker();
+            prefs().edit().remove(PREFS_TOKEN).remove(PREFS_EMAIL).commit();
+            return false;
         }
     }
 
-    public void clearSession() {
-        prefs().edit().remove(PREFS_TOKEN).remove(PREFS_EMAIL).commit();
+    public boolean clearSession() {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            boolean marked = writeSignedOutMarker();
+            boolean removed = prefs().edit()
+                    .remove(PREFS_TOKEN).remove(PREFS_EMAIL).commit();
+            if (marked && removed) return true;
+        }
+        return false;
+    }
+
+    private File signedOutMarker() {
+        return new File(context.getNoBackupFilesDir(), SIGNED_OUT_MARKER);
+    }
+
+    private boolean writeSignedOutMarker() {
+        File marker = signedOutMarker();
+        try (FileOutputStream output = new FileOutputStream(marker, false)) {
+            output.write(1);
+            output.getFD().sync();
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean clearSignedOutMarker() {
+        File marker = signedOutMarker();
+        return !marker.exists() || marker.delete();
     }
 
     // ── 认证网络层（同步调用，须在后台线程执行） ────────────────────────────
@@ -220,10 +291,15 @@ public final class AuthManager {
             JSONObject body,
             String token,
             String fallback401) {
+        HttpURLConnection conn = null;
         try {
             URL endpoint = new URL(serverUrl() + path);
-            HttpURLConnection conn =
-                    (HttpURLConnection) endpoint.openConnection();
+            if (!"https".equalsIgnoreCase(endpoint.getProtocol())) {
+                return new AuthResult(
+                        0, "账号服务需要安全连接", null, null, null);
+            }
+            conn = (HttpURLConnection) endpoint.openConnection();
+            conn.setInstanceFollowRedirects(false);
             conn.setRequestMethod(method);
             conn.setRequestProperty("Content-Type", "application/json");
             conn.setRequestProperty("Accept", "application/json");
@@ -232,9 +308,12 @@ public final class AuthManager {
             }
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
-            conn.setDoOutput(true);
-            try (OutputStream output = conn.getOutputStream()) {
-                output.write(body.toString().getBytes(StandardCharsets.UTF_8));
+            if (!"GET".equals(method) && !"HEAD".equals(method)) {
+                conn.setDoOutput(true);
+                try (OutputStream output = conn.getOutputStream()) {
+                    JSONObject payload = body == null ? new JSONObject() : body;
+                    output.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+                }
             }
             int status = conn.getResponseCode();
             InputStream stream = status >= 200 && status < 300
@@ -242,36 +321,52 @@ public final class AuthManager {
                     : conn.getErrorStream();
             String text = stream == null ? "" : readAll(stream);
             if (stream != null) stream.close();
-            conn.disconnect();
-            String message = extractError(text);
-            if (status == 200) {
-                JSONObject json = null;
-                if (text != null && !text.isEmpty()) {
-                    try {
-                        json = new JSONObject(text);
-                    } catch (Exception ignored) {
-                    }
+            String contentType = conn.getContentType();
+            boolean isJson = contentType != null
+                    && contentType.toLowerCase(Locale.ROOT).contains("application/json");
+            JSONObject json = null;
+            if (isJson && text != null && !text.isEmpty()) {
+                try {
+                    json = new JSONObject(text);
+                } catch (Exception ignored) {
                 }
-                return new AuthResult(200, "", null, null, json);
             }
+            if (status >= 200 && status < 300) {
+                if (!isJson || json == null) return AuthResult.protocolFailure();
+                return new AuthResult(status, "", null, null, json);
+            }
+            // 网关 HTML 等非 JSON 错误不能伪装成可离线容忍的真实服务端 5xx。
+            if (!isJson || (text != null && !text.isEmpty() && json == null)) {
+                return AuthResult.protocolFailure();
+            }
+            String message = json == null ? null : json.optString("error", null);
             return new AuthResult(
                     status,
                     message == null ? fallbackMessage(status, fallback401) : message,
                     null,
                     null,
                     null);
+        } catch (AuthProtocolException error) {
+            return AuthResult.protocolFailure();
         } catch (java.io.IOException error) {
             return networkFailure();
         } catch (Exception error) {
             return networkFailure();
+        } finally {
+            if (conn != null) conn.disconnect();
         }
     }
+
+    private static final class AuthProtocolException extends IOException {}
 
     private static String readAll(InputStream stream) throws java.io.IOException {
         java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
         byte[] chunk = new byte[4096];
         int read;
         while ((read = stream.read(chunk)) != -1) {
+            if (buffer.size() + read > MAX_RESPONSE_BYTES) {
+                throw new AuthProtocolException();
+            }
             buffer.write(chunk, 0, read);
         }
         return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
@@ -317,11 +412,18 @@ public final class AuthManager {
         if (result.status == 200) {
             String token = tokenFrom(result.json);
             String accountEmail = emailFrom(result.json);
-            if (token != null) {
-                saveSession(token, accountEmail == null ? normalizeEmail(email) : accountEmail);
+            if (token != null && !token.isEmpty()
+                    && accountEmail != null && !accountEmail.isEmpty()) {
+                boolean saved = saveSession(
+                        token,
+                        accountEmail);
+                if (!saved) {
+                    return new AuthResult(
+                            500, "无法安全保存登录状态", null, null, null);
+                }
                 return new AuthResult(200, "", token, accountEmail, result.json);
             }
-            return new AuthResult(500, "服务器未返回登录态", null, null, null);
+            return AuthResult.protocolFailure();
         }
         return result;
     }
@@ -339,11 +441,18 @@ public final class AuthManager {
         if (result.status == 200) {
             String token = tokenFrom(result.json);
             String accountEmail = emailFrom(result.json);
-            if (token != null) {
-                saveSession(token, accountEmail == null ? normalizeEmail(email) : accountEmail);
+            if (token != null && !token.isEmpty()
+                    && accountEmail != null && !accountEmail.isEmpty()) {
+                boolean saved = saveSession(
+                        token,
+                        accountEmail);
+                if (!saved) {
+                    return new AuthResult(
+                            500, "无法安全保存登录状态", null, null, null);
+                }
                 return new AuthResult(200, "", token, accountEmail, result.json);
             }
-            return new AuthResult(500, "服务器未返回登录态", null, null, null);
+            return AuthResult.protocolFailure();
         }
         return result;
     }
@@ -355,8 +464,7 @@ public final class AuthManager {
                 ? new AuthResult(200, "", null, null, null)
                 : request("POST", "/v1/auth/logout", new JSONObject(), token,
                         "未登录");
-        clearSession();
-        return result;
+        return clearSession() ? result : result.withLocalCleanupFailure();
     }
 
     /**
@@ -368,14 +476,15 @@ public final class AuthManager {
         if (token == null) {
             return new AuthResult(401, "未登录", null, null, null);
         }
-        AuthResult result = request("GET", "/v1/auth/me", new JSONObject(),
+        AuthResult result = request("GET", "/v1/auth/me", null,
                 token, "登录已过期，请重新登录");
         if (result.status == 200 && result.json != null) {
             String accountEmail = emailFrom(result.json);
             if (accountEmail != null && !accountEmail.isEmpty()) {
                 prefs().edit().putString(PREFS_EMAIL, accountEmail).commit();
+                return new AuthResult(200, "", token, accountEmail, result.json);
             }
-            return new AuthResult(200, "", token, accountEmail, result.json);
+            return AuthResult.protocolFailure();
         }
         return result;
     }
