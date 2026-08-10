@@ -179,9 +179,11 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 登录故障按客户端提交前问题处理：2026-08-10 用户报告时间段内，生产 Nginx 专用访问日志没有 `/api/v1/auth/login` 请求，公网登录接口对无效凭据仍能稳定返回结构化 `401`。五端原界面同时使用“登录”表示模式与提交动作，选中的模式按钮点击不会发请求，容易被理解为提交无响应；模式标签因此统一改为“已有账号 / 创建账号”，提交按钮继续使用“登录 / 注册”，Apple 忙碌态保留动作文字与进度指示。
 - macOS 使用 `DesktopWorkspaceLayout` 持久化主导航、拍摄参数栏、编辑媒体池、编辑工具栏和底部工具区尺寸；AppKit 主窗口用独立 autosave 名称恢复大小与位置，并在显示器拓扑变化时把窗口约束回可见工作区。分隔条支持拖拽与方向键微调，并提供辅助功能标签和值。
 - Windows 使用 `%LOCALAPPDATA%/NikonLink/desktop-workspace-layout-v1.json` 保存窗口几何、最大化状态和同组面板尺寸；恢复时按虚拟桌面边界约束窗口。WPF `GridSplitter` 与设置页预设复用同一状态模型，响应式折叠仍优先保留中央预览。
+- macOS `WorkspaceSplitHandle` 在 `DragGesture(minimumDistance: 0)` 的每次变化中关闭隐式动画并直接更新绑定值，窗口缩小时再按中央拍摄/编辑画面的最低尺寸动态收紧范围。Windows 六处 WPF `GridSplitter` 使用 `ShowsPreview=False`，拖动中实时重排；AI 工具列宽与其他面板一起写入同一布局状态。
+- AI 空间按平台根因收敛：macOS AI 区只保留顶部五工具入口和自身生成底栏，不再重复完整调整分类与通用编辑底栏；Windows AI 模式使用等宽两列，预设按分类建立独立换行容器，并允许在 340–720 px 内调节 AI 工具列。
 - 两个桌面端均提供默认、拍摄、监看、编辑、紧凑五套预设与恢复默认。第一阶段只支持主窗口内的固定分区调整，不实现 Adobe 式任意浮动面板、跨窗口拖放或跨显示器面板停靠；这些能力会显著扩大窗口生命周期、焦点、无障碍和状态迁移风险，留待后续独立迭代。
 - Apple 的运行时本地化先匹配完整字符串，再做动态片段替换。登录忙碌态因此必须在共享的 `zh-Hans/en/ja` Apple 语言包中提供“正在登录…”与“正在注册…”的 exact key；回归测试会直接核对三语返回值，防止出现“正在Sign In…”或“正在ログイン…”混排。
-- 候选版本为 `1.5.11 / build 38`，实现与六包打包源码固定为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`。完整 `npm test` 492/492 通过；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的既有平台边界保持不变。六包、侧车、发布说明与使用说明组成的聚合包已通过 14 项同一性核对，SHA-256 为 `34820dbca35ca93c907f8a7c7dc16e51505caaab31a8380b7c73e94f3f300c99`。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
+- 候选版本为 `1.5.11 / build 38`，当前实现与桌面包打包源码为 `cdfda111aaf5b498e3c3653aec0c7f4343313019`。完整 `npm test` 493/493 通过；macOS 全源类型检查、应用构建/严格验签/DMG 校验以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。增量双审与最终聚合包重建进行中；候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
 ## 1. 总体原则
 

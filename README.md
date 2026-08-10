@@ -46,8 +46,8 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 
 - 五端登录页将模式选择改为“已有账号 / 创建账号”，与真正的登录提交按钮明确区分；Apple 端提交期间会同时显示进度和“正在登录…”文字。
 - macOS 与 Windows 会记住主窗口大小和位置，Windows 还会恢复最大化状态；显示器环境变化后，越界窗口会被移回当前可见区域。
-- 桌面端可拖动调整主导航、拍摄参数、编辑媒体池、工具栏和底部工具区，并提供默认、拍摄、监看、编辑、紧凑五种预设及“恢复默认布局”。
-- 本候选尚未切入官网更新。完整测试 492/492 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。Windows 多显示器/DPI、两端真实拖拽与重启恢复仍需真机验收。
+- 桌面端可实时、连续拖动主导航、拍摄参数、编辑媒体池、工具栏和底部工具区；Windows 的 AI 工具栏也可独立调宽。macOS AI 区移除了重复导航与无关底栏，默认留出更多选项空间。两端均提供默认、拍摄、监看、编辑、紧凑五种预设及“恢复默认布局”。
+- 本候选尚未切入官网更新。完整测试 493/493 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。Windows 多显示器/DPI、两端真实拖拽与重启恢复仍需真机验收。
 
 ### v1.5.10 官网更新
 
@@ -436,8 +436,8 @@ in a local library for review and export.
 
 - Sign-in mode choices now read Existing Account and Create Account on all five platforms, clearly separating mode selection from the actual submit action. Apple clients keep the progress indicator and “Signing in…” label visible during submission.
 - macOS and Windows remember main-window size and position; Windows also restores the maximized state. A saved off-screen window is moved back into the current visible desktop after display changes.
-- Desktop users can drag to resize the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Default, Capture, Monitor, Edit, and Compact presets and Restore Default Layout are included.
-- This candidate is not on the official update feed. The full 492-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Real Windows multi-monitor/DPI behavior and hands-on drag/relaunch checks on both desktop targets remain pending.
+- Desktop dividers resize their content live and continuously for the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Windows also has an independent AI-tools divider. The macOS AI area removes duplicate navigation and an unrelated footer to leave more room for its options. Default, Capture, Monitor, Edit, and Compact presets and Restore Default Layout are included.
+- This candidate is not on the official update feed. The full 493-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Real Windows multi-monitor/DPI behavior and hands-on drag/relaunch checks on both desktop targets remain pending.
 
 ### Official website update in v1.5.10
 
@@ -766,8 +766,8 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 
 - 5 プラットフォームのログイン画面で、モード選択を「既存のアカウント」と「新規登録」に分け、実際のログイン操作と区別しました。Apple 版では送信中も進行表示と「ログインしています…」を併記します。
 - macOS と Windows はメインウインドウのサイズと位置を記憶し、Windows では最大化状態も復元します。ディスプレイ構成が変わって保存位置が画面外になった場合は、現在の表示領域へ戻します。
-- デスクトップ版では、メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグして調整できます。デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへの復元も追加しました。
-- この候補は公式更新フィードには未配信です。全 492 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ・再起動復元確認は未完了です。
+- デスクトップ版の区切り線は、メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグ中に連続して再配置します。Windows では AI ツールパネルの幅も個別に調整できます。macOS の AI 領域は重複ナビゲーションと無関係な下部操作列を省き、各項目の表示領域を広げました。デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへの復元も利用できます。
+- この候補は公式更新フィードには未配信です。全 493 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ・再起動復元確認は未完了です。
 
 ### v1.5.10 公式サイト更新
 

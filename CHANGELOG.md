@@ -9,6 +9,9 @@
   Saved off-screen frames are corrected after display changes.
 - Added draggable, keyboard-accessible splitters for the main navigation,
   capture controls, editor media pool, editor tool panel, and lower editor area.
+- Made every desktop splitter resize its content continuously while dragging,
+  widened the safe adjustment ranges, and added a dedicated splitter for the
+  Windows AI tools panel.
 - Added Default, Capture, Monitor, Edit, and Compact workspace presets, plus a
   one-click Restore Default Layout action.
 
@@ -20,6 +23,9 @@
   request.
 - Kept the Apple submit action label visible beside its progress indicator so
   an in-flight sign-in no longer looks unresponsive.
+- Reclaimed macOS AI workspace height by removing its duplicate section
+  navigation and the unrelated generic edit footer; Windows AI modes and preset
+  groups now reflow with the available panel width.
 
 ### Known limitations
 

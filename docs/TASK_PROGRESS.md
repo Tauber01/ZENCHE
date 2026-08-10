@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-10（Asia/Shanghai）
-> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；实现与打包源码 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`，五端六包、聚合总包与双审返修项均已闭环
+> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；连续调节实现与桌面包源码 `cdfda111aaf5b498e3c3653aec0c7f4343313019`，增量双审与聚合总包重建进行中
 > 公开状态：GitHub v1.5.3 仍为公开稳定版；官网自动更新继续提供 W14 的 1.5.10 / build 37，1.5.11 尚未部署、推送、打标签或创建 Release
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
@@ -18,8 +18,8 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；实现与打包源码为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`，五端六包及同名侧车已按该提交重建并通过 SHA-256/结构回验。最终聚合包 `dist/ZENCHE-1.5.11-W15-five-platform-delivery-final.zip` 的 SHA-256 为 `34820dbca35ca93c907f8a7c7dc16e51505caaab31a8380b7c73e94f3f300c99`。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
-- W15 已完成源码实现：五端登录页用“已有账号 / 创建账号”区分模式与提交动作；Apple 登录忙碌态补齐中英日 exact key；五端公告按逐包事实披露不同签名状态；macOS、Windows 支持主窗口大小/位置和面板尺寸记忆、越界恢复、可访问分隔条、五套工作区预设及恢复默认。完整 `npm test` 492/492 通过，五端构建、六包与聚合总包回验、返修后双审均已闭环；真实桌面拖拽/重启恢复与 Windows 多显示器/DPI 仍需实机验收。
+- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；连续调节实现与桌面包打包源码为 `cdfda111aaf5b498e3c3653aec0c7f4343313019`。macOS DMG 与 Windows Setup/ZIP 已按该提交重建并通过同名侧车、结构及签名属性回验；Android、iOS、HarmonyOS 沿用同一候选的既有包。最终聚合包将在本轮增量双审后重建。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
+- W15 已完成源码增量：五端登录动作与 Apple 忙碌态、逐平台签名公告保持闭环；macOS、Windows 的主窗口与面板状态继续持久化。桌面分隔条现为拖动中实时连续调节，Windows 新增 AI 工具面板宽度，macOS AI 区释放重复导航与通用底栏占用的高度，两端预设与安全范围同步扩大。完整 `npm test` 493/493 通过，macOS 全源类型检查/构建和 Windows WPF 编译/打包均通过；增量双审与聚合总包重建进行中。真实桌面拖拽/重启恢复与 Windows 多显示器/DPI 仍需实机验收。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
@@ -49,7 +49,7 @@
 | 自动拍摄任务 | 已实现待验收 | 五端间隔、曝光包围、焦点包围、B 门静态测试通过 | 长任务、取消、断线、存储不足实测 |
 | 专业监看 | 已实现待验收 | 直方图、波形、矢量、峰值对焦、假色等五端检查通过 | 性能、色彩准确性和长时间运行验证 |
 | 实时监看开关与 iOS 相机桥接 | 已实现待验收 | 五端开关、Sony Camera Remote SDK 的 Mac 桥接、Nikon PTP 兼容桥接与局域网配对契约 | Sony/Nikon 真机、弱网、发热、长时间拉流和 iOS/macOS 联调 |
-| 登录动作清晰化与桌面工作区 | 已实现待验收 | `83eb7b2`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 窗口与面板状态模型；完整 492/492、五端构建、六包/聚合包回验、双审返修闭环 | macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能实机 |
+| 登录动作清晰化与桌面工作区 | 已实现待验收 | `cdfda11`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 连续实时分隔条、AI 空间与布局状态；完整 493/493、桌面编译与三包重建通过，增量双审进行中 | 聚合包重建；macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能实机 |
 | 无线收图 | 已实现待验收 | 五端 FTP/HTTP/WebDAV 源码与文档存在 | 大文件、中断、并发、端口释放和相机 FTP 实测 |
 | 拍摄会话与交付 | 已实现待验收 | 命名、配对、评级、双备份、SHA-256 五端检查通过 | 恢复、磁盘异常、跨卷和大量文件压力测试 |
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
@@ -1163,3 +1163,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 范围边界：第一阶段是单主窗口内的可调分区，不包含任意浮动面板、跨窗口拖放、面板自由编组或 Adobe 完整 dock 系统。macOS/Windows 真实拖拽、重启恢复、Windows 多显示器/DPI 和辅助功能仍需真实桌面环境验收。
 - 当前验证：实现与打包源码为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`；完整 `npm test` 492/492，登录/布局/公告专项包含在内。Android Debug APK、iOS unsigned Release、HarmonyOS Release HAP、macOS arm64 DMG、Windows x64 publish/NSIS 均按该提交重建成功；六个包压缩/DMG 结构、版本、适用签名属性与 SHA-256 已回验，三份 Apple strings lint 通过，IPA 内中英日忙碌态 exact 值已直接抽取核对。AI审查 对 exact `d4c1b067…` 给出 P0/P1/P2=0 的最终 UI/交互 PASS；GPT5.6luna 同一提交确认上一轮 Apple exact key、签名公告两项 P1 和文档 P2 已闭环，且无新的事实、翻译、AI 痕迹或能力越界，唯一新增 P1 是聚合总包仍含旧六包。总包现已用当前六包、侧车、发布说明与使用说明重建，SHA-256 为 `34820dbca35ca93c907f8a7c7dc16e51505caaab31a8380b7c73e94f3f300c99`；14 个内嵌文件逐个与当前源文件二进制一致，内嵌六份侧车全部通过。
 - 版本边界：源码候选为 `1.5.11 / build 38`；生产清单保持 `1.5.10 / build 37`，本轮未部署、未推送、未打标签、未创建 GitHub Release。使用说明见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，发布表见 `docs/releases/v1.5.11.md`。
+
+## 12.54 W15 桌面连续调节与 AI 空间增量（2026-08-10，GPT5.6）
+
+- 用户反馈与根因：macOS 截图显示 AI 工具的模式、预设和输出参数被压缩在较小底部区域；源码核对确认该区域同时渲染重复的完整分类导航、AI 自有生成底栏和通用编辑状态/操作栏。Windows 的五处分隔条采用拖动预览、松手生效，AI 预览与选项列则没有独立分隔条。
+- 实现：macOS 移除 AI 区重复分类导航及无关通用底栏，把默认底部高度提升到 360 pt、编辑预设提升到 480 pt，并将导航、参数、媒体池、工具和底部区域范围扩大；拖动期间禁用隐式动画，悬停/拖动显示系统调整光标与强调色，动态范围为中央画面保留最低尺寸。Windows 六处分隔条全部实时重排，新增可持久化的 340–720 px AI 工具列；模式按钮等宽自适应，快捷预设按分类独立换行。
+- 验证与交付：实现与桌面包打包源码为 `cdfda111aaf5b498e3c3653aec0c7f4343313019`。完整 `npm test` 493/493；macOS 全源 `swiftc -typecheck` 通过，应用构建、ad-hoc 深度严格验签、DMG 校验通过；Windows WPF `dotnet build` 0 error，Release publish、NSIS 与便携 ZIP 通过。新包 SHA-256：macOS DMG `639f0c3e177e5257fe4fea58a00b52430f68c0d02b298f917461b1eac1fa5bec`，Windows Setup `315ede1a6cb26626ebb6f46f579756ae7994d68d8f47e1e3675eca2f8e2d0ab1`，Windows ZIP `96b03055376f871cc27fdc85c64cfa65258c8c6c0290778282b7c4cf8e96aefd`。
+- 当前状态：增量 UI/交互与三语/材料双审待完成；通过后重建 14 项最终聚合包并回填哈希。本轮未改移动端功能或生产清单，未部署、未推送、未打标签、未创建 Release。真实 macOS/Windows 拖拽、辅助功能、重启恢复以及 Windows 多显示器/DPI 仍需实机验收。
