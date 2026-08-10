@@ -9607,10 +9607,20 @@ enum AiRebindService {
 }
 
 private final class AiImageService {
-    private static let defaultServer = "http://101.34.255.115:8787"
+    private static let defaultServer = "https://zenche.top/api"
+    private static let legacyServer = "http://101.34.255.115:8787"
 
     static var serverURL: String {
-        UserDefaults.standard.string(forKey: "aiServerURL") ?? defaultServer
+        let configured = UserDefaults.standard.string(forKey: "aiServerURL")?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var normalized = configured
+        while normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        if normalized.isEmpty || normalized == legacyServer {
+            return defaultServer
+        }
+        return normalized
     }
 
     struct Request: Encodable {
@@ -9653,7 +9663,7 @@ private final class AiImageService {
         }
         var r = URLRequest(url: url); r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.timeoutInterval = 60
+        r.timeoutInterval = 300
         // W13-c：登录墙下 AI 激活请求带上会话令牌，服务端记录 账号↔设备↔激活码 三元组；
         // 无令牌（存量流程/异常态）不影响既有请求。
         if url.scheme?.lowercased() == "https",

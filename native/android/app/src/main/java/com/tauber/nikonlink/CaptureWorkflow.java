@@ -215,24 +215,45 @@ final class CaptureWorkflow {
                 ? reserveBaseName(cameraName)
                 : sanitize(reservedBaseName);
         File destination = uniqueFile(primaryDirectory(), base, extension);
-        try (FileOutputStream output = new FileOutputStream(destination)) {
-            byte[] buffer = new byte[64 * 1024];
-            int count;
-            long total = 0;
-            while ((count = input.read(buffer)) >= 0) {
-                if (count == 0) continue;
-                output.write(buffer, 0, count);
-                total += count;
+        File staging = new File(
+                destination.getParentFile(),
+                "." + destination.getName() + "." + System.nanoTime() + ".importing");
+        boolean complete = false;
+        try {
+            try (FileOutputStream output = new FileOutputStream(staging)) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                long total = 0;
+                while ((count = input.read(buffer)) >= 0) {
+                    if (count == 0) continue;
+                    output.write(buffer, 0, count);
+                    total += count;
+                }
+                if (total == 0) {
+                    throw new Exception("所选文件为空。");
+                }
+                output.getFD().sync();
             }
-            if (total == 0) {
-                destination.delete();
-                throw new Exception("所选文件为空。");
+            if (!staging.renameTo(destination)) {
+                copy(staging, destination);
+                if (!staging.delete()) {
+                    throw new Exception("无法清理导入临时文件。");
+                }
             }
-            output.getFD().sync();
+            finalizeFile(destination, null);
+            status = "已写入会话 · " + destination.getName();
+            complete = true;
+            return destination;
+        } finally {
+            if (!complete) {
+                deleteImportArtifacts(staging, destination);
+            }
         }
-        finalizeFile(destination, null);
-        status = "已写入会话 · " + destination.getName();
-        return destination;
+    }
+
+    private void deleteImportArtifacts(File staging, File destination) {
+        staging.delete();
+        destination.delete();
     }
 
     synchronized File reserveExternalRecording(

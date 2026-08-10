@@ -883,6 +883,8 @@ public partial class MainWindow : Window
     ];
 
     private const int AiMaxUsage = 100;
+    private const string AiServerDefault = "https://zenche.top/api";
+    private const string AiServerLegacy = "http://101.34.255.115:8787";
     private const string AiRebindEndpoint =
         "https://zenche.top/api/v1/ai/rebind";
     private const int AiRebindResponseLimit = 64 * 1024;
@@ -992,8 +994,11 @@ public partial class MainWindow : Window
             var serverPath = Path.Combine(AiDataDir, "ai-server-url.txt");
             if (File.Exists(serverPath))
             {
-                var value = File.ReadAllText(serverPath).Trim();
-                if (value.Length > 0) return value;
+                var value = File.ReadAllText(serverPath).Trim().TrimEnd('/');
+                if (value.Length > 0 &&
+                    !string.Equals(value, AiServerLegacy,
+                        StringComparison.OrdinalIgnoreCase))
+                    return value;
             }
         }
         catch (Exception error)
@@ -1001,7 +1006,7 @@ public partial class MainWindow : Window
             DiagnosticLogger.Shared.Warning(
                 "ai", $"读取 AI 服务器地址失败：{error.Message}");
         }
-        return "http://101.34.255.115:8787";
+        return AiServerDefault;
     }
 
     private static string LoadActivationCode()
@@ -9073,7 +9078,7 @@ public partial class MainWindow : Window
                 body["image"] = $"data:{ImageMimeType(_editorSelectedPath)};base64,{b64}";
             }
             using var client = new HttpClient();
-            client.Timeout = TimeSpan.FromSeconds(60);
+            client.Timeout = TimeSpan.FromSeconds(300);
             var content = new StringContent(
                 JsonSerializer.Serialize(body),
                 System.Text.Encoding.UTF8,

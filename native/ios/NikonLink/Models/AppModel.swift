@@ -140,6 +140,13 @@ struct LibraryItem: Identifiable, Hashable {
     }
 }
 
+enum SystemPhotoEditAccessState: Equatable {
+    case ready
+    case limited
+    case needsRequest
+    case settingsRequired
+}
+
 @MainActor
 final class MediaLibrary: ObservableObject {
     @Published private(set) var items: [LibraryItem] = []
@@ -309,7 +316,8 @@ final class MediaLibrary: ObservableObject {
         }
     }
 
-    func importPhotoData(_ data: Data, fileExtension: String = "jpg") {
+    @discardableResult
+    func importPhotoData(_ data: Data, fileExtension: String = "jpg") -> URL? {
         let normalizedExtension = supportedExtensions.contains(
             fileExtension.lowercased()
         ) ? fileExtension.lowercased() : "jpg"
@@ -322,12 +330,99 @@ final class MediaLibrary: ObservableObject {
             reload()
             selectedItemID = destination.path
             message = "照片已从机主相册加入文件库"
+            return destination
         } catch {
             DiagnosticLogger.shared.error(
                 "library",
                 "相册照片导入失败：\(error.localizedDescription)"
             )
             message = "相册照片导入失败：\(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    var systemPhotoEditAccessState: SystemPhotoEditAccessState {
+        switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+        case .authorized: return .ready
+        case .limited: return .limited
+        case .notDetermined: return .needsRequest
+        case .denied, .restricted: return .settingsRequired
+        @unknown default: return .settingsRequired
+        }
+    }
+
+    static var systemPhotoPermissionSettingsURL: URL? {
+        URL(string: UIApplication.openSettingsURLString)
+    }
+
+    /// Loads the original bytes (including iCloud-backed assets), then stores
+    /// an app-owned working copy. The PHAsset itself is never edited in place.
+    func importSystemPhotoForEditing(
+        _ asset: PHAsset,
+        completion: @escaping (URL?) -> Void
+    ) {
+        let continueImport: () -> Void = { [weak self] in
+            guard let self else {
+                completion(nil)
+                return
+            }
+            let options = PHImageRequestOptions()
+            options.deliveryMode = .highQualityFormat
+            options.version = .current
+            options.isNetworkAccessAllowed = true
+            let filename = PHAssetResource.assetResources(for: asset)
+                .first?.originalFilename ?? "system-photo.jpg"
+            PHImageManager.default().requestImageDataAndOrientation(
+                for: asset,
+                options: options
+            ) { data, _, _, info in
+                DispatchQueue.main.async {
+                    if let cancelled = info?[PHImageCancelledKey] as? Bool,
+                       cancelled {
+                        self.message = "已取消读取系统照片"
+                        completion(nil)
+                        return
+                    }
+                    if let error = info?[PHImageErrorKey] as? Error {
+                        self.message = "系统照片读取失败：\(error.localizedDescription)"
+                        completion(nil)
+                        return
+                    }
+                    guard let data, !data.isEmpty else {
+                        self.message = "系统照片为空或暂时不可读取"
+                        completion(nil)
+                        return
+                    }
+                    let ext = (filename as NSString).pathExtension
+                    let destination = self.importPhotoData(
+                        data,
+                        fileExtension: ext.isEmpty ? "jpg" : ext
+                    )
+                    if destination != nil {
+                        self.message = "系统照片已导入为可编辑副本"
+                    }
+                    completion(destination)
+                }
+            }
+        }
+
+        switch systemPhotoEditAccessState {
+        case .ready, .limited:
+            continueImport()
+        case .needsRequest:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
+                DispatchQueue.main.async {
+                    guard status == .authorized || status == .limited else {
+                        self?.message = "未获得系统照片读取权限；可前往系统设置恢复"
+                        completion(nil)
+                        return
+                    }
+                    continueImport()
+                }
+            }
+        case .settingsRequired:
+            message = "未获得系统照片读取权限；可前往系统设置恢复"
+            completion(nil)
         }
     }
 
@@ -432,6 +527,15 @@ final class MediaLibrary: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Explicit editor-facing action: exports a new Photos asset and never
+    /// replaces the source PHAsset or the app-owned working copy.
+    func saveEditedCopyToSystemPhotos(
+        _ url: URL,
+        completion: @escaping (String) -> Void
+    ) {
+        saveToSystemPhotos(url, completion: completion)
     }
 
     func reload() {

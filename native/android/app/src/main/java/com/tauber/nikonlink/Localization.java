@@ -111,6 +111,9 @@ final class Localization {
                 "撮影ファイルに標準 XMP GPS サイドカーを作成します");
         add("AI 创作", "AI Create", "AI クリエイト");
         add("修图覆盖原图 · 生图保存新文件", "AI editing overwrites the original · generation saves a new file", "AI編集は元画像を上書き · 生成は新規ファイルとして保存");
+        add("AI 云端修图与生图使用当前账号和设备激活权益。",
+                "Cloud AI editing and generation use the signed-in account and this device's activation entitlement.",
+                "クラウド AI 編集・生成には、ログイン中のアカウントとこのデバイスのアクティベーション権限を使用します。");
         add("需要激活", "Activation required", "アクティベーションが必要");
         add("已解锁", "Unlocked", "ロック解除済み");
         add("输出参数", "Output parameters", "出力パラメータ");

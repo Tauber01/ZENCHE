@@ -146,6 +146,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_BLUETOOTH_REMOTE = 4106;
     private static final int REQUEST_CAPTURE_LOCATION = 4107;
     private static final int REQUEST_LOCAL_CAMERA = 4108;
+    private static final int REQUEST_EDITOR_SYSTEM_PHOTO = 4109;
+    private static final String AI_SERVER_DEFAULT = "https://zenche.top/api";
+    private static final String AI_SERVER_LEGACY = "http://101.34.255.115:8787";
     private static int PAPER = Color.rgb(233, 237, 242);
     private static int PAPER_2 = Color.rgb(228, 233, 239);
     private static int SURFACE = Color.rgb(248, 250, 252);
@@ -1556,6 +1559,7 @@ public final class MainActivity extends Activity {
     private volatile String updateStatus = "尚未检查更新";
     private volatile String currentSection = "capture";
     private String editorSelectedPath;
+    private volatile String editorSystemPhotoStatus = "";
     private final EditorAdjustments editorAdjustments =
             new EditorAdjustments();
     private List<NikonCloudPreview.Preset> nikonCloudPresets =
@@ -1638,8 +1642,19 @@ public final class MainActivity extends Activity {
     }
 
     private String aiServerUrl() {
-        return getSharedPreferences("nikon-link", MODE_PRIVATE)
-                .getString("aiServerURL", "http://101.34.255.115:8787");
+        String configured = getSharedPreferences("nikon-link", MODE_PRIVATE)
+                .getString("aiServerURL", AI_SERVER_DEFAULT);
+        String normalized = configured == null ? "" : configured.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        // The original public IP endpoint is retired and cannot carry the
+        // account Bearer token. Migrate only that exact historical default;
+        // keep any explicit self-hosted override intact for compatibility.
+        if (normalized.isEmpty() || AI_SERVER_LEGACY.equals(normalized)) {
+            return AI_SERVER_DEFAULT;
+        }
+        return normalized;
     }
 
     private static final String AI_PUBLIC_KEY =
@@ -2051,7 +2066,19 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_EDITOR_SYSTEM_PHOTO
+                && (resultCode != RESULT_OK || data == null)) {
+            editorSystemPhotoStatus = "";
+            return;
+        }
         if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        if (requestCode == REQUEST_EDITOR_SYSTEM_PHOTO) {
+            Uri uri = data.getData();
+            if (uri != null) {
+                importSystemPhotoForEditing(uri);
+            }
             return;
         }
         if (requestCode == REQUEST_OWNER_PHOTO
@@ -2149,6 +2176,89 @@ public final class MainActivity extends Activity {
         if ("library".equals(currentSection)) {
             showSection("library");
         }
+    }
+
+    /**
+     * Opens the permission-safe system picker for a single editor source.
+     * The selected item is copied into ZENCHE before any edit is applied.
+     */
+    void openSystemPhotoForEditing() {
+        try {
+            startActivityForResult(
+                    SystemPhotoEditBridge.pickerIntent(),
+                    REQUEST_EDITOR_SYSTEM_PHOTO);
+            editorSystemPhotoStatus = "正在选择系统相册照片…";
+        } catch (RuntimeException error) {
+            editorSystemPhotoStatus = "无法打开系统相册：" + error.getMessage();
+            showError(editorSystemPhotoStatus);
+        }
+    }
+
+    private void importSystemPhotoForEditing(Uri uri) {
+        editorSystemPhotoStatus = "正在创建可编辑副本…";
+        editorExecutor.execute(() -> {
+            try {
+                File copy = SystemPhotoEditBridge.importEditableCopy(
+                        this,
+                        captureWorkflow,
+                        uri);
+                mainHandler.post(() -> {
+                    editorSelectedPath = copy.getAbsolutePath();
+                    editorState = EditorState.PRO;
+                    aiMode = 0;
+                    aiResultBitmap = null;
+                    editorAdjustments.reset();
+                    editorAIAnalysis = null;
+                    editorSystemPhotoStatus = "系统照片已导入为可编辑副本";
+                    updateFileCount();
+                    showSection("editor");
+                });
+            } catch (Exception error) {
+                diagnostics.error(
+                        "editor",
+                        "系统照片导入失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    editorSystemPhotoStatus = "系统照片导入失败："
+                            + error.getMessage();
+                    showError(editorSystemPhotoStatus);
+                });
+            }
+        });
+    }
+
+    /** Saves an existing ZENCHE edit as a new system-album item. */
+    void saveEditedCopyToSystemAlbum(File editedFile) {
+        editorSystemPhotoStatus = "正在保存新副本到系统相册…";
+        editorExecutor.execute(() -> {
+            try {
+                SystemPhotoEditBridge.saveNewCopy(this, editedFile);
+                mainHandler.post(() -> {
+                    editorSystemPhotoStatus = "已保存新副本到系统相册";
+                    showToast(editorSystemPhotoStatus);
+                });
+                diagnostics.info(
+                        "editor",
+                        "编辑副本已保存到系统相册");
+            } catch (Exception error) {
+                diagnostics.error(
+                        "editor",
+                        "系统相册保存失败：" + error.getMessage());
+                mainHandler.post(() -> {
+                    editorSystemPhotoStatus = "系统相册保存失败："
+                            + error.getMessage();
+                    showError(editorSystemPhotoStatus);
+                });
+            }
+        });
+    }
+
+    /** Permission-recovery action exposed for the editor surface. */
+    void openSystemPhotoPermissionSettings() {
+        startActivity(SystemPhotoEditBridge.permissionSettingsIntent(this));
+    }
+
+    String editorSystemPhotoStatus() {
+        return editorSystemPhotoStatus;
     }
 
     private void openCloudDrive() {
@@ -7248,7 +7358,7 @@ public final class MainActivity extends Activity {
         content.addView(sectionHeader(
                 editorState == EditorState.AI ? "AI 工具" : "专业显影",
                 editorState == EditorState.AI
-                        ? "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。"
+                        ? "AI 云端修图与生图使用当前账号和设备激活权益。"
                         : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
                 COBALT));
         LinearLayout modeRow = new LinearLayout(this);
@@ -8588,12 +8698,17 @@ public final class MainActivity extends Activity {
     }
 
     private Bitmap decodeEditorThumbnail(File file, int width, int height) {
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 4;
-        Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
-        return bitmap == null
-                ? null
-                : Bitmap.createScaledBitmap(bitmap, dp(width), dp(height), true);
+        Bitmap bitmap = EditorBitmapDecoder.decode(
+                file,
+                Math.max(dp(width), dp(height)));
+        if (bitmap == null) return null;
+        Bitmap scaled = Bitmap.createScaledBitmap(
+                bitmap,
+                dp(width),
+                dp(height),
+                true);
+        if (scaled != bitmap) bitmap.recycle();
+        return scaled;
     }
 
     private void showEditorPhotoPickerDialog(List<File> photos) {
@@ -9760,19 +9875,7 @@ public final class MainActivity extends Activity {
     private Bitmap renderEditorAnalysisBitmap(
             File file,
             int maximumDimension) {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
-        int sampleSize = 1;
-        while (Math.max(
-                bounds.outWidth / sampleSize,
-                bounds.outHeight / sampleSize) > maximumDimension) {
-            sampleSize *= 2;
-        }
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = sampleSize;
-        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        return EditorBitmapDecoder.decode(file, maximumDimension);
     }
 
     private SeekBar addEditorAdjustment(
@@ -9951,21 +10054,7 @@ public final class MainActivity extends Activity {
             File file,
             EditorAdjustments settings,
             int maximumDimension) {
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
-        int sampleSize = 1;
-        while (Math.max(
-                bounds.outWidth / sampleSize,
-                bounds.outHeight / sampleSize) > maximumDimension) {
-            sampleSize *= 2;
-        }
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = sampleSize;
-        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-        Bitmap source = BitmapFactory.decodeFile(
-                file.getAbsolutePath(),
-                options);
+        Bitmap source = EditorBitmapDecoder.decode(file, maximumDimension);
         if (source == null) return null;
         if (settings.showingOriginal) {
             return source;

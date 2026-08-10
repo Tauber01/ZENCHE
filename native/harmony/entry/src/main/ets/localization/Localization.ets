@@ -147,6 +147,11 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('定位未开启', 'Location is off', '位置情報はオフです'),
   new TranslationEntry('AI 创作', 'AI Create', 'AI クリエイト'),
   new TranslationEntry('修图覆盖原图 · 生图保存新文件', 'AI editing overwrites the original · generation saves a new file', 'AI編集は元画像を上書き · 生成は新規ファイルとして保存'),
+  new TranslationEntry(
+    'AI 云端修图与生图使用当前账号和设备激活权益。',
+    "Cloud AI editing and generation use the signed-in account and this device's activation entitlement.",
+    'クラウド AI 編集・生成には、ログイン中のアカウントとこのデバイスのアクティベーション権限を使用します。'
+  ),
   new TranslationEntry('需要激活', 'Activation required', 'アクティベーションが必要'),
   new TranslationEntry('已解锁', 'Unlocked', 'ロック解除済み'),
   new TranslationEntry('输出参数', 'Output parameters', '出力パラメータ'),

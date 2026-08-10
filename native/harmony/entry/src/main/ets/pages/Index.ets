@@ -617,6 +617,8 @@ const RELEASES_URL: string =
 const AFDIAN_URL: string =
   'https://www.ifdian.net/a/Tauber';
 const ZENCHE_WEBSITE_URL: string = 'https://zenche.top';
+const AI_SERVER_DEFAULT: string = 'https://zenche.top/api';
+const AI_SERVER_LEGACY: string = 'http://101.34.255.115:8787';
 const AI_ACTIVATION_PUBLIC_KEY: string =
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngqgOi5fjajCPusMNsfB' +
   'FdMmWyzAGArL5bA+JK/uW+Md/YDtGvXjgSodev7VOQ9SPWqHUYA+XTpdyeCA+weL' +
@@ -1143,6 +1145,7 @@ struct Index {
   @State private aiResultPath: string = '';
   @State private aiGenerating: boolean = false;
   @State private aiStatus: string = '';
+  @State private systemPhotoEditStatus: string = '';
   @State private editorTabMode: string = 'pro'; // 'pro' | 'ai'
   @State private aiActivationInput: string = '';
   @State private aiActivationMsg: string = '';
@@ -3330,7 +3333,7 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
-      Text(this.tr('基于 nano-banana-2 模型的 AI 修图与生图；需在设置中配置 API Key。'))
+      Text(this.tr('AI 云端修图与生图使用当前账号和设备激活权益。'))
         .fontSize(EDITOR_FS_MEDIUM)
         .fontColor($r('app.color.muted'))
         .width('100%')
@@ -3926,10 +3929,20 @@ struct Index {
         getContext(this) as common.UIAbilityContext,
         { name: 'zenche_ai_settings' }
       );
-      const url: string = (prefs.getSync('ai_server_url', 'http://101.34.255.115:8787') as string) || 'http://101.34.255.115:8787';
-      return url;
+      const stored: string = (prefs.getSync(
+        'ai_server_url',
+        AI_SERVER_DEFAULT
+      ) as string) || AI_SERVER_DEFAULT;
+      let normalized: string = stored.trim();
+      while (normalized.endsWith('/')) {
+        normalized = normalized.substring(0, normalized.length - 1);
+      }
+      if (normalized.length === 0 || normalized === AI_SERVER_LEGACY) {
+        normalized = AI_SERVER_DEFAULT;
+      }
+      return normalized;
     } catch (_) {
-      return 'http://101.34.255.115:8787';
+      return AI_SERVER_DEFAULT;
     }
   }
 
@@ -12529,6 +12542,100 @@ struct Index {
       if (businessError.code !== 13900012) {
         this.showError(`无法打开机主相册：${businessError.message}`);
       }
+    }
+  }
+
+  /**
+   * Selects one system-library image and imports it through CaptureWorkflow.
+   * The editor always works on this app-owned copy, never the source asset URI.
+   */
+  private async openSystemPhotoForEditing(): Promise<void> {
+    this.systemPhotoEditStatus = '正在选择系统相册照片…';
+    try {
+      const options: photoAccessHelper.PhotoSelectOptions =
+        new photoAccessHelper.PhotoSelectOptions();
+      options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+      options.maxSelectNumber = 1;
+      options.isOriginalSupported = true;
+      const result: photoAccessHelper.PhotoSelectResult =
+        await new photoAccessHelper.PhotoViewPicker().select(options);
+      if (result.photoUris.length === 0) {
+        this.systemPhotoEditStatus = '';
+        return;
+      }
+      const workflow: CaptureWorkflow | undefined = this.captureWorkflow;
+      if (!workflow) {
+        throw new Error('文件库尚未就绪');
+      }
+      const importedPath: string = await workflow.importFromUri(
+        result.photoUris[0],
+        this.externalPhotoName(result.photoUris[0], '系统相册', 0),
+        '系统相册编辑'
+      );
+      this.refreshPhotos();
+      this.editorSelectedPath = importedPath;
+      this.editorTabMode = 'pro';
+      this.aiMode = 0;
+      this.aiResultPath = '';
+      this.resetImageEditor();
+      this.systemPhotoEditStatus = '系统照片已导入为可编辑副本';
+      this.status = this.systemPhotoEditStatus;
+      promptAction.showToast({ message: this.tr(this.systemPhotoEditStatus) });
+    } catch (error) {
+      const businessError: BusinessError = error as BusinessError;
+      if (businessError.code === 13900012) {
+        this.systemPhotoEditStatus = '需要照片访问权限，请在系统设置中允许后重试';
+      } else {
+        this.systemPhotoEditStatus = `系统照片导入失败：${businessError.message}`;
+      }
+      this.showError(this.systemPhotoEditStatus);
+    }
+  }
+
+  /**
+   * Saves an edited app-owned file as a new system-library asset. The system
+   * consent dialog is the permission-recovery path and the original is never
+   * modified or replaced.
+   */
+  private async saveEditedCopyToSystemAlbum(path: string): Promise<void> {
+    if (path.length === 0 || !fs.accessSync(path) || fs.statSync(path).size === 0) {
+      this.systemPhotoEditStatus = '没有可保存的编辑结果';
+      this.showError(this.systemPhotoEditStatus);
+      return;
+    }
+    this.systemPhotoEditStatus = '正在保存新副本到系统相册…';
+    try {
+      const context: common.UIAbilityContext =
+        getContext(this) as common.UIAbilityContext;
+      const helper: photoAccessHelper.PhotoAccessHelper =
+        photoAccessHelper.getPhotoAccessHelper(context);
+      const dot: number = path.lastIndexOf('.');
+      const extension: string = dot >= 0
+        ? path.substring(dot + 1).toLowerCase()
+        : 'jpg';
+      const config: photoAccessHelper.PhotoCreationConfig = {
+        title: `ZENCHE_${Date.now()}`,
+        fileNameExtension: extension.length > 0 ? extension : 'jpg',
+        photoType: photoAccessHelper.PhotoType.IMAGE,
+        subtype: photoAccessHelper.PhotoSubtype.DEFAULT
+      };
+      const created: Array<string> = await helper.showAssetsCreationDialog(
+        [`file://${path}`],
+        [config]
+      );
+      if (created.length === 0) {
+        this.systemPhotoEditStatus = '未保存系统相册副本';
+        return;
+      }
+      this.systemPhotoEditStatus = '已保存新副本到系统相册';
+      this.status = this.systemPhotoEditStatus;
+      promptAction.showToast({ message: this.tr(this.systemPhotoEditStatus) });
+    } catch (error) {
+      const businessError: BusinessError = error as BusinessError;
+      this.systemPhotoEditStatus = businessError.code === 13900012
+        ? '需要照片写入权限，请在系统设置中允许后重试'
+        : `系统相册保存失败：${businessError.message}`;
+      this.showError(this.systemPhotoEditStatus);
     }
   }
 

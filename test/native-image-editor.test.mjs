@@ -535,10 +535,12 @@ test("AI server address is no longer editable in native Settings while legacy re
   assert.match(ios, /UserDefaults\.standard\.string\(forKey: "aiServerURL"\)/);
 
   assert.doesNotMatch(android, /aiServerUrlInput|saveAiServerUrl|保存服务器地址/);
-  assert.match(android, /\.getString\("aiServerURL", "http:\/\/101\.34\.255\.115:8787"\)/);
+  assert.match(android, /AI_SERVER_DEFAULT = "https:\/\/zenche\.top\/api"/);
+  assert.match(android, /AI_SERVER_LEGACY = "http:\/\/101\.34\.255\.115:8787"/);
 
   assert.doesNotMatch(harmony, /aiServerInput|服务器地址（默认 http:\/\/101\.34\.255\.115:8787）/);
-  assert.match(harmony, /prefs\.getSync\('ai_server_url', 'http:\/\/101\.34\.255\.115:8787'\)/);
+  assert.match(harmony, /AI_SERVER_DEFAULT: string = 'https:\/\/zenche\.top\/api'/);
+  assert.match(harmony, /AI_SERVER_LEGACY: string = 'http:\/\/101\.34\.255\.115:8787'/);
 
   assert.doesNotMatch(macosSettings, /serverURL|AI 服务器|服务器地址（如/);
   assert.match(macosMain, /UserDefaults\.standard\.string\(forKey: "aiServerURL"\)/);

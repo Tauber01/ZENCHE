@@ -1587,9 +1587,20 @@ enum AiRebindService {
 
 private final class AiImageService {
     private static let requestTimeout: TimeInterval = 300
+    private static let defaultServer = "https://zenche.top/api"
+    private static let legacyServer = "http://101.34.255.115:8787"
 
     private static var serverURL: String {
-        UserDefaults.standard.string(forKey: "aiServerURL") ?? "http://101.34.255.115:8787"
+        let configured = UserDefaults.standard.string(forKey: "aiServerURL")?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var normalized = configured
+        while normalized.hasSuffix("/") {
+            normalized.removeLast()
+        }
+        if normalized.isEmpty || normalized == legacyServer {
+            return defaultServer
+        }
+        return normalized
     }
     private static var endpoint: URL? {
         URL(string: "\(serverURL.trimmingCharacters(in: .whitespacesAndNewlines))/v1/ai")
