@@ -181,9 +181,12 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - Windows 使用 `%LOCALAPPDATA%/NikonLink/desktop-workspace-layout-v1.json` 保存窗口几何、最大化状态和同组面板尺寸；恢复时按虚拟桌面边界约束窗口。WPF `GridSplitter` 与设置页预设复用同一状态模型，响应式折叠仍优先保留中央预览。
 - macOS `WorkspaceSplitHandle` 在 `DragGesture(minimumDistance: 0)` 的每次变化中关闭隐式动画并直接更新绑定值，窗口缩小时再按中央拍摄/编辑画面的最低尺寸动态收紧范围。Windows 六处 WPF `GridSplitter` 使用 `ShowsPreview=False`，拖动中实时重排；AI 工具列宽与其他面板一起写入同一布局状态。
 - AI 空间按平台根因收敛：macOS AI 区只保留顶部五工具入口和自身生成底栏，不再重复完整调整分类与通用编辑底栏；Windows AI 模式使用等宽两列，预设按分类建立独立换行容器，并允许在 340–720 px 内调节 AI 工具列。
+- 编辑层级统一为两级：一级“编辑模式”只包含“专业显影 / AI 工具”，二级“调整类别”只包含专业显影分类；从 AI 返回时恢复上次专业分类。macOS 把模式入口放入编辑器标题区，Windows 放入始终可见的标题工具区，避免同一目的地在上下两排重复出现。
+- macOS 示波器由固定标签宽度的横排改为状态头 + 自适应曲线区，曲线填满分区；同一 SwiftUI pass 只生成一份最大边 2048 的预览图并供画面与示波器复用，保存/导出才请求完整尺寸。Windows 用 33 ms `DispatcherTimer` 合并参数滑动产生的高频预览请求，一次 1600 px 渲染同时供预览与 320 px 示波器采样；`WaveformScope.SetData` 对相同 RGB 数据不再重复 invalidation。
+- Windows 监看时间码只在录制期间启动，停止录制、离开编辑页和关闭窗口时会停止计时并释放预览、AI 结果及示波器位图，避免隐藏页面继续占用 CPU/GDI 内存。
 - 两个桌面端均提供默认、拍摄、监看、编辑、紧凑五套预设与恢复默认。第一阶段只支持主窗口内的固定分区调整，不实现 Adobe 式任意浮动面板、跨窗口拖放或跨显示器面板停靠；这些能力会显著扩大窗口生命周期、焦点、无障碍和状态迁移风险，留待后续独立迭代。
 - Apple 的运行时本地化先匹配完整字符串，再做动态片段替换。登录忙碌态因此必须在共享的 `zh-Hans/en/ja` Apple 语言包中提供“正在登录…”与“正在注册…”的 exact key；回归测试会直接核对三语返回值，防止出现“正在Sign In…”或“正在ログイン…”混排。
-- 候选版本为 `1.5.11 / build 38`，当前实现与桌面包打包源码为 `97659b2ea7a588720be041e32f736c98e8cec65c`。完整 `npm test` 493/493 通过；macOS 全源类型检查、应用构建/严格验签/DMG 校验以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。原生 UI/交互终审 P0/P1/P2 均为 0；材料终审确认三语、签名事实、生产边界与去 AI 痕迹通过，所指出的旧聚合包、状态待办和英文窗口术语均已关闭。最终聚合包 SHA-256 为 `77a2f957c89f332e9b3afd09ad1a9e81ed26f0375d5b2201580b7644051dd15f`，14 项内容逐字节匹配当前交付源。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
+- 候选版本为 `1.5.11 / build 38`，当前实现与桌面包打包源码为 `0faeccdc987146c104fd73d742547c9baf9db221`。完整 `npm test` 495/495 通过；macOS 全源类型检查、应用构建/严格验签/DMG 校验以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。Impeccable 对本轮桌面布局文件检测为 0 条反模式；最终聚合包 SHA-256 为 `734051ea363f2d721947ba6a3a3dd2afd476b058a332a134081bb3bdb0f7074d`，14 项内容逐字节匹配当前交付源，AI审查/GPT5.6luna 双审正在进行。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
 ## 1. 总体原则
 
