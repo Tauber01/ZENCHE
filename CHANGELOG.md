@@ -142,9 +142,9 @@ the project uses semantic versioning.
 
 - Device migration remains server-disabled until the production DNS/HTTPS,
   reverse-proxy, secret/key injection, and public-port closure gates are met.
-- The local candidate packages are not a GitHub stable release. Platform signing,
-  notarization, Windows-host validation, and camera-device validation are reported
-  separately with the delivered artifacts.
+- At the time of the 1.5.2 candidate review, those local packages were not yet a
+  GitHub stable release. Platform signing, notarization, Windows-host validation,
+  and camera-device validation were reported separately with those artifacts.
 
 ## [1.5.0] - 2026-08-03
 
