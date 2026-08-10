@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-10（Asia/Shanghai）
-> 当前开发候选：`agent/mobile-known-fixes`，1.5.11 / build 38；移动端实现与三包源码基线 `e17fdb9e749f76b2bbed8b15e874b0e3f3686207`，桌面实现与三包源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，最终聚合包 SHA-256 `0e591c596309968d541d8ab4b1bb21697f2d4dab95c6d05fd90caa40cfc4705f`
+> 当前开发候选：`agent/mobile-known-fixes`，1.5.11 / build 38；移动端实现源码基线 `95378b2bd1e2f8af898363b8be4f951ab388ed65`，桌面实现与三包源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，最终聚合包 SHA-256 `bd6239cd4d1bb7ccd9f1fb5572bc14fe05f0586e9f4a9de8af3df17c6708bbd1`
 > 公开状态：GitHub v1.5.3 仍为公开稳定版；官网自动更新继续提供 W14 的 1.5.10 / build 37，1.5.11 尚未部署、推送、打标签或创建 Release
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
@@ -18,8 +18,8 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/mobile-known-fixes`。桌面菜单层级、示波器空间、性能与 Windows AI 临时结果生命周期继续使用已封板基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；本轮移动端实现与三包使用 `e17fdb9e749f76b2bbed8b15e874b0e3f3686207`，覆盖 Nikon Z50 繁忙恢复、Android Camera2 降级、五端 AI HTTPS 代理及三移动端系统照片编辑与新副本保存。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
-- 完整 `npm test` 513/513 通过。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包结构、侧车与 Android Debug v2 签名均已回验。最终聚合包 SHA-256 为 `0e591c596309968d541d8ab4b1bb21697f2d4dab95c6d05fd90caa40cfc4705f`，根侧车、ZIP 结构、六份内嵌侧车与 14 项逐字节一致性通过。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
+- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/mobile-known-fixes`。桌面菜单层级、示波器空间、性能与 Windows AI 临时结果生命周期继续使用已封板基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；本轮移动端最终实现源码使用 `95378b2bd1e2f8af898363b8be4f951ab388ed65`，覆盖 Nikon Z50 繁忙恢复、Android Camera2 降级、五端 AI HTTPS 代理、三移动端系统照片编辑与新副本保存，以及新增状态与 AI 控件三语闭环。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
+- 完整 `npm test` 514/514 通过。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包结构、侧车与 Android Debug v2 签名均已回验。最终聚合包 SHA-256 为 `bd6239cd4d1bb7ccd9f1fb5572bc14fe05f0586e9f4a9de8af3df17c6708bbd1`，根侧车、ZIP 结构、六份内嵌侧车与 14 项逐字节一致性通过。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
@@ -1202,5 +1202,5 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - AI 请求链复核：Android、iOS/iPadOS、HarmonyOS、macOS、Windows 均向 `/v1/ai` 提交激活码、设备 ID、提示词和尺寸，修图携带完整 MIME data URL；HTTPS 且有 session 时附加 Bearer；结果支持 `b64_json` 或 URL，并落到编辑器结果。该修复未在客户端重新引入模型 API Key。
 - 系统照片编辑流程：Android 新增 Photo Picker/Document Provider 桥接，以 `ContentResolver` 流复制到 `CaptureWorkflow`，对 provider `SIZE` 与真实读取字节实施双重 64 MB 上限；导入先写 `.importing` 同目录临时文件，流、同步、重命名或收尾失败均清理临时文件和本次目标，取消选择也会清空忙碌状态；另存使用 MediaStore 新建项目并处理 pending/失败清理。Android 另增加无第三方依赖的 JPEG EXIF Orientation 1–8 解码归一化，编辑缩略图、预览、分析、调整和导出共用同一方向。iOS/iPadOS 新增 PhotoKit 权限状态、iCloud 可读工作副本、设置恢复 URL 与新 PHAsset 导出；HarmonyOS 新增单选 PhotoViewPicker 工作副本和 `showAssetsCreationDialog` 新资产导出。
 - 可见 UI 与保存契约：三端专业显影和 AI 修图都显示“照片来源 / 从系统相册导入”，空文件库仍可进入系统选择器；保存动作分为应用文件库新副本与系统相册新项目。移动端 AI 修图不再覆盖所选工作副本；拒绝权限、取消、导入/保存失败和设置恢复均有明确状态。Apple 中英日补齐 exact key，Android/HarmonyOS 运行时三语同步。
-- 回归与构建：集成源码基线 `e17fdb9e749f76b2bbed8b15e874b0e3f3686207`；完整 `npm test` 513/513 通过，专项覆盖默认 AI 代理、Bearer、原图 data URL、三端导入/导出、EXIF 1–8、可见入口和新副本保存契约。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包 SHA-256 分别为 `8726d5d6c4c95d12d0a0b7a366d0df4b2c0540cac544a1803668e22d4f262f53`、`ae66671104385e29e2fb137dde39d73028ca49e8ccd3a71626610f9dba621c57`、`4cca97685b1ef78690c3dfbbb1daf44656117659dd8aaa3735e1d1937a2e718a`，三份侧车和压缩结构均通过，Android v2 Debug 签名证书保持一致。复用既有桌面包后重建最终聚合包，SHA-256 为 `0e591c596309968d541d8ab4b1bb21697f2d4dab95c6d05fd90caa40cfc4705f`；六包、六侧车和两份说明共 14 项与当前交付源逐字节一致。
+- 回归与构建：最终移动端实现源码基线 `95378b2bd1e2f8af898363b8be4f951ab388ed65`；完整 `npm test` 514/514 通过，专项覆盖默认 AI 代理、Bearer、原图 data URL、三端导入/导出、EXIF 1–8、可见入口、新副本保存，以及 Android/HarmonyOS 新增运行态三语契约。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包 SHA-256 分别为 `335b8c1f7d498dbeecc2dfebe00359b7383ba42f75ad11e168e180ecc3e101cc`、`a25f4dcf69a7298df034bb0345fc8b902db7d21e786567e9cde879ce6c2ec5b3`、`a74b316fd9c43209ae4be82a332bb90ec99585aff4d8a368372840bd7d02c96f`，三份侧车和压缩结构均通过，Android v2 Debug 签名证书保持一致。复用既有桌面包后重建最终聚合包，SHA-256 为 `bd6239cd4d1bb7ccd9f1fb5572bc14fe05f0586e9f4a9de8af3df17c6708bbd1`；六包、六侧车和两份说明共 14 项与当前交付源逐字节一致。
 - 尚未验证：未用有效激活码访问生产代理，未在 Android/iOS/HarmonyOS 真机执行 URI/iCloud/权限拒绝恢复/系统相册另存，也未在 Nikon Z50 或 OPPO PEDM00 上做实机回归；未做正式签名或安装验收。未推送、未部署、未打标签、未创建 Release，官网生产仍为 1.5.10 / build 37。
