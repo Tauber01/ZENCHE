@@ -136,7 +136,6 @@ final class LocalCameraController implements AutoCloseable {
             throw new SecurityException("需要相机权限才能使用本机摄像头");
         }
         close();
-        startThread();
         String cameraId = chooseCameraId();
         CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
         StreamConfigurationMap map = characteristics.get(
@@ -150,10 +149,17 @@ final class LocalCameraController implements AutoCloseable {
                     CameraAccessException.CAMERA_ERROR,
                     "本机摄像头不支持 JPEG 输出");
         }
+        startThread();
         ConfiguredCamera configuredCamera = null;
         Exception lastSessionError = null;
         for (StreamCandidate candidate : buildStreamCandidates(jpegSizes)) {
-            OpenedCamera openedCamera = openCamera(cameraId);
+            OpenedCamera openedCamera;
+            try {
+                openedCamera = openCamera(cameraId);
+            } catch (Exception error) {
+                close();
+                throw error;
+            }
             try {
                 configuredCamera = configureSession(openedCamera, candidate);
                 synchronized (stateLock) {

@@ -29,6 +29,10 @@ test('Android local camera retries simpler stream plans after a rejected session
   assert.match(source, /addStreamCandidate\(candidates, smallest, smallest, true\)/);
   assert.match(source, /openedCamera\.abandoned\.set\(true\)/);
   assert.match(source, /if \(openedCamera\.abandoned\.get\(\)\) camera\.close\(\)/);
+  assert.match(
+    source,
+    /try \{\s*openedCamera = openCamera\(cameraId\);\s*} catch \(Exception error\) \{\s*close\(\);\s*throw error;/,
+  );
 });
 
 test('Android local camera falls back from two JPEG outputs to one shared JPEG output', () => {
