@@ -183,7 +183,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - AI 空间按平台根因收敛：macOS AI 区只保留顶部五工具入口和自身生成底栏，不再重复完整调整分类与通用编辑底栏；Windows AI 模式使用等宽两列，预设按分类建立独立换行容器，并允许在 340–720 px 内调节 AI 工具列。
 - 两个桌面端均提供默认、拍摄、监看、编辑、紧凑五套预设与恢复默认。第一阶段只支持主窗口内的固定分区调整，不实现 Adobe 式任意浮动面板、跨窗口拖放或跨显示器面板停靠；这些能力会显著扩大窗口生命周期、焦点、无障碍和状态迁移风险，留待后续独立迭代。
 - Apple 的运行时本地化先匹配完整字符串，再做动态片段替换。登录忙碌态因此必须在共享的 `zh-Hans/en/ja` Apple 语言包中提供“正在登录…”与“正在注册…”的 exact key；回归测试会直接核对三语返回值，防止出现“正在Sign In…”或“正在ログイン…”混排。
-- 候选版本为 `1.5.11 / build 38`，当前实现与桌面包打包源码为 `cdfda111aaf5b498e3c3653aec0c7f4343313019`。完整 `npm test` 493/493 通过；macOS 全源类型检查、应用构建/严格验签/DMG 校验以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。增量双审与最终聚合包重建进行中；候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
+- 候选版本为 `1.5.11 / build 38`，当前实现与桌面包打包源码为 `97659b2ea7a588720be041e32f736c98e8cec65c`。完整 `npm test` 493/493 通过；macOS 全源类型检查、应用构建/严格验签/DMG 校验以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。原生 UI/交互终审 P0/P1/P2 均为 0；材料终审确认三语、签名事实、生产边界与去 AI 痕迹通过，所指出的旧聚合包、状态待办和英文窗口术语均已关闭。最终聚合包 SHA-256 为 `77a2f957c89f332e9b3afd09ad1a9e81ed26f0375d5b2201580b7644051dd15f`，14 项内容逐字节匹配当前交付源。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
 ## 1. 总体原则
 
