@@ -92,6 +92,42 @@ test("HarmonyOS system photo editing imports a picker Uri copy and saves through
   assert.match(source, /photoAccessHelper\.PhotoSubtype\.DEFAULT/);
 });
 
+test("mobile editors expose system-photo import and save-new-copy actions in both manual and AI workflows", async () => {
+  const [android, ios, harmony] = await Promise.all([
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+  ]);
+
+  assert.match(android, /buildEditorSourceCard\(List<File> photos\)/);
+  assert.match(android, /buildEditorSourceCard\(photos\)[\s\S]*?文件库中没有可编辑照片/);
+  assert.match(android, /从系统相册导入/);
+  assert.match(android, /saveRenderedEditorCopy\([^)]*true\)/);
+  assert.match(android, /saveAiResultToSystemAlbum/);
+  assert.match(android, /File dest = source != null\s*\? uniqueEditedFile\(source\)/);
+
+  assert.match(ios, /private var editorSourcePicker: some View/);
+  assert.match(ios, /showingEditorSystemPhotos = true/);
+  assert.match(ios, /editorSystemPhotoPickerSheet/);
+  assert.match(ios, /saveCopyToSystemPhotos\(\)/);
+  assert.match(ios, /saveAiResultToSystemPhotos\(\)/);
+  assert.match(ios, /private func saveAiResult\(\)[\s\S]*?saveEditedImage\(/);
+  assert.doesNotMatch(ios, /private func saveAiResult\(\)[\s\S]{0,800}?replaceEditedImage\(/);
+
+  assert.match(harmony, /private EditorPhotoPicker\(\)[\s\S]*?从系统相册导入[\s\S]*?openSystemPhotoForEditing\(\)/);
+  assert.match(harmony, /private async saveEditedPhoto\(exportToSystemAlbum: boolean = false\)/);
+  assert.match(harmony, /saveEditedPhoto\(true\)/);
+  assert.match(harmony, /private async saveAiResult\(exportToSystemAlbum: boolean = false\)/);
+  assert.match(harmony, /saveAiResult\(true\)/);
+  assert.match(harmony, /private async saveAiResult[\s\S]*?library\.saveEditedCopy\(/);
+  assert.doesNotMatch(harmony, /private async saveAiResult[\s\S]{0,1600}?library\.replaceFile\(/);
+
+  for (const source of [android, ios, harmony]) {
+    assert.match(source, /保存(?:新副本)?到系统相册/);
+    assert.match(source, /原片保持不变|原文件保持不变/);
+  }
+});
+
 test("Android editor normalizes all eight JPEG EXIF orientations before preview, analysis, and export", async () => {
   const [decoder, activity] = await Promise.all([
     read("native/android/app/src/main/java/com/tauber/nikonlink/EditorBitmapDecoder.java"),

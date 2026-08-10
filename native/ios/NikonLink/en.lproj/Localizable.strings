@@ -545,6 +545,7 @@
 "AI 功能已解锁" = "AI features unlocked";
 "AI 创作" = "AI Create";
 "修图覆盖原图 · 生图保存新文件" = "AI editing overwrites the original · generation saves a new file";
+"修图与生图都会保存新副本" = "AI edits and generated images are saved as new copies";
 "需要激活" = "Activation required";
 "已解锁" = "Unlocked";
 "输出参数" = "Output parameters";
@@ -943,3 +944,15 @@
 "桥接不可用" = "Bridge unavailable";
 "请先在 Mac 端连接相机" = "Connect a camera on the Mac first";
 "相机端选择 FTP 并开启 PASV；HTTP/WebDAV 使用相同账号的 Basic Auth，PUT/POST 请求需提供 Content-Length。iPhone/iPad 的 Mac 相机桥接还需要上方本次配对码：索尼由 Mac 端 Camera Remote SDK 驱动；尼康在厂商未提供 iOS SDK 前明确使用 PTP 兼容路径。首次启动时请允许 macOS 接受传入网络连接。" = "On the camera, select FTP and enable PASV. HTTP/WebDAV uses the same account’s Basic Auth, and PUT/POST requests must include Content-Length. The iPhone/iPad Mac Camera Bridge also requires the session code shown above: Sony is driven by Camera Remote SDK on the Mac; Nikon uses a clearly labeled PTP-compatible path until Nikon provides an iOS SDK. Allow incoming network connections when macOS first prompts.";
+
+// ── W16: system photo editing and account-backed AI ──
+"AI 云端修图与生图使用当前账号和设备激活权益。" = "Cloud AI editing and generation use the signed-in account and this device’s activation entitlement.";
+"系统相册" = "Photos";
+"选择系统照片并创建可编辑副本，原片保持不变" = "Choose a photo and create an editable copy. The original stays unchanged.";
+"正在创建可编辑副本…" = "Creating an editable copy…";
+"没有可导入的系统照片" = "No Photos Available to Import";
+"打开系统设置" = "Open System Settings";
+"从系统相册导入" = "Import from Photos";
+"未获得照片读取权限；可前往系统设置恢复。" = "Photos access was not granted. You can restore access in System Settings.";
+"系统照片已导入为可编辑副本" = "Photo imported as an editable copy";
+"保存到系统相册" = "Save to Photos";

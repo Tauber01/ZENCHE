@@ -111,9 +111,30 @@ final class Localization {
                 "撮影ファイルに標準 XMP GPS サイドカーを作成します");
         add("AI 创作", "AI Create", "AI クリエイト");
         add("修图覆盖原图 · 生图保存新文件", "AI editing overwrites the original · generation saves a new file", "AI編集は元画像を上書き · 生成は新規ファイルとして保存");
+        add("修图与生图都会保存新副本", "AI edits and generated images are saved as new copies", "AI編集と画像生成はいずれも新しいコピーとして保存されます");
         add("AI 云端修图与生图使用当前账号和设备激活权益。",
                 "Cloud AI editing and generation use the signed-in account and this device's activation entitlement.",
                 "クラウド AI 編集・生成には、ログイン中のアカウントとこのデバイスのアクティベーション権限を使用します。");
+        add("修图工作台", "Photo Editor", "写真編集");
+        add("选择照片来源与编辑模式；结果始终保存为新副本。",
+                "Choose a photo source and editing mode. Results are always saved as new copies.",
+                "写真の読み込み元と編集モードを選択します。結果は常に新しいコピーとして保存されます。");
+        add("编辑模式", "Editing mode", "編集モード");
+        add("照片来源", "Photo source", "写真の読み込み元");
+        add("从系统相册导入", "Import from Photos", "システム写真から読み込む");
+        add("系统照片会先复制到文件库，原片保持不变。",
+                "System photos are copied into the library first; the originals remain unchanged.",
+                "システム写真は先にライブラリへコピーされ、元の写真は変更されません。");
+        add("保存新副本到系统相册", "Save New Copy to Photos", "新しいコピーをシステム写真に保存");
+        add("张可编辑", " editable", " 枚を編集可能");
+        add("正在选择系统相册照片…", "Choosing a system photo…", "システム写真を選択しています…");
+        add("正在创建可编辑副本…", "Creating an editable copy…", "編集用コピーを作成しています…");
+        add("系统照片已导入为可编辑副本", "System photo imported as an editable copy", "システム写真を編集用コピーとして読み込みました");
+        add("正在保存新副本到系统相册…", "Saving a new copy to Photos…", "新しいコピーをシステム写真に保存しています…");
+        add("已保存新副本到系统相册", "New copy saved to Photos", "新しいコピーをシステム写真に保存しました");
+        add("没有可保存的 AI 结果", "There is no AI result to save", "保存できる AI 結果がありません");
+        add("需要照片写入权限", "Photo write access is required", "写真の書き込み権限が必要です");
+        add("打开系统设置", "Open System Settings", "システム設定を開く");
         add("需要激活", "Activation required", "アクティベーションが必要");
         add("已解锁", "Unlocked", "ロック解除済み");
         add("输出参数", "Output parameters", "出力パラメータ");

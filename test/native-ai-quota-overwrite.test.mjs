@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const read = async (path) => readFile(new URL(path, root), "utf8");
 
-test("Android AI calls apply the server quota and atomically replace edit sources", async () => {
+test("Android AI calls apply the server quota and save retouches as new copies", async () => {
   const source = await read(
     "native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java",
   );
@@ -13,12 +13,11 @@ test("Android AI calls apply the server quota and atomically replace edit source
   assert.match(source, /parseAiRemaining/);
   assert.match(source, /setAiRemainingUsage/);
   assert.match(source, /recordAiUsage\(\)/);
-  assert.match(source, /StandardCopyOption\.ATOMIC_MOVE/);
-  assert.match(source, /StandardCopyOption\.REPLACE_EXISTING/);
   assert.match(source, /aiMode == 0 && editorSelectedPath != null/);
+  assert.match(source, /File dest = source != null\s*\? uniqueEditedFile\(source\)/);
 });
 
-test("HarmonyOS AI calls apply the server quota and replaces edit sources", async () => {
+test("HarmonyOS AI calls apply the server quota and save retouches as new copies", async () => {
   const [page, library] = await Promise.all([
     read("native/harmony/entry/src/main/ets/pages/Index.ets"),
     read("native/harmony/entry/src/main/ets/storage/PhotoLibrary.ets"),
@@ -27,9 +26,9 @@ test("HarmonyOS AI calls apply the server quota and replaces edit sources", asyn
   assert.match(page, /parseAiRemaining/);
   assert.match(page, /setAiRemainingUsage/);
   assert.match(page, /recordAiUsage\(\)/);
-  assert.match(page, /library\.replaceFile\(this\.editorSelectedPath/);
+  assert.match(page, /private async saveAiResult[\s\S]*?library\.saveEditedCopy\(/);
   assert.match(library, /replaceFile\(path: string, bytes: Uint8Array\)/);
-  assert.match(library, /ai\.tmp/);
+  assert.match(library, /saveEditedCopy\(originalName: string, bytes: Uint8Array\)/);
 });
 
 test("all native AI retouch requests carry the selected source as a typed data URL", async () => {

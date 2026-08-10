@@ -2246,7 +2246,18 @@ public final class MainActivity extends Activity {
                 mainHandler.post(() -> {
                     editorSystemPhotoStatus = "系统相册保存失败："
                             + error.getMessage();
-                    showError(editorSystemPhotoStatus);
+                    if (error instanceof SecurityException) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("需要照片写入权限")
+                                .setMessage(editorSystemPhotoStatus)
+                                .setNegativeButton("取消", null)
+                                .setPositiveButton(
+                                        "打开系统设置",
+                                        (dialog, which) -> openSystemPhotoPermissionSettings())
+                                .show();
+                    } else {
+                        showError(editorSystemPhotoStatus);
+                    }
                 });
             }
         });
@@ -7356,11 +7367,12 @@ public final class MainActivity extends Activity {
         LinearLayout content = verticalContainer();
         content.setPadding(dp(20), dp(22), dp(20), dp(28));
         content.addView(sectionHeader(
-                editorState == EditorState.AI ? "AI 工具" : "专业显影",
-                editorState == EditorState.AI
-                        ? "AI 云端修图与生图使用当前账号和设备激活权益。"
-                        : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                "修图工作台",
+                "选择照片来源与编辑模式；结果始终保存为新副本。",
                 COBALT));
+        content.addView(
+                text("编辑模式", TS_CAPTION, Typeface.BOLD, MUTED),
+                marginParams(-1, -2, 0, 4, 0, 6));
         LinearLayout modeRow = new LinearLayout(this);
         modeRow.setOrientation(LinearLayout.HORIZONTAL);
         Button proMode = nativeButton(
@@ -7399,9 +7411,19 @@ public final class MainActivity extends Activity {
                 photos.add(file);
             }
         }
+        content.addView(
+                text(
+                        "分组调整光线、色彩、细节、效果与几何；始终保留原文件。",
+                        TS_BODY,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 0, 0, 10));
+        content.addView(
+                buildEditorSourceCard(photos),
+                marginParams(-1, -2, 0, 0, 0, 14));
         if (photos.isEmpty()) {
             TextView empty = text(
-                    "文件库中没有可编辑照片\n视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
+                    "文件库中没有可编辑照片\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
                     14,
                     Typeface.NORMAL,
                     MUTED);
@@ -7419,10 +7441,6 @@ public final class MainActivity extends Activity {
                                 editorSelectedPath))) {
             editorSelectedPath = photos.get(0).getAbsolutePath();
         }
-
-        content.addView(
-                buildEditorPhotoPicker(photos),
-                marginParams(-1, dp(64), 0, 0, 0, 12));
 
         // 图 2 移动端降级：监视器固定顶部，控制面板（工具条/媒体/示波器/参数）位于其下
         EditorMaskImageView preview = new EditorMaskImageView(editorAdjustments);
@@ -8117,57 +8135,21 @@ public final class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(0, dp(48), 1f);
         resetParams.setMargins(dp(8), 0, 0, 0);
         actions.addView(reset, resetParams);
-        Button save = nativeButton("保存高质量副本", true);
-        save.setOnClickListener(view -> {
-            File source = new File(editorSelectedPath);
-            save.setEnabled(false);
-            status.setText(tr("正在保存编辑副本…"));
-            EditorAdjustments savedAdjustments =
-                    editorAdjustments.copy();
-            savedAdjustments.showingOriginal = false;
-            editorExecutor.execute(() -> {
-                Bitmap output = renderEditedBitmap(
-                        source,
-                        savedAdjustments,
-                        4096);
-                File destination = uniqueEditedFile(source);
-                boolean success = false;
-                if (output != null) {
-                    try (FileOutputStream stream =
-                                 new FileOutputStream(destination)) {
-                        success = output.compress(
-                                Bitmap.CompressFormat.JPEG,
-                                95,
-                                stream);
-                    } catch (Exception error) {
-                        diagnostics.error(
-                                "editor",
-                                "保存编辑副本失败：" + error.getMessage());
-                    }
-                    output.recycle();
-                }
-                boolean saved = success;
-                mainHandler.post(() -> {
-                    save.setEnabled(true);
-                    if (saved) {
-                        editorSelectedPath =
-                                destination.getAbsolutePath();
-                        editorAdjustments.reset();
-                        selectedNikonCloudPreset = null;
-                        updateFileCount();
-                        showToast("已保存编辑副本：" + destination.getName());
-                        showSection("editor");
-                    } else {
-                        status.setText(tr("保存编辑副本失败"));
-                    }
-                });
-            });
-        });
-        LinearLayout.LayoutParams saveParams =
-                new LinearLayout.LayoutParams(0, dp(48), 1f);
-        saveParams.setMargins(dp(8), 0, 0, 0);
-        actions.addView(save, saveParams);
         content.addView(actions);
+        Button save = nativeButton("保存高质量副本", true);
+        save.setOnClickListener(view -> saveRenderedEditorCopy(
+                save,
+                status,
+                false));
+        content.addView(save, marginParams(-1, dp(48), 0, 10, 0, 8));
+
+        Button saveToAlbum = nativeButton("保存新副本到系统相册", false);
+        saveToAlbum.setContentDescription("渲染当前调整并在系统相册创建新照片");
+        saveToAlbum.setOnClickListener(view -> saveRenderedEditorCopy(
+                saveToAlbum,
+                status,
+                true));
+        content.addView(saveToAlbum, marginParams(-1, dp(48), 0, 0, 0, 0));
         content.addView(
                 status,
                 marginParams(-1, -2, 0, 8, 0, 0));
@@ -8371,21 +8353,13 @@ public final class MainActivity extends Activity {
                 photos.add(file);
             }
         }
-        if (aiMode == 0 && photos.isEmpty()) {
-            aiMode = 1;
-        }
-
-        content.addView(
-                buildResolveEditorWorkbench(photos),
-                marginParams(-1, dp(118), 0, 0, 0, 12));
-
         LinearLayout aiIntro = new LinearLayout(this);
         aiIntro.setOrientation(LinearLayout.VERTICAL);
         aiIntro.setPadding(dp(14), dp(12), dp(14), dp(12));
         aiIntro.setBackground(rounded(COBALT_SOFT, 12, COBALT));
         aiIntro.addView(text("AI 创作", EDITOR_FS_HEAD, Typeface.BOLD, INK));
         aiIntro.addView(text(
-                "修图覆盖原图 · 生图保存新文件",
+                "修图与生图都会保存新副本",
                 TS_BODY,
                 Typeface.NORMAL,
                 MUTED), marginParams(-1, -2, 0, 6, 0, 0));
@@ -8406,8 +8380,8 @@ public final class MainActivity extends Activity {
                         : photos.get(0).getAbsolutePath();
             }
             content.addView(
-                    buildEditorPhotoPicker(photos),
-                    marginParams(-1, dp(64), 0, 0, 0, 10));
+                    buildEditorSourceCard(photos),
+                    marginParams(-1, -2, 0, 0, 0, 12));
             if (aiResultBitmap == null && editorSelectedPath != null) {
                 Bitmap original = renderEditorAnalysisBitmap(
                         new File(editorSelectedPath),
@@ -8606,38 +8580,18 @@ public final class MainActivity extends Activity {
                             : null;
                     String stem = aiMode == 0 ? "edited" : "generated";
                     File dest = source != null
-                            ? source
+                            ? uniqueEditedFile(source)
                             : new File(
                                     photoDirectory,
                                     "ai_" + stem + "_" + new java.text.SimpleDateFormat(
                                             "yyyyMMdd_HHmmss", java.util.Locale.US)
                                             .format(new Date()) + ".jpg");
-                    File temporary = source != null
-                            ? new File(dest.getAbsolutePath() + ".ai.tmp")
-                            : dest;
                     boolean ok = false;
-                    try (FileOutputStream stream = new FileOutputStream(temporary)) {
+                    try (FileOutputStream stream = new FileOutputStream(dest)) {
                         ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
                         stream.getFD().sync();
-                        if (ok && source != null) {
-                            try {
-                                java.nio.file.Files.move(
-                                        temporary.toPath(),
-                                        dest.toPath(),
-                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-                            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
-                                java.nio.file.Files.move(
-                                        temporary.toPath(),
-                                        dest.toPath(),
-                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                            }
-                        }
                     } catch (Exception e) {
-                        if (source != null && temporary.exists()) {
-                            // Best-effort cleanup of an interrupted atomic write.
-                            temporary.delete();
-                        }
+                        if (dest.exists()) dest.delete();
                         diagnostics.error("ai", "保存失败：" + e.getMessage());
                     }
                     boolean saved = ok;
@@ -8653,10 +8607,119 @@ public final class MainActivity extends Activity {
                     });
                 });
             });
-            content.addView(saveBtn, marginParams(-1, dp(48), 0, 0, 0, 0));
+            content.addView(saveBtn, marginParams(-1, dp(48), 0, 0, 0, 8));
+
+            Button saveAlbumBtn = nativeButton(
+                    "保存新副本到系统相册",
+                    false);
+            saveAlbumBtn.setContentDescription(
+                    "将当前 AI 结果作为新照片保存到系统相册");
+            saveAlbumBtn.setOnClickListener(view ->
+                    saveAiResultToSystemAlbum(saveAlbumBtn, aiStatus));
+            content.addView(
+                    saveAlbumBtn,
+                    marginParams(-1, dp(48), 0, 0, 0, 0));
         }
         scroll.addView(content);
         return scroll;
+    }
+
+    private void saveAiResultToSystemAlbum(Button action, TextView status) {
+        Bitmap bitmap = aiResultBitmap;
+        if (bitmap == null) {
+            status.setText(tr("没有可保存的 AI 结果"));
+            return;
+        }
+        action.setEnabled(false);
+        status.setText(tr("正在保存新副本到系统相册…"));
+        editorExecutor.execute(() -> {
+            File destination = new File(
+                    photoDirectory,
+                    "ai_" + (aiMode == 0 ? "edited" : "generated")
+                            + "_" + System.currentTimeMillis() + ".jpg");
+            boolean saved = false;
+            try (FileOutputStream stream = new FileOutputStream(destination)) {
+                saved = bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream);
+                stream.getFD().sync();
+            } catch (Exception error) {
+                diagnostics.error(
+                        "ai",
+                        "保存 AI 系统相册副本失败：" + error.getMessage());
+            }
+            if (!saved && destination.exists()) destination.delete();
+            boolean succeeded = saved;
+            mainHandler.post(() -> {
+                action.setEnabled(true);
+                if (!succeeded) {
+                    status.setText(tr("保存 AI 结果失败"));
+                    return;
+                }
+                editorSelectedPath = destination.getAbsolutePath();
+                updateFileCount();
+                saveEditedCopyToSystemAlbum(destination);
+                showSection("editor");
+            });
+        });
+    }
+
+    private View buildEditorSourceCard(List<File> photos) {
+        LinearLayout card = panel();
+        card.setPadding(dp(14), dp(12), dp(14), dp(14));
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        heading.addView(
+                text("照片来源", TS_BODY, Typeface.BOLD, INK),
+                new LinearLayout.LayoutParams(0, dp(32), 1f));
+        TextView count = text(
+                photos.size() + " 张可编辑",
+                TS_CAPTION,
+                Typeface.BOLD,
+                photos.isEmpty() ? MUTED : COBALT);
+        count.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        heading.addView(count, new LinearLayout.LayoutParams(dp(110), dp(32)));
+        card.addView(heading);
+
+        if (!photos.isEmpty()) {
+            card.addView(
+                    buildEditorPhotoPicker(photos),
+                    marginParams(-1, dp(56), 0, 4, 0, 8));
+        }
+
+        Button systemPhoto = nativeButton(
+                "从系统相册导入",
+                photos.isEmpty());
+        systemPhoto.setContentDescription(
+                "从系统相册选择照片并创建可编辑副本");
+        systemPhoto.setCompoundDrawablesWithIntrinsicBounds(
+                android.R.drawable.ic_menu_gallery,
+                0,
+                0,
+                0);
+        systemPhoto.setCompoundDrawablePadding(dp(8));
+        systemPhoto.setOnClickListener(view -> openSystemPhotoForEditing());
+        card.addView(systemPhoto, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(48)));
+
+        TextView explanation = text(
+                "系统照片会先复制到文件库，原片保持不变。",
+                TS_CAPTION,
+                Typeface.NORMAL,
+                MUTED);
+        card.addView(
+                explanation,
+                marginParams(-1, -2, 0, 8, 0, 0));
+        if (!editorSystemPhotoStatus.isEmpty()) {
+            TextView state = text(
+                    editorSystemPhotoStatus,
+                    TS_CAPTION,
+                    Typeface.BOLD,
+                    editorSystemPhotoStatus.contains("失败") ? VIDEO : COBALT);
+            card.addView(state, marginParams(-1, -2, 0, 6, 0, 0));
+        }
+        return card;
     }
 
     private View buildEditorPhotoPicker(List<File> photos) {
@@ -10048,6 +10111,64 @@ public final class MainActivity extends Activity {
                 + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2
                 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
         return Math.max(0, Math.min(1, y));
+    }
+
+    private void saveRenderedEditorCopy(
+            Button action,
+            TextView status,
+            boolean exportToSystemAlbum) {
+        if (editorSelectedPath == null) {
+            status.setText(tr("请先选择一张照片"));
+            return;
+        }
+        File source = new File(editorSelectedPath);
+        action.setEnabled(false);
+        status.setText(tr(exportToSystemAlbum
+                ? "正在保存新副本到系统相册…"
+                : "正在保存编辑副本…"));
+        EditorAdjustments savedAdjustments = editorAdjustments.copy();
+        savedAdjustments.showingOriginal = false;
+        editorExecutor.execute(() -> {
+            File destination = uniqueEditedFile(source);
+            Bitmap output = renderEditedBitmap(source, savedAdjustments, 4096);
+            boolean success = false;
+            if (output != null) {
+                try (FileOutputStream stream = new FileOutputStream(destination)) {
+                    success = output.compress(
+                            Bitmap.CompressFormat.JPEG,
+                            95,
+                            stream);
+                    stream.getFD().sync();
+                } catch (Exception error) {
+                    diagnostics.error(
+                            "editor",
+                            "保存编辑副本失败：" + error.getMessage());
+                } finally {
+                    output.recycle();
+                }
+            }
+            if (!success && destination.exists()) destination.delete();
+            boolean saved = success;
+            mainHandler.post(() -> {
+                action.setEnabled(true);
+                if (!saved) {
+                    status.setText(tr("保存编辑副本失败"));
+                    return;
+                }
+                editorSelectedPath = destination.getAbsolutePath();
+                editorAdjustments.reset();
+                selectedNikonCloudPreset = null;
+                updateFileCount();
+                if (exportToSystemAlbum) {
+                    status.setText(tr("正在保存新副本到系统相册…"));
+                    saveEditedCopyToSystemAlbum(destination);
+                    showSection("editor");
+                } else {
+                    showToast("已保存编辑副本：" + destination.getName());
+                    showSection("editor");
+                }
+            });
+        });
     }
 
     private Bitmap renderEditedBitmap(

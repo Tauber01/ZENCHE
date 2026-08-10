@@ -10621,7 +10621,7 @@ private struct ImageEditorView: View {
                         .foregroundStyle(.white)
                     RuntimeLocalizedText(
                         selectedSection == .aiTools
-                            ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                            ? "AI 云端修图与生图使用当前账号和设备激活权益。"
                             : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
                     )
                         .font(.system(size: TypeScale.caption))

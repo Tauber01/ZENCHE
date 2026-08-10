@@ -2338,6 +2338,10 @@ private struct ImageEditorPage: View {
     @State private var aiIsGenerating = false
     @State private var pickerSample = "—"
     @State private var pickerColor = IPalette.whiteWash
+    @State private var showingEditorSystemPhotos = false
+    @State private var editorSystemPhotos: [SystemAlbumItem] = []
+    @State private var editorSystemPhotoStatus = ""
+    @State private var importingEditorSystemPhoto = false
     private let aiService = AiImageService()
 
     private var photos: [LibraryItem] {
@@ -2407,6 +2411,23 @@ private struct ImageEditorPage: View {
         .menuStyle(.automatic)
     }
 
+    private var editorSourcePicker: some View {
+        HStack(spacing: SpaceToken.s8) {
+            editorPhotoPicker
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                showingEditorSystemPhotos = true
+                Task { await loadEditorSystemPhotos() }
+            } label: {
+                Label("系统相册", systemImage: "photo.badge.plus")
+                    .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .frame(minHeight: 44)
+            .accessibilityHint("选择系统照片并创建可编辑副本，原片保持不变")
+        }
+    }
+
     @ViewBuilder
     private func editorPhotoMenuItem(_ item: LibraryItem) -> some View {
         Button {
@@ -2459,7 +2480,7 @@ private struct ImageEditorPage: View {
                     PageTitle(
                         title: selectedSection == .aiTools ? "AI 工具" : "专业显影",
                         subtitle: selectedSection == .aiTools
-                            ? "基于 nano-banana-2 模型的 AI 修图与生图"
+                            ? "AI 云端修图与生图使用当前账号和设备激活权益。"
                             : "分组调整光线、色彩、细节、效果与几何；始终保留原文件。"
                     )
 
@@ -2481,6 +2502,110 @@ private struct ImageEditorPage: View {
             status = selectedItem == nil
                 ? "请选择文件库中的照片"
                 : "调整不会覆盖原文件"
+        }
+        .sheet(isPresented: $showingEditorSystemPhotos) {
+            editorSystemPhotoPickerSheet
+        }
+    }
+
+    private var editorSystemPhotoPickerSheet: some View {
+        NavigationStack {
+            Group {
+                if importingEditorSystemPhoto {
+                    ProgressView("正在创建可编辑副本…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if editorSystemPhotos.isEmpty {
+                    ContentUnavailableView(
+                        "没有可导入的系统照片",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text(editorSystemPhotoStatus)
+                    )
+                    .overlay(alignment: .bottom) {
+                        if model.library.systemPhotoEditAccessState == .settingsRequired,
+                           let settingsURL = MediaLibrary.systemPhotoPermissionSettingsURL {
+                            Button("打开系统设置") {
+                                UIApplication.shared.open(settingsURL)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .padding(.bottom, SpaceToken.s24)
+                        }
+                    }
+                } else {
+                    ScrollView {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 132), spacing: SpaceToken.s12)],
+                            spacing: SpaceToken.s12
+                        ) {
+                            ForEach(editorSystemPhotos) { item in
+                                Button {
+                                    importEditorSystemPhoto(item.asset)
+                                } label: {
+                                    SystemAlbumThumbnail(item: item)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("导入 \(item.name)")
+                            }
+                        }
+                        .padding(SpaceToken.s16)
+                    }
+                }
+            }
+            .navigationTitle("从系统相册导入")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { showingEditorSystemPhotos = false }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func loadEditorSystemPhotos() async {
+        editorSystemPhotoStatus = "正在读取系统相册…"
+        var authorization = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if authorization == .notDetermined {
+            authorization = await withCheckedContinuation { continuation in
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) {
+                    continuation.resume(returning: $0)
+                }
+            }
+        }
+        guard authorization == .authorized || authorization == .limited else {
+            editorSystemPhotos = []
+            editorSystemPhotoStatus = "未获得照片读取权限；可前往系统设置恢复。"
+            return
+        }
+        let options = PHFetchOptions()
+        options.fetchLimit = 120
+        options.sortDescriptors = [
+            NSSortDescriptor(key: "creationDate", ascending: false)
+        ]
+        let assets = PHAsset.fetchAssets(with: .image, options: options)
+        var items: [SystemAlbumItem] = []
+        assets.enumerateObjects { asset, _, _ in
+            items.append(SystemAlbumItem(asset: asset))
+        }
+        editorSystemPhotos = items
+        editorSystemPhotoStatus = authorization == .limited
+            ? "显示已允许访问的 \(items.count) 张照片"
+            : "最近 \(items.count) 张照片"
+    }
+
+    private func importEditorSystemPhoto(_ asset: PHAsset) {
+        importingEditorSystemPhoto = true
+        editorSystemPhotoStatus = "正在创建可编辑副本…"
+        model.library.importSystemPhotoForEditing(asset) { destination in
+            importingEditorSystemPhoto = false
+            guard let destination else {
+                editorSystemPhotoStatus = model.library.message
+                return
+            }
+            selectedItemID = destination.path
+            model.library.selectedItemID = destination.path
+            selectedSection = .light
+            status = "系统照片已导入为可编辑副本"
+            showingEditorSystemPhotos = false
         }
     }
 
@@ -2624,7 +2749,7 @@ private struct ImageEditorPage: View {
     private var resolveWorkbench: some View {
         ResolveEditorWorkbench {
             EditorMediaRail {
-                editorPhotoPicker
+                editorSourcePicker
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("可编辑照片")
                     .font(.system(size: EditorFontSize.tiny, weight: .bold, design: .monospaced))
@@ -2706,7 +2831,7 @@ private struct ImageEditorPage: View {
 
     private var aiToolsToolbar: some View {
         HStack(spacing: SpaceToken.s8) {
-            editorPhotoPicker.frame(maxWidth: 340, alignment: .leading)
+            editorSourcePicker.frame(maxWidth: 480, alignment: .leading)
             Spacer()
             if aiResultImage != nil {
                 Button { aiResultImage = nil } label: {
@@ -2722,7 +2847,7 @@ private struct ImageEditorPage: View {
                 VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Label("AI 创作", systemImage: "sparkles")
                         .font(.headline)
-                    Text("修图覆盖原图 · 生图保存新文件")
+                    Text("修图与生图都会保存新副本")
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
                 }
@@ -2813,6 +2938,9 @@ private struct ImageEditorPage: View {
                     Button { saveAiResult() } label: {
                         Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
                     }.buttonStyle(.borderedProminent).disabled(isSaving)
+                    Button { saveAiResultToSystemPhotos() } label: {
+                        Label("保存到系统相册", systemImage: "photo.badge.plus")
+                    }.buttonStyle(.bordered).disabled(isSaving)
                 }
                 Spacer()
             }
@@ -3004,7 +3132,7 @@ private struct ImageEditorPage: View {
 
     private var editorToolbar: some View {
         HStack(spacing: SpaceToken.s8) {
-            editorPhotoPicker.frame(maxWidth: 340, alignment: .leading)
+            editorSourcePicker.frame(maxWidth: 480, alignment: .leading)
 
             Menu {
                 ForEach(EditorPreset.allCases) { preset in
@@ -3664,25 +3792,40 @@ private struct ImageEditorPage: View {
     }
 
     private var editorFooter: some View {
-        HStack(spacing: SpaceToken.s12) {
-            Button("全部重置") {
-                resetAdjustments()
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(spacing: SpaceToken.s12) {
+                Button("全部重置") {
+                    resetAdjustments()
+                }
+                .buttonStyle(.bordered)
+                Text(status)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(IPalette.muted)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.bordered)
-            Text(status)
-                .font(.caption.monospaced())
-                .foregroundStyle(IPalette.muted)
-            Spacer()
-            Button {
-                saveCopy()
-            } label: {
-                Label(
-                    isSaving ? "正在保存…" : "保存高质量副本",
-                    systemImage: "square.and.arrow.down"
-                )
+            HStack(spacing: SpaceToken.s8) {
+                Button {
+                    saveCopy()
+                } label: {
+                    Label(
+                        isSaving ? "正在保存…" : "保存高质量副本",
+                        systemImage: "square.and.arrow.down"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(selectedItem == nil || isSaving)
+
+                Button {
+                    saveCopyToSystemPhotos()
+                } label: {
+                    Label("保存到系统相册", systemImage: "photo.badge.plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(selectedItem == nil || isSaving)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(selectedItem == nil || isSaving)
         }
     }
 
@@ -4343,19 +4486,41 @@ private struct ImageEditorPage: View {
         guard let img = aiResultImage, let data = img.jpegData(compressionQuality: 0.95) else { status = "没有可保存的 AI 结果"; return }
         isSaving = true
         let saved: URL?
-        if aiMode == .edit, let selectedItem {
-            saved = model.library.replaceEditedImage(
-                data,
-                at: selectedItem.url,
-                originalFilename: selectedItem.filename
-            )
-        } else {
-            saved = model.library.saveEditedImage(data, originalFilename: "ai_generated.jpg")
-        }
+        saved = model.library.saveEditedImage(
+            data,
+            originalFilename: aiMode == .edit
+                ? "ai_edited.jpg"
+                : "ai_generated.jpg"
+        )
         if let saved {
             selectedItemID = saved.path; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
         } else { status = model.library.message }
         isSaving = false
+    }
+
+    private func saveAiResultToSystemPhotos() {
+        guard let image = aiResultImage,
+              let data = image.jpegData(compressionQuality: 0.95)
+        else {
+            status = "没有可保存的 AI 结果"
+            return
+        }
+        isSaving = true
+        guard let saved = model.library.saveEditedImage(
+            data,
+            originalFilename: aiMode == .edit
+                ? "ai_edited.jpg"
+                : "ai_generated.jpg"
+        ) else {
+            status = model.library.message
+            isSaving = false
+            return
+        }
+        selectedItemID = saved.path
+        model.library.saveEditedCopyToSystemPhotos(saved) { message in
+            status = message
+            isSaving = false
+        }
     }
 
     private func resetAdjustments() {
@@ -4626,6 +4791,37 @@ private struct ImageEditorPage: View {
             showingOriginal = wasShowingOriginal
         }
         isSaving = false
+    }
+
+    private func saveCopyToSystemPhotos() {
+        let wasShowingOriginal = showingOriginal
+        showingOriginal = false
+        guard let selectedItem,
+              let renderedImage,
+              let data = renderedImage.jpegData(compressionQuality: 0.95)
+        else {
+            showingOriginal = wasShowingOriginal
+            status = "无法渲染当前照片"
+            return
+        }
+        isSaving = true
+        guard let saved = model.library.saveEditedImage(
+            data,
+            originalFilename: selectedItem.filename
+        ) else {
+            isSaving = false
+            showingOriginal = wasShowingOriginal
+            status = model.library.message
+            return
+        }
+        selectedItemID = saved.path
+        model.library.saveEditedCopyToSystemPhotos(saved) { message in
+            status = message
+            isSaving = false
+            if message.contains("已保存") {
+                resetAdjustments()
+            }
+        }
     }
 }
 

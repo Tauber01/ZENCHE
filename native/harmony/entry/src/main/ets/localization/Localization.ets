@@ -148,9 +148,65 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('AI 创作', 'AI Create', 'AI クリエイト'),
   new TranslationEntry('修图覆盖原图 · 生图保存新文件', 'AI editing overwrites the original · generation saves a new file', 'AI編集は元画像を上書き · 生成は新規ファイルとして保存'),
   new TranslationEntry(
+    '修图与生图都会保存新副本',
+    'AI edits and generated images are saved as new copies',
+    'AI編集と画像生成はいずれも新しいコピーとして保存されます'
+  ),
+  new TranslationEntry(
     'AI 云端修图与生图使用当前账号和设备激活权益。',
     "Cloud AI editing and generation use the signed-in account and this device's activation entitlement.",
     'クラウド AI 編集・生成には、ログイン中のアカウントとこのデバイスのアクティベーション権限を使用します。'
+  ),
+  new TranslationEntry('照片来源', 'Photo Source', '写真の選択元'),
+  new TranslationEntry('张可编辑', 'editable', '枚編集可能'),
+  new TranslationEntry('原片保持不变', 'Original unchanged', 'オリジナルは変更されません'),
+  new TranslationEntry('从系统相册导入', 'Import from Photos', 'システム写真から読み込む'),
+  new TranslationEntry(
+    '系统照片会先复制到文件库，原片保持不变。',
+    'A working copy is added to the library. The original stays unchanged.',
+    'システム写真は編集用コピーとしてライブラリに追加され、オリジナルは変更されません。'
+  ),
+  new TranslationEntry(
+    '可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。',
+    'Import a photo from Photos. Videos and unsupported RAW files are excluded from the editor.',
+    'システム写真から読み込めます。動画と未対応の RAW ファイルは編集リストに表示されません。'
+  ),
+  new TranslationEntry(
+    '保存新副本到系统相册',
+    'Save New Copy to Photos',
+    '新しいコピーをシステム写真に保存'
+  ),
+  new TranslationEntry(
+    '正在选择系统相册照片…',
+    'Choosing a photo…',
+    'システム写真を選択しています…'
+  ),
+  new TranslationEntry('未选择系统相册照片', 'No photo selected', '写真は選択されませんでした'),
+  new TranslationEntry(
+    '需要系统相册读取权限，请在系统设置中允许后重试',
+    'Photos access is required. Allow access in system settings, then try again.',
+    '写真へのアクセスが必要です。システム設定で許可してから再試行してください。'
+  ),
+  new TranslationEntry(
+    '系统照片已导入为可编辑副本',
+    'Photo imported as an editable copy',
+    '写真を編集用コピーとして読み込みました'
+  ),
+  new TranslationEntry(
+    '正在保存新副本到系统相册…',
+    'Saving a new copy to Photos…',
+    '新しいコピーをシステム写真に保存しています…'
+  ),
+  new TranslationEntry('未保存系统相册副本', 'Photo was not saved', 'システム写真への保存をキャンセルしました'),
+  new TranslationEntry(
+    '已保存新副本到系统相册',
+    'New copy saved to Photos',
+    '新しいコピーをシステム写真に保存しました'
+  ),
+  new TranslationEntry(
+    '需要照片写入权限，请在系统设置中允许后重试',
+    'Photos write access is required. Allow access in system settings, then try again.',
+    '写真への書き込み権限が必要です。システム設定で許可してから再試行してください。'
   ),
   new TranslationEntry('需要激活', 'Activation required', 'アクティベーションが必要'),
   new TranslationEntry('已解锁', 'Unlocked', 'ロック解除済み'),

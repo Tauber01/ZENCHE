@@ -2796,6 +2796,7 @@ struct Index {
         .fontSize(EDITOR_FS_MEDIUM)
         .fontColor($r('app.color.muted'))
         .width('100%')
+      this.EditorPhotoPicker()
       if (this.editablePhotos().length === 0) {
         Column({ space: 8 }) {
           Text(this.tr('文件库中没有可编辑照片'))
@@ -2803,7 +2804,7 @@ struct Index {
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
           Text(this.tr(
-            '视频与暂不支持解码的 RAW 文件不会进入编辑列表。'
+            '可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。'
           ))
             .fontSize(EDITOR_FS_SUB)
             .fontColor($r('app.color.muted'))
@@ -2818,7 +2819,6 @@ struct Index {
           radius: RADIUS_12
         })
       } else {
-        this.EditorPhotoPicker()
         // 图 2 移动端降级：监视器固定顶部，控制面板（工具条/媒体/示波器/参数）位于其下
         Stack({ alignContent: Alignment.Center }) {
           if (
@@ -3153,6 +3153,26 @@ struct Index {
             })
         }
         .width('100%')
+
+        Button(
+          this.editorSaving
+            ? this.tr('正在保存…')
+            : this.tr('保存新副本到系统相册'),
+          { type: ButtonType.Normal }
+        )
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.rule'),
+            radius: RADIUS_8
+          })
+          .onClick((): void => {
+            this.saveEditedPhoto(true);
+          })
       }
     }
     .width('100%')
@@ -3164,15 +3184,56 @@ struct Index {
   @Builder
   private EditorPhotoPicker() {
     Column({ space: 6 }) {
-      Button(this.editorSelectedLabel(), { type: ButtonType.Normal })
-        .height(50)
+      Row({ space: 8 }) {
+        Column({ space: 2 }) {
+          Text(this.tr('照片来源'))
+            .fontSize(TS_BODY)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+          Text(`${this.editablePhotos().length} ${this.tr('张可编辑')}`)
+            .fontSize(TS_CAPTION)
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text(this.tr('原片保持不变'))
+          .fontSize(TS_CAPTION)
+          .fontColor($r('app.color.muted'))
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      if (this.editablePhotos().length > 0) {
+        Button(this.editorSelectedLabel(), { type: ButtonType.Normal })
+          .height(50)
+          .width('100%')
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
+          .onClick((): void => {
+            this.editorPickerVisible = !this.editorPickerVisible;
+          })
+      }
+      Button(this.tr('从系统相册导入'), { type: ButtonType.Normal })
+        .height(48)
         .width('100%')
-        .fontColor($r('app.color.ink'))
-        .backgroundColor($r('app.color.surface'))
+        .fontColor($r('app.color.accent_ink'))
+        .backgroundColor($r('app.color.accent'))
         .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
         .onClick((): void => {
-          this.editorPickerVisible = !this.editorPickerVisible;
+          this.openSystemPhotoForEditing();
         })
+      Text(this.tr('系统照片会先复制到文件库，原片保持不变。'))
+        .fontSize(TS_CAPTION)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
+      if (this.systemPhotoEditStatus.length > 0) {
+        Text(this.tr(this.systemPhotoEditStatus))
+          .fontSize(TS_CAPTION)
+          .fontColor(this.systemPhotoEditStatus.indexOf('失败') >= 0
+            ? $r('app.color.video') : $r('app.color.muted'))
+          .width('100%')
+      }
       if (this.editorPickerVisible) {
         Column({ space: 4 }) {
           this.EditorPhotoGroup('未分类', this.unclassifiedEditablePhotos(), 0)
@@ -3344,7 +3405,7 @@ struct Index {
             .fontSize(EDITOR_FS_HEAD)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text(this.tr('修图覆盖原图 · 生图保存新文件'))
+          Text(this.tr('修图与生图都会保存新副本'))
             .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
         }
@@ -3369,7 +3430,7 @@ struct Index {
       .backgroundColor($r('app.color.surface'))
       .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_12 })
 
-      if (this.aiMode === 0 && this.editablePhotos().length > 0) {
+      if (this.aiMode === 0) {
         this.EditorPhotoPicker()
         if (this.aiResultPath.length === 0 && this.editorSelectedPath.length > 0) {
           Text(this.tr('已选择原图'))
@@ -3534,6 +3595,17 @@ struct Index {
           .backgroundColor($r('app.color.accent'))
           .onClick((): void => {
             this.saveAiResult();
+          })
+
+        Button(this.editorSaving ? '正在保存…' : '保存新副本到系统相册', { type: ButtonType.Normal })
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
+          .onClick((): void => {
+            this.saveAiResult(true);
           })
       }
 
@@ -3783,7 +3855,7 @@ struct Index {
     }
   }
 
-  private async saveAiResult(): Promise<void> {
+  private async saveAiResult(exportToSystemAlbum: boolean = false): Promise<void> {
     if (this.aiResultPath.length === 0) {
       return;
     }
@@ -3806,13 +3878,17 @@ struct Index {
         this.aiStatus = '保存 AI 结果失败';
         return;
       }
-      const destination: string = this.aiMode === 0 && this.editorSelectedPath.length > 0
-        ? library.replaceFile(this.editorSelectedPath, new Uint8Array(data))
-        : library.saveEditedCopy(`ai_${stem}`, new Uint8Array(data));
+      const destination: string = library.saveEditedCopy(
+        `ai_${stem}`,
+        new Uint8Array(data)
+      );
       this.refreshPhotos();
       this.editorSelectedPath = destination;
       this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
       this.editorSaving = false;
+      if (exportToSystemAlbum) {
+        await this.saveEditedCopyToSystemAlbum(destination);
+      }
     } catch (err) {
       this.editorSaving = false;
       this.aiStatus = '保存 AI 结果失败';
@@ -14650,7 +14726,7 @@ struct Index {
     }
   }
 
-  private async saveEditedPhoto(): Promise<void> {
+  private async saveEditedPhoto(exportToSystemAlbum: boolean = false): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
     const selected: PhotoItem | undefined = this.editablePhotos().find(
       (item: PhotoItem): boolean =>
@@ -14743,6 +14819,9 @@ struct Index {
       this.resetImageEditor();
       this.refreshEditorImageMetrics();
       this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
+      if (exportToSystemAlbum) {
+        await this.saveEditedCopyToSystemAlbum(destination);
+      }
     } catch (error) {
       this.showError(
         `保存编辑副本失败：${(error as BusinessError).message}`

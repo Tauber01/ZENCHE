@@ -483,7 +483,7 @@ test("Windows AI uses server quota and overwrites the selected source for retouc
   assert.match(windows, /ai_generated_/);
 });
 
-test("all native AI clients consume server quota and replace retouched originals", async () => {
+test("all native AI clients consume server quota and use the platform save contract", async () => {
   const [ios, android, harmony, macos, windows] = await Promise.all([
     read("native/ios/NikonLink/Views/RootView.swift"),
     read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
@@ -495,17 +495,17 @@ test("all native AI clients consume server quota and replace retouched originals
   assert.match(ios, /X-ZENCHE-Remaining/);
   assert.match(ios, /ActivationManager\.updateServerRemaining/);
   assert.match(ios, /ActivationManager\.recordUsageFallback/);
-  assert.match(ios, /replaceEditedImage/);
+  assert.match(ios, /private func saveAiResult\(\)[\s\S]*?saveEditedImage\(/);
 
   assert.match(android, /parseAiRemaining\(conn\.getHeaderField\("X-ZENCHE-Remaining"\)\)/);
   assert.match(android, /setAiRemainingUsage\(result\.remaining\)/);
   assert.match(android, /recordAiUsage\(\)/);
-  assert.match(android, /StandardCopyOption\.ATOMIC_MOVE/);
+  assert.match(android, /File dest = source != null\s*\? uniqueEditedFile\(source\)/);
 
   assert.match(harmony, /parseAiRemaining\(/);
   assert.match(harmony, /setAiRemainingUsage\(/);
   assert.match(harmony, /recordAiUsage\(\)/);
-  assert.match(harmony, /library\.replaceFile\(/);
+  assert.match(harmony, /private async saveAiResult[\s\S]*?library\.saveEditedCopy\(/);
 
   assert.match(macos, /X-ZENCHE-Remaining/);
   assert.match(macos, /ActivationManager\.updateServerRemaining/);
