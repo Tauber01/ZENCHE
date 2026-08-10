@@ -180,7 +180,8 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - macOS 使用 `DesktopWorkspaceLayout` 持久化主导航、拍摄参数栏、编辑媒体池、编辑工具栏和底部工具区尺寸；AppKit 主窗口用独立 autosave 名称恢复大小与位置，并在显示器拓扑变化时把窗口约束回可见工作区。分隔条支持拖拽与方向键微调，并提供辅助功能标签和值。
 - Windows 使用 `%LOCALAPPDATA%/NikonLink/desktop-workspace-layout-v1.json` 保存窗口几何、最大化状态和同组面板尺寸；恢复时按虚拟桌面边界约束窗口。WPF `GridSplitter` 与设置页预设复用同一状态模型，响应式折叠仍优先保留中央预览。
 - 两个桌面端均提供默认、拍摄、监看、编辑、紧凑五套预设与恢复默认。第一阶段只支持主窗口内的固定分区调整，不实现 Adobe 式任意浮动面板、跨窗口拖放或跨显示器面板停靠；这些能力会显著扩大窗口生命周期、焦点、无障碍和状态迁移风险，留待后续独立迭代。
-- 候选版本为 `1.5.11 / build 38`，只用于本地开发验证；官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
+- Apple 的运行时本地化先匹配完整字符串，再做动态片段替换。登录忙碌态因此必须在共享的 `zh-Hans/en/ja` Apple 语言包中提供“正在登录…”与“正在注册…”的 exact key；回归测试会直接核对三语返回值，防止出现“正在Sign In…”或“正在ログイン…”混排。
+- 候选版本为 `1.5.11 / build 38`，实现与六包打包源码固定为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`。完整 `npm test` 492/492 通过；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的既有平台边界保持不变。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
 ## 1. 总体原则
 

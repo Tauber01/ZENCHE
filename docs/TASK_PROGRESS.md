@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-10（Asia/Shanghai）
-> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；提交、产物与终审状态待本轮冻结后回填
+> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；实现与打包源码 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`，五端六包已重建，最终双审返修复核进行中
 > 公开状态：GitHub v1.5.3 仍为公开稳定版；官网自动更新继续提供 W14 的 1.5.10 / build 37，1.5.11 尚未部署、推送、打标签或创建 Release
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
@@ -18,8 +18,8 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；本轮冻结提交和产物哈希尚待验证后回填。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
-- W15 已完成源码实现：五端登录页用“已有账号 / 创建账号”区分模式与提交动作；macOS、Windows 支持主窗口大小/位置和面板尺寸记忆、越界恢复、可访问分隔条、五套工作区预设及恢复默认。当前已通过登录/布局专项 53/53、macOS 全源 Swift 类型检查和 Windows Release 编译；完整测试、五端成包、真实桌面拖拽/重启恢复与双终审仍在进行。
+- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；实现与打包源码为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`，五端六包及同名侧车已按该提交重建并通过 SHA-256/结构回验。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
+- W15 已完成源码实现：五端登录页用“已有账号 / 创建账号”区分模式与提交动作；Apple 登录忙碌态补齐中英日 exact key；五端公告按逐包事实披露不同签名状态；macOS、Windows 支持主窗口大小/位置和面板尺寸记忆、越界恢复、可访问分隔条、五套工作区预设及恢复默认。完整 `npm test` 492/492 通过，五端构建与六包回验已完成；真实桌面拖拽/重启恢复、Windows 多显示器/DPI 与返修后最终双审仍待闭环。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
@@ -49,7 +49,7 @@
 | 自动拍摄任务 | 已实现待验收 | 五端间隔、曝光包围、焦点包围、B 门静态测试通过 | 长任务、取消、断线、存储不足实测 |
 | 专业监看 | 已实现待验收 | 直方图、波形、矢量、峰值对焦、假色等五端检查通过 | 性能、色彩准确性和长时间运行验证 |
 | 实时监看开关与 iOS 相机桥接 | 已实现待验收 | 五端开关、Sony Camera Remote SDK 的 Mac 桥接、Nikon PTP 兼容桥接与局域网配对契约 | Sony/Nikon 真机、弱网、发热、长时间拉流和 iOS/macOS 联调 |
-| 登录动作清晰化与桌面工作区 | 进行中 | 五端模式/提交文案契约；macOS/Windows 窗口与面板状态模型、预设、越界恢复；专项 53/53、Swift 类型检查、Windows Release 编译 | 完整回归、五端成包、macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、双终审 |
+| 登录动作清晰化与桌面工作区 | 已实现待验收 | `83eb7b2`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 窗口与面板状态模型；完整 492/492、五端构建、六包哈希/结构回验 | 返修后最终双审；macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能实机 |
 | 无线收图 | 已实现待验收 | 五端 FTP/HTTP/WebDAV 源码与文档存在 | 大文件、中断、并发、端口释放和相机 FTP 实测 |
 | 拍摄会话与交付 | 已实现待验收 | 命名、配对、评级、双备份、SHA-256 五端检查通过 | 恢复、磁盘异常、跨卷和大量文件压力测试 |
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
@@ -1158,8 +1158,8 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 ## 12.53 W15 登录动作清晰化与桌面工作区（2026-08-10，GPT5.6）
 
 - 诊断证据：生产 `https://zenche.top/api/v1/auth/login` 对无效凭据约 0.2 秒返回结构化 `401`；按用户报告前后时间窗检索 `/var/log/nginx/zenche-top.access.log`，没有登录请求。故障点位于客户端提交前，不是认证服务不可达。五端原登录墙把模式按钮和真正提交按钮都标为“登录”，选中模式按钮再次点击没有行为，形成“点登录没反应”的高概率误解。
-- 登录修复：iOS/iPadOS、Android、HarmonyOS、macOS、Windows 的模式标签统一为“已有账号 / 创建账号”，真正提交按钮继续使用“登录 / 注册”；Apple 忙碌态显示进度指示和“正在登录 / 正在注册”，切换模式时清除旧错误并把焦点移回邮箱。认证 API、安全存储、会话校验与 AI Bearer 协议不变。
+- 登录修复：iOS/iPadOS、Android、HarmonyOS、macOS、Windows 的模式标签统一为“已有账号 / 创建账号”，真正提交按钮继续使用“登录 / 注册”；Apple 忙碌态显示进度指示和“正在登录 / 正在注册”，共享语言包补齐中英日 exact key，切换模式时清除旧错误并把焦点移回邮箱。认证 API、安全存储、会话校验与 AI Bearer 协议不变。
 - 桌面布局：macOS 和 Windows 均可保存主窗口大小/位置以及导航、拍摄参数、编辑媒体池、工具栏和底部区尺寸；分隔条支持拖动，设置页提供默认、拍摄、监看、编辑、紧凑预设及恢复默认。恢复逻辑会把离开当前显示器工作区的窗口约束回可见区域，Windows 另保存最大化状态。
 - 范围边界：第一阶段是单主窗口内的可调分区，不包含任意浮动面板、跨窗口拖放、面板自由编组或 Adobe 完整 dock 系统。macOS/Windows 真实拖拽、重启恢复、Windows 多显示器/DPI 和辅助功能仍需真实桌面环境验收。
-- 当前验证：登录/布局专项 53/53、完整 `npm test` 491/491；macOS 全源 `swiftc -typecheck`、Android Debug APK、iOS unsigned Release、HarmonyOS Release HAP、macOS arm64 DMG、Windows x64 publish/NSIS 均成功。六个包压缩/DMG 结构、版本、适用签名属性与 SHA-256 已回验；`git diff --check`、XAML、三份 Apple strings 及 Impeccable 八个 UI 文件检测均通过。macOS 实窗确认公告、主工作区和桌面布局设置卡片正常渲染；AI审查 视觉/交互终审与 GPT5.6luna 三语/去 AI 痕迹终审尚待冻结提交后完成。
+- 当前验证：实现与打包源码为 `83eb7b22afe0eb90daa2cb99dc0bc675ab03a57e`；完整 `npm test` 492/492，登录/布局/公告专项包含在内。Android Debug APK、iOS unsigned Release、HarmonyOS Release HAP、macOS arm64 DMG、Windows x64 publish/NSIS 均按该提交重建成功；六个包压缩/DMG 结构、版本、适用签名属性与 SHA-256 已回验，三份 Apple strings lint 通过，IPA 内中英日忙碌态 exact 值已直接抽取核对。AI审查 对上一实现候选 `ed706112…` 给出 P0/P1/P2=0 的 UI/交互 PASS；GPT5.6luna 对同一候选指出 Apple exact key 与签名公告两项 P1，均已在 `83eb7b2` 返修，返修后最终复核进行中。
 - 版本边界：源码候选为 `1.5.11 / build 38`；生产清单保持 `1.5.10 / build 37`，本轮未部署、未推送、未打标签、未创建 GitHub Release。使用说明见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，发布表见 `docs/releases/v1.5.11.md`。
