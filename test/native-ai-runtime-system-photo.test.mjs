@@ -173,7 +173,22 @@ test("mobile system-photo and AI result states use exact runtime localization pa
   assert.match(harmonyLocalization, /new TranslationEntry\('保存 AI 结果失败', 'Unable to save the AI result', 'AI 結果を保存できません'\)/);
   assert.match(harmonyLocalization, /new TranslationEntry\('已保存 AI 结果', 'AI result saved', 'AI 結果を保存しました'\)/);
   assert.match(harmony, /Button\(`\$\{this\.aiMode === 0 \? '●' : '○'\} \$\{this\.tr\('AI 修图'\)\}`/);
+  assert.match(harmony, /Button\(`\$\{this\.aiMode === 1 \? '●' : '○'\} \$\{this\.tr\('AI 生图'\)\}`/);
   assert.match(harmony, /placeholder: this\.tr\(this\.aiMode === 0 \? '输入修图描述…（可补充）' : '输入生图描述…（可补充）'\)/);
+  assert.match(harmony, /Button\(this\.tr\(this\.aiGenerating \? '正在生成…' : '生成图像'\)/);
+  assert.match(harmony, /Text\(this\.tr\('可组合预设'\)\)/);
+  assert.match(harmony, /Button\(this\.tr\('清空'\)/);
+  for (const key of [
+    "AI 修图",
+    "AI 生图",
+    "输入修图描述…（可补充）",
+    "输入生图描述…（可补充）",
+    "正在生成…",
+    "可组合预设",
+    "清空",
+  ]) {
+    assert.match(harmonyLocalization, new RegExp(`new TranslationEntry\\(\\s*'${key}`));
+  }
 });
 
 test("Android editor normalizes all eight JPEG EXIF orientations before preview, analysis, and export", async () => {

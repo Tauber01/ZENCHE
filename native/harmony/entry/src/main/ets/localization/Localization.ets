@@ -254,7 +254,7 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   ),
   new TranslationEntry('生成图像', 'Generate Image', '画像を生成'),
   new TranslationEntry('AI 修图', 'AI Retouch', 'AI レタッチ'),
-  new TranslationEntry('AI 生图', 'AI Generate', 'AI 画像生成'),
+  new TranslationEntry('AI 生图', 'AI Image Generation', 'AI 画像生成'),
   new TranslationEntry(
     '输入修图描述…（可补充）',
     'Describe the edit… (optional)',
