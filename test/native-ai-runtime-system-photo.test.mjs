@@ -4,6 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const read = async (path) => readFile(new URL(path, root), "utf8");
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 test("five native AI clients use the production HTTPS proxy and migrate only the legacy default", async () => {
   const [ios, android, harmony, macos, windows] = await Promise.all([
@@ -129,11 +130,12 @@ test("mobile editors expose system-photo import and save-new-copy actions in bot
 });
 
 test("mobile system-photo and AI result states use exact runtime localization paths", async () => {
-  const [android, androidLocalization, ios, iosEn, iosJa, harmony, harmonyLocalization] =
+  const [android, androidLocalization, ios, iosZh, iosEn, iosJa, harmony, harmonyLocalization] =
     await Promise.all([
       read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
       read("native/android/app/src/main/java/com/tauber/nikonlink/Localization.java"),
       read("native/ios/NikonLink/Views/RootView.swift"),
+      read("native/ios/NikonLink/zh-Hans.lproj/Localizable.strings"),
       read("native/ios/NikonLink/en.lproj/Localizable.strings"),
       read("native/ios/NikonLink/ja.lproj/Localizable.strings"),
       read("native/harmony/entry/src/main/ets/pages/Index.ets"),
@@ -150,6 +152,36 @@ test("mobile system-photo and AI result states use exact runtime localization pa
   assert.match(android, /setMessage\(tr\(editorSystemPhotoStatus\)\)/);
   assert.match(android, /setNegativeButton\(tr\("取消"\), null\)/);
   assert.match(android, /tr\("打开系统设置"\)/);
+  assert.match(
+    android,
+    /text\(\s*tr\(\s*"文件库中没有可编辑照片\\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。"\s*\)/,
+  );
+  assert.match(
+    androidLocalization,
+    /add\("文件库中没有可编辑照片\\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。",\s*"There are no editable photos in the library\\nImport a photo from Photos\. Videos and RAW files that cannot yet be decoded are excluded from the editor\.",\s*"ライブラリに編集可能な写真がありません\\nシステム写真から写真を読み込めます。動画と、まだデコードできない RAW ファイルは編集リストに表示されません。"\)/,
+  );
+  assert.match(
+    android,
+    /showToast\("已保存 AI 结果：%s", dest\.getName\(\)\)/,
+  );
+  assert.match(
+    android,
+    /private String formatLocalized\(String messageTemplate, String replacementValue\)[\s\S]*?tr\(messageTemplate\)\.replace\("%s", replacementValue\)/,
+  );
+  assert.match(
+    android,
+    /private void showToast\(String messageTemplate, String replacementValue\)[\s\S]*?formatLocalized\(messageTemplate, replacementValue\)/,
+  );
+  assert.match(
+    androidLocalization,
+    /add\("已保存 AI 结果：%s",\s*"AI result saved: %s",\s*"AI 結果を保存しました：%s"\)/,
+  );
+  assert.match(android, /setContentDescription\(tr\("清空已选 AI 提示词预设"\)\)/);
+  assert.match(android, /aiStatus\.setText\(tr\("已清空预设"\)\)/);
+  assert.match(android, /aiStatus\.setText\(formatLocalized\([\s\S]*?"已选择 · %s"[\s\S]*?"已取消 · %s"[\s\S]*?value\)\)/);
+  for (const key of ["清空已选 AI 提示词预设", "已清空预设", "已选择 · %s", "已取消 · %s"]) {
+    assert.match(androidLocalization, new RegExp(`add\\("${escapeRegExp(key)}"`));
+  }
   for (const prefix of ["无法打开系统相册：", "系统照片导入失败：", "系统相册保存失败："]) {
     assert.match(androidLocalization, new RegExp(`add\\("${prefix}"`));
   }
@@ -162,6 +194,39 @@ test("mobile system-photo and AI result states use exact runtime localization pa
     assert.match(table, /"显示已允许访问的 %lld 张照片" = ".+%lld.+";/);
     assert.match(table, /"最近 %lld 张照片" = ".+%lld.+";/);
     assert.match(table, /"导入 %@" = "[^"\n]*%@[^"\n]*";/);
+  }
+  assert.match(ios, /private func localizedEditorStatus\(/);
+  assert.match(
+    ios,
+    /Text\(\s*localizedEditorStatus\(\s*aiIsGenerating \? "正在调用 AI 模型…" : status\s*\)\s*\)/,
+  );
+  assert.match(
+    ios,
+    /private var editorFooter: some View[\s\S]*?Text\(localizedEditorStatus\(status\)\)/,
+  );
+  assert.doesNotMatch(ios, /status\s*=\s*error\.localizedDescription/);
+  assert.match(ios, /AI 请求失败：/);
+  for (const table of [iosZh, iosEn, iosJa]) {
+    for (const key of [
+      "请输入提示词",
+      "请先在设置中输入激活码解锁 AI 功能",
+      "生成完成",
+      "无法解码 AI 返回的图片",
+      "没有可保存的 AI 结果",
+      "无法读取原图，未发送 AI 修图请求",
+      "激活码无效或已过期，请联系开发者",
+      "API 端点地址无效",
+      "网络连接失败",
+      "AI 未返回有效图片",
+      "AI 服务暂不可用，请稍后重试",
+      "AI 生成超时，请稍后重试",
+    ]) {
+      assert.ok(table.includes(`"${key}" = "`), `missing iOS AI status key: ${key}`);
+    }
+    assert.match(table, /"已保存 AI 结果 · %@" = "[^"\n]*%@[^"\n]*";/);
+    assert.match(table, /"AI 请求失败：%@" = "[^"\n]*%@[^"\n]*";/);
+    assert.match(table, /"AI 服务返回错误（%d）：%@" = "[^"\n]*%d[^"\n]*%@[^"\n]*";/);
+    assert.match(table, /"AI 服务返回错误（%d）" = "[^"\n]*%d[^"\n]*";/);
   }
 
   assert.match(harmony, /Text\(`\$\{this\.tr\('可编辑照片'\)\} · \$\{this\.editablePhotos\(\)\.length\}`\)/);
@@ -178,6 +243,50 @@ test("mobile system-photo and AI result states use exact runtime localization pa
   assert.match(harmony, /Button\(this\.tr\(this\.aiGenerating \? '正在生成…' : '生成图像'\)/);
   assert.match(harmony, /Text\(this\.tr\('可组合预设'\)\)/);
   assert.match(harmony, /Button\(this\.tr\('清空'\)/);
+  for (const assignment of [
+    /this\.aiStatus = '请输入提示词'/,
+    /this\.aiStatus = '请先在设置中输入激活码解锁 AI 功能'/,
+    /this\.aiStatus = '正在调用 AI 模型…'/,
+    /this\.aiStatus = serverMessage \|\| '激活码无效或次数用完'/,
+    /this\.aiStatus = serverMessage \|\| 'AI 服务暂时不可用'/,
+    /this\.aiStatus = '生成完成'/,
+    /this\.aiStatus = `生成失败：\$\{msg\}`/,
+    /this\.aiStatus = 'AI 次数已用完'/,
+  ]) {
+    assert.match(harmony, assignment);
+  }
+  const harmonyAiStatuses = [
+    ["请输入提示词", "Enter a prompt", "プロンプトを入力してください"],
+    ["正在调用 AI 模型…", "Calling the AI model…", "AI モデルを呼び出しています…"],
+    [
+      "请先在设置中输入激活码解锁 AI 功能",
+      "Enter an activation key in Settings to unlock AI features",
+      "設定でアクティベーションキーを入力して AI 機能を有効にしてください",
+    ],
+    [
+      "激活码无效或次数用完",
+      "The activation key is invalid or has no uses remaining",
+      "アクティベーションキーが無効か、利用回数を使い切っています",
+    ],
+    [
+      "AI 服务暂时不可用",
+      "The AI service is temporarily unavailable",
+      "AI サービスは一時的に利用できません",
+    ],
+    ["生成完成", "Generation complete", "生成が完了しました"],
+    ["生成失败：", "Generation failed: ", "生成に失敗しました："],
+    ["AI 次数已用完", "No AI uses remaining", "AI の利用回数を使い切りました"],
+  ];
+  for (const [chinese, english, japanese] of harmonyAiStatuses) {
+    assert.match(
+      harmonyLocalization,
+      new RegExp(
+        `new TranslationEntry\\(\\s*'${escapeRegExp(chinese)}',\\s*'${escapeRegExp(english)}',\\s*'${escapeRegExp(japanese)}'\\s*\\)`,
+      ),
+    );
+  }
+  assert.match(harmonyLocalization, /if \(entry\.chinese === source\)/);
+  assert.match(harmonyLocalization, /if \(translated\.includes\(entry\.chinese\)\)/);
   for (const key of [
     "AI 修图",
     "AI 生图",

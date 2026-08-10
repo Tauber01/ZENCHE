@@ -7423,7 +7423,7 @@ public final class MainActivity extends Activity {
                 marginParams(-1, -2, 0, 0, 0, 14));
         if (photos.isEmpty()) {
             TextView empty = text(
-                    "文件库中没有可编辑照片\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
+                    tr("文件库中没有可编辑照片\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。"),
                     14,
                     Typeface.NORMAL,
                     MUTED);
@@ -8600,7 +8600,7 @@ public final class MainActivity extends Activity {
                         saveBtn.setEnabled(true);
                         if (saved) {
                             editorSelectedPath = dest.getAbsolutePath();
-                            showToast("已保存 AI 结果：" + dest.getName());
+                            showToast("已保存 AI 结果：%s", dest.getName());
                             updateFileCount();
                         } else {
                             aiStatus.setText(tr("保存 AI 结果失败"));
@@ -8896,12 +8896,12 @@ public final class MainActivity extends Activity {
         header.addView(text("可组合预设", TS_CAPTION, Typeface.BOLD, MUTED),
                 new LinearLayout.LayoutParams(0, dp(36), 1f));
         Button clear = nativeButton("清空", false);
-        clear.setContentDescription("清空已选 AI 提示词预设");
+        clear.setContentDescription(tr("清空已选 AI 提示词预设"));
         clear.setOnClickListener(v -> {
             aiSelectedPresetKeys.clear();
             aiManualPrompt = "";
             setComposedAiPrompt(promptInput);
-            aiStatus.setText("已清空预设");
+            aiStatus.setText(tr("已清空预设"));
         });
         header.addView(clear, new LinearLayout.LayoutParams(dp(72), dp(44)));
         container.addView(header,
@@ -8926,7 +8926,11 @@ public final class MainActivity extends Activity {
                             8,
                             isAiPresetSelected(category, value) ? COBALT : RULE));
                     setComposedAiPrompt(promptInput);
-                    aiStatus.setText((isAiPresetSelected(category, value) ? "已选择 · " : "已取消 · ") + value);
+                    aiStatus.setText(formatLocalized(
+                            isAiPresetSelected(category, value)
+                                    ? "已选择 · %s"
+                                    : "已取消 · %s",
+                            value));
                 });
                 LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT, dp(44));
@@ -15019,6 +15023,10 @@ public final class MainActivity extends Activity {
         return Localization.translate(appLanguage, value);
     }
 
+    private String formatLocalized(String messageTemplate, String replacementValue) {
+        return tr(messageTemplate).replace("%s", replacementValue);
+    }
+
     private void changeLanguage(String language) {
         String normalized = Localization.normalize(language);
         if (normalized.equals(appLanguage)) {
@@ -15145,6 +15153,13 @@ public final class MainActivity extends Activity {
 
     private void showToast(String message) {
         Toast.makeText(this, tr(message), Toast.LENGTH_SHORT).show();
+    }
+
+    private void showToast(String messageTemplate, String replacementValue) {
+        Toast.makeText(
+                this,
+                formatLocalized(messageTemplate, replacementValue),
+                Toast.LENGTH_SHORT).show();
     }
 
     private void showError(String message) {

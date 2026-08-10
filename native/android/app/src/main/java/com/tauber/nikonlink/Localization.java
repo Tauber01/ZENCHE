@@ -145,6 +145,12 @@ final class Localization {
                 "Render the current adjustments and create a new photo in Photos",
                 "現在の調整を反映し、システム写真に新しい写真を作成");
         add("没有可保存的 AI 结果", "There is no AI result to save", "保存できる AI 結果がありません");
+        add("清空已选 AI 提示词预设",
+                "Clear selected AI prompt presets",
+                "選択した AI プロンプトプリセットをクリア");
+        add("已清空预设", "Presets cleared", "プリセットをクリアしました");
+        add("已选择 · %s", "Selected · %s", "選択済み · %s");
+        add("已取消 · %s", "Deselected · %s", "選択解除 · %s");
         add("需要照片写入权限", "Photo write access is required", "写真の書き込み権限が必要です");
         add("打开系统设置", "Open System Settings", "システム設定を開く");
         add("需要激活", "Activation required", "アクティベーションが必要");
@@ -704,6 +710,9 @@ final class Localization {
         add("文件库中没有可编辑照片",
                 "There are no editable photos in the library",
                 "ライブラリに編集可能な写真がありません");
+        add("文件库中没有可编辑照片\n可从系统相册导入照片；视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
+                "There are no editable photos in the library\nImport a photo from Photos. Videos and RAW files that cannot yet be decoded are excluded from the editor.",
+                "ライブラリに編集可能な写真がありません\nシステム写真から写真を読み込めます。動画と、まだデコードできない RAW ファイルは編集リストに表示されません。");
         add("文件库 · %lld 个文件", "Library · %lld files", "ライブラリ · %lld 件");
         add("个文件", "files", "件");
         add("未选择照片", "No photo selected", "写真が選択されていません");
@@ -725,6 +734,9 @@ final class Localization {
         add("已保存编辑副本",
                 "Saved edited copy",
                 "編集したコピーを保存しました");
+        add("已保存 AI 结果：%s",
+                "AI result saved: %s",
+                "AI 結果を保存しました：%s");
         add("保存编辑副本失败",
                 "Failed to save the edited copy",
                 "編集したコピーの保存に失敗しました");

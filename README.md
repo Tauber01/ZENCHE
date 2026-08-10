@@ -445,7 +445,7 @@ in a local library for review and export.
 - Preview and scope rendering reuse one bounded image. Windows also coalesces rapid preview requests, runs the timecode refresh only while recording, and clears AI temporary results and editor bitmaps when switching photos or modes, leaving the editor, or closing the window to reduce duplicate work and background resource use.
 - Android now gives the Nikon Z50 up to 20 seconds of bounded backoff when JPEG download encounters `DeviceBusy (0x2009)` after capture, without firing the shutter again. If a vendor Camera2 HAL rejects the normal dual-JPEG session, the system-camera path falls back to lower-load or shared-stream combinations that the device reports as supported.
 - Pro Develop and AI Retouch on Android, iOS/iPadOS, and HarmonyOS now expose a visible system-photo entry point. Imported images become private working copies; manual and AI edits create new app copies, and export creates a new system photo instead of overwriting the original. The default AI endpoint now uses the HTTPS account-and-device activation proxy.
-- This candidate is not on the official update feed. The full 513-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Camera, system-photo, live AI service, and long-session desktop behavior still require hands-on testing on the corresponding platforms.
+- This candidate is not on the official update feed. The full 514-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Camera, system-photo, live AI service, and long-session desktop behavior still require hands-on testing on the corresponding platforms.
 
 ### Official website update in v1.5.10
 
@@ -779,7 +779,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - プレビューとスコープは、サイズを制限した同一画像を再利用します。Windows では高頻度のプレビュー要求をまとめ、録画中だけタイムコードを更新し、写真やモードの切り替え、編集画面からの移動、ウインドウ終了時に AI の一時結果とビットマップを解放して、重複処理とバックグラウンド負荷を抑えます。
 - Android では、Nikon Z50 の撮影後に JPEG 読み出しが `DeviceBusy (0x2009)` になった場合、再撮影せず最大 20 秒の範囲で待機と再試行を行います。端末メーカーの Camera2 HAL が通常の 2 系統 JPEG セッションを拒否した場合は、端末が対応を申告している低負荷構成または共有 1 ストリーム構成へ段階的に切り替えます。
 - Android、iOS/iPadOS、HarmonyOS のプロ現像と AI レタッチに、システム写真を選ぶ入口を常時表示します。読み込んだ写真はアプリ内の作業コピーとなり、調整結果と AI 結果は新しいアプリ内コピーとして保存します。書き出し時も新しいシステム写真を作成し、元の写真は上書きしません。AI の既定接続先は、アカウントとデバイス認証を共用する HTTPS プロキシへ移行しました。
-- この候補は公式更新フィードには未配信です。全 513 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。カメラ、システム写真、実 AI サービス、デスクトップの長時間動作は、対応する実機での確認が必要です。
+- この候補は公式更新フィードには未配信です。全 514 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。カメラ、システム写真、実 AI サービス、デスクトップの長時間動作は、対応する実機での確認が必要です。
 
 ### v1.5.10 公式サイト更新
 

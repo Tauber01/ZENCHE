@@ -2965,7 +2965,7 @@ private struct ImageEditorPage: View {
                 }
                 Spacer()
             }
-            Text(aiIsGenerating ? "正在调用 AI 模型…" : status)
+            Text(localizedEditorStatus(aiIsGenerating ? "正在调用 AI 模型…" : status))
                 .font(.caption.monospaced())
                 .foregroundStyle(IPalette.muted)
                 .lineLimit(2)
@@ -3819,7 +3819,7 @@ private struct ImageEditorPage: View {
                     resetAdjustments()
                 }
                 .buttonStyle(.bordered)
-                Text(status)
+                Text(localizedEditorStatus(status))
                     .font(.caption.monospaced())
                     .foregroundStyle(IPalette.muted)
                     .lineLimit(2)
@@ -4466,6 +4466,60 @@ private struct ImageEditorPage: View {
         }
     }
 
+    private func localizedEditorStatus(_ source: String) -> String {
+        if let localizedServerFailure = localizedAiServerFailure(source) {
+            return localizedServerFailure
+        }
+        let parameterizedStatuses = [
+            (prefix: "已保存 AI 结果 · ", format: "已保存 AI 结果 · %@"),
+            (prefix: "保存编辑副本失败：", format: "保存编辑副本失败：%@"),
+            (prefix: "系统照片库保存失败：", format: "系统照片库保存失败：%@"),
+            (prefix: "AI 请求失败：", format: "AI 请求失败：%@")
+        ]
+        for status in parameterizedStatuses where source.hasPrefix(status.prefix) {
+            let detail = String(source.dropFirst(status.prefix.count))
+            return RuntimeLocalization.format(
+                status.format,
+                locale: locale,
+                detail
+            )
+        }
+        return RuntimeLocalization.text(source, locale: locale)
+    }
+
+    private func localizedAiServerFailure(_ source: String) -> String? {
+        let prefix = "AI 服务返回错误（"
+        guard source.hasPrefix(prefix) else { return nil }
+        let remainder = source.dropFirst(prefix.count)
+        guard let closing = remainder.firstIndex(of: "）"),
+              let statusCode = Int(String(remainder[..<closing]))
+        else {
+            return nil
+        }
+        let suffix = remainder[remainder.index(after: closing)...]
+        guard !suffix.isEmpty else {
+            return RuntimeLocalization.format(
+                "AI 服务返回错误（%d）",
+                locale: locale,
+                statusCode
+            )
+        }
+        guard suffix.first == "：" else { return nil }
+        return RuntimeLocalization.format(
+            "AI 服务返回错误（%d）：%@",
+            locale: locale,
+            statusCode,
+            String(suffix.dropFirst())
+        )
+    }
+
+    private func aiFailureStatus(_ error: Error) -> String {
+        if let aiError = error as? AiError {
+            return aiError.localizedDescription
+        }
+        return "AI 请求失败：\(error.localizedDescription)"
+    }
+
     private func generateAi() {
         guard !aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { status = "请输入提示词"; return }
         guard ActivationManager.isActivated else { status = "请先在设置中输入激活码解锁 AI 功能"; return }
@@ -4498,7 +4552,10 @@ private struct ImageEditorPage: View {
                     status = img != nil ? "生成完成" : "无法解码 AI 返回的图片"
                 }
             } catch {
-                await MainActor.run { aiIsGenerating = false; status = error.localizedDescription }
+                await MainActor.run {
+                    aiIsGenerating = false
+                    status = aiFailureStatus(error)
+                }
             }
         }
     }

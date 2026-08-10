@@ -268,7 +268,42 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('正在生成…', 'Generating…', '生成中…'),
   new TranslationEntry('可组合预设', 'Mix-and-Match Presets', '組み合わせプリセット'),
   new TranslationEntry('清空', 'Clear', 'クリア'),
-  new TranslationEntry('正在调用 AI 模型…', 'Calling the AI model…', 'AI モデルを呼び出しています…'),
+  new TranslationEntry('请输入提示词', 'Enter a prompt', 'プロンプトを入力してください'),
+  new TranslationEntry(
+    '请先在设置中输入激活码解锁 AI 功能',
+    'Enter an activation key in Settings to unlock AI features',
+    '設定でアクティベーションキーを入力して AI 機能を有効にしてください'
+  ),
+  new TranslationEntry(
+    '激活码无效或次数用完',
+    'The activation key is invalid or has no uses remaining',
+    'アクティベーションキーが無効か、利用回数を使い切っています'
+  ),
+  new TranslationEntry(
+    'AI 服务暂时不可用',
+    'The AI service is temporarily unavailable',
+    'AI サービスは一時的に利用できません'
+  ),
+  new TranslationEntry('生成完成', 'Generation complete', '生成が完了しました'),
+  new TranslationEntry('生成失败：', 'Generation failed: ', '生成に失敗しました：'),
+  new TranslationEntry('AI 生成失败', 'AI generation failed', 'AI 生成に失敗しました'),
+  new TranslationEntry(
+    'AI 生成超时，请稍后重试',
+    'AI generation timed out. Try again later.',
+    'AI 生成がタイムアウトしました。しばらくしてから再試行してください'
+  ),
+  new TranslationEntry(
+    '无法读取原图，未发送 AI 修图请求',
+    'Unable to read the original image. The AI retouch request was not sent.',
+    '元画像を読み込めないため、AI レタッチのリクエストは送信されませんでした'
+  ),
+  new TranslationEntry(
+    'AI 未返回有效图片',
+    'AI returned no valid image',
+    'AI から有効な画像が返されませんでした'
+  ),
+  new TranslationEntry('AI 服务返回错误', 'AI service returned error', 'AI サービスからエラーが返されました'),
+  new TranslationEntry('AI 次数已用完', 'No AI uses remaining', 'AI の利用回数を使い切りました'),
   new TranslationEntry('保存 AI 结果失败', 'Unable to save the AI result', 'AI 結果を保存できません'),
   new TranslationEntry('已保存 AI 结果', 'AI result saved', 'AI 結果を保存しました'),
   new TranslationEntry('创建蒙版', 'Create Mask', 'マスクを作成'),
