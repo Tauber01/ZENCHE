@@ -70,6 +70,18 @@ final class DesktopWorkspaceLayout: ObservableObject {
     static let editorToolsRange: ClosedRange<CGFloat> = 280...720
     static let editorBottomRange: ClosedRange<CGFloat> = 220...720
 
+    static let minimumCaptureWorkspaceWidth = minimumCaptureCanvasWidth
+        + inspectorRange.lowerBound
+        + splitHandleThickness
+    static let minimumEditorWorkspaceWidth = minimumEditorCanvasWidth
+        + editorMediaRange.lowerBound
+        + editorToolsRange.lowerBound
+        + splitHandleThickness * 2
+    static let minimumWorkspaceWidth = max(
+        minimumCaptureWorkspaceWidth,
+        minimumEditorWorkspaceWidth
+    )
+
     @Published var sidebarWidth: CGFloat {
         didSet { persist(sidebarWidth, key: Key.sidebar) }
     }
@@ -134,6 +146,16 @@ final class DesktopWorkspaceLayout: ObservableObject {
 
     func reset() {
         apply(.standard)
+    }
+
+    static func sidebarRange(
+        forAvailableWidth availableWidth: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        constrainedRange(
+            sidebarRange,
+            maximum: availableWidth - minimumWorkspaceWidth
+                - splitHandleThickness
+        )
     }
 
     static func inspectorRange(

@@ -48,6 +48,11 @@ test('macOS 工作区分隔条支持持久化、键盘调整、预设与重置',
   assert.match(layout, /editor\.bottom\.height\.v2/);
   assert.match(layout, /editorBottomRange\([\s\S]*forAvailableHeight/);
   assert.match(layout, /editorToolsRange\([\s\S]*forAvailableWidth/);
+  assert.match(layout, /minimumCaptureWorkspaceWidth[\s\S]*minimumWorkspaceWidth/);
+  assert.match(layout, /sidebarRange\([\s\S]*forAvailableWidth/);
+  assert.match(main, /GeometryReader \{ geometry in[\s\S]*sidebarRange[\s\S]*sidebarWidth/);
+  assert.match(main, /minWidth: DesktopWorkspaceLayout\.minimumWorkspaceWidth/);
+  assert.match(main, /current\.width < minimum\.width[\s\S]*setVisibleContentSize/);
   assert.match(main, /minimumCaptureCanvasWidth/);
   assert.match(main, /minimumEditorCanvasWidth/);
   assert.match(settings, /ForEach\(DesktopWorkspacePreset\.allCases\)/);
@@ -121,6 +126,15 @@ test('Windows 原生 GridSplitter 可调主导航、拍摄参数与编辑区', a
   assert.match(code, /ParameterColumn\.MinWidth = cameraWorkspace \? 240 : 0/);
   assert.match(code, /EditorAiToolsWidth/);
   assert.match(code, /EditorAiToolsColumn\.ActualWidth/);
+  assert.match(code, /maximumSidebarWidth = Math\.Clamp\([\s\S]*availableWidth - minimumWorkspaceWidth/);
+  assert.match(code, /compact \? 708d : 828d/);
+  assert.match(code, /ParameterColumn\.MaxWidth = cameraWorkspace/);
+  assert.match(code, /EditorAiPreviewColumn\.Width = compact[\s\S]*new GridLength\(0\)/);
+  assert.match(code, /AiPreviewPanel\.Visibility = compact[\s\S]*Visibility\.Collapsed/);
+  assert.match(code, /EditorAiToolsSplitter\.Visibility = compact[\s\S]*Visibility\.Collapsed/);
+  assert.match(code, /EditorAiToolsColumn\.Width = compact[\s\S]*GridUnitType\.Star/);
+  assert.match(xaml, /x:Name="EditorAiPreviewColumn"[\s\S]{0,160}MinWidth="360"/);
+  assert.match(xaml, /x:Name="AiPreviewPanel"/);
   assert.match(xaml, /x:Name="EditorAiToolsColumn"[\s\S]{0,180}MaxWidth="720"/);
   assert.match(xaml, /<UniformGrid Margin="0,8,0,10" Columns="2">/);
   assert.match(xaml, /<StackPanel x:Name="AiPresetPanel"/);

@@ -14251,7 +14251,21 @@ private struct RootView: View {
             ? NSSize(width: 1040, height: 700)
             : NSSize(width: 320, height: 420)
         DispatchQueue.main.async {
-            (NSApp.mainWindow ?? NSApp.keyWindow ?? NSApp.windows.first)?.minSize = minimum
+            guard let window = NSApp.mainWindow
+                ?? NSApp.keyWindow
+                ?? NSApp.windows.first else { return }
+            window.minSize = minimum
+            guard state == .signedIn else { return }
+            let current = window.contentRect(forFrameRect: window.frame).size
+            if current.width < minimum.width || current.height < minimum.height {
+                DesktopWindowFrame.setVisibleContentSize(
+                    NSSize(
+                        width: max(current.width, minimum.width),
+                        height: max(current.height, minimum.height)
+                    ),
+                    for: window
+                )
+            }
         }
     }
 
@@ -14263,21 +14277,37 @@ private struct RootView: View {
                 showConnection: $showConnection,
                 showSettings: $showSettings
             )
-            HStack(spacing: SpaceToken.s0) {
-                Sidebar(model: model)
-                    .frame(width: desktopLayout.sidebarWidth)
-                WorkspaceSplitHandle(
-                    axis: .vertical,
-                    label: "调整主导航宽度",
-                    value: $desktopLayout.sidebarWidth,
-                    range: DesktopWorkspaceLayout.sidebarRange
+            GeometryReader { geometry in
+                let sidebarRange = DesktopWorkspaceLayout.sidebarRange(
+                    forAvailableWidth: geometry.size.width
                 )
-                // Keep exactly one workspace mounted while navigating. An
-                // animated Group can retain the previous monitor view during
-                // layout, causing its image to bleed behind the editor.
-                currentWorkspace
-                    .id(model.section)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                let sidebarWidth = DesktopWorkspaceLayout.clamp(
+                    desktopLayout.sidebarWidth,
+                    to: sidebarRange
+                )
+                HStack(spacing: SpaceToken.s0) {
+                    Sidebar(model: model)
+                        .frame(width: sidebarWidth)
+                    WorkspaceSplitHandle(
+                        axis: .vertical,
+                        label: "调整主导航宽度",
+                        value: Binding(
+                            get: { sidebarWidth },
+                            set: { desktopLayout.sidebarWidth = $0 }
+                        ),
+                        range: sidebarRange
+                    )
+                    // Keep exactly one workspace mounted while navigating. An
+                    // animated Group can retain the previous monitor view during
+                    // layout, causing its image to bleed behind the editor.
+                    currentWorkspace
+                        .id(model.section)
+                        .frame(
+                            minWidth: DesktopWorkspaceLayout.minimumWorkspaceWidth,
+                            maxWidth: .infinity,
+                            maxHeight: .infinity
+                        )
+                }
             }
             HStack {
                 HStack(spacing: SpaceToken.s4) {

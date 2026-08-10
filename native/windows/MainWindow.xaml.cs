@@ -742,6 +742,7 @@ public partial class MainWindow : Window
     private readonly UpdateService _updateService = new();
     private readonly AuthService _authService = new();
     private WorkspaceLayoutState _workspaceLayout = LoadWorkspaceLayout();
+    private string _currentDestination = "capture";
     private readonly List<LibraryBranch> _libraryBranches;
     private readonly Dictionary<string, string> _libraryFileAssignments;
     private readonly List<RememberedCameraDevice> _rememberedDevices;
@@ -1459,11 +1460,45 @@ public partial class MainWindow : Window
     {
         if (EditorMediaColumn is null ||
             EditorToolsColumn is null ||
+            EditorAiPreviewColumn is null ||
             EditorAiToolsColumn is null)
         {
             return;
         }
-        var compact = ActualWidth > 0 && ActualWidth < 1120;
+        var availableWidth = ActualWidth > 0 ? ActualWidth : Width;
+        var compact = availableWidth < 1120;
+        var cameraWorkspace = _currentDestination is "capture" or "monitor";
+        var editorWorkspace = _currentDestination == "editor";
+        var minimumWorkspaceWidth = cameraWorkspace
+            ? 620d
+            : editorWorkspace
+                ? (compact ? 708d : 828d)
+                : 380d;
+        var maximumSidebarWidth = Math.Clamp(
+            availableWidth - minimumWorkspaceWidth,
+            72d,
+            360d);
+        SidebarColumn.MaxWidth = maximumSidebarWidth;
+        var sidebarWidth = Math.Clamp(
+            _workspaceLayout.SidebarWidth,
+            72d,
+            maximumSidebarWidth);
+        SidebarColumn.Width = new GridLength(sidebarWidth);
+
+        ParameterColumn.MinWidth = cameraWorkspace ? 240 : 0;
+        ParameterColumn.MaxWidth = cameraWorkspace
+            ? Math.Clamp(
+                availableWidth - sidebarWidth - 380d,
+                240d,
+                720d)
+            : 0;
+        ParameterColumn.Width = cameraWorkspace
+            ? new GridLength(Math.Clamp(
+                _workspaceLayout.ParameterWidth,
+                240d,
+                ParameterColumn.MaxWidth))
+            : new GridLength(0);
+
         EditorMediaColumn.MinWidth = compact ? 0 : 140;
         EditorMediaColumn.Width = compact
             ? new GridLength(0)
@@ -1476,10 +1511,24 @@ public partial class MainWindow : Window
             compact
                 ? 300
                 : Math.Clamp(_workspaceLayout.EditorToolsWidth, 280, 720));
-        EditorAiToolsColumn.Width = new GridLength(
-            compact
-                ? 340
-                : Math.Clamp(_workspaceLayout.EditorAiToolsWidth, 340, 720));
+        EditorAiPreviewColumn.MinWidth = compact ? 0 : 360;
+        EditorAiPreviewColumn.Width = compact
+            ? new GridLength(0)
+            : new GridLength(1, GridUnitType.Star);
+        AiPreviewPanel.Visibility = compact
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        EditorAiToolsSplitter.Visibility = compact
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        EditorAiToolsColumn.MinWidth = compact ? 0 : 340;
+        EditorAiToolsColumn.MaxWidth = compact
+            ? double.PositiveInfinity
+            : 720;
+        EditorAiToolsColumn.Width = compact
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(Math.Clamp(
+                _workspaceLayout.EditorAiToolsWidth, 340, 720));
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -5323,16 +5372,9 @@ public partial class MainWindow : Window
 
     private void ApplyWorkspacePanelSizes()
     {
-        SidebarColumn.Width = new GridLength(Math.Clamp(
-            _workspaceLayout.SidebarWidth, 72, 360));
         EditorBottomRow.Height = new GridLength(Math.Clamp(
             _workspaceLayout.EditorBottomHeight, 220, 680));
         ApplyResponsiveEditorLayout();
-        if (ParameterPanelShell.Visibility == Visibility.Visible)
-        {
-            ParameterColumn.Width = new GridLength(Math.Clamp(
-                _workspaceLayout.ParameterWidth, 240, 720));
-        }
     }
 
     private void CaptureWorkspacePanelSizes()
@@ -5456,6 +5498,7 @@ public partial class MainWindow : Window
 
     private void ShowDestination(Button? navigation, string? destination)
     {
+        _currentDestination = destination ?? "capture";
         SetCurrentNavigation(navigation);
         CapturePanel.Visibility =
             destination == "capture"
@@ -5490,12 +5533,7 @@ public partial class MainWindow : Window
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
         ParameterSplitter.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
-        ParameterColumn.MinWidth = cameraWorkspace ? 240 : 0;
-        ParameterColumn.Width =
-            cameraWorkspace
-                ? new GridLength(Math.Clamp(
-                    _workspaceLayout.ParameterWidth, 240, 720))
-                : new GridLength(0);
+        ApplyResponsiveEditorLayout();
         // v1.5.7 issue 655a0a14: 视频页右侧参数面板强制恒深白字，拍照页仍随主题
         ApplyParameterPanelMonitorTheme(destination == "monitor");
         if (destination == "library")
@@ -8787,6 +8825,7 @@ public partial class MainWindow : Window
             "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中输入激活码解锁。");
         EditorProGrid.Visibility = Visibility.Collapsed;
         EditorAiGrid.Visibility = Visibility.Visible;
+        ApplyResponsiveEditorLayout();
         AiEditModeBtn.Style = (Style)FindResource(
             _aiMode == 0 ? "PrimaryButton" : "ButtonBase");
         AiGenModeBtn.Style = (Style)FindResource(

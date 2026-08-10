@@ -6,7 +6,8 @@
 
 - Added persistent desktop workspaces on macOS and Windows. Both restore the
   main-window size and position; Windows also restores the maximized state.
-  Saved off-screen frames are corrected after display changes.
+  Saved off-screen windows are moved back into the visible desktop after
+  display changes.
 - Added draggable, keyboard-accessible splitters for the main navigation,
   capture controls, editor media pool, editor tool panel, and lower editor area.
 - Made every desktop splitter resize its content continuously while dragging,
