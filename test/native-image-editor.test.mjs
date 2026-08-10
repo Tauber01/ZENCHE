@@ -463,7 +463,7 @@ test("AI retouch previews its selected original and masks render real blue alpha
   );
   assert.match(
     windows,
-    /_editorSelectedPath = item\.Path;\s*_aiResultPath = null;/s,
+    /_editorSelectedPath = item\.Path;\s*ClearAiResultFile\(\);/s,
   );
   assert.match(windows, /RedrawEditorMaskOverlay[\s\S]*PixelFormats\.Pbgra32/);
 });

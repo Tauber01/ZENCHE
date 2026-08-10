@@ -5586,6 +5586,7 @@ public partial class MainWindow : Window
             _editorPreviewPending = false;
             EditorPreviewImage.Source = null;
             AiPreviewImage.Source = null;
+            ClearAiResultFile();
             EditorScopeWaveform.SetData("—", "—", "—");
         }
         ShootingTaskPanel.Visibility =
@@ -8892,8 +8893,16 @@ public partial class MainWindow : Window
         {
             try
             {
-                AiPreviewImage.Source = new BitmapImage(
-                    new Uri(previewPath));
+                var image = new BitmapImage();
+                image.BeginInit();
+                if (_aiResultPath != null)
+                {
+                    // 临时结果需在生命周期切换时删除：立即解码并释放文件句柄。
+                    image.CacheOption = BitmapCacheOption.OnLoad;
+                }
+                image.UriSource = new Uri(previewPath);
+                image.EndInit();
+                AiPreviewImage.Source = image;
             }
             catch { }
         }
@@ -8974,7 +8983,7 @@ public partial class MainWindow : Window
     private void AiEditMode_Click(object sender, RoutedEventArgs e)
     {
         _aiMode = 0;
-        _aiResultPath = null;
+        ClearAiResultFile();
         _aiPrompt = ComposeAiPrompt();
         RefreshAiEditor();
         RefreshAiPresets();
@@ -8983,7 +8992,7 @@ public partial class MainWindow : Window
     private void AiGenMode_Click(object sender, RoutedEventArgs e)
     {
         _aiMode = 1;
-        _aiResultPath = null;
+        ClearAiResultFile();
         _aiSelectedPresets.RemoveWhere(item => item.StartsWith(
             "智能移除:",
             StringComparison.Ordinal));
@@ -9132,6 +9141,7 @@ public partial class MainWindow : Window
                 Path.GetTempPath(),
                 $"zenche_ai_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid():N}.jpg");
             await File.WriteAllBytesAsync(tempPath, imageBytes);
+            ClearAiResultFile();
             _aiResultPath = tempPath;
             if (serverRemaining is null)
             {
@@ -9251,6 +9261,63 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 释放当前 AI 临时结果：遗忘路径引用并尽力删除本应用写入系统临时
+    /// 目录的 zenche_ai_*.jpg 文件。容错：任何失败都不抛出、不阻断调用
+    /// 路径；只删除与本应用生成命名完全匹配且位于系统临时目录的文件，
+    /// 绝不触碰用户保存的正式副本或其它应用文件。
+    /// </summary>
+    private void ClearAiResultFile()
+    {
+        var path = _aiResultPath;
+        _aiResultPath = null;
+        TryDeleteAiTempFile(path);
+    }
+
+    /// <summary>
+    /// 仅当 path 确属本应用写入系统临时目录的 zenche_ai_*.jpg 时尽力
+    /// 删除，否则原样忽略。删除失败（如文件正被占用）静默容忍，遗留
+    /// 文件在下次生命周期切换时重试。
+    /// </summary>
+    private static void TryDeleteAiTempFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+        try
+        {
+            var tempRoot = Path.GetTempPath().TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
+            if (!string.Equals(
+                    Path.GetDirectoryName(path),
+                    tempRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            var fileName = Path.GetFileName(path);
+            if (!fileName.StartsWith(
+                    "zenche_ai_",
+                    StringComparison.Ordinal) ||
+                !fileName.EndsWith(
+                    ".jpg",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // 尽力而为：清理失败绝不阻断调用路径。
+        }
+    }
+
     private static string ImageMimeType(string? path)
     {
         return Path.GetExtension(path ?? string.Empty).ToLowerInvariant() switch
@@ -9298,7 +9365,7 @@ public partial class MainWindow : Window
             return;
         }
         _editorSelectedPath = item.Path;
-        _aiResultPath = null;
+        ClearAiResultFile();
         var choice = EditorPhotoBox.Items
             .OfType<EditorPhotoChoice>()
             .FirstOrDefault(candidate =>
@@ -12193,6 +12260,7 @@ public partial class MainWindow : Window
         _editorPreviewPending = false;
         EditorPreviewImage.Source = null;
         AiPreviewImage.Source = null;
+        ClearAiResultFile();
         StopWifiMonitoring();
         StopWifiPreviewLoop();
         if (_immersivePreviewWindow is { } immersive)
