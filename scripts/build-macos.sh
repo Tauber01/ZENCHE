@@ -148,7 +148,12 @@ for size in 16 32 128 256 512; do
   sips -z "$doubled" "$doubled" "$PROJECT_ROOT/icons/icon-512.png" \
     --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$RESOURCES/AppIcon.icns"
+if ! iconutil -c icns "$ICONSET" -o "$RESOURCES/AppIcon.icns"; then
+  # Some Command Line Tools releases reject an otherwise complete iconset.
+  # sips writes the same ICNS container directly from the full-size source.
+  sips -s format icns "$PROJECT_ROOT/icons/icon-512.png" \
+    --out "$RESOURCES/AppIcon.icns" >/dev/null
+fi
 
 if [[ -d "$PROJECT_ROOT/third_party/licenses" ]]; then
   cp -R "$PROJECT_ROOT/third_party/licenses" "$RESOURCES/Licenses"
