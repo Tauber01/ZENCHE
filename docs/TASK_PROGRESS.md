@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-11（Asia/Shanghai）
-> 当前发布版本：1.5.11 / build 38；移动端实现源码基线 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，桌面实现与三包源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，GitHub 发布聚合包 SHA-256 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`
-> 公开状态：GitHub v1.5.11 为公开稳定版；官网自动更新继续提供 W14 的 1.5.10 / build 37，未部署 1.5.11
+> 当前发布版本：1.5.11 / build 38；标签提交 `7e7641fbfe571a2494e594a56c9bd3f7bad9341b`，移动端实现源码基线 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，桌面实现与三包源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，GitHub 发布聚合包 SHA-256 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`
+> 公开状态：GitHub v1.5.11 为公开稳定版，Release 的 14 个线上资产已逐项回验；官网自动更新继续提供 W14 的 1.5.10 / build 37，未部署 1.5.11
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1205,3 +1205,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 回归与构建：最终移动端实现源码基线 `5e7150d9217690e6aea56ea15d8fae852a2d825f`；完整 `npm test` 514/514 通过，专项覆盖默认 AI 代理、Bearer、原图 data URL、三端导入/导出、EXIF 1–8、可见入口、新副本保存，以及 Android/iOS/HarmonyOS 动态 AI 状态 exact/参数化三语契约。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包 SHA-256 分别为 `91d4abd24ab634299d0d49d72fa3c2075b823f4a03ad17a6201d5399b81529f3`、`d2b4ce5fe40e77f2f5a6a51c03f7b1937db2e66ab2112ac9517012b6cb81c4f5`、`92d3b9cf19fb4855bde24e1209b229f530ea3b74bb57b4beba9193884b304223`，三份侧车和压缩结构均通过，Android v2 Debug 签名证书保持一致。复用既有桌面包后重建 GitHub 发布聚合包，SHA-256 为 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`；六包、六侧车和两份说明共 14 项与当前交付源逐字节一致。
 - 双审封板：AI审查 对 exact `cd20e2d3ffe44fc60b06d4225d083622968741b4` 的原生 UI/交互增量终审 PASS（P0/P1/P2=0）；GPT5.6luna 对同一快照确认三端运行态三语、README 计数、事实边界、去 AI 痕迹及聚合包实体全部通过，其唯一 P2 为长期进度仍写“复核中”，已在本次状态提交中关闭。
 - 尚未验证：未用有效激活码访问生产代理，未在 Android/iOS/HarmonyOS 真机执行 URI/iCloud/权限拒绝恢复/系统相册另存，也未在 Nikon Z50 或 OPPO PEDM00 上做实机回归；未做正式签名或安装验收。GitHub v1.5.11 已公开，官网生产仍为 1.5.10 / build 37，未部署本版本。
+
+## 12.59 GitHub v1.5.11 公开发布（2026-08-11，GPT5.6）
+
+- Tauber 在 Buzz 明确指示“传 github”。`main` 由 `8bd995cb29b4d9e03ac3152ba0cdd34393371e1b` 快进到发布提交 `7e7641fbfe571a2494e594a56c9bd3f7bad9341b`；注释标签 `v1.5.11` 解引用到同一提交。发布前 exact HEAD 完整 `npm test` 514/514，测试前后 HEAD 一致，工作树 clean，`git diff --check` 通过。
+- [GitHub Release v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) 于 `2026-08-10T18:12:28Z` 公开，状态为非草稿、非预发布。Release 包含 Android APK、iOS unsigned IPA、HarmonyOS HAP、macOS arm64 DMG、Windows x64 Setup/ZIP 六个安装包及六份侧车，以及聚合交付包和其侧车，共 14 个资产；线上字节数与 GitHub SHA-256 摘要逐项对照本地文件，14/14 一致。聚合包 SHA-256 为 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`。
+- GitHub 公开稳定版不改变签名与实机边界：Android 为 Debug 证书，iOS/HarmonyOS 未签名，macOS ad-hoc 且未公证，Windows 无 Authenticode。Nikon Z50、OPPO Camera2、移动相册/iCloud/真实 AI、桌面拖拽/多显示器/DPI、辅助功能、安装升级与长时间性能仍需真机验收；官网自动更新和生产部署均未切换，继续提供 1.5.10 / build 37。

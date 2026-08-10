@@ -10,10 +10,6 @@ permissions:
 
 jobs:
   package:
-    # v1.5.11 uses the locally frozen, cross-platform packages whose hashes are
-    # recorded in docs/releases/v1.5.11.md. Rebuilding only the macOS-hosted
-    # subset here would make the aggregate package inconsistent.
-    if: ${{ github.ref_name != 'v1.5.11' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

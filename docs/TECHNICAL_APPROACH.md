@@ -195,7 +195,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - iOS/iPadOS 以 PhotoKit `.readWrite` 状态区分 ready/limited/request/settings，允许 iCloud 下载后把 PHAsset 数据导入 `MediaLibrary` 私有副本。导出复用 `.addOnly` 授权和 `PHAssetCreationRequest.forAsset().addResource` 创建新资产；同时提供 `UIApplication.openSettingsURLString`，系统原 PHAsset 永不进入 change request。
 - HarmonyOS 使用单选 `PhotoViewPicker`，把返回 URI 交给 `CaptureWorkflow.importFromUri` 生成文件库副本；导出使用 API 12 `showAssetsCreationDialog` 与 `PhotoCreationConfig`，让系统同意对话框承担写入授权与恢复。桌面端没有系统相册产品入口，本轮只同步 AI HTTPS 默认值和超时。
 - 三个移动端都把“照片来源”放在专业显影与 AI 修图可见区域，空文件库时仍显示系统照片入口；专业调整与 AI 结果统一先写新的应用副本，再按用户操作创建新的系统相册项目。系统原片不进入覆盖/替换调用，AI 生图同样保存新副本。
-- 自动化回归锁定五端默认/旧址迁移、HTTPS Bearer、data URL 上传、`b64_json` 解码、三种移动端“工作副本 + 新相册项目”边界，以及 Android、iOS/iPadOS、HarmonyOS 的动态 AI 状态 exact/参数化三语路径；运行时先翻译模板再插入文件名、预设名或服务端详情，避免二次翻译用户内容。最终移动端实现源码基线为 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，完整 `npm test` 514/514。Android `assembleDebug`、iOS Release 无签名构建与 HarmonyOS Release HAP 构建通过，三包容器和侧车已回验。GitHub 发布聚合包 SHA-256 为 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`，14 项与当前交付源逐字节一致；真机权限、iCloud、厂商相册实现与网络代理真实生成仍分开记录。
+- 自动化回归锁定五端默认/旧址迁移、HTTPS Bearer、data URL 上传、`b64_json` 解码、三种移动端“工作副本 + 新相册项目”边界，以及 Android、iOS/iPadOS、HarmonyOS 的动态 AI 状态 exact/参数化三语路径；运行时先翻译模板再插入文件名、预设名或服务端详情，避免二次翻译用户内容。最终移动端实现源码基线为 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，完整 `npm test` 514/514。Android `assembleDebug`、iOS Release 无签名构建与 HarmonyOS Release HAP 构建通过，三包容器和侧车已回验。GitHub 发布聚合包 SHA-256 为 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`；注释标签 `v1.5.11` 解析到 `7e7641fbfe571a2494e594a56c9bd3f7bad9341b`，Release 于 `2026-08-10T18:12:28Z` 公开为非草稿、非预发布版本。六包、六侧车、聚合包及其侧车共 14 个线上资产的字节数与 GitHub SHA-256 摘要均与本地一致；真机权限、iCloud、厂商相册实现与网络代理真实生成仍分开记录。
 
 ## 0.20. Android Camera2 厂商会话降级
 
