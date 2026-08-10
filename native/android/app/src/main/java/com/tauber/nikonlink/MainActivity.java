@@ -8613,7 +8613,7 @@ public final class MainActivity extends Activity {
                     "保存新副本到系统相册",
                     false);
             saveAlbumBtn.setContentDescription(
-                    "将当前 AI 结果作为新照片保存到系统相册");
+                    tr("将当前 AI 结果作为新照片保存到系统相册"));
             saveAlbumBtn.setOnClickListener(view ->
                     saveAiResultToSystemAlbum(saveAlbumBtn, aiStatus));
             content.addView(
@@ -8691,7 +8691,7 @@ public final class MainActivity extends Activity {
                 "从系统相册导入",
                 photos.isEmpty());
         systemPhoto.setContentDescription(
-                "从系统相册选择照片并创建可编辑副本");
+                tr("从系统相册选择照片并创建可编辑副本"));
         systemPhoto.setCompoundDrawablesWithIntrinsicBounds(
                 android.R.drawable.ic_menu_gallery,
                 0,

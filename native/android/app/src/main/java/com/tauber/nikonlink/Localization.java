@@ -128,10 +128,19 @@ final class Localization {
         add("保存新副本到系统相册", "Save New Copy to Photos", "新しいコピーをシステム写真に保存");
         add("张可编辑", " editable", " 枚を編集可能");
         add("正在选择系统相册照片…", "Choosing a system photo…", "システム写真を選択しています…");
+        add("无法打开系统相册：", "Unable to open Photos: ", "システム写真を開けません：");
         add("正在创建可编辑副本…", "Creating an editable copy…", "編集用コピーを作成しています…");
         add("系统照片已导入为可编辑副本", "System photo imported as an editable copy", "システム写真を編集用コピーとして読み込みました");
+        add("系统照片导入失败：", "Unable to import the system photo: ", "システム写真を読み込めません：");
         add("正在保存新副本到系统相册…", "Saving a new copy to Photos…", "新しいコピーをシステム写真に保存しています…");
         add("已保存新副本到系统相册", "New copy saved to Photos", "新しいコピーをシステム写真に保存しました");
+        add("系统相册保存失败：", "Unable to save to Photos: ", "システム写真に保存できません：");
+        add("从系统相册选择照片并创建可编辑副本",
+                "Choose a photo and create an editable copy",
+                "システム写真を選択して編集用コピーを作成");
+        add("将当前 AI 结果作为新照片保存到系统相册",
+                "Save the current AI result to Photos as a new photo",
+                "現在の AI 結果を新しい写真としてシステム写真に保存");
         add("没有可保存的 AI 结果", "There is no AI result to save", "保存できる AI 結果がありません");
         add("需要照片写入权限", "Photo write access is required", "写真の書き込み権限が必要です");
         add("打开系统设置", "Open System Settings", "システム設定を開く");

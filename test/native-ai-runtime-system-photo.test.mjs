@@ -128,6 +128,44 @@ test("mobile editors expose system-photo import and save-new-copy actions in bot
   }
 });
 
+test("mobile system-photo and AI result states use exact runtime localization paths", async () => {
+  const [android, androidLocalization, ios, iosEn, iosJa, harmony, harmonyLocalization] =
+    await Promise.all([
+      read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+      read("native/android/app/src/main/java/com/tauber/nikonlink/Localization.java"),
+      read("native/ios/NikonLink/Views/RootView.swift"),
+      read("native/ios/NikonLink/en.lproj/Localizable.strings"),
+      read("native/ios/NikonLink/ja.lproj/Localizable.strings"),
+      read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+      read("native/harmony/entry/src/main/ets/localization/Localization.ets"),
+    ]);
+
+  assert.match(android, /private TextView text[\s\S]*?text\.setText\(tr\(value\)\)/);
+  assert.match(android, /private Button nativeButton[\s\S]*?button\.setText\(tr\(label\)\)/);
+  assert.match(android, /setContentDescription\(\s*tr\("从系统相册选择照片并创建可编辑副本"\)\s*\)/);
+  assert.match(android, /setContentDescription\(\s*tr\("将当前 AI 结果作为新照片保存到系统相册"\)\s*\)/);
+  for (const prefix of ["无法打开系统相册：", "系统照片导入失败：", "系统相册保存失败："]) {
+    assert.match(androidLocalization, new RegExp(`add\\("${prefix}"`));
+  }
+
+  assert.match(ios, /description: RuntimeLocalizedText\(editorSystemPhotoStatus\)/);
+  assert.match(ios, /RuntimeLocalization\.format\(\s*"显示已允许访问的 %lld 张照片"/);
+  assert.match(ios, /RuntimeLocalization\.format\(\s*"最近 %lld 张照片"/);
+  assert.match(ios, /RuntimeLocalization\.format\(\s*"导入 %@"/);
+  for (const table of [iosEn, iosJa]) {
+    assert.match(table, /"显示已允许访问的 %lld 张照片" = ".+%lld.+";/);
+    assert.match(table, /"最近 %lld 张照片" = ".+%lld.+";/);
+    assert.match(table, /"导入 %@" = "[^"\n]*%@[^"\n]*";/);
+  }
+
+  assert.match(harmony, /Text\(`\$\{this\.tr\('可编辑照片'\)\} · \$\{this\.editablePhotos\(\)\.length\}`\)/);
+  assert.match(harmony, /Button\(this\.tr\(this\.editorSaving \? '正在保存…' : '保存到文件库'\)/);
+  assert.match(harmony, /this\.tr\(this\.editorSaving \? '正在保存…' : '保存新副本到系统相册'\)/);
+  assert.match(harmony, /Text\(this\.tr\(this\.aiGenerating \? '正在调用 AI 模型…' : this\.aiStatus\)\)/);
+  assert.match(harmonyLocalization, /new TranslationEntry\('可编辑照片', 'Editable Photos', '編集可能な写真'\)/);
+  assert.match(harmonyLocalization, /new TranslationEntry\('保存到文件库', 'Save to Library', 'ライブラリに保存'\)/);
+});
+
 test("Android editor normalizes all eight JPEG EXIF orientations before preview, analysis, and export", async () => {
   const [decoder, activity] = await Promise.all([
     read("native/android/app/src/main/java/com/tauber/nikonlink/EditorBitmapDecoder.java"),

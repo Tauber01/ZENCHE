@@ -956,3 +956,6 @@
 "未获得照片读取权限；可前往系统设置恢复。" = "Photos access was not granted. You can restore access in System Settings.";
 "系统照片已导入为可编辑副本" = "Photo imported as an editable copy";
 "保存到系统相册" = "Save to Photos";
+"显示已允许访问的 %lld 张照片" = "Showing %lld permitted photos";
+"最近 %lld 张照片" = "Latest %lld photos";
+"导入 %@" = "Import %@";

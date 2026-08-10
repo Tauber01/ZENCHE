@@ -158,7 +158,7 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     'クラウド AI 編集・生成には、ログイン中のアカウントとこのデバイスのアクティベーション権限を使用します。'
   ),
   new TranslationEntry('照片来源', 'Photo Source', '写真の選択元'),
-  new TranslationEntry('张可编辑', 'editable', '枚編集可能'),
+  new TranslationEntry('可编辑照片', 'Editable Photos', '編集可能な写真'),
   new TranslationEntry('原片保持不变', 'Original unchanged', 'オリジナルは変更されません'),
   new TranslationEntry('从系统相册导入', 'Import from Photos', 'システム写真から読み込む'),
   new TranslationEntry(
@@ -202,6 +202,12 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '已保存新副本到系统相册',
     'New copy saved to Photos',
     '新しいコピーをシステム写真に保存しました'
+  ),
+  new TranslationEntry('保存到文件库', 'Save to Library', 'ライブラリに保存'),
+  new TranslationEntry(
+    '正在调用 AI 模型…',
+    'Calling the AI model…',
+    'AI モデルを呼び出しています…'
   ),
   new TranslationEntry(
     '需要照片写入权限，请在系统设置中允许后重试',

@@ -117,7 +117,7 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 
 编辑器内置 **AI 工具**，接入 nano-banana 图像模型，支持：
 
-- **AI 修图**：选择照片后立即预览原图，支持自然美颜、风格转换与天空增强；切换照片会清除旧结果，成功后原子覆盖当前原图
+- **AI 修图**：选择照片后立即预览原图，支持自然美颜、风格转换与天空增强；切换照片会清除旧结果。Android、iOS / iPadOS 与 HarmonyOS 会保存新的应用副本，系统相册原片始终不被覆盖；macOS 与 Windows 则按界面提示替换当前应用内文件
 - **AI 生图**：纯文本描述生成人像、风光、城市夜景等，结果另存为新文件
 - **智能移除**：可去路人并自然补全背景，也可去除摄影器材、工作人员、反光、杂物等穿帮元素
 - **蒙版修复**：智能与画笔蒙版使用真实蓝色覆盖，橡皮擦除覆盖区域；删除、反转及曝光/对比度/色彩/细节等局部参数仅作用于对应蒙版
@@ -500,7 +500,7 @@ in a local library for review and export.
 
 The built-in editor includes **AI Tools** powered by the nano-banana image model:
 
-- **AI Photo Editing**: immediately previews the selected original, supports natural beautification, style transfer, and sky enhancement, clears stale results when switching photos, and atomically overwrites the current original on success
+- **AI Photo Editing**: immediately previews the selected original, supports natural beautification, style transfer, and sky enhancement, and clears stale results when switching photos. Android, iOS / iPadOS, and HarmonyOS save a new app copy without overwriting the system-library original; macOS and Windows replace the current in-app file as indicated in the interface
 - **AI Image Generation**: text-to-image for portraits, landscapes, city night scenes, and more, saved as a new file
 - **Smart Removal**: removes passersby with natural background reconstruction, as well as equipment, crew, reflections, clutter, and other production artifacts
 - **Mask fixes**: smart and brush masks use a true blue overlay, the eraser removes coverage, and deletion, inversion, exposure, contrast, color, and detail apply only within the corresponding mask
@@ -834,7 +834,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 
 内蔵エディタに **AI ツール** を搭載し、nano-banana 画像モデルを使用します：
 
-- **AI 編集**：選択した元画像をすぐプレビューし、自然な美肌、スタイル変換、空の強調などを適用。写真切り替え時は古い結果を消去し、成功時は現在の元画像を原子的に上書き
+- **AI 編集**：選択した元画像をすぐプレビューし、自然な美肌、スタイル変換、空の強調などを適用し、写真の切り替え時には古い結果を消去します。Android、iOS / iPadOS、HarmonyOS では新しいアプリ内コピーとして保存し、システム写真の原本は上書きしません。macOS と Windows では、画面の案内どおり現在のアプリ内ファイルを置き換えます
 - **AI 生成**：テキストから人物、風景、都市夜景などを生成し、新規ファイルとして保存
 - **スマート除去**：通行人を削除して背景を自然に補完し、撮影機材、スタッフ、反射、不要物などの写り込みも除去
 - **マスク修正**：スマート／ブラシマスクを実際の青いオーバーレイで表示し、消しゴムで範囲を削除。削除、反転、露出、コントラスト、色、ディテールは対応するマスク内だけに適用

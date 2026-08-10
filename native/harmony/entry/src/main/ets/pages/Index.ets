@@ -3190,7 +3190,7 @@ struct Index {
             .fontSize(TS_BODY)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text(`${this.editablePhotos().length} ${this.tr('张可编辑')}`)
+          Text(`${this.tr('可编辑照片')} · ${this.editablePhotos().length}`)
             .fontSize(TS_CAPTION)
             .fontColor($r('app.color.muted'))
         }
@@ -3587,7 +3587,9 @@ struct Index {
           .borderRadius(RADIUS_14)
           .padding(12)
 
-        Button(this.editorSaving ? '正在保存…' : '保存到文件库', { type: ButtonType.Normal })
+        Button(this.tr(this.editorSaving ? '正在保存…' : '保存到文件库'), {
+          type: ButtonType.Normal
+        })
           .height(48)
           .width('100%')
           .enabled(!this.editorSaving)
@@ -3597,7 +3599,10 @@ struct Index {
             this.saveAiResult();
           })
 
-        Button(this.editorSaving ? '正在保存…' : '保存新副本到系统相册', { type: ButtonType.Normal })
+        Button(
+          this.tr(this.editorSaving ? '正在保存…' : '保存新副本到系统相册'),
+          { type: ButtonType.Normal }
+        )
           .height(48)
           .width('100%')
           .enabled(!this.editorSaving)
@@ -3610,7 +3615,7 @@ struct Index {
       }
 
       if (this.aiStatus.length > 0 || this.aiGenerating) {
-        Text(this.aiGenerating ? '正在调用 AI 模型…' : this.aiStatus)
+        Text(this.tr(this.aiGenerating ? '正在调用 AI 模型…' : this.aiStatus))
           .fontSize(TS_CAPTION)
           .fontColor($r('app.color.muted'))
           .width('100%')

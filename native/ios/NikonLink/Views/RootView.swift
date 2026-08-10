@@ -2518,7 +2518,7 @@ private struct ImageEditorPage: View {
                     ContentUnavailableView(
                         "没有可导入的系统照片",
                         systemImage: "photo.on.rectangle.angled",
-                        description: Text(editorSystemPhotoStatus)
+                        description: RuntimeLocalizedText(editorSystemPhotoStatus)
                     )
                     .overlay(alignment: .bottom) {
                         if model.library.systemPhotoEditAccessState == .settingsRequired,
@@ -2543,7 +2543,15 @@ private struct ImageEditorPage: View {
                                     SystemAlbumThumbnail(item: item)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("导入 \(item.name)")
+                                .accessibilityLabel(
+                                    Text(
+                                        RuntimeLocalization.format(
+                                            "导入 %@",
+                                            locale: locale,
+                                            item.name
+                                        )
+                                    )
+                                )
                             }
                         }
                         .padding(SpaceToken.s16)
@@ -2588,8 +2596,16 @@ private struct ImageEditorPage: View {
         }
         editorSystemPhotos = items
         editorSystemPhotoStatus = authorization == .limited
-            ? "显示已允许访问的 \(items.count) 张照片"
-            : "最近 \(items.count) 张照片"
+            ? RuntimeLocalization.format(
+                "显示已允许访问的 %lld 张照片",
+                locale: locale,
+                Int64(items.count)
+            )
+            : RuntimeLocalization.format(
+                "最近 %lld 张照片",
+                locale: locale,
+                Int64(items.count)
+            )
     }
 
     private func importEditorSystemPhoto(_ asset: PHAsset) {
