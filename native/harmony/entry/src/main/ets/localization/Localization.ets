@@ -253,6 +253,24 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '収録停止 · 外部収録ファイルを ZENCHE ライブラリへ保存しました'
   ),
   new TranslationEntry('生成图像', 'Generate Image', '画像を生成'),
+  new TranslationEntry('AI 修图', 'AI Retouch', 'AI レタッチ'),
+  new TranslationEntry('AI 生图', 'AI Generate', 'AI 画像生成'),
+  new TranslationEntry(
+    '输入修图描述…（可补充）',
+    'Describe the edit… (optional)',
+    '編集内容を入力…（任意）'
+  ),
+  new TranslationEntry(
+    '输入生图描述…（可补充）',
+    'Describe the image… (optional)',
+    '生成する画像を入力…（任意）'
+  ),
+  new TranslationEntry('正在生成…', 'Generating…', '生成中…'),
+  new TranslationEntry('可组合预设', 'Mix-and-Match Presets', '組み合わせプリセット'),
+  new TranslationEntry('清空', 'Clear', 'クリア'),
+  new TranslationEntry('正在调用 AI 模型…', 'Calling the AI model…', 'AI モデルを呼び出しています…'),
+  new TranslationEntry('保存 AI 结果失败', 'Unable to save the AI result', 'AI 結果を保存できません'),
+  new TranslationEntry('已保存 AI 结果', 'AI result saved', 'AI 結果を保存しました'),
   new TranslationEntry('创建蒙版', 'Create Mask', 'マスクを作成'),
   new TranslationEntry('蒙版', 'Mask', 'マスク'),
   new TranslationEntry('蒙版列表', 'Mask List', 'マスク一覧'),

@@ -126,7 +126,7 @@ final class Localization {
                 "System photos are copied into the library first; the originals remain unchanged.",
                 "システム写真は先にライブラリへコピーされ、元の写真は変更されません。");
         add("保存新副本到系统相册", "Save New Copy to Photos", "新しいコピーをシステム写真に保存");
-        add("张可编辑", " editable", " 枚を編集可能");
+        add("可编辑照片", "Editable Photos", "編集可能な写真");
         add("正在选择系统相册照片…", "Choosing a system photo…", "システム写真を選択しています…");
         add("无法打开系统相册：", "Unable to open Photos: ", "システム写真を開けません：");
         add("正在创建可编辑副本…", "Creating an editable copy…", "編集用コピーを作成しています…");
@@ -141,6 +141,9 @@ final class Localization {
         add("将当前 AI 结果作为新照片保存到系统相册",
                 "Save the current AI result to Photos as a new photo",
                 "現在の AI 結果を新しい写真としてシステム写真に保存");
+        add("渲染当前调整并在系统相册创建新照片",
+                "Render the current adjustments and create a new photo in Photos",
+                "現在の調整を反映し、システム写真に新しい写真を作成");
         add("没有可保存的 AI 结果", "There is no AI result to save", "保存できる AI 結果がありません");
         add("需要照片写入权限", "Photo write access is required", "写真の書き込み権限が必要です");
         add("打开系统设置", "Open System Settings", "システム設定を開く");

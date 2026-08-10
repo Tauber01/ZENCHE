@@ -2248,11 +2248,11 @@ public final class MainActivity extends Activity {
                             + error.getMessage();
                     if (error instanceof SecurityException) {
                         new AlertDialog.Builder(this)
-                                .setTitle("需要照片写入权限")
-                                .setMessage(editorSystemPhotoStatus)
-                                .setNegativeButton("取消", null)
+                                .setTitle(tr("需要照片写入权限"))
+                                .setMessage(tr(editorSystemPhotoStatus))
+                                .setNegativeButton(tr("取消"), null)
                                 .setPositiveButton(
-                                        "打开系统设置",
+                                        tr("打开系统设置"),
                                         (dialog, which) -> openSystemPhotoPermissionSettings())
                                 .show();
                     } else {
@@ -8144,7 +8144,8 @@ public final class MainActivity extends Activity {
         content.addView(save, marginParams(-1, dp(48), 0, 10, 0, 8));
 
         Button saveToAlbum = nativeButton("保存新副本到系统相册", false);
-        saveToAlbum.setContentDescription("渲染当前调整并在系统相册创建新照片");
+        saveToAlbum.setContentDescription(
+                tr("渲染当前调整并在系统相册创建新照片"));
         saveToAlbum.setOnClickListener(view -> saveRenderedEditorCopy(
                 saveToAlbum,
                 status,
@@ -8673,7 +8674,7 @@ public final class MainActivity extends Activity {
                 text("照片来源", TS_BODY, Typeface.BOLD, INK),
                 new LinearLayout.LayoutParams(0, dp(32), 1f));
         TextView count = text(
-                photos.size() + " 张可编辑",
+                tr("可编辑照片") + " · " + photos.size(),
                 TS_CAPTION,
                 Typeface.BOLD,
                 photos.isEmpty() ? MUTED : COBALT);

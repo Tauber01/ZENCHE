@@ -3449,7 +3449,7 @@ struct Index {
       }
 
       Row({ space: 8 }) {
-        Button(this.aiMode === 0 ? '● AI 修图' : '○ AI 修图', { type: ButtonType.Normal })
+        Button(`${this.aiMode === 0 ? '●' : '○'} ${this.tr('AI 修图')}`, { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
           .fontColor(this.aiMode === 0 ? $r('app.color.accent_ink') : $r('app.color.ink'))
@@ -3459,7 +3459,7 @@ struct Index {
             this.aiResultPath = '';
             this.composeAiPrompt();
           })
-        Button(this.aiMode === 1 ? '● AI 生图' : '○ AI 生图', { type: ButtonType.Normal })
+        Button(`${this.aiMode === 1 ? '●' : '○'} ${this.tr('AI 生图')}`, { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
           .fontColor(this.aiMode === 1 ? $r('app.color.accent_ink') : $r('app.color.ink'))
@@ -3472,7 +3472,10 @@ struct Index {
       }
       .width('100%')
 
-      TextArea({ placeholder: this.aiMode === 0 ? '输入修图描述…（可补充）' : '输入生图描述…（可补充）', text: this.aiManualPrompt })
+      TextArea({
+        placeholder: this.tr(this.aiMode === 0 ? '输入修图描述…（可补充）' : '输入生图描述…（可补充）'),
+        text: this.aiManualPrompt
+      })
         .height(80)
         .fontSize(EDITOR_FS_MEDIUM)
         .onChange((value: string): void => {
@@ -3517,7 +3520,7 @@ struct Index {
       }
       .width('100%')
 
-      Button(this.aiGenerating ? '正在生成…' : '生成图像', { type: ButtonType.Normal })
+      Button(this.tr(this.aiGenerating ? '正在生成…' : '生成图像'), { type: ButtonType.Normal })
         .height(48)
         .width('100%')
         .enabled(
@@ -3532,12 +3535,12 @@ struct Index {
         })
 
       Row() {
-        Text('可组合预设')
+        Text(this.tr('可组合预设'))
           .fontSize(TS_BODY)
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.muted'))
           .layoutWeight(1)
-        Button('清空', { type: ButtonType.Normal })
+        Button(this.tr('清空'), { type: ButtonType.Normal })
           .height(44)
           .fontSize(TS_CAPTION)
           .backgroundColor($r('app.color.surface'))
