@@ -100,7 +100,9 @@ test('version 1.5.11 launch announcements describe login clarity and desktop wor
     assert.match(announcement, /macOS 与 Windows 新增桌面工作区布局/);
     assert.match(announcement, /Windows 还会恢复最大化状态/);
     assert.match(announcement, /默认、拍摄、监看、编辑与紧凑预设/);
-    assert.match(announcement, /1\.5\.11 为未签名开发验证包/);
+    assert.match(announcement, /1\.5\.11 为本地开发验证候选/);
+    assert.match(announcement, /各平台签名状态不同/);
+    assert.match(announcement, /查阅逐包说明/);
   }
 
   assert.match(announcements[1], /tr\("• 五端登录页将模式选项明确为/);

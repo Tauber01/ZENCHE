@@ -56,3 +56,43 @@ test('新增登录模式标签具备五端三语资源', async () => {
     assert.match(source, /创建账号/);
   }
 });
+
+test('Apple 登录忙碌态 exact key 在片段回退前返回完整三语', async () => {
+  const runtimeLocalization = await read(
+    'native/macos/Sources/NikonLink/SettingsSheet.swift',
+  );
+  assert.match(
+    runtimeLocalization,
+    /if let exact = table\[source\] \{\s*return exact\s*\}/,
+  );
+
+  const packs = [
+    {
+      source: await read(
+        'native/ios/NikonLink/zh-Hans.lproj/Localizable.strings',
+      ),
+      expected: ['正在登录…', '正在注册…'],
+    },
+    {
+      source: await read('native/ios/NikonLink/en.lproj/Localizable.strings'),
+      expected: ['Signing in…', 'Creating account…'],
+    },
+    {
+      source: await read('native/ios/NikonLink/ja.lproj/Localizable.strings'),
+      expected: ['ログインしています…', 'アカウントを作成しています…'],
+    },
+  ];
+
+  for (const { source, expected } of packs) {
+    const exactValue = (key) => {
+      const line = source
+        .split('\n')
+        .find((candidate) => candidate.startsWith(`"${key}" = `));
+      assert.ok(line, `missing exact Apple localization key: ${key}`);
+      return line.slice(line.indexOf(' = "') + 4, -2);
+    };
+
+    assert.equal(exactValue('正在登录…'), expected[0]);
+    assert.equal(exactValue('正在注册…'), expected[1]);
+  }
+});
