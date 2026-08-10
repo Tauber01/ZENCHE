@@ -18,6 +18,16 @@
 
 ### Fixed
 
+- Added bounded Nikon Z50 busy recovery after SDRAM capture so a still-writing
+  JPEG is retried without triggering a second exposure.
+- Added Android Camera2 stream-plan fallback for vendor HALs that reject the
+  normal two-JPEG session, including a timestamp-separated shared JPEG mode.
+- Restored the native AI service default to the production HTTPS account proxy
+  and removed obsolete mobile API-key guidance.
+- Added visible system-photo import and Save New Copy actions to the Android,
+  iOS/iPadOS, and HarmonyOS editors. Manual adjustments and mobile AI retouches
+  now create new app copies; exporting creates a new system photo and leaves
+  the original unchanged.
 - Clarified the sign-in mode choices across all five native clients as
   Existing Account and Create Account, separating them from the actual submit
   button after production logs confirmed the reported click sent no login

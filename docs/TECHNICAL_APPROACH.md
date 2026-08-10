@@ -188,13 +188,20 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - Apple 的运行时本地化先匹配完整字符串，再做动态片段替换。登录忙碌态因此必须在共享的 `zh-Hans/en/ja` Apple 语言包中提供“正在登录…”与“正在注册…”的 exact key；回归测试会直接核对三语返回值，防止出现“正在Sign In…”或“正在ログイン…”混排。
 - 候选版本为 `1.5.11 / build 38`，最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`。Windows AI 结果使用 `BitmapCacheOption.OnLoad` 解码后释放文件句柄；集中清理只接受系统临时目录下严格匹配 `zenche_ai_*.jpg` 的文件，并覆盖新结果替换、照片/模式切换、离开编辑页和窗口关闭，用户保存副本不会进入删除路径。完整 `npm test` 503/503 通过；macOS 全源类型检查、应用构建/严格验签以及 Windows WPF 编译、Release publish、NSIS、便携 ZIP 校验均通过。Windows 两包按最终源码基线重建；最终基线相对 `0faeccdc987146c104fd73d742547c9baf9db221` 只有 Windows 专属实现与测试变化，因此 macOS DMG 复用该提交已严格验签和校验的同字节产物。Android Debug、iOS unsigned、HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 的平台边界保持不变。Impeccable 对本轮桌面布局文件检测为 0 条反模式；最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，14 项内容逐字节匹配当前交付源。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、事实、去 AI 痕迹和交付内容无实体问题，其唯一状态 P2 已完成回填。候选只用于本地开发验证，官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
-## 0.19. W15 AI 代理迁移与移动端系统照片编辑底层
+## 0.19. W15 AI 代理迁移与移动端系统照片编辑流程
 
 - 五端 AI 客户端默认基址统一为 `https://zenche.top/api`，再拼接 `/v1/ai`。升级时先去除空白与尾斜杠；仅当结果为空或等于历史默认 `http://101.34.255.115:8787` 时迁移到 HTTPS，其他显式自托管地址原样保留。只有 HTTPS endpoint 且本地存在有效 session 时附加 `Authorization: Bearer`；请求继续携带 `activationCode`、`deviceId`、`prompt`、`size`，修图再携带完整 MIME data URL。五端均兼容 `data[0].b64_json` 与下载 URL 结果；Android、iOS、HarmonyOS 及桌面端等待窗口统一覆盖代理轮询所需的 300 秒。
 - Android 使用 Android 13+ Photo Picker，旧系统使用 `ACTION_OPEN_DOCUMENT`。导入必须经 `ContentResolver.openInputStream(uri)` 交给 `CaptureWorkflow.importFile`，不得构造 `File(uri)`；先读取 provider 声明的 `SIZE`，并以流式计数再次执行 64 MB 硬上限，避免未知或虚报大小绕过。`CaptureWorkflow` 先写同目录 `.importing` 临时文件，成功落盘后再重命名，流读取、同步、重命名或后续收尾异常都会清理临时文件和本次目标。编辑器的统一 `EditorBitmapDecoder` 解析 JPEG APP1/TIFF 的 Orientation 标签，并用 1–8 对应矩阵在采样解码后归一化旋转/镜像；缩略图、预览、分析、调整渲染和最终 JPEG 导出均复用该入口。导出使用 `MediaStore.Images` 新建项目，Android 10+ 通过 `RELATIVE_PATH=Pictures/ZENCHE` 和 `IS_PENDING` 原子公开，写入或 pending 发布失败均删除半成品。Android 9 及更早只在清单声明 legacy write 权限，并暴露应用设置恢复动作。
 - iOS/iPadOS 以 PhotoKit `.readWrite` 状态区分 ready/limited/request/settings，允许 iCloud 下载后把 PHAsset 数据导入 `MediaLibrary` 私有副本。导出复用 `.addOnly` 授权和 `PHAssetCreationRequest.forAsset().addResource` 创建新资产；同时提供 `UIApplication.openSettingsURLString`，系统原 PHAsset 永不进入 change request。
 - HarmonyOS 使用单选 `PhotoViewPicker`，把返回 URI 交给 `CaptureWorkflow.importFromUri` 生成文件库副本；导出使用 API 12 `showAssetsCreationDialog` 与 `PhotoCreationConfig`，让系统同意对话框承担写入授权与恢复。桌面端没有系统相册产品入口，本轮只同步 AI HTTPS 默认值和超时。
-- 自动化回归锁定五端默认/旧址迁移、HTTPS Bearer、data URL 上传、`b64_json` 解码及三种移动端“工作副本 + 新相册项目”边界；构建级验证与真机权限、iCloud、厂商相册实现、网络代理真实生成仍分开记录。
+- 三个移动端都把“照片来源”放在专业显影与 AI 修图可见区域，空文件库时仍显示系统照片入口；专业调整与 AI 结果统一先写新的应用副本，再按用户操作创建新的系统相册项目。系统原片不进入覆盖/替换调用，AI 生图同样保存新副本。
+- 自动化回归锁定五端默认/旧址迁移、HTTPS Bearer、data URL 上传、`b64_json` 解码及三种移动端“工作副本 + 新相册项目”边界；实现与三包源码基线为 `e17fdb9e749f76b2bbed8b15e874b0e3f3686207`，完整 `npm test` 513/513。Android `assembleDebug`、iOS Release 无签名构建与 HarmonyOS Release HAP 构建通过，三包容器和侧车已回验。最终聚合包 SHA-256 为 `0e591c596309968d541d8ab4b1bb21697f2d4dab95c6d05fd90caa40cfc4705f`，14 项与当前交付源逐字节一致；真机权限、iCloud、厂商相册实现与网络代理真实生成仍分开记录。
+
+## 0.20. Android Camera2 厂商会话降级
+
+- `LocalCameraController` 只从 `SCALER_STREAM_CONFIGURATION_MAP` 选择 JPEG 输出，按常规双流、低负载双流、常规共享流、低负载共享流和最小共享流尝试。厂商 HAL 拒绝会话时关闭本次 `CameraDevice`/`ImageReader` 后重新打开，避免在失败设备上复用污染状态。
+- 共享单 JPEG 流在静态拍照前停止 repeating、清空旧帧，并以 `onCaptureStarted` 的传感器时间戳标记目标 JPEG；完成或失败后恢复原 preview request。打开超时、迟到 `onOpened`、配置失败和 capture 同步异常走同一释放路径。
+- 该降级不改变相机权限、文件保存、外录或 UI；自动化锁定候选顺序、尺寸来源、重开策略、共享表面和时间戳分流。OPPO PEDM00 / Android 14 仍需真实设备执行连接、监看、拍照、重复连接和前后台恢复。
 
 ## 1. 总体原则
 

@@ -49,7 +49,9 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - 桌面端可实时、连续拖动主导航、拍摄参数、编辑媒体池、工具栏和底部工具区；Windows 的 AI 工具栏也可独立调宽。macOS AI 区移除了重复导航与无关底栏，默认留出更多选项空间。两端均提供默认、拍摄、监看、编辑、紧凑五种预设及“恢复默认布局”。
 - 桌面编辑器把“专业显影 / AI 工具”固定为一级模式，把色轮、曲线、蒙版等归入“调整类别”，不再混用两级入口；底部 RGB 示波器会填满可用宽高，不再缩在角落。
 - 预览与示波器共用同一份受控尺寸图像；Windows 合并高频预览请求、仅在录制时运行时间码刷新，并在切换照片、切换模式、离开编辑页或关闭窗口时清理 AI 临时结果与位图资源，减少重复渲染和后台占用。
-- 本候选尚未切入官网更新。完整测试 503/503 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。Windows 多显示器/DPI、两端真实拖拽、重启恢复与长时间性能仍需真机验收。
+- Android 在 Nikon Z50 拍摄后读取 JPEG 遇到 `DeviceBusy (0x2009)` 时，会在不重复触发快门的前提下进行最长 20 秒的有界退避；本机摄像头若被厂商 Camera2 HAL 拒绝双 JPEG 会话，则自动降级到设备声明支持的低负载或共享单流方案。
+- Android、iOS/iPadOS 与 HarmonyOS 的专业显影和 AI 修图均提供可见的系统照片入口。导入先建立应用工作副本，调整与 AI 结果保存为新的应用副本；导出会创建新的系统相册项目，不覆盖系统原片。AI 默认连接已迁移到账号与设备激活共用的 HTTPS 代理。
+- 本候选尚未切入官网更新。完整测试 513/513 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。相机、系统相册、真实 AI 服务及桌面长时间性能仍需对应平台真机验收。
 
 ### v1.5.10 官网更新
 
@@ -441,7 +443,9 @@ in a local library for review and export.
 - Desktop dividers resize their content live and continuously for the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Windows also has an independent AI-tools divider. The macOS AI area removes duplicate navigation and an unrelated footer to leave more room for its options. Default, Capture, Monitor, Edit, and Compact presets and Restore Default Layout are included.
 - The desktop editor now keeps Pro Develop and AI Tools at the top level while placing Wheels, Curves, Masks, and related controls under Adjustment Groups. The lower RGB scope expands to the full available width and height instead of remaining in a small corner.
 - Preview and scope rendering reuse one bounded image. Windows also coalesces rapid preview requests, runs the timecode refresh only while recording, and clears AI temporary results and editor bitmaps when switching photos or modes, leaving the editor, or closing the window to reduce duplicate work and background resource use.
-- This candidate is not on the official update feed. The full 503-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Real Windows multi-monitor/DPI behavior and hands-on drag, relaunch, and long-session performance checks on both desktop targets remain pending.
+- Android now gives the Nikon Z50 up to 20 seconds of bounded backoff when JPEG download encounters `DeviceBusy (0x2009)` after capture, without firing the shutter again. If a vendor Camera2 HAL rejects the normal dual-JPEG session, the system-camera path falls back to lower-load or shared-stream combinations that the device reports as supported.
+- Pro Develop and AI Retouch on Android, iOS/iPadOS, and HarmonyOS now expose a visible system-photo entry point. Imported images become private working copies; manual and AI edits create new app copies, and export creates a new system photo instead of overwriting the original. The default AI endpoint now uses the HTTPS account-and-device activation proxy.
+- This candidate is not on the official update feed. The full 513-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Camera, system-photo, live AI service, and long-session desktop behavior still require hands-on testing on the corresponding platforms.
 
 ### Official website update in v1.5.10
 
@@ -773,7 +777,9 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - デスクトップ版の区切り線は、メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグ中に連続して再配置します。Windows では AI ツールパネルの幅も個別に調整できます。macOS の AI 領域は重複ナビゲーションと無関係な下部操作列を省き、各項目の表示領域を広げました。デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへの復元も利用できます。
 - デスクトップ編集画面では「プロ現像 / AI ツール」を第1階層に固定し、カラーホイール、カーブ、マスクなどを「調整カテゴリー」にまとめました。下部の RGB スコープは、隅の小さな領域ではなく、利用可能な幅と高さ全体を使います。
 - プレビューとスコープは、サイズを制限した同一画像を再利用します。Windows では高頻度のプレビュー要求をまとめ、録画中だけタイムコードを更新し、写真やモードの切り替え、編集画面からの移動、ウインドウ終了時に AI の一時結果とビットマップを解放して、重複処理とバックグラウンド負荷を抑えます。
-- この候補は公式更新フィードには未配信です。全 503 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ、再起動復元、長時間動作の確認は未完了です。
+- Android では、Nikon Z50 の撮影後に JPEG 読み出しが `DeviceBusy (0x2009)` になった場合、再撮影せず最大 20 秒の範囲で待機と再試行を行います。端末メーカーの Camera2 HAL が通常の 2 系統 JPEG セッションを拒否した場合は、端末が対応を申告している低負荷構成または共有 1 ストリーム構成へ段階的に切り替えます。
+- Android、iOS/iPadOS、HarmonyOS のプロ現像と AI レタッチに、システム写真を選ぶ入口を常時表示します。読み込んだ写真はアプリ内の作業コピーとなり、調整結果と AI 結果は新しいアプリ内コピーとして保存します。書き出し時も新しいシステム写真を作成し、元の写真は上書きしません。AI の既定接続先は、アカウントとデバイス認証を共用する HTTPS プロキシへ移行しました。
+- この候補は公式更新フィードには未配信です。全 513 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。カメラ、システム写真、実 AI サービス、デスクトップの長時間動作は、対応する実機での確認が必要です。
 
 ### v1.5.10 公式サイト更新
 
