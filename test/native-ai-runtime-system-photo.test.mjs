@@ -148,7 +148,7 @@ test("mobile system-photo and AI result states use exact runtime localization pa
     assert.match(androidLocalization, new RegExp(`add\\("${prefix}"`));
   }
 
-  assert.match(ios, /description: RuntimeLocalizedText\(editorSystemPhotoStatus\)/);
+  assert.match(ios, /description: Text\(\s*RuntimeLocalization\.text\(\s*editorSystemPhotoStatus,\s*locale: locale/);
   assert.match(ios, /RuntimeLocalization\.format\(\s*"显示已允许访问的 %lld 张照片"/);
   assert.match(ios, /RuntimeLocalization\.format\(\s*"最近 %lld 张照片"/);
   assert.match(ios, /RuntimeLocalization\.format\(\s*"导入 %@"/);

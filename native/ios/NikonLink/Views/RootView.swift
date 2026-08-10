@@ -2518,7 +2518,12 @@ private struct ImageEditorPage: View {
                     ContentUnavailableView(
                         "没有可导入的系统照片",
                         systemImage: "photo.on.rectangle.angled",
-                        description: RuntimeLocalizedText(editorSystemPhotoStatus)
+                        description: Text(
+                            RuntimeLocalization.text(
+                                editorSystemPhotoStatus,
+                                locale: locale
+                            )
+                        )
                     )
                     .overlay(alignment: .bottom) {
                         if model.library.systemPhotoEditAccessState == .settingsRequired,
