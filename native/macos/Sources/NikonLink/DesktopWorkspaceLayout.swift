@@ -30,15 +30,15 @@ enum DesktopWorkspacePreset: String, CaseIterable, Identifiable {
     ) {
         switch self {
         case .standard:
-            return (104, 330, 220, 320, 260, NSSize(width: 1440, height: 900))
+            return (112, 380, 240, 380, 360, NSSize(width: 1480, height: 940))
         case .capture:
-            return (112, 360, 200, 300, 240, NSSize(width: 1500, height: 940))
+            return (120, 420, 220, 360, 320, NSSize(width: 1540, height: 960))
         case .monitor:
-            return (88, 280, 180, 280, 220, NSSize(width: 1540, height: 920))
+            return (96, 320, 200, 340, 300, NSSize(width: 1580, height: 940))
         case .editor:
-            return (96, 300, 250, 360, 280, NSSize(width: 1600, height: 980))
+            return (104, 360, 280, 440, 480, NSSize(width: 1680, height: 1020))
         case .compact:
-            return (88, 260, 160, 260, 180, NSSize(width: 1120, height: 720))
+            return (88, 260, 160, 280, 240, NSSize(width: 1160, height: 760))
         }
     }
 }
@@ -54,14 +54,21 @@ final class DesktopWorkspaceLayout: ObservableObject {
         static let inspector = "desktop.workspace.inspector.width.v1"
         static let editorMedia = "desktop.workspace.editor.media.width.v1"
         static let editorTools = "desktop.workspace.editor.tools.width.v1"
-        static let editorBottom = "desktop.workspace.editor.bottom.height.v1"
+        // v2 gives the vertically dense AI workspace a useful first-run height
+        // without rewriting the user's other saved panel widths.
+        static let editorBottom = "desktop.workspace.editor.bottom.height.v2"
     }
 
-    static let sidebarRange: ClosedRange<CGFloat> = 88...220
-    static let inspectorRange: ClosedRange<CGFloat> = 260...460
-    static let editorMediaRange: ClosedRange<CGFloat> = 160...360
-    static let editorToolsRange: ClosedRange<CGFloat> = 260...480
-    static let editorBottomRange: ClosedRange<CGFloat> = 160...420
+    static let splitHandleThickness: CGFloat = 12
+    static let minimumCaptureCanvasWidth: CGFloat = 560
+    static let minimumEditorCanvasWidth: CGFloat = 360
+    static let minimumEditorPreviewHeight: CGFloat = 240
+
+    static let sidebarRange: ClosedRange<CGFloat> = 72...360
+    static let inspectorRange: ClosedRange<CGFloat> = 240...720
+    static let editorMediaRange: ClosedRange<CGFloat> = 140...520
+    static let editorToolsRange: ClosedRange<CGFloat> = 280...720
+    static let editorBottomRange: ClosedRange<CGFloat> = 220...720
 
     @Published var sidebarWidth: CGFloat {
         didSet { persist(sidebarWidth, key: Key.sidebar) }
@@ -127,6 +134,66 @@ final class DesktopWorkspaceLayout: ObservableObject {
 
     func reset() {
         apply(.standard)
+    }
+
+    static func inspectorRange(
+        forAvailableWidth availableWidth: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        constrainedRange(
+            inspectorRange,
+            maximum: availableWidth - minimumCaptureCanvasWidth
+                - splitHandleThickness
+        )
+    }
+
+    static func editorToolsRange(
+        forAvailableWidth availableWidth: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        constrainedRange(
+            editorToolsRange,
+            maximum: availableWidth - minimumEditorCanvasWidth
+                - editorMediaRange.lowerBound
+                - splitHandleThickness * 2
+        )
+    }
+
+    static func editorMediaRange(
+        forAvailableWidth availableWidth: CGFloat,
+        toolsWidth: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        constrainedRange(
+            editorMediaRange,
+            maximum: availableWidth - minimumEditorCanvasWidth
+                - toolsWidth
+                - splitHandleThickness * 2
+        )
+    }
+
+    static func editorBottomRange(
+        forAvailableHeight availableHeight: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        constrainedRange(
+            editorBottomRange,
+            maximum: availableHeight - minimumEditorPreviewHeight
+                - splitHandleThickness
+        )
+    }
+
+    static func clamp(
+        _ value: CGFloat,
+        to range: ClosedRange<CGFloat>
+    ) -> CGFloat {
+        min(range.upperBound, max(range.lowerBound, value))
+    }
+
+    private static func constrainedRange(
+        _ preferred: ClosedRange<CGFloat>,
+        maximum: CGFloat
+    ) -> ClosedRange<CGFloat> {
+        preferred.lowerBound...max(
+            preferred.lowerBound,
+            min(preferred.upperBound, maximum)
+        )
     }
 
     private func persist(_ value: CGFloat, key: String) {
@@ -210,17 +277,27 @@ struct WorkspaceSplitHandle: View {
     var reversesHorizontalDirection = false
     @Environment(\.locale) private var locale
     @State private var dragStart: CGFloat?
+    @State private var isHovered = false
+    @State private var isDragging = false
 
     var body: some View {
         Rectangle()
             .fill(Color.clear)
             .frame(
-                width: axis == .vertical ? 9 : nil,
-                height: axis == .horizontal ? 9 : nil
+                width: axis == .vertical
+                    ? DesktopWorkspaceLayout.splitHandleThickness
+                    : nil,
+                height: axis == .horizontal
+                    ? DesktopWorkspaceLayout.splitHandleThickness
+                    : nil
             )
             .overlay {
                 Rectangle()
-                    .fill(Palette.rule)
+                    .fill(
+                        isHovered || isDragging
+                            ? Palette.editorAccent
+                            : Palette.rule
+                    )
                     .frame(
                         width: axis == .vertical ? 1 : nil,
                         height: axis == .horizontal ? 1 : nil
@@ -231,6 +308,7 @@ struct WorkspaceSplitHandle: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
                         if dragStart == nil { dragStart = value }
+                        isDragging = true
                         var delta = axis == .vertical
                             ? gesture.translation.width
                             : -gesture.translation.height
@@ -238,10 +316,30 @@ struct WorkspaceSplitHandle: View {
                             delta = -delta
                         }
                         let candidate = (dragStart ?? value) + delta
-                        value = min(range.upperBound, max(range.lowerBound, candidate))
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            value = min(
+                                range.upperBound,
+                                max(range.lowerBound, candidate)
+                            )
+                        }
                     }
-                    .onEnded { _ in dragStart = nil }
+                    .onEnded { _ in
+                        dragStart = nil
+                        isDragging = false
+                    }
             )
+            .onHover { hovering in
+                isHovered = hovering
+                if hovering {
+                    (axis == .vertical
+                        ? NSCursor.resizeLeftRight
+                        : NSCursor.resizeUpDown).set()
+                } else {
+                    NSCursor.arrow.set()
+                }
+            }
             .focusable()
             .onMoveCommand { direction in
                 let step: CGFloat = 8

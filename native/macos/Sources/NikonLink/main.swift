@@ -6477,56 +6477,68 @@ private struct CaptureView: View {
     @Binding var showSettings: Bool
 
     var body: some View {
-        HStack(spacing: SpaceToken.s0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: SpaceToken.s20) {
-                        ControlPageHeader(
-                            model: model,
-                            showConnection: $showConnection,
-                            showSettings: $showSettings
-                        )
-                        // v1.5.9 实测修复：fig1 批次删掉拍照页 PreviewStage 后监看
-                        // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
-                        // 监看画面为拍照页第一内容区：功能顶栏之后、状态行之前。
-                        CaptureCompactPreview(model: model)
-                        MacLiveMonitoringToggle(model: model)
-                        ControlStatusRow(model: model) { showConnection = true }
-                        ControlStatusCardGrid(model: model)
-                        ControlParameterGrid(model: model)
-                        ControlCaptureDock(
-                            model: model,
-                            openConnection: { showConnection = true }
-                        ) {
-                            withAnimation {
-                                proxy.scrollTo(
-                                    "captureShootingTasks",
-                                    anchor: .top
-                                )
-                            }
-                        }
-                        NikonCloudMacMonitorPicker(
-                            model: model,
-                            darkAppearance: true
-                        )
-                        CaptureSessionPanel(workflow: model.captureWorkflow)
-                        ShootingTaskPanel(model: model)
-                            .id("captureShootingTasks")
-                    }
-                    .padding(SpaceToken.s24)
-                }
-            }
-            .frame(minWidth: 560)
-            .background(Palette.uiBackground)
-            WorkspaceSplitHandle(
-                axis: .vertical,
-                label: "调整拍摄参数面板宽度",
-                value: $desktopLayout.inspectorWidth,
-                range: DesktopWorkspaceLayout.inspectorRange,
-                reversesHorizontalDirection: true
+        GeometryReader { geometry in
+            let inspectorRange = DesktopWorkspaceLayout.inspectorRange(
+                forAvailableWidth: geometry.size.width
             )
-            ParameterInspector(model: model)
-                .frame(width: desktopLayout.inspectorWidth)
+            let inspectorWidth = DesktopWorkspaceLayout.clamp(
+                desktopLayout.inspectorWidth,
+                to: inspectorRange
+            )
+            HStack(spacing: SpaceToken.s0) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: SpaceToken.s20) {
+                            ControlPageHeader(
+                                model: model,
+                                showConnection: $showConnection,
+                                showSettings: $showSettings
+                            )
+                            // v1.5.9 实测修复：fig1 批次删掉拍照页 PreviewStage 后监看
+                            // 画面消失，恢复紧凑预览区（帧渲染逻辑与 MonitorView 共享）。
+                            // 监看画面为拍照页第一内容区：功能顶栏之后、状态行之前。
+                            CaptureCompactPreview(model: model)
+                            MacLiveMonitoringToggle(model: model)
+                            ControlStatusRow(model: model) { showConnection = true }
+                            ControlStatusCardGrid(model: model)
+                            ControlParameterGrid(model: model)
+                            ControlCaptureDock(
+                                model: model,
+                                openConnection: { showConnection = true }
+                            ) {
+                                withAnimation {
+                                    proxy.scrollTo(
+                                        "captureShootingTasks",
+                                        anchor: .top
+                                    )
+                                }
+                            }
+                            NikonCloudMacMonitorPicker(
+                                model: model,
+                                darkAppearance: true
+                            )
+                            CaptureSessionPanel(workflow: model.captureWorkflow)
+                            ShootingTaskPanel(model: model)
+                                .id("captureShootingTasks")
+                        }
+                        .padding(SpaceToken.s24)
+                    }
+                }
+                .frame(minWidth: DesktopWorkspaceLayout.minimumCaptureCanvasWidth)
+                .background(Palette.uiBackground)
+                WorkspaceSplitHandle(
+                    axis: .vertical,
+                    label: "调整拍摄参数面板宽度",
+                    value: Binding(
+                        get: { inspectorWidth },
+                        set: { desktopLayout.inspectorWidth = $0 }
+                    ),
+                    range: inspectorRange,
+                    reversesHorizontalDirection: true
+                )
+                ParameterInspector(model: model)
+                    .frame(width: inspectorWidth)
+            }
         }
         // fig1 控制面恒为深色；强制深色让保留的旧面板在同一页内观感一致。
         .preferredColorScheme(.dark)
@@ -10123,23 +10135,49 @@ private struct ResolveEditorWorkbench<
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            media.frame(width: desktopLayout.editorMediaWidth)
-            WorkspaceSplitHandle(
-                axis: .vertical,
-                label: "调整编辑媒体池宽度",
-                value: $desktopLayout.editorMediaWidth,
-                range: DesktopWorkspaceLayout.editorMediaRange
+        GeometryReader { geometry in
+            let toolsRange = DesktopWorkspaceLayout.editorToolsRange(
+                forAvailableWidth: geometry.size.width
             )
-            canvasArea.frame(maxWidth: .infinity)
-            WorkspaceSplitHandle(
-                axis: .vertical,
-                label: "调整编辑工具面板宽度",
-                value: $desktopLayout.editorToolsWidth,
-                range: DesktopWorkspaceLayout.editorToolsRange,
-                reversesHorizontalDirection: true
+            let toolsWidth = DesktopWorkspaceLayout.clamp(
+                desktopLayout.editorToolsWidth,
+                to: toolsRange
             )
-            tools.frame(width: desktopLayout.editorToolsWidth)
+            let mediaRange = DesktopWorkspaceLayout.editorMediaRange(
+                forAvailableWidth: geometry.size.width,
+                toolsWidth: toolsWidth
+            )
+            let mediaWidth = DesktopWorkspaceLayout.clamp(
+                desktopLayout.editorMediaWidth,
+                to: mediaRange
+            )
+            HStack(spacing: 0) {
+                media.frame(width: mediaWidth)
+                WorkspaceSplitHandle(
+                    axis: .vertical,
+                    label: "调整编辑媒体池宽度",
+                    value: Binding(
+                        get: { mediaWidth },
+                        set: { desktopLayout.editorMediaWidth = $0 }
+                    ),
+                    range: mediaRange
+                )
+                canvasArea.frame(
+                    minWidth: DesktopWorkspaceLayout.minimumEditorCanvasWidth,
+                    maxWidth: .infinity
+                )
+                WorkspaceSplitHandle(
+                    axis: .vertical,
+                    label: "调整编辑工具面板宽度",
+                    value: Binding(
+                        get: { toolsWidth },
+                        set: { desktopLayout.editorToolsWidth = $0 }
+                    ),
+                    range: toolsRange,
+                    reversesHorizontalDirection: true
+                )
+                tools.frame(width: toolsWidth)
+            }
         }
         .padding(1)
         .background(Palette.editorRule)
@@ -10465,6 +10503,19 @@ private struct ImageEditorView: View {
                 nikonCloudPreviewNotice
             }
             GeometryReader { geometry in
+                let bottomRange = DesktopWorkspaceLayout.editorBottomRange(
+                    forAvailableHeight: geometry.size.height
+                )
+                let bottomHeight = DesktopWorkspaceLayout.clamp(
+                    desktopLayout.editorBottomHeight,
+                    to: bottomRange
+                )
+                let bottomToolsWidth = DesktopWorkspaceLayout.clamp(
+                    desktopLayout.editorToolsWidth,
+                    to: DesktopWorkspaceLayout.editorToolsRange(
+                        forAvailableWidth: geometry.size.width
+                    )
+                )
                 VStack(spacing: 1) {
                     ResolveEditorWorkbench(desktopLayout: desktopLayout) {
                         EditorMediaRail {
@@ -10495,8 +10546,11 @@ private struct ImageEditorView: View {
                     WorkspaceSplitHandle(
                         axis: .horizontal,
                         label: "调整编辑底部工具区高度",
-                        value: $desktopLayout.editorBottomHeight,
-                        range: DesktopWorkspaceLayout.editorBottomRange
+                        value: Binding(
+                            get: { bottomHeight },
+                            set: { desktopLayout.editorBottomHeight = $0 }
+                        ),
+                        range: bottomRange
                     )
                     HStack(spacing: 1) {
                         EditorToolRail {
@@ -10507,9 +10561,9 @@ private struct ImageEditorView: View {
                             hasSource: selectedPhoto != nil,
                             metrics: editorScopeMetrics
                         )
-                        .frame(width: desktopLayout.editorToolsWidth)
+                        .frame(width: bottomToolsWidth)
                     }
-                    .frame(height: desktopLayout.editorBottomHeight)
+                    .frame(height: bottomHeight)
                 }
                 .background(Palette.editorRule)
                 .frame(
@@ -10596,11 +10650,6 @@ private struct ImageEditorView: View {
 
     private var aiToolsPanel: some View {
         VStack(alignment: .leading, spacing: SpaceToken.s0) {
-            sectionSelector
-                .padding(.horizontal, SpaceToken.s16)
-                .padding(.top, SpaceToken.s16)
-                .padding(.bottom, SpaceToken.s12)
-            Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: SpaceToken.s16) {
                     HStack(alignment: .center, spacing: SpaceToken.s8) {
@@ -11052,12 +11101,12 @@ private struct ImageEditorView: View {
                         .padding(.horizontal, SpaceToken.s12)
                         .padding(.bottom, SpaceToken.s8)
                 }
+                Rectangle()
+                    .fill(Palette.editorRule)
+                    .frame(height: 1)
+                editorStatusRow
+                editorActionRow
             }
-            Rectangle()
-                .fill(Palette.editorRule)
-                .frame(height: 1)
-            editorStatusRow
-            editorActionRow
         }
     }
 

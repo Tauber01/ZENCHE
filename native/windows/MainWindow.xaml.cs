@@ -45,14 +45,15 @@ public partial class MainWindow : Window
         public int SchemaVersion { get; set; } = 1;
         public double Left { get; set; } = double.NaN;
         public double Top { get; set; } = double.NaN;
-        public double Width { get; set; } = 1280;
-        public double Height { get; set; } = 820;
+        public double Width { get; set; } = 1440;
+        public double Height { get; set; } = 900;
         public bool Maximized { get; set; }
         public double SidebarWidth { get; set; } = 176;
-        public double ParameterWidth { get; set; } = 300;
-        public double EditorMediaWidth { get; set; } = 220;
-        public double EditorToolsWidth { get; set; } = 320;
-        public double EditorBottomHeight { get; set; } = 260;
+        public double ParameterWidth { get; set; } = 380;
+        public double EditorMediaWidth { get; set; } = 240;
+        public double EditorToolsWidth { get; set; } = 380;
+        public double EditorBottomHeight { get; set; } = 360;
+        public double EditorAiToolsWidth { get; set; } = 440;
     }
 
     private sealed class LibraryBranch
@@ -1456,23 +1457,29 @@ public partial class MainWindow : Window
 
     private void ApplyResponsiveEditorLayout()
     {
-        if (EditorMediaColumn is null || EditorToolsColumn is null)
+        if (EditorMediaColumn is null ||
+            EditorToolsColumn is null ||
+            EditorAiToolsColumn is null)
         {
             return;
         }
         var compact = ActualWidth > 0 && ActualWidth < 1120;
-        EditorMediaColumn.MinWidth = compact ? 0 : 160;
+        EditorMediaColumn.MinWidth = compact ? 0 : 140;
         EditorMediaColumn.Width = compact
             ? new GridLength(0)
             : new GridLength(Math.Clamp(
-                _workspaceLayout.EditorMediaWidth, 160, 360));
+                _workspaceLayout.EditorMediaWidth, 140, 520));
         EditorMediaRail.Visibility = compact
             ? Visibility.Collapsed
             : Visibility.Visible;
         EditorToolsColumn.Width = new GridLength(
             compact
-                ? 260
-                : Math.Clamp(_workspaceLayout.EditorToolsWidth, 260, 480));
+                ? 300
+                : Math.Clamp(_workspaceLayout.EditorToolsWidth, 280, 720));
+        EditorAiToolsColumn.Width = new GridLength(
+            compact
+                ? 340
+                : Math.Clamp(_workspaceLayout.EditorAiToolsWidth, 340, 720));
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -5260,20 +5267,30 @@ public partial class MainWindow : Window
 
     private void ApplyWorkspacePreset(string preset)
     {
-        var values = preset switch
+        (
+            double sidebar,
+            double parameter,
+            double editorMedia,
+            double editorTools,
+            double editorBottom,
+            double editorAiTools,
+            double windowWidth,
+            double windowHeight
+        ) values = preset switch
         {
-            "capture" => (112d, 360d, 200d, 300d, 240d, 1500d, 940d),
-            "monitor" => (96d, 280d, 180d, 280d, 220d, 1540d, 920d),
-            "editor" => (104d, 300d, 250d, 360d, 280d, 1600d, 980d),
-            "compact" => (96d, 260d, 160d, 260d, 180d, 1120d, 720d),
-            _ => (176d, 300d, 220d, 320d, 260d, 1280d, 820d)
+            "capture" => (120d, 420d, 220d, 360d, 320d, 400d, 1540d, 960d),
+            "monitor" => (96d, 320d, 200d, 340d, 300d, 380d, 1580d, 940d),
+            "editor" => (104d, 360d, 280d, 440d, 480d, 520d, 1680d, 1020d),
+            "compact" => (88d, 260d, 140d, 300d, 240d, 340d, 1160d, 760d),
+            _ => (176d, 380d, 240d, 380d, 360d, 440d, 1440d, 900d)
         };
-        _workspaceLayout.SidebarWidth = values.Item1;
-        _workspaceLayout.ParameterWidth = values.Item2;
-        _workspaceLayout.EditorMediaWidth = values.Item3;
-        _workspaceLayout.EditorToolsWidth = values.Item4;
-        _workspaceLayout.EditorBottomHeight = values.Item5;
-        ResizeWindowInsideVisibleArea(values.Item6, values.Item7);
+        _workspaceLayout.SidebarWidth = values.sidebar;
+        _workspaceLayout.ParameterWidth = values.parameter;
+        _workspaceLayout.EditorMediaWidth = values.editorMedia;
+        _workspaceLayout.EditorToolsWidth = values.editorTools;
+        _workspaceLayout.EditorBottomHeight = values.editorBottom;
+        _workspaceLayout.EditorAiToolsWidth = values.editorAiTools;
+        ResizeWindowInsideVisibleArea(values.windowWidth, values.windowHeight);
         ApplyWorkspacePanelSizes();
         SaveWorkspaceLayout(capturePanelSizes: false);
     }
@@ -5307,35 +5324,41 @@ public partial class MainWindow : Window
     private void ApplyWorkspacePanelSizes()
     {
         SidebarColumn.Width = new GridLength(Math.Clamp(
-            _workspaceLayout.SidebarWidth, 96, 280));
+            _workspaceLayout.SidebarWidth, 72, 360));
         EditorBottomRow.Height = new GridLength(Math.Clamp(
-            _workspaceLayout.EditorBottomHeight, 160, 420));
+            _workspaceLayout.EditorBottomHeight, 220, 680));
         ApplyResponsiveEditorLayout();
         if (ParameterPanelShell.Visibility == Visibility.Visible)
         {
             ParameterColumn.Width = new GridLength(Math.Clamp(
-                _workspaceLayout.ParameterWidth, 260, 480));
+                _workspaceLayout.ParameterWidth, 240, 720));
         }
     }
 
     private void CaptureWorkspacePanelSizes()
     {
         _workspaceLayout.SidebarWidth = Math.Clamp(
-            SidebarColumn.ActualWidth, 96, 280);
+            SidebarColumn.ActualWidth, 72, 360);
         if (ParameterPanelShell.Visibility == Visibility.Visible)
         {
             _workspaceLayout.ParameterWidth = Math.Clamp(
-                ParameterColumn.ActualWidth, 260, 480);
+                ParameterColumn.ActualWidth, 240, 720);
         }
         if (EditorMediaRail.Visibility == Visibility.Visible)
         {
             _workspaceLayout.EditorMediaWidth = Math.Clamp(
-                EditorMediaColumn.ActualWidth, 160, 360);
+                EditorMediaColumn.ActualWidth, 140, 520);
         }
         _workspaceLayout.EditorToolsWidth = Math.Clamp(
-            EditorToolsColumn.ActualWidth, 260, 480);
+            EditorToolsColumn.ActualWidth, 280, 720);
         _workspaceLayout.EditorBottomHeight = Math.Clamp(
-            EditorBottomRow.ActualHeight, 160, 420);
+            EditorBottomRow.ActualHeight, 220, 680);
+        if (EditorAiGrid.Visibility == Visibility.Visible &&
+            EditorAiToolsColumn.ActualWidth > 0)
+        {
+            _workspaceLayout.EditorAiToolsWidth = Math.Clamp(
+                EditorAiToolsColumn.ActualWidth, 340, 720);
+        }
     }
 
     private void ResizeWindowInsideVisibleArea(double requestedWidth, double requestedHeight)
@@ -5467,11 +5490,11 @@ public partial class MainWindow : Window
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
         ParameterSplitter.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
-        ParameterColumn.MinWidth = cameraWorkspace ? 260 : 0;
+        ParameterColumn.MinWidth = cameraWorkspace ? 240 : 0;
         ParameterColumn.Width =
             cameraWorkspace
                 ? new GridLength(Math.Clamp(
-                    _workspaceLayout.ParameterWidth, 260, 480))
+                    _workspaceLayout.ParameterWidth, 240, 720))
                 : new GridLength(0);
         // v1.5.7 issue 655a0a14: 视频页右侧参数面板强制恒深白字，拍照页仍随主题
         ApplyParameterPanelMonitorTheme(destination == "monitor");
@@ -8839,6 +8862,11 @@ public partial class MainWindow : Window
         foreach (var module in modules)
         {
             AiPresetPanel.Children.Add(new TextBlock { Text = AppLocalization.T(module.Category), Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(0, 4, 0, 2) });
+            var choices = new WrapPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
             foreach (var value in module.Values)
             {
                 var key = $"{module.Category}:{value}";
@@ -8851,8 +8879,9 @@ public partial class MainWindow : Window
                     if (!selected) _aiSelectedPresets.Add(key);
                     AiPromptBox.Text = ComposeAiPrompt();
                 };
-                AiPresetPanel.Children.Add(button);
+                choices.Children.Add(button);
             }
+            AiPresetPanel.Children.Add(choices);
         }
     }
 

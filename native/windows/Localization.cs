@@ -127,6 +127,9 @@ internal static class AppLocalization
             ["调整编辑底部工具区高度"] = new(
                 "Resize lower editor tools",
                 "編集画面下部のツール領域の高さを調整"),
+            ["调整 AI 工具面板宽度"] = new(
+                "Resize AI tools panel",
+                "AIツールパネルの幅を調整"),
             ["账号"] = new("Account", "アカウント"),
             ["登录"] = new("Sign In", "ログイン"),
             ["注册"] = new("Create Account", "新規登録"),

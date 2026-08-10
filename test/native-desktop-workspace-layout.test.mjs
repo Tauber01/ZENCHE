@@ -34,6 +34,9 @@ test('macOS 工作区分隔条支持持久化、键盘调整、预设与重置',
     assert.match(main, new RegExp(`desktopLayout\\.${key}`));
   }
   assert.match(layout, /DragGesture\(minimumDistance: 0\)/);
+  assert.match(layout, /transaction\.disablesAnimations = true/);
+  assert.match(layout, /NSCursor\.resizeLeftRight/);
+  assert.match(layout, /NSCursor\.resizeUpDown/);
   assert.match(layout, /reversesHorizontalDirection/);
   assert.ok(
     (main.match(/reversesHorizontalDirection: true/g) ?? []).length >= 2,
@@ -42,8 +45,32 @@ test('macOS 工作区分隔条支持持久化、键盘调整、预设与重置',
   assert.match(layout, /\.onMoveCommand/);
   assert.match(layout, /RuntimeLocalization\.text\(label, locale: locale\)/);
   assert.match(layout, /拖动或使用方向键调整/);
+  assert.match(layout, /editor\.bottom\.height\.v2/);
+  assert.match(layout, /editorBottomRange\([\s\S]*forAvailableHeight/);
+  assert.match(layout, /editorToolsRange\([\s\S]*forAvailableWidth/);
+  assert.match(main, /minimumCaptureCanvasWidth/);
+  assert.match(main, /minimumEditorCanvasWidth/);
   assert.match(settings, /ForEach\(DesktopWorkspacePreset\.allCases\)/);
   assert.match(settings, /desktopLayout\.reset\(\)/);
+});
+
+test('macOS AI 工具区去除重复导航与重复底栏，默认保留可操作空间', async () => {
+  const [layout, main] = await Promise.all([
+    read('native/macos/Sources/NikonLink/DesktopWorkspaceLayout.swift'),
+    read('native/macos/Sources/NikonLink/main.swift')
+  ]);
+  const aiPanel = main.slice(
+    main.indexOf('private var aiToolsPanel'),
+    main.indexOf('private var aiModules')
+  );
+  const colorPanel = main.slice(
+    main.indexOf('private var editorColorPanel'),
+    main.indexOf('private var editorToolStrip')
+  );
+  assert.doesNotMatch(aiPanel, /sectionSelector/);
+  assert.match(colorPanel, /if selectedSection == \.aiTools \{[\s\S]*aiToolsPanel[\s\S]*\} else \{[\s\S]*editorStatusRow[\s\S]*editorActionRow/);
+  assert.match(layout, /return \(104, 360, 280, 440, 480,/);
+  assert.match(layout, /editorBottomRange: ClosedRange<CGFloat> = 220\.\.\.720/);
 });
 
 test('Windows 保存 RestoreBounds 与最大化状态，并夹紧到虚拟桌面', async () => {
@@ -63,18 +90,24 @@ test('Windows 原生 GridSplitter 可调主导航、拍摄参数与编辑区', a
     read('native/windows/MainWindow.xaml.cs'),
     read('native/windows/Localization.cs')
   ]);
-  assert.ok((xaml.match(/<GridSplitter/g) ?? []).length >= 5);
+  assert.ok((xaml.match(/<GridSplitter/g) ?? []).length >= 6);
   assert.ok(
-    (xaml.match(/ResizeBehavior="CurrentAndNext"/g) ?? []).length >= 5,
+    (xaml.match(/ResizeBehavior="CurrentAndNext"/g) ?? []).length >= 6,
     '覆盖在当前栏边缘的分隔条必须调整当前栏与下一栏'
   );
+  assert.ok(
+    (xaml.match(/ShowsPreview="False"/g) ?? []).length >= 6,
+    '桌面分隔条拖动时必须实时连续重排内容'
+  );
+  assert.doesNotMatch(xaml, /ShowsPreview="True"/);
   assert.doesNotMatch(xaml, /ResizeBehavior="PreviousAndNext"/);
   for (const label of [
     '调整主导航宽度',
     '调整拍摄参数面板宽度',
     '调整编辑媒体池宽度',
     '调整编辑工具面板宽度',
-    '调整编辑底部工具区高度'
+    '调整编辑底部工具区高度',
+    '调整 AI 工具面板宽度'
   ]) {
     assert.match(xaml, new RegExp(`AutomationProperties\\.Name="${label}"`));
     assert.match(localization, new RegExp(`\\["${label}"\\]`));
@@ -85,7 +118,13 @@ test('Windows 原生 GridSplitter 可调主导航、拍摄参数与编辑区', a
   assert.match(code, /SaveWorkspaceLayout\(capturePanelSizes: false\)/);
   assert.match(code, /if \(capturePanelSizes\)/);
   assert.match(code, /ResetWorkspaceLayout_Click/);
-  assert.match(code, /ParameterColumn\.MinWidth = cameraWorkspace \? 260 : 0/);
+  assert.match(code, /ParameterColumn\.MinWidth = cameraWorkspace \? 240 : 0/);
+  assert.match(code, /EditorAiToolsWidth/);
+  assert.match(code, /EditorAiToolsColumn\.ActualWidth/);
+  assert.match(xaml, /x:Name="EditorAiToolsColumn"[\s\S]{0,180}MaxWidth="720"/);
+  assert.match(xaml, /<UniformGrid Margin="0,8,0,10" Columns="2">/);
+  assert.match(xaml, /<StackPanel x:Name="AiPresetPanel"/);
+  assert.match(code, /var choices = new WrapPanel/);
   assert.doesNotMatch(
     code,
     /ParameterColumn\.Width\s*=\s*cameraWorkspace\s*\?\s*new GridLength\(320\)/
