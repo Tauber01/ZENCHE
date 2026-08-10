@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.5.11] - 2026-08-10
+
+### Added
+
+- Added persistent desktop workspaces on macOS and Windows. Both restore the
+  main-window size and position; Windows also restores the maximized state.
+  Saved off-screen frames are corrected after display changes.
+- Added draggable, keyboard-accessible splitters for the main navigation,
+  capture controls, editor media pool, editor tool panel, and lower editor area.
+- Added Default, Capture, Monitor, Edit, and Compact workspace presets, plus a
+  one-click Restore Default Layout action.
+
+### Fixed
+
+- Clarified the sign-in mode choices across all five native clients as
+  Existing Account and Create Account, separating them from the actual submit
+  button after production logs confirmed the reported click sent no login
+  request.
+- Kept the Apple submit action label visible beside its progress indicator so
+  an in-flight sign-in no longer looks unresponsive.
+
+### Known limitations
+
+- Arbitrary floating panels and cross-display panel docking are not included in
+  this first workspace release.
+- Windows multi-monitor restore and 125%/150%/200% DPI behavior still require
+  validation on a real Windows host. Packages remain unsigned or development
+  signed according to their existing platform-specific status.
+
 ## [1.5.10] - 2026-08-09
 
 ### Added

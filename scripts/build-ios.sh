@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_ROOT=${0:A:h:h}
-VERSION=1.5.10
+VERSION=1.5.11
 MODE=${1:---unsigned}
 IOS_ROOT="$PROJECT_ROOT/native/ios"
 BUILD_ROOT="$PROJECT_ROOT/build/ios"

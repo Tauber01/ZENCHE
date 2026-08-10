@@ -40,6 +40,21 @@ public partial class MainWindow : Window
         public DateTime LastConnectedAt { get; set; } = DateTime.Now;
     }
 
+    private sealed class WorkspaceLayoutState
+    {
+        public int SchemaVersion { get; set; } = 1;
+        public double Left { get; set; } = double.NaN;
+        public double Top { get; set; } = double.NaN;
+        public double Width { get; set; } = 1280;
+        public double Height { get; set; } = 820;
+        public bool Maximized { get; set; }
+        public double SidebarWidth { get; set; } = 176;
+        public double ParameterWidth { get; set; } = 300;
+        public double EditorMediaWidth { get; set; } = 220;
+        public double EditorToolsWidth { get; set; } = 320;
+        public double EditorBottomHeight { get; set; } = 260;
+    }
+
     private sealed class LibraryBranch
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -702,6 +717,10 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
         "live-photo-seconds.txt");
+    private static readonly string WorkspaceLayoutStatePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "NikonLink",
+        "desktop-workspace-layout-v1.json");
     private const string LibraryDragFormat = "ZENCHE.LibraryFilePath";
     private const string AfdianUrl = "https://www.ifdian.net/a/Tauber";
     private const string ZencheWebsiteUrl = "https://zenche.top";
@@ -721,6 +740,7 @@ public partial class MainWindow : Window
     private readonly DiagnosticLogger _diagnostics = DiagnosticLogger.Shared;
     private readonly UpdateService _updateService = new();
     private readonly AuthService _authService = new();
+    private WorkspaceLayoutState _workspaceLayout = LoadWorkspaceLayout();
     private readonly List<LibraryBranch> _libraryBranches;
     private readonly Dictionary<string, string> _libraryFileAssignments;
     private readonly List<RememberedCameraDevice> _rememberedDevices;
@@ -1441,17 +1461,23 @@ public partial class MainWindow : Window
             return;
         }
         var compact = ActualWidth > 0 && ActualWidth < 1120;
+        EditorMediaColumn.MinWidth = compact ? 0 : 160;
         EditorMediaColumn.Width = compact
             ? new GridLength(0)
-            : new GridLength(220);
+            : new GridLength(Math.Clamp(
+                _workspaceLayout.EditorMediaWidth, 160, 360));
         EditorMediaRail.Visibility = compact
             ? Visibility.Collapsed
             : Visibility.Visible;
-        EditorToolsColumn.Width = new GridLength(compact ? 280 : 320);
+        EditorToolsColumn.Width = new GridLength(
+            compact
+                ? 260
+                : Math.Clamp(_workspaceLayout.EditorToolsWidth, 260, 480));
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        ApplyWorkspaceLayout();
 #if NIKONLINK_WINDOWS_SHARE
         try
         {
@@ -1555,8 +1581,8 @@ public partial class MainWindow : Window
 
     private void UpdateAuthLocalizedText()
     {
-        AuthLoginModeButton.Content = AppLocalization.T("登录");
-        AuthRegisterModeButton.Content = AppLocalization.T("注册");
+        AuthLoginModeButton.Content = AppLocalization.T("已有账号");
+        AuthRegisterModeButton.Content = AppLocalization.T("创建账号");
         AuthSubmitButton.Content = AppLocalization.T(
             _authBusy
                 ? _authRegisterMode ? "正在注册…" : "正在登录…"
@@ -5214,6 +5240,173 @@ public partial class MainWindow : Window
         ShowDestination(null, "settings");
     }
 
+    private void WorkspacePreset_Click(object sender, RoutedEventArgs e)
+    {
+        var preset = sender is Button button
+            ? Convert.ToString(button.Tag) ?? "standard"
+            : "standard";
+        ApplyWorkspacePreset(preset);
+    }
+
+    private void ResetWorkspaceLayout_Click(object sender, RoutedEventArgs e) =>
+        ApplyWorkspacePreset("standard");
+
+    private void WorkspaceSplitter_DragCompleted(
+        object sender,
+        DragCompletedEventArgs e)
+    {
+        SaveWorkspaceLayout();
+    }
+
+    private void ApplyWorkspacePreset(string preset)
+    {
+        var values = preset switch
+        {
+            "capture" => (112d, 360d, 200d, 300d, 240d, 1500d, 940d),
+            "monitor" => (96d, 280d, 180d, 280d, 220d, 1540d, 920d),
+            "editor" => (104d, 300d, 250d, 360d, 280d, 1600d, 980d),
+            "compact" => (96d, 260d, 160d, 260d, 180d, 1120d, 720d),
+            _ => (176d, 300d, 220d, 320d, 260d, 1280d, 820d)
+        };
+        _workspaceLayout.SidebarWidth = values.Item1;
+        _workspaceLayout.ParameterWidth = values.Item2;
+        _workspaceLayout.EditorMediaWidth = values.Item3;
+        _workspaceLayout.EditorToolsWidth = values.Item4;
+        _workspaceLayout.EditorBottomHeight = values.Item5;
+        ResizeWindowInsideVisibleArea(values.Item6, values.Item7);
+        ApplyWorkspacePanelSizes();
+        SaveWorkspaceLayout(capturePanelSizes: false);
+    }
+
+    private void ApplyWorkspaceLayout()
+    {
+        var workArea = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        var width = Math.Clamp(_workspaceLayout.Width, MinWidth, workArea.Width);
+        var height = Math.Clamp(_workspaceLayout.Height, MinHeight, workArea.Height);
+        var left = double.IsFinite(_workspaceLayout.Left)
+            ? _workspaceLayout.Left
+            : workArea.Left + (workArea.Width - width) / 2;
+        var top = double.IsFinite(_workspaceLayout.Top)
+            ? _workspaceLayout.Top
+            : workArea.Top + (workArea.Height - height) / 2;
+        Left = Math.Clamp(left, workArea.Left, workArea.Right - width);
+        Top = Math.Clamp(top, workArea.Top, workArea.Bottom - height);
+        Width = width;
+        Height = height;
+        ApplyWorkspacePanelSizes();
+        if (_workspaceLayout.Maximized)
+        {
+            WindowState = WindowState.Maximized;
+        }
+    }
+
+    private void ApplyWorkspacePanelSizes()
+    {
+        SidebarColumn.Width = new GridLength(Math.Clamp(
+            _workspaceLayout.SidebarWidth, 96, 280));
+        EditorBottomRow.Height = new GridLength(Math.Clamp(
+            _workspaceLayout.EditorBottomHeight, 160, 420));
+        ApplyResponsiveEditorLayout();
+        if (ParameterPanelShell.Visibility == Visibility.Visible)
+        {
+            ParameterColumn.Width = new GridLength(Math.Clamp(
+                _workspaceLayout.ParameterWidth, 260, 480));
+        }
+    }
+
+    private void CaptureWorkspacePanelSizes()
+    {
+        _workspaceLayout.SidebarWidth = Math.Clamp(
+            SidebarColumn.ActualWidth, 96, 280);
+        if (ParameterPanelShell.Visibility == Visibility.Visible)
+        {
+            _workspaceLayout.ParameterWidth = Math.Clamp(
+                ParameterColumn.ActualWidth, 260, 480);
+        }
+        if (EditorMediaRail.Visibility == Visibility.Visible)
+        {
+            _workspaceLayout.EditorMediaWidth = Math.Clamp(
+                EditorMediaColumn.ActualWidth, 160, 360);
+        }
+        _workspaceLayout.EditorToolsWidth = Math.Clamp(
+            EditorToolsColumn.ActualWidth, 260, 480);
+        _workspaceLayout.EditorBottomHeight = Math.Clamp(
+            EditorBottomRow.ActualHeight, 160, 420);
+    }
+
+    private void ResizeWindowInsideVisibleArea(double requestedWidth, double requestedHeight)
+    {
+        if (WindowState != WindowState.Normal)
+        {
+            WindowState = WindowState.Normal;
+        }
+        var workArea = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+        Width = Math.Clamp(requestedWidth, MinWidth, workArea.Width);
+        Height = Math.Clamp(requestedHeight, MinHeight, workArea.Height);
+        Left = workArea.Left + (workArea.Width - Width) / 2;
+        Top = workArea.Top + (workArea.Height - Height) / 2;
+    }
+
+    private static WorkspaceLayoutState LoadWorkspaceLayout()
+    {
+        try
+        {
+            if (!File.Exists(WorkspaceLayoutStatePath))
+            {
+                return new WorkspaceLayoutState();
+            }
+            var loaded = JsonSerializer.Deserialize<WorkspaceLayoutState>(
+                File.ReadAllText(WorkspaceLayoutStatePath));
+            return loaded is { SchemaVersion: 1 }
+                ? loaded
+                : new WorkspaceLayoutState();
+        }
+        catch
+        {
+            return new WorkspaceLayoutState();
+        }
+    }
+
+    private void SaveWorkspaceLayout(bool capturePanelSizes = true)
+    {
+        try
+        {
+            if (capturePanelSizes)
+            {
+                CaptureWorkspacePanelSizes();
+            }
+            var bounds = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, ActualWidth, ActualHeight)
+                : RestoreBounds;
+            if (bounds.Width >= MinWidth && bounds.Height >= MinHeight)
+            {
+                _workspaceLayout.Left = bounds.Left;
+                _workspaceLayout.Top = bounds.Top;
+                _workspaceLayout.Width = bounds.Width;
+                _workspaceLayout.Height = bounds.Height;
+            }
+            _workspaceLayout.Maximized = WindowState == WindowState.Maximized;
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(WorkspaceLayoutStatePath)!);
+            File.WriteAllText(
+                WorkspaceLayoutStatePath,
+                JsonSerializer.Serialize(_workspaceLayout));
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "workspace", $"保存桌面工作区布局失败：{error.Message}");
+        }
+    }
+
     private void LanguageBox_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
@@ -5272,8 +5465,14 @@ public partial class MainWindow : Window
         var cameraWorkspace = destination is "capture" or "monitor";
         ParameterPanelShell.Visibility =
             cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
+        ParameterSplitter.Visibility =
+            cameraWorkspace ? Visibility.Visible : Visibility.Collapsed;
+        ParameterColumn.MinWidth = cameraWorkspace ? 260 : 0;
         ParameterColumn.Width =
-            cameraWorkspace ? new GridLength(320) : new GridLength(0);
+            cameraWorkspace
+                ? new GridLength(Math.Clamp(
+                    _workspaceLayout.ParameterWidth, 260, 480))
+                : new GridLength(0);
         // v1.5.7 issue 655a0a14: 视频页右侧参数面板强制恒深白字，拍照页仍随主题
         ApplyParameterPanelMonitorTheme(destination == "monitor");
         if (destination == "library")
@@ -6053,11 +6252,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n" +
-                "• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n" +
-                "• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n" +
-                "• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n" +
-                "• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。"),
+                "• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n" +
+                "• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n" +
+                "• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n" +
+                "• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n" +
+                "• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。"),
             Style = (Style)FindResource("AnnouncementBody"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -11886,6 +12085,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         _shutdownStarted = true;
+        SaveWorkspaceLayout();
         Closing -= Window_Closing;
         _monitorTimecodeTimer.Stop();
         StopWifiMonitoring();

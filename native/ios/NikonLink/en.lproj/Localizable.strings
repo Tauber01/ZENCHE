@@ -824,7 +824,7 @@
 "本地图像分析" = "Local Image Analysis";
 "暂无图像源" = "No Image Source";
 "连接相机后可用" = "Available after connecting a camera";
-"• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。" = "• iOS / iPadOS adds a trusted-LAN camera bridge: Sony's official Camera Remote SDK runs on the macOS bridge, while Nikon uses an explicitly identified PTP-compatible bridge.\n• All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter.\n• Disabling monitoring now clears cached frames immediately and shows an explicit empty state; Android's disabled state is localized in all three languages.\n• Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available; see the usage guide for compatibility and hardware-test limits.\n• When updating to 1.5.10 through the official feed, verify SHA-256 before installing; package signing status remains explicitly disclosed.";
+"• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。" = "• Sign-in mode choices now read Existing Account and Create Account on all five platforms. The actual sign-in button remains visible while the request is in progress, so selecting a mode no longer looks like an unresponsive login attempt.\n• macOS and Windows add a desktop workspace layout. Both restore main-window size and position; Windows also restores the maximized state.\n• Drag to resize the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Splitters also support keyboard input and accessible names.\n• New Default, Capture, Monitor, Edit, and Compact presets are available, along with one-click restoration of the default layout.\n• Version 1.5.11 is an unsigned development-validation package. Verify its SHA-256 before installation; the Windows layout still requires multi-monitor and DPI validation on Windows hardware.";
 "控制" = "Control";
 "菜单" = "Menu";
 "更多" = "More";
@@ -840,6 +840,8 @@
 // ── W13-c：邮箱账号登录墙 ──
 "登录" = "Sign In";
 "注册" = "Create Account";
+"已有账号" = "Existing Account";
+"创建账号" = "Create Account";
 "登录或注册" = "Sign in or create an account";
 "邮箱" = "Email";
 "密码（至少 8 位）" = "Password (min 8 characters)";
@@ -856,6 +858,19 @@
 "请输入 6 位验证码" = "Please enter the 6-digit code";
 "邮件服务暂未配置，可直接注册" = "Email service is not configured yet; you can register directly.";
 "邮箱或密码错误" = "Incorrect email or password";
+"桌面工作区" = "Desktop Workspace";
+"拖动窗口边缘、主导航与面板分隔条可调整大小；窗口位置和布局会在下次启动时恢复。" = "Drag the window edges, main navigation divider, or panel dividers to resize them. Window position and layout are restored at the next launch.";
+"默认" = "Default";
+"监看" = "Monitor";
+"紧凑" = "Compact";
+"预设会调整窗口和面板尺寸；之后仍可继续自由拖动。" = "A preset adjusts the window and panel sizes. You can continue dragging afterward.";
+"恢复默认布局" = "Restore Default Layout";
+"调整主导航宽度" = "Resize main navigation";
+"调整拍摄参数面板宽度" = "Resize capture controls";
+"调整编辑媒体池宽度" = "Resize editor media pool";
+"调整编辑工具面板宽度" = "Resize editor tool panel";
+"调整编辑底部工具区高度" = "Resize lower editor tools";
+"拖动或使用方向键调整" = "Drag or use the arrow keys to resize";
 "该邮箱已注册，请直接登录" = "This email is already registered. Please sign in.";
 "账号已禁用，请联系开发者" = "This account has been disabled. Please contact the developer.";
 "登录已失效，请重新登录" = "Your session has expired. Please sign in again.";

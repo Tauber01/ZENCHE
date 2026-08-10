@@ -28,7 +28,7 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - 最新正式版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 当前源码版本：**1.5.10 / build 37**
+- 当前源码版本：**1.5.11 / build 38**（本地开发验证候选）
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
@@ -41,6 +41,13 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.11 本地开发验证候选
+
+- 五端登录页将模式选择改为“已有账号 / 创建账号”，与真正的登录提交按钮明确区分；Apple 端提交期间会同时显示进度和“正在登录…”文字。
+- macOS 与 Windows 会记住主窗口大小和位置，Windows 还会恢复最大化状态；显示器环境变化后，越界窗口会被移回当前可见区域。
+- 桌面端可拖动调整主导航、拍摄参数、编辑媒体池、工具栏和底部工具区，并提供默认、拍摄、监看、编辑、紧凑五种预设及“恢复默认布局”。
+- 本候选尚未切入官网更新。完整测试 491/491 通过，五端安装包已完成构建、结构与 SHA-256 回验；Windows 多显示器/DPI、两端真实拖拽与重启恢复仍需真机验收。
 
 ### v1.5.10 官网更新
 
@@ -409,7 +416,7 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - Latest stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
-- Source version: **1.5.10 / build 37**
+- Source version: **1.5.11 / build 38** (local development-validation candidate)
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
@@ -424,6 +431,13 @@ in a local library for review and export.
 > against their respective release notes and SHA-256 manifests.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### v1.5.11 local development-validation candidate
+
+- Sign-in mode choices now read Existing Account and Create Account on all five platforms, clearly separating mode selection from the actual submit action. Apple clients keep the progress indicator and “Signing in…” label visible during submission.
+- macOS and Windows remember main-window size and position; Windows also restores the maximized state. A saved off-screen window is moved back into the current visible desktop after display changes.
+- Desktop users can drag to resize the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Default, Capture, Monitor, Edit, and Compact presets and Restore Default Layout are included.
+- This candidate is not on the official update feed. The full 491-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks. Real Windows multi-monitor/DPI behavior and hands-on drag/relaunch checks on both desktop targets remain pending.
 
 ### Official website update in v1.5.10
 
@@ -733,7 +747,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - 最新安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
-- 現在のソースバージョン：**1.5.10 / build 37**
+- 現在のソースバージョン：**1.5.11 / build 38**（ローカル開発検証候補）
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
@@ -747,6 +761,13 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > GitHub 公開安定版と公式サイトの自動更新版は、それぞれのリリースノートと
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.11 ローカル開発検証候補
+
+- 5 プラットフォームのログイン画面で、モード選択を「既存のアカウント」と「新規登録」に分け、実際のログイン操作と区別しました。Apple 版では送信中も進行表示と「ログインしています…」を併記します。
+- macOS と Windows はメインウインドウのサイズと位置を記憶し、Windows では最大化状態も復元します。ディスプレイ構成が変わって保存位置が画面外になった場合は、現在の表示領域へ戻します。
+- デスクトップ版では、メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグして調整できます。デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへの復元も追加しました。
+- この候補は公式更新フィードには未配信です。全 491 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ・再起動復元確認は未完了です。
 
 ### v1.5.10 公式サイト更新
 

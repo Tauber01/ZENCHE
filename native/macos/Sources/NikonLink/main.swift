@@ -5776,7 +5776,7 @@ private struct Sidebar: View {
             Spacer()
         }
         .padding(.vertical, SpaceToken.s16)
-        .frame(width: 104)
+        .frame(maxWidth: .infinity)
         .background(Palette.paperSecondary)
         .overlay(alignment: .trailing) {
             Rectangle().fill(Palette.rule).frame(width: 1)
@@ -6472,6 +6472,7 @@ private struct ControlGalleryThumbnail: View {
 
 private struct CaptureView: View {
     @ObservedObject var model: CameraModel
+    @ObservedObject var desktopLayout: DesktopWorkspaceLayout
     @Binding var showConnection: Bool
     @Binding var showSettings: Bool
 
@@ -6517,8 +6518,15 @@ private struct CaptureView: View {
             }
             .frame(minWidth: 560)
             .background(Palette.uiBackground)
+            WorkspaceSplitHandle(
+                axis: .vertical,
+                label: "调整拍摄参数面板宽度",
+                value: $desktopLayout.inspectorWidth,
+                range: DesktopWorkspaceLayout.inspectorRange,
+                reversesHorizontalDirection: true
+            )
             ParameterInspector(model: model)
-                .frame(width: 330)
+                .frame(width: desktopLayout.inspectorWidth)
         }
         // fig1 控制面恒为深色；强制深色让保留的旧面板在同一页内观感一致。
         .preferredColorScheme(.dark)
@@ -10097,25 +10105,41 @@ private struct ResolveEditorWorkbench<
     CanvasArea: View,
     Tools: View
 >: View {
+    @ObservedObject var desktopLayout: DesktopWorkspaceLayout
     let media: Media
     let canvasArea: CanvasArea
     let tools: Tools
 
     init(
+        desktopLayout: DesktopWorkspaceLayout,
         @ViewBuilder media: () -> Media,
         @ViewBuilder canvasArea: () -> CanvasArea,
         @ViewBuilder tools: () -> Tools
     ) {
+        self.desktopLayout = desktopLayout
         self.media = media()
         self.canvasArea = canvasArea()
         self.tools = tools()
     }
 
     var body: some View {
-        HStack(spacing: 1) {
-            media.frame(width: 220)
+        HStack(spacing: 0) {
+            media.frame(width: desktopLayout.editorMediaWidth)
+            WorkspaceSplitHandle(
+                axis: .vertical,
+                label: "调整编辑媒体池宽度",
+                value: $desktopLayout.editorMediaWidth,
+                range: DesktopWorkspaceLayout.editorMediaRange
+            )
             canvasArea.frame(maxWidth: .infinity)
-            tools.frame(width: 320)
+            WorkspaceSplitHandle(
+                axis: .vertical,
+                label: "调整编辑工具面板宽度",
+                value: $desktopLayout.editorToolsWidth,
+                range: DesktopWorkspaceLayout.editorToolsRange,
+                reversesHorizontalDirection: true
+            )
+            tools.frame(width: desktopLayout.editorToolsWidth)
         }
         .padding(1)
         .background(Palette.editorRule)
@@ -10271,6 +10295,7 @@ private enum MacEditorRGBDensity {
 
 private struct ImageEditorView: View {
     @ObservedObject var model: CameraModel
+    @ObservedObject var desktopLayout: DesktopWorkspaceLayout
     @StateObject private var branchStore = MacLibraryBranchStore()
     @State private var selectedPhotoURL: URL?
     @State private var selectedSection = EditorAdjustmentSection.light
@@ -10441,7 +10466,7 @@ private struct ImageEditorView: View {
             }
             GeometryReader { geometry in
                 VStack(spacing: 1) {
-                    ResolveEditorWorkbench {
+                    ResolveEditorWorkbench(desktopLayout: desktopLayout) {
                         EditorMediaRail {
                             editorPhotoPicker
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -10467,6 +10492,12 @@ private struct ImageEditorView: View {
                         editorSummaryRail
                     }
                     .frame(maxHeight: .infinity)
+                    WorkspaceSplitHandle(
+                        axis: .horizontal,
+                        label: "调整编辑底部工具区高度",
+                        value: $desktopLayout.editorBottomHeight,
+                        range: DesktopWorkspaceLayout.editorBottomRange
+                    )
                     HStack(spacing: 1) {
                         EditorToolRail {
                             editorColorPanel
@@ -10476,9 +10507,9 @@ private struct ImageEditorView: View {
                             hasSource: selectedPhoto != nil,
                             metrics: editorScopeMetrics
                         )
-                        .frame(width: 320)
+                        .frame(width: desktopLayout.editorToolsWidth)
                     }
-                    .frame(height: 320)
+                    .frame(height: desktopLayout.editorBottomHeight)
                 }
                 .background(Palette.editorRule)
                 .frame(
@@ -13678,6 +13709,13 @@ private enum AuthFormMode: String, CaseIterable, Identifiable {
     case login = "登录"
     case register = "注册"
     var id: String { rawValue }
+
+    var modeTitle: String {
+        switch self {
+        case .login: return "已有账号"
+        case .register: return "创建账号"
+        }
+    }
 }
 
 /// 登录/注册页：邮箱 + 密码 +（条件显示的）验证码字段 + 获取验证码按钮（60s 倒计时）。
@@ -13754,6 +13792,10 @@ private struct LoginView: View {
             countdownTask?.cancel()
             countdownTask = nil
         }
+        .onChange(of: mode) { _, _ in
+            errorMessage = ""
+            focusedField = .email
+        }
     }
 
     private var loginHeader: some View {
@@ -13785,7 +13827,7 @@ private struct LoginView: View {
     private var modePicker: some View {
         Picker("登录或注册", selection: $mode) {
             ForEach(AuthFormMode.allCases) { mode in
-                RuntimeLocalizedText(mode.rawValue).tag(mode)
+                RuntimeLocalizedText(mode.modeTitle).tag(mode)
             }
         }
         .pickerStyle(.segmented)
@@ -13856,14 +13898,17 @@ private struct LoginView: View {
             Button {
                 submit()
             } label: {
-                Group {
+                HStack(spacing: SpaceToken.s8) {
                     if isWorking {
                         ProgressView()
                             .controlSize(.small)
-                    } else {
-                        RuntimeLocalizedText(mode == .login ? "登录" : "注册")
-                            .font(.system(size: TypeScale.emphasis, weight: .bold))
                     }
+                    RuntimeLocalizedText(
+                        isWorking
+                            ? mode == .login ? "正在登录…" : "正在注册…"
+                            : mode == .login ? "登录" : "注册"
+                    )
+                    .font(.system(size: TypeScale.emphasis, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
@@ -13871,6 +13916,7 @@ private struct LoginView: View {
             .buttonStyle(.borderedProminent)
             .tint(Palette.cobalt)
             .disabled(isWorking)
+            .keyboardShortcut(.defaultAction)
 
             RuntimeLocalizedText(mode == .login
                  ? "还没有账号？切换到「注册」即可创建"
@@ -13981,6 +14027,7 @@ private struct LoginView: View {
 private struct RootView: View {
     @ObservedObject var model: CameraModel
     @StateObject private var updater = UpdateController()
+    @StateObject private var desktopLayout = DesktopWorkspaceLayout.shared
     @AppStorage("appLanguage") private var languageRaw = "zh-Hans"
     @AppStorage("appThemeMode") private var themeRaw = ThemeMode.system.rawValue
     @AppStorage("dismissedLaunchAnnouncementVersion")
@@ -14002,13 +14049,14 @@ private struct RootView: View {
         case .capture:
             CaptureView(
                 model: model,
+                desktopLayout: desktopLayout,
                 showConnection: $showConnection,
                 showSettings: $showSettings
             )
         case .monitor:
             MonitorView(model: model)
         case .editor:
-            ImageEditorView(model: model)
+            ImageEditorView(model: model, desktopLayout: desktopLayout)
         case .library:
             LibraryView(model: model)
         case .devices:
@@ -14024,7 +14072,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.10"
+        ) as? String ?? "1.5.11"
     }
 
     var body: some View {
@@ -14061,6 +14109,7 @@ private struct RootView: View {
             SettingsSheet(
                 updater: updater,
                 auth: model.auth,
+                desktopLayout: desktopLayout,
                 languageRaw: $languageRaw,
                 themeRaw: $themeRaw,
                 bluetoothRemote: model.bluetoothRemote,
@@ -14167,6 +14216,13 @@ private struct RootView: View {
             )
             HStack(spacing: SpaceToken.s0) {
                 Sidebar(model: model)
+                    .frame(width: desktopLayout.sidebarWidth)
+                WorkspaceSplitHandle(
+                    axis: .vertical,
+                    label: "调整主导航宽度",
+                    value: $desktopLayout.sidebarWidth,
+                    range: DesktopWorkspaceLayout.sidebarRange
+                )
                 // Keep exactly one workspace mounted while navigating. An
                 // animated Group can retain the previous monitor view during
                 // layout, causing its image to bleed behind the editor.
@@ -14231,7 +14287,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         // 会把工作台最小尺寸恢复为 1040×700。
         window.minSize = NSSize(width: 320, height: 420)
         window.contentView = hostingView
-        window.center()
+        DesktopWindowFrame.restoreOrCenter(window)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         print("帧澈 ZENCHE native SwiftUI ready")

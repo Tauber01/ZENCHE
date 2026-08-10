@@ -291,6 +291,13 @@ private enum AuthFormMode: String, CaseIterable, Identifiable {
     case login = "登录"
     case register = "注册"
     var id: String { rawValue }
+
+    var modeTitle: String {
+        switch self {
+        case .login: return "已有账号"
+        case .register: return "创建账号"
+        }
+    }
 }
 
 /// 登录/注册页：邮箱 + 密码 +（条件显示的）验证码字段 + 获取验证码按钮（60s 倒计时）。
@@ -367,6 +374,10 @@ private struct LoginView: View {
             countdownTask?.cancel()
             countdownTask = nil
         }
+        .onChange(of: mode) { _, _ in
+            errorMessage = ""
+            focusedField = .email
+        }
         .onChange(of: visibleErrorMessage) { _, message in
             guard !message.isEmpty else { return }
             UIAccessibility.post(
@@ -405,7 +416,7 @@ private struct LoginView: View {
     private var modePicker: some View {
         Picker("登录或注册", selection: $mode) {
             ForEach(AuthFormMode.allCases) { mode in
-                RuntimeLocalizedText(mode.rawValue).tag(mode)
+                RuntimeLocalizedText(mode.modeTitle).tag(mode)
             }
         }
         .pickerStyle(.segmented)
@@ -528,14 +539,17 @@ private struct LoginView: View {
             Button {
                 submit()
             } label: {
-                Group {
+                HStack(spacing: SpaceToken.s8) {
                     if isWorking {
                         ProgressView()
                             .tint(.white)
-                    } else {
-                        RuntimeLocalizedText(mode == .login ? "登录" : "注册")
-                            .font(.system(size: FontToken.emphasis, weight: .bold))
                     }
+                    RuntimeLocalizedText(
+                        isWorking
+                            ? mode == .login ? "正在登录…" : "正在注册…"
+                            : mode == .login ? "登录" : "注册"
+                    )
+                    .font(.system(size: FontToken.emphasis, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
@@ -662,7 +676,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.10"
+        ) as? String ?? "1.5.11"
     }
 
     var body: some View {
@@ -10673,7 +10687,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。")
+                    Text("• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。")
                     .font(.subheadline)
                     .lineSpacing(5)
 

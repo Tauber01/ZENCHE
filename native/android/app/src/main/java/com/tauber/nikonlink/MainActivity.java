@@ -11876,7 +11876,8 @@ public final class MainActivity extends Activity {
         for (String mode : new String[]{"login", "register"}) {
             boolean selected = authMode.equals(mode);
             Button modeButton = new Button(this);
-            modeButton.setText(tr("login".equals(mode) ? "登录" : "注册"));
+            modeButton.setText(tr(
+                    "login".equals(mode) ? "已有账号" : "创建账号"));
             modeButton.setTextSize(14);
             modeButton.setTypeface(Typeface.create("sans", Typeface.BOLD));
             modeButton.setTextColor(selected ? Color.WHITE : MUTED);
@@ -15391,9 +15392,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.10" : version;
+            return version == null || version.isEmpty() ? "1.5.11" : version;
         } catch (Exception error) {
-            return "1.5.10";
+            return "1.5.11";
         }
     }
 
@@ -15541,11 +15542,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        tr("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n"
-                                + "• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n"
-                                + "• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n"
-                                + "• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n"
-                                + "• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。"),
+                        tr("• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n"
+                                + "• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n"
+                                + "• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n"
+                                + "• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n"
+                                + "• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。"),
                         14,
                         Typeface.NORMAL,
                         INK),

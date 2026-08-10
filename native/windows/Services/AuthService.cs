@@ -664,7 +664,7 @@ public sealed class AuthService
             Timeout = TimeSpan.FromMilliseconds(RequestTimeoutMs)
         };
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.10");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("ZENCHE-Windows/1.5.11");
         return client;
     }
 }

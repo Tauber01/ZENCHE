@@ -8,7 +8,7 @@
         Height="820"
         MinWidth="860"
         MinHeight="600"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="Manual">
   <Window.Resources>
     <!-- fig2 editor tool strip icons: 16x16 linear monochrome line art. -->
     <Geometry x:Key="EditorIconColorWheel">
@@ -127,9 +127,14 @@
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="176" />
+        <ColumnDefinition x:Name="SidebarColumn"
+                          Width="176"
+                          MinWidth="96"
+                          MaxWidth="280" />
         <ColumnDefinition Width="*" MinWidth="380" />
-        <ColumnDefinition x:Name="ParameterColumn" Width="300" />
+        <ColumnDefinition x:Name="ParameterColumn"
+                          Width="300"
+                          MaxWidth="480" />
       </Grid.ColumnDefinitions>
 
       <Border Grid.Column="0"
@@ -177,6 +182,19 @@
           </StackPanel>
         </DockPanel>
       </Border>
+
+      <GridSplitter x:Name="SidebarSplitter"
+                    Grid.Column="0"
+                    Width="8"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    ResizeDirection="Columns"
+                    ResizeBehavior="CurrentAndNext"
+                    ShowsPreview="True"
+                    Panel.ZIndex="20"
+                    Background="Transparent"
+                    AutomationProperties.Name="调整主导航宽度"
+                    DragCompleted="WorkspaceSplitter_DragCompleted" />
 
       <Grid Grid.Column="1" Margin="24">
         <Grid x:Name="MonitorDashboard" Visibility="Collapsed">
@@ -1205,8 +1223,13 @@
           </Border>
           <Grid x:Name="EditorProGrid" Grid.Row="1" Margin="0,18,0,0">
             <Grid.RowDefinitions>
-              <RowDefinition Height="2*" />
-              <RowDefinition Height="3*" />
+              <RowDefinition x:Name="EditorPreviewRow"
+                             Height="*"
+                             MinHeight="240" />
+              <RowDefinition x:Name="EditorBottomRow"
+                             Height="260"
+                             MinHeight="160"
+                             MaxHeight="420" />
             </Grid.RowDefinitions>
             <Grid x:Name="EditorResolveWorkbench"
                   Grid.RowSpan="2"
@@ -1216,9 +1239,15 @@
             <!-- 中带三栏：媒体池 / 主监视器 / AI 摘要 -->
             <Grid Grid.Row="0" Margin="0,0,0,1">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="EditorMediaColumn" Width="220" />
+                <ColumnDefinition x:Name="EditorMediaColumn"
+                                  Width="220"
+                                  MinWidth="160"
+                                  MaxWidth="360" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition x:Name="EditorToolsColumn" Width="320" />
+                <ColumnDefinition x:Name="EditorToolsColumn"
+                                  Width="320"
+                                  MinWidth="260"
+                                  MaxWidth="480" />
               </Grid.ColumnDefinitions>
               <Border x:Name="EditorMediaRail"
                       Grid.Column="0"
@@ -1318,6 +1347,18 @@
                   <TextBlock Grid.Row="3" Style="{DynamicResource EditorCaption}" Text="非破坏编辑 · 保存为高质量副本" TextWrapping="Wrap" />
                 </Grid>
               </Border>
+              <GridSplitter Grid.Column="0"
+                            Width="8"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            ResizeDirection="Columns"
+                            ResizeBehavior="CurrentAndNext"
+                            ShowsPreview="True"
+                            Panel.ZIndex="20"
+                            Background="Transparent"
+                            Focusable="True"
+                            AutomationProperties.Name="调整编辑媒体池宽度"
+                            DragCompleted="WorkspaceSplitter_DragCompleted" />
               <Border Grid.Column="1"
                       Margin="1,0,1,0"
                       Background="{DynamicResource GraphiteBrush}"
@@ -1471,7 +1512,32 @@
                   </StackPanel>
                 </ScrollViewer>
               </Border>
+              <GridSplitter Grid.Column="1"
+                            Width="8"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Stretch"
+                            ResizeDirection="Columns"
+                            ResizeBehavior="CurrentAndNext"
+                            ShowsPreview="True"
+                            Panel.ZIndex="20"
+                            Background="Transparent"
+                            Focusable="True"
+                            AutomationProperties.Name="调整编辑工具面板宽度"
+                            DragCompleted="WorkspaceSplitter_DragCompleted" />
             </Grid>
+
+            <GridSplitter Grid.Row="0"
+                          Height="8"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Bottom"
+                          ResizeDirection="Rows"
+                          ResizeBehavior="CurrentAndNext"
+                          ShowsPreview="True"
+                          Panel.ZIndex="20"
+                          Background="Transparent"
+                          Focusable="True"
+                          AutomationProperties.Name="调整编辑底部工具区高度"
+                          DragCompleted="WorkspaceSplitter_DragCompleted" />
 
             <!-- 下带两栏：调色面板 / 示波器 -->
             <Grid Grid.Row="1" Margin="0,1,0,0">
@@ -1785,6 +1851,50 @@
                   </ComboBox>
                 </Grid>
               </Border>
+              <Border Margin="0,0,0,20" Style="{DynamicResource PanelCard}">
+                <StackPanel>
+                  <TextBlock Style="{DynamicResource SectionTitle}"
+                             Text="桌面工作区" />
+                  <TextBlock Margin="0,4,0,12"
+                             Foreground="{DynamicResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="拖动窗口边缘、主导航与面板分隔条可调整大小；窗口位置和布局会在下次启动时恢复。" />
+                  <WrapPanel>
+                    <Button Margin="0,0,8,8"
+                            Style="{DynamicResource ButtonBase}"
+                            Tag="standard"
+                            Content="默认"
+                            Click="WorkspacePreset_Click" />
+                    <Button Margin="0,0,8,8"
+                            Style="{DynamicResource ButtonBase}"
+                            Tag="capture"
+                            Content="拍摄"
+                            Click="WorkspacePreset_Click" />
+                    <Button Margin="0,0,8,8"
+                            Style="{DynamicResource ButtonBase}"
+                            Tag="monitor"
+                            Content="监看"
+                            Click="WorkspacePreset_Click" />
+                    <Button Margin="0,0,8,8"
+                            Style="{DynamicResource ButtonBase}"
+                            Tag="editor"
+                            Content="编辑"
+                            Click="WorkspacePreset_Click" />
+                    <Button Margin="0,0,8,8"
+                            Style="{DynamicResource ButtonBase}"
+                            Tag="compact"
+                            Content="紧凑"
+                            Click="WorkspacePreset_Click" />
+                    <Button Margin="0,0,0,8"
+                            Style="{DynamicResource PrimaryButton}"
+                            Content="恢复默认布局"
+                            Click="ResetWorkspaceLayout_Click" />
+                  </WrapPanel>
+                  <TextBlock Foreground="{DynamicResource MutedBrush}"
+                             TextWrapping="Wrap"
+                             Text="预设会调整窗口和面板尺寸；之后仍可继续自由拖动。" />
+                </StackPanel>
+              </Border>
               <ContentControl x:Name="CaptureAssistSettingsHost"
                               Margin="0,0,0,20" />
               <Border Style="{DynamicResource PanelCard}">
@@ -2039,6 +2149,20 @@
           </ScrollViewer>
         </Grid>
       </Grid>
+
+      <GridSplitter x:Name="ParameterSplitter"
+                    Grid.Column="1"
+                    Width="8"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    ResizeDirection="Columns"
+                    ResizeBehavior="CurrentAndNext"
+                    ShowsPreview="True"
+                    Panel.ZIndex="20"
+                    Background="Transparent"
+                    Focusable="True"
+                    AutomationProperties.Name="调整拍摄参数面板宽度"
+                    DragCompleted="WorkspaceSplitter_DragCompleted" />
 
       <Border x:Name="ParameterPanelShell"
               Grid.Column="2"
@@ -2328,14 +2452,14 @@
                         Height="44"
                         Margin="4"
                         Style="{DynamicResource PrimaryButton}"
-                        Content="登录"
+                        Content="已有账号"
                         Click="AuthLoginMode_Click" />
                 <Button x:Name="AuthRegisterModeButton"
                         Grid.Column="1"
                         Height="44"
                         Margin="4"
                         Style="{DynamicResource ButtonBase}"
-                        Content="注册"
+                        Content="创建账号"
                         Click="AuthRegisterMode_Click" />
               </Grid>
 

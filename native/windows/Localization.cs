@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Data;
 
@@ -98,9 +99,39 @@ internal static class AppLocalization
             ["正被占用"] = new("In use", "使用中"),
             ["连接管理"] = new("Connection Manager", "接続管理"),
             ["账号登录"] = new("Account Sign In", "アカウントログイン"),
+            ["桌面工作区"] = new("Desktop Workspace", "デスクトップワークスペース"),
+            ["拖动窗口边缘、主导航与面板分隔条可调整大小；窗口位置和布局会在下次启动时恢复。"] = new(
+                "Drag the window edges, main navigation divider, or panel dividers to resize them. Window position and layout are restored at the next launch.",
+                "ウインドウの端、メインナビゲーション、パネルの区切り線をドラッグしてサイズを調整できます。位置とレイアウトは次回起動時に復元されます。"),
+            ["默认"] = new("Default", "デフォルト"),
+            ["监看"] = new("Monitor", "モニター"),
+            ["紧凑"] = new("Compact", "コンパクト"),
+            ["预设会调整窗口和面板尺寸；之后仍可继续自由拖动。"] = new(
+                "A preset adjusts the window and panel sizes. You can continue dragging afterward.",
+                "プリセット適用後も、ウインドウとパネルのサイズを自由に調整できます。"),
+            ["恢复默认布局"] = new(
+                "Restore Default Layout",
+                "デフォルトレイアウトに戻す"),
+            ["调整主导航宽度"] = new(
+                "Resize main navigation",
+                "メインナビゲーションの幅を調整"),
+            ["调整拍摄参数面板宽度"] = new(
+                "Resize capture controls",
+                "撮影パラメータパネルの幅を調整"),
+            ["调整编辑媒体池宽度"] = new(
+                "Resize editor media pool",
+                "編集メディアプールの幅を調整"),
+            ["调整编辑工具面板宽度"] = new(
+                "Resize editor tool panel",
+                "編集ツールパネルの幅を調整"),
+            ["调整编辑底部工具区高度"] = new(
+                "Resize lower editor tools",
+                "編集画面下部のツール領域の高さを調整"),
             ["账号"] = new("Account", "アカウント"),
             ["登录"] = new("Sign In", "ログイン"),
             ["注册"] = new("Create Account", "新規登録"),
+            ["已有账号"] = new("Existing Account", "既存のアカウント"),
+            ["创建账号"] = new("Create Account", "新規登録"),
             ["邮箱"] = new("Email", "メールアドレス"),
             ["密码（至少 8 位）"] = new(
                 "Password (8 characters minimum)",
@@ -988,22 +1019,22 @@ internal static class AppLocalization
                 new(
                     "Adjustments are always written to a new copy; the original stays untouched.",
                     "調整は常に新しいコピーへ保存され、元のファイルは変更されません。"),
-            ["• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n" +
-             "• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n" +
-             "• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n" +
-             "• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n" +
-             "• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。"] =
+            ["• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n" +
+             "• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n" +
+             "• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n" +
+             "• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n" +
+             "• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。"] =
                 new(
-                    "• iOS / iPadOS adds a trusted-LAN camera bridge: Sony's official Camera Remote SDK runs on the macOS bridge, while Nikon uses an explicitly identified PTP-compatible bridge.\n" +
-                    "• All five capture screens add a Live Monitoring switch. Turning it off stops preview frames without disconnecting the camera or disabling the shutter.\n" +
-                    "• Disabling monitoring now clears cached frames immediately and shows an explicit empty state; Android's disabled state is localized in all three languages.\n" +
-                    "• Existing system-camera, UVC, USB/PTP, and Wi-Fi PTP/IP paths remain available; see the usage guide for compatibility and hardware-test limits.\n" +
-                    "• When updating to 1.5.10 through the official feed, verify SHA-256 before installing; package signing status remains explicitly disclosed.",
-                    "• iOS / iPadOS に信頼済み LAN 向けカメラブリッジを追加。Sony 公式 Camera Remote SDK は macOS ブリッジ側で動作し、Nikon は明示された PTP 互換ブリッジを使用します。\n" +
-                    "• 5 端末の撮影画面に「ライブモニター」スイッチを追加。オフにしてもカメラ接続とシャッターは維持し、プレビュー取得だけを停止します。\n" +
-                    "• モニターをオフにするとキャッシュ済み画像を直ちに消去し、明確な空状態を表示。Android のオフ状態も 3 言語に対応しました。\n" +
-                    "• システムカメラ、UVC、USB/PTP、Wi-Fi PTP/IP の既存経路は維持。互換性と実機検証の制約は使用ガイドを参照してください。\n" +
-                    "• 公式更新フィードから 1.5.10 に更新する場合は、インストール前に SHA-256 を確認してください。各パッケージの署名状態も引き続き明示します。"),
+                    "• Sign-in mode choices now read Existing Account and Create Account on all five platforms. The actual sign-in button remains visible while the request is in progress, so selecting a mode no longer looks like an unresponsive login attempt.\n" +
+                    "• macOS and Windows add a desktop workspace layout. Both restore main-window size and position; Windows also restores the maximized state.\n" +
+                    "• Drag to resize the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Splitters also support keyboard input and accessible names.\n" +
+                    "• New Default, Capture, Monitor, Edit, and Compact presets are available, along with one-click restoration of the default layout.\n" +
+                    "• Version 1.5.11 is an unsigned development-validation package. Verify its SHA-256 before installation; the Windows layout still requires multi-monitor and DPI validation on Windows hardware.",
+                    "• 5 プラットフォームのログイン画面で、モード選択を「既存のアカウント」と「新規登録」に分けました。実際のログインボタンには処理中の状態が表示され、モード選択を誤って押しても無反応に見えません。\n" +
+                    "• macOS と Windows にデスクトップワークスペースを追加しました。両方でメインウインドウのサイズと位置を復元し、Windows では最大化状態も復元します。\n" +
+                    "• メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグして調整できます。区切り線はキーボード操作とアクセシビリティ名にも対応します。\n" +
+                    "• デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへ戻す操作を追加しました。\n" +
+                    "• 1.5.11 は未署名の開発検証用パッケージです。インストール前に SHA-256 を確認してください。Windows 版のレイアウトは、実機のマルチモニターおよび DPI 環境での確認が残っています。"),
 
         // D1 1.5.8：未处理异常对话框（可复制完整堆栈）
         ["未处理异常"] = new("Unhandled Exception", "未処理の例外"),
@@ -1017,6 +1048,7 @@ internal static class AppLocalization
 
     private static readonly Dictionary<DependencyObject, string> OriginalText = [];
     private static readonly Dictionary<FrameworkElement, string> OriginalToolTips = [];
+    private static readonly Dictionary<FrameworkElement, string> OriginalAutomationNames = [];
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "NikonLink",
@@ -1120,6 +1152,22 @@ internal static class AppLocalization
                 OriginalToolTips[frameworkElement] = source;
             }
             frameworkElement.ToolTip = T(source);
+        }
+
+        if (element is FrameworkElement accessibleElement)
+        {
+            var currentName = AutomationProperties.GetName(accessibleElement);
+            if (!string.IsNullOrWhiteSpace(currentName))
+            {
+                if (!OriginalAutomationNames.TryGetValue(
+                        accessibleElement,
+                        out var source))
+                {
+                    source = currentName;
+                    OriginalAutomationNames[accessibleElement] = source;
+                }
+                AutomationProperties.SetName(accessibleElement, T(source));
+            }
         }
     }
 

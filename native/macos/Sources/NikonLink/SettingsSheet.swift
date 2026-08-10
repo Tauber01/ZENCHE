@@ -167,6 +167,7 @@ private let zencheWebsiteURL = URL(string: "https://zenche.top")!
 struct SettingsSheet: View {
     @ObservedObject var updater: UpdateController
     let auth: AuthService
+    @ObservedObject var desktopLayout: DesktopWorkspaceLayout
     @Binding var languageRaw: String
     @Binding var themeRaw: String
     @ObservedObject var bluetoothRemote: BluetoothRemoteService
@@ -293,6 +294,51 @@ struct SettingsSheet: View {
                     .background(SettingsPalette.base)
                     .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r8))
                     .fixedSize()
+                }
+            }
+
+            settingsCard {
+                HStack(alignment: .top, spacing: SpaceToken.s12) {
+                    settingIcon("rectangle.3.group", color: SettingsPalette.cobalt)
+                    VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                        RuntimeLocalizedText("桌面工作区")
+                            .font(.system(size: TypeScale.title, weight: .bold))
+                        RuntimeLocalizedText("拖动窗口边缘、主导航与面板分隔条可调整大小；窗口位置和布局会在下次启动时恢复。")
+                            .font(.system(size: TypeScale.body))
+                            .foregroundStyle(SettingsPalette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer()
+                }
+
+                Divider()
+
+                HStack(spacing: SpaceToken.s8) {
+                    ForEach(DesktopWorkspacePreset.allCases) { preset in
+                        Button {
+                            desktopLayout.apply(preset)
+                        } label: {
+                            RuntimeLocalizedText(preset.title)
+                                .font(.system(size: TypeScale.body, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 36)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+
+                HStack {
+                    RuntimeLocalizedText("预设会调整窗口和面板尺寸；之后仍可继续自由拖动。")
+                        .font(.system(size: TypeScale.caption))
+                        .foregroundStyle(SettingsPalette.muted)
+                    Spacer()
+                    Button {
+                        desktopLayout.reset()
+                    } label: {
+                        Label("恢复默认布局", systemImage: "arrow.counterclockwise")
+                            .font(.system(size: TypeScale.body, weight: .semibold))
+                    }
+                    .buttonStyle(.bordered)
                 }
             }
 
@@ -1066,7 +1112,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        RuntimeLocalizedText("• iOS / iPadOS 新增可信局域网相机桥接：Sony 官方 Camera Remote SDK 在 macOS 桥接端运行；Nikon 使用明确标注的 PTP 兼容桥接。\n• 五端拍照页新增“实时监看”开关；关闭只停止取景帧，不断开相机，也不影响快门。\n• 关闭监看后立即清除缓存画面并显示明确空态；Android 关闭状态已纳入三语资源。\n• 保留系统相机、UVC、USB/PTP 与 Wi‑Fi PTP/IP 既有路径；兼容性和真机限制见使用说明。\n• 通过官网更新到 1.5.10 时，请在安装前按发布说明核对 SHA‑256；各平台签名状态仍会如实披露。")
+                        RuntimeLocalizedText("• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n• 1.5.11 为未签名开发验证包；安装前请核对 SHA-256，Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。")
                             .font(.system(size: TypeScale.body))
                             .lineSpacing(5)
                     }

@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-09（Asia/Shanghai）
+> 最近核对：2026-08-10（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -173,6 +173,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - macOS 复用无线收件箱的 `8080` 端口，新增 `/sdk-bridge/status`、`live.jpg`、`capture` 与 `monitor`；既有 Basic Auth 之外还必须提供每次启动随机生成的 `X-Zenche-Bridge-Token`。关闭监看停止客户端拉帧，不会把相机断开。
 - Sony 相机仅在 Mac 端 `SonyOfficialSDKService` 真正连接 Sony Camera Remote SDK 时返回 `officialSDK=true`；Nikon 返回 `nikon-ptp-compatible` 与 `officialSDK=false`。Sony 与 Nikon 当前公开的桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本，iOS 没有加载桌面 Mach-O 运行时，Nikon 也不宣称官方 SDK 控制。
 - 使用步骤、网络边界与故障排查见 `docs/LIVE_MONITOR_AND_IOS_CAMERA_BRIDGE.md`。当前静态编译与契约不等同于 Sony/Nikon 真机或长时间网络验收。
+
+## 0.18. W15 登录动作清晰化与桌面工作区（本地候选）
+
+- 登录故障按客户端提交前问题处理：2026-08-10 用户报告时间段内，生产 Nginx 专用访问日志没有 `/api/v1/auth/login` 请求，公网登录接口对无效凭据仍能稳定返回结构化 `401`。五端原界面同时使用“登录”表示模式与提交动作，选中的模式按钮点击不会发请求，容易被理解为提交无响应；模式标签因此统一改为“已有账号 / 创建账号”，提交按钮继续使用“登录 / 注册”，Apple 忙碌态保留动作文字与进度指示。
+- macOS 使用 `DesktopWorkspaceLayout` 持久化主导航、拍摄参数栏、编辑媒体池、编辑工具栏和底部工具区尺寸；AppKit 主窗口用独立 autosave 名称恢复大小与位置，并在显示器拓扑变化时把窗口约束回可见工作区。分隔条支持拖拽与方向键微调，并提供辅助功能标签和值。
+- Windows 使用 `%LOCALAPPDATA%/NikonLink/desktop-workspace-layout-v1.json` 保存窗口几何、最大化状态和同组面板尺寸；恢复时按虚拟桌面边界约束窗口。WPF `GridSplitter` 与设置页预设复用同一状态模型，响应式折叠仍优先保留中央预览。
+- 两个桌面端均提供默认、拍摄、监看、编辑、紧凑五套预设与恢复默认。第一阶段只支持主窗口内的固定分区调整，不实现 Adobe 式任意浮动面板、跨窗口拖放或跨显示器面板停靠；这些能力会显著扩大窗口生命周期、焦点、无障碍和状态迁移风险，留待后续独立迭代。
+- 候选版本为 `1.5.11 / build 38`，只用于本地开发验证；官网自动更新继续提供 `1.5.10 / build 37`。使用步骤与边界见 `docs/DESKTOP_WORKSPACE_LAYOUT.md`，交付状态见 `docs/releases/v1.5.11.md`。
 
 ## 1. 总体原则
 
