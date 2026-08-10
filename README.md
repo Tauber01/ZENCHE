@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- 最新正式版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
+- GitHub 公开稳定版：**v1.5.3**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
 - 当前源码版本：**1.5.11 / build 38**（本地开发验证候选）
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[v1.5.3 最新稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[GitHub 公开稳定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -48,8 +48,8 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - macOS 与 Windows 会记住主窗口大小和位置，Windows 还会恢复最大化状态；显示器环境变化后，越界窗口会被移回当前可见区域。
 - 桌面端可实时、连续拖动主导航、拍摄参数、编辑媒体池、工具栏和底部工具区；Windows 的 AI 工具栏也可独立调宽。macOS AI 区移除了重复导航与无关底栏，默认留出更多选项空间。两端均提供默认、拍摄、监看、编辑、紧凑五种预设及“恢复默认布局”。
 - 桌面编辑器把“专业显影 / AI 工具”固定为一级模式，把色轮、曲线、蒙版等归入“调整类别”，不再混用两级入口；底部 RGB 示波器会填满可用宽高，不再缩在角落。
-- 预览与示波器共用同一份受控尺寸图像；Windows 合并高频预览请求、仅在录制时运行时间码刷新，并在离开编辑页时释放位图资源，减少重复渲染和后台占用。
-- 本候选尚未切入官网更新。完整测试 495/495 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。Windows 多显示器/DPI、两端真实拖拽、重启恢复与长时间性能仍需真机验收。
+- 预览与示波器共用同一份受控尺寸图像；Windows 合并高频预览请求、仅在录制时运行时间码刷新，并在切换照片、切换模式、离开编辑页或关闭窗口时清理 AI 临时结果与位图资源，减少重复渲染和后台占用。
+- 本候选尚未切入官网更新。完整测试 503/503 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。Windows 多显示器/DPI、两端真实拖拽、重启恢复与长时间性能仍需真机验收。
 
 ### v1.5.10 官网更新
 
@@ -201,7 +201,7 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [v1.5.3 最新正式版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)
+前往 [GitHub 公开稳定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
@@ -417,12 +417,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- Latest stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
+- GitHub public stable release: **v1.5.3** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3))
 - Source version: **1.5.11 / build 38** (local development-validation candidate)
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
-- Downloads: [latest stable v1.5.3 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [GitHub public stable release v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -439,9 +439,9 @@ in a local library for review and export.
 - Sign-in mode choices now read Existing Account and Create Account on all five platforms, clearly separating mode selection from the actual submit action. Apple clients keep the progress indicator and “Signing in…” label visible during submission.
 - macOS and Windows remember main-window size and position; Windows also restores the maximized state. A saved off-screen window is moved back into the current visible desktop after display changes.
 - Desktop dividers resize their content live and continuously for the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Windows also has an independent AI-tools divider. The macOS AI area removes duplicate navigation and an unrelated footer to leave more room for its options. Default, Capture, Monitor, Edit, and Compact presets and Restore Default Layout are included.
-- The desktop editor now keeps Professional Develop and AI Tools at the top level while placing Wheels, Curves, Masks, and related controls under Adjustment Groups. The lower RGB scope expands to the full available width and height instead of remaining in a small corner.
-- Preview and scope rendering reuse one bounded image. Windows also coalesces rapid preview requests, runs the timecode refresh only while recording, and releases editor bitmaps when the page is left to reduce duplicate work and background usage.
-- This candidate is not on the official update feed. The full 495-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Real Windows multi-monitor/DPI behavior and hands-on drag, relaunch, and long-session performance checks on both desktop targets remain pending.
+- The desktop editor now keeps Pro Develop and AI Tools at the top level while placing Wheels, Curves, Masks, and related controls under Adjustment Groups. The lower RGB scope expands to the full available width and height instead of remaining in a small corner.
+- Preview and scope rendering reuse one bounded image. Windows also coalesces rapid preview requests, runs the timecode refresh only while recording, and clears AI temporary results and editor bitmaps when switching photos or modes, leaving the editor, or closing the window to reduce duplicate work and background resource use.
+- This candidate is not on the official update feed. The full 503-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 candidate notes](docs/releases/v1.5.11.md). Real Windows multi-monitor/DPI behavior and hands-on drag, relaunch, and long-session performance checks on both desktop targets remain pending.
 
 ### Official website update in v1.5.10
 
@@ -750,12 +750,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- 最新安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
+- GitHub 公開安定版：**v1.5.3**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)）
 - 現在のソースバージョン：**1.5.11 / build 38**（ローカル開発検証候補）
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
-- ダウンロード：[最新安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[GitHub 公開安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -772,8 +772,8 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - macOS と Windows はメインウインドウのサイズと位置を記憶し、Windows では最大化状態も復元します。ディスプレイ構成が変わって保存位置が画面外になった場合は、現在の表示領域へ戻します。
 - デスクトップ版の区切り線は、メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグ中に連続して再配置します。Windows では AI ツールパネルの幅も個別に調整できます。macOS の AI 領域は重複ナビゲーションと無関係な下部操作列を省き、各項目の表示領域を広げました。デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへの復元も利用できます。
 - デスクトップ編集画面では「プロ現像 / AI ツール」を第1階層に固定し、カラーホイール、カーブ、マスクなどを「調整カテゴリー」にまとめました。下部の RGB スコープは、隅の小さな領域ではなく、利用可能な幅と高さ全体を使います。
-- プレビューとスコープは、サイズを制限した同一画像を再利用します。Windows では高頻度のプレビュー要求をまとめ、録画中だけタイムコードを更新し、編集画面を離れた際にビットマップを解放して、重複処理とバックグラウンド負荷を抑えます。
-- この候補は公式更新フィードには未配信です。全 495 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ、再起動復元、長時間動作の確認は未完了です。
+- プレビューとスコープは、サイズを制限した同一画像を再利用します。Windows では高頻度のプレビュー要求をまとめ、録画中だけタイムコードを更新し、写真やモードの切り替え、編集画面からの移動、ウインドウ終了時に AI の一時結果とビットマップを解放して、重複処理とバックグラウンド負荷を抑えます。
+- この候補は公式更新フィードには未配信です。全 503 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 候補の説明](docs/releases/v1.5.11.md) に記載しています。Windows 実機でのマルチモニター/DPI、および両デスクトップ版のドラッグ、再起動復元、長時間動作の確認は未完了です。
 
 ### v1.5.10 公式サイト更新
 
@@ -916,7 +916,7 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[最新安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) から
+[GitHub 公開安定版 v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 

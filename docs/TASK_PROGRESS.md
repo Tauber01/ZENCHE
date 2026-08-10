@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-10（Asia/Shanghai）
-> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；菜单层级、示波器空间与性能增量实现/桌面包源码 `0faeccdc987146c104fd73d742547c9baf9db221`，新聚合包已重建，最终双审进行中
+> 当前开发候选：`agent/1.5.10-login-layout`，1.5.11 / build 38；菜单层级、示波器空间、性能与 Windows AI 临时结果生命周期最终源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，新聚合包已通过 14 项一致性核对，最终双审正在收口
 > 公开状态：GitHub v1.5.3 仍为公开稳定版；官网自动更新继续提供 W14 的 1.5.10 / build 37，1.5.11 尚未部署、推送、打标签或创建 Release
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
@@ -18,8 +18,8 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；菜单层级、示波器空间与性能增量实现/桌面包打包源码为 `0faeccdc987146c104fd73d742547c9baf9db221`。macOS DMG 与 Windows Setup/ZIP 已按该提交重建并通过同名侧车、结构及签名属性回验；Android、iOS、HarmonyOS 沿用同一候选的既有包。新聚合包 SHA-256 为 `734051ea363f2d721947ba6a3a3dd2afd476b058a332a134081bb3bdb0f7074d`，14 项逐字节一致，最终双审正在收口。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
-- W15 已完成本轮源码增量：桌面编辑器把“专业显影 / AI 工具”与“调整类别”分成明确两级，RGB 示波器填满底部可用区；macOS 预览和示波器复用受控尺寸图像，Windows 合并高频刷新、复用示波器输入、空闲时停止时间码并释放位图。完整 `npm test` 495/495 通过，两端桌面编译和三包重建完成；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能仍需实机验收。
+- 当前开发候选为 **1.5.11 / build 38**，位于 `agent/1.5.10-login-layout`；菜单层级、示波器空间、性能与 Windows AI 临时结果生命周期最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`。Windows Setup/ZIP 已按该基线重建；最终基线相对 `0faeccdc987146c104fd73d742547c9baf9db221` 只有 Windows 专属实现与测试变化，macOS DMG 因而复用该提交已验证的同字节产物。Android、iOS、HarmonyOS 沿用同一候选的既有包。新聚合包 SHA-256 为 `cb3f511b294ab83177d9be8dff0c6cbf4c94ea6684755c6e64bbb9f2e5f2b883`，14 项逐字节一致；最终双审正在收口。GitHub 公开稳定版仍是 [v1.5.3](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.3)，官网自动更新继续提供 1.5.10 / build 37；1.5.11 尚未部署、推送、打标签或创建 GitHub Release。
+- W15 已完成本轮源码增量：桌面编辑器把“专业显影 / AI 工具”与“调整类别”分成明确两级，RGB 示波器填满底部可用区；macOS 预览和示波器复用受控尺寸图像，Windows 合并高频刷新、复用示波器输入、空闲时停止时间码，并在新结果替换、照片/模式切换、离开编辑页或关闭窗口时清理受限命名的 AI 临时结果和位图。完整 `npm test` 503/503 通过；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能仍需实机验收。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
@@ -49,7 +49,7 @@
 | 自动拍摄任务 | 已实现待验收 | 五端间隔、曝光包围、焦点包围、B 门静态测试通过 | 长任务、取消、断线、存储不足实测 |
 | 专业监看 | 已实现待验收 | 直方图、波形、矢量、峰值对焦、假色等五端检查通过 | 性能、色彩准确性和长时间运行验证 |
 | 实时监看开关与 iOS 相机桥接 | 已实现待验收 | 五端开关、Sony Camera Remote SDK 的 Mac 桥接、Nikon PTP 兼容桥接与局域网配对契约 | Sony/Nikon 真机、弱网、发热、长时间拉流和 iOS/macOS 联调 |
-| 登录动作清晰化与桌面工作区 | 已实现待验收 | `0faeccd`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 连续实时分隔条、清晰编辑层级、自适应 RGB 示波器、窄窗安全约束、渲染合并与资源释放；完整 495/495、桌面三包与 14 项聚合包通过 | 双审封板；macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能实机 |
+| 登录动作清晰化与桌面工作区 | 已实现待验收 | `831a823`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 连续实时分隔条、清晰编辑层级、自适应 RGB 示波器、窄窗安全约束、渲染合并、Windows AI 临时结果生命周期清理；完整 503/503，桌面包回验通过 | 聚合包与双审封板；macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能实机 |
 | 无线收图 | 已实现待验收 | 五端 FTP/HTTP/WebDAV 源码与文档存在 | 大文件、中断、并发、端口释放和相机 FTP 实测 |
 | 拍摄会话与交付 | 已实现待验收 | 命名、配对、评级、双备份、SHA-256 五端检查通过 | 恢复、磁盘异常、跨卷和大量文件压力测试 |
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
@@ -1178,5 +1178,6 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 实现：macOS 与 Windows 将“专业显影 / AI 工具”固定为一级“编辑模式”，把光线、色彩、色轮、曲线、取色器、蒙版、细节、效果和几何固定为二级“调整类别”；AI 不再作为二级重复入口。macOS 从 AI 返回时恢复上次专业分类，Windows 的模式入口在 AI 页仍保持可见。
 - 空间：macOS 示波器改为状态头在上、RGB 曲线填满剩余宽高；Windows 底部工具与示波器改为 3:2 自适应比例，不再使用固定 300 px 曲线列。两端均继续服从底部分隔条的连续调节与安全范围。
 - 性能：macOS 同一界面刷新只生成一份最大边 2048 的预览图供画面和示波器复用，完整分辨率仅用于保存/导出。Windows 以 33 ms 合并高频刷新，一次 1600 px 渲染同时供预览与 320 px 示波器采样；相同 RGB 数据不重复重绘，时间码只在录制期间运行，离开编辑页或关闭窗口时释放预览、AI 结果和示波器位图。
-- 验证与交付：实现与桌面包打包源码为 `0faeccdc987146c104fd73d742547c9baf9db221`；桌面专项 8/8、完整 `npm test` 495/495，三份 Apple strings lint、macOS 全源类型检查、Windows WPF 编译与 `git diff --check` 通过。Impeccable 最终检测为 0 条布局反模式。macOS DMG SHA-256 为 `c7b6239b145aaf66698712d136457bd220287c40ddb5802bfcb1e7195e483463`，Windows Setup 为 `8ca2ee5fdf97e65719f09420462b8edb8af336d92df808ce2796824f0ecc01c9`，Windows ZIP 为 `bd713a937c9c0dbbf880d943dad6bdcd9a1e23ca2a65e0f147f487fa600c913c`；三份侧车、ZIP/DMG 结构和 macOS 应用深度严格验签均通过。
-- 当前状态：新聚合包 SHA-256 为 `734051ea363f2d721947ba6a3a3dd2afd476b058a332a134081bb3bdb0f7074d`，根侧车、ZIP 完整性、六份内嵌侧车及 14 项逐字节一致性均通过；最终双审正在进行。未改移动端功能或生产清单，未部署、未推送、未打标签、未创建 Release。真实 macOS/Windows 拖拽、重启恢复、VoiceOver/Narrator、Windows 多显示器/DPI、安装及长时间 CPU/内存/帧率仍需实机验收。
+- P2 返修：Windows 新增集中式 AI 临时结果清理。只有系统临时目录下严格匹配 `zenche_ai_*.jpg` 的文件可被删除；先遗忘活动引用再尽力删除，删除失败不会阻断用户操作。新结果替换、AI 编辑/生成模式切换、照片切换、离开编辑页和窗口关闭均覆盖；AI 结果预览使用 `BitmapCacheOption.OnLoad` 立即释放文件句柄，保存到用户路径的正式副本不进入清理路径。异常退出可能留下至多一个活动文件，未做目录扫除以避免多实例竞态。
+- 验证与交付：最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；完整 `npm test` 503/503，三份 Apple strings lint、macOS 全源类型检查、Windows WPF 编译与 `git diff --check` 通过。Impeccable 最终检测为 0 条布局反模式。macOS DMG SHA-256 为 `c7b6239b145aaf66698712d136457bd220287c40ddb5802bfcb1e7195e483463`；Windows Setup 为 `4687c8220c2f6c59411b5a47ab5d4a58dfe93273a8dbb8165837c872e08df03f`，Windows ZIP 为 `b732db1f8e395b138a93138ab839636d6cb3c541a353c99ad40dfebca94ff965`。Windows 两包按最终源码重建；最终基线相对 `0faeccdc987146c104fd73d742547c9baf9db221` 只有 Windows 专属变化，macOS DMG 因而复用该提交已完成深度严格验签与 DMG 校验的同字节产物。三份侧车与 Windows ZIP 结构均已回验。
+- 当前状态：新聚合包 SHA-256 为 `cb3f511b294ab83177d9be8dff0c6cbf4c94ea6684755c6e64bbb9f2e5f2b883`，根侧车、ZIP 完整性、六份内嵌侧车及 14 项逐字节一致性均通过；最终双审正在进行。未改移动端功能或生产清单，未部署、未推送、未打标签、未创建 Release。真实 macOS/Windows 拖拽、重启恢复、VoiceOver/Narrator、Windows 多显示器/DPI、安装及长时间 CPU/内存/帧率仍需实机验收。

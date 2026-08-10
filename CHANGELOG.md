@@ -27,10 +27,12 @@
 - Reclaimed macOS AI workspace height by removing its duplicate section
   navigation and the unrelated generic edit footer; Windows AI modes and preset
   groups now reflow with the available panel width.
-- Separated the desktop editor's top-level Professional Develop and AI Tools
+- Separated the desktop editor's top-level Pro Develop and AI Tools
   modes from its Adjustment Groups, removing the ambiguous duplicate menu row.
 - Expanded the lower RGB scope to the available dock area and reduced duplicate
   preview rendering, idle timers, and retained editor bitmaps.
+- Added bounded cleanup for Windows AI temporary results when replacing a
+  result, switching photos or modes, leaving the editor, or closing the window.
 
 ### Known limitations
 
@@ -243,7 +245,7 @@ the project uses semantic versioning.
 
 ### Changed
 
-- Unified the AI editor announcement around the Professional Develop / AI Tools
+- Unified the AI editor announcement around the Pro Develop / AI Tools
   switch, server-side usage counting, and device-bound activation keys.
 - Removed the editable AI Server settings entry while keeping legacy configuration
   reads compatible; Nikon, Sony, and Canon camera profiles remain available.
