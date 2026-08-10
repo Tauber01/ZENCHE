@@ -35,6 +35,12 @@ public sealed class WaveformScope : FrameworkElement
         string green,
         string blue)
     {
+        if (string.Equals(_red, red, StringComparison.Ordinal) &&
+            string.Equals(_green, green, StringComparison.Ordinal) &&
+            string.Equals(_blue, blue, StringComparison.Ordinal))
+        {
+            return;
+        }
         _red = red;
         _green = green;
         _blue = blue;

@@ -632,6 +632,8 @@ internal static class AppLocalization
             ["无法预览："] = new("Unable to preview: ", "プレビューできません："),
             ["保存失败："] = new("Save failed: ", "保存に失敗しました："),
             ["专业显影"] = new("Pro Develop", "プロ現像"),
+            ["编辑模式"] = new("Edit Mode", "編集モード"),
+            ["调整类别"] = new("Adjustment Groups", "調整カテゴリー"),
             ["分组调整光线、色彩、细节、效果与几何；始终保留原文件。"] =
                 new(
                     "Adjust light, color, detail, effects, and geometry in focused groups while always preserving the original.",

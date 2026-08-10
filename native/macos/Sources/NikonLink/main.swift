@@ -10234,25 +10234,31 @@ private struct EditorScopeDock: View {
     let metrics: String?
 
     var body: some View {
-        HStack(spacing: SpaceToken.s12) {
-            VStack(alignment: .leading, spacing: SpaceToken.s4) {
-                RuntimeLocalizedText("编辑示波器")
-                    .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
-                    .foregroundStyle(Palette.editorLabel)
-                RuntimeLocalizedText(hasSource ? "本地图像分析" : "暂无图像源")
-                    .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(hasSource ? Palette.editorAccent : Palette.editorLabel)
+        VStack(alignment: .leading, spacing: SpaceToken.s8) {
+            HStack(alignment: .firstTextBaseline, spacing: SpaceToken.s12) {
+                VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                    RuntimeLocalizedText("编辑示波器")
+                        .font(.system(size: TypeScale.caption, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Palette.editorLabel)
+                    RuntimeLocalizedText(hasSource ? "本地图像分析" : "暂无图像源")
+                        .font(.system(size: TypeScale.caption, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(hasSource ? Palette.editorAccent : Palette.editorLabel)
+                }
+                Spacer(minLength: SpaceToken.s8)
                 if let metrics {
                     Text(metrics)
                         .font(.system(size: TypeScale.caption, weight: .medium, design: .monospaced))
                         .foregroundStyle(Palette.editorLabel)
                         .lineLimit(1)
+                        .truncationMode(.middle)
                 }
             }
-            .frame(width: 190, alignment: .leading)
             MacScopePlot(label: "RGB", traces: traces)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(1)
         }
         .padding(SpaceToken.s8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Palette.editorPanel)
     }
 }
@@ -10337,6 +10343,7 @@ private struct ImageEditorView: View {
     @StateObject private var branchStore = MacLibraryBranchStore()
     @State private var selectedPhotoURL: URL?
     @State private var selectedSection = EditorAdjustmentSection.light
+    @State private var lastProfessionalSection = EditorAdjustmentSection.light
     @State private var settings = ProfessionalEditSettings()
     @State private var selectedPreset = EditorPreset.original
     @State private var selectedNikonCloudPresetID: String?
@@ -10503,6 +10510,9 @@ private struct ImageEditorView: View {
                 nikonCloudPreviewNotice
             }
             GeometryReader { geometry in
+                // Preview and scope share one bounded render per SwiftUI pass.
+                // Full-resolution rendering is reserved for export.
+                let displayImage = editorDisplayImage
                 let bottomRange = DesktopWorkspaceLayout.editorBottomRange(
                     forAvailableHeight: geometry.size.height
                 )
@@ -10537,7 +10547,7 @@ private struct ImageEditorView: View {
                                 .foregroundStyle(Palette.whiteGhost)
                         }
                     } canvasArea: {
-                        preview
+                        preview(image: displayImage)
                             .background(Palette.editorBg)
                     } tools: {
                         editorSummaryRail
@@ -10557,7 +10567,7 @@ private struct ImageEditorView: View {
                             editorColorPanel
                         }
                         EditorScopeDock(
-                            traces: editorScopeTraces,
+                            traces: editorScopeTraces(for: displayImage),
                             hasSource: selectedPhoto != nil,
                             metrics: editorScopeMetrics
                         )
@@ -10608,6 +10618,7 @@ private struct ImageEditorView: View {
                         .foregroundStyle(Palette.editorLabel)
                 }
                 Spacer()
+                editorToolStrip
             }
             .padding(.horizontal, SpaceToken.s16)
             .frame(minHeight: 52)
@@ -10621,13 +10632,14 @@ private struct ImageEditorView: View {
     /// RGB density traces computed from the current editor image — the same
     /// source the preview renders (aiTools surfaces the AI result or original,
     /// every other section the rendered edit). Empty when no image is selected.
-    private var editorScopeTraces: [MacScopeTrace] {
-        let image: NSImage?
+    private var editorDisplayImage: NSImage? {
         if selectedSection == .aiTools {
-            image = aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil)
-        } else {
-            image = renderedImage
+            return aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil)
         }
+        return renderedImage(maxDimension: 2048)
+    }
+
+    private func editorScopeTraces(for image: NSImage?) -> [MacScopeTrace] {
         guard let image,
               let densities = MacEditorRGBDensity.compute(from: image) else { return [] }
         return [
@@ -10910,11 +10922,8 @@ private struct ImageEditorView: View {
         .background(Palette.editorRaised)
     }
 
-    private var preview: some View {
+    private func preview(image: NSImage?) -> some View {
         GeometryReader { proxy in
-            let image = selectedSection == .aiTools
-                ? (aiResultImage ?? (aiMode == .edit ? selectedOriginalImage : nil))
-                : renderedImage
             let imageRect = editorImageRect(
                 in: proxy.size,
                 imageSize: image?.size
@@ -11082,14 +11091,10 @@ private struct ImageEditorView: View {
         status = "已取样 \(settings.pickedColorHex) · 已微调色温/色调"
     }
 
-    /// fig2 下带左栏：调色面板 —— 工具条五钮 + 参数区 + 状态行 + 操作行，
-    /// 1px 分隔，直角平铺，无卡片包装。
+    /// fig2 下带左栏：二级调整类别 + 参数区 + 状态行 + 操作行；
+    /// 一级专业/AI 模式固定在标题栏，直角平铺，无卡片包装。
     private var editorColorPanel: some View {
         VStack(spacing: SpaceToken.s0) {
-            editorToolStrip
-            Rectangle()
-                .fill(Palette.editorRule)
-                .frame(height: 1)
             if selectedSection == .aiTools {
                 aiToolsPanel
             } else {
@@ -11110,15 +11115,30 @@ private struct ImageEditorView: View {
         }
     }
 
-    /// fig2 工具图标条：五枚图标+文字单色钮（图标 16pt 与文字同 tint），
-    /// 品牌橙标记当前工具；点击只路由既有 selectedSection，无新增状态。
+    /// fig2 一级模式条：只负责“专业显影 / AI 工具”两种稳定模式。
+    /// 具体调整组由下方二级选择器承担，避免同名入口重复出现。
     private var editorToolStrip: some View {
         HStack(spacing: SpaceToken.s8) {
-            editorToolButton(.wheels, icon: .colorWheel)
-            editorToolButton(.curves, icon: .curve)
-            editorToolButton(.masks, icon: .mask)
-            editorToolButton(.geometry, icon: .geometry)
-            editorToolButton(.aiTools, icon: .ai)
+            RuntimeLocalizedText("编辑模式")
+                .font(.system(size: TypeScale.caption, weight: .semibold))
+                .foregroundStyle(Palette.editorLabel)
+            editorModeButton(
+                title: "专业显影",
+                icon: .colorWheel,
+                active: selectedSection != .aiTools
+            ) {
+                selectedSection = lastProfessionalSection
+            }
+            editorModeButton(
+                title: "AI 工具",
+                icon: .ai,
+                active: selectedSection == .aiTools
+            ) {
+                if selectedSection != .aiTools {
+                    lastProfessionalSection = selectedSection
+                }
+                selectedSection = .aiTools
+            }
             Spacer(minLength: 0)
             if selectedSection == .aiTools, aiResultImage != nil {
                 Button { aiResultImage = nil } label: {
@@ -11131,15 +11151,14 @@ private struct ImageEditorView: View {
         .padding(.vertical, SpaceToken.s8)
     }
 
-    private func editorToolButton(
-        _ section: EditorAdjustmentSection,
-        icon: EditorToolIcon
+    private func editorModeButton(
+        title: String,
+        icon: EditorToolIcon,
+        active: Bool,
+        action: @escaping () -> Void
     ) -> some View {
-        let active = selectedSection == section
         let tint = active ? Palette.editorAccent : Palette.editorLabel
-        return Button {
-            selectedSection = section
-        } label: {
+        return Button(action: action) {
             HStack(spacing: SpaceToken.s8) {
                 EditorToolIconShape(icon: icon)
                     .stroke(
@@ -11151,7 +11170,7 @@ private struct ImageEditorView: View {
                         )
                     )
                     .frame(width: 16, height: 16)
-                Text(LocalizedStringKey(section.rawValue))
+                Text(LocalizedStringKey(title))
                     .font(.system(size: TypeScale.caption, weight: .semibold))
                     .foregroundStyle(tint)
             }
@@ -11341,17 +11360,26 @@ private struct ImageEditorView: View {
     }
 
     private var sectionSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SpaceToken.s4) {
-                ForEach(EditorAdjustmentSection.allCases) { section in
-                    Button(LocalizedStringKey(section.rawValue)) {
-                        selectedSection = section
-                    }
-                    .buttonStyle(
-                        EditorSectionButtonStyle(
-                            selected: selectedSection == section
+        HStack(spacing: SpaceToken.s8) {
+            RuntimeLocalizedText("调整类别")
+                .font(.system(size: TypeScale.caption, weight: .semibold))
+                .foregroundStyle(Palette.editorLabel)
+                .fixedSize()
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SpaceToken.s4) {
+                    ForEach(
+                        EditorAdjustmentSection.allCases.filter { $0 != .aiTools }
+                    ) { section in
+                        Button(LocalizedStringKey(section.rawValue)) {
+                            selectedSection = section
+                            lastProfessionalSection = section
+                        }
+                        .buttonStyle(
+                            EditorSectionButtonStyle(
+                                selected: selectedSection == section
+                            )
                         )
-                    )
+                    }
                 }
             }
         }
@@ -11739,7 +11767,7 @@ private var curvesControls: some View {
         }
     }
 
-    private var renderedImage: NSImage? {
+    private func renderedImage(maxDimension: CGFloat? = nil) -> NSImage? {
         guard let selectedPhoto else { return nil }
         let source =
             CIImage(contentsOf: selectedPhoto.url)
@@ -11754,7 +11782,15 @@ private var curvesControls: some View {
             output = applyGeometry(to: output, using: settings)
             output = applyingEditorMask(to: output, using: settings)
         }
-        let extent = output.extent.integral
+        var extent = output.extent.integral
+        if let maxDimension,
+           max(extent.width, extent.height) > maxDimension {
+            let scale = maxDimension / max(extent.width, extent.height)
+            output = output.transformed(
+                by: CGAffineTransform(scaleX: scale, y: scale)
+            )
+            extent = output.extent.integral
+        }
         guard let cgImage = context.createCGImage(output, from: extent) else {
             return nil
         }
@@ -12696,7 +12732,7 @@ private var curvesControls: some View {
         let wasShowingOriginal = showingOriginal
         showingOriginal = false
         guard let selectedPhoto,
-              let renderedImage,
+              let renderedImage = renderedImage(),
               let cgImage = renderedImage.cgImage(
                 forProposedRect: nil,
                 context: nil,

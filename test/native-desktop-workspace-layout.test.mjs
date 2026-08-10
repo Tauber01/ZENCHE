@@ -145,6 +145,63 @@ test('Windows 原生 GridSplitter 可调主导航、拍摄参数与编辑区', a
   );
 });
 
+test('桌面编辑器以模式和调整类别分级，并让波形填满自适应分析区', async () => {
+  const [mac, windowsXaml, windowsCode] = await Promise.all([
+    read('native/macos/Sources/NikonLink/main.swift'),
+    read('native/windows/MainWindow.xaml'),
+    read('native/windows/MainWindow.xaml.cs')
+  ]);
+
+  const macModeStrip = mac.slice(
+    mac.indexOf('private var editorToolStrip'),
+    mac.indexOf('private func editorModeButton')
+  );
+  assert.match(macModeStrip, /RuntimeLocalizedText\("编辑模式"\)/);
+  assert.match(macModeStrip, /title: "专业显影"/);
+  assert.match(macModeStrip, /title: "AI 工具"/);
+  assert.doesNotMatch(macModeStrip, /editorToolButton\(\.wheels/);
+  assert.match(mac, /RuntimeLocalizedText\("调整类别"\)/);
+  assert.match(mac, /EditorAdjustmentSection\.allCases\.filter \{ \$0 != \.aiTools \}/);
+  const macScope = mac.slice(
+    mac.indexOf('private struct EditorScopeDock'),
+    mac.indexOf('private enum MacEditorRGBDensity')
+  );
+  assert.match(macScope, /VStack\(alignment: \.leading/);
+  assert.match(macScope, /MacScopePlot[\s\S]*\.frame\(maxWidth: \.infinity, maxHeight: \.infinity\)/);
+  assert.doesNotMatch(macScope, /\.frame\(width: 190/);
+
+  assert.match(windowsXaml, /x:Name="EditorModePro"[\s\S]{0,220}Tag="pro"/);
+  assert.match(windowsXaml, /x:Name="EditorModeAi"[\s\S]{0,220}Tag="ai"/);
+  assert.doesNotMatch(windowsXaml, /x:Name="EditorTool(?:Wheels|Curves|Mask|Geometry|Ai)"/);
+  assert.match(windowsXaml, /Text="调整类别"/);
+  assert.match(windowsXaml, /<ColumnDefinition Width="3\*" \/>[\s\S]{0,80}<ColumnDefinition Width="2\*" \/>/);
+  assert.match(windowsCode, /SetEditorToolActive\(EditorModePro, tool != "ai"\)/);
+  assert.match(windowsCode, /SetEditorToolActive\(EditorModeAi, tool == "ai"\)/);
+});
+
+test('桌面编辑预览合并高频更新并复用同一帧生成波形', async () => {
+  const [mac, windowsCode, waveform] = await Promise.all([
+    read('native/macos/Sources/NikonLink/main.swift'),
+    read('native/windows/MainWindow.xaml.cs'),
+    read('native/windows/Controls/WaveformScope.cs')
+  ]);
+  assert.match(mac, /let displayImage = editorDisplayImage/);
+  assert.match(mac, /preview\(image: displayImage\)/);
+  assert.match(mac, /editorScopeTraces\(for: displayImage\)/);
+  assert.match(mac, /renderedImage\(maxDimension: 2048\)/);
+  assert.match(windowsCode, /_editorPreviewTimer[\s\S]*TimeSpan\.FromMilliseconds\(33\)/);
+  assert.match(windowsCode, /private void RenderEditorPreviewNow\(\)/);
+  assert.match(windowsCode, /UpdateEditorScopeWaveform\(previewBitmap\)/);
+  const scopeUpdate = windowsCode.slice(
+    windowsCode.indexOf('private void UpdateEditorScopeWaveform'),
+    windowsCode.indexOf('private void EditorPreviewImage_MouseLeftButtonDown')
+  );
+  assert.doesNotMatch(scopeUpdate, /RenderEditedBitmap\(/);
+  assert.match(windowsCode, /_monitorTimecodeTimer\.Start\(\);[\s\S]{0,160}else if \(!_videoRecording/);
+  assert.match(waveform, /string\.Equals\(_red, red, StringComparison\.Ordinal\)/);
+  assert.match(waveform, /return;[\s\S]{0,120}_red = red/);
+});
+
 test('登录墙继续位于工作区分隔条之上', async () => {
   const xaml = await read('native/windows/MainWindow.xaml');
   assert.match(xaml, /x:Name="AuthWall"[\s\S]*Panel\.ZIndex="100"/);

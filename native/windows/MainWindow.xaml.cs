@@ -805,6 +805,9 @@ public partial class MainWindow : Window
     private DateTime? _recordingStartedAt;
     private readonly System.Windows.Threading.DispatcherTimer _monitorTimecodeTimer =
         new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly System.Windows.Threading.DispatcherTimer _editorPreviewTimer =
+        new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private bool _editorPreviewPending;
     private int _previewAnalysisSequence;
     private double _videoFrameRate = 30;
     private double _videoShutterAngle = 180;
@@ -1353,7 +1356,16 @@ public partial class MainWindow : Window
         _authCodeTimer.Tick += AuthCodeTimer_Tick;
         CameraStorageList.ItemsSource = _cameraStorageRows;
         _monitorTimecodeTimer.Tick += (_, _) => UpdateMonitorTimecode();
-        _monitorTimecodeTimer.Start();
+        _editorPreviewTimer.Tick += (_, _) =>
+        {
+            _editorPreviewTimer.Stop();
+            if (!_editorPreviewPending || _shutdownStarted)
+            {
+                return;
+            }
+            _editorPreviewPending = false;
+            RenderEditorPreviewNow();
+        };
         BuildEditorAdjustmentControls();
         EditorPresetBox.SelectedIndex = 0;
         NikonCloudPresetBox.Items.Add(new ComboBoxItem
@@ -4793,6 +4805,14 @@ public partial class MainWindow : Window
 
     private void UpdateRecordingState()
     {
+        if (_videoRecording && !_monitorTimecodeTimer.IsEnabled)
+        {
+            _monitorTimecodeTimer.Start();
+        }
+        else if (!_videoRecording && _monitorTimecodeTimer.IsEnabled)
+        {
+            _monitorTimecodeTimer.Stop();
+        }
         UpdateMonitorTimecode();
         if (_videoMode)
         {
@@ -5556,8 +5576,17 @@ public partial class MainWindow : Window
                 EditorHeaderTitle.Text = AppLocalization.T("专业显影");
                 EditorHeaderSubtitle.Text = AppLocalization.T(
                     "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
+                UpdateEditorToolStrip("pro");
             }
             RefreshImageEditor();
+        }
+        else
+        {
+            _editorPreviewTimer.Stop();
+            _editorPreviewPending = false;
+            EditorPreviewImage.Source = null;
+            AiPreviewImage.Source = null;
+            EditorScopeWaveform.SetData("—", "—", "—");
         }
         ShootingTaskPanel.Visibility =
             destination == "capture"
@@ -8823,6 +8852,7 @@ public partial class MainWindow : Window
         EditorHeaderTitle.Text = AppLocalization.T("AI 工具");
         EditorHeaderSubtitle.Text = AppLocalization.T(
             "基于 nano-banana-2 模型的 AI 修图与生图；需在设置中输入激活码解锁。");
+        UpdateEditorToolStrip("ai");
         EditorProGrid.Visibility = Visibility.Collapsed;
         EditorAiGrid.Visibility = Visibility.Visible;
         ApplyResponsiveEditorLayout();
@@ -10364,6 +10394,7 @@ public partial class MainWindow : Window
         if (tool == "ai")
         {
             _editorInAiMode = true;
+            UpdateEditorToolStrip("ai");
             RefreshAiEditor();
             return;
         }
@@ -10373,30 +10404,15 @@ public partial class MainWindow : Window
         EditorHeaderTitle.Text = AppLocalization.T("专业显影");
         EditorHeaderSubtitle.Text = AppLocalization.T(
             "分组调整光线、色彩、细节、效果与几何；始终保留原文件。");
-        UpdateEditorToolStrip(tool);
-        var index = tool switch
-        {
-            "wheels" => 4,
-            "curves" => 5,
-            "mask" => 7,
-            "geometry" => 8,
-            _ => -1
-        };
-        if (index >= 0 && index < EditorAdjustmentHost.Children.Count &&
-            EditorAdjustmentHost.Children[index] is FrameworkElement target)
-        {
-            target.BringIntoView();
-        }
+        UpdateEditorToolStrip("pro");
+        UpdateEditorPreview();
     }
 
     private void UpdateEditorToolStrip(string tool)
     {
         // fig2 tool strip selection indicator (pure UI; no editor state machine).
-        SetEditorToolActive(EditorToolWheels, tool == "wheels");
-        SetEditorToolActive(EditorToolCurves, tool == "curves");
-        SetEditorToolActive(EditorToolMask, tool == "mask");
-        SetEditorToolActive(EditorToolGeometry, tool == "geometry");
-        SetEditorToolActive(EditorToolAi, tool == "ai");
+        SetEditorToolActive(EditorModePro, tool != "ai");
+        SetEditorToolActive(EditorModeAi, tool == "ai");
     }
 
     private void SetEditorToolActive(Button button, bool active)
@@ -10761,25 +10777,42 @@ public partial class MainWindow : Window
 
     private void UpdateEditorPreview()
     {
-        UpdateEditorScopeWaveform();
+        // Slider and direct-manipulation events may arrive faster than the UI
+        // can filter a preview. Coalesce them to one render per display frame.
+        _editorPreviewPending = true;
+        if (!_editorPreviewTimer.IsEnabled)
+        {
+            _editorPreviewTimer.Start();
+        }
+    }
+
+    private void RenderEditorPreviewNow()
+    {
+        if (_currentDestination != "editor" || _editorInAiMode)
+        {
+            return;
+        }
         if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
             !File.Exists(_editorSelectedPath))
         {
             EditorPreviewImage.Source = null;
             EditorPreviewEmpty.Visibility = Visibility.Visible;
             SaveEditedPhotoButton.IsEnabled = false;
+            EditorScopeWaveform.SetData("—", "—", "—");
             return;
         }
         try
         {
-            EditorPreviewImage.Source = RenderEditedBitmap(
+            var previewBitmap = RenderEditedBitmap(
                 _editorSelectedPath,
                 _editorAdjustments,
                 _selectedNikonCloudPreset,
                 1600);
+            EditorPreviewImage.Source = previewBitmap;
             EditorPreviewEmpty.Visibility = Visibility.Collapsed;
             SaveEditedPhotoButton.IsEnabled = true;
             RedrawEditorMaskOverlay();
+            UpdateEditorScopeWaveform(previewBitmap);
         }
         catch (Exception error)
         {
@@ -10791,24 +10824,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateEditorScopeWaveform()
+    private void UpdateEditorScopeWaveform(BitmapSource previewBitmap)
     {
-        // 编辑页波形：从当前编辑图（预览同图源）计算 RGB 密度，
-        // 复用视频页 ProfessionalMonitor 的 S64x48 契约与 WaveformScope 绘制。
-        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
-            !File.Exists(_editorSelectedPath))
-        {
-            EditorScopeWaveform.SetData("—", "—", "—");
-            return;
-        }
+        // 编辑页波形复用本帧预览，不再二次解码和滤镜渲染。
         try
         {
-            var bitmap = RenderEditedBitmap(
-                _editorSelectedPath,
-                _editorAdjustments,
-                _selectedNikonCloudPreset,
-                320);
-            var monitor = ProfessionalMonitor.Process(bitmap, false, false);
+            BitmapSource scopeBitmap = previewBitmap;
+            if (previewBitmap.PixelWidth > 320)
+            {
+                var scale = 320d / previewBitmap.PixelWidth;
+                scopeBitmap = new TransformedBitmap(
+                    previewBitmap,
+                    new ScaleTransform(scale, scale));
+                scopeBitmap.Freeze();
+            }
+            var monitor = ProfessionalMonitor.Process(
+                scopeBitmap,
+                false,
+                false);
             EditorScopeWaveform.SetData(
                 monitor.RedHistogram,
                 monitor.GreenHistogram,
@@ -12156,6 +12189,10 @@ public partial class MainWindow : Window
         SaveWorkspaceLayout();
         Closing -= Window_Closing;
         _monitorTimecodeTimer.Stop();
+        _editorPreviewTimer.Stop();
+        _editorPreviewPending = false;
+        EditorPreviewImage.Source = null;
+        AiPreviewImage.Source = null;
         StopWifiMonitoring();
         StopWifiPreviewLoop();
         if (_immersivePreviewWindow is { } immersive)

@@ -448,6 +448,8 @@
 "保存编辑副本失败" = "Failed to save the edited copy";
 "已保存副本" = "Saved copy";
 "专业显影" = "Pro Develop";
+"编辑模式" = "Edit Mode";
+"调整类别" = "Adjustment Groups";
 "分组调整光线、色彩、细节、效果与几何；始终保留原文件。" = "Adjust light, color, detail, effects, and geometry in focused groups while always preserving the original.";
 "光线" = "Light";
 "色彩" = "Color";
