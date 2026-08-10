@@ -276,44 +276,44 @@ final class LocalCameraController implements AutoCloseable {
             pendingCapture = future;
             pendingCaptureTimestampNanos = Long.MAX_VALUE;
         }
-        CaptureRequest.Builder builder = activeDevice.createCaptureRequest(
-                CameraDevice.TEMPLATE_STILL_CAPTURE);
-        builder.addTarget(activeReader.getSurface());
-        builder.set(
-                CaptureRequest.CONTROL_AF_MODE,
-                preferredAfMode);
-        builder.set(
-                CaptureRequest.CONTROL_AE_MODE,
-                CaptureRequest.CONTROL_AE_MODE_ON);
-        activeSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
-            @Override public void onCaptureStarted(
-                    CameraCaptureSession captureSession,
-                    CaptureRequest request,
-                    long timestamp,
-                    long frameNumber) {
-                synchronized (stateLock) {
-                    if (pendingCapture == future) {
-                        pendingCaptureTimestampNanos = timestamp;
+        try {
+            CaptureRequest.Builder builder = activeDevice.createCaptureRequest(
+                    CameraDevice.TEMPLATE_STILL_CAPTURE);
+            builder.addTarget(activeReader.getSurface());
+            builder.set(
+                    CaptureRequest.CONTROL_AF_MODE,
+                    preferredAfMode);
+            builder.set(
+                    CaptureRequest.CONTROL_AE_MODE,
+                    CaptureRequest.CONTROL_AE_MODE_ON);
+            activeSession.capture(builder.build(), new CameraCaptureSession.CaptureCallback() {
+                @Override public void onCaptureStarted(
+                        CameraCaptureSession captureSession,
+                        CaptureRequest request,
+                        long timestamp,
+                        long frameNumber) {
+                    synchronized (stateLock) {
+                        if (pendingCapture == future) {
+                            pendingCaptureTimestampNanos = timestamp;
+                        }
                     }
                 }
-            }
 
-            @Override public void onCaptureFailed(
-                    CameraCaptureSession captureSession,
-                    CaptureRequest request,
-                    android.hardware.camera2.CaptureFailure failure) {
-                future.completeExceptionally(
-                        new IllegalStateException("本机摄像头拍摄失败"));
-            }
+                @Override public void onCaptureFailed(
+                        CameraCaptureSession captureSession,
+                        CaptureRequest request,
+                        android.hardware.camera2.CaptureFailure failure) {
+                    future.completeExceptionally(
+                            new IllegalStateException("本机摄像头拍摄失败"));
+                }
 
-            @Override public void onCaptureCompleted(
-                    CameraCaptureSession captureSession,
-                    CaptureRequest request,
-                    TotalCaptureResult result) {
-                // JPEG delivery is completed by the ImageReader callback.
-            }
-        }, cameraHandler);
-        try {
+                @Override public void onCaptureCompleted(
+                        CameraCaptureSession captureSession,
+                        CaptureRequest request,
+                        TotalCaptureResult result) {
+                    // JPEG delivery is completed by the ImageReader callback.
+                }
+            }, cameraHandler);
             return future.get(12, TimeUnit.SECONDS);
         } finally {
             synchronized (stateLock) {

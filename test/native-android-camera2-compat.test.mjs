@@ -53,4 +53,8 @@ test('shared JPEG mode separates still capture frames from preview frames by sen
   );
   assert.match(source, /future\.complete\(jpeg\)/);
   assert.match(source, /setRepeatingRequest\(previewRequest, null, cameraHandler\)/);
+  assert.match(
+    source,
+    /pendingCaptureTimestampNanos = Long\.MAX_VALUE;\s*}\s*try \{\s*CaptureRequest\.Builder builder[\s\S]*activeSession\.capture[\s\S]*return future\.get\(12, TimeUnit\.SECONDS\);\s*} finally \{/,
+  );
 });
