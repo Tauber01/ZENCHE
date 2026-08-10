@@ -1181,3 +1181,10 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - P2 返修：Windows 新增集中式 AI 临时结果清理。只有系统临时目录下严格匹配 `zenche_ai_*.jpg` 的文件可被删除；先遗忘活动引用再尽力删除，删除失败不会阻断用户操作。新结果替换、AI 编辑/生成模式切换、照片切换、离开编辑页和窗口关闭均覆盖；AI 结果预览使用 `BitmapCacheOption.OnLoad` 立即释放文件句柄，保存到用户路径的正式副本不进入清理路径。异常退出可能留下至多一个活动文件，未做目录扫除以避免多实例竞态。
 - 验证与交付：最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；完整 `npm test` 503/503，三份 Apple strings lint、macOS 全源类型检查、Windows WPF 编译与 `git diff --check` 通过。Impeccable 最终检测为 0 条布局反模式。macOS DMG SHA-256 为 `c7b6239b145aaf66698712d136457bd220287c40ddb5802bfcb1e7195e483463`；Windows Setup 为 `4687c8220c2f6c59411b5a47ab5d4a58dfe93273a8dbb8165837c872e08df03f`，Windows ZIP 为 `b732db1f8e395b138a93138ab839636d6cb3c541a353c99ad40dfebca94ff965`。Windows 两包按最终源码重建；最终基线相对 `0faeccdc987146c104fd73d742547c9baf9db221` 只有 Windows 专属变化，macOS DMG 因而复用该提交已完成深度严格验签与 DMG 校验的同字节产物。三份侧车与 Windows ZIP 结构均已回验。
 - 当前状态：最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，根侧车、ZIP 完整性、六份内嵌侧车及 14 项逐字节一致性均通过。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、签名事实、生产边界、去 AI 痕迹、六包哈希和聚合内容无实体问题，其上一轮唯一 P2 为材料仍写“复核进行中”，现已完成状态回填。未改移动端功能或生产清单，未部署、未推送、未打标签、未创建 Release。真实 macOS/Windows 拖拽、重启恢复、VoiceOver/Narrator、Windows 多显示器/DPI、安装及长时间 CPU/内存/帧率仍需实机验收。
+
+## 12.56 Android Nikon Z50 拍摄后 DeviceBusy 恢复（2026-08-10）
+
+- 用户日志显示 `CaptureToSdram` 后的 `GetObject (0x1009)` 连续返回 `DeviceBusy (0x2009)`；第 4 次警告到最终失败仅约 29 ms。根因是旧实现虽然循环 4 次，但只调用可能提前成功的 `DeviceReady`，没有强制等待，相机写入 JPEG 时会在极短时间内耗尽全部重试。
+- Android `PtpCamera` 将对象下载恢复收口为独立方法：最多 9 次、最长 20 秒，按 300/600/1200/2400/4000 ms 封顶退避；每轮读取 `DeviceReady` 和 `GetEvent`，若机身补发最终 SDRAM 句柄则切换句柄后再下载。恢复路径没有 `CaptureToSdram`，不会重复拍摄；非 `0x2009 + 0x1009` 错误立即失败，线程中断保留中断状态。
+- 验证：`test/known-issue-regressions.test.mjs` 定向 9/9 通过；使用 Android 35 `android.jar` 与基线完整 Debug classpath 对修改后的 `PtpCamera.java` 单独执行 Java 8 `javac`，编译通过（仅 `-source 8` 引导类路径提示）。完整 `npm test` 与 Gradle 编译在受限执行环境中均因禁止回环 socket（`listen EPERM 127.0.0.1` / Gradle daemon socket）未能启动完整门禁，不属于源码测试失败，合入前必须在允许本机回环的环境复跑。
+- 边界：尚未持有 Nikon Z50 对不同固件、存储卡速度、RAW/JPEG 模式和 OPPO Android 14 USB 主机组合做真机拍摄；本分支未推送、未部署、未打标签或发布安装包。

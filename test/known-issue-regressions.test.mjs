@@ -92,8 +92,27 @@ test("direct camera capture waits for readiness and retries busy downloads", asy
   ]);
 
   assert.match(android, /waitUntilDeviceReady\(6_000\)/);
-  assert.match(android, /message\.contains\("0x2009"\)/);
-  assert.match(android, /for \(int attempt = 0; attempt < 4; attempt\+\+\)/);
+  assert.match(android, /CAPTURE_OBJECT_DOWNLOAD_ATTEMPTS = 9/);
+  assert.match(android, /CAPTURE_OBJECT_BUSY_TIMEOUT_MILLIS = 20_000L/);
+  assert.match(android, /downloadCapturedObjectWithRecovery\(handle\)/);
+  assert.match(android, /isPtpResponse\(error, 0x2009, GET_OBJECT\)/);
+  assert.match(android, /captureObjectBackoffMillis\(attempt\)/);
+  assert.match(android, /sleepCaptureRecovery\(delay\)/);
+  assert.match(android, /300L << Math\.min\(Math\.max\(failedAttempt - 1, 0\), 4\)/);
+  assert.match(android, /Math\.min\(exponential, 4_000L\)/);
+  assert.match(
+    android,
+    /findSdramObject\(\s*transact\(GET_EVENT, null, null, 3_000\)\)/,
+  );
+  const recovery = android.slice(
+    android.indexOf('private byte[] downloadCapturedObjectWithRecovery'),
+    android.indexOf('private static long captureObjectBackoffMillis'),
+  );
+  assert.doesNotMatch(
+    recovery,
+    /CAPTURE_TO_SDRAM/,
+    'busy download recovery must never fire the shutter again',
+  );
   assert.doesNotMatch(
     androidActivity,
     /if \(packet\.monitoring\) \{\s*decodeOpts\.inSampleSize = 2;/,

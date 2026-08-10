@@ -122,6 +122,8 @@ final class PtpCamera {
     private static final int USB_RECIPIENT_ENDPOINT = 0x02;
     private static final int PTP_USB_REQUEST_RESET = 0x66;
     private static final int CONNECT_ATTEMPTS = 3;
+    private static final int CAPTURE_OBJECT_DOWNLOAD_ATTEMPTS = 9;
+    private static final long CAPTURE_OBJECT_BUSY_TIMEOUT_MILLIS = 20_000L;
     private static final int EXPOSURE_TIME = 0x500d;
     private static final int NIKON_EXPOSURE_TIME = 0xd100;
     private static final int NIKON_MOVIE_EXPOSURE_TIME = 0xd1a8;
@@ -623,35 +625,7 @@ final class PtpCamera {
                 waitUntilDeviceReady(8_000);
                 handle = 0xffff0001L;
             }
-            byte[] objectData = null;
-            Exception objectError = null;
-            for (int attempt = 0; attempt < 4; attempt++) {
-                try {
-                    objectData = transact(
-                            GET_OBJECT,
-                            new long[]{handle},
-                            null,
-                            60_000);
-                    break;
-                } catch (Exception error) {
-                    objectError = error;
-                    String message = error.getMessage();
-                    if (message == null || !message.contains("0x2009")) {
-                        throw error;
-                    }
-                    diagnostics.warning(
-                            "capture",
-                            cameraName()
-                                    + " 读取照片时相机忙，第 "
-                                    + (attempt + 1)
-                                    + " 次重试："
-                                    + message);
-                    waitUntilDeviceReady(3_000);
-                }
-            }
-            if (objectData == null && objectError != null) {
-                throw objectError;
-            }
+            byte[] objectData = downloadCapturedObjectWithRecovery(handle);
             byte[] jpeg = extractJpeg(objectData);
             waitUntilDeviceReady(8_000);
             return jpeg;
@@ -677,6 +651,135 @@ final class PtpCamera {
             if (resumeLiveView) {
                 resumeLiveViewAfterExclusiveOperation();
             }
+        }
+    }
+
+    /**
+     * Nikon may acknowledge DeviceReady before its SDRAM JPEG is readable. In
+     * particular, the Z50 can keep returning DeviceBusy for GetObject while it
+     * finishes the file. Retrying immediately only burns through the retry
+     * budget in a few milliseconds, so every busy response gets a mandatory,
+     * bounded backoff. We also drain GetEvent again because some bodies replace
+     * the provisional SDRAM handle with the final handle after the first busy
+     * response. This method never issues CaptureToSdram, so recovery cannot
+     * create a duplicate exposure.
+     */
+    private byte[] downloadCapturedObjectWithRecovery(long initialHandle)
+            throws Exception {
+        long handle = initialHandle;
+        long startedAt = System.currentTimeMillis();
+        long deadline = startedAt + CAPTURE_OBJECT_BUSY_TIMEOUT_MILLIS;
+        Exception finalError = null;
+        for (int attempt = 1;
+             attempt <= CAPTURE_OBJECT_DOWNLOAD_ATTEMPTS;
+             attempt++) {
+            try {
+                return transact(
+                        GET_OBJECT,
+                        new long[]{handle},
+                        null,
+                        60_000);
+            } catch (Exception error) {
+                if (!isPtpResponse(error, 0x2009, GET_OBJECT)) {
+                    throw error;
+                }
+                finalError = error;
+                long remaining = deadline - System.currentTimeMillis();
+                if (attempt == CAPTURE_OBJECT_DOWNLOAD_ATTEMPTS
+                        || remaining <= 0) {
+                    break;
+                }
+                long delay = Math.min(
+                        captureObjectBackoffMillis(attempt),
+                        remaining);
+                diagnostics.warning(
+                        "capture",
+                        cameraName()
+                                + " 已完成拍摄，但照片仍在写入；GetObject 第 "
+                                + attempt
+                                + "/"
+                                + CAPTURE_OBJECT_DOWNLOAD_ATTEMPTS
+                                + " 次遇到相机忙，将等待 "
+                                + delay
+                                + " ms 后刷新对象状态："
+                                + error.getMessage());
+                sleepCaptureRecovery(delay);
+                handle = refreshCapturedObjectState(handle);
+            }
+        }
+        throw new Exception(
+                cameraName()
+                        + " 已完成拍摄，但照片在有界恢复 "
+                        + Math.max(
+                                1L,
+                                (System.currentTimeMillis() - startedAt + 999L)
+                                        / 1_000L)
+                        + " 秒后仍未可读取；未再次触发快门。"
+                        + "请等待机身存储指示灯熄灭后重试，并检查存储卡写入速度。",
+                finalError);
+    }
+
+    private long refreshCapturedObjectState(long currentHandle)
+            throws Exception {
+        try {
+            transact(DEVICE_READY, null, null, 3_000);
+        } catch (Exception error) {
+            if (!isPtpResponse(error, 0x2009, DEVICE_READY)) {
+                throw error;
+            }
+        }
+        try {
+            long refreshedHandle = findSdramObject(
+                    transact(GET_EVENT, null, null, 3_000));
+            if (refreshedHandle != 0 && refreshedHandle != currentHandle) {
+                diagnostics.info(
+                        "capture",
+                        cameraName()
+                                + " 已刷新拍摄对象句柄："
+                                + Long.toUnsignedString(currentHandle)
+                                + " → "
+                                + Long.toUnsignedString(refreshedHandle));
+                return refreshedHandle;
+            }
+        } catch (Exception error) {
+            if (!isPtpResponse(error, 0x2009, GET_EVENT)) {
+                throw error;
+            }
+        }
+        return currentHandle;
+    }
+
+    private static long captureObjectBackoffMillis(int failedAttempt) {
+        long exponential = 300L << Math.min(Math.max(failedAttempt - 1, 0), 4);
+        return Math.min(exponential, 4_000L);
+    }
+
+    private static boolean isPtpResponse(
+            Throwable error,
+            int responseCode,
+            int operation) {
+        String response = String.format(Locale.US, "0x%04X", responseCode);
+        String operationText = String.format(Locale.US, "0x%04X", operation);
+        for (Throwable current = error;
+             current != null;
+             current = current.getCause()) {
+            String message = current.getMessage();
+            if (message != null
+                    && message.contains(response)
+                    && message.contains(operationText)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void sleepCaptureRecovery(long delayMillis)
+            throws InterruptedException {
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw interrupted;
         }
     }
 
