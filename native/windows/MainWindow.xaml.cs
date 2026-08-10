@@ -9276,8 +9276,8 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 仅当 path 确属本应用写入系统临时目录的 zenche_ai_*.jpg 时尽力
-    /// 删除，否则原样忽略。删除失败（如文件正被占用）静默容忍，遗留
-    /// 文件在下次生命周期切换时重试。
+    /// 删除，否则原样忽略。删除失败（如文件正被占用）静默容忍；异常
+    /// 退出或瞬时占用可能遗留单个文件，避免目录级清扫与另一实例竞态。
     /// </summary>
     private static void TryDeleteAiTempFile(string? path)
     {
