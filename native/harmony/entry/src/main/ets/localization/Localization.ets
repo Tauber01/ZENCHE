@@ -1268,21 +1268,21 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '調整は常に新しいコピーへ保存され、元のファイルは変更されません。'
   ),
   new TranslationEntry(
-    '• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n' +
-      '• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n' +
-      '• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n' +
-      '• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n' +
-      '• 1.5.11 为本地开发验证候选；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。',
-    '• Sign-in mode choices now read Existing Account and Create Account on all five platforms. The actual sign-in button remains visible while the request is in progress, so selecting a mode no longer looks like an unresponsive login attempt.\n' +
-      '• macOS and Windows add a desktop workspace layout. Both restore main-window size and position; Windows also restores the maximized state.\n' +
-      '• Drag to resize the main navigation, capture controls, editor media pool, tool panel, and lower tool area. Splitters also support keyboard input and accessible names.\n' +
-      '• New Default, Capture, Monitor, Edit, and Compact presets are available, along with one-click restoration of the default layout.\n' +
-      '• Version 1.5.11 is a local development-validation candidate. Signing status varies by platform; verify the SHA-256 and review the per-package notes before installation. The Windows layout still requires multi-monitor and DPI validation on Windows hardware.',
-    '• 5 プラットフォームのログイン画面で、モード選択を「既存のアカウント」と「新規登録」に分けました。実際のログインボタンには処理中の状態が表示され、モード選択を誤って押しても無反応に見えません。\n' +
-      '• macOS と Windows にデスクトップワークスペースを追加しました。両方でメインウインドウのサイズと位置を復元し、Windows では最大化状態も復元します。\n' +
-      '• メインナビゲーション、撮影パラメータ、編集メディアプール、ツールパネル、下部ツール領域をドラッグして調整できます。区切り線はキーボード操作とアクセシビリティ名にも対応します。\n' +
-      '• デフォルト、撮影、モニター、編集、コンパクトの各プリセットと、デフォルトレイアウトへ戻す操作を追加しました。\n' +
-      '• 1.5.11 はローカル開発検証候補です。署名状態はプラットフォームごとに異なるため、インストール前に SHA-256 とパッケージ別の説明を確認してください。Windows 版のレイアウトは、実機のマルチモニターおよび DPI 環境での確認が残っています。'
+    '• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n' +
+      '• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n' +
+      '• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n' +
+      '• 其余功能与 1.5.11 保持一致。\n' +
+      '• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。',
+    '• Fixed a Windows startup null-reference crash: while WPF builds the control tree, the default exposure-mode selection no longer accesses shutter, aperture, and ISO controls before they exist.\n' +
+      '• Exposure mode, video shutter mode, and the shared parameter handler now return during initialization; shutter configuration and exposure readouts resume after the full interface loads.\n' +
+      '• Added Windows startup regression contracts for XAML default-selection order, initialization guards, and post-load recovery.\n' +
+      '• All other behavior remains unchanged from 1.5.11.\n' +
+      '• Version 1.5.12 is provided as the GitHub public stable release. Signing status varies by platform; verify SHA-256 and the per-package notes before installation. Windows still requires real-host cold-start, installation, driver, and SmartScreen validation.',
+    '• Windows 起動時の null 参照クラッシュを修正しました。WPF がコントロールツリーを構築している間、露出モードの既定選択が、まだ生成されていないシャッター、絞り、ISO のコントロールへ先にアクセスしません。\n' +
+      '• 露出モード、動画シャッターモード、共有パラメーター処理は初期化中に先に終了し、画面全体の読み込み後にシャッター設定と露出表示を復元します。\n' +
+      '• XAML の既定選択順序、初期化ガード、全コントロール生成後の復元経路を固定する Windows 起動回帰テストを追加しました。\n' +
+      '• その他の機能は 1.5.11 から変更ありません。\n' +
+      '• 1.5.12 は GitHub 公開安定版として提供します。署名状態はプラットフォームごとに異なるため、インストール前に SHA-256 とパッケージ別の説明を確認してください。Windows 実機でのコールド起動、インストール、ドライバー、SmartScreen の検証は引き続き必要です。'
   )
 ];
 

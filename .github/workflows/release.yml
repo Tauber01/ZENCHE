@@ -10,6 +10,10 @@ permissions:
 
 jobs:
   package:
+    # v1.5.12 uses the locally frozen six-platform packages whose hashes are
+    # recorded in docs/releases/v1.5.12.md. Rebuilding only the macOS-hosted
+    # subset here would make the release assets inconsistent.
+    if: ${{ github.ref_name != 'v1.5.12' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4

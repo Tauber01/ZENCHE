@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.11 launch announcements describe login clarity and desktop workspaces', async () => {
+test('version 1.5.12 launch announcements describe the Windows startup fix and release boundary', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,15 +95,39 @@ test('version 1.5.11 launch announcements describe login clarity and desktop wor
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /已有账号 \/ 创建账号/);
-    assert.match(announcement, /真正的登录按钮会持续显示提交状态/);
-    assert.match(announcement, /macOS 与 Windows 新增桌面工作区布局/);
-    assert.match(announcement, /Windows 还会恢复最大化状态/);
-    assert.match(announcement, /默认、拍摄、监看、编辑与紧凑预设/);
-    assert.match(announcement, /1\.5\.11 为本地开发验证候选/);
+    assert.match(announcement, /修复 Windows 启动阶段的空引用崩溃/);
+    assert.match(announcement, /曝光模式、视频快门模式与共享参数处理器/);
+    assert.match(announcement, /XAML 默认选择顺序/);
+    assert.match(announcement, /其余功能与 1\.5\.11 保持一致/);
+    assert.match(announcement, /1\.5\.12 作为 GitHub 公开稳定版提供/);
     assert.match(announcement, /各平台签名状态不同/);
     assert.match(announcement, /查阅逐包说明/);
+    assert.match(announcement, /真实 Windows 冷启动、安装、驱动与 SmartScreen 验收/);
   }
 
-  assert.match(announcements[1], /tr\("• 五端登录页将模式选项明确为/);
+  assert.match(announcements[1], /tr\("• 修复 Windows 启动阶段的空引用崩溃/);
+
+  const englishAnnouncements = await Promise.all([
+    read('native/ios/NikonLink/en.lproj/Localizable.strings'),
+    read('native/android/app/src/main/java/com/tauber/nikonlink/Localization.java'),
+    read('native/harmony/entry/src/main/ets/localization/Localization.ets'),
+    read('native/windows/Localization.cs'),
+  ]);
+  const japaneseAnnouncements = await Promise.all([
+    read('native/ios/NikonLink/ja.lproj/Localizable.strings'),
+    read('native/android/app/src/main/java/com/tauber/nikonlink/Localization.java'),
+    read('native/harmony/entry/src/main/ets/localization/Localization.ets'),
+    read('native/windows/Localization.cs'),
+  ]);
+
+  for (const announcement of englishAnnouncements) {
+    assert.match(announcement, /Fixed a Windows startup null-reference crash/);
+    assert.match(announcement, /All other behavior remains unchanged from 1\.5\.11/);
+    assert.match(announcement, /Version 1\.5\.12 is provided as the GitHub public stable release/);
+  }
+  for (const announcement of japaneseAnnouncements) {
+    assert.match(announcement, /Windows 起動時の null 参照クラッシュを修正しました/);
+    assert.match(announcement, /その他の機能は 1\.5\.11 から変更ありません/);
+    assert.match(announcement, /1\.5\.12 は GitHub 公開安定版として提供します/);
+  }
 });

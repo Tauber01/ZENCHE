@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-11（Asia/Shanghai）
-> 当前发布版本：1.5.11 / build 38；标签提交 `7e7641fbfe571a2494e594a56c9bd3f7bad9341b`，移动端实现源码基线 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，桌面实现与三包源码基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，GitHub 发布聚合包 SHA-256 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`
-> 公开状态：GitHub v1.5.11 为公开稳定版，Release 的 14 个线上资产已逐项回验；官网自动更新继续提供 W14 的 1.5.10 / build 37，未部署 1.5.11
+> 当前源码候选：1.5.12 / build 39；Windows 启动修复代码提交 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，发布分支 `agent/1.5.12-windows-nre-release`
+> 公开状态：Tauber 已授权把 v1.5.12 作为下一版 GitHub 公开稳定版；发布完成前，GitHub 当前稳定版仍为 v1.5.11。官网自动更新继续提供 W14 的 1.5.10 / build 37，本次不部署官网
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,14 +18,14 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前 GitHub 发布版本为 **1.5.11 / build 38**。桌面菜单层级、示波器空间、性能与 Windows AI 临时结果生命周期继续使用已封板基线 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；移动端最终实现源码使用 `5e7150d9217690e6aea56ea15d8fae852a2d825f`，覆盖 Nikon Z50 繁忙恢复、Android Camera2 降级、五端 AI HTTPS 代理、三移动端系统照片编辑与新副本保存，以及动态 AI 状态 exact/参数化三语闭环。GitHub 公开稳定版为 [v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)，官网自动更新继续提供 1.5.10 / build 37；未部署 1.5.11。
-- Windows 启动空引用已形成本地 1.5.11 热修候选 `970f8e08edce2529750d5b29fe3aaccd53da61ac`：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、完整 `npm test` 517/517 和独立 P0/P1/P2=0 复审通过。新版 Setup/ZIP 已在 macOS 交叉构建并完成侧车与压缩结构回验，但未上传、未部署，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60。
-- 完整 `npm test` 514/514 通过。Android `assembleDebug`、iOS Release 无签名构建、HarmonyOS Release HAP 构建成功；三包结构、侧车与 Android Debug v2 签名均已回验。GitHub 发布聚合包 SHA-256 为 `2f90a8afb39dbe26c1537c4f642e09f76898627547693453d8829005c190d9e4`，根侧车、ZIP 结构、六份内嵌侧车与 14 项逐字节一致性通过。最终双审已完成：AI审查 对原生 UI/交互增量给出 PASS（P0/P1/P2=0）；GPT5.6luna 确认三端动态三语、README 计数、签名与生产边界、去 AI 痕迹及交付实体均无 P0/P1，上一轮唯一 P2 已关闭。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
+- 当前发布候选为 **1.5.12 / build 39**，仅新增 Windows 启动初始化门禁及相应回归，并同步五端版本元数据和中英日启动公告；1.5.11 的桌面工作区、移动端相册与 AI 代理等能力保持不变。发布完成前，GitHub 公开稳定版仍为 [v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)；官网自动更新继续提供 1.5.10 / build 37。
+- Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已进入 1.5.12 候选：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。版本同步后的完整 `npm test` 518/518 通过。六个 1.5.12 包及侧车正在从当前候选源码重建；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60 与 §12.61。
+- 1.5.11 的完整 `npm test` 514/514、五端原生构建、包结构、侧车、签名边界与 GitHub 14/14 线上回验均作为历史发布事实保留。1.5.12 在发布前重新执行全部自动化与六包校验，不沿用旧包哈希。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0 与 v1.5.3 已作为历史 GitHub Release 保留；当前 GitHub 公开稳定版为 v1.5.11。官网生产更新继续提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
+- v1.5.0 与 v1.5.3 已作为历史 GitHub Release 保留；v1.5.12 完成发布前，GitHub 公开稳定版仍为 v1.5.11。官网生产更新继续提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
 - 最大未闭环风险仍是跨 46 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -1220,3 +1220,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **验证**：exact 代码提交完整 `npm test -- --test-reporter=dot` 为 517/517；`git diff --check` 通过。`scripts/build-windows.ps1 -Runtime win-x64` 使用既有已验证的 libusb、Nikon Image/Remote SDK 和 Sony Camera Remote SDK 运行库完成 Release publish、NSIS 和便携 ZIP，命令最终退出 0；NU1900（漏洞源不可达）、`PtpCamera.cs` CS8629 与 `_aiGenerating` CS0414 为既有非阻断警告。独立只读全扫覆盖 11 个 XAML `IsSelected="True"`，结论为 P0=0、P1=0、P2=0。
 - **本地交付物**：`ZENCHE-1.5.11-Windows-x64-Setup.exe` 为 90,871,247 字节，SHA-256 `69afb3763b374005a97b6ef1da558c7dded8fa5d94c954d5aa673560fa7d5d47`；`ZENCHE-1.5.11-Windows-x64.zip` 为 110,137,992 字节，SHA-256 `37ba48fae87f3fd074a222fe214dadacd882e3d3e0383333aa98246a38917e40`。两份 `.sha256` 使用 `shasum -a 256 -c` 回验通过；ZIP 的 52 项压缩结构及 Nikon/Sony/libusb 运行库通过 `unzip -t`。Setup 与主程序 PE Security Directory 均为 0，未做 Authenticode。
 - **边界与下一步**：两个文件沿用 1.5.11 名称，仅是本地热修候选，未替换 GitHub v1.5.11 资产、未推送分支、未打标签、未创建新 Release、未切换官网自动更新。当前主机为 macOS，无法完成真实 Windows STA/BAML 冷启动、主窗口显示、曝光/视频快门切换、安装/升级/卸载、驱动与 SmartScreen 验收；这些门禁完成前不得把静态契约或交叉包描述为 Windows 实机通过。`GPT5.6luna` 的最终去 AI 痕迹审查已发起；在 Tauber 随后的“重新派工”指令下，deepseek-v4-flash 对 exact `9dce5e56001ab1cd01241a99675a35bb262d68b2` 的技术/事实与文案/去 AI 痕迹两轮窄审均给出 PASS（P0/P1/P2=0），最终门禁已按新派工闭环。
+
+## 12.61 v1.5.12 GitHub Latest 发布准备（2026-08-11，GPT5.6）
+
+- Tauber 在 Buzz 线程 `88c2862071355eb93ab89725fe92107cd7a910f0bd2c124213909b7f3c837f64` 明确要求把 Windows 启动修复“作为最新版发布”。本轮使用新补丁版本 `1.5.12 / build 39`，不覆盖 v1.5.11 标签或资产；发布范围为 GitHub `main`、注释标签和公开稳定 Release，官网生产清单不在本次授权范围内，继续保持 `1.5.10 / build 37`。
+- 发布分支 `agent/1.5.12-windows-nre-release` 从远程 `main` 的 `77dd4056efaf95d98825c0ca81d7029f8fed2ee7` 之上现有热修封板 `6228f00f0179b1d33206783b26ff57a519b4e3fa` 创建。五端版本元数据、运行时版本回退值与中英日启动公告统一到 1.5.12 / build 39；README 新增 1.5.12 章节并保留 1.5.11 历史，`CHANGELOG.md` 增补独立条目，构建总脚本取消读取版本失败时静默回退到 1.5.3。
+- 当前验证：`git diff --check` 通过，三份 Apple `.strings` 通过 `plutil -lint`，完整 `npm test` 518/518 通过。六个安装包、六份侧车、聚合包及其侧车尚待从冻结候选提交生成并回验；最终提交、标签、各包字节数与 SHA-256、线上 14/14 结果将在实际发布后回填。Windows 包继续由 macOS 交叉构建且无 Authenticode，不能据此声称真实 Windows 启动、安装、驱动或 SmartScreen 已验收。

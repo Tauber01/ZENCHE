@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.5.12] - 2026-08-11
+
+### Fixed
+
+- Fixed a Windows startup null-reference crash caused by WPF firing XAML
+  default-selection events before the complete control tree existed.
+- Moved the exposure-mode, video-shutter-mode, and shared-parameter
+  initialization guards ahead of cross-control refresh and configuration.
+- Preserved the selected video-shutter mode during initialization, then
+  restored shutter configuration, parameter availability, and exposure
+  readouts after the full interface loaded.
+
+### Validation
+
+- Added three Windows startup-order regression contracts and verified that
+  they fail against the pre-fix `77dd405` baseline and pass after the fix.
+- The full automated suite passes 518/518. Windows Release publish, NSIS, and
+  portable ZIP packaging complete on the macOS cross-build host.
+- Windows packages remain without Authenticode and still require real Windows
+  cold-start, exposure/video-shutter switching, installation, driver, and
+  SmartScreen validation.
+
 ## [1.5.11] - 2026-08-10
 
 ### Added

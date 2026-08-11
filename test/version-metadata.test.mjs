@@ -8,6 +8,7 @@ const read = async (path) => readFile(new URL(path, root), "utf8");
 test("release version is consistent across packages and build scripts", async () => {
   const packageMetadata = JSON.parse(await read("package.json"));
   const version = packageMetadata.version;
+  assert.equal(version, "1.5.12");
   const sources = await Promise.all([
     read("scripts/build-android.sh"),
     read("scripts/build-harmony.sh"),
@@ -27,6 +28,28 @@ test("release version is consistent across packages and build scripts", async ()
   }
 });
 
+test("runtime version fallbacks and diagnostics match the release version", async () => {
+  const version = JSON.parse(await read("package.json")).version;
+  const sources = await Promise.all([
+    read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
+    read("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    read("native/harmony/entry/src/main/ets/diagnostics/DiagnosticLogger.ets"),
+    read("native/ios/NikonLink/Models/UpdateController.swift"),
+    read("native/ios/NikonLink/Views/RootView.swift"),
+    read("native/macos/Sources/NikonLink/UpdateController.swift"),
+    read("native/macos/Sources/NikonLink/main.swift"),
+    read("native/windows/Services/AuthService.cs"),
+    read("native/windows/Services/UpdateService.cs"),
+  ]);
+
+  for (const source of sources) {
+    assert.ok(source.includes(version), `missing runtime release version ${version}`);
+  }
+
+  const buildAll = await read("scripts/build-all.sh");
+  assert.doesNotMatch(buildAll, /echo\s+["']1\.5\.3["']/);
+});
+
 test("native package build numbers stay aligned", async () => {
   const [android, harmony, ios, macos] = await Promise.all([
     read("native/android/app/build.gradle"),
@@ -36,7 +59,7 @@ test("native package build numbers stay aligned", async () => {
   ]);
   const buildNumber = android.match(/versionCode (\d+)/)?.[1];
 
-  assert.equal(buildNumber, "38");
+  assert.equal(buildNumber, "39");
   assert.match(harmony, new RegExp(`versionCode: ${buildNumber}`));
   assert.match(ios, new RegExp(`CURRENT_PROJECT_VERSION = ${buildNumber};`, "g"));
   assert.match(

@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-10（Asia/Shanghai）
+> 最近核对：2026-08-11（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -209,7 +209,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - `_initializing` 必须在字段初始化时显式为 `true`，并保持到构造器完成初始快门配置后。跨控件刷新或配置必须在副作用前短路：共享参数处理器先于 `UpdateExposureReadout()` 返回，曝光模式先于 `UpdateExposureAvailability()` 返回，视频快门模式只允许先保存当前安全预选值，再于 `ConfigureShutterControl()` 前返回。
 - 提前返回不会丢失初始状态：`InitializeComponent()` 完成后，构造器会调用 `ConfigureShutterControl(false)`，该方法在完整控件树上刷新参数可用性；构造器随后结束初始化门禁，再次更新曝光读数。
 - `test/native-windows-exposure-startup.test.mjs` 同时锁定门禁初值、三条事件连接、三个默认选中项、控件声明顺序、危险调用之前的立即返回，以及完整树加载后的恢复配置。静态契约用于防止源码顺序回退，不能替代真实 Windows STA/BAML 冷启动和模式切换冒烟。
-- 本地热修代码提交为 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，完整 `npm test` 517/517，`scripts/build-windows.ps1` 的 Release publish、NSIS 和两份侧车回验均通过。Setup/ZIP SHA-256 分别为 `69afb3763b374005a97b6ef1da558c7dded8fa5d94c954d5aa673560fa7d5d47`、`37ba48fae87f3fd074a222fe214dadacd882e3d3e0383333aa98246a38917e40`；两包由 macOS 交叉构建、无 Authenticode，未上传、未部署，仍需真实 Windows 安装与启动验收。
+- 修复代码提交为 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，现已纳入 1.5.12 / build 39 发布候选；版本同步后的完整 `npm test` 518/518。先前沿用 1.5.11 名称的本地 Windows 热修包只用于验证构建链，本次发布不得复用或改名，六个安装包及侧车都要从冻结的 1.5.12 候选源码重新生成。Windows 包继续由 macOS 交叉构建、无 Authenticode，仍需真实 Windows 安装与启动验收；官网自动更新继续保持 1.5.10 / build 37。
 
 ## 1. 总体原则
 

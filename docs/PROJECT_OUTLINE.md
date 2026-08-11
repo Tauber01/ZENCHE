@@ -14,13 +14,13 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.11
-- 当前原生构建号：38
-- 发布状态：1.5.11 / build 38 已作为 [GitHub 公开稳定版](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) 发布；注释标签解析到 `7e7641fbfe571a2494e594a56c9bd3f7bad9341b`，官网自动更新未切换，继续提供 W14 的 1.5.10 / build 37
+- 当前源码版本：1.5.12
+- 当前原生构建号：39
+- 发布状态：Tauber 已授权把 1.5.12 / build 39 作为下一版 GitHub 公开稳定版发布；发布候选正在重建与校验，完成标签和 Release 前，GitHub 当前稳定版仍为 [v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)。官网自动更新不在本次授权范围内，继续提供 W14 的 1.5.10 / build 37
 
 W15 修复五端登录页中“模式标签”和“提交按钮”同名造成的误触歧义，并为 macOS、Windows 增加可保存的桌面工作区。两端会恢复主窗口大小和位置，Windows 还会恢复最大化状态；主导航、拍摄参数、编辑媒体池、工具面板及底部工具区可在拖动中实时连续调节，Windows AI 工具面板另有独立分隔条。桌面编辑器将“专业显影 / AI 工具”固定为一级模式，色轮、曲线、蒙版等归入二级“调整类别”；RGB 示波器会填满底部可用空间。预览和示波器复用同一受控尺寸图像，Windows 另合并高频刷新、按录制状态启停时间码，并在替换结果、切换照片或模式、离开编辑页及关闭窗口时清理受限命名的 AI 临时文件和编辑位图。第一版不包含任意浮动面板或跨屏面板停靠；Windows 多显示器/DPI 与两端真实拖拽、重启恢复及长时间性能仍需真机验收。最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，完整测试 503/503 通过；Windows 两包已按该基线重建，未受后续 Windows 专属改动影响的 macOS DMG 复用 `0faeccdc987146c104fd73d742547c9baf9db221` 已验证产物。最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，14 项逐字节一致。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、签名事实、生产边界、去 AI 痕迹与交付内容无实体问题，其唯一状态 P2 已完成回填。
 
-Windows 1.5.11 启动异常已有本地热修候选：WPF 在 `InitializeComponent()` 期间同步处理 XAML 默认选中项；曝光模式会在后置参数控件创建前刷新整组可用性，形成截图所示 `SetParameterAvailability → UpdateExposureAvailability → ExposureModeBox_SelectionChanged` 空引用链，视频快门模式随后也会在 `ShutterBox` 创建前配置快门。共享参数处理器虽在当前冷启动断开态下未证实触发同类空引用，但也在初始化门禁前刷新读数，本次作为防御性加固一并收口。候选提交 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 将三条路径统一置于初始化门禁之后，并以 3 条启动契约锁定事件连接、默认选中、控件顺序、门禁初值及完整树加载后的恢复配置；完整 `npm test` 517/517 通过。macOS 上已交叉生成本地 `1.5.11` Windows Setup/ZIP，SHA-256 分别为 `69afb3763b374005a97b6ef1da558c7dded8fa5d94c954d5aa673560fa7d5d47` 与 `37ba48fae87f3fd074a222fe214dadacd882e3d3e0383333aa98246a38917e40`。这两个沿用 1.5.11 版本号的文件仅是本地热修候选，未替换 GitHub 资产、未进入官网清单且无 Authenticode；仍需真实 Windows 冷启动、参数交互、安装升级、卸载、驱动和 SmartScreen 验收。
+Windows 启动异常修复已进入 1.5.12 / build 39 发布候选：WPF 在 `InitializeComponent()` 期间同步处理 XAML 默认选中项；曝光模式会在后置参数控件创建前刷新整组可用性，形成截图所示 `SetParameterAvailability → UpdateExposureAvailability → ExposureModeBox_SelectionChanged` 空引用链，视频快门模式随后也会在 `ShutterBox` 创建前配置快门。共享参数处理器虽在当前冷启动断开态下未证实触发同类空引用，但也在初始化门禁前刷新读数，本次作为防御性加固一并收口。代码提交 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 将三条路径统一置于初始化门禁之后，并以 3 条启动契约锁定事件连接、默认选中、控件顺序、门禁初值及完整树加载后的恢复配置；1.5.12 版本同步后的完整 `npm test` 518/518 通过。六个新版本包必须由当前候选源码重新构建，不复用或改名 1.5.11 资产。Windows 包继续由 macOS 交叉构建且无 Authenticode；真实 Windows 冷启动、参数交互、安装升级、卸载、驱动和 SmartScreen 仍需实机验收。
 
 Android Nikon Z50 的 SDRAM 拍摄后下载新增有界繁忙恢复：`CaptureToSdram` 成功后若 `GetObject (0x1009)` 返回 `DeviceBusy (0x2009)`，客户端不会再次触发快门，而是在最长 20 秒、最多 9 次尝试内强制指数退避，并重新读取 Nikon 事件以刷新最终对象句柄。该修复针对“相机已接受拍摄但仍在写入 JPEG”的阶段；不同固件、存储卡速度与 USB 主机组合仍需 Z50 真机验收。
 

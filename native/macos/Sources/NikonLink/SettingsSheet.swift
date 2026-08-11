@@ -1112,7 +1112,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        RuntimeLocalizedText("• 五端登录页将模式选项明确为“已有账号 / 创建账号”，真正的登录按钮会持续显示提交状态，避免误点后看似无响应。\n• macOS 与 Windows 新增桌面工作区布局：两端会在重启后恢复主窗口大小和位置，Windows 还会恢复最大化状态。\n• 主导航、拍摄参数、编辑媒体池、工具栏与底部工具区可拖动调整；分隔条支持键盘和辅助功能名称。\n• 新增默认、拍摄、监看、编辑与紧凑预设，并可一键恢复默认布局。\n• 1.5.11 为本地开发验证候选；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 布局仍需在真实 Windows 多显示器/DPI 环境复核。")
+                        RuntimeLocalizedText("• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n• 其余功能与 1.5.11 保持一致。\n• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。")
                             .font(.system(size: TypeScale.body))
                             .lineSpacing(5)
                     }

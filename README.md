@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- GitHub 公开稳定版：**v1.5.11**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)）
-- 当前源码版本：**1.5.11 / build 38**
+- GitHub 公开稳定版：**v1.5.12**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
+- 当前源码版本：**1.5.12 / build 39**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[GitHub 公开稳定版 v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[GitHub 公开稳定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -41,6 +41,11 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.12 GitHub 发布
+
+- 修复 Windows 启动空引用：WPF 在构造控件树期间触发 XAML 默认选中事件时，不再提前访问尚未创建的快门、光圈和 ISO 控件；曝光模式、视频快门模式与共享参数处理器均在初始化副作用前短路，完整界面加载后再恢复快门配置与曝光读数。
+- 新增 3 条 Windows 启动顺序回归契约，完整测试 518/518 通过。五端安装包已按 `1.5.12 / build 39` 重建；本版本已发布到 GitHub，但尚未切入官网更新。签名状态与逐包校验见 [1.5.12 发布说明](docs/releases/v1.5.12.md)。真实 Windows 冷启动、曝光/视频快门切换、安装、驱动与 SmartScreen 仍需实机验收。
 
 ### v1.5.11 GitHub 发布
 
@@ -51,7 +56,7 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - 预览与示波器共用同一份受控尺寸图像；Windows 合并高频预览请求、仅在录制时运行时间码刷新，并在切换照片、切换模式、离开编辑页或关闭窗口时清理 AI 临时结果与位图资源，减少重复渲染和后台占用。
 - Android 在 Nikon Z50 拍摄后读取 JPEG 遇到 `DeviceBusy (0x2009)` 时，会在不重复触发快门的前提下进行最长 20 秒的有界退避；本机摄像头若被厂商 Camera2 HAL 拒绝双 JPEG 会话，则自动降级到设备声明支持的低负载或共享单流方案。
 - Android、iOS/iPadOS 与 HarmonyOS 的专业显影和 AI 修图均提供可见的系统照片入口。导入先建立应用工作副本，调整与 AI 结果保存为新的应用副本；导出会创建新的系统相册项目，不覆盖系统原片。AI 默认连接已迁移到账号与设备激活共用的 HTTPS 代理。
-- 本版本已发布到 GitHub，但尚未切入官网更新。完整测试 514/514 通过，五端安装包已完成构建、结构与 SHA-256 回验；各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。相机、系统相册、真实 AI 服务及桌面长时间性能仍需对应平台真机验收。
+- v1.5.11 已发布到 GitHub，但未切入官网更新。完整测试 514/514 通过，各平台签名状态以 [1.5.11 逐包说明](docs/releases/v1.5.11.md) 为准。相机、系统相册、真实 AI 服务及桌面长时间性能仍需对应平台真机验收。
 
 ### v1.5.10 官网更新
 
@@ -203,17 +208,17 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [GitHub 公开稳定版 v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)
+前往 [GitHub 公开稳定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.11-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.5.11-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.5.11-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.5.11-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.5.11-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.5.11-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.5.12-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.5.12-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -419,12 +424,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- GitHub public stable release: **v1.5.11** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11))
-- Source version: **1.5.11 / build 38**
+- GitHub public stable release: **v1.5.12** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12))
+- Source version: **1.5.12 / build 39**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
-- Downloads: [GitHub public stable release v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [GitHub public stable release v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -436,6 +441,11 @@ in a local library for review and export.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
 
+### v1.5.12 GitHub release
+
+- Fixed the Windows startup null-reference crash caused by XAML default-selection events running while WPF was still constructing the control tree. Exposure mode, video shutter mode, and the shared parameter handler now stop before initialization side effects, then restore shutter configuration and exposure readouts after the full interface loads.
+- Added three Windows startup-order regression contracts; the full suite passes 518/518. All five platform packages were rebuilt as `1.5.12 / build 39`. This version is published on GitHub but is not on the official update feed. See the [1.5.12 release notes](docs/releases/v1.5.12.md) for signing and per-package checks. Real Windows cold start, exposure/video-shutter switching, installation, drivers, and SmartScreen still require hardware validation.
+
 ### v1.5.11 GitHub release
 
 - Sign-in mode choices now read Existing Account and Create Account on all five platforms, clearly separating mode selection from the actual submit action. Apple clients keep the progress indicator and “Signing in…” label visible during submission.
@@ -445,7 +455,7 @@ in a local library for review and export.
 - Preview and scope rendering reuse one bounded image. Windows also coalesces rapid preview requests, runs the timecode refresh only while recording, and clears AI temporary results and editor bitmaps when switching photos or modes, leaving the editor, or closing the window to reduce duplicate work and background resource use.
 - Android now gives the Nikon Z50 up to 20 seconds of bounded backoff when JPEG download encounters `DeviceBusy (0x2009)` after capture, without firing the shutter again. If a vendor Camera2 HAL rejects the normal dual-JPEG session, the system-camera path falls back to lower-load or shared-stream combinations that the device reports as supported.
 - Pro Develop and AI Retouch on Android, iOS/iPadOS, and HarmonyOS now expose a visible system-photo entry point. Imported images become private working copies; manual and AI edits create new app copies, and export creates a new system photo instead of overwriting the original. The default AI endpoint now uses the HTTPS account-and-device activation proxy.
-- This version is published on GitHub but is not on the official update feed. The full 514-test suite passed, and all five platform packages passed build, archive-integrity, and SHA-256 checks; signing status is listed per package in the [1.5.11 release notes](docs/releases/v1.5.11.md). Camera, system-photo, live AI service, and long-session desktop behavior still require hands-on testing on the corresponding platforms.
+- v1.5.11 is published on GitHub but is not on the official update feed. Its full 514-test suite passed; signing status is listed per package in the [1.5.11 release notes](docs/releases/v1.5.11.md). Camera, system-photo, live AI service, and long-session desktop behavior still require hands-on testing on the corresponding platforms.
 
 ### Official website update in v1.5.10
 
@@ -593,17 +603,17 @@ completed hardware validation.
 ### Download and install
 
 Download packages and their matching `.sha256` files from the
-[latest stable v1.5.11 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11).
+[latest stable v1.5.12 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12).
 The delivery names are:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.11-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.5.11-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.5.11-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.5.11-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.5.11-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.5.11-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.5.12-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.5.12-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -754,12 +764,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- GitHub 公開安定版：**v1.5.11**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11)）
-- 現在のソースバージョン：**1.5.11 / build 38**
+- GitHub 公開安定版：**v1.5.12**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
+- 現在のソースバージョン：**1.5.12 / build 39**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
-- ダウンロード：[GitHub 公開安定版 v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[GitHub 公開安定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -770,6 +780,11 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
 
+### v1.5.12 GitHub リリース
+
+- WPF がコントロールツリーを構築中に XAML の既定選択イベントを処理し、未生成のシャッター、絞り、ISO コントロールへ先にアクセスしていた Windows 起動時の null 参照クラッシュを修正しました。露出モード、動画シャッターモード、共有パラメーター処理は初期化中の副作用より前に終了し、画面全体の読み込み後にシャッター設定と露出表示を復元します。
+- Windows の起動順序を固定する 3 件の回帰テストを追加し、全 518 テストに合格しました。5 プラットフォームのパッケージを `1.5.12 / build 39` として再構築しています。このバージョンは GitHub で公開済みですが、公式更新フィードには未配信です。署名状態とパッケージ別の検証結果は [1.5.12 リリースノート](docs/releases/v1.5.12.md)を参照してください。Windows 実機でのコールド起動、露出／動画シャッター切り替え、インストール、ドライバー、SmartScreen の確認が引き続き必要です。
+
 ### v1.5.11 GitHub リリース
 
 - 5 プラットフォームのログイン画面で、モード選択を「既存のアカウント」と「新規登録」に分け、実際のログイン操作と区別しました。Apple 版では送信中も進行表示と「ログインしています…」を併記します。
@@ -779,7 +794,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - プレビューとスコープは、サイズを制限した同一画像を再利用します。Windows では高頻度のプレビュー要求をまとめ、録画中だけタイムコードを更新し、写真やモードの切り替え、編集画面からの移動、ウインドウ終了時に AI の一時結果とビットマップを解放して、重複処理とバックグラウンド負荷を抑えます。
 - Android では、Nikon Z50 の撮影後に JPEG 読み出しが `DeviceBusy (0x2009)` になった場合、再撮影せず最大 20 秒の範囲で待機と再試行を行います。端末メーカーの Camera2 HAL が通常の 2 系統 JPEG セッションを拒否した場合は、端末が対応を申告している低負荷構成または共有 1 ストリーム構成へ段階的に切り替えます。
 - Android、iOS/iPadOS、HarmonyOS のプロ現像と AI レタッチに、システム写真を選ぶ入口を常時表示します。読み込んだ写真はアプリ内の作業コピーとなり、調整結果と AI 結果は新しいアプリ内コピーとして保存します。書き出し時も新しいシステム写真を作成し、元の写真は上書きしません。AI の既定接続先は、アカウントとデバイス認証を共用する HTTPS プロキシへ移行しました。
-- このバージョンは GitHub で公開済みですが、公式更新フィードには未配信です。全 514 テストを通過し、5 プラットフォームのパッケージはビルド、アーカイブ整合性、SHA-256 の確認を完了しました。各パッケージの署名状態は [1.5.11 リリースノート](docs/releases/v1.5.11.md) に記載しています。カメラ、システム写真、実 AI サービス、デスクトップの長時間動作は、対応する実機での確認が必要です。
+- v1.5.11 は GitHub で公開済みですが、公式更新フィードには未配信です。全 514 テストを通過し、各パッケージの署名状態は [1.5.11 リリースノート](docs/releases/v1.5.11.md) に記載しています。カメラ、システム写真、実 AI サービス、デスクトップの長時間動作は、対応する実機での確認が必要です。
 
 ### v1.5.10 公式サイト更新
 
@@ -922,18 +937,18 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[GitHub 公開安定版 v1.5.11](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.11) から
+[GitHub 公開安定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.11-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.5.11-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.5.11-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.5.11-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.5.11-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.5.11-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.5.12-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.5.12-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
