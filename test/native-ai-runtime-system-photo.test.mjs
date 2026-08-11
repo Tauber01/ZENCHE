@@ -116,9 +116,9 @@ test("mobile editors expose system-photo import and save-new-copy actions in bot
   assert.doesNotMatch(ios, /private func saveAiResult\(\)[\s\S]{0,800}?replaceEditedImage\(/);
 
   assert.match(harmony, /private EditorPhotoPicker\(\)[\s\S]*?从系统相册导入[\s\S]*?openSystemPhotoForEditing\(\)/);
-  assert.match(harmony, /private async saveEditedPhoto\(exportToSystemAlbum: boolean = false\)/);
+  assert.match(harmony, /private async saveEditedPhoto\(\s*exportToSystemAlbum: boolean = false,\s*exportToLocal: boolean = false\s*\)/);
   assert.match(harmony, /saveEditedPhoto\(true\)/);
-  assert.match(harmony, /private async saveAiResult\(exportToSystemAlbum: boolean = false\)/);
+  assert.match(harmony, /private async saveAiResult\(\s*exportToSystemAlbum: boolean = false,\s*exportToLocal: boolean = false\s*\)/);
   assert.match(harmony, /saveAiResult\(true\)/);
   assert.match(harmony, /private async saveAiResult[\s\S]*?library\.saveEditedCopy\(/);
   assert.doesNotMatch(harmony, /private async saveAiResult[\s\S]{0,1600}?library\.replaceFile\(/);

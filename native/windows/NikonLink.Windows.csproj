@@ -11,7 +11,9 @@
     <AssemblyName>ZENCHE</AssemblyName>
     <RootNamespace>NikonLink.Windows</RootNamespace>
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
-    <Version>1.5.12</Version>
+    <Version>1.5.13</Version>
+    <AssemblyVersion>1.5.13.40</AssemblyVersion>
+    <FileVersion>1.5.13.40</FileVersion>
     <Company>ZENCHE contributors</Company>
     <Product>帧澈 ZENCHE</Product>
     <Description>跨平台相机控制与影像传输工具 · Capture · Connect · Flow</Description>

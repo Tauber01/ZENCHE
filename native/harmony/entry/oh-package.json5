@@ -1,6 +1,6 @@
 {
   name: "entry",
-  version: "1.5.12",
+  version: "1.5.13",
   description: "帧澈 ZENCHE · 跨平台相机控制与影像传输工具",
   main: "",
   author: "",

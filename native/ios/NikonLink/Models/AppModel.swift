@@ -136,7 +136,9 @@ struct LibraryItem: Identifiable, Hashable {
     var id: String { url.path }
     var filename: String { url.lastPathComponent }
     var isVideo: Bool {
-        ["mov", "mp4", "m4v"].contains(url.pathExtension.lowercased())
+        ["mov", "mp4", "m4v", "avi"].contains(
+            url.pathExtension.lowercased()
+        )
     }
 }
 
@@ -158,7 +160,8 @@ final class MediaLibrary: ObservableObject {
     let workflow: CaptureWorkflow
     private let supportedExtensions: Set<String> = [
         "jpg", "jpeg", "heic", "heif", "png", "tif", "tiff", "nef", "nrw",
-        "mov", "mp4", "m4v"
+        "arw", "cr2", "cr3",
+        "mov", "mp4", "m4v", "avi"
     ]
 
     init() {

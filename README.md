@@ -28,7 +28,7 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - GitHub 公开稳定版：**v1.5.12**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
-- 当前源码版本：**1.5.12 / build 39**
+- 当前源码版本：**1.5.13 / build 40**（本地候选，尚未发布）
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
@@ -41,6 +41,13 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.13 本地候选（未发布）
+
+- 五个原生平台新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图结果和专业编辑副本均可通过系统保存器另存到用户选择的位置。五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口，AI 和专业编辑工作区另有直达入口。“保存到系统相册”继续作为独立操作保留。
+- 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件。AI 与专业编辑的直达流程会先生成新的文件库副本；macOS 与 Windows 的 AI 修图也改为始终保存新文件，不再覆盖当前原图。五端文件库现统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI；能否直接预览仍取决于系统解码能力。
+- 用户取消系统保存器不会显示成功或错误；只有复制完成、同步落盘并通过大小校验后才报告成功，失败时会清理本次临时文件或尽力删除不完整目标。同名与覆盖确认由各平台系统保存器处理。
+- 这是 `1.5.13 / build 40` 的本地候选，尚未推送、打标签、发布 GitHub Release 或切换官网更新。五端构建链路均已在本地通过；冻结候选的逐包签名边界、字节数和 SHA-256 见 [1.5.13 发布说明草稿](docs/releases/v1.5.13.md)。GitHub 公开稳定版仍为 v1.5.12，官网自动更新仍提供 1.5.10 / build 37。
 
 ### v1.5.12 GitHub 发布
 
@@ -122,7 +129,7 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 
 编辑器内置 **AI 工具**，接入 nano-banana 图像模型，支持：
 
-- **AI 修图**：选择照片后立即预览原图，支持自然美颜、风格转换与天空增强；切换照片会清除旧结果。Android、iOS / iPadOS 与 HarmonyOS 会保存新的应用副本，系统相册原片始终不被覆盖；macOS 与 Windows 则按界面提示替换当前应用内文件
+- **AI 修图**：选择照片后立即预览原图，支持自然美颜、风格转换与天空增强；切换照片会清除旧结果。五个原生平台都会把结果保存为新的应用副本，不覆盖当前应用内文件或系统相册原片
 - **AI 生图**：纯文本描述生成人像、风光、城市夜景等，结果另存为新文件
 - **智能移除**：可去路人并自然补全背景，也可去除摄影器材、工作人员、反光、杂物等穿帮元素
 - **蒙版修复**：智能与画笔蒙版使用真实蓝色覆盖，橡皮擦除覆盖区域；删除、反转及曝光/对比度/色彩/细节等局部参数仅作用于对应蒙版
@@ -425,7 +432,7 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - GitHub public stable release: **v1.5.12** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12))
-- Source version: **1.5.12 / build 39**
+- Source version: **1.5.13 / build 40** (local candidate, not released)
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
@@ -440,6 +447,13 @@ in a local library for review and export.
 > against their respective release notes and SHA-256 manifests.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### v1.5.13 local candidate (unpublished)
+
+- All five native apps add **Save a Local Copy** for tethered captures, camera-card downloads, AI-edited or generated images, and Pro Develop results. Every file library offers the same action; supported in-app previews also provide a shortcut, while the AI and Pro Develop workspaces have direct actions of their own. **Save to System Photos** remains separate.
+- Export creates a copy and never moves or deletes the source in the ZENCHE library. Direct AI and Pro Develop actions first create a new library item; AI retouching on macOS and Windows now always saves a new file instead of overwriting the current original. All five libraries now recognize JPG/JPEG, HEIF/HEIC, PNG, TIF/TIFF, NEF/NRW, ARW, CR2/CR3, MOV/MP4/M4V, and AVI. Preview support still depends on the platform decoder.
+- Closing the system save picker is neutral. Success is reported only after the copy is complete, storage has been synchronized, and the destination size has been verified; failures clean up the temporary file or make a best effort to remove an incomplete destination. The platform save picker owns filename and overwrite confirmation.
+- This is a local `1.5.13 / build 40` candidate. It has not been pushed, tagged, published as a GitHub Release, or deployed to the official update feed. All five platform build pipelines pass locally; see the [draft 1.5.13 release notes](docs/releases/v1.5.13.md) for the frozen packages, signing limits, byte counts, and SHA-256 values. GitHub public stable remains v1.5.12, and the official feed remains 1.5.10 / build 37.
 
 ### v1.5.12 GitHub release
 
@@ -510,7 +524,7 @@ in a local library for review and export.
 
 The built-in editor includes **AI Tools** powered by the nano-banana image model:
 
-- **AI Photo Editing**: immediately previews the selected original, supports natural beautification, style transfer, and sky enhancement, and clears stale results when switching photos. Android, iOS / iPadOS, and HarmonyOS save a new app copy without overwriting the system-library original; macOS and Windows replace the current in-app file as indicated in the interface
+- **AI Photo Editing**: immediately previews the selected original, supports natural beautification, style transfer, and sky enhancement, and clears stale results when switching photos. All five native apps save the result as a new app copy without overwriting the current in-app file or the system-library original
 - **AI Image Generation**: text-to-image for portraits, landscapes, city night scenes, and more, saved as a new file
 - **Smart Removal**: removes passersby with natural background reconstruction, as well as equipment, crew, reflections, clutter, and other production artifacts
 - **Mask fixes**: smart and brush masks use a true blue overlay, the eraser removes coverage, and deletion, inversion, exposure, contrast, color, and detail apply only within the corresponding mask
@@ -765,7 +779,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - GitHub 公開安定版：**v1.5.12**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
-- 現在のソースバージョン：**1.5.12 / build 39**
+- 現在のソースバージョン：**1.5.13 / build 40**（ローカル候補、未公開）
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
@@ -779,6 +793,13 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > GitHub 公開安定版と公式サイトの自動更新版は、それぞれのリリースノートと
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.13 ローカル候補（未公開）
+
+- 5 つのネイティブ版に「ローカルコピーを保存」を追加しました。テザー撮影したファイル、カメラカードから取り込んだファイル、AI レタッチ／画像生成の結果、プロ現像後のファイルを、OS 標準の保存先選択画面から任意の場所へ保存できます。各ファイルライブラリに共通の操作を用意し、ZENCHE 内でプレビューできる画面にもショートカットを設けました。AI とプロ現像には直接保存する操作もあります。「システム写真に保存」は独立した操作として引き続き利用できます。
+- 書き出しはコピーのみを作成し、ZENCHE ライブラリ内の元ファイルを移動・削除しません。AI とプロ現像から直接保存する場合も、先に新しいライブラリ項目を作成します。macOS と Windows の AI レタッチは元画像を上書きせず、常に新しいファイルとして保存する方式へ変更しました。5 つのライブラリは JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V、AVI を共通して認識します。プレビューできる形式は各 OS のデコーダーに依存します。
+- OS 標準の保存画面を閉じた場合は成功にもエラーにもなりません。コピー完了、ストレージへの同期、保存先のサイズ確認がすべて終わった後にのみ成功を表示します。失敗時は一時ファイルを削除し、不完全な保存先も可能な範囲で取り除きます。同名ファイルと上書きの確認は各 OS の保存画面が担当します。
+- これは `1.5.13 / build 40` のローカル候補です。まだ push、タグ作成、GitHub Release 公開、公式更新フィードへの配信は行っていません。5 プラットフォームすべてのビルド経路はローカルで通過しています。凍結候補の署名上の制約、バイト数、SHA-256 は [1.5.13 リリースノート草稿](docs/releases/v1.5.13.md)を参照してください。GitHub 公開安定版は v1.5.12、公式更新フィードは 1.5.10 / build 37 のままです。
 
 ### v1.5.12 GitHub リリース
 
@@ -849,7 +870,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 
 内蔵エディタに **AI ツール** を搭載し、nano-banana 画像モデルを使用します：
 
-- **AI 編集**：選択した元画像をすぐプレビューし、自然な美肌、スタイル変換、空の強調などを適用し、写真の切り替え時には古い結果を消去します。Android、iOS / iPadOS、HarmonyOS では新しいアプリ内コピーとして保存し、システム写真の原本は上書きしません。macOS と Windows では、画面の案内どおり現在のアプリ内ファイルを置き換えます
+- **AI 編集**：選択した元画像をすぐプレビューし、自然な美肌、スタイル変換、空の強調などを適用し、写真の切り替え時には古い結果を消去します。5 つのネイティブ版はいずれも結果を新しいアプリ内コピーとして保存し、現在のアプリ内ファイルやシステム写真の原本を上書きしません
 - **AI 生成**：テキストから人物、風景、都市夜景などを生成し、新規ファイルとして保存
 - **スマート除去**：通行人を削除して背景を自然に補完し、撮影機材、スタッフ、反射、不要物などの写り込みも除去
 - **マスク修正**：スマート／ブラシマスクを実際の青いオーバーレイで表示し、消しゴムで範囲を削除。削除、反転、露出、コントラスト、色、ディテールは対応するマスク内だけに適用

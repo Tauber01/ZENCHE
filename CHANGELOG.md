@@ -1,5 +1,52 @@
 # Changelog
 
+## [1.5.13] - Unreleased (local candidate)
+
+### Added
+
+- Added **Save a Local Copy** across iOS/iPadOS, Android, HarmonyOS, macOS,
+  and Windows for tethered captures, camera-card downloads, AI retouch and
+  generation results, and Pro Develop output.
+- Added consistent local-copy actions to every file library and supported in-app preview, plus direct
+  actions in the AI and Pro Develop workspaces. Save to System Photos remains
+  a separate mobile workflow.
+
+### Changed
+
+- Direct AI and Pro Develop exports now create a new ZENCHE library item before
+  opening the system save picker. Local export never moves or deletes the
+  library source.
+- AI retouching on macOS and Windows now always creates a new file instead of
+  overwriting the current original.
+- Aligned all five libraries on the supported export set: JPG/JPEG,
+  HEIF/HEIC, PNG, TIF/TIFF, NEF/NRW, ARW, CR2/CR3, MOV/MP4/M4V, and AVI.
+
+### Reliability
+
+- A cancelled system save picker is neutral. Success is reported only after
+  copying, storage synchronization, and destination-size verification.
+- Failed exports clean up their temporary files and make a best effort to
+  remove incomplete document-provider targets. Desktop exports use a same-
+  directory temporary file before replacement or same-volume commit.
+- Desktop copies now run off the UI thread and verify stable file identity
+  before copying and immediately before commit, preventing symlink, alias,
+  junction, or hardlink paths from resolving back to the library source.
+- Android preserves a pending library-relative export across Activity
+  recreation, rejects source/target inode matches, and verifies the target's
+  actual size after `fsync`. HarmonyOS performs copy, sync, and verification
+  in a TaskPool worker.
+
+### Release status
+
+- The source version target is `1.5.13 / build 40`, but this candidate has not
+  been pushed, tagged, published as a GitHub Release, or deployed to the
+  official update feed.
+- GitHub public stable remains v1.5.12. The official update feed remains
+  1.5.10 / build 37. All five platform build pipelines have completed locally;
+  final candidate packages and SHA-256 sidecars are regenerated only after the
+  implementation commit is frozen. Signing and real-device limits remain
+  documented per package.
+
 ## [1.5.12] - 2026-08-11
 
 ### Fixed

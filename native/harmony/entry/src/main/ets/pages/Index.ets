@@ -5,7 +5,7 @@ import {
 } from '@kit.AbilityKit';
 import { dataSharePredicates, preferences } from '@kit.ArkData';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
-import { util } from '@kit.ArkTS';
+import { taskpool, util } from '@kit.ArkTS';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { image } from '@kit.ImageKit';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
@@ -217,6 +217,116 @@ class ControlTile {
 function filenameFromPath(path: string): string {
   const index: number = path.lastIndexOf('/');
   return index >= 0 ? path.substring(index + 1) : path;
+}
+
+@Concurrent
+function copyAiResultToLibrary(
+  sourcePath: string,
+  libraryDirectory: string,
+  outputStem: string
+): string {
+  if (outputStem !== 'ai_edited' && outputStem !== 'ai_generated') {
+    throw new Error('AI 结果文件名无效');
+  }
+  let source: fs.File | undefined = undefined;
+  let target: fs.File | undefined = undefined;
+  let temporaryPath: string = '';
+  let committed: boolean = false;
+  try {
+    source = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
+    const expectedBytes: number = fs.statSync(source.fd).size;
+    if (expectedBytes === 0) {
+      throw new Error('AI 结果文件为空');
+    }
+
+    const temporaryStamp: number = Date.now();
+    let temporarySequence: number = 0;
+    temporaryPath = `${libraryDirectory}/.${outputStem}.${temporaryStamp}.part`;
+    while (fs.accessSync(temporaryPath)) {
+      temporarySequence++;
+      temporaryPath =
+        `${libraryDirectory}/.${outputStem}.${temporaryStamp}.${temporarySequence}.part`;
+    }
+    target = fs.openSync(
+      temporaryPath,
+      fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE | fs.OpenMode.TRUNC
+    );
+    fs.copyFileSync(source.fd, target.fd);
+    fs.fsyncSync(target.fd);
+    const copiedBytes: number = fs.statSync(target.fd).size;
+    if (copiedBytes !== expectedBytes) {
+      throw new Error('AI 结果文件大小校验失败');
+    }
+    fs.closeSync(target);
+    target = undefined;
+
+    const outputName: string = `${outputStem}.jpg`;
+    let destinationPath: string = `${libraryDirectory}/${outputName}`;
+    if (fs.accessSync(destinationPath)) {
+      const destinationStamp: number = Date.now();
+      let destinationSequence: number = 0;
+      destinationPath =
+        `${libraryDirectory}/${outputStem}_${destinationStamp}.jpg`;
+      while (fs.accessSync(destinationPath)) {
+        destinationSequence++;
+        destinationPath =
+          `${libraryDirectory}/${outputStem}_${destinationStamp}_${destinationSequence}.jpg`;
+      }
+    }
+    fs.renameSync(temporaryPath, destinationPath);
+    committed = true;
+    return destinationPath;
+  } finally {
+    if (source !== undefined) {
+      try { fs.closeSync(source); } catch (closeError) {}
+    }
+    if (target !== undefined) {
+      try { fs.closeSync(target); } catch (closeError) {}
+    }
+    if (!committed && temporaryPath.length > 0 && fs.accessSync(temporaryPath)) {
+      try { fs.unlinkSync(temporaryPath); } catch (cleanupError) {}
+    }
+  }
+}
+
+@Concurrent
+function copyLocalExportFile(
+  sourcePath: string,
+  destinationUri: string
+): number {
+  let source: fs.File | undefined = undefined;
+  let target: fs.File | undefined = undefined;
+  try {
+    source = fs.openSync(sourcePath, fs.OpenMode.READ_ONLY);
+    const sourceStat: fs.Stat = fs.statSync(source.fd);
+    const expectedBytes: number = sourceStat.size;
+    if (expectedBytes === 0) {
+      throw new Error('文件不存在或为空，无法下载');
+    }
+    target = fs.openSync(
+      destinationUri,
+      fs.OpenMode.READ_WRITE
+    );
+    const destinationStat: fs.Stat = fs.statSync(target.fd);
+    if (sourceStat.ino === destinationStat.ino) {
+      return -1;
+    }
+    fs.truncateSync(target.fd, 0);
+    fs.copyFileSync(source.fd, target.fd);
+    fs.fsyncSync(target.fd);
+    const copiedBytes: number = fs.statSync(target.fd).size;
+    if (copiedBytes !== expectedBytes) {
+      throw new Error('下载文件大小校验失败');
+    }
+    return copiedBytes;
+  } finally {
+    if (source !== undefined) {
+      try { fs.closeSync(source); } catch (closeError) {}
+    }
+    if (target !== undefined) {
+      try { fs.closeSync(target); } catch (closeError) {}
+    }
+  }
 }
 
 class SelectEntry {
@@ -604,7 +714,7 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 // 与 AppScope/app.json5 的 versionName 同步；发布构建以该清单为版本源。
-const CURRENT_VERSION: string = '1.5.12';
+const CURRENT_VERSION: string = '1.5.13';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -1010,6 +1120,7 @@ struct Index {
   @State private availableVersion: string = '';
   @State private largePreviewVisible: boolean = false;
   @State private largePreviewName: string = '';
+  @State private largePreviewPath: string = '';
   @State private systemMedia: Array<SystemMediaItem> = [];
   @State private systemAlbumStatus: string = '等待相册授权';
   @State private cloudGuideVisible: boolean = false;
@@ -1046,6 +1157,7 @@ struct Index {
   @State private localPhotosExpanded: boolean = true;
   @State private localVideosExpanded: boolean = true;
   @State private localUnclassifiedExpanded: boolean = true;
+  @State private localExportBusy: boolean = false;
   @State private userLibraryBranches: Array<LibraryBranch> = [];
   @State private expandedLibraryBranchIds: Array<string> = [];
   @State private libraryFileAssignments: Array<LibraryFileAssignmentData> = [];
@@ -3154,6 +3266,22 @@ struct Index {
         }
         .width('100%')
 
+        Button(this.tr('下载到本地'), { type: ButtonType.Normal })
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving && !this.localExportBusy)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.rule'),
+            radius: RADIUS_8
+          })
+          .accessibilityText(this.tr('渲染当前调整并下载为本地文件'))
+          .onClick((): void => {
+            this.saveEditedPhoto(false, true);
+          })
+
         Button(
           this.editorSaving
             ? this.tr('正在保存…')
@@ -3602,6 +3730,18 @@ struct Index {
             this.saveAiResult();
           })
 
+        Button(this.tr('下载到本地'), { type: ButtonType.Normal })
+          .height(48)
+          .width('100%')
+          .enabled(!this.editorSaving && !this.localExportBusy)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.surface'))
+          .border({ width: 1, color: $r('app.color.rule'), radius: RADIUS_8 })
+          .accessibilityText(this.tr('将当前 AI 结果下载为本地文件'))
+          .onClick((): void => {
+            this.saveAiResult(false, true);
+          })
+
         Button(
           this.tr(this.editorSaving ? '正在保存…' : '保存新副本到系统相册'),
           { type: ButtonType.Normal }
@@ -3863,22 +4003,15 @@ struct Index {
     }
   }
 
-  private async saveAiResult(exportToSystemAlbum: boolean = false): Promise<void> {
+  private async saveAiResult(
+    exportToSystemAlbum: boolean = false,
+    exportToLocal: boolean = false
+  ): Promise<void> {
     if (this.aiResultPath.length === 0) {
       return;
     }
     this.editorSaving = true;
     try {
-      const file: fs.File = fs.openSync(this.aiResultPath, fs.OpenMode.READ_ONLY);
-      let data: ArrayBuffer;
-      try {
-        const stat: fs.Stat = fs.statSync(this.aiResultPath);
-        const buffer: ArrayBuffer = new ArrayBuffer(stat.size);
-        fs.readSync(file.fd, buffer);
-        data = buffer;
-      } finally {
-        fs.closeSync(file);
-      }
       const stem: string = this.aiMode === 0 ? 'edited' : 'generated';
       const library: PhotoLibrary | undefined = this.library;
       if (!library) {
@@ -3886,15 +4019,28 @@ struct Index {
         this.aiStatus = '保存 AI 结果失败';
         return;
       }
-      const destination: string = library.saveEditedCopy(
-        `ai_${stem}`,
-        new Uint8Array(data)
+      const savedResult: Object = await taskpool.execute(
+        copyAiResultToLibrary,
+        this.aiResultPath,
+        library.directoryPath,
+        `ai_${stem}`
       );
+      const destination: string = savedResult as string;
       this.refreshPhotos();
       this.editorSelectedPath = destination;
-      this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
+      if (!exportToLocal) {
+        this.aiStatus = `已保存 AI 结果 · ${destination.split('/').pop()}`;
+      }
       this.editorSaving = false;
-      if (exportToSystemAlbum) {
+      if (exportToLocal) {
+        const stat: fs.Stat = fs.statSync(destination);
+        await this.downloadPhotoToLocal(new PhotoItem(
+          filenameFromPath(destination),
+          destination,
+          stat.size,
+          Date.now()
+        ));
+      } else if (exportToSystemAlbum) {
         await this.saveEditedCopyToSystemAlbum(destination);
       }
     } catch (err) {
@@ -6800,71 +6946,89 @@ struct Index {
       )
     }
     .width('100%')
-    .height(Math.min(320, Math.max(96, items.length * 82)))
+    .height(Math.min(520, Math.max(132, items.length * 132)))
   }
 
   @Builder
   private LocalPhotoRow(item: PhotoItem) {
-    Row({ space: 12 }) {
-      if (item.isVideo) {
-        Stack({ alignContent: Alignment.Center }) {
-          Text('▶')
-            .fontSize(20) // ▶ 播放图标，图标豁免族（不受 TS/LIBRARY_FS 约束）
-            .fontColor(Color.White)
-        }
-        .width(68)
-        .height(50)
-        .backgroundColor($r('app.color.graphite'))
-        .borderRadius(RADIUS_6)
-      } else {
-        Image(`file://${item.path}`)
+    Column({ space: 8 }) {
+      Row({ space: 12 }) {
+        if (item.isVideo) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('▶')
+              .fontSize(20) // ▶ 播放图标，图标豁免族（不受 TS/LIBRARY_FS 约束）
+              .fontColor(Color.White)
+          }
           .width(68)
           .height(50)
-          .objectFit(ImageFit.Cover)
+          .backgroundColor($r('app.color.graphite'))
           .borderRadius(RADIUS_6)
+        } else {
+          Image(`file://${item.path}`)
+            .width(68)
+            .height(50)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(RADIUS_6)
+        }
+        Column({ space: 4 }) {
+          Text(item.name)
+            .fontSize(LIBRARY_FS_TITLE)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(item.detail)
+            .fontSize(LIBRARY_FS_TINY)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
       }
-      Column({ space: 4 }) {
-        Text(item.name)
-          .fontSize(LIBRARY_FS_TITLE)
-          .fontWeight(FontWeight.Bold)
+      .width('100%')
+      Row({ space: 6 }) {
+        Button(this.tr('预览'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
           .fontColor($r('app.color.ink'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(item.detail)
-          .fontSize(LIBRARY_FS_TINY)
-          .fontFamily('monospace')
-          .fontColor($r('app.color.muted'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.previewPhoto(item);
+          })
+        Button(this.tr('下载'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.downloadPhotoToLocal(item);
+          })
+        Button(this.tr('分享'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.sharePhoto(item);
+          })
+        Button(this.tr('删除'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.error'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.error'),
+            radius: RADIUS_6
+          })
+          .onClick((): void => {
+            this.deletePhoto(item);
+          })
       }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      Button(this.tr('预览'), { type: ButtonType.Normal })
-        .height(44)
-        .fontColor($r('app.color.ink'))
-        .backgroundColor($r('app.color.paper_2'))
-        .borderRadius(RADIUS_6)
-        .onClick((): void => {
-          this.previewPhoto(item);
-        })
-      Button(this.tr('分享'), { type: ButtonType.Normal })
-        .height(44)
-        .fontColor($r('app.color.ink'))
-        .backgroundColor($r('app.color.paper_2'))
-        .borderRadius(RADIUS_6)
-        .onClick((): void => {
-          this.sharePhoto(item);
-        })
-      Button(this.tr('删除'), { type: ButtonType.Normal })
-        .height(44)
-        .fontColor($r('app.color.error'))
-        .backgroundColor($r('app.color.surface'))
-        .border({
-          width: 1,
-          color: $r('app.color.error'),
-          radius: RADIUS_6
-        })
-        .onClick((): void => {
-          this.deletePhoto(item);
-        })
+      .width('100%')
     }
     .width('100%')
     .padding(12)
@@ -7560,7 +7724,7 @@ struct Index {
           .onClick((): void => {
             const item: PhotoItem | undefined = this.photos.find(
               (candidate: PhotoItem): boolean =>
-                candidate.name === this.largePreviewName
+                candidate.path === this.largePreviewPath
             );
             if (item !== undefined && !item.isVideo) {
               this.editorSelectedPath = item.path;
@@ -7577,10 +7741,24 @@ struct Index {
           .onClick((): void => {
             const item: PhotoItem | undefined = this.photos.find(
               (candidate: PhotoItem): boolean =>
-                candidate.name === this.largePreviewName
+                candidate.path === this.largePreviewPath
             );
             if (item !== undefined) {
               this.sharePhoto(item);
+            }
+          })
+        Button(this.tr('下载到本地'), { type: ButtonType.Normal })
+          .height(44)
+          .fontColor(Color.White)
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(RADIUS_8)
+          .onClick((): void => {
+            const item: PhotoItem | undefined = this.photos.find(
+              (candidate: PhotoItem): boolean =>
+                candidate.path === this.largePreviewPath
+            );
+            if (item !== undefined) {
+              this.downloadPhotoToLocal(item);
             }
           })
       }
@@ -8347,11 +8525,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n' +
-                '• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n' +
-                '• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n' +
-                '• 其余功能与 1.5.11 保持一致。\n' +
-                '• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。'
+                '• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n' +
+                '• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n' +
+                '• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n' +
+                '• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n' +
+                '• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。'
               ))
                 .fontSize(EDITOR_FS_MEDIUM)
                 .lineHeight(23)
@@ -14734,7 +14912,10 @@ struct Index {
     }
   }
 
-  private async saveEditedPhoto(exportToSystemAlbum: boolean = false): Promise<void> {
+  private async saveEditedPhoto(
+    exportToSystemAlbum: boolean = false,
+    exportToLocal: boolean = false
+  ): Promise<void> {
     const library: PhotoLibrary | undefined = this.library;
     const selected: PhotoItem | undefined = this.editablePhotos().find(
       (item: PhotoItem): boolean =>
@@ -14826,8 +15007,18 @@ struct Index {
       this.editorSelectedPath = destination;
       this.resetImageEditor();
       this.refreshEditorImageMetrics();
-      this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
-      if (exportToSystemAlbum) {
+      if (!exportToLocal) {
+        this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
+      }
+      if (exportToLocal) {
+        const stat: fs.Stat = fs.statSync(destination);
+        await this.downloadPhotoToLocal(new PhotoItem(
+          filenameFromPath(destination),
+          destination,
+          stat.size,
+          Date.now()
+        ));
+      } else if (exportToSystemAlbum) {
         await this.saveEditedCopyToSystemAlbum(destination);
       }
     } catch (error) {
@@ -14979,6 +15170,7 @@ struct Index {
       }
       this.largePreview = pixelMap;
       this.largePreviewName = item.name;
+      this.largePreviewPath = item.path;
       this.largePreviewVisible = true;
       this.status = `正在查看 ${item.name}`;
     } catch (error) {
@@ -14991,6 +15183,7 @@ struct Index {
   private closeLargePhoto(): void {
     this.largePreviewVisible = false;
     this.largePreviewName = '';
+    this.largePreviewPath = '';
     if (this.largePreview !== undefined) {
       this.largePreview.release();
       this.largePreview = undefined;
@@ -15018,6 +15211,81 @@ struct Index {
       this.showError(
         `无法打开系统分享面板：${(error as BusinessError).message}`
       );
+    }
+  }
+
+  private async downloadPhotoToLocal(item: PhotoItem): Promise<void> {
+    if (this.localExportBusy) {
+      promptAction.showToast({ message: this.tr('正在选择保存位置') });
+      return;
+    }
+    try {
+      if (!fs.accessSync(item.path) || fs.statSync(item.path).size === 0) {
+        this.showError(this.tr('文件不存在或为空，无法下载'));
+        return;
+      }
+    } catch (error) {
+      this.diagnostics?.error(
+        'local-download',
+        `读取源文件失败：${(error as Error).message}`
+      );
+      this.showError(
+        this.tr(`下载到本地失败：${(error as Error).message}`)
+      );
+      return;
+    }
+
+    this.localExportBusy = true;
+    let destinationUri: string = '';
+    try {
+      const context: common.UIAbilityContext =
+        getContext(this) as common.UIAbilityContext;
+      const documentPicker: picker.DocumentViewPicker =
+        new picker.DocumentViewPicker(context);
+      const options: picker.DocumentSaveOptions =
+        new picker.DocumentSaveOptions();
+      options.newFileNames = [item.name];
+      const destinations: Array<string> = await documentPicker.save(options);
+      if (destinations.length === 0) {
+        return;
+      }
+      destinationUri = destinations[0];
+      const copiedResult: Object = await taskpool.execute(
+        copyLocalExportFile,
+        item.path,
+        destinationUri
+      );
+      const copiedBytes: number = copiedResult as number;
+      if (copiedBytes < 0) {
+        // DocumentViewPicker can point back to the source. Never unlink or
+        // truncate that file while handling the rejected destination.
+        destinationUri = '';
+        this.showError(this.tr('该文件已位于所选位置'));
+        return;
+      }
+      this.status = `已下载到本地：${item.name}`;
+      this.diagnostics?.info(
+        'local-download',
+        `文件副本已保存；源=${item.name}；大小=${copiedBytes}`
+      );
+      promptAction.showToast({ message: this.tr(this.status) });
+    } catch (error) {
+      const businessError: BusinessError = error as BusinessError;
+      if (businessError.code !== 13900012) {
+        if (destinationUri.length > 0) {
+          try {
+            fs.unlinkSync(destinationUri);
+          } catch (cleanupError) {
+            this.diagnostics?.warning(
+              'local-download',
+              `清理未完成的目标文件失败：${(cleanupError as Error).message}`
+            );
+          }
+        }
+        this.showError(this.tr(`下载到本地失败：${businessError.message}`));
+      }
+    } finally {
+      this.localExportBusy = false;
     }
   }
 

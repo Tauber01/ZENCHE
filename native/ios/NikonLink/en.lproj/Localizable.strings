@@ -558,8 +558,8 @@
 "请输入激活码" = "Please enter an activation code";
 "AI 功能已解锁" = "AI features unlocked";
 "AI 创作" = "AI Create";
-"修图覆盖原图 · 生图保存新文件" = "AI editing overwrites the original · generation saves a new file";
 "修图与生图都会保存新副本" = "AI edits and generated images are saved as new copies";
+"AI 修图与生图均保存新文件" = "AI editing and generation both save new files";
 "需要激活" = "Activation required";
 "已解锁" = "Unlocked";
 "输出参数" = "Output parameters";
@@ -841,7 +841,7 @@
 "本地图像分析" = "Local Image Analysis";
 "暂无图像源" = "No Image Source";
 "连接相机后可用" = "Available after connecting a camera";
-"• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n• 其余功能与 1.5.11 保持一致。\n• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。" = "• Fixed a Windows startup null-reference crash: while WPF builds the control tree, the default exposure-mode selection no longer accesses shutter, aperture, and ISO controls before they exist.\n• Exposure mode, video shutter mode, and the shared parameter handler now return during initialization; shutter configuration and exposure readouts resume after the full interface loads.\n• Added Windows startup regression contracts for XAML default-selection order, initialization guards, and post-load recovery.\n• All other behavior remains unchanged from 1.5.11.\n• Version 1.5.12 is provided as the GitHub public stable release. Signing status varies by platform; verify SHA-256 and the per-package notes before installation. Windows still requires real-host cold-start, installation, driver, and SmartScreen validation.";
+"• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。" = "• Added “Save a Local Copy”: tethered captures, camera-card downloads, AI edits and generated images, and professional-editor results can now be saved to a location chosen in the system picker.\n• Every file library offers the same action. Supported in-app previews also provide a shortcut, while AI and the professional editor have direct actions of their own. “Save to Photos” remains separate.\n• Export creates a copy and never moves or deletes the source in the ZENCHE library. On macOS and Windows, AI edits now always create new files instead of overwriting the originals.\n• Cancelling does not show an error. Success is shown only after the copy finishes, data is flushed to storage, and the file size is verified. Failures remove temporary files and make a best effort to delete an incomplete destination.\n• Version 1.5.13 is a local candidate that has not been pushed, released, or added to the website update feed. System pickers, permissions, name collisions, large files, and out-of-space behavior still require device testing.";
 "控制" = "Control";
 "菜单" = "Menu";
 "更多" = "More";
@@ -973,3 +973,14 @@
 "显示已允许访问的 %lld 张照片" = "Showing %lld permitted photos";
 "最近 %lld 张照片" = "Latest %lld photos";
 "导入 %@" = "Import %@";
+"下载" = "Download";
+"下载到本地" = "Save a Local Copy";
+"正在选择保存位置" = "Choosing a save location…";
+"文件不存在或为空，无法下载" = "This file is missing or empty and cannot be saved.";
+"已下载到本地：" = "Saved locally: ";
+"已下载到本地 · " = "Saved locally · ";
+"下载到本地失败：" = "Could not save locally: ";
+"下载文件大小校验失败" = "The saved file did not pass size verification";
+"所选保存位置不可写" = "The selected save location is not writable";
+"该文件已位于所选位置" = "The file is already in the selected location";
+"所选保存位置无效" = "The selected save location is invalid";

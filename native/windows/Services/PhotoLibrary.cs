@@ -7,7 +7,8 @@ public sealed class PhotoLibrary
 {
     private static readonly string[] SupportedExtensions =
         [
-            ".jpg", ".jpeg", ".png", ".nef", ".nrw", ".heif", ".heic",
+            ".jpg", ".jpeg", ".png", ".nef", ".nrw", ".arw", ".cr2",
+            ".cr3", ".heif", ".heic",
             ".tif", ".tiff", ".mp4", ".mov", ".m4v", ".avi"
         ];
 

@@ -1,6 +1,7 @@
 using NikonLink.Windows.Models;
 using NikonLink.Windows.Services;
 using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
 using System.Buffers.Binary;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,6 +9,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
@@ -26,6 +28,32 @@ namespace NikonLink.Windows;
 
 public partial class MainWindow : Window
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME CreationTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastAccessTime;
+        public System.Runtime.InteropServices.ComTypes.FILETIME LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    private readonly record struct WindowsFileIdentity(
+        uint VolumeSerialNumber,
+        uint FileIndexHigh,
+        uint FileIndexLow);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file,
+        out ByHandleFileInformation information);
+
     private sealed record PreparedPreview(
         BitmapSource Source,
         BitmapSource Display,
@@ -751,6 +779,8 @@ public partial class MainWindow : Window
     private CameraStorageSnapshot _cameraStorageSnapshot =
         CameraStorageSnapshot.Empty;
     private bool _cameraStorageBusy;
+    private bool _localDownloadBusy;
+    private bool _localDownloadPreparationBusy;
     private CancellationTokenSource? _previewCancellation;
     private Task? _previewTask;
     private CancellationTokenSource? _shootingTaskCancellation;
@@ -6361,11 +6391,11 @@ public partial class MainWindow : Window
         body.Children.Add(new TextBlock
         {
             Text = AppLocalization.T(
-                "• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n" +
-                "• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n" +
-                "• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n" +
-                "• 其余功能与 1.5.11 保持一致。\n" +
-                "• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。"),
+                "• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n" +
+                "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n" +
+                "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n" +
+                "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n" +
+                "• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。"),
             Style = (Style)FindResource("AnnouncementBody"),
             TextWrapping = TextWrapping.Wrap,
             LineHeight = 22,
@@ -7224,6 +7254,8 @@ public partial class MainWindow : Window
         DeleteBranchButton.IsEnabled = selectedNode?.BranchId is not null;
         DeletePhotoButton.IsEnabled =
             item is { IsLibraryItem: true };
+        DownloadPhotoButton.IsEnabled =
+            item is { IsLibraryItem: true };
         SharePhotoButton.IsEnabled = item is not null;
         if (item is null)
         {
@@ -7421,6 +7453,250 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void DownloadPhotoButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if ((PhotoTree.SelectedItem as LibraryTreeNode)?.Item is
+            { IsLibraryItem: true } item)
+        {
+            await DownloadPhotoToLocalAsync(item);
+        }
+    }
+
+    private Task<bool> DownloadPhotoToLocalAsync(
+        PhotoItem item,
+        Window? dialogOwner = null) =>
+        DownloadFileToLocalAsync(
+            item.Path,
+            item.Name,
+            dialogOwner: dialogOwner);
+
+    private async Task<bool> DownloadFileToLocalAsync(
+        string sourcePath,
+        string suggestedFileName,
+        Action<string>? statusSink = null,
+        Window? dialogOwner = null,
+        bool preparationOwner = false)
+    {
+        void UpdateStatus(string message)
+        {
+            var localized = AppLocalization.T(message);
+            OperationStatusText.Text = localized;
+            statusSink?.Invoke(localized);
+        }
+
+        if (_localDownloadBusy)
+        {
+            return false;
+        }
+        if (_localDownloadPreparationBusy && !preparationOwner)
+        {
+            return false;
+        }
+        if (!File.Exists(sourcePath))
+        {
+            UpdateStatus("文件不存在或为空，无法下载");
+            return false;
+        }
+        try
+        {
+            if (new FileInfo(sourcePath).Length == 0)
+            {
+                UpdateStatus("文件不存在或为空，无法下载");
+                return false;
+            }
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "local-download",
+                $"读取源文件失败：{error.Message}");
+            UpdateStatus($"下载到本地失败：{error.Message}");
+            return false;
+        }
+
+        var fileName = string.IsNullOrWhiteSpace(suggestedFileName)
+            ? Path.GetFileName(sourcePath)
+            : suggestedFileName;
+        var extension = Path.GetExtension(fileName);
+        var extensionLabel = string.IsNullOrWhiteSpace(extension)
+            ? AppLocalization.T("文件")
+            : extension.TrimStart('.').ToUpperInvariant() + " "
+                + AppLocalization.T("文件");
+        var dialog = new SaveFileDialog
+        {
+            Title = AppLocalization.T("下载到本地"),
+            FileName = fileName,
+            InitialDirectory = Environment.GetFolderPath(
+                Environment.SpecialFolder.UserProfile) is { Length: > 0 } home
+                    ? Path.Combine(home, "Downloads")
+                    : "",
+            AddExtension = !string.IsNullOrWhiteSpace(extension),
+            DefaultExt = extension,
+            Filter = string.IsNullOrWhiteSpace(extension)
+                ? $"{AppLocalization.T("所有文件")}|*.*"
+                : $"{extensionLabel}|*{extension}|"
+                    + $"{AppLocalization.T("所有文件")}|*.*",
+            OverwritePrompt = true,
+            CheckPathExists = true
+        };
+        _localDownloadBusy = true;
+        try
+        {
+            if (dialog.ShowDialog(dialogOwner ?? this) != true)
+            {
+                return false;
+            }
+            var destinationPath = dialog.FileName;
+            UpdateStatus("正在保存…");
+            await Task.Run(() => CopyFileToLocalAtomically(
+                sourcePath,
+                destinationPath));
+            UpdateStatus(
+                $"已下载到本地：{Path.GetFileName(destinationPath)}");
+            _diagnostics.Info(
+                "local-download",
+                $"文件副本已保存；源={Path.GetFileName(sourcePath)}；目标={destinationPath}");
+            return true;
+        }
+        catch (InvalidOperationException error)
+        {
+            UpdateStatus(error.Message);
+            return false;
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error(
+                "local-download",
+                $"保存本地副本失败：{error.Message}");
+            UpdateStatus($"下载到本地失败：{error.Message}");
+            ShowError($"下载到本地失败：{error.Message}");
+            return false;
+        }
+        finally
+        {
+            _localDownloadBusy = false;
+        }
+    }
+
+    private static void CopyFileToLocalAtomically(
+        string sourcePath,
+        string destinationPath)
+    {
+        var sourceFullPath = Path.GetFullPath(sourcePath);
+        var destinationFullPath = Path.GetFullPath(destinationPath);
+        if (string.Equals(
+            sourceFullPath,
+            destinationFullPath,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("该文件已位于所选位置");
+        }
+
+        var destinationDirectory = Path.GetDirectoryName(destinationFullPath)
+            ?? throw new IOException("所选保存位置无效");
+        var temporaryPath = Path.Combine(
+            destinationDirectory,
+            $".zenche-download-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using var source = new FileStream(
+                sourceFullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                64 * 1024,
+                FileOptions.SequentialScan);
+            var sourceLength = source.Length;
+            if (sourceLength == 0)
+            {
+                throw new InvalidOperationException(
+                    "文件不存在或为空，无法下载");
+            }
+            var sourceIdentity = GetWindowsFileIdentity(
+                source.SafeFileHandle);
+            EnsureDestinationIsNotSource(
+                sourceIdentity,
+                destinationFullPath);
+
+            using (var target = new FileStream(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                64 * 1024,
+                FileOptions.SequentialScan))
+            {
+                source.CopyTo(target, 64 * 1024);
+                target.Flush(flushToDisk: true);
+            }
+            if (new FileInfo(temporaryPath).Length != sourceLength)
+            {
+                throw new IOException("下载文件大小校验失败");
+            }
+            if (File.Exists(destinationFullPath))
+            {
+                EnsureDestinationIsNotSource(
+                    sourceIdentity,
+                    destinationFullPath);
+                File.Replace(temporaryPath, destinationFullPath, null);
+            }
+            else
+            {
+                File.Move(temporaryPath, destinationFullPath);
+            }
+            if (!File.Exists(destinationFullPath) ||
+                new FileInfo(destinationFullPath).Length != sourceLength)
+            {
+                throw new IOException("下载文件大小校验失败");
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static void EnsureDestinationIsNotSource(
+        WindowsFileIdentity sourceIdentity,
+        string destinationPath)
+    {
+        if (!File.Exists(destinationPath))
+        {
+            return;
+        }
+        using var destination = new FileStream(
+            destinationPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        var destinationIdentity = GetWindowsFileIdentity(
+            destination.SafeFileHandle);
+        if (sourceIdentity == destinationIdentity)
+        {
+            throw new InvalidOperationException("该文件已位于所选位置");
+        }
+    }
+
+    private static WindowsFileIdentity GetWindowsFileIdentity(
+        SafeFileHandle file)
+    {
+        if (!GetFileInformationByHandle(file, out var information))
+        {
+            throw new IOException(
+                "无法确认文件身份",
+                new Win32Exception(Marshal.GetLastWin32Error()));
+        }
+        return new WindowsFileIdentity(
+            information.VolumeSerialNumber,
+            information.FileIndexHigh,
+            information.FileIndexLow);
+    }
+
     private void BeginShare(string path)
     {
         _sharePhotoPath = path;
@@ -7536,6 +7812,17 @@ public partial class MainWindow : Window
             share.Click += (_, _) => BeginShare(item.Path);
             DockPanel.SetDock(share, Dock.Right);
             toolbar.Children.Add(share);
+            var download = new Button
+            {
+                Content = AppLocalization.T("下载到本地"),
+                Width = 132,
+                Margin = new Thickness(0, 0, 8, 0),
+                Style = (Style)FindResource("PrimaryButton")
+            };
+            download.Click += async (_, _) =>
+                await DownloadPhotoToLocalAsync(item, viewer);
+            DockPanel.SetDock(download, Dock.Right);
+            toolbar.Children.Add(download);
             layout.Children.Add(toolbar);
 
             var image = new Image
@@ -7602,6 +7889,17 @@ public partial class MainWindow : Window
         share.Click += (_, _) => BeginShare(item.Path);
         DockPanel.SetDock(share, Dock.Right);
         toolbar.Children.Add(share);
+        var download = new Button
+        {
+            Content = AppLocalization.T("下载到本地"),
+            Width = 132,
+            Margin = new Thickness(0, 0, 8, 0),
+            Style = (Style)FindResource("PrimaryButton")
+        };
+        download.Click += async (_, _) =>
+            await DownloadPhotoToLocalAsync(item, viewer);
+        DockPanel.SetDock(download, Dock.Right);
+        toolbar.Children.Add(download);
         root.Children.Add(toolbar);
         viewer.Content = root;
         viewer.Loaded += (_, _) => media.Play();
@@ -8631,6 +8929,7 @@ public partial class MainWindow : Window
         DeletePhotoButton.IsEnabled = false;
         DeleteBranchButton.IsEnabled = false;
         SharePhotoButton.IsEnabled = false;
+        DownloadPhotoButton.IsEnabled = false;
     }
 
     private LibraryTreeNode BuildSourceNode(
@@ -8902,6 +9201,9 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         AiSaveBtn.Visibility = _aiResultPath != null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AiDownloadBtn.Visibility = _aiResultPath != null
             ? Visibility.Visible
             : Visibility.Collapsed;
         AiPreviewEmpty.Visibility = previewPath != null
@@ -9186,49 +9488,116 @@ public partial class MainWindow : Window
 
     private void AiSave_Click(object sender, RoutedEventArgs e)
     {
-        if (_aiResultPath == null || !File.Exists(_aiResultPath))
+        if (_localDownloadPreparationBusy || _localDownloadBusy)
         {
             return;
         }
+        SaveAiResultCopy();
+    }
+
+    private async void AiDownload_Click(object sender, RoutedEventArgs e)
+    {
+        if (_localDownloadBusy || _localDownloadPreparationBusy)
+        {
+            return;
+        }
+        var sourcePath = _aiResultPath;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            return;
+        }
+        var destination = UniqueDestination(
+            AiResultFileName(_aiMode, _editorSelectedPath));
+
+        _localDownloadPreparationBusy = true;
+        AiSaveBtn.IsEnabled = false;
+        AiDownloadBtn.IsEnabled = false;
         try
         {
-            using var source = File.OpenRead(_aiResultPath);
-            var bytes = new byte[source.Length];
-            source.ReadExactly(bytes);
-            using var memStream = new MemoryStream(bytes);
-            var decoder = BitmapDecoder.Create(
-                memStream,
-                BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
-            var frame = decoder.Frames[0];
-            if (_aiMode == 0 &&
-                !string.IsNullOrWhiteSpace(_editorSelectedPath) &&
-                File.Exists(_editorSelectedPath))
-            {
-                var originalPath = _editorSelectedPath;
-                SaveBitmapAtomically(originalPath, frame);
-                RefreshPhotoList();
-                RefreshImageEditor();
-                AiStatusText.Text = AppLocalization.T(
-                    $"已覆盖原图 · {Path.GetFileName(originalPath)}");
-            }
-            else
-            {
-                var dest = new FileInfo(
-                    UniqueDestination(
-                        $"ai_generated_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.jpg"));
-                SaveBitmapAtomically(dest.FullName, frame);
-                _editorSelectedPath = dest.FullName;
-                RefreshPhotoList();
-                AiStatusText.Text = AppLocalization.T(
-                    $"已保存 AI 结果 · {dest.Name}");
-            }
+            AiStatusText.Text = AppLocalization.T("正在保存…");
+            await Task.Run(() => SaveAiResultCopyCore(
+                sourcePath,
+                destination));
+            _editorSelectedPath = destination;
+            RefreshPhotoList();
+            RefreshImageEditor();
+            AiStatusText.Text = AppLocalization.T(
+                $"已保存 AI 结果 · {Path.GetFileName(destination)}");
+            await DownloadFileToLocalAsync(
+                destination,
+                Path.GetFileName(destination),
+                message => AiStatusText.Text = message,
+                preparationOwner: true);
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Error("ai", $"准备 AI 本地副本失败：{error.Message}");
+            AiStatusText.Text = AppLocalization.T("保存 AI 结果失败");
+        }
+        finally
+        {
+            _localDownloadPreparationBusy = false;
+            var canSave = _aiResultPath is { } resultPath &&
+                File.Exists(resultPath);
+            AiSaveBtn.IsEnabled = canSave;
+            AiDownloadBtn.IsEnabled = canSave;
+        }
+    }
+
+    private string? SaveAiResultCopy()
+    {
+        if (_localDownloadPreparationBusy || _localDownloadBusy)
+        {
+            return null;
+        }
+        if (_aiResultPath == null || !File.Exists(_aiResultPath))
+        {
+            return null;
+        }
+        try
+        {
+            var destination = UniqueDestination(
+                AiResultFileName(_aiMode, _editorSelectedPath));
+            SaveAiResultCopyCore(_aiResultPath, destination);
+            _editorSelectedPath = destination;
+            RefreshPhotoList();
+            RefreshImageEditor();
+            AiStatusText.Text = AppLocalization.T(
+                $"已保存 AI 结果 · {Path.GetFileName(destination)}");
+            return destination;
         }
         catch (Exception error)
         {
             _diagnostics.Error("ai", $"保存 AI 结果失败：{error.Message}");
             AiStatusText.Text = AppLocalization.T("保存 AI 结果失败");
+            return null;
         }
+    }
+
+    private static string AiResultFileName(
+        int aiMode,
+        string? editorSourcePath) =>
+        aiMode == 0 &&
+        !string.IsNullOrWhiteSpace(editorSourcePath) &&
+        File.Exists(editorSourcePath)
+            ? $"{Path.GetFileNameWithoutExtension(editorSourcePath)}_ai_edited_"
+                + $"{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.jpg"
+            : $"ai_generated_{DateTime.Now:yyyyMMdd_HHmmss}_"
+                + $"{Guid.NewGuid():N}.jpg";
+
+    private static void SaveAiResultCopyCore(
+        string sourcePath,
+        string destination)
+    {
+        using var source = File.OpenRead(sourcePath);
+        var bytes = new byte[source.Length];
+        source.ReadExactly(bytes);
+        using var memory = new MemoryStream(bytes, writable: false);
+        var decoder = BitmapDecoder.Create(
+            memory,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        SaveBitmapAtomically(destination, decoder.Frames[0]);
     }
 
     public string UniqueDestination(string filename)
@@ -10883,6 +11252,7 @@ public partial class MainWindow : Window
             EditorPreviewImage.Source = null;
             EditorPreviewEmpty.Visibility = Visibility.Visible;
             SaveEditedPhotoButton.IsEnabled = false;
+            DownloadEditedPhotoButton.IsEnabled = false;
             EditorScopeWaveform.SetData("—", "—", "—");
             return;
         }
@@ -10896,6 +11266,7 @@ public partial class MainWindow : Window
             EditorPreviewImage.Source = previewBitmap;
             EditorPreviewEmpty.Visibility = Visibility.Collapsed;
             SaveEditedPhotoButton.IsEnabled = true;
+            DownloadEditedPhotoButton.IsEnabled = true;
             RedrawEditorMaskOverlay();
             UpdateEditorScopeWaveform(previewBitmap);
         }
@@ -10904,6 +11275,7 @@ public partial class MainWindow : Window
             EditorPreviewImage.Source = null;
             EditorPreviewEmpty.Visibility = Visibility.Visible;
             SaveEditedPhotoButton.IsEnabled = false;
+            DownloadEditedPhotoButton.IsEnabled = false;
             EditorStatusText.Text =
                 AppLocalization.T($"无法预览：{error.Message}");
         }
@@ -11113,33 +11485,52 @@ public partial class MainWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
-            !File.Exists(_editorSelectedPath))
+        if (_localDownloadPreparationBusy || _localDownloadBusy)
         {
             return;
         }
+        SaveEditedPhotoCopy();
+    }
+
+    private async void DownloadEditedPhoto_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_localDownloadBusy || _localDownloadPreparationBusy)
+        {
+            return;
+        }
+        var sourcePath = _editorSelectedPath;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+        {
+            return;
+        }
+        var adjustments = _editorAdjustments.Copy();
+        adjustments.ShowingOriginal = false;
+        var nikonCloudPreset = _selectedNikonCloudPreset;
+        var destination = UniqueEditedPath(sourcePath);
+
+        _localDownloadPreparationBusy = true;
+        SaveEditedPhotoButton.IsEnabled = false;
+        DownloadEditedPhotoButton.IsEnabled = false;
         try
         {
-            SaveEditedPhotoButton.IsEnabled = false;
             EditorStatusText.Text = AppLocalization.T("正在保存…");
-            var savedAdjustments = _editorAdjustments.Copy();
-            savedAdjustments.ShowingOriginal = false;
-            var bitmap = RenderEditedBitmap(
-                _editorSelectedPath,
-                savedAdjustments,
-                _selectedNikonCloudPreset);
-            var destination = UniqueEditedPath(_editorSelectedPath);
-            var encoder = new JpegBitmapEncoder { QualityLevel = 95 };
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using (var stream = File.Create(destination))
-            {
-                encoder.Save(stream);
-            }
+            await Task.Run(() => SaveEditedPhotoCopyCore(
+                sourcePath,
+                destination,
+                adjustments,
+                nikonCloudPreset));
             _editorSelectedPath = destination;
             RefreshPhotoList();
             RefreshImageEditor();
             EditorStatusText.Text = AppLocalization.T(
                 $"已保存副本 {Path.GetFileName(destination)}");
+            await DownloadFileToLocalAsync(
+                destination,
+                Path.GetFileName(destination),
+                message => EditorStatusText.Text = message,
+                preparationOwner: true);
         }
         catch (Exception error)
         {
@@ -11149,9 +11540,73 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SaveEditedPhotoButton.IsEnabled =
-                !string.IsNullOrWhiteSpace(_editorSelectedPath);
+            _localDownloadPreparationBusy = false;
+            var canSave =
+                !string.IsNullOrWhiteSpace(_editorSelectedPath) &&
+                File.Exists(_editorSelectedPath);
+            SaveEditedPhotoButton.IsEnabled = canSave;
+            DownloadEditedPhotoButton.IsEnabled = canSave;
         }
+    }
+
+    private string? SaveEditedPhotoCopy()
+    {
+        if (_localDownloadPreparationBusy || _localDownloadBusy)
+        {
+            return null;
+        }
+        if (string.IsNullOrWhiteSpace(_editorSelectedPath) ||
+            !File.Exists(_editorSelectedPath))
+        {
+            return null;
+        }
+        try
+        {
+            SaveEditedPhotoButton.IsEnabled = false;
+            DownloadEditedPhotoButton.IsEnabled = false;
+            EditorStatusText.Text = AppLocalization.T("正在保存…");
+            var savedAdjustments = _editorAdjustments.Copy();
+            savedAdjustments.ShowingOriginal = false;
+            var destination = UniqueEditedPath(_editorSelectedPath);
+            SaveEditedPhotoCopyCore(
+                _editorSelectedPath,
+                destination,
+                savedAdjustments,
+                _selectedNikonCloudPreset);
+            _editorSelectedPath = destination;
+            RefreshPhotoList();
+            RefreshImageEditor();
+            EditorStatusText.Text = AppLocalization.T(
+                $"已保存副本 {Path.GetFileName(destination)}");
+            return destination;
+        }
+        catch (Exception error)
+        {
+            EditorStatusText.Text =
+                AppLocalization.T($"保存失败：{error.Message}");
+            ShowError(error.Message);
+            return null;
+        }
+        finally
+        {
+            var canSave = !string.IsNullOrWhiteSpace(_editorSelectedPath) &&
+                File.Exists(_editorSelectedPath);
+            SaveEditedPhotoButton.IsEnabled = canSave;
+            DownloadEditedPhotoButton.IsEnabled = canSave;
+        }
+    }
+
+    private static void SaveEditedPhotoCopyCore(
+        string sourcePath,
+        string destination,
+        EditorAdjustments adjustments,
+        NikonCloudPreset? nikonCloudPreset)
+    {
+        var bitmap = RenderEditedBitmap(
+            sourcePath,
+            adjustments,
+            nikonCloudPreset);
+        SaveBitmapAtomically(destination, bitmap);
     }
 
     private static bool IsEditableImage(string path)

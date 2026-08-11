@@ -46,10 +46,14 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
 import android.os.StatFs;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
+import android.system.Os;
+import android.system.StructStat;
 import android.content.ContentUris;
 import android.text.InputType;
 import android.text.Editable;
@@ -91,6 +95,7 @@ import android.widget.Toast;
 import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.VideoView;
+import android.webkit.MimeTypeMap;
 
 import androidx.core.content.FileProvider;
 
@@ -102,6 +107,7 @@ import android.security.keystore.KeyProperties;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -147,6 +153,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_CAPTURE_LOCATION = 4107;
     private static final int REQUEST_LOCAL_CAMERA = 4108;
     private static final int REQUEST_EDITOR_SYSTEM_PHOTO = 4109;
+    private static final int REQUEST_EXPORT_LOCAL_FILE = 4110;
+    private static final String STATE_PENDING_LOCAL_EXPORT =
+            "pendingLocalExportRelativePath";
     private static final String AI_SERVER_DEFAULT = "https://zenche.top/api";
     private static final String AI_SERVER_LEGACY = "http://101.34.255.115:8787";
     private static int PAPER = Color.rgb(233, 237, 242);
@@ -1417,6 +1426,8 @@ public final class MainActivity extends Activity {
     private boolean immersiveMoreParametersExpanded;
     private volatile boolean immersiveMonitoring;
     private File photoDirectory;
+    private File pendingLocalExportFile;
+    private boolean localExportBusy;
     private CaptureWorkflow captureWorkflow;
     private WirelessTransferServer wirelessServer;
 
@@ -1940,6 +1951,7 @@ public final class MainActivity extends Activity {
             legacyPhotoDirectory.renameTo(photoDirectory);
         }
         if (!photoDirectory.exists()) photoDirectory.mkdirs();
+        restorePendingLocalExport(state);
         captureWorkflow = new CaptureWorkflow(this, photoDirectory);
         wirelessServer = new WirelessTransferServer(
                 photoDirectory,
@@ -2000,6 +2012,53 @@ public final class MainActivity extends Activity {
             checkForUpdates(true);
         }
         diagnostics.info("app", "Android 原生界面已就绪");
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        String relativePath = pendingLocalExportRelativePath(
+                pendingLocalExportFile);
+        if (relativePath != null) {
+            outState.putString(STATE_PENDING_LOCAL_EXPORT, relativePath);
+        }
+        super.onSaveInstanceState(outState);
+    }
+
+    private void restorePendingLocalExport(Bundle state) {
+        if (state == null || photoDirectory == null) return;
+        String relativePath = state.getString(STATE_PENDING_LOCAL_EXPORT);
+        if (relativePath == null || relativePath.isEmpty()) return;
+        File restored = new File(photoDirectory, relativePath);
+        if (pendingLocalExportRelativePath(restored) != null
+                && restored.isFile()
+                && restored.length() > 0) {
+            pendingLocalExportFile = restored;
+            localExportBusy = true;
+            diagnostics.info(
+                    "local-download",
+                    "已恢复待保存的文件：" + restored.getName());
+        } else {
+            diagnostics.warning(
+                    "local-download",
+                    "待保存文件已失效，未恢复");
+        }
+    }
+
+    private String pendingLocalExportRelativePath(File file) {
+        if (file == null || photoDirectory == null) return null;
+        try {
+            String libraryRoot = photoDirectory.getCanonicalPath()
+                    + File.separator;
+            String sourcePath = file.getCanonicalPath();
+            if (!sourcePath.startsWith(libraryRoot)) return null;
+            String relativePath = sourcePath.substring(libraryRoot.length());
+            return relativePath.isEmpty() ? null : relativePath;
+        } catch (Exception error) {
+            diagnostics.warning(
+                    "local-download",
+                    "无法保存待下载状态：" + error.getMessage());
+            return null;
+        }
     }
 
     @Override
@@ -2066,6 +2125,33 @@ public final class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_EXPORT_LOCAL_FILE) {
+            File source = pendingLocalExportFile;
+            pendingLocalExportFile = null;
+            if (resultCode != RESULT_OK) {
+                localExportBusy = false;
+                return;
+            }
+            Uri destination = data == null ? null : data.getData();
+            if (destination == null) {
+                localExportBusy = false;
+                diagnostics.error(
+                        "local-download",
+                        "系统保存器未返回目标文件");
+                showError("下载到本地失败：系统未返回保存位置");
+                return;
+            }
+            if (source == null) {
+                localExportBusy = false;
+                cleanupIncompleteLocalExport(
+                        destination,
+                        "应用恢复后找不到待保存的源文件");
+                showError("下载到本地失败：源文件状态已失效，请重试");
+                return;
+            }
+            copyLibraryFileToDocument(source, destination);
+            return;
+        }
         if (requestCode == REQUEST_EDITOR_SYSTEM_PHOTO
                 && (resultCode != RESULT_OK || data == null)) {
             editorSystemPhotoStatus = "";
@@ -2581,6 +2667,160 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void downloadPhotoToLocal(File file) {
+        if (localExportBusy || pendingLocalExportFile != null) {
+            showToast(pendingLocalExportFile != null
+                    ? "正在选择保存位置"
+                    : "正在保存到本地…");
+            return;
+        }
+        try {
+            String libraryRoot = photoDirectory.getCanonicalPath()
+                    + File.separator;
+            String sourcePath = file.getCanonicalPath();
+            if (!sourcePath.startsWith(libraryRoot)
+                    || !file.isFile()
+                    || file.length() == 0) {
+                showError("文件不存在或为空，无法下载");
+                return;
+            }
+            localExportBusy = true;
+            pendingLocalExportFile = file;
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType(localExportMimeType(file));
+            intent.putExtra(Intent.EXTRA_TITLE, file.getName());
+            startActivityForResult(intent, REQUEST_EXPORT_LOCAL_FILE);
+        } catch (Exception error) {
+            localExportBusy = false;
+            pendingLocalExportFile = null;
+            diagnostics.error(
+                    "local-download",
+                    "无法打开系统保存器：" + error.getMessage());
+            showError("下载到本地失败：" + error.getMessage());
+        }
+    }
+
+    private String localExportMimeType(File file) {
+        String extension = MimeTypeMap.getFileExtensionFromUrl(
+                Uri.fromFile(file).toString());
+        String mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(
+                extension == null ? "" : extension.toLowerCase(Locale.ROOT));
+        return mime == null ? "application/octet-stream" : mime;
+    }
+
+    private void copyLibraryFileToDocument(File source, Uri destination) {
+        try {
+            storageExecutor.execute(() -> {
+            boolean cleanupTarget = true;
+            try {
+                String libraryRoot = photoDirectory.getCanonicalPath()
+                        + File.separator;
+                String sourcePath = source.getCanonicalPath();
+                if (!sourcePath.startsWith(libraryRoot)
+                        || !source.isFile()) {
+                    throw new IllegalStateException(
+                            "文件不存在或为空，无法下载");
+                }
+                long copiedBytes = 0;
+                long expectedBytes;
+                try (FileInputStream input = new FileInputStream(source)) {
+                    expectedBytes = input.getChannel().size();
+                    if (expectedBytes == 0) {
+                        throw new IllegalStateException(
+                                "文件不存在或为空，无法下载");
+                    }
+                    try (ParcelFileDescriptor descriptor =
+                                 getContentResolver().openFileDescriptor(
+                                         destination,
+                                         "rw")) {
+                    if (descriptor == null) {
+                        throw new IllegalStateException("所选保存位置不可写");
+                    }
+                    StructStat sourceStat = Os.fstat(input.getFD());
+                    StructStat destinationStat = Os.fstat(
+                            descriptor.getFileDescriptor());
+                    if (sourceStat.st_dev == destinationStat.st_dev
+                            && sourceStat.st_ino == destinationStat.st_ino) {
+                        cleanupTarget = false;
+                        throw new IllegalStateException(
+                                "保存位置不能与源文件相同");
+                    }
+                    Os.ftruncate(descriptor.getFileDescriptor(), 0);
+                    try (FileOutputStream output = new FileOutputStream(
+                            descriptor.getFileDescriptor())) {
+                        output.getChannel().position(0);
+                        byte[] buffer = new byte[64 * 1024];
+                        int count;
+                        while ((count = input.read(buffer)) != -1) {
+                            output.write(buffer, 0, count);
+                            copiedBytes += count;
+                        }
+                        output.flush();
+                        output.getFD().sync();
+                        long destinationBytes = Os.fstat(
+                                descriptor.getFileDescriptor()).st_size;
+                        if (destinationBytes != expectedBytes) {
+                            throw new IllegalStateException(
+                                    "下载文件大小校验失败");
+                        }
+                    }
+                }
+                }
+                if (copiedBytes != expectedBytes) {
+                    throw new IllegalStateException("下载文件大小校验失败");
+                }
+                diagnostics.info(
+                        "local-download",
+                        "文件副本已保存；源=" + source.getName()
+                                + "；大小=" + copiedBytes);
+                mainHandler.post(() -> showToast(
+                        "已下载到本地：%s",
+                        source.getName()));
+            } catch (Exception error) {
+                if (cleanupTarget) {
+                    cleanupIncompleteLocalExport(
+                            destination,
+                            "复制或校验未完成：" + error.getMessage());
+                } else {
+                    diagnostics.warning(
+                            "local-download",
+                            "已拒绝覆盖源文件，未删除所选目标");
+                }
+                diagnostics.error(
+                        "local-download",
+                        "保存本地副本失败：" + error.getMessage());
+                mainHandler.post(() -> showError(
+                        "下载到本地失败：" + error.getMessage()));
+            } finally {
+                mainHandler.post(() -> localExportBusy = false);
+            }
+            });
+        } catch (RuntimeException error) {
+            localExportBusy = false;
+            diagnostics.error(
+                    "local-download",
+                    "无法启动本地文件复制：" + error.getMessage());
+            showError("下载到本地失败：" + error.getMessage());
+        }
+    }
+
+    private void cleanupIncompleteLocalExport(Uri destination, String reason) {
+        diagnostics.warning(
+                "local-download",
+                "清理未完成的目标文件；原因=" + reason);
+        try {
+            DocumentsContract.deleteDocument(
+                    getContentResolver(),
+                    destination);
+        } catch (Exception cleanupError) {
+            diagnostics.warning(
+                    "local-download",
+                    "清理未完成的目标文件失败："
+                            + cleanupError.getMessage());
+        }
+    }
+
     private void showLargePhoto(File file) {
         if (isVideoFile(file)) {
             showLargeLocalVideo(file);
@@ -2615,12 +2855,16 @@ public final class MainActivity extends Activity {
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT));
 
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
         Button close = nativeButton("关闭", false);
         close.setOnClickListener(view -> dialog.dismiss());
-        FrameLayout.LayoutParams closeParams =
-                new FrameLayout.LayoutParams(dp(88), dp(48), Gravity.TOP | Gravity.START);
-        closeParams.setMargins(dp(16), dp(28), 0, 0);
-        root.addView(close, closeParams);
+        LinearLayout.LayoutParams actionParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        actionParams.setMargins(dp(4), 0, dp(4), 0);
+        actions.addView(close, actionParams);
 
         Button edit = nativeButton("编辑", true);
         edit.setOnClickListener(view -> {
@@ -2630,17 +2874,23 @@ public final class MainActivity extends Activity {
             aiResultBitmap = null;
             showSection("editor");
         });
-        FrameLayout.LayoutParams editParams =
-                new FrameLayout.LayoutParams(dp(88), dp(48), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        editParams.setMargins(0, dp(28), 0, 0);
-        root.addView(edit, editParams);
+        actions.addView(edit, new LinearLayout.LayoutParams(actionParams));
+
+        Button download = nativeButton("下载到本地", true);
+        download.setOnClickListener(view -> downloadPhotoToLocal(file));
+        actions.addView(download, new LinearLayout.LayoutParams(actionParams));
 
         Button share = nativeButton("分享", true);
         share.setOnClickListener(view -> sharePhoto(file));
-        FrameLayout.LayoutParams shareParams =
-                new FrameLayout.LayoutParams(dp(96), dp(48), Gravity.TOP | Gravity.END);
-        shareParams.setMargins(0, dp(28), dp(16), 0);
-        root.addView(share, shareParams);
+        actions.addView(share, new LinearLayout.LayoutParams(actionParams));
+
+        FrameLayout.LayoutParams actionsParams =
+                new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP);
+        actionsParams.setMargins(dp(12), dp(28), dp(12), 0);
+        root.addView(actions, actionsParams);
         dialog.setContentView(root);
         dialog.setOnDismissListener(ignored -> {
             if (!bitmap.isRecycled()) bitmap.recycle();
@@ -2663,24 +2913,32 @@ public final class MainActivity extends Activity {
         root.addView(video, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
         Button close = nativeButton("关闭", false);
         close.setOnClickListener(view -> dialog.dismiss());
-        FrameLayout.LayoutParams closeParams =
-                new FrameLayout.LayoutParams(
-                        dp(88),
-                        dp(48),
-                        Gravity.TOP | Gravity.START);
-        closeParams.setMargins(dp(16), dp(28), 0, 0);
-        root.addView(close, closeParams);
+        LinearLayout.LayoutParams actionParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        actionParams.setMargins(dp(4), 0, dp(4), 0);
+        actions.addView(close, actionParams);
+
+        Button download = nativeButton("下载到本地", true);
+        download.setOnClickListener(view -> downloadPhotoToLocal(file));
+        actions.addView(download, new LinearLayout.LayoutParams(actionParams));
+
         Button share = nativeButton("分享", true);
         share.setOnClickListener(view -> sharePhoto(file));
-        FrameLayout.LayoutParams shareParams =
+        actions.addView(share, new LinearLayout.LayoutParams(actionParams));
+
+        FrameLayout.LayoutParams actionsParams =
                 new FrameLayout.LayoutParams(
-                        dp(96),
-                        dp(48),
-                        Gravity.TOP | Gravity.END);
-        shareParams.setMargins(0, dp(28), dp(16), 0);
-        root.addView(share, shareParams);
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP);
+        actionsParams.setMargins(dp(12), dp(28), dp(12), 0);
+        root.addView(actions, actionsParams);
         dialog.setContentView(root);
         dialog.show();
     }
@@ -8140,8 +8398,21 @@ public final class MainActivity extends Activity {
         save.setOnClickListener(view -> saveRenderedEditorCopy(
                 save,
                 status,
+                false,
                 false));
         content.addView(save, marginParams(-1, dp(48), 0, 10, 0, 8));
+
+        Button download = nativeButton("下载到本地", false);
+        download.setContentDescription(
+                tr("渲染当前调整并下载为本地文件"));
+        download.setOnClickListener(view -> saveRenderedEditorCopy(
+                download,
+                status,
+                false,
+                true));
+        content.addView(
+                download,
+                marginParams(-1, dp(48), 0, 0, 0, 8));
 
         Button saveToAlbum = nativeButton("保存新副本到系统相册", false);
         saveToAlbum.setContentDescription(
@@ -8149,7 +8420,8 @@ public final class MainActivity extends Activity {
         saveToAlbum.setOnClickListener(view -> saveRenderedEditorCopy(
                 saveToAlbum,
                 status,
-                true));
+                true,
+                false));
         content.addView(saveToAlbum, marginParams(-1, dp(48), 0, 0, 0, 0));
         content.addView(
                 status,
@@ -8582,16 +8854,19 @@ public final class MainActivity extends Activity {
                     String stem = aiMode == 0 ? "edited" : "generated";
                     File dest = source != null
                             ? uniqueEditedFile(source)
-                            : new File(
-                                    photoDirectory,
-                                    "ai_" + stem + "_" + new java.text.SimpleDateFormat(
-                                            "yyyyMMdd_HHmmss", java.util.Locale.US)
-                                            .format(new Date()) + ".jpg");
+                            : uniquePhotoDestination(
+                                    "ai_" + stem + "_"
+                                            + new java.text.SimpleDateFormat(
+                                                    "yyyyMMdd_HHmmss",
+                                                    java.util.Locale.US)
+                                                    .format(new Date())
+                                            + ".jpg");
                     boolean ok = false;
                     try (FileOutputStream stream = new FileOutputStream(dest)) {
                         ok = bmp.compress(Bitmap.CompressFormat.JPEG, 95, stream);
                         stream.getFD().sync();
                     } catch (Exception e) {
+                        ok = false;
                         if (dest.exists()) dest.delete();
                         diagnostics.error("ai", "保存失败：" + e.getMessage());
                     }
@@ -8610,6 +8885,15 @@ public final class MainActivity extends Activity {
             });
             content.addView(saveBtn, marginParams(-1, dp(48), 0, 0, 0, 8));
 
+            Button downloadBtn = nativeButton("下载到本地", false);
+            downloadBtn.setContentDescription(
+                    tr("将当前 AI 结果下载为本地文件"));
+            downloadBtn.setOnClickListener(view ->
+                    saveAiResultToLocal(downloadBtn, aiStatus));
+            content.addView(
+                    downloadBtn,
+                    marginParams(-1, dp(48), 0, 0, 0, 8));
+
             Button saveAlbumBtn = nativeButton(
                     "保存新副本到系统相册",
                     false);
@@ -8623,6 +8907,56 @@ public final class MainActivity extends Activity {
         }
         scroll.addView(content);
         return scroll;
+    }
+
+    private void saveAiResultToLocal(Button action, TextView status) {
+        Bitmap bitmap = aiResultBitmap;
+        if (bitmap == null) {
+            status.setText(tr("没有可保存的 AI 结果"));
+            return;
+        }
+        action.setEnabled(false);
+        editorExecutor.execute(() -> {
+            File source = aiMode == 0 && editorSelectedPath != null
+                    ? new File(editorSelectedPath)
+                    : null;
+            String stem = aiMode == 0 ? "edited" : "generated";
+            File destination = source != null
+                    ? uniqueEditedFile(source)
+                    : uniquePhotoDestination(
+                            "ai_" + stem + "_"
+                                    + new java.text.SimpleDateFormat(
+                                            "yyyyMMdd_HHmmss",
+                                            java.util.Locale.US)
+                                            .format(new Date())
+                                    + ".jpg");
+            boolean saved = false;
+            try (FileOutputStream stream = new FileOutputStream(destination)) {
+                saved = bitmap.compress(
+                        Bitmap.CompressFormat.JPEG,
+                        95,
+                        stream);
+                stream.getFD().sync();
+                saved = saved && destination.length() > 0;
+            } catch (Exception error) {
+                saved = false;
+                diagnostics.error(
+                        "local-download",
+                        "准备 AI 本地副本失败：" + error.getMessage());
+            }
+            if (!saved && destination.exists()) destination.delete();
+            boolean prepared = saved;
+            mainHandler.post(() -> {
+                action.setEnabled(true);
+                if (!prepared) {
+                    status.setText(tr("保存 AI 结果失败"));
+                    return;
+                }
+                editorSelectedPath = destination.getAbsolutePath();
+                updateFileCount();
+                downloadPhotoToLocal(destination);
+            });
+        });
     }
 
     private void saveAiResultToSystemAlbum(Button action, TextView status) {
@@ -8643,6 +8977,7 @@ public final class MainActivity extends Activity {
                 saved = bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream);
                 stream.getFD().sync();
             } catch (Exception error) {
+                saved = false;
                 diagnostics.error(
                         "ai",
                         "保存 AI 系统相册副本失败：" + error.getMessage());
@@ -10121,16 +10456,19 @@ public final class MainActivity extends Activity {
     private void saveRenderedEditorCopy(
             Button action,
             TextView status,
-            boolean exportToSystemAlbum) {
+            boolean exportToSystemAlbum,
+            boolean exportToLocal) {
         if (editorSelectedPath == null) {
             status.setText(tr("请先选择一张照片"));
             return;
         }
         File source = new File(editorSelectedPath);
         action.setEnabled(false);
-        status.setText(tr(exportToSystemAlbum
-                ? "正在保存新副本到系统相册…"
-                : "正在保存编辑副本…"));
+        if (!exportToLocal) {
+            status.setText(tr(exportToSystemAlbum
+                    ? "正在保存新副本到系统相册…"
+                    : "正在保存编辑副本…"));
+        }
         EditorAdjustments savedAdjustments = editorAdjustments.copy();
         savedAdjustments.showingOriginal = false;
         editorExecutor.execute(() -> {
@@ -10145,6 +10483,7 @@ public final class MainActivity extends Activity {
                             stream);
                     stream.getFD().sync();
                 } catch (Exception error) {
+                    success = false;
                     diagnostics.error(
                             "editor",
                             "保存编辑副本失败：" + error.getMessage());
@@ -10164,7 +10503,9 @@ public final class MainActivity extends Activity {
                 editorAdjustments.reset();
                 selectedNikonCloudPreset = null;
                 updateFileCount();
-                if (exportToSystemAlbum) {
+                if (exportToLocal) {
+                    downloadPhotoToLocal(destination);
+                } else if (exportToSystemAlbum) {
                     status.setText(tr("正在保存新副本到系统相册…"));
                     saveEditedCopyToSystemAlbum(destination);
                     showSection("editor");
@@ -11329,7 +11670,7 @@ public final class MainActivity extends Activity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(10), dp(10), dp(10));
         row.setBackground(rounded(SURFACE, 12, RULE));
-        LinearLayout.LayoutParams rowParams = marginParams(-1, dp(160), 0, 0, 0, 10);
+        LinearLayout.LayoutParams rowParams = marginParams(-1, dp(208), 0, 0, 0, 10);
         row.setLayoutParams(rowParams);
         row.setContentDescription("双击查看 " + file.getName() + " 大图");
         GestureDetector doubleTap = new GestureDetector(
@@ -11364,7 +11705,7 @@ public final class MainActivity extends Activity {
                     BitmapFactory.decodeFile(file.getAbsolutePath(), options));
         }
         thumbnail.setBackgroundColor(GRAPHITE);
-        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(140)));
+        row.addView(thumbnail, new LinearLayout.LayoutParams(dp(108), dp(188)));
 
         LinearLayout details = new LinearLayout(this);
         details.setOrientation(LinearLayout.VERTICAL);
@@ -11382,7 +11723,7 @@ public final class MainActivity extends Activity {
                 TS_CAPTION,
                 Typeface.NORMAL,
                 COBALT));
-        row.addView(details, new LinearLayout.LayoutParams(0, dp(140), 1f));
+        row.addView(details, new LinearLayout.LayoutParams(0, dp(188), 1f));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.VERTICAL);
@@ -11400,6 +11741,13 @@ public final class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(dp(72), dp(44));
         shareParams.setMargins(0, dp(4), 0, 0);
         actions.addView(share, shareParams);
+        Button download = nativeButton("下载", false);
+        download.setContentDescription(tr("下载到本地"));
+        download.setOnClickListener(view -> downloadPhotoToLocal(file));
+        LinearLayout.LayoutParams downloadParams =
+                new LinearLayout.LayoutParams(dp(72), dp(44));
+        downloadParams.setMargins(0, dp(4), 0, 0);
+        actions.addView(download, downloadParams);
         Button delete = nativeButton("删除", false);
         delete.setOnClickListener(view -> new AlertDialog.Builder(this)
                 .setTitle(tr("删除照片？"))
@@ -11420,7 +11768,7 @@ public final class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(dp(72), dp(44));
         deleteParams.setMargins(0, dp(4), 0, 0);
         actions.addView(delete, deleteParams);
-        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(140)));
+        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(188)));
         return row;
     }
 
@@ -14890,6 +15238,10 @@ public final class MainActivity extends Activity {
                     || lower.endsWith(".jpeg")
                     || lower.endsWith(".png")
                     || lower.endsWith(".nef")
+                    || lower.endsWith(".nrw")
+                    || lower.endsWith(".arw")
+                    || lower.endsWith(".cr2")
+                    || lower.endsWith(".cr3")
                     || lower.endsWith(".heif")
                     || lower.endsWith(".heic")
                     || lower.endsWith(".tif")
@@ -15618,9 +15970,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.12" : version;
+            return version == null || version.isEmpty() ? "1.5.13" : version;
         } catch (Exception error) {
-            return "1.5.12";
+            return "1.5.13";
         }
     }
 
@@ -15768,11 +16120,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        tr("• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n"
-                                + "• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n"
-                                + "• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n"
-                                + "• 其余功能与 1.5.11 保持一致。\n"
-                                + "• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。"),
+                        tr("• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n"
+                                + "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n"
+                                + "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n"
+                                + "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n"
+                                + "• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。"),
                         14,
                         Typeface.NORMAL,
                         INK),

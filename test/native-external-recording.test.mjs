@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.12 launch announcements describe the Windows startup fix and release boundary', async () => {
+test('version 1.5.13 launch announcements describe local-copy exports and candidate boundaries', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,17 +95,18 @@ test('version 1.5.12 launch announcements describe the Windows startup fix and r
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /修复 Windows 启动阶段的空引用崩溃/);
-    assert.match(announcement, /曝光模式、视频快门模式与共享参数处理器/);
-    assert.match(announcement, /XAML 默认选择顺序/);
-    assert.match(announcement, /其余功能与 1\.5\.11 保持一致/);
-    assert.match(announcement, /1\.5\.12 作为 GitHub 公开稳定版提供/);
-    assert.match(announcement, /各平台签名状态不同/);
-    assert.match(announcement, /查阅逐包说明/);
-    assert.match(announcement, /真实 Windows 冷启动、安装、驱动与 SmartScreen 验收/);
+    assert.match(announcement, /新增“下载到本地”/);
+    assert.match(announcement, /联机拍摄、相机卡下载、AI 修图\/生图与专业编辑结果/);
+    assert.match(announcement, /“保存到系统相册”继续作为独立操作保留/);
+    assert.match(announcement, /不移动或删除 ZENCHE 文件库中的源文件/);
+    assert.match(announcement, /macOS 与 Windows 的 AI 修图也改为始终生成新文件/);
+    assert.match(announcement, /同步落盘且大小校验通过后才显示成功/);
+    assert.match(announcement, /尽力删除未完成的目标/);
+    assert.match(announcement, /1\.5\.13 是尚未推送、发布或切换官网更新的本地候选/);
+    assert.match(announcement, /真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足/);
   }
 
-  assert.match(announcements[1], /tr\("• 修复 Windows 启动阶段的空引用崩溃/);
+  assert.match(announcements[1], /tr\("• 新增“下载到本地”/);
 
   const englishAnnouncements = await Promise.all([
     read('native/ios/NikonLink/en.lproj/Localizable.strings'),
@@ -121,13 +122,15 @@ test('version 1.5.12 launch announcements describe the Windows startup fix and r
   ]);
 
   for (const announcement of englishAnnouncements) {
-    assert.match(announcement, /Fixed a Windows startup null-reference crash/);
-    assert.match(announcement, /All other behavior remains unchanged from 1\.5\.11/);
-    assert.match(announcement, /Version 1\.5\.12 is provided as the GitHub public stable release/);
+    assert.match(announcement, /Added “Save a Local Copy”/);
+    assert.match(announcement, /Export creates a copy and never moves or deletes the source/);
+    assert.match(announcement, /make a best effort to delete an incomplete destination/);
+    assert.match(announcement, /Version 1\.5\.13 is a local candidate that has not been pushed, released, or added to the website update feed/);
   }
   for (const announcement of japaneseAnnouncements) {
-    assert.match(announcement, /Windows 起動時の null 参照クラッシュを修正しました/);
-    assert.match(announcement, /その他の機能は 1\.5\.11 から変更ありません/);
-    assert.match(announcement, /1\.5\.12 は GitHub 公開安定版として提供します/);
+    assert.match(announcement, /「ローカルコピーを保存」を追加しました/);
+    assert.match(announcement, /元ファイルを移動・削除しません/);
+    assert.match(announcement, /未完了の保存先も可能な範囲で取り除きます/);
+    assert.match(announcement, /1\.5\.13 はローカル候補版/);
   }
 });

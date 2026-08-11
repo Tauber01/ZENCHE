@@ -2425,6 +2425,7 @@ private final class CameraModel: ObservableObject {
     @Published var connected = false
     @Published var localCameraConnected = false
     @Published var connecting = false
+    @Published private(set) var localDownloadBusy = false
     @Published var liveViewEnabled = false
     @Published var capturing = false
     @Published var videoRecording = false
@@ -2496,6 +2497,10 @@ private final class CameraModel: ObservableObject {
     private let logger = DiagnosticLogger.shared
     private let cameraQueue = DispatchQueue(
         label: "com.tauber.nikonlink.camera",
+        qos: .userInitiated
+    )
+    private let localDownloadQueue = DispatchQueue(
+        label: "com.tauber.nikonlink.local-download",
         qos: .userInitiated
     )
     private let previewProcessingQueue = DispatchQueue(
@@ -3855,7 +3860,8 @@ private final class CameraModel: ObservableObject {
         photos = urls
             .filter {
                 [
-                    "jpg", "jpeg", "png", "nef", "heif", "heic", "tif", "tiff",
+                    "jpg", "jpeg", "png", "nef", "nrw", "arw", "cr2", "cr3",
+                    "heif", "heic", "tif", "tiff",
                     "mov", "mp4", "m4v", "avi"
                 ]
                     .contains($0.pathExtension.lowercased())
@@ -3998,6 +4004,293 @@ private final class CameraModel: ObservableObject {
 
     func revealLibrary() {
         NSWorkspace.shared.activateFileViewerSelecting([photoDirectory])
+    }
+
+    private enum LocalDownloadCopyError: LocalizedError {
+        case invalidDestination
+        case sameFile
+        case sizeMismatch
+        case sourceMissingOrEmpty
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidDestination:
+                return String(localized: "所选保存位置无效")
+            case .sameFile:
+                return String(localized: "该文件已位于所选位置")
+            case .sizeMismatch:
+                return String(localized: "下载文件大小校验失败")
+            case .sourceMissingOrEmpty:
+                return String(localized: "文件不存在或为空，无法下载")
+            }
+        }
+    }
+
+    private enum LocalDownloadCopyResult: Sendable {
+        case failed(String)
+        case sameFile
+        case saved(URL)
+    }
+
+    private static func resolvedFileURL(_ url: URL) -> URL {
+        let standardized = url.standardizedFileURL
+        let aliasResolved = (
+            try? URL(
+                resolvingAliasFileAt: standardized,
+                options: [.withoutUI, .withoutMounting]
+            )
+        ) ?? standardized
+        return aliasResolved.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    private static func fileResourceIdentifier(at url: URL) -> NSObject? {
+        guard
+            let values = try? url.resourceValues(
+                forKeys: [.fileResourceIdentifierKey]
+            ),
+            let identifier = values.fileResourceIdentifier as? NSObject
+        else {
+            return nil
+        }
+        return identifier
+    }
+
+    private static func fileResourceIdentifiersMatch(
+        _ first: URL,
+        _ second: URL
+    ) -> Bool {
+        guard
+            let firstIdentifier = fileResourceIdentifier(at: first),
+            let secondIdentifier = fileResourceIdentifier(at: second)
+        else {
+            return false
+        }
+        return firstIdentifier.isEqual(secondIdentifier)
+    }
+
+    private static func canonicalDownloadDestination(
+        for selectedURL: URL,
+        fileManager: FileManager
+    ) throws -> URL {
+        let filename = selectedURL.lastPathComponent
+        guard !filename.isEmpty, filename != ".", filename != ".." else {
+            throw LocalDownloadCopyError.invalidDestination
+        }
+        let resolvedParent = resolvedFileURL(
+            selectedURL.deletingLastPathComponent()
+        )
+        var parentIsDirectory: ObjCBool = false
+        guard
+            fileManager.fileExists(
+                atPath: resolvedParent.path,
+                isDirectory: &parentIsDirectory
+            ),
+            parentIsDirectory.boolValue
+        else {
+            throw LocalDownloadCopyError.invalidDestination
+        }
+        return resolvedParent
+            .appendingPathComponent(filename, isDirectory: false)
+            .standardizedFileURL
+    }
+
+    private static func destinationExists(
+        _ destination: URL,
+        fileManager: FileManager
+    ) -> Bool {
+        if fileManager.fileExists(atPath: destination.path) {
+            return true
+        }
+        return (
+            try? destination.resourceValues(
+                forKeys: [.isSymbolicLinkKey]
+            ).isSymbolicLink
+        ) == true
+    }
+
+    private static func ensureDownloadDestinationIsDistinct(
+        from source: URL,
+        destination: URL,
+        fileManager: FileManager
+    ) throws {
+        let resolvedSource = resolvedFileURL(source)
+
+        // The leaf does not exist yet. Resolve the parent first so a directory
+        // symlink or Finder alias cannot spell the source path differently.
+        guard destination.path != resolvedSource.path else {
+            throw LocalDownloadCopyError.sameFile
+        }
+        guard destinationExists(destination, fileManager: fileManager) else {
+            return
+        }
+
+        let resolvedDestination = resolvedFileURL(destination)
+        if fileResourceIdentifiersMatch(
+            resolvedSource,
+            resolvedDestination
+        ) || resolvedDestination.path == resolvedSource.path {
+            throw LocalDownloadCopyError.sameFile
+        }
+    }
+
+    private static func copyPhotoToLocal(
+        source sourceURL: URL,
+        selectedDestination selectedURL: URL
+    ) -> LocalDownloadCopyResult {
+        let fileManager = FileManager.default
+        let source = resolvedFileURL(sourceURL)
+        var temporaryURL: URL?
+
+        do {
+            let sourceSize = (
+                try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize
+            ) ?? 0
+            guard
+                fileManager.fileExists(atPath: source.path),
+                sourceSize > 0
+            else {
+                throw LocalDownloadCopyError.sourceMissingOrEmpty
+            }
+
+            let destination = try canonicalDownloadDestination(
+                for: selectedURL,
+                fileManager: fileManager
+            )
+            try ensureDownloadDestinationIsDistinct(
+                from: source,
+                destination: destination,
+                fileManager: fileManager
+            )
+
+            let temporary = destination
+                .deletingLastPathComponent()
+                .appendingPathComponent(
+                    ".zenche-download-\(UUID().uuidString)",
+                    isDirectory: false
+                )
+            temporaryURL = temporary
+            try fileManager.copyItem(at: source, to: temporary)
+            let copiedSize = (
+                try? temporary.resourceValues(
+                    forKeys: [.fileSizeKey]
+                ).fileSize
+            ) ?? 0
+            guard copiedSize == sourceSize else {
+                throw LocalDownloadCopyError.sizeMismatch
+            }
+
+            let handle = try FileHandle(forWritingTo: temporary)
+            do {
+                try handle.synchronize()
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+
+            // Re-check immediately before the atomic publish in case the
+            // destination changed while a large RAW or AVI was being copied.
+            try ensureDownloadDestinationIsDistinct(
+                from: source,
+                destination: destination,
+                fileManager: fileManager
+            )
+            if destinationExists(destination, fileManager: fileManager) {
+                _ = try fileManager.replaceItemAt(
+                    destination,
+                    withItemAt: temporary,
+                    backupItemName: nil,
+                    options: [.usingNewMetadataOnly]
+                )
+            } else {
+                try fileManager.moveItem(at: temporary, to: destination)
+            }
+            temporaryURL = nil
+
+            let destinationSize = (
+                try? destination.resourceValues(
+                    forKeys: [.fileSizeKey]
+                ).fileSize
+            ) ?? 0
+            guard destinationSize == sourceSize else {
+                throw LocalDownloadCopyError.sizeMismatch
+            }
+            return .saved(destination)
+        } catch LocalDownloadCopyError.sameFile {
+            if let temporaryURL {
+                try? fileManager.removeItem(at: temporaryURL)
+            }
+            return .sameFile
+        } catch {
+            if let temporaryURL {
+                try? fileManager.removeItem(at: temporaryURL)
+            }
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    func downloadPhotoToLocal(_ photo: PhotoRecord) {
+        guard !localDownloadBusy else { return }
+        let fileManager = FileManager.default
+        let source = Self.resolvedFileURL(photo.url)
+        let sourceSize =
+            (try? source.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard fileManager.fileExists(atPath: source.path),
+              sourceSize > 0
+        else {
+            errorMessage = "文件不存在或为空，无法下载"
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.title = String(localized: "下载到本地")
+        panel.nameFieldStringValue = photo.name
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.directoryURL = fileManager.urls(
+            for: .downloadsDirectory,
+            in: .userDomainMask
+        ).first
+        if let contentType = UTType(filenameExtension: source.pathExtension) {
+            panel.allowedContentTypes = [contentType]
+        }
+
+        localDownloadBusy = true
+        panel.begin { [weak self] response in
+            guard let self else { return }
+            guard response == .OK, let selectedURL = panel.url else {
+                self.localDownloadBusy = false
+                return
+            }
+            self.detail = "正在保存…"
+            self.localDownloadQueue.async {
+                let result = Self.copyPhotoToLocal(
+                    source: source,
+                    selectedDestination: selectedURL
+                )
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.localDownloadBusy = false
+                    switch result {
+                    case .saved(let destination):
+                        self.detail =
+                            "已下载到本地 · \(destination.lastPathComponent)"
+                        self.logger.info(
+                            "local-download",
+                            "文件副本已保存；源=\(source.lastPathComponent)；目标=\(destination.path)"
+                        )
+                    case .sameFile:
+                        self.detail = "该文件已位于所选位置"
+                    case .failed(let message):
+                        self.logger.error(
+                            "local-download",
+                            "保存本地副本失败：\(message)"
+                        )
+                        self.errorMessage = "下载到本地失败：\(message)"
+                    }
+                }
+            }
+        }
     }
 
     func canAdjustExposureParameter(_ name: String) -> Bool {
@@ -8615,6 +8908,20 @@ private struct LibraryView: View {
                 Button("焦点合成") { showFocusStackComposer = true }
                     .buttonStyle(NativeButtonStyle(primary: true))
                 if let selectedPhoto = model.selectedPhoto {
+                    Button {
+                        model.downloadPhotoToLocal(selectedPhoto)
+                    } label: {
+                        Label(
+                            LocalizedStringKey(
+                                model.localDownloadBusy
+                                    ? "正在保存…"
+                                    : "下载到本地"
+                            ),
+                            systemImage: "arrow.down.to.line"
+                        )
+                    }
+                    .buttonStyle(NativeButtonStyle(primary: true))
+                    .disabled(model.localDownloadBusy)
                     ShareLink(item: selectedPhoto.url) {
                         Label("分享到社交平台", systemImage: "square.and.arrow.up")
                     }
@@ -8758,7 +9065,12 @@ private struct LibraryView: View {
             }
         }
         .sheet(item: $largePhoto) { photo in
-            LargePhotoView(photo: photo)
+            LargePhotoView(
+                photo: photo,
+                downloadBusy: model.localDownloadBusy
+            ) {
+                model.downloadPhotoToLocal(photo)
+            }
         }
         .sheet(item: $systemLargePhoto) { item in
             SystemMacAlbumPreview(item: item)
@@ -10678,7 +10990,7 @@ private struct ImageEditorView: View {
                         VStack(alignment: .leading, spacing: SpaceToken.s4) {
                             Label("AI 创作", systemImage: "sparkles")
                                 .font(.system(size: TypeScale.emphasis, weight: .semibold))
-                            Text("修图覆盖原图 · 生图保存新文件")
+                            Text("AI 修图与生图均保存新文件")
                                 .font(.system(size: TypeScale.caption))
                                 .foregroundStyle(Palette.editorLabel)
                         }
@@ -10784,7 +11096,7 @@ private struct ImageEditorView: View {
             }
             Divider()
             VStack(alignment: .leading, spacing: SpaceToken.s8) {
-                HStack {
+                VStack(spacing: SpaceToken.s8) {
                     Button { generateAi() } label: {
                         Label(aiIsGenerating ? "正在生成…" : "生成图像", systemImage: "sparkles")
                             .frame(maxWidth: .infinity)
@@ -10792,9 +11104,27 @@ private struct ImageEditorView: View {
                     .buttonStyle(NativeButtonStyle(primary: true))
                     .disabled(aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || aiIsGenerating || (selectedPhoto == nil && aiMode == .edit))
                     if aiResultImage != nil {
-                        Button { saveAiResult() } label: {
-                            Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
-                        }.buttonStyle(NativeButtonStyle(primary: true)).disabled(isSaving)
+                        HStack(spacing: SpaceToken.s8) {
+                            Button { saveAiResult() } label: {
+                                Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(NativeButtonStyle(primary: true))
+                            .disabled(isSaving)
+                            Button { saveAiResultToLocal() } label: {
+                                Label(
+                                    LocalizedStringKey(
+                                        isSaving || model.localDownloadBusy
+                                            ? "正在保存…"
+                                            : "下载到本地"
+                                    ),
+                                    systemImage: "arrow.down.to.line"
+                                )
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(NativeButtonStyle())
+                            .disabled(isSaving || model.localDownloadBusy)
+                        }
                     }
                 }
                 Text(aiIsGenerating ? "正在调用 AI 模型…" : status)
@@ -11233,6 +11563,22 @@ private struct ImageEditorView: View {
             }
             .buttonStyle(NativeButtonStyle())
             Spacer()
+            Button {
+                saveCopyToLocal()
+            } label: {
+                Label(
+                    LocalizedStringKey(
+                        isSaving || model.localDownloadBusy
+                            ? "正在保存…"
+                            : "下载到本地"
+                    ),
+                    systemImage: "arrow.down.to.line"
+                )
+            }
+            .buttonStyle(NativeButtonStyle())
+            .disabled(
+                selectedPhoto == nil || isSaving || model.localDownloadBusy
+            )
             Button {
                 saveCopy()
             } label: {
@@ -12739,6 +13085,15 @@ private var curvesControls: some View {
     }
 
     private func saveCopy() {
+        saveCopy(downloadToLocal: false)
+    }
+
+    private func saveCopyToLocal() {
+        guard !model.localDownloadBusy else { return }
+        saveCopy(downloadToLocal: true)
+    }
+
+    private func saveCopy(downloadToLocal: Bool) {
         let wasShowingOriginal = showingOriginal
         showingOriginal = false
         guard let selectedPhoto,
@@ -12770,6 +13125,11 @@ private var curvesControls: some View {
             selectedPhotoURL = saved
             resetAdjustments()
             status = "已保存高质量副本 · \(saved.lastPathComponent)"
+            if downloadToLocal {
+                model.downloadPhotoToLocal(
+                    PhotoRecord(url: saved, createdAt: Date())
+                )
+            }
         } else {
             status = model.errorMessage ?? "保存编辑副本失败"
             showingOriginal = wasShowingOriginal
@@ -12816,22 +13176,32 @@ private var curvesControls: some View {
     }
 
     private func saveAiResult() {
+        saveAiResult(downloadToLocal: false)
+    }
+
+    private func saveAiResultToLocal() {
+        guard !model.localDownloadBusy else { return }
+        saveAiResult(downloadToLocal: true)
+    }
+
+    private func saveAiResult(downloadToLocal: Bool) {
         guard let img = aiResultImage, let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { status = "没有可保存的 AI 结果"; return }
         let rep = NSBitmapImageRep(cgImage: cg)
         guard let data = rep.representation(using: .jpeg, properties: [.compressionFactor: 0.95]) else { status = "无法编码 AI 结果"; return }
         isSaving = true
-        let saved: URL?
-        if aiMode == .edit, let selectedPhoto {
-            saved = model.replaceEditedPhoto(
-                data,
-                at: selectedPhoto.url,
-                originalFilename: selectedPhoto.name
-            )
-        } else {
-            saved = model.saveEditedPhoto(data, originalFilename: "ai_generated.jpg")
-        }
+        let saved = model.saveEditedPhoto(
+            data,
+            originalFilename: aiMode == .edit
+                ? "ai_edited.jpg"
+                : "ai_generated.jpg"
+        )
         if let saved {
             selectedPhotoURL = saved; status = "已保存 AI 结果 · \(saved.lastPathComponent)"
+            if downloadToLocal {
+                model.downloadPhotoToLocal(
+                    PhotoRecord(url: saved, createdAt: Date())
+                )
+            }
         } else { status = model.errorMessage ?? "保存 AI 结果失败" }
         isSaving = false
     }
@@ -13085,6 +13455,8 @@ private struct MacCloudDriveGuide: View {
 private struct LargePhotoView: View {
     @Environment(\.dismiss) private var dismiss
     let photo: PhotoRecord
+    let downloadBusy: Bool
+    let download: () -> Void
     @State private var player: AVPlayer?
 
     var body: some View {
@@ -13097,6 +13469,16 @@ private struct LargePhotoView: View {
                     .font(.system(size: TypeScale.body, design: .monospaced))
                     .lineLimit(1)
                 Spacer()
+                Button(action: download) {
+                    Label(
+                        LocalizedStringKey(
+                            downloadBusy ? "正在保存…" : "下载到本地"
+                        ),
+                        systemImage: "arrow.down.to.line"
+                    )
+                }
+                .buttonStyle(NativeButtonStyle(primary: true))
+                .disabled(downloadBusy)
                 ShareLink(item: photo.url) {
                     Label("分享到社交平台", systemImage: "square.and.arrow.up")
                 }
@@ -14167,7 +14549,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.12"
+        ) as? String ?? "1.5.13"
     }
 
     var body: some View {

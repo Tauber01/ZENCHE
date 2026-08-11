@@ -1193,6 +1193,13 @@
                     Content="分享到社交平台"
                     IsEnabled="False"
                     Click="SharePhotoButton_Click" />
+            <Button x:Name="DownloadPhotoButton"
+                    Width="132"
+                    Margin="0,0,8,0"
+                    Style="{DynamicResource PrimaryButton}"
+                    Content="下载到本地"
+                    IsEnabled="False"
+                    Click="DownloadPhotoButton_Click" />
             <Button x:Name="DeletePhotoButton"
                     Width="118"
                     Style="{DynamicResource DangerButton}"
@@ -1613,14 +1620,24 @@
                             Content="全部重置"
                             Click="ResetEditor_Click" />
                   </StackPanel>
-                  <Button x:Name="SaveEditedPhotoButton"
-                          Grid.Row="4"
-                          Height="46"
-                          Style="{DynamicResource PrimaryButton}"
-                          Effect="{x:Null}"
-                          Content="保存高质量副本"
-                          IsEnabled="False"
-                          Click="SaveEditedPhoto_Click" />
+                  <UniformGrid Grid.Row="4" Columns="2">
+                    <Button x:Name="SaveEditedPhotoButton"
+                            Height="46"
+                            Margin="0,0,4,0"
+                            Style="{DynamicResource PrimaryButton}"
+                            Effect="{x:Null}"
+                            Content="保存高质量副本"
+                            IsEnabled="False"
+                            Click="SaveEditedPhoto_Click" />
+                    <Button x:Name="DownloadEditedPhotoButton"
+                            Height="46"
+                            Margin="4,0,0,0"
+                            Style="{DynamicResource PrimaryButton}"
+                            Effect="{x:Null}"
+                            Content="下载到本地"
+                            IsEnabled="False"
+                            Click="DownloadEditedPhoto_Click" />
+                  </UniformGrid>
                 </Grid>
               </Border>
               <Border x:Name="EditorScopeDock"
@@ -1723,7 +1740,7 @@
                     <TextBlock FontWeight="SemiBold" Text="AI 创作" />
                     <TextBlock Margin="0,3,0,0"
                                Style="{DynamicResource AiPanelHint}"
-                               Text="修图覆盖原图 · 生图保存新文件" />
+                               Text="修图与生图均保存新文件" />
                   </StackPanel>
                   <TextBlock x:Name="AiUnlockStatus"
                              DockPanel.Dock="Right"
@@ -1796,13 +1813,22 @@
                            Style="{DynamicResource AiStatusText}"
                            Text="请输入提示词"
                            TextWrapping="Wrap" />
-                <Button x:Name="AiSaveBtn"
-                        Margin="0,14,0,0"
-                        Height="44"
-                        Style="{DynamicResource PrimaryButton}"
-                        Content="保存到文件库"
-                        Visibility="Collapsed"
-                        Click="AiSave_Click" />
+                <UniformGrid Margin="0,14,0,0" Columns="2">
+                  <Button x:Name="AiSaveBtn"
+                          Height="44"
+                          Margin="0,0,4,0"
+                          Style="{DynamicResource PrimaryButton}"
+                          Content="保存到文件库"
+                          Visibility="Collapsed"
+                          Click="AiSave_Click" />
+                  <Button x:Name="AiDownloadBtn"
+                          Height="44"
+                          Margin="4,0,0,0"
+                          Style="{DynamicResource PrimaryButton}"
+                          Content="下载到本地"
+                          Visibility="Collapsed"
+                          Click="AiDownload_Click" />
+                </UniformGrid>
                   </StackPanel>
                 </Border>
               </Grid>

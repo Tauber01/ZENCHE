@@ -64,10 +64,13 @@ test('Windows AI temp: 临时结果预览立即解码释放文件句柄，原图
   assert.match(source, /var image = new BitmapImage\(\);\s*image\.BeginInit\(\);\s*if \(_aiResultPath != null\)\s*\{\s*\/\/ 临时结果需在生命周期切换时删除：立即解码并释放文件句柄。\s*image\.CacheOption = BitmapCacheOption\.OnLoad;\s*\}/);
 });
 
-test('Windows AI temp: 保存路径不删除临时文件且仍读取 _aiResultPath（正式副本不受影响）', async () => {
+test('Windows AI temp: 保存路径快照临时文件且不删除它（正式副本不受影响）', async () => {
   const source = await read('native/windows/MainWindow.xaml.cs');
   const saveBody = source.match(/private void AiSave_Click\([\s\S]*?\n    public string UniqueDestination/)?.[0];
   assert.ok(saveBody, '应能找到 AiSave_Click 方法体');
-  assert.match(saveBody, /File\.OpenRead\(_aiResultPath\)/);
+  assert.match(saveBody, /SaveAiResultCopy\(\)/);
+  assert.match(saveBody, /var sourcePath = _aiResultPath;/);
+  assert.match(saveBody, /SaveAiResultCopyCore\(\s*sourcePath,/);
+  assert.match(saveBody, /File\.OpenRead\(sourcePath\)/);
   assert.doesNotMatch(saveBody, /ClearAiResultFile|File\.Delete/);
 });

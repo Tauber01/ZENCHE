@@ -18,7 +18,7 @@ public sealed record UpdateCheckResult(
 
 public sealed class UpdateService
 {
-    private const string FallbackVersion = "1.5.12";
+    private const string FallbackVersion = "1.5.13";
     private const string DefaultMirrorChyanResourceId = "ZENCHE";
     private const string LatestReleaseApi =
         "https://api.github.com/repos/Tauber01/ZENCHE/releases/latest";

@@ -8,7 +8,7 @@ const read = async (path) => readFile(new URL(path, root), "utf8");
 test("release version is consistent across packages and build scripts", async () => {
   const packageMetadata = JSON.parse(await read("package.json"));
   const version = packageMetadata.version;
-  assert.equal(version, "1.5.12");
+  assert.equal(version, "1.5.13");
   const sources = await Promise.all([
     read("scripts/build-android.sh"),
     read("scripts/build-harmony.sh"),
@@ -51,19 +51,30 @@ test("runtime version fallbacks and diagnostics match the release version", asyn
 });
 
 test("native package build numbers stay aligned", async () => {
-  const [android, harmony, ios, macos] = await Promise.all([
+  const [android, harmony, ios, macos, windows, windowsBuild] = await Promise.all([
     read("native/android/app/build.gradle"),
     read("native/harmony/AppScope/app.json5"),
     read("native/ios/NikonLink.xcodeproj/project.pbxproj"),
     read("native/macos/Info.plist"),
+    read("native/windows/NikonLink.Windows.csproj"),
+    read("scripts/build-windows.ps1"),
   ]);
   const buildNumber = android.match(/versionCode (\d+)/)?.[1];
 
-  assert.equal(buildNumber, "39");
+  assert.equal(buildNumber, "40");
   assert.match(harmony, new RegExp(`versionCode: ${buildNumber}`));
   assert.match(ios, new RegExp(`CURRENT_PROJECT_VERSION = ${buildNumber};`, "g"));
   assert.match(
     macos,
     new RegExp(`<key>CFBundleVersion</key>\\s*<string>${buildNumber}</string>`),
   );
+  assert.match(
+    windows,
+    new RegExp(`<AssemblyVersion>1\\.5\\.13\\.${buildNumber}</AssemblyVersion>`),
+  );
+  assert.match(
+    windows,
+    new RegExp(`<FileVersion>1\\.5\\.13\\.${buildNumber}</FileVersion>`),
+  );
+  assert.match(windowsBuild, new RegExp(`\\$BuildNumber = ${buildNumber}`));
 });

@@ -297,7 +297,9 @@ internal static class AppLocalization
             ["定位未开启"] = new("Location is off", "位置情報はオフです"),
             ["启用"] = new("Enable", "有効"),
             ["AI 创作"] = new("AI Create", "AI クリエイト"),
-            ["修图覆盖原图 · 生图保存新文件"] = new("AI editing overwrites the original · generation saves a new file", "AI編集は元画像を上書き · 生成は新規ファイルとして保存"),
+            ["修图与生图均保存新文件"] = new(
+                "AI editing and generation both save new files",
+                "AI 編集と生成はいずれも新規ファイルとして保存"),
             ["需要激活"] = new("Activation required", "アクティベーションが必要"),
             ["已解锁"] = new("Unlocked", "ロック解除済み"),
             ["输出参数"] = new("Output parameters", "出力パラメータ"),
@@ -1024,22 +1026,51 @@ internal static class AppLocalization
                 new(
                     "Adjustments are always written to a new copy; the original stays untouched.",
                     "調整は常に新しいコピーへ保存され、元のファイルは変更されません。"),
-            ["• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n" +
-             "• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n" +
-             "• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n" +
-             "• 其余功能与 1.5.11 保持一致。\n" +
-             "• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。"] =
+            ["下载"] = new("Download", "ダウンロード"),
+            ["文件"] = new("File", "ファイル"),
+            ["下载到本地"] = new("Save a Local Copy", "ローカルコピーを保存"),
+            ["文件不存在或为空，无法下载"] =
                 new(
-                    "• Fixed a Windows startup null-reference crash: while WPF builds the control tree, the default exposure-mode selection no longer accesses shutter, aperture, and ISO controls before they exist.\n" +
-                    "• Exposure mode, video shutter mode, and the shared parameter handler now return during initialization; shutter configuration and exposure readouts resume after the full interface loads.\n" +
-                    "• Added Windows startup regression contracts for XAML default-selection order, initialization guards, and post-load recovery.\n" +
-                    "• All other behavior remains unchanged from 1.5.11.\n" +
-                    "• Version 1.5.12 is provided as the GitHub public stable release. Signing status varies by platform; verify SHA-256 and the per-package notes before installation. Windows still requires real-host cold-start, installation, driver, and SmartScreen validation.",
-                    "• Windows 起動時の null 参照クラッシュを修正しました。WPF がコントロールツリーを構築している間、露出モードの既定選択が、まだ生成されていないシャッター、絞り、ISO のコントロールへ先にアクセスしません。\n" +
-                    "• 露出モード、動画シャッターモード、共有パラメーター処理は初期化中に先に終了し、画面全体の読み込み後にシャッター設定と露出表示を復元します。\n" +
-                    "• XAML の既定選択順序、初期化ガード、全コントロール生成後の復元経路を固定する Windows 起動回帰テストを追加しました。\n" +
-                    "• その他の機能は 1.5.11 から変更ありません。\n" +
-                    "• 1.5.12 は GitHub 公開安定版として提供します。署名状態はプラットフォームごとに異なるため、インストール前に SHA-256 とパッケージ別の説明を確認してください。Windows 実機でのコールド起動、インストール、ドライバー、SmartScreen の検証は引き続き必要です。"),
+                    "This file is missing or empty and cannot be saved.",
+                    "ファイルが見つからないか空のため、保存できません。"),
+            ["已下载到本地："] =
+                new("Saved locally: ", "ローカルに保存しました："),
+            ["已下载到本地 · "] =
+                new("Saved locally · ", "ローカルに保存しました · "),
+            ["下载到本地失败："] =
+                new("Could not save locally: ", "ローカル保存に失敗しました："),
+            ["下载文件大小校验失败"] =
+                new(
+                    "The saved file did not pass size verification",
+                    "保存したファイルのサイズ検証に失敗しました"),
+            ["该文件已位于所选位置"] =
+                new(
+                    "The file is already in the selected location",
+                    "ファイルはすでに選択した場所にあります"),
+            ["所选保存位置无效"] =
+                new(
+                    "The selected save location is invalid",
+                    "選択した保存先は無効です"),
+            ["无法确认文件身份"] =
+                new(
+                    "Could not verify the file identity",
+                    "ファイルの同一性を確認できませんでした"),
+            ["• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n" +
+             "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n" +
+             "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n" +
+             "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n" +
+             "• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。"] =
+                new(
+                    "• Added “Save a Local Copy”: tethered captures, camera-card downloads, AI edits and generated images, and professional-editor results can now be saved to a location chosen in the system picker.\n" +
+                    "• Every file library offers the same action. Supported in-app previews also provide a shortcut, while AI and the professional editor have direct actions of their own. “Save to Photos” remains separate.\n" +
+                    "• Export creates a copy and never moves or deletes the source in the ZENCHE library. On macOS and Windows, AI edits now always create new files instead of overwriting the originals.\n" +
+                    "• Cancelling does not show an error. Success is shown only after the copy finishes, data is flushed to storage, and the file size is verified. Failures remove temporary files and make a best effort to delete an incomplete destination.\n" +
+                    "• Version 1.5.13 is a local candidate that has not been pushed, released, or added to the website update feed. System pickers, permissions, name collisions, large files, and out-of-space behavior still require device testing.",
+                    "• 「ローカルコピーを保存」を追加しました。テザー撮影、カメラカードからのダウンロード、AI 編集／画像生成、プロ編集の結果を、システムの保存画面で選んだ場所へ保存できます。\n" +
+                    "• 5 つのネイティブ版のファイルライブラリに共通の操作を用意し、ZENCHE 内でプレビューできる画面にもショートカットを設けました。AI とプロ編集には直接保存する操作があります。「写真に保存」は独立した操作として残しています。\n" +
+                    "• 書き出しではコピーだけを作成し、ZENCHE ファイルライブラリの元ファイルを移動・削除しません。macOS と Windows の AI 編集も、元画像を上書きせず常に新規ファイルとして保存します。\n" +
+                    "• キャンセル時はエラーを表示しません。コピー、ストレージへの同期、ファイルサイズの確認が完了してから成功を表示します。失敗時は一時ファイルを削除し、未完了の保存先も可能な範囲で取り除きます。\n" +
+                    "• 1.5.13 はローカル候補版で、プッシュ、公開、公式サイトの更新配信への切り替えはまだ行っていません。システムの保存画面、権限、同名ファイル、大容量ファイル、空き容量不足の動作は実機での確認が必要です。"),
 
         // D1 1.5.8：未处理异常对话框（可复制完整堆栈）
         ["未处理异常"] = new("Unhandled Exception", "未処理の例外"),

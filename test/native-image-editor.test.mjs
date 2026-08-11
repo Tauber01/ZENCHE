@@ -468,7 +468,7 @@ test("AI retouch previews its selected original and masks render real blue alpha
   assert.match(windows, /RedrawEditorMaskOverlay[\s\S]*PixelFormats\.Pbgra32/);
 });
 
-test("Windows AI uses server quota and overwrites the selected source for retouch", async () => {
+test("Windows AI uses server quota and saves retouch results as new files", async () => {
   const windows = await read("native/windows/MainWindow.xaml.cs");
 
   assert.match(windows, /X-ZENCHE-Remaining/);
@@ -477,10 +477,15 @@ test("Windows AI uses server quota and overwrites the selected source for retouc
   assert.match(windows, /_aiServerRemainingUsage = remaining/);
   assert.match(
     windows,
-    /if \(_aiMode == 0[\s\S]*SaveBitmapAtomically\(originalPath, frame\)/,
+    /private static string AiResultFileName\([\s\S]*?aiMode == 0[\s\S]*?_ai_edited_[\s\S]*?ai_generated_/,
+  );
+  assert.match(
+    windows,
+    /UniqueDestination\(\s*AiResultFileName\(_aiMode, _editorSelectedPath\)\)/,
   );
   assert.match(windows, /File\.Replace\(temporary, destination, null\)/);
   assert.match(windows, /ai_generated_/);
+  assert.doesNotMatch(windows, /SaveBitmapAtomically\(originalPath, frame\)/);
 });
 
 test("all native AI clients consume server quota and use the platform save contract", async () => {
@@ -505,17 +510,31 @@ test("all native AI clients consume server quota and use the platform save contr
   assert.match(harmony, /parseAiRemaining\(/);
   assert.match(harmony, /setAiRemainingUsage\(/);
   assert.match(harmony, /recordAiUsage\(\)/);
-  assert.match(harmony, /private async saveAiResult[\s\S]*?library\.saveEditedCopy\(/);
+  assert.match(
+    harmony,
+    /private async saveAiResult[\s\S]*?taskpool\.execute\(\s*copyAiResultToLibrary/,
+  );
 
   assert.match(macos, /X-ZENCHE-Remaining/);
   assert.match(macos, /ActivationManager\.updateServerRemaining/);
   assert.match(macos, /ActivationManager\.recordUsageFallback/);
-  assert.match(macos, /replaceEditedPhoto/);
+  assert.match(
+    macos,
+    /private func saveAiResult\(\)[\s\S]*?model\.saveEditedPhoto\(/,
+  );
+  assert.doesNotMatch(
+    macos,
+    /private func saveAiResult\(\)[\s\S]{0,1100}?replaceEditedPhoto\(/,
+  );
 
   assert.match(windows, /X-ZENCHE-Remaining/);
   assert.match(windows, /ReadServerRemainingUsage\(response\)/);
   assert.match(windows, /if \(serverRemaining is null\)[\s\S]*RecordAiUsage\(\)/);
-  assert.match(windows, /SaveBitmapAtomically\(originalPath, frame\)/);
+  assert.match(
+    windows,
+    /SaveAiResultCopy\(\)[\s\S]*?UniqueDestination\(\s*AiResultFileName\(_aiMode, _editorSelectedPath\)\)/,
+  );
+  assert.doesNotMatch(windows, /SaveBitmapAtomically\(originalPath, frame\)/);
 });
 
 test("AI server address is no longer editable in native Settings while legacy readers remain", async () => {

@@ -84,6 +84,93 @@ private struct RuntimeLocalizedText: View {
     }
 }
 
+private struct LocalFileExportRequest: Identifiable {
+    let id = UUID()
+    let sourceURL: URL
+}
+
+private func localExportMatchesSource(
+    sourceURL: URL,
+    destinationURL: URL
+) async -> Bool {
+    await Task.detached(priority: .utility) {
+        let needsSecurityScope =
+            destinationURL.startAccessingSecurityScopedResource()
+        defer {
+            if needsSecurityScope {
+                destinationURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let sourceSize =
+            (try? sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+                ?? 0
+        guard sourceSize > 0 else { return false }
+
+        var destinationSize = 0
+        var coordinationError: NSError?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(
+            readingItemAt: destinationURL,
+            options: [],
+            error: &coordinationError
+        ) { coordinatedURL in
+            destinationSize =
+                (try? coordinatedURL.resourceValues(
+                    forKeys: [.fileSizeKey]
+                ).fileSize) ?? 0
+        }
+        return coordinationError == nil && destinationSize == sourceSize
+    }.value
+}
+
+private struct LocalFileExportPicker: UIViewControllerRepresentable {
+    let sourceURL: URL
+    let completion: (URL?) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(completion: completion)
+    }
+
+    func makeUIViewController(
+        context: Context
+    ) -> UIDocumentPickerViewController {
+        let controller = UIDocumentPickerViewController(
+            forExporting: [sourceURL],
+            asCopy: true
+        )
+        controller.delegate = context.coordinator
+        controller.shouldShowFileExtensions = true
+        return controller
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIDocumentPickerViewController,
+        context: Context
+    ) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let completion: (URL?) -> Void
+
+        init(completion: @escaping (URL?) -> Void) {
+            self.completion = completion
+        }
+
+        func documentPicker(
+            _ controller: UIDocumentPickerViewController,
+            didPickDocumentsAt urls: [URL]
+        ) {
+            completion(urls.first)
+        }
+
+        func documentPickerWasCancelled(
+            _ controller: UIDocumentPickerViewController
+        ) {
+            completion(nil)
+        }
+    }
+}
+
 private enum IPalette {
     private static func dynamic(light: Int, dark: Int) -> Color {
         Color(uiColor: UIColor { traits in
@@ -676,7 +763,7 @@ struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.12"
+        ) as? String ?? "1.5.13"
     }
 
     var body: some View {
@@ -2342,6 +2429,7 @@ private struct ImageEditorPage: View {
     @State private var editorSystemPhotos: [SystemAlbumItem] = []
     @State private var editorSystemPhotoStatus = ""
     @State private var importingEditorSystemPhoto = false
+    @State private var localExportRequest: LocalFileExportRequest?
     private let aiService = AiImageService()
 
     private var photos: [LibraryItem] {
@@ -2505,6 +2593,22 @@ private struct ImageEditorPage: View {
         }
         .sheet(isPresented: $showingEditorSystemPhotos) {
             editorSystemPhotoPickerSheet
+        }
+        .sheet(item: $localExportRequest) { request in
+            LocalFileExportPicker(sourceURL: request.sourceURL) { destination in
+                localExportRequest = nil
+                guard let destination else { return }
+                Task {
+                    if await localExportMatchesSource(
+                        sourceURL: request.sourceURL,
+                        destinationURL: destination
+                    ) {
+                        status = "已下载到本地 · \(destination.lastPathComponent)"
+                    } else {
+                        status = "下载到本地失败：下载文件大小校验失败"
+                    }
+                }
+            }
         }
     }
 
@@ -2950,20 +3054,24 @@ private struct ImageEditorPage: View {
                 }
                 Spacer()
             }
-            HStack {
-                Button { generateAi() } label: {
-                    Label(aiIsGenerating ? "正在生成…" : "生成图像", systemImage: "sparkles")
-                }.buttonStyle(.borderedProminent)
-                .disabled(aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || aiIsGenerating || (selectedItem == nil && aiMode == .edit))
-                if aiResultImage != nil {
-                    Button { saveAiResult() } label: {
-                        Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
-                    }.buttonStyle(.borderedProminent).disabled(isSaving)
-                    Button { saveAiResultToSystemPhotos() } label: {
-                        Label("保存到系统相册", systemImage: "photo.badge.plus")
-                    }.buttonStyle(.bordered).disabled(isSaving)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack {
+                    Button { generateAi() } label: {
+                        Label(aiIsGenerating ? "正在生成…" : "生成图像", systemImage: "sparkles")
+                    }.buttonStyle(.borderedProminent)
+                    .disabled(aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || aiIsGenerating || (selectedItem == nil && aiMode == .edit))
+                    if aiResultImage != nil {
+                        Button { saveAiResult() } label: {
+                            Label(isSaving ? "正在保存…" : "保存到文件库", systemImage: "square.and.arrow.down")
+                        }.buttonStyle(.borderedProminent).disabled(isSaving)
+                        Button { saveAiResultToLocal() } label: {
+                            Label("下载到本地", systemImage: "arrow.down.to.line")
+                        }.buttonStyle(.bordered).disabled(isSaving)
+                        Button { saveAiResultToSystemPhotos() } label: {
+                            Label("保存到系统相册", systemImage: "photo.badge.plus")
+                        }.buttonStyle(.bordered).disabled(isSaving)
+                    }
                 }
-                Spacer()
             }
             Text(localizedEditorStatus(aiIsGenerating ? "正在调用 AI 模型…" : status))
                 .font(.caption.monospaced())
@@ -3825,7 +3933,15 @@ private struct ImageEditorPage: View {
                     .lineLimit(2)
                 Spacer(minLength: 0)
             }
-            HStack(spacing: SpaceToken.s8) {
+            LazyVGrid(
+                columns: [
+                    GridItem(
+                        .adaptive(minimum: 150),
+                        spacing: SpaceToken.s8
+                    )
+                ],
+                spacing: SpaceToken.s8
+            ) {
                 Button {
                     saveCopy()
                 } label: {
@@ -3836,6 +3952,15 @@ private struct ImageEditorPage: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(selectedItem == nil || isSaving)
+
+                Button {
+                    saveCopyToLocal()
+                } label: {
+                    Label("下载到本地", systemImage: "arrow.down.to.line")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
                 .disabled(selectedItem == nil || isSaving)
 
                 Button {
@@ -4601,6 +4726,30 @@ private struct ImageEditorPage: View {
         }
     }
 
+    private func saveAiResultToLocal() {
+        guard let image = aiResultImage,
+              let data = image.jpegData(compressionQuality: 0.95)
+        else {
+            status = "没有可保存的 AI 结果"
+            return
+        }
+        isSaving = true
+        guard let saved = model.library.saveEditedImage(
+            data,
+            originalFilename: aiMode == .edit
+                ? "ai_edited.jpg"
+                : "ai_generated.jpg"
+        ) else {
+            status = model.library.message
+            isSaving = false
+            return
+        }
+        selectedItemID = saved.path
+        status = "已保存 AI 结果 · \(saved.lastPathComponent)"
+        isSaving = false
+        localExportRequest = LocalFileExportRequest(sourceURL: saved)
+    }
+
     private func resetAdjustments() {
         settings = ProfessionalEditSettings()
         selectedPreset = .original
@@ -4900,6 +5049,34 @@ private struct ImageEditorPage: View {
                 resetAdjustments()
             }
         }
+    }
+
+    private func saveCopyToLocal() {
+        let wasShowingOriginal = showingOriginal
+        showingOriginal = false
+        guard let selectedItem,
+              let renderedImage,
+              let data = renderedImage.jpegData(compressionQuality: 0.95)
+        else {
+            showingOriginal = wasShowingOriginal
+            status = "无法渲染当前照片"
+            return
+        }
+        isSaving = true
+        guard let saved = model.library.saveEditedImage(
+            data,
+            originalFilename: selectedItem.filename
+        ) else {
+            isSaving = false
+            showingOriginal = wasShowingOriginal
+            status = model.library.message
+            return
+        }
+        selectedItemID = saved.path
+        status = "已保存高质量副本 · \(saved.lastPathComponent)"
+        isSaving = false
+        resetAdjustments()
+        localExportRequest = LocalFileExportRequest(sourceURL: saved)
     }
 }
 
@@ -8893,6 +9070,7 @@ private struct LibraryBranchFileRow: View {
 private struct LibraryPage: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.locale) private var locale
     @StateObject private var branchStore = LibraryBranchStore()
     @State private var showingCloudImporter = false
     @State private var showingCloudGuide = false
@@ -8903,6 +9081,8 @@ private struct LibraryPage: View {
     @State private var branchPendingDeletion: UserLibraryBranch?
     @State private var mobileBranchDrawerExpanded = false
     @State private var previewItem: LibraryItem?
+    @State private var localExportRequest: LocalFileExportRequest?
+    @State private var localExportResult: String?
     @State private var systemPreviewItem: SystemAlbumItem?
     @State private var systemAlbumItems: [SystemAlbumItem] = []
     @State private var systemAlbumStatus = "正在读取系统相册…"
@@ -9114,6 +9294,35 @@ private struct LibraryPage: View {
         }
         .fullScreenCover(item: $previewItem) { item in
             LibraryLargePhotoView(item: item)
+        }
+        .sheet(item: $localExportRequest) { request in
+            LocalFileExportPicker(sourceURL: request.sourceURL) { destination in
+                localExportRequest = nil
+                guard let destination else { return }
+                Task {
+                    let matches = await localExportMatchesSource(
+                        sourceURL: request.sourceURL,
+                        destinationURL: destination
+                    )
+                    let result = matches
+                        ? "已下载到本地 · \(destination.lastPathComponent)"
+                        : "下载到本地失败：下载文件大小校验失败"
+                    model.library.message = result
+                    model.statusMessage = result
+                    localExportResult = result
+                }
+            }
+        }
+        .alert(
+            "下载到本地",
+            isPresented: Binding(
+                get: { localExportResult != nil },
+                set: { if !$0 { localExportResult = nil } }
+            )
+        ) {
+            Button("好") { localExportResult = nil }
+        } message: {
+            Text(RuntimeLocalization.text(localExportResult ?? "", locale: locale))
         }
         .fullScreenCover(item: $systemPreviewItem) { item in
             SystemAlbumPreviewView(item: item)
@@ -9478,6 +9687,11 @@ private struct LibraryPage: View {
                         .font(.caption.monospaced())
                         .lineLimit(1)
                     Spacer()
+                    Button {
+                        beginLocalExport(selected)
+                    } label: {
+                        Label("下载到本地", systemImage: "arrow.down.to.line")
+                    }
                     ShareLink(item: selected.url) {
                         Label("分享", systemImage: "square.and.arrow.up")
                     }
@@ -9605,6 +9819,21 @@ private struct LibraryPage: View {
                 .accessibilityHint("长按并拖动到分支")
             }
         }
+    }
+
+    private func beginLocalExport(_ item: LibraryItem) {
+        let sourceSize =
+            (try? item.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard FileManager.default.fileExists(atPath: item.url.path),
+              sourceSize > 0
+        else {
+            let result = "文件不存在或为空，无法下载"
+            model.library.message = result
+            model.statusMessage = result
+            localExportResult = result
+            return
+        }
+        localExportRequest = LocalFileExportRequest(sourceURL: item.url)
     }
 
     @MainActor
@@ -9949,9 +10178,12 @@ private struct CloudDriveGuideView: View {
 
 private struct LibraryLargePhotoView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     @EnvironmentObject private var model: AppModel
     let item: LibraryItem
     @State private var player: AVPlayer?
+    @State private var localExportRequest: LocalFileExportRequest?
+    @State private var localExportResult: String?
 
     var body: some View {
         ZStack {
@@ -9979,30 +10211,23 @@ private struct LibraryLargePhotoView: View {
             }
 
             VStack {
-                HStack {
-                    Button {
-                        player?.pause()
-                        dismiss()
-                    } label: {
-                        Label("关闭", systemImage: "xmark")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: SpaceToken.s8) {
+                        closeButton
+                        Spacer(minLength: SpaceToken.s8)
+                        if !item.isVideo { editButton }
+                        localDownloadButton
+                        shareButton
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(IPalette.hudBg)
-                    Spacer()
-                    if !item.isVideo {
-                        Button {
-                            player?.pause()
-                            dismiss()
-                            model.section = .editor
-                        } label: {
-                            Label("编辑", systemImage: AppSection.editor.icon)
-                        }
-                        .buttonStyle(.borderedProminent)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                    HStack(spacing: SpaceToken.s8) {
+                        compactCloseButton
+                        Spacer(minLength: SpaceToken.s8)
+                        if !item.isVideo { compactEditButton }
+                        compactLocalDownloadButton
+                        compactShareButton
                     }
-                    ShareLink(item: item.url) {
-                        Label("分享到社交平台", systemImage: "square.and.arrow.up")
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
                 Spacer()
                 Text(item.filename)
@@ -10018,6 +10243,130 @@ private struct LibraryLargePhotoView: View {
                 player = AVPlayer(url: item.url)
             }
         }
+        .sheet(item: $localExportRequest) { request in
+            LocalFileExportPicker(sourceURL: request.sourceURL) { destination in
+                localExportRequest = nil
+                guard let destination else { return }
+                Task {
+                    let matches = await localExportMatchesSource(
+                        sourceURL: request.sourceURL,
+                        destinationURL: destination
+                    )
+                    let result = matches
+                        ? "已下载到本地 · \(destination.lastPathComponent)"
+                        : "下载到本地失败：下载文件大小校验失败"
+                    model.library.message = result
+                    model.statusMessage = result
+                    localExportResult = result
+                }
+            }
+        }
+        .alert(
+            "下载到本地",
+            isPresented: Binding(
+                get: { localExportResult != nil },
+                set: { if !$0 { localExportResult = nil } }
+            )
+        ) {
+            Button("好") { localExportResult = nil }
+        } message: {
+            Text(RuntimeLocalization.text(localExportResult ?? "", locale: locale))
+        }
+    }
+
+    private var closeButton: some View {
+        Button {
+            player?.pause()
+            dismiss()
+        } label: {
+            Label("关闭", systemImage: "xmark")
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(IPalette.hudBg)
+    }
+
+    private var editButton: some View {
+        Button {
+            player?.pause()
+            dismiss()
+            model.section = .editor
+        } label: {
+            Label("编辑", systemImage: AppSection.editor.icon)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var localDownloadButton: some View {
+        Button(action: beginLocalExport) {
+            Label("下载到本地", systemImage: "arrow.down.to.line")
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var shareButton: some View {
+        ShareLink(item: item.url) {
+            Label("分享到社交平台", systemImage: "square.and.arrow.up")
+        }
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var compactCloseButton: some View {
+        Button {
+            player?.pause()
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(IPalette.hudBg)
+        .accessibilityLabel("关闭")
+    }
+
+    private var compactEditButton: some View {
+        Button {
+            player?.pause()
+            dismiss()
+            model.section = .editor
+        } label: {
+            Image(systemName: AppSection.editor.icon)
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityLabel("编辑")
+    }
+
+    private var compactLocalDownloadButton: some View {
+        Button(action: beginLocalExport) {
+            Image(systemName: "arrow.down.to.line")
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityLabel("下载到本地")
+    }
+
+    private var compactShareButton: some View {
+        ShareLink(item: item.url) {
+            Image(systemName: "square.and.arrow.up")
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityLabel("分享到社交平台")
+    }
+
+    private func beginLocalExport() {
+        let sourceSize =
+            (try? item.url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        guard FileManager.default.fileExists(atPath: item.url.path),
+              sourceSize > 0
+        else {
+            let result = "文件不存在或为空，无法下载"
+            model.library.message = result
+            model.statusMessage = result
+            localExportResult = result
+            return
+        }
+        localExportRequest = LocalFileExportRequest(sourceURL: item.url)
     }
 }
 
@@ -10972,7 +11321,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 修复 Windows 启动阶段的空引用崩溃：WPF 构造控件树时，曝光模式的默认选择不会再提前访问尚未创建的快门、光圈和 ISO 控件。\n• 曝光模式、视频快门模式与共享参数处理器现在会在初始化期间先行短路；完整界面加载后再恢复快门配置和曝光读数。\n• 新增 Windows 启动回归契约，锁定 XAML 默认选择顺序、初始化门禁以及完整控件树加载后的恢复路径。\n• 其余功能与 1.5.11 保持一致。\n• 1.5.12 作为 GitHub 公开稳定版提供；各平台签名状态不同，请在安装前核对 SHA-256 并查阅逐包说明。Windows 包仍需真实 Windows 冷启动、安装、驱动与 SmartScreen 验收。")
+                    Text("• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业编辑结果都可以通过系统保存器另存到用户选择的位置。\n• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。")
                     .font(.subheadline)
                     .lineSpacing(5)
 
