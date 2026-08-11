@@ -209,7 +209,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - `_initializing` 必须在字段初始化时显式为 `true`，并保持到构造器完成初始快门配置后。跨控件刷新或配置必须在副作用前短路：共享参数处理器先于 `UpdateExposureReadout()` 返回，曝光模式先于 `UpdateExposureAvailability()` 返回，视频快门模式只允许先保存当前安全预选值，再于 `ConfigureShutterControl()` 前返回。
 - 提前返回不会丢失初始状态：`InitializeComponent()` 完成后，构造器会调用 `ConfigureShutterControl(false)`，该方法在完整控件树上刷新参数可用性；构造器随后结束初始化门禁，再次更新曝光读数。
 - `test/native-windows-exposure-startup.test.mjs` 同时锁定门禁初值、三条事件连接、三个默认选中项、控件声明顺序、危险调用之前的立即返回，以及完整树加载后的恢复配置。静态契约用于防止源码顺序回退，不能替代真实 Windows STA/BAML 冷启动和模式切换冒烟。
-- 修复代码提交为 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，现已纳入 1.5.12 / build 39 发布候选；版本同步后的完整 `npm test` 518/518。先前沿用 1.5.11 名称的本地 Windows 热修包只用于验证构建链，本次发布不得复用或改名，六个安装包及侧车都要从冻结的 1.5.12 候选源码重新生成。Windows 包继续由 macOS 交叉构建、无 Authenticode，仍需真实 Windows 安装与启动验收；官网自动更新继续保持 1.5.10 / build 37。
+- 修复代码提交为 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，现已纳入 1.5.12 / build 39 发布候选；冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518。先前沿用 1.5.11 名称的本地 Windows 热修包只用于验证构建链，本次六个安装包及侧车均由冻结候选重新生成；Windows Setup/ZIP SHA-256 分别为 `ceb97d5552c18b15cc05f054c1c7c3c1486367d1cb764ef561aeb74cc253a4fe`、`2f9d0cd10b43015c9aed943c5a8eefb37799c322eec6ab83d095fc456477ea69`，14 项聚合包 SHA-256 为 `1bdaed8f3ae6214e1f8aa3133d8e88fa5a7274a0b711e52374a30b2c38d5f2ce`。Windows 包继续由 macOS 交叉构建、无 Authenticode，仍需真实 Windows 安装与启动验收；官网自动更新继续保持 1.5.10 / build 37。
 
 ## 1. 总体原则
 
