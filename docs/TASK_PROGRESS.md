@@ -1,6 +1,6 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-11（Asia/Shanghai）
+> 快照时间：2026-08-12（Asia/Shanghai）
 > 当前公开版本：1.5.12 / build 39；Windows 启动修复代码提交 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，注释标签 `v1.5.12` 解引用到 `bb9aab0707a0260e6dd44667836e710d2820485f`
 > 公开状态：v1.5.12 已于 2026-08-11T09:10:29Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
@@ -20,6 +20,7 @@
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
 - 当前 GitHub 公开稳定版为 [**1.5.12 / build 39**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)，仅新增 Windows 启动初始化门禁及相应回归，并同步五端版本元数据和中英日启动公告；1.5.11 的桌面工作区、移动端相册与 AI 代理等能力保持不变。官网自动更新继续提供 1.5.10 / build 37。
 - Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已随 v1.5.12 发布：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518 通过。六个 1.5.12 包、侧车及聚合包已完成本地重建与校验；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60、§12.61 与 `docs/releases/v1.5.12.md`。
+- 1.5.13 / build 40 的“下载到本地”五端候选已冻结于实现提交 `b31ed953e1019cbde5fa965c2d0b66efc82f70a3`：完整 `npm test` 532/532，Android、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车已从该提交重建并回验。候选未推送、未打标签、未创建 Release、未切换官网；逐包字节数、SHA-256 与签名边界见 `docs/releases/v1.5.13.md`。
 - 1.5.11 的完整 `npm test` 514/514、五端原生构建、包结构、侧车、签名边界与 GitHub 14/14 线上回验均作为历史发布事实保留。1.5.12 在发布前重新执行全部自动化与六包校验，不沿用旧包哈希；发布后 14 个线上附件的名称、字节数与 GitHub SHA-256 摘要逐项一致。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
@@ -54,6 +55,7 @@
 | 登录动作清晰化与桌面工作区 | 已实现待验收 | `831a823`；五端模式/提交与签名公告契约；Apple 忙碌态 exact 三语；macOS/Windows 连续实时分隔条、清晰编辑层级、自适应 RGB 示波器、窄窗安全约束、渲染合并、Windows AI 临时结果生命周期清理；完整 503/503，桌面包、聚合包与双审封板通过 | macOS/Windows 真实拖拽与重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能实机 |
 | 无线收图 | 已实现待验收 | 五端 FTP/HTTP/WebDAV 源码与文档存在 | 大文件、中断、并发、端口释放和相机 FTP 实测 |
 | 拍摄会话与交付 | 已实现待验收 | 命名、配对、评级、双备份、SHA-256 五端检查通过 | 恢复、磁盘异常、跨卷和大量文件压力测试 |
+| 下载到本地 | 已实现待验收 | 五端文件库、预览、AI 与专业编辑直达入口；系统保存器、后台复制、同步/大小校验、同源保护和失败清理契约；冻结提交 532/532 与六包回验 | 真实文档提供器、同名覆盖、无空间、大文件、权限，以及真实 Windows/macOS 安装与文件系统验收 |
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
 | 非破坏性编辑 | 已实现待验收 | 五端主导航、分组参数与导出语义检查；三移动端可见系统照片入口、工作副本与新相册项目契约通过 | 真机权限/iCloud/厂商相册、像素结果、色彩空间和超大图验证 |
 | **AI 修图与生图** | **已实现待验收** | 五端 HTTPS 账号代理、原图 data URL、结果解析；三移动端 AI 新副本保存和系统相册导出回归通过 | 有效激活码真实生成、各平台真机 UI、服务器容灾与激活码发放流程 |
@@ -1229,14 +1231,14 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 六包文件名、字节数和 SHA-256 见 `docs/releases/v1.5.12.md`。聚合交付包 `ZENCHE-1.5.12-W15-five-platform-delivery-final.zip` 为 275,097,184 字节，SHA-256 `1bdaed8f3ae6214e1f8aa3133d8e88fa5a7274a0b711e52374a30b2c38d5f2ce`；内部 14 项压缩结构通过，并逐项与六包、六侧车、发布说明和桌面操作说明源文件一致。Windows 包继续由 macOS 交叉构建且无 Authenticode，不能据此声称真实 Windows 启动、安装、驱动或 SmartScreen 已验收。
 - 发布结果：`main` 快进到 `bb9aab0707a0260e6dd44667836e710d2820485f` 后，注释标签 `v1.5.12`（标签对象 `174afc182b874409370bc43bd1fc90c68363c111`）解引用到同一提交；标签触发的 Release workflow run `31476217183` 按临时精确 guard 显示 `completed/skipped`，没有重建或覆盖冻结资产。[GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)（ID `368441961`）于 2026-08-11T09:10:29Z 发布为 Latest，非草稿、非预发布。14 个线上附件的名称、字节数与 GitHub SHA-256 摘要和本地逐项一致，14/14 零差异；本次发布未部署官网。临时 v1.5.12 workflow guard 已在发布后移除。
 
-## 12.62 v1.5.13 下载到本地五端候选草稿（2026-08-11，GPT5.6）
+## 12.62 v1.5.13 下载到本地五端冻结候选（2026-08-11—12，GPT5.6）
 
-- **工作现场**：独立工作树 `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.13-local-downloads`，分支 `agent/1.5.13-local-downloads`，起始基线 `32aeeba0757d2fabbe1eff3c2493c50abe7b7233`。当前是含未提交五端增量的共享候选，不是冻结提交；目标版本为 `1.5.13 / build 40`。
+- **工作现场**：独立工作树 `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.13-local-downloads`，分支 `agent/1.5.13-local-downloads`，起始基线 `32aeeba0757d2fabbe1eff3c2493c50abe7b7233`，冻结实现提交 `b31ed953e1019cbde5fa965c2d0b66efc82f70a3`；目标版本为 `1.5.13 / build 40`。
 - **产品范围**：iOS/iPadOS、Android、HarmonyOS、macOS 与 Windows 均增加“下载到本地”。入口覆盖联机拍摄/外录、相机卡下载、AI 修图/生图结果和专业编辑副本；五端文件库均提供统一动作，支持应用内预览的页面也有快捷动作，AI 与专业编辑另有直达动作。“保存到系统相册”继续独立保留。
 - **数据语义**：所有导出仅复制，不移动或删除 ZENCHE 文件库源文件。AI/编辑直达流程先创建新的文件库副本；macOS 与 Windows 的 AI 修图不再覆盖当前原图。用户取消为中性状态；成功只在复制完成、同步落盘和目标实际大小校验后显示，失败清理本次临时文件并尽力删除不完整目标。桌面端后台复制并采用同目录临时文件后替换/同卷移动；macOS 文件资源标识、Windows 卷序列号+文件索引在复制前和发布前拦截别名回指源文件。Android 以设备号+inode 拦截同源并保存待导出的库内相对路径以覆盖 Activity 重建；HarmonyOS 复制移入 TaskPool。移动文档提供器不夸大为严格原子写入。
 - **兼容性补齐**：导出保持原字节和扩展名，不重新编码；五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI，确保已支持的联机视频与 RAW 能进入导出入口。相机档案和 USB/PTP、PTP/IP 协议不在本轮变更范围。
 - **文档状态**：README 的简中/英/日三段已增加实质等价的 1.5.13 本地候选说明，源码版本显示目标改为 `1.5.13 / build 40`；稳定版链接与下载文件名继续指向 v1.5.12。`CHANGELOG.md` 顶部新增 Unreleased 条目，详细候选草稿位于 `docs/releases/v1.5.13.md`。
-- **验证与交付**：本地下载专项 13/13、Windows AI 临时文件专项 8/8、图像编辑专项 17/17，当前工作树完整 `npm test` 531/531。Android Debug APK、iOS generic/device Release unsigned IPA、HarmonyOS HAP、macOS arm64 DMG 与 Windows x64 Release/NSIS/便携 ZIP 的构建链路均已成功；Windows Release 编译 0 错误，HarmonyOS 最新 AI TaskPool 补丁后全量 HAP 再构建成功。冻结提交后仍须重建全部候选包并回填最终字节数、SHA-256 与结构校验；不把静态、交叉编译、未签名容器或 macOS 主机生成的 Windows 包扩大为实机 PASS。
-- **审查返修**：最终独立源码审查 P0=0、P1=0；已关闭 HarmonyOS 同源目标先截断、Android 落盘失败误报成功、Windows 模态保存器 owner/重入、Windows AI/编辑大图主线程准备、HarmonyOS AI 整文件主线程读写与 Harmony AI 文件名重复 `_edited` 等问题，文件名返修后 HarmonyOS HAP 再构建成功。两项 P2 不阻断：Harmony 仅有 inode 时会在跨卷碰撞时保守拒绝；Windows 后台准备期间切换编辑上下文可能在完成时回到新副本。iOS/macOS 专业编辑与 HarmonyOS 专业编辑的完整渲染器后台化需要独立线程模型重构，不在本次本地下载功能中冒险扩展；复制与 Windows/HarmonyOS AI 准备已在后台执行。
-- **发布边界**：1.5.13 尚未推送、打标签、创建 GitHub Release、上传附件或切换官网。GitHub 公开稳定版仍为 v1.5.12，官网生产仍为 1.5.10 / build 37。冻结前生成的同名包和旧 SHA-256 只用于构建链路预检，最终候选必须从冻结实现提交重新生成，严禁复用旧包或编造哈希。
-- **下一步**：冻结实现提交，在该精确提交复跑完整自动化并重建五端候选；回填逐包证据和最终独立审查结论后，再由 Tauber 决定是否另行授权发布或部署。
+- **验证与交付**：冻结实现提交的本地下载/本地化专项 22/22、Windows AI 临时文件专项 8/8、图像编辑专项 17/17，完整 `npm test` 532/532。Android Debug APK、iOS generic/device Release unsigned IPA、HarmonyOS HAP、macOS arm64 DMG 与 Windows x64 Release/NSIS/便携 ZIP 均已从该精确提交重建；六份侧车 6/6 `OK`，APK/IPA/HAP/Windows ZIP 结构、DMG 校验和、macOS 深度严格验签、版本元数据与 PE Security Directory 均已复核。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`；不把静态、交叉编译、未签名容器或 macOS 主机生成的 Windows 包扩大为实机 PASS。
+- **审查返修**：最终源码门禁 P0=0、P1=0；已关闭 HarmonyOS 同源目标先截断、Android 落盘失败误报成功、Windows 模态保存器 owner/重入、Windows AI/编辑大图主线程准备、HarmonyOS AI 整文件主线程读写、Harmony AI 文件名重复 `_edited`，以及 Harmony 专业编辑失败提示未走三语等问题；最后一项另由新增契约和全量 ArkTS 构建验证。两项 P2 不阻断：Harmony 仅有 inode 时会在跨卷碰撞时保守拒绝；Windows 后台准备期间切换编辑上下文可能在完成时回到新副本。iOS/macOS 专业编辑与 HarmonyOS 专业编辑的完整渲染器后台化需要独立线程模型重构，不在本次本地下载功能中冒险扩展；复制与 Windows/HarmonyOS AI 准备已在后台执行。
+- **发布边界**：1.5.13 尚未推送、打标签、创建 GitHub Release、上传附件或切换官网。GitHub 公开稳定版仍为 v1.5.12，官网生产仍为 1.5.10 / build 37。六包为本地候选，不因自动化和静态包校验通过而获得正式签名或实机 PASS。
+- **下一步**：由 Tauber 决定是否另行授权推送或发布；真实文档提供器、同名覆盖、无空间、大文件、移动端权限、macOS Gatekeeper、公证与真实 Windows 启动/安装/驱动/SmartScreen 仍作为独立验收项。

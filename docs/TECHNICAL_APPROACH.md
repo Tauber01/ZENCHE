@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-11（Asia/Shanghai）
+> 最近核对：2026-08-12（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -373,6 +373,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - Windows 的 AI/专业编辑直达路径会在主线程快照源文件、调整参数和预设，再把全分辨率解码、渲染、JPEG 编码与文件库原子写入放入后台任务；busy 门禁覆盖“准备副本—系统保存器—复制完成”全流程。HarmonyOS 的 AI 结果以独立 TaskPool worker 在文件库同目录写 `.part`、同步、校验后重命名，避免在 UI 状态对象上分配并读取整文件。Apple 与 HarmonyOS 专业编辑继续复用既有渲染管线；本轮没有以越过 actor/isolate 约束的方式强行迁移可变编辑状态。
 - 用户取消不显示成功或错误；源缺失/为空、目标不可写、空间不足、提供器断开或大小校验失败均进入明确失败状态。Android/HarmonyOS 的文档提供器不保证跨提供器事务重命名，因此仅在全部复制并同步后报告成功，失败时尽力删除本次目标，不能把该边界描述为严格原子写入。
 - 下载层按原文件名和类型工作，不对 JPEG、RAW 或视频重新编码；五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI，确保支持范围内的联机产物都能到达导出入口。自动化静态契约锁定五端入口、三类产物直达路径、系统选择器、取消语义、同步/目标大小校验、失败清理、Activity 恢复、文件身份和桌面原子提交；真实文档提供器、无空间、同名覆盖、大文件与真机权限仍需平台实测。
+- `1.5.13 / build 40` 本地候选冻结于实现提交 `b31ed953e1019cbde5fa965c2d0b66efc82f70a3`，完整自动化 532/532；Android、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc 与 Windows x64 Setup/ZIP 六包及六份侧车均从该提交重建并回验。Windows 包由 macOS 交叉构建且无 Authenticode，未满足真实 Windows 主机的启动、安装、驱动和 SmartScreen 验收，因此只能称本地候选。逐包字节数、SHA-256、签名状态、两项非阻断 P2 与发布边界见 `docs/releases/v1.5.13.md`；本候选未推送、未发布、未切换官网更新。
 
 ## 7. 本地化、更新与诊断
 
