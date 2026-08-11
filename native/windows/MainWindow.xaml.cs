@@ -5004,9 +5004,12 @@ public partial class MainWindow : Window
         object sender,
         SelectionChangedEventArgs e)
     {
+        if (_initializing)
+        {
+            return;
+        }
         UpdateExposureReadout();
-        if (_initializing ||
-            _configuringVideoControls ||
+        if (_configuringVideoControls ||
             !_camera.IsConnected ||
             _operationInProgress ||
             sender is not ComboBox combo ||
@@ -5077,9 +5080,14 @@ public partial class MainWindow : Window
         object sender,
         SelectionChangedEventArgs e)
     {
+        // XAML 会先选中曝光模式，再继续创建后面的快门、光圈等控件。
+        // InitializeComponent 完成前不能刷新整组参数可用性。
+        if (_initializing)
+        {
+            return;
+        }
         UpdateExposureAvailability();
-        if (_initializing ||
-            !_camera.IsConnected ||
+        if (!_camera.IsConnected ||
             _operationInProgress ||
             ExposureModeBox.SelectedItem is not ComboBoxItem item)
         {
@@ -5104,6 +5112,11 @@ public partial class MainWindow : Window
             return;
         }
         _videoShutterMode = Convert.ToString(item.Tag) ?? "angle";
+        // 先保留 XAML 预选值，但后面的 ShutterBox 创建前不能刷新控件。
+        if (_initializing)
+        {
+            return;
+        }
         if (!_configuringVideoControls)
         {
             ConfigureShutterControl(_videoMode);
