@@ -15023,7 +15023,7 @@ struct Index {
       }
     } catch (error) {
       this.showError(
-        `保存编辑副本失败：${(error as BusinessError).message}`
+        this.tr(`保存编辑副本失败：${(error as BusinessError).message}`)
       );
     } finally {
       if (packer !== undefined) {

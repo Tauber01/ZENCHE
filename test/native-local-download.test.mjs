@@ -58,6 +58,20 @@ test("Harmony preview actions bind to the selected path, not a reused filename",
   );
 });
 
+test("Harmony editor download statuses stay localized in English and Japanese", async () => {
+  const [harmony, localization] = await Promise.all([
+    source("native/harmony/entry/src/main/ets/pages/Index.ets"),
+    source("native/harmony/entry/src/main/ets/localization/Localization.ets"),
+  ]);
+
+  assert.match(
+    harmony,
+    /this\.showError\(\s*this\.tr\(`保存编辑副本失败：\$\{\(error as BusinessError\)\.message\}`\)\s*\)/,
+  );
+  assert.match(localization, /'已保存编辑副本',[\s\S]{0,100}?'Saved edited copy',[\s\S]{0,100}?'編集したコピーを保存しました'/);
+  assert.match(localization, /'保存编辑副本失败',[\s\S]{0,120}?'Failed to save the edited copy',[\s\S]{0,120}?'編集したコピーの保存に失敗しました'/);
+});
+
 test("all five native libraries keep supported RAW and AVI outputs visible", async () => {
   const libraries = await Promise.all([
     source("native/ios/NikonLink/Models/AppModel.swift"),

@@ -1053,6 +1053,11 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '調整しても元のファイルは上書きされません'
   ),
   new TranslationEntry(
+    '已保存编辑副本',
+    'Saved edited copy',
+    '編集したコピーを保存しました'
+  ),
+  new TranslationEntry(
     '保存编辑副本失败',
     'Failed to save the edited copy',
     '編集したコピーの保存に失敗しました'
