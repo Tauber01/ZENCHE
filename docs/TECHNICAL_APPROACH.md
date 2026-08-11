@@ -205,9 +205,9 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 
 ## 0.21. Windows XAML 默认选择初始化门禁
 
-- WPF 会在 `InitializeComponent()` 仍在构造命名控件树时同步触发默认选中项的 `SelectionChanged`。`ExposureModeBox`、`VideoShutterModeBox` 和 `ShutterBox` 都位于其处理器会访问的部分兄弟控件之前，因此事件处理器不能把“字段已生成”当作“完整 XAML 树已就绪”。
+- WPF 会在 `InitializeComponent()` 构造命名控件树期间同步触发默认选中项的 `SelectionChanged`。`ExposureModeBox` 会在后置参数控件创建前刷新可用性，`VideoShutterModeBox` 会在 `ShutterBox` 创建前配置快门；这两条是可证的启动危险路径。`ShutterBox` 的共享处理器也在初始化门禁前调用 `UpdateExposureReadout()`，但冷启动相机尚未连接，未证实该路径当前会解引用后置控件，因此按防御性加固处理。
 - `_initializing` 必须在字段初始化时显式为 `true`，并保持到构造器完成初始快门配置后。跨控件刷新或配置必须在副作用前短路：共享参数处理器先于 `UpdateExposureReadout()` 返回，曝光模式先于 `UpdateExposureAvailability()` 返回，视频快门模式只允许先保存当前安全预选值，再于 `ConfigureShutterControl()` 前返回。
-- 提前返回不会丢失初始状态：`InitializeComponent()` 完成后，构造器会调用 `ConfigureShutterControl(false)`，该方法在完整控件树上刷新参数可用性；构造器随后再次更新曝光读数并结束初始化门禁。
+- 提前返回不会丢失初始状态：`InitializeComponent()` 完成后，构造器会调用 `ConfigureShutterControl(false)`，该方法在完整控件树上刷新参数可用性；构造器随后结束初始化门禁，再次更新曝光读数。
 - `test/native-windows-exposure-startup.test.mjs` 同时锁定门禁初值、三条事件连接、三个默认选中项、控件声明顺序、危险调用之前的立即返回，以及完整树加载后的恢复配置。静态契约用于防止源码顺序回退，不能替代真实 Windows STA/BAML 冷启动和模式切换冒烟。
 - 本地热修代码提交为 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，完整 `npm test` 517/517，`scripts/build-windows.ps1` 的 Release publish、NSIS 和两份侧车回验均通过。Setup/ZIP SHA-256 分别为 `69afb3763b374005a97b6ef1da558c7dded8fa5d94c954d5aa673560fa7d5d47`、`37ba48fae87f3fd074a222fe214dadacd882e3d3e0383333aa98246a38917e40`；两包由 macOS 交叉构建、无 Authenticode，未上传、未部署，仍需真实 Windows 安装与启动验收。
 
