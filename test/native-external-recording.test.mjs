@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.13 launch announcements describe local-copy exports and candidate boundaries', async () => {
+test('version 1.5.13 launch announcements describe local-copy exports and release boundaries', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -102,8 +102,9 @@ test('version 1.5.13 launch announcements describe local-copy exports and candid
     assert.match(announcement, /macOS 与 Windows 的 AI 修图也改为始终生成新文件/);
     assert.match(announcement, /同步落盘且大小校验通过后才显示成功/);
     assert.match(announcement, /尽力删除未完成的目标/);
-    assert.match(announcement, /1\.5\.13 是尚未推送、发布或切换官网更新的本地候选/);
-    assert.match(announcement, /真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足/);
+    assert.match(announcement, /GitHub Release 提供 1\.5\.13 五端安装包/);
+    assert.match(announcement, /官网自动更新仍保持 1\.5\.10/);
+    assert.match(announcement, /请参阅发布说明并按需真机验证/);
   }
 
   assert.match(announcements[1], /tr\("• 新增“下载到本地”/);
@@ -125,12 +126,14 @@ test('version 1.5.13 launch announcements describe local-copy exports and candid
     assert.match(announcement, /Added “Save a Local Copy”/);
     assert.match(announcement, /Export creates a copy and never moves or deletes the source/);
     assert.match(announcement, /make a best effort to delete an incomplete destination/);
-    assert.match(announcement, /Version 1\.5\.13 is a local candidate that has not been pushed, released, or added to the website update feed/);
+    assert.match(announcement, /GitHub Release provides the five-platform 1\.5\.13 packages/);
+    assert.match(announcement, /website update feed remains on 1\.5\.10/);
   }
   for (const announcement of japaneseAnnouncements) {
     assert.match(announcement, /「ローカルコピーを保存」を追加しました/);
     assert.match(announcement, /元ファイルを移動・削除しません/);
     assert.match(announcement, /未完了の保存先も可能な範囲で取り除きます/);
-    assert.match(announcement, /1\.5\.13 はローカル候補版/);
+    assert.match(announcement, /GitHub Release では 5 プラットフォーム向けの 1\.5\.13 パッケージ/);
+    assert.match(announcement, /公式サイトの更新配信は 1\.5\.10 のまま/);
   }
 });

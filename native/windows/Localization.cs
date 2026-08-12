@@ -1059,18 +1059,18 @@ internal static class AppLocalization
              "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业编辑提供直达入口；“保存到系统相册”继续作为独立操作保留。\n" +
              "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n" +
              "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n" +
-             "• 1.5.13 是尚未推送、发布或切换官网更新的本地候选；请在真机上继续验证系统保存器、权限、同名文件、大文件与存储空间不足等场景。"] =
+             "• GitHub Release 提供 1.5.13 五端安装包，官网自动更新仍保持 1.5.10。各平台签名与安装边界，以及系统保存器、权限、同名文件、大文件和存储空间不足等场景，请参阅发布说明并按需真机验证。"] =
                 new(
                     "• Added “Save a Local Copy”: tethered captures, camera-card downloads, AI edits and generated images, and professional-editor results can now be saved to a location chosen in the system picker.\n" +
                     "• Every file library offers the same action. Supported in-app previews also provide a shortcut, while AI and the professional editor have direct actions of their own. “Save to Photos” remains separate.\n" +
                     "• Export creates a copy and never moves or deletes the source in the ZENCHE library. On macOS and Windows, AI edits now always create new files instead of overwriting the originals.\n" +
                     "• Cancelling does not show an error. Success is shown only after the copy finishes, data is flushed to storage, and the file size is verified. Failures remove temporary files and make a best effort to delete an incomplete destination.\n" +
-                    "• Version 1.5.13 is a local candidate that has not been pushed, released, or added to the website update feed. System pickers, permissions, name collisions, large files, and out-of-space behavior still require device testing.",
+                    "• GitHub Release provides the five-platform 1.5.13 packages, while the website update feed remains on 1.5.10. See the release notes for platform signing and installation limits, and verify system pickers, permissions, name collisions, large files, and out-of-space behavior on devices as needed.",
                     "• 「ローカルコピーを保存」を追加しました。テザー撮影、カメラカードからのダウンロード、AI 編集／画像生成、プロ編集の結果を、システムの保存画面で選んだ場所へ保存できます。\n" +
                     "• 5 つのネイティブ版のファイルライブラリに共通の操作を用意し、ZENCHE 内でプレビューできる画面にもショートカットを設けました。AI とプロ編集には直接保存する操作があります。「写真に保存」は独立した操作として残しています。\n" +
                     "• 書き出しではコピーだけを作成し、ZENCHE ファイルライブラリの元ファイルを移動・削除しません。macOS と Windows の AI 編集も、元画像を上書きせず常に新規ファイルとして保存します。\n" +
                     "• キャンセル時はエラーを表示しません。コピー、ストレージへの同期、ファイルサイズの確認が完了してから成功を表示します。失敗時は一時ファイルを削除し、未完了の保存先も可能な範囲で取り除きます。\n" +
-                    "• 1.5.13 はローカル候補版で、プッシュ、公開、公式サイトの更新配信への切り替えはまだ行っていません。システムの保存画面、権限、同名ファイル、大容量ファイル、空き容量不足の動作は実機での確認が必要です。"),
+                    "• GitHub Release では 5 プラットフォーム向けの 1.5.13 パッケージを提供し、公式サイトの更新配信は 1.5.10 のままです。プラットフォームごとの署名・インストール上の制約はリリースノートを参照し、システムの保存画面、権限、同名ファイル、大容量ファイル、空き容量不足の動作は必要に応じて実機で確認してください。"),
 
         // D1 1.5.8：未处理异常对话框（可复制完整堆栈）
         ["未处理异常"] = new("Unhandled Exception", "未処理の例外"),
