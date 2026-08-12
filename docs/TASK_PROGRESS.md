@@ -1,8 +1,8 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-12（Asia/Shanghai）
-> 当前公开版本：1.5.12 / build 39；Windows 启动修复代码提交 `970f8e08edce2529750d5b29fe3aaccd53da61ac`，注释标签 `v1.5.12` 解引用到 `bb9aab0707a0260e6dd44667836e710d2820485f`
-> 公开状态：v1.5.12 已于 2026-08-11T09:10:29Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
+> 当前公开版本：1.5.13 / build 40；最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`，注释标签 `v1.5.13` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`
+> 公开状态：v1.5.13 已于 2026-08-12T03:33:52Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -18,15 +18,15 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前 GitHub 公开稳定版为 [**1.5.12 / build 39**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)，仅新增 Windows 启动初始化门禁及相应回归，并同步五端版本元数据和中英日启动公告；1.5.11 的桌面工作区、移动端相册与 AI 代理等能力保持不变。官网自动更新继续提供 1.5.10 / build 37。
+- 当前 GitHub 公开稳定版为 [**1.5.13 / build 40**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)，新增五端“下载到本地”入口与副本保护，并继承 1.5.12 的 Windows 启动初始化修复、1.5.11 的桌面工作区、移动端相册与 AI 代理能力。官网自动更新继续提供 1.5.10 / build 37。
 - Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已随 v1.5.12 发布：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518 通过。六个 1.5.12 包、侧车及聚合包已完成本地重建与校验；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60、§12.61 与 `docs/releases/v1.5.12.md`。
-- 1.5.13 / build 40 的“下载到本地”发布实现已冻结于 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`：exact HEAD 完整 `npm test` 532/532，Android Debug、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车均从该提交重建并回验；聚合包含 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。当前尚未推送、打标签、创建 Release 或切换官网；逐包字节数、SHA-256 与签名边界见 `docs/releases/v1.5.13.md`。
+- 1.5.13 / build 40 的“下载到本地”发布实现冻结于 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`：exact HEAD 与标签提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98` 的完整 `npm test` 均为 532/532；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车均从最终实现重建并回验。聚合包含 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，线上名称、字节数、GitHub SHA-256 摘要和回下载字节均与本地一致，14/14 零差异；逐包表和签名边界见 `docs/releases/v1.5.13.md`。
 - 1.5.11 的完整 `npm test` 514/514、五端原生构建、包结构、侧车、签名边界与 GitHub 14/14 线上回验均作为历史发布事实保留。1.5.12 在发布前重新执行全部自动化与六包校验，不沿用旧包哈希；发布后 14 个线上附件的名称、字节数与 GitHub SHA-256 摘要逐项一致。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0、v1.5.3 与 v1.5.11 已作为历史 GitHub Release 保留；v1.5.12 为当前 GitHub Latest。官网生产更新继续提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
+- v1.5.0、v1.5.3、v1.5.11 与 v1.5.12 已作为历史 GitHub Release 保留；v1.5.13 为当前 GitHub Latest。官网生产更新继续提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
 - 最大未闭环风险仍是跨 46 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -1231,7 +1231,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - 六包文件名、字节数和 SHA-256 见 `docs/releases/v1.5.12.md`。聚合交付包 `ZENCHE-1.5.12-W15-five-platform-delivery-final.zip` 为 275,097,184 字节，SHA-256 `1bdaed8f3ae6214e1f8aa3133d8e88fa5a7274a0b711e52374a30b2c38d5f2ce`；内部 14 项压缩结构通过，并逐项与六包、六侧车、发布说明和桌面操作说明源文件一致。Windows 包继续由 macOS 交叉构建且无 Authenticode，不能据此声称真实 Windows 启动、安装、驱动或 SmartScreen 已验收。
 - 发布结果：`main` 快进到 `bb9aab0707a0260e6dd44667836e710d2820485f` 后，注释标签 `v1.5.12`（标签对象 `174afc182b874409370bc43bd1fc90c68363c111`）解引用到同一提交；标签触发的 Release workflow run `31476217183` 按临时精确 guard 显示 `completed/skipped`，没有重建或覆盖冻结资产。[GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)（ID `368441961`）于 2026-08-11T09:10:29Z 发布为 Latest，非草稿、非预发布。14 个线上附件的名称、字节数与 GitHub SHA-256 摘要和本地逐项一致，14/14 零差异；本次发布未部署官网。临时 v1.5.12 workflow guard 已在发布后移除。
 
-## 12.62 v1.5.13 下载到本地五端发布准备（2026-08-11—12，GPT5.6）
+## 12.62 v1.5.13 下载到本地五端发布交付（2026-08-11—12，GPT5.6）
 
 - **工作现场**：独立工作树 `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.13-local-downloads`，分支 `agent/1.5.13-local-downloads`，起始基线 `32aeeba0757d2fabbe1eff3c2493c50abe7b7233`，最终冻结实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`；目标版本为 `1.5.13 / build 40`。
 - **产品范围**：iOS/iPadOS、Android、HarmonyOS、macOS 与 Windows 均增加“下载到本地”。入口覆盖联机拍摄/外录、相机卡下载、AI 修图/生图结果和专业显影副本；五端文件库均提供统一动作，支持应用内预览的页面也有快捷动作，AI 与专业显影另有直达动作。“保存到系统相册”继续独立保留。
@@ -1240,8 +1240,8 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **文档状态**：README 简中/英/日三段已切换至 v1.5.13 GitHub 发布口径，下载文件名、Canon 14 款清单和三语校验命令一致；`CHANGELOG.md` 顶部为 2026-08-12 正式条目，正式正文位于 `docs/releases/v1.5.13.md`。官网生产边界仍明确为 1.5.10 / build 37。
 - **验证与交付**：最终冻结实现 `a89e2f89416e6a70564258d9f421d58d6cdc75cd` 的术语专项 19/19、Apple strings lint 和完整 `npm test` 532/532 通过，测试前后 HEAD 一致。Android Debug APK、iOS generic/device Release unsigned IPA、HarmonyOS unsigned HAP、macOS arm64 ad-hoc DMG 与 Windows x64 Release/NSIS/便携 ZIP 均从该精确提交重建；六份侧车 6/6 `OK`，APK/IPA/HAP/Windows ZIP 结构、DMG 校验、macOS 深度严格验签、版本元数据、PE Security Directory 与五端包内三语正式术语均已复核。聚合包含六包、六侧车与发布说明，共 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`，逐项与交付源一致。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`；不把静态、交叉编译、未签名容器或 macOS 主机生成的 Windows 包扩大为实机 PASS。
 - **审查返修**：最终源码门禁 P0=0、P1=0；已关闭 HarmonyOS 同源目标先截断、Android 落盘失败误报成功、Windows 模态保存器 owner/重入、Windows AI/编辑大图主线程准备、HarmonyOS AI 整文件主线程读写、Harmony AI 文件名重复 `_edited`，以及 Harmony 专业编辑失败提示未走三语等问题；最后一项另由新增契约和全量 ArkTS 构建验证。两项 P2 不阻断：Harmony 仅有 inode 时会在跨卷碰撞时保守拒绝；Windows 后台准备期间切换编辑上下文可能在完成时回到新副本。iOS/macOS 专业编辑与 HarmonyOS 专业编辑的完整渲染器后台化需要独立线程模型重构，不在本次本地下载功能中冒险扩展；复制与 Windows/HarmonyOS AI 准备已在后台执行。
-- **发布边界**：1.5.13 尚未推送、打标签、创建 GitHub Release、上传附件或切换官网。GitHub 公开稳定版仍为 v1.5.12，官网生产仍为 1.5.10 / build 37。六包为本地候选，不因自动化和静态包校验通过而获得正式签名或实机 PASS。
+- **发布结果**：`main` 与注释标签 `v1.5.13` 已原子推送；标签对象 `4a603e992e244f0ddf5c16c8334472a1e53909bb` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`。[GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) 于 `2026-08-12T03:33:52Z` 发布为 Latest、非草稿、非预发布。发布 run `31560420972` 在公开前核对冻结分片、聚合包、六份侧车、14 个固定名称/字节数/摘要，在公开后重新下载全部 14 个资产并逐项 `cmp`，14/14 零差异。本次未切换官网，生产清单继续为 1.5.10 / build 37；GitHub Latest 不改变 Android Debug、iOS/HarmonyOS unsigned、macOS ad-hoc 未公证、Windows 无 Authenticode 与实机待验收边界。
 - **交付续行与文案返修**：Tauber 于 2026-08-12 授权“继续推进至交付”。独立发布文案审查发现旧六包内嵌“尚未推送、发布”的瞬时候选公告，正式发布后会立即失实，判为 P1。五端简中公告与 iOS、Android、HarmonyOS、Windows 的英文、日文资源已改为长期有效的 GitHub Release / 官网 1.5.10 边界，并引导查阅逐包签名、安装和实机限制；对应静态契约同步改为锁定正式发布语义。从 `b31ed953e1019cbde5fa965c2d0b66efc82f70a3` 生成的六包及侧车已判定作废，不会上传。
 - **最终术语返修**：独立发布门禁确认 P0=0，但发现五端公告把正式产品名称“专业显影 / Pro Develop / プロ現像”写成通用“专业编辑”措辞，判为 P1。五端主资源与兜底文案现已统一为正式名称；静态契约增加三语正向匹配和旧措辞反向断言。从 `227d7b4de8b5f0e07c1ebfcf26278a786a38434f` 生成的六包、六侧车与聚合包已全部作废，不会上传。门禁同时指出本文件上一版仍把该提交描述为当前冻结实现，本段已纠正。
-- **发布材料状态**：README 简中/英/日已切换到 v1.5.13，并补齐 Canon 14 款清单、三语下载与校验命令；CHANGELOG 改为 2026-08-12 正式条目；Release 正文移除内部候选/授权流程，保留功能、数据安全、签名、验证、限制和升级指引。标签提交将临时精确跳过 v1.5.13 自动重建，避免 CI 生成的子集覆盖本地冻结六包，发布后立即移除 guard。
-- **下一步**：提交发布材料；对 exact 标签提交再次执行完整测试，然后推送 `main` 与注释标签 `v1.5.13`、创建 GitHub Release、上传并在线核对六包、六侧车、聚合包及其侧车共 14 个资产。在线回验后立即移除精确 workflow guard 并回填发布事实。官网自动更新继续保持 1.5.10 / build 37；真实文档提供器、同名覆盖、无空间、大文件、移动端权限、macOS Gatekeeper、公证与真实 Windows 启动/安装/驱动/SmartScreen 仍作为独立验收项。
+- **发布材料状态**：README 简中/英/日、CHANGELOG 与 `docs/releases/v1.5.13.md` 已随标签提交公开；正文保留功能、数据安全、签名、验证、限制和升级指引。因本机 GitHub API/Uploads 端点持续 502，冻结聚合包曾经一次性桥接到受限 Actions 工作流；首次 run `31559838492` 在公开前安全失败，修正 draft/Latest 与 draft by-tag 语义后，第二次 run 完成发布和回验。临时桥接分支与两个触发标签已删除，常规 Release workflow 的 v1.5.13 精确 guard 已在发布后移除。
+- **后续验收**：GitHub 交付闭环已完成。真实文档提供器、同名覆盖、无空间、大文件、移动端权限、macOS Gatekeeper/公证，以及真实 Windows 启动、安装、驱动和 SmartScreen 继续作为独立验收项；官网自动更新保持 1.5.10 / build 37，未获得切换 1.5.13 的授权。
