@@ -373,7 +373,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - Windows 的 AI/专业编辑直达路径会在主线程快照源文件、调整参数和预设，再把全分辨率解码、渲染、JPEG 编码与文件库原子写入放入后台任务；busy 门禁覆盖“准备副本—系统保存器—复制完成”全流程。HarmonyOS 的 AI 结果以独立 TaskPool worker 在文件库同目录写 `.part`、同步、校验后重命名，避免在 UI 状态对象上分配并读取整文件。Apple 与 HarmonyOS 专业编辑继续复用既有渲染管线；本轮没有以越过 actor/isolate 约束的方式强行迁移可变编辑状态。
 - 用户取消不显示成功或错误；源缺失/为空、目标不可写、空间不足、提供器断开或大小校验失败均进入明确失败状态。Android/HarmonyOS 的文档提供器不保证跨提供器事务重命名，因此仅在全部复制并同步后报告成功，失败时尽力删除本次目标，不能把该边界描述为严格原子写入。
 - 下载层按原文件名和类型工作，不对 JPEG、RAW 或视频重新编码；五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI，确保支持范围内的联机产物都能到达导出入口。自动化静态契约锁定五端入口、三类产物直达路径、系统选择器、取消语义、同步/目标大小校验、失败清理、Activity 恢复、文件身份和桌面原子提交；真实文档提供器、无空间、同名覆盖、大文件与真机权限仍需平台实测。
-- `1.5.13 / build 40` 的首轮本地候选曾冻结于实现提交 `b31ed953e1019cbde5fa965c2d0b66efc82f70a3`，完整自动化 532/532，并生成 Android、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc 与 Windows x64 Setup/ZIP 六包。发布文案门禁随后发现这六包仍嵌入“尚未发布”的候选状态，不能作为正式 GitHub Release 资产。五端三语公告已改为稳定描述 GitHub Release 与仍停留在 1.5.10 的官网更新通道，并明确引导查阅签名、安装和实机边界；测试契约同步更新。旧六包及侧车全部作废，发布前必须从本次修正后的冻结实现重建、复验并更新逐包记录。Windows 仍由 macOS 交叉构建且无 Authenticode，不得据此声称真实 Windows 启动、安装、驱动或 SmartScreen 已验收。
+- `1.5.13 / build 40` 的发布实现先在提交 `227d7b4de8b5f0e07c1ebfcf26278a786a38434f` 把五端三语启动公告改为长期有效的 GitHub Release 与官网 1.5.10 更新边界，并明确引导查阅签名、安装和实机限制。最终门禁随后发现公告仍把产品正式名称“专业显影 / Pro Develop / プロ現像”写成通用“专业编辑”措辞；本轮把五端主资源与兜底文案统一为正式名称，并增加三语反向断言阻止旧措辞回归。从 `227d7b4de8b5f0e07c1ebfcf26278a786a38434f` 生成的 Android、iOS、HarmonyOS、macOS 和 Windows 六包、侧车及聚合包全部作废，必须在完整自动化通过后从本轮精确实现提交重建。Windows 仍将由 macOS 交叉构建且无 Authenticode，不得据此声称真实 Windows 启动、安装、驱动或 SmartScreen 已验收；官网生产清单继续保持 1.5.10 / build 37。
 
 ## 7. 本地化、更新与诊断
 

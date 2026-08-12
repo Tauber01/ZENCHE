@@ -121,7 +121,7 @@ test("camera, AI, and editor outputs all enter the downloadable ZENCHE library",
   assert.match(windows, /private void SaveEditedPhoto_Click/);
 });
 
-test("AI and professional-editor results have direct local-download paths", async () => {
+test("AI and Pro Develop results have direct local-download paths", async () => {
   const [ios, android, harmony, macos, windowsXaml, windows] =
     await Promise.all([
       source("native/ios/NikonLink/Views/RootView.swift"),

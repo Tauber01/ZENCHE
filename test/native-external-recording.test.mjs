@@ -96,7 +96,8 @@ test('version 1.5.13 launch announcements describe local-copy exports and releas
 
   for (const announcement of announcements) {
     assert.match(announcement, /新增“下载到本地”/);
-    assert.match(announcement, /联机拍摄、相机卡下载、AI 修图\/生图与专业编辑结果/);
+    assert.match(announcement, /联机拍摄、相机卡下载、AI 修图\/生图与专业显影结果/);
+    assert.doesNotMatch(announcement, /专业编辑结果|AI 与专业编辑提供直达入口/);
     assert.match(announcement, /“保存到系统相册”继续作为独立操作保留/);
     assert.match(announcement, /不移动或删除 ZENCHE 文件库中的源文件/);
     assert.match(announcement, /macOS 与 Windows 的 AI 修图也改为始终生成新文件/);
@@ -124,6 +125,8 @@ test('version 1.5.13 launch announcements describe local-copy exports and releas
 
   for (const announcement of englishAnnouncements) {
     assert.match(announcement, /Added “Save a Local Copy”/);
+    assert.match(announcement, /Pro Develop results/);
+    assert.doesNotMatch(announcement, /professional-editor results|the professional editor/);
     assert.match(announcement, /Export creates a copy and never moves or deletes the source/);
     assert.match(announcement, /make a best effort to delete an incomplete destination/);
     assert.match(announcement, /GitHub Release provides the five-platform 1\.5\.13 packages/);
@@ -131,6 +134,8 @@ test('version 1.5.13 launch announcements describe local-copy exports and releas
   }
   for (const announcement of japaneseAnnouncements) {
     assert.match(announcement, /「ローカルコピーを保存」を追加しました/);
+    assert.match(announcement, /プロ現像の結果/);
+    assert.doesNotMatch(announcement, /プロ編集の結果|AI とプロ編集/);
     assert.match(announcement, /元ファイルを移動・削除しません/);
     assert.match(announcement, /未完了の保存先も可能な範囲で取り除きます/);
     assert.match(announcement, /GitHub Release では 5 プラットフォーム向けの 1\.5\.13 パッケージ/);
