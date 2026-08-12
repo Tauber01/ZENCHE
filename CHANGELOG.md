@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.5.13] - Unreleased (local candidate)
+## [1.5.13] - 2026-08-12
 
 ### Added
 
@@ -38,14 +38,14 @@
 
 ### Release status
 
-- The source version target is `1.5.13 / build 40`, but this candidate has not
-  been pushed, tagged, published as a GitHub Release, or deployed to the
-  official update feed.
-- GitHub public stable remains v1.5.12. The official update feed remains
-  1.5.10 / build 37. All five platform build pipelines have completed locally;
-  final candidate packages and SHA-256 sidecars are regenerated only after the
-  implementation commit is frozen. Signing and real-device limits remain
-  documented per package.
+- Published `1.5.13 / build 40` as the GitHub stable release with Android,
+  iOS/iPadOS, HarmonyOS, macOS, and Windows packages plus per-file SHA-256
+  sidecars. The full automated suite passed 532/532 before packaging.
+- The official website update feed remains on 1.5.10 / build 37. Android uses
+  a debug certificate, iOS and HarmonyOS are unsigned, macOS is ad-hoc signed
+  and not notarized, and Windows has no Authenticode signature. Platform save
+  dialogs, installation, permissions, and low-storage behavior still require
+  appropriate device validation.
 
 ## [1.5.12] - 2026-08-11
 

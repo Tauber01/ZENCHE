@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- GitHub 公开稳定版：**v1.5.12**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
-- 当前源码版本：**1.5.13 / build 40**（本地候选，尚未发布）
+- GitHub 公开稳定版：**v1.5.13**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)）
+- 当前源码版本：**1.5.13 / build 40**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[GitHub 公开稳定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[GitHub 公开稳定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -42,12 +42,12 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
 
-### v1.5.13 本地候选（未发布）
+### v1.5.13 GitHub 发布
 
-- 五个原生平台新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图结果和专业编辑副本均可通过系统保存器另存到用户选择的位置。五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口，AI 和专业编辑工作区另有直达入口。“保存到系统相册”继续作为独立操作保留。
-- 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件。AI 与专业编辑的直达流程会先生成新的文件库副本；macOS 与 Windows 的 AI 修图也改为始终保存新文件，不再覆盖当前原图。五端文件库现统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI；能否直接预览仍取决于系统解码能力。
-- 用户取消系统保存器不会显示成功或错误；只有复制完成、同步落盘并通过大小校验后才报告成功，失败时会清理本次临时文件或尽力删除不完整目标。同名与覆盖确认由各平台系统保存器处理。
-- 这是 `1.5.13 / build 40` 的本地候选，尚未推送、打标签、发布 GitHub Release 或切换官网更新。五端构建链路均已在本地通过；冻结候选的逐包签名边界、字节数和 SHA-256 见 [1.5.13 发布说明草稿](docs/releases/v1.5.13.md)。GitHub 公开稳定版仍为 v1.5.12，官网自动更新仍提供 1.5.10 / build 37。
+- 五个原生平台新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图结果和专业显影副本均可通过系统保存界面另存到用户选择的位置。五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口，AI 和专业显影工作区另有直达入口。“保存到系统相册”继续作为独立操作保留。
+- 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件。AI 与专业显影的直达流程会先生成新的文件库副本；macOS 与 Windows 的 AI 修图也改为始终保存新文件，不再覆盖当前原图。五端文件库现统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI；能否直接预览仍取决于系统解码能力。
+- 取消系统保存界面不会显示成功或错误；只有复制和写入完成、目标文件大小校验通过后才报告成功，失败时会清理临时文件或尽力删除不完整文件。同名与覆盖确认由各平台系统保存界面处理。
+- `1.5.13 / build 40` 已作为 GitHub Release 提供六个五端安装包及逐包 SHA-256；签名、安装与实机边界见 [1.5.13 发布说明](docs/releases/v1.5.13.md)。官网自动更新仍提供 1.5.10 / build 37，本次没有修改生产清单。
 
 ### v1.5.12 GitHub 发布
 
@@ -187,7 +187,7 @@ iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，
 - **Nikon EXPEED 6** (10)：Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **Nikon EXPEED 7** (7)：Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 - **Sony α** (12)：A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II — ⚠️ 实验性，待实机验证
-- **Canon EOS R** (10)：EOS R1、R3、R5、R5 Mark II、R6 Mark II、R7、R8、R10、R50、R100 — ⚠️ 实验性，待实机验证
+- **Canon EOS R** (14)：EOS R1、R3、R5、R5 Mark II、R6 Mark III、R6 Mark II、R6、R5 C、R7、R8、R10、R50 V、R50、R100 — ⚠️ 实验性，待实机验证
 
 <details>
 <summary>查看 USB Product ID</summary>
@@ -215,17 +215,17 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [GitHub 公开稳定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)
+前往 [GitHub 公开稳定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.5.12-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.5.12-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.5.13-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.5.13-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -236,13 +236,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.5.3-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.5.3-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -431,12 +431,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- GitHub public stable release: **v1.5.12** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12))
-- Source version: **1.5.13 / build 40** (local candidate, not released)
+- GitHub public stable release: **v1.5.13** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13))
+- Source version: **1.5.13 / build 40**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
-- Downloads: [GitHub public stable release v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [GitHub public stable release v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -448,12 +448,12 @@ in a local library for review and export.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
 
-### v1.5.13 local candidate (unpublished)
+### v1.5.13 GitHub release
 
 - All five native apps add **Save a Local Copy** for tethered captures, camera-card downloads, AI-edited or generated images, and Pro Develop results. Every file library offers the same action; supported in-app previews also provide a shortcut, while the AI and Pro Develop workspaces have direct actions of their own. **Save to System Photos** remains separate.
 - Export creates a copy and never moves or deletes the source in the ZENCHE library. Direct AI and Pro Develop actions first create a new library item; AI retouching on macOS and Windows now always saves a new file instead of overwriting the current original. All five libraries now recognize JPG/JPEG, HEIF/HEIC, PNG, TIF/TIFF, NEF/NRW, ARW, CR2/CR3, MOV/MP4/M4V, and AVI. Preview support still depends on the platform decoder.
-- Closing the system save picker is neutral. Success is reported only after the copy is complete, storage has been synchronized, and the destination size has been verified; failures clean up the temporary file or make a best effort to remove an incomplete destination. The platform save picker owns filename and overwrite confirmation.
-- This is a local `1.5.13 / build 40` candidate. It has not been pushed, tagged, published as a GitHub Release, or deployed to the official update feed. All five platform build pipelines pass locally; see the [draft 1.5.13 release notes](docs/releases/v1.5.13.md) for the frozen packages, signing limits, byte counts, and SHA-256 values. GitHub public stable remains v1.5.12, and the official feed remains 1.5.10 / build 37.
+- Canceling the system save dialog shows neither success nor an error. Success is reported only after copying and writing finish and the destination size is verified; failures remove temporary files or make a best effort to remove incomplete files. The platform save dialog owns filename and overwrite confirmation.
+- `1.5.13 / build 40` is available as a GitHub Release with six five-platform packages and per-file SHA-256 checks. See the [1.5.13 release notes](docs/releases/v1.5.13.md) for signing, installation, and device-validation limits. The official website update feed remains on 1.5.10 / build 37 and was not changed by this release.
 
 ### v1.5.12 GitHub release
 
@@ -589,7 +589,7 @@ foreground FTP/HTTP/WebDAV receiving.
 - **EXPEED 6:** Z7, Z6, Z50, D780, D6, Z5, Z7II, Z6II, Z fc, and Z30
 - **EXPEED 7:** Z9, Z8, Z f, Z6III, Z50II, Z5II, and ZR
 - **Sony α (experimental):** A1, A1 II, A9 III, A7R V, A7 IV, A7S III, A7C II, A7C R, ZV-E1, A6700, FX30, and ZV-E10 II
-- **Canon EOS R (experimental):** EOS R1, R3, R5, R5 Mark II, R6 Mark II, R7, R8, R10, R50, and R100
+- **Canon EOS R (experimental):** EOS R1, R3, R5, R5 Mark II, R6 Mark III, R6 Mark II, R6, R5 C, R7, R8, R10, R50 V, R50, and R100
 
 Nikon uses USB Vendor ID `0x04b0`, Sony uses `0x054c`, and Canon uses `0x04a9`.
 A built-in camera profile means that ZENCHE can identify the device and select the intended parameter range; it
@@ -617,23 +617,35 @@ completed hardware validation.
 ### Download and install
 
 Download packages and their matching `.sha256` files from the
-[latest stable v1.5.12 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12).
+[latest stable v1.5.13 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13).
 The delivery names are:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.5.12-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.5.12-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.5.13-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.5.13-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | Validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
 the interface driver can affect NX Tether, Camera Control Pro, or system photo
 import. See [HarmonyOS build and deployment](docs/HARMONY_BUILD.md) and
 [iOS signing and release](docs/IOS_SIGNING.md) for platform signing details.
+
+Verify downloaded files against their matching sidecars, for example:
+
+```sh
+shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
+```
+
+Windows PowerShell:
+
+```powershell
+Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
+```
 
 ### Automatic updates and MirrorChyan
 
@@ -778,14 +790,14 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- GitHub 公開安定版：**v1.5.12**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12)）
-- 現在のソースバージョン：**1.5.13 / build 40**（ローカル候補、未公開）
+- GitHub 公開安定版：**v1.5.13**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)）
+- 現在のソースバージョン：**1.5.13 / build 40**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
-- ダウンロード：[GitHub 公開安定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[GitHub 公開安定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
-- Afdian 交換コード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
+- Afdian 引き換えコード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
 - 実機検証：[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
 
@@ -794,12 +806,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
 
-### v1.5.13 ローカル候補（未公開）
+### v1.5.13 GitHub リリース
 
 - 5 つのネイティブ版に「ローカルコピーを保存」を追加しました。テザー撮影したファイル、カメラカードから取り込んだファイル、AI レタッチ／画像生成の結果、プロ現像後のファイルを、OS 標準の保存先選択画面から任意の場所へ保存できます。各ファイルライブラリに共通の操作を用意し、ZENCHE 内でプレビューできる画面にもショートカットを設けました。AI とプロ現像には直接保存する操作もあります。「システム写真に保存」は独立した操作として引き続き利用できます。
 - 書き出しはコピーのみを作成し、ZENCHE ライブラリ内の元ファイルを移動・削除しません。AI とプロ現像から直接保存する場合も、先に新しいライブラリ項目を作成します。macOS と Windows の AI レタッチは元画像を上書きせず、常に新しいファイルとして保存する方式へ変更しました。5 つのライブラリは JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V、AVI を共通して認識します。プレビューできる形式は各 OS のデコーダーに依存します。
 - OS 標準の保存画面を閉じた場合は成功にもエラーにもなりません。コピー完了、ストレージへの同期、保存先のサイズ確認がすべて終わった後にのみ成功を表示します。失敗時は一時ファイルを削除し、不完全な保存先も可能な範囲で取り除きます。同名ファイルと上書きの確認は各 OS の保存画面が担当します。
-- これは `1.5.13 / build 40` のローカル候補です。まだ push、タグ作成、GitHub Release 公開、公式更新フィードへの配信は行っていません。5 プラットフォームすべてのビルド経路はローカルで通過しています。凍結候補の署名上の制約、バイト数、SHA-256 は [1.5.13 リリースノート草稿](docs/releases/v1.5.13.md)を参照してください。GitHub 公開安定版は v1.5.12、公式更新フィードは 1.5.10 / build 37 のままです。
+- `1.5.13 / build 40` は GitHub Release で公開され、5 プラットフォーム向けの 6 パッケージと個別の SHA-256 を提供します。署名、インストール、実機検証上の制約は [1.5.13 リリースノート](docs/releases/v1.5.13.md)を参照してください。公式サイトの更新配信は 1.5.10 / build 37 のままで、本リリースでは変更していません。
 
 ### v1.5.12 GitHub リリース
 
@@ -881,8 +893,8 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 AI 機能は**デバイス紐付けアクティベーションコード方式**です。AI クラウド利用回数は
 サーバーで計数し、オープンソースのクライアントにはモデル API キーを埋め込みません。
 ZENCHE 本体は無料・オープンソースのままです。AI ツールのデバイス ID をコピーし、
-[http://zenche.top/](http://zenche.top/) でキーを交換してください。交換コードがない場合は、
-アプリ内の「Afdian で交換コードを購入」導線または QR コード、または [Afdian ページ](https://www.ifdian.net/a/Tauber) を利用できます。設定には
+[http://zenche.top/](http://zenche.top/) でキーを引き換えてください。引き換えコードがない場合は、
+アプリ内の「Afdian で引き換えコードを購入」導線または QR コード、または [Afdian ページ](https://www.ifdian.net/a/Tauber) を利用できます。設定には
 編集可能な AI サーバー欄を設けず、旧設定の読み込み互換性だけを維持します。公式サイトと
 アプリ内 Afdian 導線だけを利用してください。
 
@@ -931,7 +943,7 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 - **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
 - **Sony α（実験的）：** A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II
-- **Canon EOS R（実験的）：** EOS R1、R3、R5、R5 Mark II、R6 Mark II、R7、R8、R10、R50、R100
+- **Canon EOS R（実験的）：** EOS R1、R3、R5、R5 Mark II、R6 Mark III、R6 Mark II、R6、R5 C、R7、R8、R10、R50 V、R50、R100
 
 USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` です。内蔵プロファイルは、
 機器を識別して想定されるパラメーター範囲を選択できることを示しますが、すべての
@@ -958,18 +970,18 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[GitHub 公開安定版 v1.5.12](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.12) から
+[GitHub 公開安定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.12-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.5.12-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.5.12-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.5.12-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.5.12-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.5.12-ios-unsigned.ipa` | CI 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.5.13-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.5.13-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
@@ -977,6 +989,18 @@ Windows ではカメラの PTP インターフェースを WinUSB に割り当�
 確認してください。署名については
 [HarmonyOS ビルドと配備](docs/HARMONY_BUILD.md)および
 [iOS 署名とリリース](docs/IOS_SIGNING.md)を参照してください。
+
+ダウンロードしたファイルは、同名のサイドカーで確認してください。例：
+
+```sh
+shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
+```
+
+Windows PowerShell：
+
+```powershell
+Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
+```
 
 ### 自動更新と MirrorChyan
 
