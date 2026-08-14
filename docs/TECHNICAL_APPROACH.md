@@ -339,6 +339,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **Probe 策略边界**：5s 周期 / 3s 超时是产品为快速恢复采用的策略，并非 CIPA 的规范值；DC-X005 将 Initiator Probe 描述为事务期间的可选探测并给出 10s 响应等待。当前策略须经 Nikon/Sony/Canon 真机验证，严格或低资源 responder 的兼容性不能由静态测试推出。
 - **网络层监听联动**：丢网即判离线，不等心跳超时——iOS/macOS `NWPathMonitor`、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（`BEARER_WIFI` + `netLost`）、Windows `NetworkChange.NetworkAvailabilityChanged`；移动端回调绑定网络/attempt 所有权，旧 callback 不得关闭新实例。Android manifest 必须声明 `ACCESS_NETWORK_STATE`，HarmonyOS module 必须声明 `GET_NETWORK_INFO`。监听到位后走同一退避重连流程，网络恢复可提前唤醒下一轮重连。
 - **UI 呈现**：仅文本分支——`reconnecting` 态显示「重连中 / 正在重连 Wi‑Fi 相机…」并禁用连接按钮，橙色状态点；断连文案与既有样式语言一致，无新控件。
+- **冻结证据**：实现提交 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 的完整自动化 573/573、连接专项 61/61 与五端原生打包通过；六包和六份侧车的版本、容器、架构及适用签名边界均已回验。该证据只覆盖静态回归、编译与本地候选产物，不替代真实 Nikon/Sony/Canon 相机的 probe、并发命令、半关闭与断网重连验证。
 
 ## 6. 本地工作流与图像处理
 

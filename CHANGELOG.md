@@ -45,15 +45,15 @@
 
 ### Validation status
 
-- Source version is `1.5.14 / build 41`. The pre-freeze working tree passes the
-  full automated suite 573/573 and the 61/61 connection regression suite. The
-  Android Release compiler, Apple type checks, HarmonyOS Release build, and
-  Windows Release build also pass. Exact-commit native builds, six candidate
-  packages, SHA-256 sidecars, and container/signature
-  checks remain to be regenerated before this local candidate is closed.
-  Camera-hardware, trusted-signing, installation, and reconnect testing remain
-  pending while this entry is marked Unreleased; package details are in
-  `docs/releases/v1.5.14.md`.
+- Source version is `1.5.14 / build 41`. Frozen implementation commit
+  `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` passes the full automated suite
+  573/573 and the 61/61 connection regression suite. All five native package
+  builds completed from that commit; six local candidate packages and their
+  SHA-256 sidecars pass container, metadata, architecture, and applicable
+  signature checks. Camera-hardware, trusted-signing, installation, and
+  reconnect testing remain pending while this entry is marked Unreleased;
+  package details are in `docs/releases/v1.5.14.md`. Nothing was pushed,
+  tagged, published, or deployed.
 
 ## [1.5.13] - 2026-08-12
 
