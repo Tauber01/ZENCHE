@@ -808,8 +808,11 @@ public partial class MainWindow : Window
     private bool _livePhotoEnabled;
     private double _livePhotoSeconds = 3.0;
     // ── E3 1.5.9：Wi‑Fi PTP/IP 取景 / 参数缓存 ──
+    private static readonly TimeSpan WifiPreviewFrameTimeout =
+        TimeSpan.FromSeconds(5);
     private CancellationTokenSource? _wifiPreviewCancellation;
     private Task? _wifiPreviewTask;
+    private long _wifiPreviewGeneration;
     private ushort _wifiIso;
     private double _wifiAperture;
     private double _wifiShutterSeconds;
@@ -826,6 +829,8 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(5000)
         };
     private CancellationTokenSource? _wifiReconnectCts;
+    private long _wifiConnectionGeneration;
+    private long _wifiOwnedSessionGeneration;
     private bool _wifiReconnecting;
     private bool _wifiManualDisconnect;
     private int _wifiMissedHeartbeats;
@@ -1825,12 +1830,19 @@ public partial class MainWindow : Window
 
     private async Task CloseAuthSensitiveStateAsync()
     {
+        InvalidateWifiConnectionAttempts();
+        ClearWifiSessionOwnership();
+        _wifiManualDisconnect = true;
+        _wifiReconnecting = false;
         foreach (var owned in OwnedWindows.Cast<Window>().ToArray())
         {
             TryAuthCleanupStep("关闭附属窗口", owned.Close);
         }
         TryAuthCleanupStep("停止 Wi-Fi 监控", StopWifiMonitoring);
         TryAuthCleanupStep("停止 Wi-Fi 预览", StopWifiPreviewLoop);
+        await TryAuthCleanupStepAsync(
+            "等待 Wi-Fi 预览停止",
+            WaitForWifiPreviewLoopAsync);
         if (_immersivePreviewWindow is { } immersive)
         {
             TryAuthCleanupStep(
@@ -1866,7 +1878,7 @@ public partial class MainWindow : Window
             "断开 Wi-Fi 相机",
             async () =>
             {
-                if (_wifiCamera.IsConnected) await _wifiCamera.DisconnectAsync();
+                await _wifiCamera.DisconnectAsync();
             });
         await TryAuthCleanupStepAsync(
             "断开 USB/PTP 相机",
@@ -2086,8 +2098,7 @@ public partial class MainWindow : Window
             {
                 await RunOperationAsync("正在停止 Wi‑Fi 实时取景…", async token =>
                 {
-                    await _wifiCamera.StopLiveViewAsync(token);
-                    StopWifiPreviewLoop();
+                    await StopWifiLiveViewAsync(token);
                     UpdateWifiControlState(wifiLiveView, wifiRecord);
                 });
             }
@@ -2096,7 +2107,7 @@ public partial class MainWindow : Window
                 await RunOperationAsync("正在开启 Wi‑Fi 实时取景…", async token =>
                 {
                     await _wifiCamera.StartLiveViewAsync(token);
-                    StartWifiPreviewLoop();
+                    await StartWifiPreviewLoopAsync();
                     UpdateWifiControlState(wifiLiveView, wifiRecord);
                 });
             }
@@ -2141,13 +2152,20 @@ public partial class MainWindow : Window
         {
             button.IsEnabled = false;
             mode.IsEnabled = false;
+            long? connectionAttempt = null;
+            long? ownedSessionGeneration = null;
             try
             {
-                if (_wifiCamera.IsConnected)
+                if (_wifiCamera.IsConnected || _wifiReconnecting)
                 {
+                    InvalidateWifiConnectionAttempts();
+                    ClearWifiSessionOwnership();
+                    _wifiManualDisconnect = true;
+                    _wifiReconnecting = false;
                     StopWifiMonitoring();
                     StopWifiPreviewLoop();
                     await _wifiCamera.DisconnectAsync();
+                    await WaitForWifiPreviewLoopAsync();
                     _lastConnectionError = null;
                 }
                 else
@@ -2162,19 +2180,49 @@ public partial class MainWindow : Window
                     _wifiReconnecting = false;
                     _wifiReconnectAttempt = 0;
                     _wifiMissedHeartbeats = 0;
+                    connectionAttempt = BeginWifiConnectionAttempt();
                     using var timeout = new CancellationTokenSource(
                         TimeSpan.FromSeconds(12));
-                    await _wifiCamera.ConnectAsync(
+                    var connection = await _wifiCamera.ConnectWithOwnershipAsync(
                         _wifiHost, _wifiPort, timeout.Token);
+                    ownedSessionGeneration = connection.SessionGeneration;
+                    EnsureWifiConnectionAttemptCurrent(
+                        connectionAttempt.Value,
+                        reconnecting: false,
+                        timeout.Token);
                     // E3 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；
                     // 尼康/佳能自动开实时取景并拉帧（约 10fps），刷新参数。
                     await _wifiCamera.DetectVendorAsync(timeout.Token);
+                    EnsureWifiConnectionAttemptCurrent(
+                        connectionAttempt.Value,
+                        reconnecting: false,
+                        timeout.Token);
                     if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Unknown)
                     {
                         await _wifiCamera.StartLiveViewAsync(timeout.Token);
-                        StartWifiPreviewLoop();
-                        await RefreshWifiParametersAsync();
+                        await RefreshWifiParametersAsync(timeout.Token);
                     }
+                    EnsureWifiConnectionAttemptCurrent(
+                        connectionAttempt.Value,
+                        reconnecting: false,
+                        timeout.Token);
+                    await _wifiCamera.ProbeAsync(timeout.Token);
+                    EnsureWifiConnectionAttemptCurrent(
+                        connectionAttempt.Value,
+                        reconnecting: false,
+                        timeout.Token);
+                    if (_wifiCamera.IsLiveView)
+                    {
+                        await StartWifiPreviewLoopAsync(
+                            connectionAttempt.Value,
+                            reconnecting: false);
+                    }
+                    EnsureWifiConnectionAttemptCurrent(
+                        connectionAttempt.Value,
+                        reconnecting: false,
+                        timeout.Token);
+                    PublishWifiSessionOwnership(
+                        ownedSessionGeneration.Value);
                     _lastConnectionError = null;
                     _diagnostics.Info(
                         "wifi-camera",
@@ -2183,10 +2231,40 @@ public partial class MainWindow : Window
                     StartWifiMonitoring();
                 }
             }
+            catch (OperationCanceledException) when (
+                _wifiManualDisconnect ||
+                connectionAttempt is { } cancelledAttempt &&
+                !IsWifiConnectionAttemptCurrent(
+                    cancelledAttempt,
+                    reconnecting: false))
+            {
+                if (connectionAttempt is { } attempt)
+                {
+                    await CleanupFailedWifiConnectionAsync(
+                        attempt,
+                        ownedSessionGeneration,
+                        reconnecting: false);
+                }
+                _lastConnectionError = null;
+            }
             catch (Exception error)
             {
-                _lastConnectionError = error.Message;
-                ShowError(error.Message);
+                var shouldReport = connectionAttempt is not { } attempt ||
+                    IsWifiConnectionAttemptCurrent(
+                        attempt,
+                        reconnecting: false);
+                if (connectionAttempt is { } failedAttempt)
+                {
+                    await CleanupFailedWifiConnectionAsync(
+                        failedAttempt,
+                        ownedSessionGeneration,
+                        reconnecting: false);
+                }
+                if (shouldReport)
+                {
+                    _lastConnectionError = error.Message;
+                    ShowError(error.Message);
+                }
             }
             status.Text = _wifiCamera.IsConnected
                 ? $"{_wifiConnectionMode.ToUpperInvariant()} · {AppLocalization.T(_wifiCamera.Status)}"
@@ -2245,6 +2323,59 @@ public partial class MainWindow : Window
 
     // ── B2 WiFi 连接监看：心跳 / 退避重连 / 网络监听 ──
 
+    private long BeginWifiConnectionAttempt() =>
+        Interlocked.Increment(ref _wifiConnectionGeneration);
+
+    private void InvalidateWifiConnectionAttempts() =>
+        Interlocked.Increment(ref _wifiConnectionGeneration);
+
+    private bool IsWifiConnectionGenerationCurrent(
+        long connectionGeneration) =>
+        Volatile.Read(ref _wifiConnectionGeneration) == connectionGeneration &&
+        !_wifiManualDisconnect;
+
+    private bool IsWifiConnectionAttemptCurrent(
+        long connectionGeneration,
+        bool reconnecting) =>
+        IsWifiConnectionGenerationCurrent(connectionGeneration) &&
+        _wifiReconnecting == reconnecting;
+
+    private bool IsPublishedWifiSessionCurrent(
+        long connectionGeneration,
+        long sessionGeneration) =>
+        sessionGeneration > 0 &&
+        IsWifiConnectionAttemptCurrent(
+            connectionGeneration,
+            reconnecting: false) &&
+        Volatile.Read(ref _wifiOwnedSessionGeneration) == sessionGeneration;
+
+    private void PublishWifiSessionOwnership(long sessionGeneration) =>
+        Volatile.Write(ref _wifiOwnedSessionGeneration, sessionGeneration);
+
+    private void ClearWifiSessionOwnership() =>
+        Interlocked.Exchange(ref _wifiOwnedSessionGeneration, 0);
+
+    private void ClearWifiSessionOwnership(long expectedSessionGeneration) =>
+        Interlocked.CompareExchange(
+            ref _wifiOwnedSessionGeneration,
+            0,
+            expectedSessionGeneration);
+
+    private void EnsureWifiConnectionAttemptCurrent(
+        long connectionGeneration,
+        bool reconnecting,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting))
+        {
+            throw new OperationCanceledException(
+                "PTP/IP 连接尝试已被取消或由新尝试取代");
+        }
+    }
+
     private void StartWifiMonitoring()
     {
         _wifiHeartbeatTimer.Tick -= WifiHeartbeatTimer_Tick;
@@ -2265,34 +2396,149 @@ public partial class MainWindow : Window
             .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
     }
 
+    private async Task CleanupFailedWifiConnectionAsync(
+        long connectionGeneration,
+        long? ownedSessionGeneration,
+        bool reconnecting)
+    {
+        var ownsUiAttempt = IsWifiConnectionAttemptCurrent(
+            connectionGeneration,
+            reconnecting);
+        if (ownsUiAttempt)
+        {
+            if (!reconnecting)
+            {
+                StopWifiMonitoring();
+            }
+            StopWifiPreviewLoop();
+        }
+        try
+        {
+            if (ownedSessionGeneration is { } ownedGeneration)
+            {
+                try
+                {
+                    await _wifiCamera.DisconnectIfOwnedAsync(ownedGeneration);
+                }
+                finally
+                {
+                    ClearWifiSessionOwnership(ownedGeneration);
+                }
+            }
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "wifi-camera",
+                $"清理失败的 PTP/IP 会话时出错：{error.Message}");
+        }
+        if (ownsUiAttempt)
+        {
+            await WaitForWifiPreviewLoopAsync();
+        }
+    }
+
     // ── E3 1.5.9：Wi‑Fi PTP/IP 实时取景 / 参数 / 录像 ──
 
-    private void StartWifiPreviewLoop()
+    private async Task StartWifiPreviewLoopAsync(
+        long? connectionGeneration = null,
+        bool reconnecting = false)
     {
         StopWifiPreviewLoop();
+        var generation = Volatile.Read(ref _wifiPreviewGeneration);
+        await WaitForWifiPreviewLoopAsync();
+        if (generation != Volatile.Read(ref _wifiPreviewGeneration) ||
+            !_wifiCamera.IsConnected || !_wifiCamera.IsLiveView ||
+            _wifiManualDisconnect ||
+            connectionGeneration is { } attempt &&
+            !IsWifiConnectionAttemptCurrent(attempt, reconnecting))
+        {
+            return;
+        }
         _wifiPreviewCancellation = new CancellationTokenSource();
         _wifiPreviewTask = WifiPreviewLoopAsync(
-            _wifiPreviewCancellation.Token);
+            _wifiPreviewCancellation.Token,
+            generation,
+            connectionGeneration);
     }
 
     private void StopWifiPreviewLoop()
     {
+        Interlocked.Increment(ref _wifiPreviewGeneration);
         _wifiPreviewCancellation?.Cancel();
-        _wifiPreviewCancellation?.Dispose();
-        _wifiPreviewCancellation = null;
-        _wifiPreviewTask = null;
     }
 
-    private async Task WifiPreviewLoopAsync(CancellationToken cancellationToken)
+    private void StopWifiPreviewLoopGracefully()
+    {
+        Interlocked.Increment(ref _wifiPreviewGeneration);
+    }
+
+    private async Task StopWifiLiveViewAsync(CancellationToken cancellationToken)
+    {
+        StopWifiPreviewLoopGracefully();
+        await WaitForWifiPreviewLoopAsync();
+        if (_wifiCamera.IsConnected && _wifiCamera.IsLiveView)
+        {
+            await _wifiCamera.StopLiveViewAsync(cancellationToken);
+        }
+    }
+
+    private async Task WaitForWifiPreviewLoopAsync()
+    {
+        var cancellation = _wifiPreviewCancellation;
+        var task = _wifiPreviewTask;
+        if (task is not null)
+        {
+            try
+            {
+                await task;
+            }
+            catch (OperationCanceledException)
+            {
+                // StopWifiPreviewLoop 已请求的正常退出。
+            }
+        }
+        if (ReferenceEquals(_wifiPreviewTask, task))
+        {
+            _wifiPreviewTask = null;
+        }
+        if (ReferenceEquals(_wifiPreviewCancellation, cancellation))
+        {
+            _wifiPreviewCancellation = null;
+        }
+        cancellation?.Dispose();
+    }
+
+    private async Task WifiPreviewLoopAsync(
+        CancellationToken cancellationToken,
+        long generation,
+        long? connectionGeneration)
     {
         var failures = 0;
         while (!cancellationToken.IsCancellationRequested &&
+               generation == Volatile.Read(ref _wifiPreviewGeneration) &&
+               (connectionGeneration is not { } connectionAttempt ||
+                IsWifiConnectionGenerationCurrent(connectionAttempt)) &&
                _wifiCamera.IsConnected && _wifiCamera.IsLiveView)
         {
             try
             {
-                var jpeg = await _wifiCamera.GetLiveViewFrameAsync(
-                    cancellationToken);
+                byte[] jpeg;
+                using (var frameTimeout =
+                       CancellationTokenSource.CreateLinkedTokenSource(
+                           cancellationToken))
+                {
+                    frameTimeout.CancelAfter(WifiPreviewFrameTimeout);
+                    jpeg = await _wifiCamera.GetLiveViewFrameAsync(
+                        frameTimeout.Token);
+                }
+                if (generation != Volatile.Read(ref _wifiPreviewGeneration) ||
+                    connectionGeneration is { } frameConnectionAttempt &&
+                    !IsWifiConnectionGenerationCurrent(
+                        frameConnectionAttempt))
+                {
+                    break;
+                }
                 failures = 0;
                 var prepared = await Task.Run(
                     () => PrepareJpeg(
@@ -2303,10 +2549,18 @@ public partial class MainWindow : Window
                         _videoRecording,
                         _monitorNikonCloudPreset),
                     cancellationToken);
+                if (generation != Volatile.Read(ref _wifiPreviewGeneration) ||
+                    connectionGeneration is { } preparedConnectionAttempt &&
+                    !IsWifiConnectionGenerationCurrent(
+                        preparedConnectionAttempt))
+                {
+                    break;
+                }
                 await Dispatcher.InvokeAsync(
                     () => DisplayWifiPreparedPreview(prepared));
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (
+                cancellationToken.IsCancellationRequested)
             {
                 break;
             }
@@ -2361,7 +2615,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// 从 Wi‑Fi 相机读取 ISO/光圈/快门并缓存到本地字段（单属性失败不阻断其余）。
     /// </summary>
-    private async Task RefreshWifiParametersAsync()
+    private async Task RefreshWifiParametersAsync(
+        CancellationToken cancellationToken = default)
     {
         if (!_wifiCamera.IsConnected)
         {
@@ -2369,10 +2624,16 @@ public partial class MainWindow : Window
         }
         try
         {
-            var isoData = await _wifiCamera.ReadPropertyAsync(0x500f);
+            var isoData = await _wifiCamera.ReadPropertyAsync(
+                0x500f,
+                cancellationToken);
             _wifiIso = isoData.Length >= 2
                 ? BinaryPrimitives.ReadUInt16LittleEndian(isoData)
                 : (ushort)0;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception error)
         {
@@ -2381,12 +2642,18 @@ public partial class MainWindow : Window
         }
         try
         {
-            var fNumberData = await _wifiCamera.ReadPropertyAsync(0x5007);
+            var fNumberData = await _wifiCamera.ReadPropertyAsync(
+                0x5007,
+                cancellationToken);
             if (fNumberData.Length >= 2)
             {
                 _wifiAperture = BinaryPrimitives.ReadUInt16LittleEndian(
                     fNumberData) / 100.0;
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception error)
         {
@@ -2395,18 +2662,25 @@ public partial class MainWindow : Window
         }
         try
         {
-            var shutterData = await _wifiCamera.ReadPropertyAsync(0x500d);
+            var shutterData = await _wifiCamera.ReadPropertyAsync(
+                0x500d,
+                cancellationToken);
             if (shutterData.Length >= 4)
             {
                 _wifiShutterSeconds = BinaryPrimitives.ReadUInt32LittleEndian(
                     shutterData) / 10000.0;
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception error)
         {
             _diagnostics.Warning(
                 "wifi-params", $"读取 Wi‑Fi 快门失败：{error.Message}");
         }
+        cancellationToken.ThrowIfCancellationRequested();
         await Dispatcher.InvokeAsync(UpdateWifiParameterReadout);
     }
 
@@ -2446,7 +2720,7 @@ public partial class MainWindow : Window
             async token =>
             {
                 await _wifiCamera.WritePropertyAsync(0x500f, payload, token);
-                await RefreshWifiParametersAsync();
+                await RefreshWifiParametersAsync(token);
             });
     }
 
@@ -2468,7 +2742,7 @@ public partial class MainWindow : Window
             async token =>
             {
                 await _wifiCamera.WritePropertyAsync(0x5007, payload, token);
-                await RefreshWifiParametersAsync();
+                await RefreshWifiParametersAsync(token);
             });
     }
 
@@ -2498,7 +2772,7 @@ public partial class MainWindow : Window
             async token =>
             {
                 await _wifiCamera.WritePropertyAsync(0x500d, payload, token);
-                await RefreshWifiParametersAsync();
+                await RefreshWifiParametersAsync(token);
             });
     }
 
@@ -2555,8 +2829,14 @@ public partial class MainWindow : Window
 
     private async void WifiHeartbeatTimer_Tick(object? sender, EventArgs e)
     {
-        if (!_wifiCamera.IsConnected || _wifiReconnecting ||
-            _wifiManualDisconnect)
+        var connectionGeneration = Volatile.Read(
+            ref _wifiConnectionGeneration);
+        var sessionGeneration = Volatile.Read(
+            ref _wifiOwnedSessionGeneration);
+        if (!_wifiCamera.IsConnected ||
+            !IsPublishedWifiSessionCurrent(
+                connectionGeneration,
+                sessionGeneration))
         {
             return;
         }
@@ -2570,7 +2850,10 @@ public partial class MainWindow : Window
         {
             alive = false;
         }
-        if (!_wifiCamera.IsConnected || _wifiManualDisconnect)
+        if (!_wifiCamera.IsConnected ||
+            !IsPublishedWifiSessionCurrent(
+                connectionGeneration,
+                sessionGeneration))
         {
             return;
         }
@@ -2584,26 +2867,66 @@ public partial class MainWindow : Window
             if (_wifiMissedHeartbeats >= 3)
             {
                 _wifiMissedHeartbeats = 0;
-                EnterWifiReconnecting();
+                await EnterWifiReconnectingAsync(
+                    connectionGeneration,
+                    sessionGeneration);
             }
         }
     }
 
-    private void EnterWifiReconnecting()
+    private async Task EnterWifiReconnectingAsync(
+        long? expectedConnectionGeneration = null,
+        long? expectedSessionGeneration = null)
     {
-        if (!_wifiCamera.IsConnected || _wifiReconnecting ||
-            _wifiManualDisconnect)
+        var connectionGeneration = expectedConnectionGeneration ??
+            Volatile.Read(ref _wifiConnectionGeneration);
+        var ownedSessionGeneration = expectedSessionGeneration ??
+            Volatile.Read(ref _wifiOwnedSessionGeneration);
+        if (ownedSessionGeneration <= 0 || !_wifiCamera.IsConnected ||
+            !IsPublishedWifiSessionCurrent(
+                connectionGeneration,
+                ownedSessionGeneration))
         {
             return;
         }
+        var transitionGeneration = BeginWifiConnectionAttempt();
         _wifiReconnecting = true;
         _wifiReconnectAttempt = 0;
         _wifiHeartbeatTimer.Stop();
+        StopWifiPreviewLoop();
+        await WaitForWifiPreviewLoopAsync();
+        if (!IsWifiConnectionAttemptCurrent(
+                transitionGeneration,
+                reconnecting: true))
+        {
+            return;
+        }
         _diagnostics.Info(
             "wifi-camera",
             "Wi‑Fi 链路已断开，进入自动重连");
         UpdateConnectionSummary();
         UpdateControlStatusRow();
+        try
+        {
+            await _wifiCamera.DisconnectIfOwnedAsync(
+                ownedSessionGeneration);
+        }
+        catch (Exception error)
+        {
+            _diagnostics.Warning(
+                "wifi-camera",
+                $"清理失效 PTP/IP 会话时出错：{error.Message}");
+        }
+        finally
+        {
+            ClearWifiSessionOwnership(ownedSessionGeneration);
+        }
+        if (!IsWifiConnectionAttemptCurrent(
+                transitionGeneration,
+                reconnecting: true))
+        {
+            return;
+        }
         ScheduleWifiReconnect();
     }
 
@@ -2618,15 +2941,20 @@ public partial class MainWindow : Window
         _wifiReconnectCts?.Cancel();
         var cts = new CancellationTokenSource();
         _wifiReconnectCts = cts;
+        var connectionGeneration = BeginWifiConnectionAttempt();
         _diagnostics.Info(
             "wifi-camera",
             $"调度自动重连（第 {_wifiReconnectAttempt} 次，退避 {delay}ms）");
-        _ = ReconnectAfterDelayAsync(delay, cts.Token);
+        _ = ReconnectAfterDelayAsync(
+            delay,
+            cts.Token,
+            connectionGeneration);
     }
 
     private async Task ReconnectAfterDelayAsync(
         int delayMs,
-        CancellationToken token)
+        CancellationToken token,
+        long connectionGeneration)
     {
         try
         {
@@ -2636,43 +2964,104 @@ public partial class MainWindow : Window
         {
             return;
         }
-        await AttemptWifiReconnectAsync(token);
+        if (!IsWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true) ||
+            token.IsCancellationRequested)
+        {
+            return;
+        }
+        await AttemptWifiReconnectAsync(token, connectionGeneration);
     }
 
-    private async Task AttemptWifiReconnectAsync(CancellationToken token)
+    private async Task AttemptWifiReconnectAsync(
+        CancellationToken token,
+        long connectionGeneration)
     {
-        if (!_wifiReconnecting || _wifiManualDisconnect)
+        if (!IsWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true) ||
+            token.IsCancellationRequested)
         {
             return;
         }
         UpdateControlStatusRow();
+        long? ownedSessionGeneration = null;
         try
         {
-            await _wifiCamera.ConnectAsync(_wifiHost, _wifiPort, token);
+            using var attemptTimeout =
+                CancellationTokenSource.CreateLinkedTokenSource(token);
+            attemptTimeout.CancelAfter(TimeSpan.FromSeconds(12));
+            var attemptToken = attemptTimeout.Token;
+            var connection = await _wifiCamera.ConnectWithOwnershipAsync(
+                _wifiHost,
+                _wifiPort,
+                attemptToken);
+            ownedSessionGeneration = connection.SessionGeneration;
+            EnsureWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true,
+                attemptToken);
+            // E3 1.5.9：重连成功后恢复厂商识别、取景与参数（对齐 iOS 重连路径）。
+            await _wifiCamera.DetectVendorAsync(attemptToken);
+            EnsureWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true,
+                attemptToken);
+            if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Unknown)
+            {
+                await _wifiCamera.StartLiveViewAsync(attemptToken);
+                await RefreshWifiParametersAsync(attemptToken);
+            }
+            EnsureWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true,
+                attemptToken);
+            await _wifiCamera.ProbeAsync(attemptToken);
+            EnsureWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true,
+                attemptToken);
+            if (_wifiCamera.IsLiveView)
+            {
+                await StartWifiPreviewLoopAsync(
+                    connectionGeneration,
+                    reconnecting: true);
+            }
+            EnsureWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true,
+                attemptToken);
+            PublishWifiSessionOwnership(
+                ownedSessionGeneration.Value);
             _wifiReconnecting = false;
             _wifiReconnectAttempt = 0;
             _lastConnectionError = null;
             _diagnostics.Info(
                 "wifi-camera",
                 $"PTP/IP 自动重连成功；相机={_wifiCamera.CameraName}");
-            // E3 1.5.9：重连成功后恢复厂商识别、取景与参数（对齐 iOS 重连路径）。
-            await _wifiCamera.DetectVendorAsync(token);
-            if (_wifiCamera.Vendor != PtpIpCamera.CameraVendor.Unknown)
-            {
-                await _wifiCamera.StartLiveViewAsync(token);
-                StartWifiPreviewLoop();
-                await RefreshWifiParametersAsync();
-            }
             StartWifiMonitoring();
             UpdateConnectionSummary();
             UpdateControlStatusRow();
         }
-        catch
+        catch (Exception error)
         {
-            if (!_wifiReconnecting || _wifiManualDisconnect)
+            var ownsUiAttempt = IsWifiConnectionAttemptCurrent(
+                connectionGeneration,
+                reconnecting: true) &&
+                !token.IsCancellationRequested;
+            await CleanupFailedWifiConnectionAsync(
+                connectionGeneration,
+                ownedSessionGeneration,
+                reconnecting: true);
+            if (!ownsUiAttempt ||
+                token.IsCancellationRequested)
             {
                 return;
             }
+            _diagnostics.Warning(
+                "wifi-camera",
+                $"PTP/IP 自动重连失败：{error.Message}");
             ScheduleWifiReconnect();
         }
     }
@@ -2690,7 +3079,7 @@ public partial class MainWindow : Window
         {
             if (_wifiCamera.IsConnected && !_wifiManualDisconnect)
             {
-                EnterWifiReconnecting();
+                _ = EnterWifiReconnectingAsync();
             }
         });
     }
@@ -2979,10 +3368,14 @@ public partial class MainWindow : Window
                     await _camera.DisconnectAsync(token);
                     SetConnectionState(null);
                 }
-                if (_wifiCamera.IsConnected)
-                {
-                    await _wifiCamera.DisconnectAsync();
-                }
+                InvalidateWifiConnectionAttempts();
+                ClearWifiSessionOwnership();
+                _wifiManualDisconnect = true;
+                _wifiReconnecting = false;
+                StopWifiMonitoring();
+                StopWifiPreviewLoop();
+                await _wifiCamera.DisconnectAsync();
+                await WaitForWifiPreviewLoopAsync();
                 await _localCamera.ConnectAsync(token);
                 RememberLocalCamera(_localCamera.DeviceName);
                 OperationStatusText.Text = AppLocalization.T(
@@ -3332,8 +3725,7 @@ public partial class MainWindow : Window
             {
                 await RunOperationAsync("正在停止 Wi‑Fi 实时取景…", async token =>
                 {
-                    await _wifiCamera.StopLiveViewAsync(token);
-                    StopWifiPreviewLoop();
+                    await StopWifiLiveViewAsync(token);
                     UpdateLiveViewState();
                 });
             }
@@ -3342,7 +3734,7 @@ public partial class MainWindow : Window
                 await RunOperationAsync("正在开启 Wi‑Fi 实时取景…", async token =>
                 {
                     await _wifiCamera.StartLiveViewAsync(token);
-                    StartWifiPreviewLoop();
+                    await StartWifiPreviewLoopAsync();
                     UpdateLiveViewState();
                 });
             }
@@ -12731,11 +13123,16 @@ public partial class MainWindow : Window
         _monitorTimecodeTimer.Stop();
         _editorPreviewTimer.Stop();
         _editorPreviewPending = false;
+        InvalidateWifiConnectionAttempts();
+        ClearWifiSessionOwnership();
+        _wifiManualDisconnect = true;
+        _wifiReconnecting = false;
         EditorPreviewImage.Source = null;
         AiPreviewImage.Source = null;
         ClearAiResultFile();
         StopWifiMonitoring();
         StopWifiPreviewLoop();
+        await WaitForWifiPreviewLoopAsync();
         if (_immersivePreviewWindow is { } immersive)
         {
             CloseImmersivePreview(immersive);

@@ -1,5 +1,5 @@
 import { socket } from '@kit.NetworkKit';
-import { util } from '@kit.ArkTS';
+import { BusinessError } from '@kit.BasicServicesKit';
 import {
   CameraStorageItem,
   CameraStorageSnapshot,
@@ -20,18 +20,42 @@ class PtpIpPacket {
   }
 }
 
+class PtpIpResponseError extends Error {
+  readonly response: number;
+
+  constructor(response: number) {
+    super(
+      `相机拒绝了 PTP/IP 操作（0x${response.toString(16).padStart(4, '0')}）`
+    );
+    this.response = response;
+  }
+}
+
 class PtpIpChannel {
   readonly tcp: socket.TCPSocket = socket.constructTCPSocketInstance();
   private buffer: Uint8Array = new Uint8Array(0);
   private packets: Array<PtpIpPacket> = [];
+  private closed: boolean = false;
+  private failureHandler?: (error: Error) => void;
 
   constructor() {
     this.tcp.on('message', (message: socket.SocketMessageInfo): void => {
       this.append(new Uint8Array(message.message));
     });
+    this.tcp.on('close', (): void => {
+      this.fail(new Error('PTP/IP TCP 通道已被远端关闭'));
+    });
+    this.tcp.on('error', (error: BusinessError): void => {
+      this.fail(new Error(`PTP/IP TCP 通道错误：${error.message}`));
+    });
+  }
+
+  setFailureHandler(handler: (error: Error) => void): void {
+    this.failureHandler = handler;
   }
 
   async connect(host: string, port: number): Promise<void> {
+    this.closed = false;
     await this.tcp.connect({
       address: {
         address: host,
@@ -47,6 +71,9 @@ class PtpIpChannel {
   }
 
   async send(type: number, payload: Uint8Array): Promise<void> {
+    if (this.closed) {
+      throw new Error('PTP/IP 通道已关闭');
+    }
     const packet: Uint8Array = new Uint8Array(payload.length + 8);
     writeU32(packet, 0, packet.length);
     writeU32(packet, 4, type);
@@ -60,19 +87,37 @@ class PtpIpChannel {
       if (this.packets.length > 0) {
         return this.packets.shift() as PtpIpPacket;
       }
+      if (this.closed) {
+        throw new Error('PTP/IP 通道已关闭');
+      }
       await delay(10);
     }
     throw new Error('相机未在限定时间内返回 PTP/IP 响应');
   }
 
   async close(): Promise<void> {
+    this.closed = true;
+    this.failureHandler = undefined;
     this.tcp.off('message');
+    this.tcp.off('close');
+    this.tcp.off('error');
     try {
       await this.tcp.close();
     } catch (error) {
     }
     this.buffer = new Uint8Array(0);
     this.packets = [];
+  }
+
+  private fail(error: Error): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    const handler: ((error: Error) => void) | undefined = this.failureHandler;
+    if (handler !== undefined) {
+      handler(error);
+    }
   }
 
   private append(bytes: Uint8Array): void {
@@ -95,6 +140,31 @@ class PtpIpChannel {
       this.packets.push(new PtpIpPacket(readU32(data, 4), data));
       this.buffer = this.buffer.slice(length);
     }
+  }
+}
+
+/**
+ * ArkTS 的 async 函数会在 await 处让出执行权；共享 command TCP 因此需要显式
+ * 串行 gate，且锁必须覆盖请求、完整数据相位与最终响应。
+ */
+class PtpIpCommandGate {
+  private tail: Promise<void> = Promise.resolve();
+  private releaseCurrent: () => void = (): void => {};
+
+  async acquire(): Promise<void> {
+    let release: () => void = (): void => {};
+    const previous: Promise<void> = this.tail;
+    this.tail = new Promise<void>((resolve: () => void): void => {
+      release = resolve;
+    });
+    await previous;
+    this.releaseCurrent = release;
+  }
+
+  release(): void {
+    const release: () => void = this.releaseCurrent;
+    this.releaseCurrent = (): void => {};
+    release();
   }
 }
 
@@ -125,9 +195,24 @@ export class PtpIpCamera {
   private static readonly PROP_F_NUMBER: number = 0x5007;
   private static readonly PROP_EXPOSURE_TIME: number = 0x500d;
   private static readonly RESPONSE_OK: number = 0x2001;
+  private static readonly RESPONSE_SESSION_NOT_OPEN: number = 0x2003;
+  private static readonly RESPONSE_INVALID_TRANSACTION_ID: number = 0x2004;
+  private static readonly RESPONSE_SESSION_ALREADY_OPEN: number = 0x201e;
+  private static readonly RESPONSE_OPERATION_NOT_SUPPORTED: number = 0x2005;
+  private static readonly RESPONSE_DEVICE_PROP_NOT_SUPPORTED: number = 0x200a;
+  private static readonly RESPONSE_DEVICE_BUSY: number = 0x2019;
 
   private command?: PtpIpChannel;
   private event?: PtpIpChannel;
+  private pendingCommand?: PtpIpChannel;
+  private pendingEvent?: PtpIpChannel;
+  private readonly commandGate: PtpIpCommandGate = new PtpIpCommandGate();
+  private readonly eventWriterGate: PtpIpCommandGate = new PtpIpCommandGate();
+  private connectionGeneration: number = 0;
+  private eventGeneration: number = 0;
+  private probeResponseSequence: number = 0;
+  private probeInProgress: boolean = false;
+  private commandChannelFailure?: Error;
   private transaction: number = 1;
   private nameValue: string = 'PTP/IP Camera';
   private vendorValue: CameraVendor = CameraVendor.UNKNOWN;
@@ -135,7 +220,32 @@ export class PtpIpCamera {
   private movieRecordingValue: boolean = false;
 
   get isConnected(): boolean {
-    return this.command !== undefined;
+    return this.command !== undefined && this.commandChannelFailure === undefined;
+  }
+
+  /** 在 UI 发布“已连接”前确认命令通道未被初始化事务毒化。 */
+  assertHealthy(): void {
+    if (this.command === undefined) {
+      throw new Error('请先连接 Wi‑Fi 相机');
+    }
+    if (this.commandChannelFailure !== undefined) {
+      throw this.commandChannelFailure;
+    }
+  }
+
+  /** 只有明确不影响会话健康的能力拒绝才允许 UI 降级继续。 */
+  static isCapabilityFallbackError(error: Error): boolean {
+    if (!(error instanceof PtpIpResponseError)) {
+      return false;
+    }
+    return error.response === PtpIpCamera.RESPONSE_OPERATION_NOT_SUPPORTED ||
+      error.response === PtpIpCamera.RESPONSE_DEVICE_PROP_NOT_SUPPORTED ||
+      error.response === PtpIpCamera.RESPONSE_DEVICE_BUSY;
+  }
+
+  private static isDeviceBusyError(error: Error): boolean {
+    return error instanceof PtpIpResponseError &&
+      error.response === PtpIpCamera.RESPONSE_DEVICE_BUSY;
   }
 
   get name(): string {
@@ -155,13 +265,21 @@ export class PtpIpCamera {
   }
 
   async connect(host: string, port: number): Promise<string> {
-    await this.disconnect();
+    const generation: number = ++this.connectionGeneration;
+    await this.closePublishedConnection();
+    this.ensureConnectionGeneration(generation);
     if (host.trim().length === 0 || port < 1 || port > 65535) {
       throw new Error('Wi‑Fi 相机地址或端口无效');
     }
     const command: PtpIpChannel = new PtpIpChannel();
+    command.setFailureHandler((error: Error): void => {
+      this.markCommandChannelFailed(command, generation, error);
+    });
+    this.pendingCommand = command;
+    let event: PtpIpChannel | undefined;
     try {
       await command.connect(host.trim(), port);
+      this.ensureConnectionGeneration(generation);
       const initialization: Array<number> = [];
       for (let index: number = 0; index < 16; index++) {
         initialization.push(Math.floor(Math.random() * 256));
@@ -169,7 +287,9 @@ export class PtpIpCamera {
       appendUtf16(initialization, 'ZENCHE HarmonyOS');
       appendU32(initialization, 0x00010000);
       await command.send(1, new Uint8Array(initialization));
+      this.ensureConnectionGeneration(generation);
       const acknowledgment: PtpIpPacket = await command.receive();
+      this.ensureConnectionGeneration(generation);
       if (acknowledgment.type !== 2 || acknowledgment.data.length < 28) {
         throw new Error('相机返回了无效的 PTP/IP 握手数据');
       }
@@ -179,26 +299,36 @@ export class PtpIpCamera {
         ? announcedName
         : 'PTP/IP Camera';
 
-      const event: PtpIpChannel = new PtpIpChannel();
+      event = new PtpIpChannel();
+      this.pendingEvent = event;
       await event.connect(host.trim(), port);
+      this.ensureConnectionGeneration(generation);
       const eventInitialization: Uint8Array = new Uint8Array(4);
       writeU32(eventInitialization, 0, connectionNumber);
       await event.send(3, eventInitialization);
+      this.ensureConnectionGeneration(generation);
       const eventAcknowledgment: PtpIpPacket = await event.receive();
+      this.ensureConnectionGeneration(generation);
       if (eventAcknowledgment.type !== 4) {
         throw new Error('相机未确认 PTP/IP 事件通道');
       }
+      if (this.pendingCommand !== command || this.pendingEvent !== event) {
+        throw new Error('PTP/IP 连接已取消或被新会话取代');
+      }
+      this.pendingCommand = undefined;
+      this.pendingEvent = undefined;
       this.command = command;
       this.event = event;
+      this.startEventReader(event);
       const response: number = await this.sendCommand(0x1002, 0, [1]);
       if (response !== 0x2001) {
         throw rejected(response);
       }
+      this.ensureCommandSession(command, generation);
       this.transaction = 1;
       return this.nameValue;
     } catch (error) {
-      await command.close();
-      await this.disconnect();
+      await this.cleanupConnectAttempt(generation, command, event);
       throw new Error(
         error instanceof Error ? error.message : 'PTP/IP 连接失败'
       );
@@ -301,39 +431,146 @@ export class PtpIpCamera {
   }
 
   async disconnect(): Promise<void> {
+    this.connectionGeneration++;
+    await this.closePublishedConnection();
+  }
+
+  private async closePublishedConnection(): Promise<void> {
+    this.eventGeneration++;
     const command: PtpIpChannel | undefined = this.command;
     const event: PtpIpChannel | undefined = this.event;
+    const pendingCommand: PtpIpChannel | undefined = this.pendingCommand;
+    const pendingEvent: PtpIpChannel | undefined = this.pendingEvent;
     this.command = undefined;
     this.event = undefined;
+    this.pendingCommand = undefined;
+    this.pendingEvent = undefined;
     this.transaction = 1;
     this.nameValue = 'PTP/IP Camera';
     this.vendorValue = CameraVendor.UNKNOWN;
     this.liveViewValue = false;
     this.movieRecordingValue = false;
-    if (command !== undefined) {
-      await command.close();
+    this.commandChannelFailure = undefined;
+    const closes: Array<Promise<void>> = [];
+    if (pendingCommand !== undefined) {
+      closes.push(pendingCommand.close());
     }
-    if (event !== undefined) {
-      await event.close();
+    if (pendingEvent !== undefined && pendingEvent !== pendingCommand) {
+      closes.push(pendingEvent.close());
+    }
+    if (command !== undefined && command !== pendingCommand &&
+      command !== pendingEvent) {
+      closes.push(command.close());
+    }
+    if (event !== undefined && event !== pendingCommand &&
+      event !== pendingEvent && event !== command) {
+      closes.push(event.close());
+    }
+    await Promise.all(closes);
+  }
+
+  private async cleanupConnectAttempt(
+    generation: number,
+    command: PtpIpChannel,
+    event: PtpIpChannel | undefined
+  ): Promise<void> {
+    if (this.connectionGeneration === generation) {
+      this.connectionGeneration++;
+      this.eventGeneration++;
+      if (this.command === command) {
+        this.command = undefined;
+      }
+      if (this.event === event) {
+        this.event = undefined;
+      }
+      if (this.pendingCommand === command) {
+        this.pendingCommand = undefined;
+      }
+      if (this.pendingEvent === event) {
+        this.pendingEvent = undefined;
+      }
+      this.transaction = 1;
+      this.nameValue = 'PTP/IP Camera';
+      this.vendorValue = CameraVendor.UNKNOWN;
+      this.liveViewValue = false;
+      this.movieRecordingValue = false;
+      this.commandChannelFailure = undefined;
+    }
+    try {
+      await command.close();
+    } finally {
+      if (event !== undefined) {
+        await event.close();
+      }
+    }
+  }
+
+  private ensureConnectionGeneration(expectedGeneration: number): void {
+    if (this.connectionGeneration !== expectedGeneration) {
+      throw new Error('PTP/IP 连接已取消或被新会话取代');
+    }
+  }
+
+  private ensureCommandSession(
+    expectedCommand: PtpIpChannel,
+    expectedGeneration: number
+  ): void {
+    if (this.command !== expectedCommand ||
+      this.connectionGeneration !== expectedGeneration) {
+      throw new Error('PTP/IP 会话已断开或被新会话取代');
+    }
+    if (this.commandChannelFailure !== undefined) {
+      throw new Error(
+        `PTP/IP 命令通道不可用：${this.commandChannelFailure.message}`
+      );
     }
   }
 
   /**
-   * 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
-   * 与在途命令同走 sendCommand（顺序 await，天然串行）；单次超时 3s。
+   * PTP/IP event 通道保活：发送 ProbeRequest(type 13)，等待常驻 reader
+   * 收到 ProbeResponse(type 14)。命令通道保持空闲，不与在途事务争抢响应。
    */
   async probe(timeoutMilliseconds: number = 3000): Promise<void> {
-    if (this.command === undefined) {
+    const event: PtpIpChannel | undefined = this.event;
+    if (this.command === undefined || event === undefined) {
       throw new Error('请先连接 Wi‑Fi 相机');
     }
-    const response: number = await this.sendCommandWithTimeout(
-      0x1002,
-      0,
-      [1],
-      timeoutMilliseconds
-    );
-    if (response !== 0x2001) {
-      throw rejected(response);
+    if (this.commandChannelFailure !== undefined) {
+      throw new Error(
+        `PTP/IP 命令通道不可用：${this.commandChannelFailure.message}`
+      );
+    }
+    if (this.probeInProgress) {
+      throw new Error('已有 PTP/IP 心跳探测正在进行');
+    }
+    this.probeInProgress = true;
+    const generation: number = this.eventGeneration;
+    const baseline: number = this.probeResponseSequence;
+    const deadline: number = Date.now() + timeoutMilliseconds;
+    try {
+      await this.sendEventPacket(
+        event,
+        generation,
+        13,
+        new Uint8Array(0)
+      );
+      while (this.probeResponseSequence === baseline) {
+        if (generation !== this.eventGeneration || this.event !== event ||
+          this.command === undefined) {
+          throw new Error('PTP/IP 事件通道已断开');
+        }
+        const remaining: number = deadline - Date.now();
+        if (remaining <= 0) {
+          throw new Error('PTP/IP 心跳探测超时');
+        }
+        await delay(Math.min(25, remaining));
+      }
+      if (generation !== this.eventGeneration || this.event !== event ||
+        this.command === undefined) {
+        throw new Error('PTP/IP 事件通道已断开');
+      }
+    } finally {
+      this.probeInProgress = false;
     }
   }
 
@@ -351,14 +588,18 @@ export class PtpIpCamera {
       const info: Uint8Array = await this.commandWithData(
         0x1001,
         this.transaction++,
-        [1]
+        []
       );
       const manufacturer: string | undefined = deviceInfoManufacturer(info);
       if (manufacturer !== undefined && manufacturer.trim().length > 0) {
         resolved = vendorForManufacturer(manufacturer, resolved);
       }
     } catch (error) {
-      // 部分机型对 0x1001 直接回响应（无数据段），退回名称启发式。
+      if (!PtpIpCamera.isCapabilityFallbackError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+      // 部分机型明确拒绝/不支持 0x1001 时可退回名称启发式；传输、超时、
+      // 帧、transaction 与会话失效错误必须阻止 UI 发布假连接。
     }
     this.vendorValue = resolved;
     return resolved;
@@ -518,7 +759,7 @@ export class PtpIpCamera {
     const response: number = await this.sendCommandWithDataOut(
       PtpIpCamera.SET_DEVICE_PROP_VALUE,
       this.transaction++,
-      [],
+      [property],
       value
     );
     if (response !== PtpIpCamera.RESPONSE_OK) {
@@ -558,12 +799,17 @@ export class PtpIpCamera {
         try {
           await this.canonWriteEosProp(PtpIpCamera.CANON_EVF_MODE, 1);
         } catch (busy) {
-          // Movie 模式 Busy 容忍。
+          if (!PtpIpCamera.isDeviceBusyError(busy as Error)) {
+            throw busy instanceof Error ? busy : new Error(String(busy));
+          }
+          // 仅明确的 DeviceBusy 可按 Movie 模式已占用 EVF 有限容忍。
         }
       }
       confirmed = true;
     } catch (error) {
-      // 读取失败容忍。
+      if (!PtpIpCamera.isDeviceBusyError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
     }
     try {
       let current: number;
@@ -572,17 +818,27 @@ export class PtpIpCamera {
           PtpIpCamera.CANON_EVF_OUTPUT_DEVICE
         );
       } catch (readError) {
-        current = -1; // 读失败回退无条件写
+        if (!PtpIpCamera.isDeviceBusyError(readError as Error)) {
+          throw readError instanceof Error
+            ? readError
+            : new Error(String(readError));
+        }
+        current = -1;
       }
       if (current < 0 || (current & ~1) === 0) {
         try {
           await this.canonWriteEosProp(PtpIpCamera.CANON_EVF_OUTPUT_DEVICE, 2);
         } catch (busy) {
-          // 容忍。
+          if (!PtpIpCamera.isDeviceBusyError(busy as Error)) {
+            throw busy instanceof Error ? busy : new Error(String(busy));
+          }
         }
       }
       confirmed = true;
     } catch (error) {
+      if (!PtpIpCamera.isDeviceBusyError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
     }
     this.liveViewValue = confirmed;
     return confirmed;
@@ -648,8 +904,8 @@ export class PtpIpCamera {
 
   /**
    * data-out 请求（DataPhaseInfo=2）：请求(type 6) → StartData(type 9,
-   * 载荷 [前导 0][TransactionID][TotalLength u64][数据]，对齐 iOS/Windows
-   * 事实标准，TBC-awaiting-hardware) → EndData(type 12) → 响应(type 7)。
+   * 载荷 [TransactionID][TotalLength u64]) → EndData(type 12,
+   * [TransactionID][数据]) → 响应(type 7)。
    * 用于 SetDevicePropValue(0x1016) 与 Canon EOS_SetDevicePropValueEx(0x9110)。
    */
   private async sendCommandWithDataOut(
@@ -658,36 +914,61 @@ export class PtpIpCamera {
     parameters: Array<number>,
     data: Uint8Array
   ): Promise<number> {
-    const command: PtpIpChannel | undefined = this.command;
-    if (command === undefined) {
+    const expectedCommand: PtpIpChannel | undefined = this.command;
+    if (expectedCommand === undefined) {
       throw new Error('请先连接 Wi‑Fi 相机');
     }
-    const request: Array<number> = [];
-    appendU32(request, 2); // DataPhaseInfo=2（数据出）
-    appendU16(request, operation);
-    appendU32(request, transaction);
-    parameters.forEach((value: number): void => appendU32(request, value));
-    await command.send(6, new Uint8Array(request));
+    const expectedGeneration: number = this.connectionGeneration;
+    await this.commandGate.acquire();
+    try {
+      this.ensureCommandSession(expectedCommand, expectedGeneration);
+      const request: Array<number> = [];
+      appendU32(request, 2); // DataPhaseInfo=2（数据出）
+      appendU16(request, operation);
+      appendU32(request, transaction);
+      parameters.forEach((value: number): void => appendU32(request, value));
+      await expectedCommand.send(6, new Uint8Array(request));
 
-    const startData: Array<number> = [];
-    appendU32(startData, 0);
-    appendU32(startData, transaction);
-    appendU64(startData, data.length);
-    for (let index: number = 0; index < data.length; index++) {
-      startData.push(data[index]);
+      const startData: Array<number> = [];
+      appendU32(startData, transaction);
+      appendU64(startData, data.length);
+      await expectedCommand.send(9, new Uint8Array(startData));
+
+      const endData: Array<number> = [];
+      appendU32(endData, transaction);
+      for (let index: number = 0; index < data.length; index++) {
+        endData.push(data[index]);
+      }
+      await expectedCommand.send(12, new Uint8Array(endData));
+
+      const response: PtpIpPacket = await expectedCommand.receive();
+      if (response.type !== 7 || response.data.length < 14 ||
+        readU32(response.data, 10) !== (transaction >>> 0)) {
+        throw new Error('相机返回了无效的 PTP/IP 响应');
+      }
+      const responseCode: number = readU16(response.data, 8);
+      this.markSessionFatalResponse(
+        expectedCommand,
+        expectedGeneration,
+        responseCode
+      );
+      return responseCode;
+    } catch (error) {
+      if (error instanceof PtpIpResponseError) {
+        throw error;
+      }
+      const failure: Error = error instanceof Error
+        ? error
+        : new Error(String(error));
+      this.markCommandChannelFailed(
+        expectedCommand,
+        expectedGeneration,
+        failure
+      );
+      throw failure;
+    } finally {
+      this.commandGate.release();
     }
-    await command.send(9, new Uint8Array(startData));
-
-    const endData: Array<number> = [];
-    appendU32(endData, 0);
-    appendU32(endData, transaction);
-    await command.send(12, new Uint8Array(endData));
-
-    const response: PtpIpPacket = await command.receive();
-    if (response.type !== 7 || response.data.length < 14) {
-      throw new Error('相机返回了无效的 PTP/IP 响应');
-    }
-    return readU16(response.data, 8);
   }
 
   private async sendCommand(
@@ -709,21 +990,50 @@ export class PtpIpCamera {
     parameters: Array<number>,
     timeoutMilliseconds: number | undefined
   ): Promise<number> {
-    const command: PtpIpChannel | undefined = this.command;
-    if (command === undefined) {
+    const expectedCommand: PtpIpChannel | undefined = this.command;
+    if (expectedCommand === undefined) {
       throw new Error('请先连接 Wi‑Fi 相机');
     }
-    const payload: Array<number> = [];
-    appendU32(payload, 1);
-    appendU16(payload, operation);
-    appendU32(payload, transaction);
-    parameters.forEach((value: number): void => appendU32(payload, value));
-    await command.send(6, new Uint8Array(payload));
-    const response: PtpIpPacket = await command.receive(timeoutMilliseconds);
-    if (response.type !== 7 || response.data.length < 14) {
-      throw new Error('相机返回了无效的 PTP/IP 响应');
+    const expectedGeneration: number = this.connectionGeneration;
+    await this.commandGate.acquire();
+    try {
+      this.ensureCommandSession(expectedCommand, expectedGeneration);
+      const payload: Array<number> = [];
+      appendU32(payload, 1);
+      appendU16(payload, operation);
+      appendU32(payload, transaction);
+      parameters.forEach((value: number): void => appendU32(payload, value));
+      await expectedCommand.send(6, new Uint8Array(payload));
+      const response: PtpIpPacket = await expectedCommand.receive(
+        timeoutMilliseconds
+      );
+      if (response.type !== 7 || response.data.length < 14 ||
+        readU32(response.data, 10) !== (transaction >>> 0)) {
+        throw new Error('相机返回了无效的 PTP/IP 响应');
+      }
+      const responseCode: number = readU16(response.data, 8);
+      this.markSessionFatalResponse(
+        expectedCommand,
+        expectedGeneration,
+        responseCode
+      );
+      return responseCode;
+    } catch (error) {
+      if (error instanceof PtpIpResponseError) {
+        throw error;
+      }
+      const failure: Error = error instanceof Error
+        ? error
+        : new Error(String(error));
+      this.markCommandChannelFailed(
+        expectedCommand,
+        expectedGeneration,
+        failure
+      );
+      throw failure;
+    } finally {
+      this.commandGate.release();
     }
-    return readU16(response.data, 8);
   }
 
   private async commandWithData(
@@ -732,62 +1042,202 @@ export class PtpIpCamera {
     parameters: Array<number>,
     timeoutMilliseconds: number = 30000
   ): Promise<Uint8Array> {
-    const command: PtpIpChannel | undefined = this.command;
-    if (command === undefined) {
+    const expectedCommand: PtpIpChannel | undefined = this.command;
+    if (expectedCommand === undefined) {
       throw new Error('请先连接 Wi‑Fi 相机');
     }
-    const payload: Array<number> = [];
-    appendU32(payload, 1);
-    appendU16(payload, operation);
-    appendU32(payload, transaction);
-    parameters.forEach((value: number): void => appendU32(payload, value));
-    await command.send(6, new Uint8Array(payload));
-    const first: PtpIpPacket = await command.receive(timeoutMilliseconds);
-    if (first.type === 7) {
-      throw rejected(first.data.length >= 10 ? readU16(first.data, 8) : 0x2002);
-    }
-    if (first.type !== 9 || first.data.length < 20 ||
-      readU32(first.data, 8) !== (transaction >>> 0)) {
-      throw new Error('相机返回了无效的 PTP/IP 数据阶段');
-    }
-    const totalLength: number = readU64(first.data, 12);
-    if (totalLength > 512 * 1024 * 1024) {
-      throw new Error('机内文件超过当前 512 MB 单文件传输上限');
-    }
-    const chunks: Array<Uint8Array> = [];
-    let received: number = 0;
-    while (true) {
-      const packet: PtpIpPacket = await command.receive(timeoutMilliseconds);
-      if ((packet.type !== 10 && packet.type !== 12) ||
-        packet.data.length < 12 ||
-        readU32(packet.data, 8) !== (transaction >>> 0)) {
-        throw new Error('相机返回了无效的 PTP/IP 文件数据包');
+    const expectedGeneration: number = this.connectionGeneration;
+    await this.commandGate.acquire();
+    try {
+      this.ensureCommandSession(expectedCommand, expectedGeneration);
+      const payload: Array<number> = [];
+      appendU32(payload, 1);
+      appendU16(payload, operation);
+      appendU32(payload, transaction);
+      parameters.forEach((value: number): void => appendU32(payload, value));
+      await expectedCommand.send(6, new Uint8Array(payload));
+      const first: PtpIpPacket = await expectedCommand.receive(
+        timeoutMilliseconds
+      );
+      if (first.type === 7) {
+        if (first.data.length < 14 ||
+          readU32(first.data, 10) !== (transaction >>> 0)) {
+          throw new Error('相机返回了无效的 PTP/IP 响应');
+        }
+        const responseCode: number = readU16(first.data, 8);
+        this.markSessionFatalResponse(
+          expectedCommand,
+          expectedGeneration,
+          responseCode
+        );
+        throw rejected(responseCode);
       }
-      const chunk: Uint8Array = packet.data.slice(12);
-      received += chunk.length;
-      if (received > 512 * 1024 * 1024) {
+      if (first.type !== 9 || first.data.length < 20 ||
+        readU32(first.data, 8) !== (transaction >>> 0)) {
+        throw new Error('相机返回了无效的 PTP/IP 数据阶段');
+      }
+      const totalLengthLow: number = readU32(first.data, 12);
+      const totalLengthHigh: number = readU32(first.data, 16);
+      const unknownLength: boolean = totalLengthLow === 0xffffffff &&
+        totalLengthHigh === 0xffffffff;
+      const totalLength: number = unknownLength
+        ? 0
+        : readU64(first.data, 12);
+      if (!unknownLength && totalLength > 512 * 1024 * 1024) {
         throw new Error('机内文件超过当前 512 MB 单文件传输上限');
       }
-      chunks.push(chunk);
-      if (packet.type === 12) {
-        break;
+      const chunks: Array<Uint8Array> = [];
+      let received: number = 0;
+      while (true) {
+        const packet: PtpIpPacket = await expectedCommand.receive(
+          timeoutMilliseconds
+        );
+        if ((packet.type !== 10 && packet.type !== 12) ||
+          packet.data.length < 12 ||
+          readU32(packet.data, 8) !== (transaction >>> 0)) {
+          throw new Error('相机返回了无效的 PTP/IP 文件数据包');
+        }
+        const chunk: Uint8Array = packet.data.slice(12);
+        received += chunk.length;
+        if (received > 512 * 1024 * 1024) {
+          throw new Error('机内文件超过当前 512 MB 单文件传输上限');
+        }
+        if (!unknownLength && received > totalLength) {
+          throw new Error('PTP/IP 数据超过 StartData 声明长度');
+        }
+        chunks.push(chunk);
+        if (packet.type === 12) {
+          break;
+        }
+      }
+      if (!unknownLength && received !== totalLength) {
+        throw new Error('PTP/IP EndData 长度与 StartData 声明不一致');
+      }
+      const response: PtpIpPacket = await expectedCommand.receive(
+        timeoutMilliseconds
+      );
+      if (response.type !== 7 || response.data.length < 14 ||
+        readU32(response.data, 10) !== (transaction >>> 0)) {
+        throw new Error('相机没有完成 PTP/IP 文件事务');
+      }
+      const code: number = readU16(response.data, 8);
+      this.markSessionFatalResponse(
+        expectedCommand,
+        expectedGeneration,
+        code
+      );
+      if (code !== 0x2001) {
+        throw rejected(code);
+      }
+      const result: Uint8Array = new Uint8Array(received);
+      let offset: number = 0;
+      chunks.forEach((chunk: Uint8Array): void => {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      });
+      return result;
+    } catch (error) {
+      if (error instanceof PtpIpResponseError) {
+        throw error;
+      }
+      const failure: Error = error instanceof Error
+        ? error
+        : new Error(String(error));
+      this.markCommandChannelFailed(
+        expectedCommand,
+        expectedGeneration,
+        failure
+      );
+      throw failure;
+    } finally {
+      this.commandGate.release();
+    }
+  }
+
+  private markCommandChannelFailed(
+    expectedCommand: PtpIpChannel,
+    expectedGeneration: number,
+    error: Error
+  ): void {
+    if (this.command === expectedCommand &&
+      this.connectionGeneration === expectedGeneration) {
+      this.commandChannelFailure = error;
+    }
+  }
+
+  private markSessionFatalResponse(
+    expectedCommand: PtpIpChannel,
+    expectedGeneration: number,
+    response: number
+  ): void {
+    if (response !== PtpIpCamera.RESPONSE_SESSION_NOT_OPEN &&
+      response !== PtpIpCamera.RESPONSE_INVALID_TRANSACTION_ID &&
+      response !== PtpIpCamera.RESPONSE_SESSION_ALREADY_OPEN) {
+      return;
+    }
+    this.markCommandChannelFailed(
+      expectedCommand,
+      expectedGeneration,
+      new Error(
+        `PTP/IP 会话失效（响应 0x${response.toString(16).padStart(4, '0')}）`
+      )
+    );
+  }
+
+  private startEventReader(event: PtpIpChannel): void {
+    const generation: number = ++this.eventGeneration;
+    this.runEventReader(event, generation);
+  }
+
+  private async runEventReader(
+    event: PtpIpChannel,
+    generation: number
+  ): Promise<void> {
+    while (generation === this.eventGeneration && this.event === event) {
+      try {
+        const packet: PtpIpPacket = await event.receive(60000);
+        if (generation !== this.eventGeneration || this.event !== event) {
+          return;
+        }
+        if (packet.type === 13) {
+          await this.sendEventPacket(
+            event,
+            generation,
+            14,
+            new Uint8Array(0)
+          );
+        } else if (packet.type === 14) {
+          this.probeResponseSequence++;
+        } else if (packet.type === 8) {
+          // 事件包已完整排空；业务事件接入时在此分发。
+        }
+      } catch (error) {
+        if (generation !== this.eventGeneration || this.event !== event) {
+          return;
+        }
+        await this.disconnect();
+        return;
       }
     }
-    const response: PtpIpPacket = await command.receive(timeoutMilliseconds);
-    if (response.type !== 7 || response.data.length < 14) {
-      throw new Error('相机没有完成 PTP/IP 文件事务');
+  }
+
+  private async sendEventPacket(
+    event: PtpIpChannel,
+    generation: number,
+    type: number,
+    payload: Uint8Array
+  ): Promise<void> {
+    const expectedConnectionGeneration: number = this.connectionGeneration;
+    await this.eventWriterGate.acquire();
+    try {
+      if (this.event !== event || this.eventGeneration !== generation ||
+        this.connectionGeneration !== expectedConnectionGeneration) {
+        throw new Error('PTP/IP 事件通道已断开或被新会话取代');
+      }
+      await event.send(type, payload);
+    } finally {
+      this.eventWriterGate.release();
     }
-    const code: number = readU16(response.data, 8);
-    if (code !== 0x2001) {
-      throw rejected(code);
-    }
-    const result: Uint8Array = new Uint8Array(received);
-    let offset: number = 0;
-    chunks.forEach((chunk: Uint8Array): void => {
-      result.set(chunk, offset);
-      offset += chunk.length;
-    });
-    return result;
   }
 }
 
@@ -856,63 +1306,69 @@ function appendU64(values: Array<number>, value: number): void {
   appendU32(values, Math.floor(value / 4294967296) & 0xffffffff);
 }
 
-/** 从 offsetRef[0] 起读一个 NUL 结尾 UTF-8 字符串（Android readUtf8 同构）。 */
-function readUtf8(bytes: Uint8Array, offsetRef: Array<number>): string | undefined {
-  const offset: number = offsetRef[0];
+/**
+ * 从 offsetRef[0] 读取 PIMA 15740 PTP STR：u8 字符数（含 UTF-16 NUL）+
+ * UTF-16LE code units。字符数为 0 表示空字符串。
+ */
+function readPtpString(
+  bytes: Uint8Array,
+  offsetRef: Array<number>
+): string | undefined {
+  let offset: number = offsetRef[0];
   if (offset >= bytes.length) {
     return undefined;
   }
-  let end: number = offset;
-  while (end < bytes.length && bytes[end] !== 0) {
-    end++;
+  const characterCount: number = bytes[offset++];
+  if (characterCount === 0) {
+    offsetRef[0] = offset;
+    return '';
   }
-  if (end >= bytes.length) {
+  const byteCount: number = characterCount * 2;
+  if (byteCount > bytes.length - offset ||
+    readU16(bytes, offset + byteCount - 2) !== 0) {
     return undefined;
   }
-  const text: string = new util.TextDecoder('utf-8').decodeToString(bytes.slice(offset, end));
-  offsetRef[0] = end + 1;
-  return text;
+  let result: string = '';
+  const textEnd: number = offset + byteCount - 2;
+  while (offset < textEnd) {
+    result += String.fromCharCode(readU16(bytes, offset));
+    offset += 2;
+  }
+  offsetRef[0] = offset + 2;
+  return result;
 }
 
 /**
- * GetDeviceInfo(0x1001) 数据段 Manufacturer 解析（UTF-8，布局见 PTPIP_PROTOCOL.md §4）：
+ * GetDeviceInfo(0x1001) 数据段 Manufacturer 解析（PIMA 15740）：
  * StandardVersion(2)+VendorExtensionID(4)+VendorExtensionVersion(2)+
- * VendorExtensionDesc(UTF8)+FunctionalMode(2)+四个数组(各 2 字节长度+条目)+
- * ImageFormats(同上)+Manufacturer(UTF8)。
+ * VendorExtensionDesc(PTP STR)+FunctionalMode(2)+五个 AUINT16
+ * (u32 数量+u16 条目)+Manufacturer(PTP STR)。
  */
 function deviceInfoManufacturer(bytes: Uint8Array): string | undefined {
   if (bytes.length < 8) {
     return undefined;
   }
   const offset: Array<number> = [8];
-  if (readUtf8(bytes, offset) === undefined) {
+  if (readPtpString(bytes, offset) === undefined) {
     return undefined; // VendorExtensionDesc
   }
   if (offset[0] + 2 > bytes.length) {
     return undefined;
   }
   offset[0] += 2; // FunctionalMode
-  for (let index: number = 0; index < 4; index++) { // Operations/Events/DeviceProperties/CaptureFormats
-    if (offset[0] + 2 > bytes.length) {
+  for (let index: number = 0; index < 5; index++) {
+    // Operations/Events/DeviceProperties/CaptureFormats/ImageFormats
+    if (offset[0] + 4 > bytes.length) {
       return undefined;
     }
-    const count: number = readU16(bytes, offset[0]);
-    offset[0] += 2;
-    if (offset[0] + count * 2 > bytes.length) {
+    const count: number = readU32(bytes, offset[0]);
+    offset[0] += 4;
+    if (count > Math.floor((bytes.length - offset[0]) / 2)) {
       return undefined;
     }
     offset[0] += count * 2;
   }
-  if (offset[0] + 2 > bytes.length) {
-    return undefined;
-  }
-  const imageCount: number = readU16(bytes, offset[0]); // ImageFormats
-  offset[0] += 2;
-  if (offset[0] + imageCount * 2 > bytes.length) {
-    return undefined;
-  }
-  offset[0] += imageCount * 2;
-  return readUtf8(bytes, offset);
+  return readPtpString(bytes, offset);
 }
 
 /** 按 Manufacturer 文本判定厂商（Android vendorForManufacturer 同构）。 */
@@ -946,9 +1402,7 @@ function vendorForName(name: string): CameraVendor {
 }
 
 function rejected(response: number): Error {
-  return new Error(
-    `相机拒绝了 PTP/IP 操作（0x${response.toString(16).padStart(4, '0')}）`
-  );
+  return new PtpIpResponseError(response);
 }
 
 function delay(milliseconds: number): Promise<void> {

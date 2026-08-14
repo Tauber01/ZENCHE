@@ -45,7 +45,7 @@ test("HarmonyOS: failure loop stops live view and releases after 3 strikes", asy
   // 源分支使 stopLiveView() 到 liveView=false 的间隔变宽，锚点窗口随布局放宽。
   assert.match(
     source,
-    /failures >= 3[\s\S]{0,200}finishExternalRecordingForDisconnect\(\)[\s\S]{0,250}stopLiveView\(\)[\s\S]{0,250}liveView = false;/,
+    /failures >= 3[\s\S]{0,200}finishExternalRecordingForDisconnect\(\)[\s\S]{0,500}wifiCamera\.stopLiveView\(\)[\s\S]{0,250}this\.camera\.stopLiveView\(\)[\s\S]{0,120}this\.liveView = false;/,
     "3 failures must stop live view and clear state",
   );
   assert.match(source, /previewGeneration\+\+/, "stale generation must be invalidated");
@@ -86,8 +86,13 @@ test("iOS: disconnect stops the session, removes inputs/outputs and cancels PTP/
   assert.match(camera, /deinit[\s\S]{0,120}removeObserver\(self\)/, "deinit must drop observers");
   assert.match(
     ptpIp,
-    /func disconnect\(\) async[\s\S]{0,80}command\?\.cancel\(\)[\s\S]{0,40}event\?\.cancel\(\)/,
-    "PTP/IP disconnect must cancel both command and event connections",
+    /func disconnect\(ifOwnedBy attempt: UInt64\) async[\s\S]{0,120}sessionOwnerAttempt == attempt[\s\S]{0,80}invalidateSession\(\)/,
+    "PTP/IP disconnect must invalidate the complete session",
+  );
+  assert.match(
+    ptpIp,
+    /private func invalidateSession\(\)[\s\S]{0,300}eventReaderTask\?\.cancel\(\)[\s\S]{0,180}command\?\.cancel\(\)[\s\S]{0,40}event\?\.cancel\(\)/,
+    "session invalidation must stop the event reader and cancel both connections",
   );
 });
 

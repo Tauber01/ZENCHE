@@ -1,5 +1,60 @@
 # Changelog
 
+## [1.5.14] - Unreleased
+
+### Fixed
+
+- Replaced the invalid PTP/IP heartbeat that repeatedly reopened an active
+  session with the protocol-defined Probe Request/Response exchange on the
+  event channel. Every native client now keeps an event reader alive, answers
+  camera-initiated probes, and drains event packets without contaminating the
+  command stream.
+- Serialized complete PTP/IP command transactions on Apple, HarmonyOS, and
+  Windows so live-view, parameter, storage, and capture responses cannot be
+  consumed by another in-flight operation. Android retains its existing
+  synchronized transaction boundary.
+- Corrected GetDeviceInfo to use no parameters and parse PIMA strings and
+  AUINT16 arrays, restoring manufacturer detection when the handshake name is
+  generic.
+- Corrected data-out framing for property and Canon EOS writes, including the
+  missing HarmonyOS property-code parameter, and validated response transaction
+  IDs before accepting results.
+- Added the Android and HarmonyOS permissions required to register network-loss
+  listeners. Windows reconnect attempts now have a 12-second deadline and do
+  not leave reconnect mode until session restoration succeeds.
+- Isolated reconnects with session generations so stale command/event writers
+  and half-finished handshakes cannot attach to a replacement session. Manual
+  disconnect now cancels in-flight reconnect restoration, and command-channel
+  transport failures are surfaced through the link monitor.
+- Made TCP handshakes and command transactions bounded and cancellable. Android
+  now exposes its in-progress command/event sockets to the non-blocking abort
+  path; Apple and Windows retire the exact failed session on a transaction
+  deadline so late responses cannot poison the next request.
+- Distinguished compatibility-level PTP rejections from session-fatal response
+  codes. Vendor-name fallback remains available for explicitly unsupported
+  discovery, while SessionNotOpen, InvalidTransactionID, and SessionAlreadyOpen
+  now prevent a false connected state and enter normal recovery.
+- Guarded Android Wi-Fi and local-camera connection callbacks with connection
+  generations. Logout, manual disconnect, and camera-source switching now
+  publish cancellation first, immediately abort the owned sockets without
+  taking the transaction monitor, and queue the full state reset on the camera
+  executor so a cancelled session cannot revive or stall the interface.
+- Accepted the PTP/IP unknown-length StartData sentinel and verified declared
+  lengths after EndData. The existing 64 MiB per-packet defensive limit remains
+  documented for cameras that send a large object in one EndData packet.
+
+### Validation status
+
+- Source version is `1.5.14 / build 41`. The pre-freeze working tree passes the
+  full automated suite 573/573 and the 61/61 connection regression suite. The
+  Android Release compiler, Apple type checks, HarmonyOS Release build, and
+  Windows Release build also pass. Exact-commit native builds, six candidate
+  packages, SHA-256 sidecars, and container/signature
+  checks remain to be regenerated before this local candidate is closed.
+  Camera-hardware, trusted-signing, installation, and reconnect testing remain
+  pending while this entry is marked Unreleased; package details are in
+  `docs/releases/v1.5.14.md`.
+
 ## [1.5.13] - 2026-08-12
 
 ### Added

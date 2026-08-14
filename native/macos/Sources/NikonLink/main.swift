@@ -2421,6 +2421,7 @@ private enum ShootingTaskKind: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+@MainActor
 private final class CameraModel: ObservableObject {
     @Published var connected = false
     @Published var localCameraConnected = false
@@ -14549,7 +14550,7 @@ private struct RootView: View {
     private static var appVersion: String {
         Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
-        ) as? String ?? "1.5.13"
+        ) as? String ?? "1.5.14"
     }
 
     var body: some View {
@@ -14774,6 +14775,7 @@ private struct RootView: View {
     }
 }
 
+@MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow!
     private let model = CameraModel()
@@ -14811,7 +14813,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 let application = NSApplication.shared
-private let delegate = AppDelegate()
+private let delegate = MainActor.assumeIsolated { AppDelegate() }
 application.delegate = delegate
 application.setActivationPolicy(.regular)
 application.run()

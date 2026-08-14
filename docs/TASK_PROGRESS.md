@@ -1,8 +1,9 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-12（Asia/Shanghai）
+> 快照时间：2026-08-15（Asia/Shanghai）
 > 当前公开版本：1.5.13 / build 40；最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`，注释标签 `v1.5.13` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`
 > 公开状态：v1.5.13 已于 2026-08-12T03:33:52Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
+> 当前源码候选：1.5.14 / build 41，PTP/IP 与网络重连可靠性修复，尚未发布
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1245,3 +1246,15 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **最终术语返修**：独立发布门禁确认 P0=0，但发现五端公告把正式产品名称“专业显影 / Pro Develop / プロ現像”写成通用“专业编辑”措辞，判为 P1。五端主资源与兜底文案现已统一为正式名称；静态契约增加三语正向匹配和旧措辞反向断言。从 `227d7b4de8b5f0e07c1ebfcf26278a786a38434f` 生成的六包、六侧车与聚合包已全部作废，不会上传。门禁同时指出本文件上一版仍把该提交描述为当前冻结实现，本段已纠正。
 - **发布材料状态**：README 简中/英/日、CHANGELOG 与 `docs/releases/v1.5.13.md` 已随标签提交公开；正文保留功能、数据安全、签名、验证、限制和升级指引。因本机 GitHub API/Uploads 端点持续 502，冻结聚合包曾经一次性桥接到受限 Actions 工作流；首次 run `31559838492` 在公开前安全失败，修正 draft/Latest 与 draft by-tag 语义后，第二次 run 完成发布和回验。临时桥接分支与两个触发标签已删除，常规 Release workflow 的 v1.5.13 精确 guard 已在发布后移除。
 - **后续验收**：GitHub 交付闭环已完成。真实文档提供器、同名覆盖、无空间、大文件、移动端权限、macOS Gatekeeper/公证，以及真实 Windows 启动、安装、驱动和 SmartScreen 继续作为独立验收项；官网自动更新保持 1.5.10 / build 37，未获得切换 1.5.13 的授权。
+
+## 12.63 v1.5.14 PTP/IP 与断网重连可靠性修复（2026-08-14—15，GPT5.6）
+
+- **工作现场**：独立工作树 `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.14-connection`，分支 `agent/1.5.14-connection`，基线为 `origin/main @ 8ef399b963ec4f7d4d889648d59ee02bffaf91ad`；源码版本提升到 `1.5.14 / build 41`。公开 GitHub Latest 仍为 1.5.13，官网生产仍为 1.5.10，本轮未获推送、标签、Release 或部署授权。
+- **根因**：五端 PTP/IP 心跳每 5 秒重复 OpenSession(0x1002, transaction=0, session=1)，合规相机会返回 SessionAlreadyOpen，连续三次后客户端误判离线并进入重连循环。event TCP 在 InitEventAck 后无人读取，既不排空 type 8 事件，也不响应相机主动 ProbeRequest(type 13)。Apple actor 跨 `await` 可重入，HarmonyOS 与 Windows 共享 command stream 无显式 gate；实时取景、参数和心跳/用户事务会互相取走响应，进一步触发 invalid packet、超时和假离线。
+- **协议勘正**：心跳改为 CIPA DC-X005 定义的 event 通道 ProbeRequest/ProbeResponse(type 13/14)，常驻 reader 同时回答相机主动 probe 并消费事件。Apple、HarmonyOS、Windows 为完整 command transaction 增加显式串行 gate，Android 保留实例 `synchronized`。四套实现统一校验 OperationResponse transaction；GetDeviceInfo(0x1001) 改为无参数，并按 PIMA 的 PTP STR（字符数 + UTF-16LE）与 AUINT16（u32 数量）解析 Manufacturer。
+- **数据写入修复**：data-out 由错误的“前导零 + StartData 携带数据”改为 `StartData(tx,totalLength) → EndData(tx,data)`；HarmonyOS SetDevicePropValue 同时补回 `[propCode]` 参数，避免 ISO、光圈、快门写入被严格 responder 拒绝。
+- **断网恢复修复**：Android manifest 补 `ACCESS_NETWORK_STATE`，HarmonyOS module 补 `GET_NETWORK_INFO`，使 NetworkCallback/NetConnection 具备注册权限。Windows 自动重连每轮使用 12 秒 linked deadline，并在厂商识别、取景、参数与监看恢复完成前保持 reconnecting；HarmonyOS 在旧会话关闭完成后才调度新会话，避免裸 Promise 与重连交错。
+- **会话取消收口**：Apple、HarmonyOS、Windows 以连接代际绑定握手、command/event writer 与重连恢复；断开先失效代际，旧 waiter 和半握手不能污染新会话。Android 初连/重连与本机 Camera2 回调也绑定连接代际，退出登录、手动断连或切换相机后不会重新发布旧会话；UI 线程先失效代际并调用不获取事务 monitor 的 `abortTransport()` 关闭捕获 socket，完整字段复位再排入单线程 camera executor，因此不会等待被阻塞的同步读写。
+- **预冻结回归**：新增 `test/native-ptpip-connection-regressions.test.mjs` 与 `test/native-ptpip-session-lifecycle.test.mjs`，锁定 event probe、双向 reader、GetDeviceInfo 参数/数据集、data-out 帧、事务 gate、会话代际、取消清理、移动端网络权限及 Windows 重连时序；同步修正旧 B2/E2 测试与 `docs/PTPIP_PROTOCOL.md` 中固化的错误契约。当前工作树完整 `npm test -- --test-reporter=dot` 573/573、连接专项 61/61；Android Release Java 编译、iOS/macOS 类型检查、HarmonyOS Release 构建与 Windows Release 构建均通过。
+- **冻结与交付待办**：须先提交冻结实现，再在该精确提交重跑完整测试与五端原生构建，重建六包和六份侧车，并复验 IPA/HAP/Windows ZIP、macOS 深度严格验签与 DMG、Windows PE Security Directory。精确字节数与 SHA-256 完成后回填 `docs/releases/v1.5.14.md`；预冻结 `dist/` 不作为候选。
+- **授权与实机边界**：本轮未推送分支、未打标签、未创建 Release、未覆盖公开资产、未切换官网。没有真实相机、移动设备或 Windows 主机时，不得把静态契约、编译、交叉包或容器校验扩大为 PTP/IP 主动/被动 Probe、并发取景、断网重连、安装、驱动或 SmartScreen 实机 PASS。

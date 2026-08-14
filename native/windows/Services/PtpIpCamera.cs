@@ -8,6 +8,21 @@ namespace NikonLink.Windows.Services;
 
 public sealed class PtpIpCamera : IAsyncDisposable
 {
+    private sealed class PtpResponseException(
+        ushort responseCode,
+        string message) : Exception(message)
+    {
+        public ushort ResponseCode { get; } = responseCode;
+    }
+
+    private readonly record struct CommandSession(
+        NetworkStream Stream,
+        long Generation);
+
+    public readonly record struct ConnectionResult(
+        string CameraName,
+        long SessionGeneration);
+
     // ── PTP/IP vendor ops（镜像 iOS RemoteCaptureServices + Windows PtpCamera 表）──
     // Nikon 实时取景/录像厂商扩展；Canon 走 EOS 属性序列（0x9110/0x9153，TBC-awaiting-hardware）。
     private const ushort NikonStartLiveView = 0x9201;
@@ -43,6 +58,19 @@ public sealed class PtpIpCamera : IAsyncDisposable
     private TcpClient? _eventClient;
     private NetworkStream? _commandStream;
     private NetworkStream? _eventStream;
+    private readonly SemaphoreSlim _commandGate = new(1, 1);
+    private readonly SemaphoreSlim _eventWriteGate = new(1, 1);
+    private readonly SemaphoreSlim _probeGate = new(1, 1);
+    private readonly object _sessionSync = new();
+    private readonly object _probeSync = new();
+    private CancellationTokenSource? _eventReaderCancellation;
+    private Task? _eventReaderTask;
+    private TaskCompletionSource<long>? _probeResponseWaiter;
+    private Exception? _eventReaderFailure;
+    private Exception? _commandChannelFailure;
+    private long _probeResponseSequence;
+    private long _connectionAttemptGeneration;
+    private long _sessionGeneration;
     private uint _transactionId = 1;
     private CameraVendor _vendor = CameraVendor.Unknown;
     private bool _liveView;
@@ -60,74 +88,200 @@ public sealed class PtpIpCamera : IAsyncDisposable
         int port = 15740,
         CancellationToken cancellationToken = default)
     {
-        await DisconnectAsync();
+        var connection = await ConnectWithOwnershipAsync(
+            host,
+            port,
+            cancellationToken);
+        return connection.CameraName;
+    }
+
+    public async Task<ConnectionResult> ConnectWithOwnershipAsync(
+        string host,
+        int port = 15740,
+        CancellationToken cancellationToken = default)
+    {
+        var connectionAttempt = ClaimConnectionAttempt();
+        var connectionAttemptGeneration = connectionAttempt.Generation;
+        await DisconnectSessionAsync(
+            connectionAttempt.SessionGeneration);
+        var sessionGeneration = CaptureSessionGeneration(
+            connectionAttemptGeneration);
         if (string.IsNullOrWhiteSpace(host) || port is < 1 or > 65535)
         {
             throw new ArgumentException("Wi‑Fi 相机地址或端口无效");
         }
 
         Status = "正在连接 Wi‑Fi 相机…";
+        TcpClient? commandClient = null;
+        TcpClient? eventClient = null;
+        NetworkStream? commandStream = null;
+        NetworkStream? eventStream = null;
         try
         {
-            _commandClient = new TcpClient { NoDelay = true };
-            await _commandClient.ConnectAsync(host.Trim(), port, cancellationToken);
-            _commandStream = _commandClient.GetStream();
+            commandClient = CreateTcpClient();
+            lock (_sessionSync)
+            {
+                EnsureConnectionCurrent(
+                    connectionAttemptGeneration,
+                    sessionGeneration);
+                _commandClient = commandClient;
+            }
+            await commandClient.ConnectAsync(host.Trim(), port, cancellationToken);
+            EnsureConnectionCurrent(
+                connectionAttemptGeneration,
+                sessionGeneration);
+            commandStream = commandClient.GetStream();
+            lock (_sessionSync)
+            {
+                EnsureConnectionCurrent(
+                    connectionAttemptGeneration,
+                    sessionGeneration);
+                _commandStream = commandStream;
+            }
 
             using var commandPayload = new MemoryStream();
             commandPayload.Write(Guid.NewGuid().ToByteArray());
             WriteUtf16(commandPayload, "ZENCHE Windows");
             WriteUInt32(commandPayload, 0x00010000);
             await SendPacketAsync(
-                _commandStream,
+                commandStream,
                 1,
                 commandPayload.ToArray(),
                 cancellationToken);
             var acknowledgment = await ReceivePacketAsync(
-                _commandStream,
+                commandStream,
                 cancellationToken);
+            EnsureConnectionCurrent(
+                connectionAttemptGeneration,
+                sessionGeneration);
             if (acknowledgment.Type != 2 || acknowledgment.Data.Length < 28)
             {
                 throw new IOException("相机返回了无效的 PTP/IP 握手数据");
             }
             var connectionNumber = ReadUInt32(acknowledgment.Data, 8);
-            CameraName = ReadUtf16(acknowledgment.Data, 28);
-            if (string.IsNullOrWhiteSpace(CameraName))
+            var cameraName = ReadUtf16(acknowledgment.Data, 28);
+            if (string.IsNullOrWhiteSpace(cameraName))
             {
-                CameraName = "PTP/IP Camera";
+                cameraName = "PTP/IP Camera";
             }
 
-            _eventClient = new TcpClient { NoDelay = true };
-            await _eventClient.ConnectAsync(host.Trim(), port, cancellationToken);
-            _eventStream = _eventClient.GetStream();
+            eventClient = CreateTcpClient();
+            lock (_sessionSync)
+            {
+                EnsureConnectionCurrent(
+                    connectionAttemptGeneration,
+                    sessionGeneration);
+                _eventClient = eventClient;
+            }
+            await eventClient.ConnectAsync(host.Trim(), port, cancellationToken);
+            EnsureConnectionCurrent(
+                connectionAttemptGeneration,
+                sessionGeneration);
+            eventStream = eventClient.GetStream();
+            lock (_sessionSync)
+            {
+                EnsureConnectionCurrent(
+                    connectionAttemptGeneration,
+                    sessionGeneration);
+                _eventStream = eventStream;
+            }
             var eventPayload = new byte[4];
             BinaryPrimitives.WriteUInt32LittleEndian(eventPayload, connectionNumber);
             await SendPacketAsync(
-                _eventStream,
+                eventStream,
                 3,
                 eventPayload,
                 cancellationToken);
             var eventAcknowledgment = await ReceivePacketAsync(
-                _eventStream,
+                eventStream,
                 cancellationToken);
+            EnsureConnectionCurrent(
+                connectionAttemptGeneration,
+                sessionGeneration);
             if (eventAcknowledgment.Type != 4)
             {
                 throw new IOException("相机未确认 PTP/IP 事件通道");
             }
+            StartEventReader(eventStream, sessionGeneration);
 
             var response = await SendCommandAsync(
                 0x1002,
-                0,
+                static () => 0,
                 [1],
                 cancellationToken);
             EnsureAccepted(response);
-            _transactionId = 1;
-            Status = $"Wi‑Fi 已连接 · {CameraName}";
-            return CameraName;
+            EnsureConnectionCurrent(
+                connectionAttemptGeneration,
+                sessionGeneration);
+            lock (_sessionSync)
+            {
+                EnsureConnectionCurrent(
+                    connectionAttemptGeneration,
+                    sessionGeneration);
+                _transactionId = 1;
+                CameraName = cameraName;
+                Status = $"Wi‑Fi 已连接 · {CameraName}";
+                return new ConnectionResult(
+                    CameraName,
+                    sessionGeneration);
+            }
         }
         catch
         {
-            await DisconnectAsync();
+            commandStream?.Dispose();
+            eventStream?.Dispose();
+            commandClient?.Dispose();
+            eventClient?.Dispose();
+            await DisconnectSessionAsync(sessionGeneration);
             throw;
+        }
+    }
+
+    private (long Generation, long SessionGeneration) ClaimConnectionAttempt()
+    {
+        lock (_sessionSync)
+        {
+            var generation = Interlocked.Increment(
+                ref _connectionAttemptGeneration);
+            return (
+                generation,
+                Volatile.Read(ref _sessionGeneration));
+        }
+    }
+
+    private long CaptureSessionGeneration(long connectionAttemptGeneration)
+    {
+        lock (_sessionSync)
+        {
+            EnsureConnectionAttemptCurrent(connectionAttemptGeneration);
+            return Volatile.Read(ref _sessionGeneration);
+        }
+    }
+
+    private void EnsureConnectionCurrent(
+        long connectionAttemptGeneration,
+        long sessionGeneration)
+    {
+        EnsureConnectionAttemptCurrent(connectionAttemptGeneration);
+        EnsureSessionCurrent(sessionGeneration);
+    }
+
+    private void EnsureConnectionAttemptCurrent(long expectedGeneration)
+    {
+        if (Volatile.Read(ref _connectionAttemptGeneration) !=
+            expectedGeneration)
+        {
+            throw new OperationCanceledException(
+                "PTP/IP 连接尝试已被取消或由新尝试取代");
+        }
+    }
+
+    private void EnsureSessionCurrent(long expectedGeneration)
+    {
+        if (Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+        {
+            throw new OperationCanceledException(
+                "PTP/IP 连接已被断开或由新会话取代");
         }
     }
 
@@ -140,7 +294,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         Status = "正在通过 Wi‑Fi 触发快门…";
         var response = await SendCommandAsync(
             0x100E,
-            _transactionId++,
+            () => _transactionId++,
             [0, 0],
             cancellationToken);
         EnsureAccepted(response);
@@ -155,7 +309,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         var storageIds = CameraStorageParser.StorageIds(
             await SendCommandWithDataAsync(
                 0x1004,
-                _transactionId++,
+                () => _transactionId++,
                 [],
                 cancellationToken));
         foreach (var storageId in storageIds)
@@ -164,13 +318,13 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 storageId,
                 await SendCommandWithDataAsync(
                     0x1005,
-                    _transactionId++,
+                    () => _transactionId++,
                     [storageId],
                     cancellationToken)));
             var pendingHandles = new Queue<uint>(CameraStorageParser.StorageIds(
                 await SendCommandWithDataAsync(
                     0x1007,
-                    _transactionId++,
+                    () => _transactionId++,
                     [storageId, 0, uint.MaxValue],
                     cancellationToken)));
             var visitedHandles = new HashSet<uint>();
@@ -179,7 +333,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 if (!visitedHandles.Add(handle)) continue;
                 var objectInfo = await SendCommandWithDataAsync(
                     0x1008,
-                    _transactionId++,
+                    () => _transactionId++,
                     [handle],
                     cancellationToken);
                 if (CameraStorageParser.IsAssociation(objectInfo))
@@ -187,7 +341,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
                     var children = CameraStorageParser.StorageIds(
                         await SendCommandWithDataAsync(
                             0x1007,
-                            _transactionId++,
+                            () => _transactionId++,
                             [storageId, 0, handle],
                             cancellationToken));
                     foreach (var child in children)
@@ -224,7 +378,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         SendCommandWithDataAsync(
             0x100a,
-            _transactionId++,
+            () => _transactionId++,
             [handle],
             cancellationToken);
 
@@ -233,7 +387,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         SendCommandWithDataAsync(
             0x1009,
-            _transactionId++,
+            () => _transactionId++,
             [handle],
             cancellationToken);
 
@@ -243,7 +397,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
     {
         var response = await SendCommandAsync(
             0x100b,
-            _transactionId++,
+            () => _transactionId++,
             [handle, 0],
             cancellationToken);
         EnsureAccepted(response);
@@ -258,6 +412,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
     public async Task<CameraVendor> DetectVendorAsync(
         CancellationToken cancellationToken = default)
     {
+        var session = CaptureCommandSession();
         if (_vendor != CameraVendor.Unknown)
         {
             return _vendor;
@@ -268,9 +423,10 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             var info = await SendCommandWithDataAsync(
                 0x1001,
-                _transactionId++,
-                [1],
-                cancellationToken);
+                () => _transactionId++,
+                [],
+                cancellationToken,
+                session);
             var manufacturer = DeviceInfoManufacturer(info);
             if (!string.IsNullOrWhiteSpace(manufacturer))
             {
@@ -279,11 +435,12 @@ public sealed class PtpIpCamera : IAsyncDisposable
                     nameBased);
             }
         }
-        catch
+        catch (PtpResponseException error) when (
+            IsVendorDetectionFallback(error.ResponseCode))
         {
-            // 部分机型对 0x1001 直接回响应（无数据段），退回名称启发式。
+            // 部分机型拒绝 0x1001，退回握手名称启发式。传输与取消错误必须上抛。
         }
-        _vendor = resolved;
+        CommitSessionState(session, () => _vendor = resolved);
         return resolved;
     }
 
@@ -291,72 +448,89 @@ public sealed class PtpIpCamera : IAsyncDisposable
     public async Task StartLiveViewAsync(
         CancellationToken cancellationToken = default)
     {
-        if (_commandStream is null)
-        {
-            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
-        }
+        var session = CaptureCommandSession();
+        await StartLiveViewAsync(session, cancellationToken);
+    }
+
+    private async Task StartLiveViewAsync(
+        CommandSession session,
+        CancellationToken cancellationToken)
+    {
+        EnsureCommandSession(session.Stream, session.Generation);
         if (_liveView)
         {
             return;
         }
         if (_vendor == CameraVendor.Canon)
         {
-            if (!await CanonOpenLiveViewAsync(cancellationToken))
+            if (!await CanonOpenLiveViewAsync(session, cancellationToken))
             {
                 throw new IOException(
                     $"{CameraName} 未能确认进入佳能实时取景（机身未确认取景输出）。");
             }
+            CommitSessionState(session, () => _liveView = true);
             return;
         }
         var response = await SendCommandAsync(
             NikonStartLiveView,
-            _transactionId++,
+            () => _transactionId++,
             [],
-            cancellationToken);
+            cancellationToken,
+            session);
         EnsureAccepted(response);
-        _liveView = true;
+        CommitSessionState(session, () => _liveView = true);
     }
 
     /// <summary>停止实时取景（尽力而为）。</summary>
     public async Task StopLiveViewAsync(
         CancellationToken cancellationToken = default)
     {
-        if (!_liveView || _commandStream is null)
+        if (_commandStream is null)
         {
             _liveView = false;
             return;
         }
-        if (_vendor == CameraVendor.Canon)
+        var session = CaptureCommandSession();
+        if (!_liveView)
         {
-            try
-            {
-                await CanonWriteEosPropAsync(
-                    CanonEvfOutputDevice,
-                    0,
-                    cancellationToken);
-                await CanonWriteEosPropAsync(
-                    CanonEvfMode,
-                    0,
-                    cancellationToken);
-            }
-            catch
-            {
-                // 忽略关闭失败
-            }
-            _liveView = false;
             return;
         }
         try
         {
-            await SendCommandAsync(
-                NikonEndLiveView,
-                _transactionId++,
-                [],
-                cancellationToken);
+            if (_vendor == CameraVendor.Canon)
+            {
+                try
+                {
+                    await CanonWriteEosPropAsync(
+                        CanonEvfOutputDevice,
+                        0,
+                        cancellationToken,
+                        session);
+                    await CanonWriteEosPropAsync(
+                        CanonEvfMode,
+                        0,
+                        cancellationToken,
+                        session);
+                }
+                catch (PtpResponseException error) when (
+                    !IsSessionFatalResponse(error.ResponseCode))
+                {
+                    // 关闭取景尽力而为；传输与取消错误仍上抛。
+                }
+            }
+            else
+            {
+                await SendCommandAsync(
+                    NikonEndLiveView,
+                    () => _transactionId++,
+                    [],
+                    cancellationToken,
+                    session);
+            }
         }
         finally
         {
-            _liveView = false;
+            TryCommitSessionState(session, () => _liveView = false);
         }
     }
 
@@ -367,10 +541,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
     public async Task<byte[]> GetLiveViewFrameAsync(
         CancellationToken cancellationToken = default)
     {
-        if (_commandStream is null)
-        {
-            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
-        }
+        var session = CaptureCommandSession();
         if (!_liveView)
         {
             throw new InvalidOperationException("实时取景尚未开启。");
@@ -379,16 +550,18 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             var raw = await SendCommandWithDataAsync(
                 CanonEosGetViewFinderData,
-                _transactionId++,
+                () => _transactionId++,
                 [0x00200000u, 0u, 0u],
-                cancellationToken);
+                cancellationToken,
+                session);
             return ExtractEosJpeg(raw);
         }
         var data = await SendCommandWithDataAsync(
             NikonGetLiveViewImage,
-            _transactionId++,
+            () => _transactionId++,
             [],
-            cancellationToken);
+            cancellationToken,
+            session);
         return ExtractJpeg(data);
     }
 
@@ -396,45 +569,41 @@ public sealed class PtpIpCamera : IAsyncDisposable
     public async Task StartMovieRecordingAsync(
         CancellationToken cancellationToken = default)
     {
-        if (_commandStream is null)
-        {
-            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
-        }
+        var session = CaptureCommandSession();
         if (_movieRecording)
         {
             return;
         }
         if (_vendor == CameraVendor.Canon)
         {
-            await StartLiveViewAsync(cancellationToken);
+            await StartLiveViewAsync(session, cancellationToken);
             await CanonWriteEosPropAsync(
                 CanonEvfRecordStatus,
                 1,
-                cancellationToken);
-            _movieRecording = true;
+                cancellationToken,
+                session);
+            CommitSessionState(session, () => _movieRecording = true);
             return;
         }
         if (!_liveView)
         {
-            await StartLiveViewAsync(cancellationToken);
+            await StartLiveViewAsync(session, cancellationToken);
         }
         var response = await SendCommandAsync(
             NikonStartMovieRecording,
-            _transactionId++,
+            () => _transactionId++,
             [],
-            cancellationToken);
+            cancellationToken,
+            session);
         EnsureAccepted(response);
-        _movieRecording = true;
+        CommitSessionState(session, () => _movieRecording = true);
     }
 
     /// <summary>停止录像（Nikon 0x920b / Canon EVFRecordStatus=0，TBC-awaiting-hardware）。</summary>
     public async Task StopMovieRecordingAsync(
         CancellationToken cancellationToken = default)
     {
-        if (_commandStream is null)
-        {
-            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
-        }
+        var session = CaptureCommandSession();
         try
         {
             if (_vendor == CameraVendor.Canon)
@@ -442,21 +611,23 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 await CanonWriteEosPropAsync(
                     CanonEvfRecordStatus,
                     0,
-                    cancellationToken);
+                    cancellationToken,
+                    session);
             }
             else
             {
                 var response = await SendCommandAsync(
                     NikonEndMovieRecording,
-                    _transactionId++,
+                    () => _transactionId++,
                     [],
-                    cancellationToken);
+                    cancellationToken,
+                    session);
                 EnsureAccepted(response);
             }
         }
         finally
         {
-            _movieRecording = false;
+            TryCommitSessionState(session, () => _movieRecording = false);
         }
     }
 
@@ -466,7 +637,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         SendCommandWithDataAsync(
             GetDevicePropValue,
-            _transactionId++,
+            () => _transactionId++,
             [property],
             cancellationToken);
 
@@ -476,7 +647,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         SendCommandWithDataAsync(
             GetDevicePropDesc,
-            _transactionId++,
+            () => _transactionId++,
             [property],
             cancellationToken);
 
@@ -488,7 +659,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
     {
         var response = await SendCommandWithDataOutAsync(
             SetDevicePropValue,
-            _transactionId++,
+            () => _transactionId++,
             [property],
             value,
             cancellationToken);
@@ -499,7 +670,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
     private async Task CanonWriteEosPropAsync(
         uint propCode,
         uint value,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSession? expectedSession = null)
     {
         var payload = new byte[12];
         BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(0, 4), 12);
@@ -509,10 +681,11 @@ public sealed class PtpIpCamera : IAsyncDisposable
             payload.AsSpan(8, 4), value);
         var response = await SendCommandWithDataOutAsync(
             CanonEosSetDevicePropValueEx,
-            _transactionId++,
+            () => _transactionId++,
             [],
             payload,
-            cancellationToken);
+            cancellationToken,
+            expectedSession);
         EnsureAccepted(response);
     }
 
@@ -522,6 +695,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
     /// 写 2=PC（读失败回退无条件写）。返回两写至少一处被接受/已满足。
     /// </summary>
     private async Task<bool> CanonOpenLiveViewAsync(
+        CommandSession session,
         CancellationToken cancellationToken)
     {
         var confirmed = false;
@@ -529,7 +703,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             var mode = await ReadEosPropValueAsync(
                 CanonEvfMode,
-                cancellationToken);
+                cancellationToken,
+                session);
             if (mode != 1)
             {
                 try
@@ -537,18 +712,21 @@ public sealed class PtpIpCamera : IAsyncDisposable
                     await CanonWriteEosPropAsync(
                         CanonEvfMode,
                         1,
-                        cancellationToken);
+                        cancellationToken,
+                        session);
                 }
-                catch
+                catch (PtpResponseException error) when (
+                    !IsSessionFatalResponse(error.ResponseCode))
                 {
                     // Movie 模式 Busy 容忍
                 }
             }
             confirmed = true;
         }
-        catch
+        catch (PtpResponseException error) when (
+            !IsSessionFatalResponse(error.ResponseCode))
         {
-            // 读取失败容忍
+            // 相机拒绝读取时容忍；传输与取消错误必须上抛。
         }
         try
         {
@@ -557,9 +735,11 @@ public sealed class PtpIpCamera : IAsyncDisposable
             {
                 current = await ReadEosPropValueAsync(
                     CanonEvfOutputDevice,
-                    cancellationToken);
+                    cancellationToken,
+                    session);
             }
-            catch
+            catch (PtpResponseException error) when (
+                !IsSessionFatalResponse(error.ResponseCode))
             {
                 current = uint.MaxValue;
             }
@@ -570,33 +750,37 @@ public sealed class PtpIpCamera : IAsyncDisposable
                     await CanonWriteEosPropAsync(
                         CanonEvfOutputDevice,
                         2,
-                        cancellationToken);
+                        cancellationToken,
+                        session);
                 }
-                catch
+                catch (PtpResponseException error) when (
+                    !IsSessionFatalResponse(error.ResponseCode))
                 {
                     // 容忍
                 }
             }
             confirmed = true;
         }
-        catch
+        catch (PtpResponseException error) when (
+            !IsSessionFatalResponse(error.ResponseCode))
         {
             // 容忍
         }
-        _liveView = confirmed;
         return confirmed;
     }
 
     /// <summary>EOS 属性读取：标准 GetDevicePropValue(0x1015)（UINT16 回 2B / UINT32 回 4B）。</summary>
     private async Task<uint> ReadEosPropValueAsync(
         uint propCode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSession? expectedSession = null)
     {
         var data = await SendCommandWithDataAsync(
             GetDevicePropValue,
-            _transactionId++,
+            () => _transactionId++,
             [propCode],
-            cancellationToken);
+            cancellationToken,
+            expectedSession);
         if (data.Length < 2)
         {
             throw new IOException("佳能属性读取返回长度不足。");
@@ -653,7 +837,10 @@ public sealed class PtpIpCamera : IAsyncDisposable
         return source[start..end];
     }
 
-    /// <summary>GetDeviceInfo 数据段 Manufacturer 解析（UTF-8，布局见协议文档 §4）。</summary>
+    /// <summary>
+    /// GetDeviceInfo 数据段 Manufacturer 解析：PIMA 15740 的字符串是
+    /// 字符数前缀（含终止符）+ UTF-16LE，五个能力表是 AUINT16（u32 数量）。
+    /// </summary>
     private static string? DeviceInfoManufacturer(byte[] data)
     {
         if (data.Length < 8)
@@ -661,7 +848,7 @@ public sealed class PtpIpCamera : IAsyncDisposable
             return null;
         }
         var offset = 8;
-        if (!ReadUtf8(data, ref offset, out _))
+        if (!ReadPtpString(data, ref offset, out _))
         {
             return null; // VendorExtensionDesc
         }
@@ -670,39 +857,36 @@ public sealed class PtpIpCamera : IAsyncDisposable
             return null;
         }
         offset += 2; // FunctionalMode
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 5; i++)
         {
-            if (offset + 2 > data.Length)
+            if (!SkipAUInt16(data, ref offset))
             {
                 return null;
             }
-            var count = BinaryPrimitives.ReadUInt16LittleEndian(
-                data.AsSpan(offset, 2));
-            offset += 2;
-            if (offset + count * 2 > data.Length)
-            {
-                return null;
-            }
-            offset += count * 2;
         }
-        if (offset + 2 > data.Length)
-        {
-            return null;
-        }
-        var imageCount = BinaryPrimitives.ReadUInt16LittleEndian(
-            data.AsSpan(offset, 2));
-        offset += 2;
-        if (offset + imageCount * 2 > data.Length)
-        {
-            return null;
-        }
-        offset += imageCount * 2;
-        return ReadUtf8(data, ref offset, out var manufacturer)
+        return ReadPtpString(data, ref offset, out var manufacturer)
             ? manufacturer
             : null;
     }
 
-    private static bool ReadUtf8(
+    private static bool SkipAUInt16(byte[] data, ref int offset)
+    {
+        if (offset < 0 || data.Length - offset < 4)
+        {
+            return false;
+        }
+        var count = ReadUInt32(data, offset);
+        offset += 4;
+        var remaining = data.Length - offset;
+        if (count > (uint)(remaining / 2))
+        {
+            return false;
+        }
+        offset += checked((int)count * 2);
+        return true;
+    }
+
+    private static bool ReadPtpString(
         byte[] data,
         ref int offset,
         out string text)
@@ -712,17 +896,24 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             return false;
         }
-        var end = offset;
-        while (end < data.Length && data[end] != 0)
+        var characterCount = data[offset++];
+        if (characterCount == 0)
         {
-            end++;
+            return true;
         }
-        if (end >= data.Length)
+        var byteCount = checked(characterCount * 2);
+        if (data.Length - offset < byteCount)
         {
             return false;
         }
-        text = Encoding.UTF8.GetString(data, offset, end - offset);
-        offset = end + 1;
+        if (data[offset + byteCount - 2] != 0 ||
+            data[offset + byteCount - 1] != 0)
+        {
+            return false;
+        }
+        var textByteCount = Math.Max(0, byteCount - 2);
+        text = Encoding.Unicode.GetString(data, offset, textByteCount);
+        offset += byteCount;
         return true;
     }
 
@@ -755,91 +946,365 @@ public sealed class PtpIpCamera : IAsyncDisposable
     /// </summary>
     private async Task<ushort> SendCommandWithDataOutAsync(
         ushort operation,
-        uint transaction,
+        Func<uint> transactionFactory,
         uint[] parameters,
         byte[] data,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSession? expectedSession = null)
     {
-        var stream = _commandStream ?? throw new InvalidOperationException(
-            "请先连接 Wi‑Fi 相机");
-        using var payload = new MemoryStream();
-        WriteUInt32(payload, 2);
-        WriteUInt16(payload, operation);
-        WriteUInt32(payload, transaction);
-        foreach (var parameter in parameters)
+        var stream = _commandStream;
+        var sessionGeneration = Volatile.Read(ref _sessionGeneration);
+        if (expectedSession is { } expected)
         {
-            WriteUInt32(payload, parameter);
+            stream = expected.Stream;
+            sessionGeneration = expected.Generation;
         }
-        await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
-
-        using var startPayload = new MemoryStream();
-        WriteUInt32(startPayload, 0);
-        WriteUInt32(startPayload, transaction);
-        WriteUInt64(startPayload, (ulong)data.Length);
-        startPayload.Write(data);
-        await SendPacketAsync(
-            stream,
-            9,
-            startPayload.ToArray(),
-            cancellationToken);
-
-        using var endPayload = new MemoryStream();
-        WriteUInt32(endPayload, 0);
-        WriteUInt32(endPayload, transaction);
-        await SendPacketAsync(
-            stream,
-            12,
-            endPayload.ToArray(),
-            cancellationToken);
-
-        var response = await ReceivePacketAsync(stream, cancellationToken);
-        if (response.Type != 7 || response.Data.Length < 14)
+        if (stream is null)
         {
-            throw new IOException("相机返回了无效的 PTP/IP 响应");
+            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
-        return ReadUInt16(response.Data, 8);
+        await _commandGate.WaitAsync(cancellationToken);
+        var transactionStarted = false;
+        try
+        {
+            EnsureCommandSession(stream, sessionGeneration);
+            var transaction = transactionFactory();
+            using var payload = new MemoryStream();
+            WriteUInt32(payload, 2);
+            WriteUInt16(payload, operation);
+            WriteUInt32(payload, transaction);
+            foreach (var parameter in parameters)
+            {
+                WriteUInt32(payload, parameter);
+            }
+            transactionStarted = true;
+            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+
+            using var startPayload = new MemoryStream();
+            WriteUInt32(startPayload, transaction);
+            WriteUInt64(startPayload, (ulong)data.Length);
+            await SendPacketAsync(
+                stream,
+                9,
+                startPayload.ToArray(),
+                cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+
+            using var endPayload = new MemoryStream();
+            WriteUInt32(endPayload, transaction);
+            endPayload.Write(data);
+            await SendPacketAsync(
+                stream,
+                12,
+                endPayload.ToArray(),
+                cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+
+            var response = await ReceivePacketAsync(stream, cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+            if (response.Type != 7 || response.Data.Length < 14 ||
+                ReadUInt32(response.Data, 10) != transaction)
+            {
+                throw new IOException("相机返回了无效的 PTP/IP 响应");
+            }
+            var responseCode = ReadUInt16(response.Data, 8);
+            RetireIfSessionFatal(
+                responseCode,
+                stream,
+                sessionGeneration);
+            return responseCode;
+        }
+        catch (IOException error)
+        {
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
+        }
+        catch (OperationCanceledException error) when (transactionStarted)
+        {
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
     }
 
-    public Task DisconnectAsync()
+    private void StartEventReader(
+        NetworkStream stream,
+        long sessionGeneration)
     {
-        _commandStream?.Dispose();
-        _eventStream?.Dispose();
-        _commandClient?.Dispose();
-        _eventClient?.Dispose();
-        _commandStream = null;
-        _eventStream = null;
-        _commandClient = null;
-        _eventClient = null;
-        _transactionId = 1;
-        _vendor = CameraVendor.Unknown;
-        _liveView = false;
-        _movieRecording = false;
-        CameraName = "PTP/IP Camera";
-        Status = "Wi‑Fi 相机未连接";
-        return Task.CompletedTask;
+        lock (_sessionSync)
+        {
+            EnsureSessionCurrent(sessionGeneration);
+            if (!ReferenceEquals(_eventStream, stream))
+            {
+                throw new OperationCanceledException(
+                    "PTP/IP 事件通道已被新会话取代");
+            }
+            _eventReaderCancellation?.Cancel();
+            _eventReaderCancellation?.Dispose();
+            _eventReaderCancellation = new CancellationTokenSource();
+            lock (_probeSync)
+            {
+                _eventReaderFailure = null;
+            }
+            Interlocked.Exchange(ref _probeResponseSequence, 0);
+            _eventReaderTask = RunEventReaderAsync(
+                stream,
+                sessionGeneration,
+                _eventReaderCancellation.Token);
+        }
+    }
+
+    private async Task RunEventReaderAsync(
+        NetworkStream stream,
+        long sessionGeneration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var packet = await ReceivePacketAsync(stream, cancellationToken);
+                switch (packet.Type)
+                {
+                    case 8:
+                        // Event packet: the UI currently has no event consumers, but the
+                        // channel must be drained so probes and camera notifications cannot
+                        // block one another.
+                        break;
+                    case 13:
+                        // Cameras may probe either side of the event channel.
+                        await SendEventPacketAsync(
+                            14,
+                            [],
+                            stream,
+                            sessionGeneration,
+                            cancellationToken);
+                        break;
+                    case 14:
+                    {
+                        var sequence = Interlocked.Increment(
+                            ref _probeResponseSequence);
+                        lock (_probeSync)
+                        {
+                            _probeResponseWaiter?.TrySetResult(sequence);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception) when (cancellationToken.IsCancellationRequested)
+        {
+            // Expected when disconnect closes the event socket.
+        }
+        catch (Exception error)
+        {
+            if (!ReferenceEquals(_eventStream, stream) ||
+                Volatile.Read(ref _sessionGeneration) != sessionGeneration)
+            {
+                return;
+            }
+            var failure = new IOException("PTP/IP 事件通道已断开", error);
+            lock (_probeSync)
+            {
+                _eventReaderFailure = failure;
+                _probeResponseWaiter?.TrySetException(failure);
+            }
+        }
+    }
+
+    private async Task SendEventPacketAsync(
+        uint type,
+        byte[] payload,
+        CancellationToken cancellationToken)
+    {
+        var stream = _eventStream ?? throw new InvalidOperationException(
+            "PTP/IP 事件通道尚未建立");
+        var sessionGeneration = Volatile.Read(ref _sessionGeneration);
+        await SendEventPacketAsync(
+            type,
+            payload,
+            stream,
+            sessionGeneration,
+            cancellationToken);
+    }
+
+    private async Task SendEventPacketAsync(
+        uint type,
+        byte[] payload,
+        NetworkStream expectedStream,
+        long expectedGeneration,
+        CancellationToken cancellationToken)
+    {
+        await _eventWriteGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!ReferenceEquals(_eventStream, expectedStream) ||
+                Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+            {
+                throw new OperationCanceledException(
+                    "PTP/IP 事件通道已被断开或由新会话取代");
+            }
+            await SendPacketAsync(
+                expectedStream,
+                type,
+                payload,
+                cancellationToken);
+            if (!ReferenceEquals(_eventStream, expectedStream) ||
+                Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+            {
+                throw new OperationCanceledException(
+                    "PTP/IP 事件通道已被断开或由新会话取代");
+            }
+        }
+        finally
+        {
+            _eventWriteGate.Release();
+        }
+    }
+
+    public async Task DisconnectAsync()
+    {
+        var disconnectAttempt = ClaimConnectionAttempt();
+        await DisconnectSessionAsync(
+            disconnectAttempt.SessionGeneration);
+    }
+
+    public async Task DisconnectIfOwnedAsync(long expectedGeneration)
+    {
+        await DisconnectSessionAsync(expectedGeneration);
+    }
+
+    private async Task DisconnectSessionAsync(long expectedGeneration)
+    {
+        CancellationTokenSource? eventReaderCancellation;
+        Task? eventReaderTask;
+        NetworkStream? commandStream;
+        NetworkStream? eventStream;
+        TcpClient? commandClient;
+        TcpClient? eventClient;
+        lock (_sessionSync)
+        {
+            if (Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+            {
+                return;
+            }
+            Interlocked.Increment(ref _sessionGeneration);
+            eventReaderCancellation = _eventReaderCancellation;
+            eventReaderTask = _eventReaderTask;
+            commandStream = _commandStream;
+            eventStream = _eventStream;
+            commandClient = _commandClient;
+            eventClient = _eventClient;
+            _eventReaderCancellation = null;
+            _eventReaderTask = null;
+            _commandStream = null;
+            _eventStream = null;
+            _commandClient = null;
+            _eventClient = null;
+            lock (_probeSync)
+            {
+                _probeResponseWaiter?.TrySetException(
+                    new IOException("PTP/IP 事件通道已关闭"));
+                _probeResponseWaiter = null;
+                _eventReaderFailure = null;
+                _commandChannelFailure = null;
+            }
+            Interlocked.Exchange(ref _probeResponseSequence, 0);
+            _transactionId = 1;
+            _vendor = CameraVendor.Unknown;
+            _liveView = false;
+            _movieRecording = false;
+            CameraName = "PTP/IP Camera";
+            Status = "Wi‑Fi 相机未连接";
+        }
+        eventReaderCancellation?.Cancel();
+        commandStream?.Dispose();
+        eventStream?.Dispose();
+        commandClient?.Dispose();
+        eventClient?.Dispose();
+        if (eventReaderTask is not null)
+        {
+            await eventReaderTask;
+        }
+        eventReaderCancellation?.Dispose();
     }
 
     /// <summary>
-    /// 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
-    /// 与在途命令同走 SendCommandAsync（共享命令流，天然串行）；
-    /// 单次探测超时 3s。
+    /// 无副作用链路探测：在 event 通道发送 ProbeRequest(type 13)，等待常驻
+    /// reader 收到 ProbeResponse(type 14)；单次探测超时 3s。
     /// </summary>
     public async Task ProbeAsync(
         CancellationToken cancellationToken = default)
     {
-        if (_commandStream is null)
+        if (_eventStream is null || _eventReaderTask is null)
         {
             throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMilliseconds(ProbeTimeoutMilliseconds));
-        var response = await SendCommandAsync(
-            0x1002,
-            0,
-            [1],
-            timeout.Token);
-        EnsureAccepted(response);
+        try
+        {
+            await _probeGate.WaitAsync(timeout.Token);
+            try
+            {
+                var baseline = Interlocked.Read(ref _probeResponseSequence);
+                var waiter = new TaskCompletionSource<long>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                lock (_probeSync)
+                {
+                    if (_commandChannelFailure is not null)
+                    {
+                        throw new IOException(
+                            "PTP/IP 命令通道不可用",
+                            _commandChannelFailure);
+                    }
+                    if (_eventReaderFailure is not null)
+                    {
+                        throw new IOException(
+                            "PTP/IP 事件通道不可用",
+                            _eventReaderFailure);
+                    }
+                    _probeResponseWaiter = waiter;
+                }
+                try
+                {
+                    await SendEventPacketAsync(13, [], timeout.Token);
+                    var responseSequence = await waiter.Task.WaitAsync(
+                        timeout.Token);
+                    var observedSequence = Interlocked.Read(
+                        ref _probeResponseSequence);
+                    if (responseSequence <= baseline ||
+                        observedSequence < responseSequence)
+                    {
+                        throw new IOException("相机返回了无效的 PTP/IP 探测响应");
+                    }
+                }
+                finally
+                {
+                    lock (_probeSync)
+                    {
+                        if (ReferenceEquals(_probeResponseWaiter, waiter))
+                        {
+                            _probeResponseWaiter = null;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _probeGate.Release();
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("PTP/IP 事件通道探测超时");
+        }
     }
 
     /// <summary>B2 保活参数（契约测试锚点）：单次探测超时 3s。</summary>
@@ -849,89 +1314,302 @@ public sealed class PtpIpCamera : IAsyncDisposable
 
     private async Task<ushort> SendCommandAsync(
         ushort operation,
-        uint transaction,
+        Func<uint> transactionFactory,
         uint[] parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSession? expectedSession = null)
     {
-        var stream = _commandStream ?? throw new InvalidOperationException(
-            "请先连接 Wi‑Fi 相机");
-        using var payload = new MemoryStream();
-        WriteUInt32(payload, 1);
-        WriteUInt16(payload, operation);
-        WriteUInt32(payload, transaction);
-        foreach (var parameter in parameters)
+        var stream = _commandStream;
+        var sessionGeneration = Volatile.Read(ref _sessionGeneration);
+        if (expectedSession is { } expected)
         {
-            WriteUInt32(payload, parameter);
+            stream = expected.Stream;
+            sessionGeneration = expected.Generation;
         }
-        await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
-        var response = await ReceivePacketAsync(stream, cancellationToken);
-        if (response.Type != 7 || response.Data.Length < 14)
+        if (stream is null)
         {
-            throw new IOException("相机返回了无效的 PTP/IP 响应");
+            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
-        return ReadUInt16(response.Data, 8);
+        await _commandGate.WaitAsync(cancellationToken);
+        var transactionStarted = false;
+        try
+        {
+            EnsureCommandSession(stream, sessionGeneration);
+            var transaction = transactionFactory();
+            using var payload = new MemoryStream();
+            WriteUInt32(payload, 1);
+            WriteUInt16(payload, operation);
+            WriteUInt32(payload, transaction);
+            foreach (var parameter in parameters)
+            {
+                WriteUInt32(payload, parameter);
+            }
+            transactionStarted = true;
+            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+            var response = await ReceivePacketAsync(stream, cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+            if (response.Type != 7 || response.Data.Length < 14 ||
+                ReadUInt32(response.Data, 10) != transaction)
+            {
+                throw new IOException("相机返回了无效的 PTP/IP 响应");
+            }
+            var responseCode = ReadUInt16(response.Data, 8);
+            RetireIfSessionFatal(
+                responseCode,
+                stream,
+                sessionGeneration);
+            return responseCode;
+        }
+        catch (IOException error)
+        {
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
+        }
+        catch (OperationCanceledException error) when (transactionStarted)
+        {
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
     }
 
     private async Task<byte[]> SendCommandWithDataAsync(
         ushort operation,
-        uint transaction,
+        Func<uint> transactionFactory,
         uint[] parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CommandSession? expectedSession = null)
     {
-        var stream = _commandStream ?? throw new InvalidOperationException(
-            "请先连接 Wi‑Fi 相机");
-        using var payload = new MemoryStream();
-        // PTP/IP value 1 is used for data-in and no-data operations.
-        WriteUInt32(payload, 1);
-        WriteUInt16(payload, operation);
-        WriteUInt32(payload, transaction);
-        foreach (var parameter in parameters) WriteUInt32(payload, parameter);
-        await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+        var stream = _commandStream;
+        var sessionGeneration = Volatile.Read(ref _sessionGeneration);
+        if (expectedSession is { } expected)
+        {
+            stream = expected.Stream;
+            sessionGeneration = expected.Generation;
+        }
+        if (stream is null)
+        {
+            throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
+        }
+        await _commandGate.WaitAsync(cancellationToken);
+        var transactionStarted = false;
+        try
+        {
+            EnsureCommandSession(stream, sessionGeneration);
+            var transaction = transactionFactory();
+            using var payload = new MemoryStream();
+            // PTP/IP value 1 is used for data-in and no-data operations.
+            WriteUInt32(payload, 1);
+            WriteUInt16(payload, operation);
+            WriteUInt32(payload, transaction);
+            foreach (var parameter in parameters) WriteUInt32(payload, parameter);
+            transactionStarted = true;
+            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
 
-        var first = await ReceivePacketAsync(stream, cancellationToken);
-        if (first.Type == 7)
-        {
-            EnsureAccepted(first.Data.Length >= 10
-                ? ReadUInt16(first.Data, 8)
-                : (ushort)0x2002);
-        }
-        if (first.Type != 9 || first.Data.Length < 20 ||
-            ReadUInt32(first.Data, 8) != transaction)
-        {
-            throw new IOException("相机返回了无效的 PTP/IP 数据阶段");
-        }
-        var totalLength = BinaryPrimitives.ReadUInt64LittleEndian(
-            first.Data.AsSpan(12, 8));
-        const ulong maximumObjectBytes = 512UL * 1024 * 1024;
-        if (totalLength > maximumObjectBytes)
-        {
-            throw new IOException("机内文件超过当前 512 MB 单文件传输上限");
-        }
-        using var data = new MemoryStream(
-            (int)Math.Min(totalLength, 8UL * 1024 * 1024));
-        while (true)
-        {
-            var packet = await ReceivePacketAsync(stream, cancellationToken);
-            if ((packet.Type != 10 && packet.Type != 12) ||
-                packet.Data.Length < 12 ||
-                ReadUInt32(packet.Data, 8) != transaction)
+            var first = await ReceivePacketAsync(stream, cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+            if (first.Type == 7)
             {
-                throw new IOException("相机返回了无效的 PTP/IP 文件数据包");
+                if (first.Data.Length < 14 ||
+                    ReadUInt32(first.Data, 10) != transaction)
+                {
+                    throw new IOException("相机返回了无效的 PTP/IP 响应");
+                }
+                EnsureAcceptedForSession(
+                    ReadUInt16(first.Data, 8),
+                    stream,
+                    sessionGeneration);
+                throw new IOException("相机没有返回 PTP/IP 数据阶段");
             }
-            data.Write(packet.Data, 12, packet.Data.Length - 12);
-            if ((ulong)data.Length > maximumObjectBytes)
+            if (first.Type != 9 || first.Data.Length < 20 ||
+                ReadUInt32(first.Data, 8) != transaction)
+            {
+                throw new IOException("相机返回了无效的 PTP/IP 数据阶段");
+            }
+            var totalLength = BinaryPrimitives.ReadUInt64LittleEndian(
+                first.Data.AsSpan(12, 8));
+            const ulong maximumObjectBytes = 512UL * 1024 * 1024;
+            var hasDeclaredLength = totalLength != ulong.MaxValue;
+            if (hasDeclaredLength && totalLength > maximumObjectBytes)
             {
                 throw new IOException("机内文件超过当前 512 MB 单文件传输上限");
             }
-            if (packet.Type == 12) break;
+            using var data = new MemoryStream(
+                (int)Math.Min(
+                    hasDeclaredLength ? totalLength : 8UL * 1024 * 1024,
+                    8UL * 1024 * 1024));
+            while (true)
+            {
+                var packet = await ReceivePacketAsync(stream, cancellationToken);
+                EnsureCommandSession(stream, sessionGeneration);
+                if ((packet.Type != 10 && packet.Type != 12) ||
+                    packet.Data.Length < 12 ||
+                    ReadUInt32(packet.Data, 8) != transaction)
+                {
+                    throw new IOException("相机返回了无效的 PTP/IP 文件数据包");
+                }
+                data.Write(packet.Data, 12, packet.Data.Length - 12);
+                if ((ulong)data.Length > maximumObjectBytes)
+                {
+                    throw new IOException("机内文件超过当前 512 MB 单文件传输上限");
+                }
+                if (hasDeclaredLength && (ulong)data.Length > totalLength)
+                {
+                    throw new IOException("相机返回的数据超过 StartData 声明长度");
+                }
+                if (packet.Type == 12) break;
+            }
+            if (hasDeclaredLength && (ulong)data.Length != totalLength)
+            {
+                throw new IOException("相机返回的数据与 StartData 声明长度不一致");
+            }
+            var response = await ReceivePacketAsync(stream, cancellationToken);
+            EnsureCommandSession(stream, sessionGeneration);
+            if (response.Type != 7 || response.Data.Length < 14 ||
+                ReadUInt32(response.Data, 10) != transaction)
+            {
+                throw new IOException("相机没有完成 PTP/IP 文件事务");
+            }
+            EnsureAcceptedForSession(
+                ReadUInt16(response.Data, 8),
+                stream,
+                sessionGeneration);
+            return data.ToArray();
         }
-        var response = await ReceivePacketAsync(stream, cancellationToken);
-        if (response.Type != 7 || response.Data.Length < 14)
+        catch (IOException error)
         {
-            throw new IOException("相机没有完成 PTP/IP 文件事务");
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
         }
-        EnsureAccepted(ReadUInt16(response.Data, 8));
-        return data.ToArray();
+        catch (OperationCanceledException error) when (transactionStarted)
+        {
+            RetireCommandSession(stream, sessionGeneration, error);
+            throw;
+        }
+        finally
+        {
+            _commandGate.Release();
+        }
+    }
+
+    private CommandSession CaptureCommandSession()
+    {
+        lock (_sessionSync)
+        {
+            var stream = _commandStream ?? throw new InvalidOperationException(
+                "请先连接 Wi‑Fi 相机");
+            var generation = Volatile.Read(ref _sessionGeneration);
+            ThrowIfCommandChannelFailed();
+            return new CommandSession(stream, generation);
+        }
+    }
+
+    private void EnsureCommandSession(
+        NetworkStream expectedStream,
+        long expectedGeneration)
+    {
+        lock (_sessionSync)
+        {
+            if (!ReferenceEquals(_commandStream, expectedStream) ||
+                Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+            {
+                throw new OperationCanceledException(
+                    "PTP/IP 命令通道已被断开或由新会话取代");
+            }
+            ThrowIfCommandChannelFailed();
+        }
+    }
+
+    private void CommitSessionState(CommandSession session, Action commit)
+    {
+        lock (_sessionSync)
+        {
+            if (!ReferenceEquals(_commandStream, session.Stream) ||
+                Volatile.Read(ref _sessionGeneration) != session.Generation)
+            {
+                throw new OperationCanceledException(
+                    "PTP/IP 会话状态已被断开或由新会话取代");
+            }
+            ThrowIfCommandChannelFailed();
+            commit();
+        }
+    }
+
+    private bool TryCommitSessionState(CommandSession session, Action commit)
+    {
+        lock (_sessionSync)
+        {
+            if (!ReferenceEquals(_commandStream, session.Stream) ||
+                Volatile.Read(ref _sessionGeneration) != session.Generation)
+            {
+                return false;
+            }
+            lock (_probeSync)
+            {
+                if (_commandChannelFailure is not null)
+                {
+                    return false;
+                }
+            }
+            commit();
+            return true;
+        }
+    }
+
+    private void ThrowIfCommandChannelFailed()
+    {
+        lock (_probeSync)
+        {
+            if (_commandChannelFailure is { } failure)
+            {
+                throw new IOException("PTP/IP 命令通道不可用", failure);
+            }
+        }
+    }
+
+    private void RetireCommandSession(
+        NetworkStream expectedStream,
+        long expectedGeneration,
+        Exception error)
+    {
+        TcpClient? client;
+        lock (_sessionSync)
+        {
+            if (!ReferenceEquals(_commandStream, expectedStream) ||
+                Volatile.Read(ref _sessionGeneration) != expectedGeneration)
+            {
+                return;
+            }
+            client = _commandClient;
+            lock (_probeSync)
+            {
+                _commandChannelFailure ??= error;
+                _probeResponseWaiter?.TrySetException(
+                    new IOException("PTP/IP 命令通道已断开", error));
+            }
+            Status = "PTP/IP 命令通道已断开";
+        }
+        try
+        {
+            expectedStream.Dispose();
+        }
+        catch
+        {
+            // 退休动作必须保持幂等。
+        }
+        try
+        {
+            client?.Dispose();
+        }
+        catch
+        {
+            // 退休动作必须保持幂等。
+        }
     }
 
     private static async Task SendPacketAsync(
@@ -946,6 +1624,16 @@ public sealed class PtpIpCamera : IAsyncDisposable
         payload.CopyTo(packet, 8);
         await stream.WriteAsync(packet, cancellationToken);
         await stream.FlushAsync(cancellationToken);
+    }
+
+    private static TcpClient CreateTcpClient()
+    {
+        var client = new TcpClient { NoDelay = true };
+        client.Client.SetSocketOption(
+            SocketOptionLevel.Socket,
+            SocketOptionName.KeepAlive,
+            true);
+        return client;
     }
 
     private static async Task<(uint Type, byte[] Data)> ReceivePacketAsync(
@@ -992,13 +1680,52 @@ public sealed class PtpIpCamera : IAsyncDisposable
         return result;
     }
 
+    private void EnsureAcceptedForSession(
+        ushort response,
+        NetworkStream stream,
+        long generation)
+    {
+        if (response == 0x2001)
+        {
+            return;
+        }
+        RetireIfSessionFatal(response, stream, generation);
+        throw new PtpResponseException(
+            response,
+            $"相机拒绝了 PTP/IP 操作（0x{response:X4}）");
+    }
+
+    private void RetireIfSessionFatal(
+        ushort response,
+        NetworkStream stream,
+        long generation)
+    {
+        if (!IsSessionFatalResponse(response))
+        {
+            return;
+        }
+        var error = new PtpResponseException(
+            response,
+            $"相机拒绝了 PTP/IP 操作（0x{response:X4}）");
+        RetireCommandSession(stream, generation, error);
+        throw error;
+    }
+
     private static void EnsureAccepted(ushort response)
     {
         if (response != 0x2001)
         {
-            throw new IOException($"相机拒绝了 PTP/IP 操作（0x{response:X4}）");
+            throw new PtpResponseException(
+                response,
+                $"相机拒绝了 PTP/IP 操作（0x{response:X4}）");
         }
     }
+
+    private static bool IsVendorDetectionFallback(ushort response) =>
+        response is 0x2005 or 0x200a or 0x2019;
+
+    private static bool IsSessionFatalResponse(ushort response) =>
+        response is 0x2003 or 0x2004 or 0x201e;
 
     private static void WriteUtf16(Stream stream, string value)
     {

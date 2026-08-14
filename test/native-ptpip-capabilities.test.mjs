@@ -18,10 +18,16 @@ test('iOS PTP/IP session exposes Nikon live-view and movie vendor ops', async ()
   assert.match(service, /startMovieRecording: UInt16 = 0x920a/);
   assert.match(service, /endMovieRecording: UInt16 = 0x920b/);
   assert.match(service, /func startLiveView\(vendor: PTPIPCameraVendor\)/);
-  assert.match(service, /func endLiveView\(vendor: PTPIPCameraVendor\)/);
+  assert.match(
+    service,
+    /func endLiveView\([\s\S]{0,120}vendor: PTPIPCameraVendor,[\s\S]{0,120}ifOwnedBy ownerAttempt: UInt64\? = nil/,
+  );
   assert.match(service, /func getLiveViewFrame\(vendor: PTPIPCameraVendor\)/);
   assert.match(service, /func startMovieRecording\(vendor: PTPIPCameraVendor\)/);
-  assert.match(service, /func stopMovieRecording\(vendor: PTPIPCameraVendor\)/);
+  assert.match(
+    service,
+    /func stopMovieRecording\([\s\S]{0,120}vendor: PTPIPCameraVendor,[\s\S]{0,120}ifOwnedBy ownerAttempt: UInt64\? = nil/,
+  );
 });
 
 test('iOS PTP/IP parameter read/write uses standard PTP prop ops', async () => {
@@ -56,7 +62,10 @@ test('iOS Canon branch aligns with C2 EOS sequence (0x9110 EVF props)', async ()
 test('iOS vendor detection derives from DeviceInfo manufacturer with name fallback', async () => {
   const service = await read(
     'native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift');
-  assert.match(service, /func detectVendor\(using cameraName: String\)/);
+  assert.match(
+    service,
+    /func detectVendor\(using cameraName: String\) async throws/,
+  );
   assert.match(service, /deviceInfoManufacturer/);
   assert.match(service, /text\.contains\("nikon"\)/);
   assert.match(service, /text\.contains\("canon"\)/);
@@ -64,13 +73,19 @@ test('iOS vendor detection derives from DeviceInfo manufacturer with name fallba
   assert.match(service, /enum PTPIPCameraVendor: Equatable/);
 });
 
-test('E2 1.5.9: iOS detectVendor 用 GetDeviceInfo(0x1001)，重连先停取景', async () => {
+test('iOS detectVendor 用 GetDeviceInfo，心跳用 event probe，重连先停取景', async () => {
   const service = await read(
     'native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift');
   // 0x1002→0x1001（0x1001 才是 ISO 15740 GetDeviceInfo；0x1002 实为 OpenSession）。
-  assert.match(service, /func detectVendor\(using cameraName: String\)[\s\S]{0,400}0x1001/);
-  // 心跳探测仍走 0x1002（B2 契约不变）。
-  assert.match(service, /operation: 0x1002/);
+  assert.match(
+    service,
+    /func detectVendor\(using cameraName: String\) async throws[\s\S]{0,500}0x1001/,
+  );
+  // 心跳不得重复 OpenSession/GetDeviceInfo，应走 PTP/IP event probe type 13/14。
+  assert.match(
+    service,
+    /func probe\(timeoutMilliseconds:[\s\S]{0,700}writeEventPacket\([\s\S]{0,80}type: 13/,
+  );
   // 重连前先停实时取景（pro 复审观察项④收口）。
   assert.match(
     service,
@@ -89,7 +104,10 @@ test('WifiCameraService exposes live view, recording and parameter state', async
   assert.match(service, /@Published private\(set\) var apertureValue: Float = 0/);
   assert.match(service, /@Published private\(set\) var shutterSpeedValue: Double = 0/);
   assert.match(service, /func startLiveViewIfNeeded\(\)/);
-  assert.match(service, /func stopLiveViewIfNeeded\(\)/);
+  assert.match(
+    service,
+    /func stopLiveViewIfNeeded\(ifOwnedBy explicitAttempt: UInt64\? = nil\)/,
+  );
   assert.match(service, /func toggleVideoRecording\(\)/);
   assert.match(service, /func refreshParameters\(\)/);
   assert.match(service, /func stepISO\(_ direction: Int\)/);
@@ -99,8 +117,11 @@ test('WifiCameraService exposes live view, recording and parameter state', async
   assert.match(service, /detectVendor\(using: name\)/);
   assert.match(service, /startLiveViewIfNeeded\(\)/);
   // 断连清理：停取景/停录像后再断开会话
-  assert.match(service, /stopLiveViewIfNeeded\(\)/);
-  assert.match(service, /stopMovieRecording\(vendor: \w+\)/);
+  assert.match(service, /stopLiveViewIfNeeded\(ifOwnedBy:/);
+  assert.match(
+    service,
+    /stopMovieRecording\([\s\S]{0,100}vendor: \w+,[\s\S]{0,100}ifOwnedBy:/,
+  );
 });
 
 test('iOS UI routes record button to the active source and shows wifi live view', async () => {
@@ -218,11 +239,11 @@ test('E4: Android MainActivity wires wifi live view, body recording, parameter s
   assert.match(main, /stepWifiIso/);
   assert.match(main, /stepWifiAperture/);
   assert.match(main, /stepWifiShutter/);
-  assert.match(main, /refreshWifiParameters\(\)/);
+  assert.match(main, /refreshWifiParameters\(long expectedGeneration\)/);
   // 连接/重连成功路径：detectVendor → 自动取景 → 参数刷新
   assert.match(main, /detectVendor\(\)/);
   assert.match(main, /startLiveView\(\)/);
-  assert.match(main, /refreshWifiParameters\(\)/);
+  assert.match(main, /refreshWifiParameters\(connectionGeneration\)/);
   // 断连/离线清理：停取景/停录像/清厂商
   assert.match(main, /stopLiveView\(\)/);
   assert.match(main, /wifiMovieRecording = false/);
@@ -271,12 +292,12 @@ test('E4: Harmony Index wires wifi live view, body recording, parameter steppers
   assert.match(main, /stepWifiIso/);
   assert.match(main, /stepWifiAperture/);
   assert.match(main, /stepWifiShutter/);
-  assert.match(main, /refreshWifiParameters\(\)/);
+  assert.match(main, /refreshWifiParametersFor\(camera, attempt\)/);
   assert.match(main, /wifiParameterReadout/);
   // 连接/重连成功路径：detectVendor → 自动取景 → 参数刷新
   assert.match(main, /detectVendor\(\)/);
   assert.match(main, /startLiveView\(\)/);
-  assert.match(main, /refreshWifiParameters\(\)/);
+  assert.match(main, /refreshWifiParametersFor\(camera, attempt\)/);
   // 预览循环按源路由（Wi‑Fi 源调 wifiCamera.getLiveViewFrame）
   assert.match(main, /wifiCamera\.getLiveViewFrame\(\)/);
   // 断连/离线清理：停取景/停录像/清厂商

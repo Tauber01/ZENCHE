@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 项目大纲
 
 > 文档状态：工作基线
-> 最近核对：2026-08-12（Asia/Shanghai）
+> 最近核对：2026-08-15（Asia/Shanghai）
 > 使用方式：开始产品、界面、技术或发布工作前，先阅读根目录 `AGENTS.md`，再阅读本文、`docs/TECHNICAL_APPROACH.md` 与 `docs/TASK_PROGRESS.md`。
 
 ## 1. 项目定位
@@ -14,11 +14,23 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.13
-- 当前原生构建号：40
+- 当前源码版本：1.5.14（连接可靠性修复候选，未发布）
+- 当前原生构建号：41
 - 发布状态：[GitHub Release v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) 已于 `2026-08-12T03:33:52Z` 发布为 Latest，非草稿、非预发布；注释标签解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`。六个五端安装包及六份 SHA-256 侧车已从最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd` 重建并回验；聚合交付包为 275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，发布 run `31560420972` 对全部线上资产重新下载并逐字节比对，14/14 一致；官网自动更新不在本次范围内，继续提供 W14 的 1.5.10 / build 37。
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
+
+1.5.14 / build 41 为五端连接可靠性修复候选。PTP/IP 心跳改用 event 通道的标准
+Probe Request/Response(type 13/14)，常驻 reader 同时响应相机主动探测并排空事件；
+Apple、HarmonyOS、Windows 为完整 command transaction 增加显式串行 gate。GetDeviceInfo
+恢复无参数请求及 PIMA STR/AUINT16 解析，data-out 按 StartData(tx,length) +
+EndData(tx,data) 组帧并校验响应 transaction。Android/HarmonyOS 补齐网络监听权限，
+Windows 自动重连每轮有 12 秒上限且只在会话恢复完成后退出重连态；五端连接取消
+均以代际或等价门禁阻止旧回调复活。预冻结工作树完整自动化 573/573、连接专项
+61/61，以及 Android Release 编译、Apple 类型检查、HarmonyOS Release 构建和
+Windows Release 构建已通过；冻结提交的五端重建、六包、侧车与容器复验仍待
+完成，逐包状态见 `docs/releases/v1.5.14.md`。GitHub Latest 仍是 1.5.13，官网仍为
+1.5.10；五端真机相机、断网恢复、正式签名与安装仍待验收。
 
 W15 修复五端登录页中“模式标签”和“提交按钮”同名造成的误触歧义，并为 macOS、Windows 增加可保存的桌面工作区。两端会恢复主窗口大小和位置，Windows 还会恢复最大化状态；主导航、拍摄参数、编辑媒体池、工具面板及底部工具区可在拖动中实时连续调节，Windows AI 工具面板另有独立分隔条。桌面编辑器将“专业显影 / AI 工具”固定为一级模式，色轮、曲线、蒙版等归入二级“调整类别”；RGB 示波器会填满底部可用空间。预览和示波器复用同一受控尺寸图像，Windows 另合并高频刷新、按录制状态启停时间码，并在替换结果、切换照片或模式、离开编辑页及关闭窗口时清理受限命名的 AI 临时文件和编辑位图。第一版不包含任意浮动面板或跨屏面板停靠；Windows 多显示器/DPI 与两端真实拖拽、重启恢复及长时间性能仍需真机验收。最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，完整测试 503/503 通过；Windows 两包已按该基线重建，未受后续 Windows 专属改动影响的 macOS DMG 复用 `0faeccdc987146c104fd73d742547c9baf9db221` 已验证产物。最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，14 项逐字节一致。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、签名事实、生产边界、去 AI 痕迹与交付内容无实体问题，其唯一状态 P2 已完成回填。
 
@@ -98,7 +110,7 @@ v1.5.2 线上七个交付包的 SHA-256 为：Android `d90bc767d0b1b710f66e5a2b8
 - **Capture**：设备识别、实时取景、SDRAM 拍摄、JPEG 下载和自动拍摄任务。
 - **Control**：曝光、对焦、白平衡、拍摄模式与 Picture Control。
 - **Monitor**：专业示波与辅助监看；监看效果不得修改原片。
-- **Connect**：FTP/PASV、HTTP PUT/POST、WebDAV 局域网收件箱；PTP/IP 直连相机，含 5s 心跳保活（GetDeviceInfo 探测、3s 超时、连续 3 次判离线）、指数退避自动重连（1/2/4/8/16s 封顶 30s、用户主动断开不触发）与网络层监听联动（丢网即判离线并进入重连）。
+- **Connect**：FTP/PASV、HTTP PUT/POST、WebDAV 局域网收件箱；PTP/IP 直连相机，含 event 通道 5s Probe 心跳（3s 超时、连续 3 次判离线）、指数退避自动重连（1/2/4/8/16s 封顶 30s、用户主动断开不触发）与网络层监听联动（丢网即判离线并进入重连）。
 - **Flow**：本地图库、树状分支、拍摄会话、RAW + JPEG 配对、评级、备份、SHA-256，以及通过系统保存器导出本地副本。
 - **Develop**：分组参数、预设、前后对比、几何调整，以及将高质量 JPEG 新副本保存到文件库、系统相册或用户选择的本地位置。
 - **AI 工具**：AI 修图与 AI 生图、快捷预设、宽高比/分辨率选择、激活码授权与服务器端计数；开源客户端不内置模型 API 密钥。

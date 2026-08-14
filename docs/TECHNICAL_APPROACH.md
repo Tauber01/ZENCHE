@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-12（Asia/Shanghai）
+> 最近核对：2026-08-15（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -326,13 +326,18 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 重名文件生成唯一名称，不覆盖已有素材；缺少 `Content-Length` 或鉴权失败时不创建空文件。
 - 服务只在用户明确开启且应用生命周期允许时监听，退出后释放全部端口。
 
-### 5.1 PTP/IP 链路与连接监看（B2，v1.5.7）
+### 5.1 PTP/IP 链路与连接监看（B2，1.5.14 协议勘正）
 
-- **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机，复用各端既有 PTP 会话通道：iOS/macOS 由 Swift actor、Android 由 Java synchronized 实例锁保证心跳与事务命令严格串行；Harmony（ArkTS 顺序 await）与 Windows（C# 共享命令流）为共享单通道隐式串行——无显式 gate，与基线用户操作同模式，交错仅限 await 点且心跳失败无害（补显式 gate 已入 backlog）。握手为 PTP/IP 标准 Init Command Request/ACK（UUID + initiator 名 + 版本）与事件通道建立，随后以 GetDeviceInfo 确认会话。
-- **心跳保活**：连接建立后每 5s 发送 GetDeviceInfo（0x1002）探测，单次超时 3s；连续 3 次失败判定离线（约 15–24s 无响应窗口）。
+- **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机。握手依次建立 command 与 event TCP、完成 Init Command/Event Request/ACK，再在 command 通道发送一次 OpenSession(0x1002, transaction=0, session=1)。event 握手完成后立即启动单 reader，持续排空 type 8 事件并处理双向 type 13/14 probe。
+- **心跳保活**：连接建立后每 5s 在 event 通道发送 ProbeRequest(type 13)，等待 ProbeResponse(type 14)，单次超时 3s；相机主动 type 13 由 reader 立即回 type 14。旧实现重复发送 OpenSession(0x1002)，合规相机会返回 SessionAlreadyOpen 并触发假离线，该行为已禁止。
+- **事务串行**：Apple、HarmonyOS、Windows 用显式异步 gate 包住完整 command transaction（transaction 分配、请求、全部 data phase、响应），Android 继续用同步 I/O + `synchronized`。Swift actor、ArkTS 顺序 `await` 与 C# 共享流都不是跨挂起点的事务锁；不得恢复“隐式串行”假设。OperationResponse 还必须校验 transaction ID。
+- **会话隔离**：Apple、HarmonyOS、Windows 的 command/event writer 都绑定连接对象与 session generation，拿 gate 后再次校验；断开会先使 generation 失效，握手期局部双通道失败必须同时清理，旧 waiter 不能污染新会话。Android 的 PTP/IP 事务继续由实例 `synchronized` 串行，但握手中的局部 socket 也绑定 transport generation 并可由无 monitor 的 abort 立即关闭；UI 初连/重连与 Camera2 初连另绑定 connection generation，每个 I/O 恢复边界和主线程发布前复核，不能从旧回调复活。HarmonyOS 跨 USB/Wi-Fi/本机相机切换另有共同 source-switch generation，旧 teardown continuation 不得重新建立被后来意图替代的源。
+- **期限与失败分类**：事务开始后的 deadline、取消、TCP 或帧错误必须退休当时捕获的精确 session/stream，避免迟到响应被下一事务读取；Apple gate waiter 取消时交还 lease，Windows preview 每帧也有有限 deadline。普通 `OperationNotSupported` / `DevicePropNotSupported` / `DeviceBusy` 可按调用语义降级，不 poison transport；`SessionNotOpen(0x2003)`、`InvalidTransactionID(0x2004)`（及平台识别的等价 session-fatal）必须使健康检查失败并进入统一重连，不能靠 event Probe 误报已连接。
+- **数据集与数据相位**：GetDeviceInfo(0x1001) 无参数，PTP STR 按字符数 + UTF-16LE、AUINT16 按 u32 数量解析。data-out 固定为 OperationRequest(DataPhaseInfo=2) → StartData(tx,totalLength) → EndData(tx,data) → OperationResponse；不允许前导零或把短数据放进 StartData。HarmonyOS SetDevicePropValue 必须携带 `[propCode]`。data-in 接受 `UINT64_MAX` 未知长度哨兵，已知长度必须与 EndData 后累计值一致；累计上限 512 MB，但当前单个 PTP/IP 包仍限 64 MiB，因此需要 responder 对大对象分片，单个超大 EndData 尚未兼容。
 - **状态机**：`connecting → connected → reconnecting → connected/disconnected`；新增 `reconnecting` 态承载自动重连。iOS/macOS 为带 attempt 的枚举（`reconnecting(attempt:)`，对外以 `isReconnecting` 呈现）；Android/Harmony/Windows 为布尔 + 计数。
-- **自动重连**：指数退避序列 1/2/4/8/16s，封顶 30s（`backoffDelay(forAttempt:)` / `wifiBackoffDelayMs` 等纯函数）；用户主动断开（`manualDisconnect` 标志）一律不触发自动重连。
-- **网络层监听联动**：丢网即判离线，不等心跳超时——iOS/macOS `NWPathMonitor`（`path.status != .satisfied`）、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（'netLost'）、Windows `NetworkChange.NetworkAvailabilityChanged`；监听到位后走同一退避重连流程，网络恢复即重连。
+- **自动重连**：指数退避序列 1/2/4/8/16s，封顶 30s（`backoffDelay(forAttempt:)` / `wifiBackoffDelayMs` 等纯函数）；用户主动断开（`manualDisconnect` 标志）一律不触发自动重连。Windows 单轮握手与恢复使用 12s linked deadline，恢复厂商、取景、参数与监看前保持 reconnecting，失败必须继续调度而不能卡死。
+- **Probe 策略边界**：5s 周期 / 3s 超时是产品为快速恢复采用的策略，并非 CIPA 的规范值；DC-X005 将 Initiator Probe 描述为事务期间的可选探测并给出 10s 响应等待。当前策略须经 Nikon/Sony/Canon 真机验证，严格或低资源 responder 的兼容性不能由静态测试推出。
+- **网络层监听联动**：丢网即判离线，不等心跳超时——iOS/macOS `NWPathMonitor`、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（`BEARER_WIFI` + `netLost`）、Windows `NetworkChange.NetworkAvailabilityChanged`；移动端回调绑定网络/attempt 所有权，旧 callback 不得关闭新实例。Android manifest 必须声明 `ACCESS_NETWORK_STATE`，HarmonyOS module 必须声明 `GET_NETWORK_INFO`。监听到位后走同一退避重连流程，网络恢复可提前唤醒下一轮重连。
 - **UI 呈现**：仅文本分支——`reconnecting` 态显示「重连中 / 正在重连 Wi‑Fi 相机…」并禁用连接按钮，橙色状态点；断连文案与既有样式语言一致，无新控件。
 
 ## 6. 本地工作流与图像处理

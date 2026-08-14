@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -25,6 +26,8 @@ final class PtpIpCamera implements Closeable {
     private static final int PACKET_START_DATA = 9;
     private static final int PACKET_DATA = 10;
     private static final int PACKET_END_DATA = 12;
+    private static final int PACKET_PROBE_REQUEST = 13;
+    private static final int PACKET_PROBE_RESPONSE = 14;
     private static final int RESPONSE_OK = 0x2001;
     /** B2 保活参数（契约测试锚点）：单次探测超时 3s。 */
     static final int PROBE_TIMEOUT_MS = 3000;
@@ -56,10 +59,23 @@ final class PtpIpCamera implements Closeable {
         SONY
     }
 
-    private Socket commandSocket;
-    private Socket eventSocket;
+    private volatile Socket commandSocket;
+    private volatile Socket eventSocket;
+    private volatile Socket connectingCommandSocket;
+    private volatile Socket connectingEventSocket;
+    private final Object transportLock = new Object();
+    private long transportGeneration;
     private InputStream commandInput;
     private OutputStream commandOutput;
+    private InputStream eventInput;
+    private OutputStream eventOutput;
+    private final Object eventOutputLock = new Object();
+    private final Object probeMonitor = new Object();
+    private volatile boolean eventReaderRunning;
+    private IOException eventReaderFailure;
+    private volatile IOException commandChannelFailure;
+    private long probeResponseSequence;
+    private Thread eventReaderThread;
     private int transactionId = 1;
     private String cameraName = "PTP/IP Camera";
     private CameraVendor vendor = CameraVendor.UNKNOWN;
@@ -71,10 +87,14 @@ final class PtpIpCamera implements Closeable {
         if (host == null || host.trim().isEmpty() || port < 1 || port > 65535) {
             throw new IOException("Wi‑Fi 相机地址或端口无效");
         }
+        final long generation = beginTransportAttempt();
         try {
-            commandSocket = open(host.trim(), port);
-            commandInput = new BufferedInputStream(commandSocket.getInputStream());
-            commandOutput = new BufferedOutputStream(commandSocket.getOutputStream());
+            Socket pendingCommandSocket = open(
+                    host.trim(), port, generation, true);
+            InputStream pendingCommandInput = new BufferedInputStream(
+                    pendingCommandSocket.getInputStream());
+            OutputStream pendingCommandOutput = new BufferedOutputStream(
+                    pendingCommandSocket.getOutputStream());
 
             ByteWriter initialization = new ByteWriter();
             byte[] guid = new byte[16];
@@ -82,8 +102,13 @@ final class PtpIpCamera implements Closeable {
             initialization.bytes(guid);
             initialization.utf16("ZENCHE Android");
             initialization.u32(0x00010000L);
-            writePacket(commandOutput, PACKET_INIT_COMMAND_REQUEST, initialization.data());
-            Packet commandAck = readPacket(commandInput);
+            writePacket(
+                    pendingCommandOutput,
+                    PACKET_INIT_COMMAND_REQUEST,
+                    initialization.data());
+            ensureTransportGeneration(generation);
+            Packet commandAck = readPacket(pendingCommandInput);
+            ensureTransportGeneration(generation);
             if (commandAck.type != PACKET_INIT_COMMAND_ACK || commandAck.data.length < 28) {
                 throw new IOException("相机返回了无效的 PTP/IP 握手数据");
             }
@@ -91,20 +116,50 @@ final class PtpIpCamera implements Closeable {
             String announcedName = utf16(commandAck.data, 28);
             if (!announcedName.isEmpty()) cameraName = announcedName;
 
-            eventSocket = open(host.trim(), port);
+            Socket pendingEventSocket = open(
+                    host.trim(), port, generation, false);
+            InputStream pendingEventInput = new BufferedInputStream(
+                    pendingEventSocket.getInputStream());
+            OutputStream pendingEventOutput = new BufferedOutputStream(
+                    pendingEventSocket.getOutputStream());
             ByteWriter eventInitialization = new ByteWriter();
             eventInitialization.u32(connectionNumber);
             writePacket(
-                    eventSocket.getOutputStream(),
+                    pendingEventOutput,
                     PACKET_INIT_EVENT_REQUEST,
                     eventInitialization.data());
-            Packet eventAck = readPacket(eventSocket.getInputStream());
+            ensureTransportGeneration(generation);
+            Packet eventAck = readPacket(pendingEventInput);
+            ensureTransportGeneration(generation);
             if (eventAck.type != PACKET_INIT_EVENT_ACK) {
                 throw new IOException("相机未确认 PTP/IP 事件通道");
             }
 
+            synchronized (transportLock) {
+                ensureTransportGenerationLocked(generation);
+                if (connectingCommandSocket != pendingCommandSocket
+                        || connectingEventSocket != pendingEventSocket) {
+                    throw new EOFException("PTP/IP 连接尝试已失效");
+                }
+                commandSocket = pendingCommandSocket;
+                commandInput = pendingCommandInput;
+                commandOutput = pendingCommandOutput;
+                eventSocket = pendingEventSocket;
+                eventInput = pendingEventInput;
+                eventOutput = pendingEventOutput;
+                connectingCommandSocket = null;
+                connectingEventSocket = null;
+            }
+            startEventReader(
+                    pendingCommandSocket,
+                    pendingEventSocket,
+                    pendingEventInput,
+                    pendingEventOutput,
+                    generation);
+
             int response = command(0x1002, 0, new long[]{1});
             if (response != RESPONSE_OK) throw rejected(response);
+            ensureTransportGeneration(generation);
             transactionId = 1;
             return cameraName;
         } catch (Exception error) {
@@ -122,19 +177,48 @@ final class PtpIpCamera implements Closeable {
         if (response != RESPONSE_OK) throw rejected(response);
     }
 
-    /**
-     * 无副作用链路探测：GetDeviceInfo（0x1002），用于心跳保活。
-     * synchronized 与在途会话命令串行；单次超时 3s（临时收紧 soTimeout）。
-     */
+    /** PTP/IP event 通道 Probe Request/Response（type 13/14），单次超时 3s。 */
     synchronized void probe() throws Exception {
         ensureConnected();
-        int previous = commandSocket.getSoTimeout();
-        try {
-            commandSocket.setSoTimeout(PROBE_TIMEOUT_MS);
-            int response = command(0x1002, 0, new long[]{1});
-            if (response != RESPONSE_OK) throw rejected(response);
-        } finally {
-            commandSocket.setSoTimeout(previous);
+        Socket expectedSocket = eventSocket;
+        OutputStream output = eventOutput;
+        if (expectedSocket == null || output == null || !eventReaderRunning) {
+            throw new IOException("PTP/IP 事件通道未连接");
+        }
+
+        long baseline;
+        synchronized (probeMonitor) {
+            if (commandChannelFailure != null) throw commandChannelFailure;
+            if (eventReaderFailure != null) throw eventReaderFailure;
+            baseline = probeResponseSequence;
+        }
+        synchronized (eventOutputLock) {
+            writePacket(output, PACKET_PROBE_REQUEST, new byte[0]);
+        }
+
+        long deadline = System.nanoTime() + PROBE_TIMEOUT_MS * 1_000_000L;
+        synchronized (probeMonitor) {
+            while (probeResponseSequence == baseline
+                    && eventReaderFailure == null
+                    && eventReaderRunning) {
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) break;
+                long milliseconds = remaining / 1_000_000L;
+                int nanoseconds = (int) (remaining % 1_000_000L);
+                try {
+                    probeMonitor.wait(milliseconds, nanoseconds);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("心跳探测被取消", interrupted);
+                }
+            }
+            if (eventReaderFailure != null) throw eventReaderFailure;
+            if (!eventReaderRunning || eventSocket != expectedSocket) {
+                throw new IOException("PTP/IP 事件通道已断开");
+            }
+            if (probeResponseSequence == baseline) {
+                throw new SocketTimeoutException("心跳探测超时");
+            }
         }
     }
 
@@ -225,12 +309,15 @@ final class PtpIpCamera implements Closeable {
         CameraVendor nameBased = vendorForName(cameraName);
         CameraVendor resolved = nameBased;
         try {
-            byte[] info = commandWithData(0x1001, transactionId++, new long[]{1});
+            byte[] info = commandWithData(0x1001, transactionId++, new long[0]);
             String manufacturer = deviceInfoManufacturer(info);
             if (manufacturer != null && !manufacturer.trim().isEmpty()) {
                 resolved = vendorForManufacturer(manufacturer, nameBased);
             }
-        } catch (Exception ignored) {
+        } catch (PtpResponseException responseError) {
+            if (!isVendorDiscoveryFallback(responseError.responseCode)) {
+                throw responseError;
+            }
             // 部分机型对 0x1001 直接回响应（无数据段），退回名称启发式。
         }
         vendor = resolved;
@@ -364,10 +451,8 @@ final class PtpIpCamera implements Closeable {
     }
 
     /**
-     * data-out 请求（DataPhaseInfo=2）：请求(type 6) → StartData(type 9,
-     * 载荷 [前导 0][TransactionID][TotalLength u64][数据]，对齐 iOS/Windows
-     * 事实标准，TBC-awaiting-hardware) → EndData(type 12) → 响应(type 7)。
-     * 用于 SetDevicePropValue(0x1016) 与 Canon EOS_SetDevicePropValueEx(0x9110)。
+     * data-out 请求（DataPhaseInfo=2）：OperationRequest → StartData(tx,length) →
+     * EndData(tx,data) → OperationResponse。
      */
     private int sendCommandWithDataOut(
             int operation,
@@ -380,23 +465,24 @@ final class PtpIpCamera implements Closeable {
         request.u16(operation);
         request.u32(transaction);
         for (long parameter : parameters) request.u32(parameter);
-        writePacket(commandOutput, PACKET_COMMAND_REQUEST, request.data());
+        writeCommandPacket(PACKET_COMMAND_REQUEST, request.data());
 
         ByteWriter startData = new ByteWriter();
-        startData.u32(0);
         startData.u32(transaction);
         startData.u64(data.length);
-        startData.bytes(data);
-        writePacket(commandOutput, PACKET_START_DATA, startData.data());
+        writeCommandPacket(PACKET_START_DATA, startData.data());
 
         ByteWriter endData = new ByteWriter();
-        endData.u32(0);
         endData.u32(transaction);
-        writePacket(commandOutput, PACKET_END_DATA, endData.data());
+        endData.bytes(data);
+        writeCommandPacket(PACKET_END_DATA, endData.data());
 
-        Packet response = readPacket(commandInput);
-        if (response.type != PACKET_COMMAND_RESPONSE || response.data.length < 14) {
-            throw new IOException("相机返回了无效的 PTP/IP 响应");
+        Packet response = readCommandPacket();
+        if (response.type != PACKET_COMMAND_RESPONSE
+                || response.data.length < 14
+                || u32(response.data, 10) != (transaction & 0xffff_ffffL)) {
+            throw commandChannelFailed(
+                    new IOException("相机返回了无效的 PTP/IP 响应"));
         }
         return u16(response.data, 8);
     }
@@ -519,45 +605,42 @@ final class PtpIpCamera implements Closeable {
         return Arrays.copyOfRange(source, start, end);
     }
 
-    /**
-     * GetDeviceInfo 数据段 Manufacturer 解析（UTF-8，布局见 PTPIP_PROTOCOL.md §4）：
-     * StandardVersion(2)+VendorExtensionID(4)+VendorExtensionVersion(2)+
-     * VendorExtensionDesc(UTF8)+FunctionalMode(2)+四个数组(各 2 字节长度+条目)+
-     * ImageFormats(同上)+Manufacturer(UTF8)。
-     */
+    /** GetDeviceInfo 数据段 Manufacturer 解析（PTP STR + AUINT16）。 */
     private static String deviceInfoManufacturer(byte[] data) {
         if (data.length < 8) return null;
         int[] offset = new int[]{8};
-        if (readUtf8(data, offset) == null) return null; // VendorExtensionDesc
+        if (readPtpString(data, offset) == null) return null; // VendorExtensionDesc
         if (offset[0] + 2 > data.length) return null;
         offset[0] += 2; // FunctionalMode
-        for (int index = 0; index < 4; index++) { // Operations/Events/DeviceProperties/CaptureFormats
-            if (offset[0] + 2 > data.length) return null;
-            int count = u16(data, offset[0]);
-            offset[0] += 2;
-            if (offset[0] + count * 2 > data.length) return null;
-            offset[0] += count * 2;
+        for (int index = 0; index < 5; index++) {
+            if (offset[0] + 4 > data.length) return null;
+            long count = u32(data, offset[0]);
+            offset[0] += 4;
+            if (count > (data.length - offset[0]) / 2L) return null;
+            offset[0] += (int) count * 2;
         }
-        if (offset[0] + 2 > data.length) return null;
-        int imageCount = u16(data, offset[0]); // ImageFormats
-        offset[0] += 2;
-        if (offset[0] + imageCount * 2 > data.length) return null;
-        offset[0] += imageCount * 2;
-        return readUtf8(data, offset);
+        return readPtpString(data, offset);
     }
 
-    private static String readUtf8(byte[] data, int[] offsetRef) {
+    private static String readPtpString(byte[] data, int[] offsetRef) {
         int offset = offsetRef[0];
         if (offset >= data.length) return null;
-        int end = offset;
-        while (end < data.length && data[end] != 0) end++;
-        if (end >= data.length) return null;
+        int characterCount = data[offset] & 0xff;
+        offset++;
+        if (characterCount == 0) {
+            offsetRef[0] = offset;
+            return "";
+        }
+        int byteCount = characterCount * 2;
+        if (byteCount > data.length - offset
+                || data[offset + byteCount - 2] != 0
+                || data[offset + byteCount - 1] != 0) return null;
         String text = new String(
                 data,
                 offset,
-                end - offset,
-                StandardCharsets.UTF_8);
-        offsetRef[0] = end + 1;
+                byteCount - 2,
+                StandardCharsets.UTF_16LE);
+        offsetRef[0] = offset + byteCount;
         return text;
     }
 
@@ -586,6 +669,18 @@ final class PtpIpCamera implements Closeable {
                 && !commandSocket.isClosed();
     }
 
+    /** 发布 UI 已连接状态前的双通道健康屏障。 */
+    synchronized void assertHealthy() throws IOException {
+        ensureConnected();
+        synchronized (probeMonitor) {
+            if (commandChannelFailure != null) throw commandChannelFailure;
+            if (eventReaderFailure != null) throw eventReaderFailure;
+            if (!eventReaderRunning || eventSocket == null || eventSocket.isClosed()) {
+                throw new EOFException("PTP/IP 事件通道已断开");
+            }
+        }
+    }
+
     synchronized String getCameraName() {
         return cameraName;
     }
@@ -598,10 +693,13 @@ final class PtpIpCamera implements Closeable {
         request.u16(operation);
         request.u32(transaction);
         for (long parameter : parameters) request.u32(parameter);
-        writePacket(commandOutput, PACKET_COMMAND_REQUEST, request.data());
-        Packet response = readPacket(commandInput);
-        if (response.type != PACKET_COMMAND_RESPONSE || response.data.length < 14) {
-            throw new IOException("相机返回了无效的 PTP/IP 响应");
+        writeCommandPacket(PACKET_COMMAND_REQUEST, request.data());
+        Packet response = readCommandPacket();
+        if (response.type != PACKET_COMMAND_RESPONSE
+                || response.data.length < 14
+                || u32(response.data, 10) != (transaction & 0xffff_ffffL)) {
+            throw commandChannelFailed(
+                    new IOException("相机返回了无效的 PTP/IP 响应"));
         }
         return u16(response.data, 8);
     }
@@ -615,57 +713,290 @@ final class PtpIpCamera implements Closeable {
         request.u16(operation);
         request.u32(transaction);
         for (long parameter : parameters) request.u32(parameter);
-        writePacket(commandOutput, PACKET_COMMAND_REQUEST, request.data());
+        writeCommandPacket(PACKET_COMMAND_REQUEST, request.data());
 
-        Packet first = readPacket(commandInput);
+        Packet first = readCommandPacket();
         if (first.type == PACKET_COMMAND_RESPONSE) {
-            int response = first.data.length >= 10 ? u16(first.data, 8) : 0x2002;
+            if (first.data.length < 14
+                    || u32(first.data, 10) != (transaction & 0xffff_ffffL)) {
+                throw commandChannelFailed(
+                        new IOException("相机返回了无效的 PTP/IP 响应"));
+            }
+            int response = u16(first.data, 8);
             throw rejected(response);
         }
         if (first.type != PACKET_START_DATA || first.data.length < 20
                 || u32(first.data, 8) != (transaction & 0xffff_ffffL)) {
-            throw new IOException("相机返回了无效的 PTP/IP 数据阶段");
+            throw commandChannelFailed(
+                    new IOException("相机返回了无效的 PTP/IP 数据阶段"));
         }
         long totalLength = u64(first.data, 12);
-        if (totalLength > 512L * 1024 * 1024) {
-            throw new IOException("机内文件超过当前 512 MB 单文件传输上限");
+        boolean hasDeclaredLength = u32(first.data, 12) != 0xffff_ffffL
+                || u32(first.data, 16) != 0xffff_ffffL;
+        if (hasDeclaredLength && totalLength > 512L * 1024 * 1024) {
+            throw commandChannelFailed(
+                    new IOException("机内文件超过当前 512 MB 单文件传输上限"));
         }
         ByteArrayOutputStream data = new ByteArrayOutputStream(
-                (int) Math.min(totalLength, 8L * 1024 * 1024));
+                (int) Math.min(
+                        hasDeclaredLength ? totalLength : 8L * 1024 * 1024,
+                        8L * 1024 * 1024));
         while (true) {
-            Packet packet = readPacket(commandInput);
+            Packet packet = readCommandPacket();
             if ((packet.type != PACKET_DATA && packet.type != PACKET_END_DATA)
                     || packet.data.length < 12
                     || u32(packet.data, 8) != (transaction & 0xffff_ffffL)) {
-                throw new IOException("相机返回了无效的 PTP/IP 文件数据包");
+                throw commandChannelFailed(
+                        new IOException("相机返回了无效的 PTP/IP 文件数据包"));
             }
             data.write(packet.data, 12, packet.data.length - 12);
             if (data.size() > 512 * 1024 * 1024) {
-                throw new IOException("机内文件超过当前 512 MB 单文件传输上限");
+                throw commandChannelFailed(
+                        new IOException("机内文件超过当前 512 MB 单文件传输上限"));
+            }
+            if (hasDeclaredLength && data.size() > totalLength) {
+                throw commandChannelFailed(
+                        new IOException("相机返回的数据超过 StartData 声明长度"));
             }
             if (packet.type == PACKET_END_DATA) break;
         }
-        Packet response = readPacket(commandInput);
-        if (response.type != PACKET_COMMAND_RESPONSE || response.data.length < 14) {
-            throw new IOException("相机没有完成 PTP/IP 文件事务");
+        if (hasDeclaredLength && data.size() != totalLength) {
+            throw commandChannelFailed(
+                    new IOException("相机返回的数据与 StartData 声明长度不一致"));
+        }
+        Packet response = readCommandPacket();
+        if (response.type != PACKET_COMMAND_RESPONSE
+                || response.data.length < 14
+                || u32(response.data, 10) != (transaction & 0xffff_ffffL)) {
+            throw commandChannelFailed(
+                    new IOException("相机没有完成 PTP/IP 文件事务"));
         }
         int code = u16(response.data, 8);
         if (code != RESPONSE_OK) throw rejected(code);
         return data.toByteArray();
     }
 
+    private void startEventReader(
+            Socket expectedCommandSocket,
+            Socket expectedEventSocket,
+            InputStream input,
+            OutputStream output,
+            long generation) throws IOException {
+        synchronized (transportLock) {
+            ensureEventReaderSessionLocked(
+                    expectedCommandSocket,
+                    expectedEventSocket,
+                    generation);
+            synchronized (probeMonitor) {
+                eventReaderFailure = null;
+                probeResponseSequence = 0;
+                eventReaderRunning = true;
+            }
+        }
+        Thread reader = new Thread(
+                () -> runEventReader(
+                        expectedCommandSocket,
+                        expectedEventSocket,
+                        input,
+                        output,
+                        generation),
+                "zenche-ptpip-events");
+        reader.setDaemon(true);
+        eventReaderThread = reader;
+        reader.start();
+    }
+
+    private void runEventReader(
+            Socket expectedCommandSocket,
+            Socket expectedEventSocket,
+            InputStream input,
+            OutputStream output,
+            long generation) {
+        IOException failure = null;
+        try {
+            while (isCurrentEventReader(
+                    expectedCommandSocket,
+                    expectedEventSocket,
+                    generation)) {
+                Packet packet;
+                try {
+                    packet = readPacket(input);
+                } catch (SocketTimeoutException idle) {
+                    continue;
+                }
+                if (!isCurrentEventReader(
+                        expectedCommandSocket,
+                        expectedEventSocket,
+                        generation)) {
+                    return;
+                }
+                if (packet.type == 13) {
+                    synchronized (eventOutputLock) {
+                        if (!isCurrentEventReader(
+                                expectedCommandSocket,
+                                expectedEventSocket,
+                                generation)) {
+                            return;
+                        }
+                        writePacket(output, PACKET_PROBE_RESPONSE, new byte[0]);
+                    }
+                } else if (packet.type == 14) {
+                    synchronized (transportLock) {
+                        if (!isCurrentEventReaderLocked(
+                                expectedCommandSocket,
+                                expectedEventSocket,
+                                generation)) {
+                            return;
+                        }
+                        synchronized (probeMonitor) {
+                            probeResponseSequence++;
+                            probeMonitor.notifyAll();
+                        }
+                    }
+                } else if (packet.type == 8) {
+                    // 事件已从 TCP 流中完整取走；业务事件接入时可在此分发。
+                }
+            }
+        } catch (IOException error) {
+            failure = error;
+        } finally {
+            boolean ownsSession = false;
+            synchronized (transportLock) {
+                if (isCurrentEventReaderLocked(
+                        expectedCommandSocket,
+                        expectedEventSocket,
+                        generation)) {
+                    ownsSession = true;
+                    eventReaderRunning = false;
+                    synchronized (probeMonitor) {
+                        eventReaderFailure = failure != null
+                                ? failure
+                                : new EOFException("PTP/IP 事件通道已断开");
+                        probeMonitor.notifyAll();
+                    }
+                }
+            }
+            if (ownsSession) {
+                // 只关闭 reader 捕获的配对 command socket；绝不读取可能已经
+                // 指向新会话的共享字段。
+                closeQuietly(expectedCommandSocket);
+            }
+        }
+    }
+
+    private boolean isCurrentEventReader(
+            Socket expectedCommandSocket,
+            Socket expectedEventSocket,
+            long generation) {
+        synchronized (transportLock) {
+            return isCurrentEventReaderLocked(
+                    expectedCommandSocket,
+                    expectedEventSocket,
+                    generation);
+        }
+    }
+
+    private boolean isCurrentEventReaderLocked(
+            Socket expectedCommandSocket,
+            Socket expectedEventSocket,
+            long generation) {
+        return eventReaderRunning
+                && transportGeneration == generation
+                && commandSocket == expectedCommandSocket
+                && eventSocket == expectedEventSocket;
+    }
+
+    private void ensureEventReaderSessionLocked(
+            Socket expectedCommandSocket,
+            Socket expectedEventSocket,
+            long generation) throws IOException {
+        ensureTransportGenerationLocked(generation);
+        if (commandSocket != expectedCommandSocket
+                || eventSocket != expectedEventSocket) {
+            throw new EOFException("PTP/IP 事件 reader 会话已失效");
+        }
+    }
+
     private void ensureConnected() throws IOException {
+        if (commandChannelFailure != null) throw commandChannelFailure;
         if (!isConnected() || commandInput == null || commandOutput == null) {
             throw new IOException("请先连接 Wi‑Fi 相机");
         }
     }
 
-    private static Socket open(String host, int port) throws IOException {
+    private long beginTransportAttempt() {
+        synchronized (transportLock) {
+            transportGeneration++;
+            return transportGeneration;
+        }
+    }
+
+    private void ensureTransportGeneration(long generation) throws IOException {
+        synchronized (transportLock) {
+            ensureTransportGenerationLocked(generation);
+        }
+    }
+
+    private void ensureTransportGenerationLocked(long generation) throws IOException {
+        if (generation != transportGeneration) {
+            throw new EOFException("PTP/IP 连接尝试已失效");
+        }
+    }
+
+    private Socket open(
+            String host,
+            int port,
+            long generation,
+            boolean commandChannel) throws IOException {
         Socket socket = new Socket();
-        socket.connect(new InetSocketAddress(host, port), 8000);
-        socket.setSoTimeout(12000);
-        socket.setTcpNoDelay(true);
-        return socket;
+        synchronized (transportLock) {
+            ensureTransportGenerationLocked(generation);
+            if (commandChannel) connectingCommandSocket = socket;
+            else connectingEventSocket = socket;
+        }
+        try {
+            socket.connect(new InetSocketAddress(host, port), 8000);
+            ensureTransportGeneration(generation);
+            socket.setSoTimeout(12000);
+            socket.setTcpNoDelay(true);
+            socket.setKeepAlive(true);
+            ensureTransportGeneration(generation);
+            return socket;
+        } catch (IOException error) {
+            synchronized (transportLock) {
+                if (commandChannel && connectingCommandSocket == socket) {
+                    connectingCommandSocket = null;
+                } else if (!commandChannel && connectingEventSocket == socket) {
+                    connectingEventSocket = null;
+                }
+            }
+            closeQuietly(socket);
+            throw error;
+        }
+    }
+
+    private void writeCommandPacket(int type, byte[] payload) throws IOException {
+        try {
+            writePacket(commandOutput, type, payload);
+        } catch (IOException error) {
+            throw commandChannelFailed(error);
+        }
+    }
+
+    private Packet readCommandPacket() throws IOException {
+        try {
+            return readPacket(commandInput);
+        } catch (IOException error) {
+            throw commandChannelFailed(error);
+        }
+    }
+
+    private IOException commandChannelFailed(IOException error) {
+        synchronized (probeMonitor) {
+            commandChannelFailure = error;
+            probeMonitor.notifyAll();
+        }
+        return error;
     }
 
     private static void writePacket(OutputStream output, int type, byte[] payload)
@@ -679,23 +1010,35 @@ final class PtpIpCamera implements Closeable {
     }
 
     private static Packet readPacket(InputStream input) throws IOException {
-        byte[] header = readExactly(input, 8);
+        // 只有在尚未消费任何新包字节时，事件 reader 才能把超时视为
+        // 空闲。半个 header 或已完整读取 header 后的 payload 超时都必须
+        // 终止该会话，否则下一轮会从包中间误当成新 header，永久流失步。
+        byte[] header = readExactly(input, 8, true);
         long length = u32(header, 0);
         if (length < 8 || length > 64 * 1024 * 1024L) {
             throw new IOException("PTP/IP 数据包长度无效");
         }
-        byte[] payload = readExactly(input, (int) length - 8);
+        byte[] payload = readExactly(input, (int) length - 8, false);
         byte[] data = new byte[(int) length];
         System.arraycopy(header, 0, data, 0, 8);
         System.arraycopy(payload, 0, data, 8, payload.length);
         return new Packet((int) u32(header, 4), data);
     }
 
-    private static byte[] readExactly(InputStream input, int count) throws IOException {
+    private static byte[] readExactly(
+            InputStream input,
+            int count,
+            boolean allowIdleTimeout) throws IOException {
         byte[] data = new byte[count];
         int offset = 0;
         while (offset < count) {
-            int read = input.read(data, offset, count - offset);
+            int read;
+            try {
+                read = input.read(data, offset, count - offset);
+            } catch (SocketTimeoutException timeout) {
+                if (allowIdleTimeout && offset == 0) throw timeout;
+                throw new IOException("PTP/IP 数据包在读取中途超时", timeout);
+            }
             if (read < 0) throw new EOFException("相机提前关闭了连接");
             offset += read;
         }
@@ -730,20 +1073,86 @@ final class PtpIpCamera implements Closeable {
         return new String(data, offset, end - offset, StandardCharsets.UTF_16LE);
     }
 
-    private static IOException rejected(int response) {
-        return new IOException(String.format(
+    private PtpResponseException rejected(int response) {
+        PtpResponseException error = new PtpResponseException(response);
+        if (isSessionFatalResponse(response)) {
+            commandChannelFailed(error);
+        }
+        return error;
+    }
+
+    private static boolean isSessionFatalResponse(int response) {
+        return response == 0x2003 // SessionNotOpen
+                || response == 0x2004 // InvalidTransactionID
+                || response == 0x201e; // SessionAlreadyOpen
+    }
+
+    private static boolean isVendorDiscoveryFallback(int response) {
+        return response == RESPONSE_OK // 无数据段的兼容 responder
+                || response == 0x2005 // OperationNotSupported
+                || response == 0x200a // DevicePropNotSupported
+                || response == 0x2019; // DeviceBusy：会话仍健康，退回握手名称
+    }
+
+    private static final class PtpResponseException extends IOException {
+        final int responseCode;
+
+        PtpResponseException(int response) {
+            super(String.format(
                 "相机拒绝了 PTP/IP 操作（0x%04X）",
                 response));
+            responseCode = response;
+        }
+    }
+
+    /**
+     * 不等待实例 monitor，立即关闭底层 socket 以打断阻塞中的同步读写。
+     * 完整字段复位仍由随后排入 cameraExecutor 的 close() 完成。
+     */
+    void abortTransport() {
+        eventReaderRunning = false;
+        IOException failure = new EOFException("PTP/IP 连接已中止");
+        Socket pendingCommand;
+        Socket pendingEvent;
+        Socket activeCommand;
+        Socket activeEvent;
+        synchronized (transportLock) {
+            transportGeneration++;
+            pendingCommand = connectingCommandSocket;
+            pendingEvent = connectingEventSocket;
+            activeCommand = commandSocket;
+            activeEvent = eventSocket;
+            connectingCommandSocket = null;
+            connectingEventSocket = null;
+            commandSocket = null;
+            eventSocket = null;
+        }
+        synchronized (probeMonitor) {
+            commandChannelFailure = failure;
+            eventReaderFailure = failure;
+            probeMonitor.notifyAll();
+        }
+        closeQuietly(pendingCommand);
+        closeQuietly(pendingEvent);
+        if (activeCommand != pendingCommand) closeQuietly(activeCommand);
+        if (activeEvent != pendingEvent) closeQuietly(activeEvent);
     }
 
     @Override
     public synchronized void close() {
-        closeQuietly(commandSocket);
-        closeQuietly(eventSocket);
-        commandSocket = null;
-        eventSocket = null;
+        Thread reader = eventReaderThread;
+        eventReaderThread = null;
+        abortTransport();
+        if (reader != null && reader != Thread.currentThread()) reader.interrupt();
         commandInput = null;
         commandOutput = null;
+        eventInput = null;
+        eventOutput = null;
+        synchronized (probeMonitor) {
+            commandChannelFailure = null;
+            eventReaderFailure = new EOFException("PTP/IP 事件通道已断开");
+            probeMonitor.notifyAll();
+        }
         transactionId = 1;
         cameraName = "PTP/IP Camera";
         vendor = CameraVendor.UNKNOWN;

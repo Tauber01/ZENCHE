@@ -714,7 +714,7 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 // 与 AppScope/app.json5 的 versionName 同步；发布构建以该清单为版本源。
-const CURRENT_VERSION: string = '1.5.13';
+const CURRENT_VERSION: string = '1.5.14';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
@@ -1021,6 +1021,13 @@ struct Index {
   private wifiMissedHeartbeats: number = 0;
   private wifiReconnectAttempt: number = 0;
   private wifiManualDisconnect: boolean = false;
+  // UI 层的 PTP/IP attempt 所有权。底层 PtpIpCamera 仍负责单实例内部的
+  // connectionGeneration；这里额外阻止旧实例的迟到回调清理或发布新实例。
+  private wifiAttemptGeneration: number = 0;
+  // USB / Wi-Fi / 本机三种源共用的用户意图代际。跨源切换一旦 await，
+  // 恢复时必须确认自己仍是最后一次选择，避免旧 continuation 启动第二个源。
+  private sourceSwitchGeneration: number = 0;
+  private wifiSourceGeneration: number = 0;
   private wifiNetConnection?: connection.NetConnection;
   private static readonly WIFI_HEARTBEAT_INTERVAL_MS: number = 5000;
   private static readonly WIFI_OFFLINE_THRESHOLD: number = 3;
@@ -1522,6 +1529,12 @@ struct Index {
   }
 
   aboutToDisappear(): void {
+    const wifiCameraToDisconnect: PtpIpCamera = this.wifiCamera;
+    this.sourceSwitchGeneration++;
+    this.wifiAttemptGeneration++;
+    this.wifiManualDisconnect = true;
+    this.wifiConnecting = false;
+    this.wifiReconnecting = false;
     this.stopImmersiveOrientationTracking();
     this.diagnostics?.endSession();
     this.previewGeneration++;
@@ -1530,7 +1543,7 @@ struct Index {
     this.stopWifiHeartbeat();
     this.stopWifiReconnect();
     this.unregisterWifiNetConnection();
-    this.wifiCamera.disconnect();
+    wifiCameraToDisconnect.disconnect();
     this.bluetoothRemote?.stop();
     this.locationTagging?.setEnabled(false);
     if (this.wireless !== undefined) {
@@ -2062,6 +2075,17 @@ struct Index {
   private async closeAuthSensitiveState(): Promise<void> {
     if (this.authSensitiveStateClosed) return;
     this.authSensitiveStateClosed = true;
+    // 必须先于下面任何 await 发布取消代际。否则旧初连/重连可以趁 USB 或
+    // 外录清理等待期间完成，并把会话重新发布到登录墙之后。
+    const wifiCameraToDisconnect: PtpIpCamera = this.wifiCamera;
+    this.sourceSwitchGeneration++;
+    const wifiCleanupGeneration: number = ++this.wifiAttemptGeneration;
+    this.wifiManualDisconnect = true;
+    this.wifiReconnecting = false;
+    this.wifiConnecting = false;
+    this.stopWifiHeartbeat();
+    this.stopWifiReconnect();
+    this.unregisterWifiNetConnection();
     this.stopImmersiveOrientationTracking();
     this.immersivePreviewVisible = false;
     this.previewGeneration++;
@@ -2088,11 +2112,15 @@ struct Index {
       );
     }
 
-    this.stopWifiHeartbeat();
-    this.stopWifiReconnect();
-    this.unregisterWifiNetConnection();
     try {
-      await this.wifiCamera.disconnect();
+      // 保留共享字段调用仅限“仍是捕获实例”的情况；若新登录已经创建 B，
+      // 旧清理只断开捕获的 A，绝不能把 B 一并断开。
+      if (this.wifiAttemptGeneration === wifiCleanupGeneration &&
+        this.wifiCamera === wifiCameraToDisconnect) {
+        await this.wifiCamera.disconnect();
+      } else {
+        await wifiCameraToDisconnect.disconnect();
+      }
     } catch (error) {
       this.diagnostics?.warning(
         'auth-cleanup',
@@ -2113,12 +2141,14 @@ struct Index {
     }
 
     this.connected = false;
-    this.wifiConnected = false;
-    this.wifiConnecting = false;
-    this.wifiLiveView = false;
-    this.wifiMovieRecording = false;
-    this.wifiReconnecting = false;
-    this.wifiManualDisconnect = true;
+    if (this.wifiAttemptGeneration === wifiCleanupGeneration) {
+      this.wifiConnected = false;
+      this.wifiLiveView = false;
+      this.wifiMovieRecording = false;
+      this.wifiVendor = CameraVendor.UNKNOWN;
+      this.wifiCameraName = 'PTP/IP Camera';
+      this.wifiStatus = 'Wi‑Fi 相机未连接';
+    }
     this.localCameraSelected = false;
     this.liveView = false;
     this.videoRecording = false;
@@ -10913,11 +10943,23 @@ struct Index {
     if (this.busy) {
       return;
     }
+    const sourceGeneration: number = ++this.sourceSwitchGeneration;
+    // USB 按钮在 Wi-Fi 初连/重连期间仍可用。开始 USB 会话前必须先让
+    // 当前 Wi-Fi attempt 失效并等待它的捕获实例清理完成。
+    if (!this.connected && (this.wifiConnected || this.wifiConnecting ||
+      this.wifiReconnecting)) {
+      await this.disconnectWifiCamera(sourceGeneration);
+      if (this.sourceSwitchGeneration !== sourceGeneration || this.busy) {
+        return;
+      }
+    }
     if (this.connected) {
       this.previewGeneration++;
       await this.runBusy('正在断开相机…', async (): Promise<void> => {
         await this.finishExternalRecordingForDisconnect();
+        if (this.sourceSwitchGeneration !== sourceGeneration) return;
         await this.camera.disconnect();
+        if (this.sourceSwitchGeneration !== sourceGeneration) return;
         this.connected = false;
         this.liveView = false;
         this.videoRecording = false;
@@ -10934,9 +10976,14 @@ struct Index {
     }
 
     await this.runBusy('正在连接相机…', async (): Promise<void> => {
+      if (this.sourceSwitchGeneration !== sourceGeneration) return;
       this.localCameraSelected = false;
       try {
         const profile: CameraProfile = await this.camera.connect();
+        if (this.sourceSwitchGeneration !== sourceGeneration) {
+          await this.camera.disconnect();
+          return;
+        }
         this.connected = true;
         this.cameraName = profile.name;
         this.cameraVendor = profile.vendorName;
@@ -10946,6 +10993,7 @@ struct Index {
         this.status = `${profile.name} 已连接`;
         this.lastConnectionError = '';
       } catch (error) {
+        if (this.sourceSwitchGeneration !== sourceGeneration) return;
         this.lastConnectionError = (error as Error).message !== undefined
           ? (error as Error).message
           : this.tr('连接失败');
@@ -10956,26 +11004,36 @@ struct Index {
 
   private async selectLocalCamera(): Promise<void> {
     if (this.busy) return;
+    // 权限弹窗期间保持当前源及 Wi-Fi attempt 有效；只有权限确认后才认领
+    // 新 source generation。拒绝权限不能停掉现有心跳或把连接态卡在旧 attempt。
+    const observedSourceGeneration: number = this.sourceSwitchGeneration;
     const granted: boolean = await this.requestFeaturePermissions([
       'ohos.permission.CAMERA'
     ]);
+    if (this.sourceSwitchGeneration !== observedSourceGeneration ||
+      this.busy) return;
     if (!granted) {
-      this.localCameraSelected = false;
       this.lastConnectionError = '未获得相机权限，无法使用本机摄像头';
       this.status = this.lastConnectionError;
       return;
     }
+    const sourceGeneration: number = ++this.sourceSwitchGeneration;
     if (this.connected) {
       this.previewGeneration++;
       await this.finishExternalRecordingForDisconnect();
+      if (this.sourceSwitchGeneration !== sourceGeneration) return;
       await this.camera.stopLiveView();
+      if (this.sourceSwitchGeneration !== sourceGeneration) return;
       await this.camera.disconnect();
+      if (this.sourceSwitchGeneration !== sourceGeneration) return;
       this.connected = false;
       this.liveView = false;
       this.videoRecording = false;
     }
-    if (this.wifiConnected) {
-      await this.disconnectWifiCamera();
+    if (this.wifiConnected || this.wifiConnecting ||
+      this.wifiReconnecting) {
+      await this.disconnectWifiCamera(sourceGeneration);
+      if (this.sourceSwitchGeneration !== sourceGeneration) return;
     }
     this.localCameraSelected = true;
     this.cameraName = 'HarmonyOS 本机摄像头';
@@ -10985,8 +11043,27 @@ struct Index {
     this.connectionPanelVisible = false;
   }
 
+  private isCurrentWifiAttempt(
+    attempt: number,
+    camera: PtpIpCamera
+  ): boolean {
+    return this.wifiAttemptGeneration === attempt &&
+      this.wifiCamera === camera &&
+      this.wifiSourceGeneration === this.sourceSwitchGeneration;
+  }
+
+  private isCurrentWifiOperation(
+    attempt: number,
+    camera: PtpIpCamera
+  ): boolean {
+    return this.isCurrentWifiAttempt(attempt, camera) &&
+      this.wifiConnected && !this.wifiReconnecting &&
+      !this.wifiManualDisconnect;
+  }
+
   private async connectWifiCamera(): Promise<void> {
-    if (this.wifiConnecting || this.busy) {
+    if (this.wifiConnecting || this.wifiReconnecting ||
+      this.wifiConnected || this.busy) {
       return;
     }
     const port: number = Number(this.wifiPort);
@@ -10995,6 +11072,12 @@ struct Index {
       this.wifiStatus = 'Wi‑Fi 相机地址或端口无效';
       return;
     }
+    const sourceGeneration: number = ++this.sourceSwitchGeneration;
+    this.wifiSourceGeneration = sourceGeneration;
+    const attempt: number = ++this.wifiAttemptGeneration;
+    const previousCamera: PtpIpCamera = this.wifiCamera;
+    const camera: PtpIpCamera = new PtpIpCamera();
+    this.wifiCamera = camera;
     this.wifiManualDisconnect = false;
     this.wifiReconnecting = false;
     this.wifiReconnectAttempt = 0;
@@ -11002,21 +11085,75 @@ struct Index {
     this.wifiConnecting = true;
     this.localCameraSelected = false;
     this.wifiStatus = '正在连接 Wi‑Fi 相机…';
-    await this.persistWifiConnectionSettings();
     try {
-      const name: string = await this.wifiCamera.connect(
+      // 每个 UI attempt 独占一个 PtpIpCamera；旧 attempt 的迟到清理只能
+      // 关闭捕获实例，绝不能碰到随后发布的新实例。
+      await previousCamera.disconnect();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+
+      // Wi‑Fi/PTP-IP 与 USB/PTP 互斥，避免同一机身已有 OpenSession 时被拒绝。
+      if (this.connected) {
+        this.previewGeneration++;
+        await this.finishExternalRecordingForDisconnect();
+        if (!this.isCurrentWifiAttempt(attempt, camera) ||
+          this.wifiManualDisconnect || !this.wifiConnecting) {
+          await this.discardCancelledWifiConnection(camera, attempt);
+          return;
+        }
+        try {
+          await this.camera.stopLiveView();
+        } catch (_) {
+        }
+        await this.camera.disconnect();
+        if (!this.isCurrentWifiAttempt(attempt, camera) ||
+          this.wifiManualDisconnect || !this.wifiConnecting) {
+          await this.discardCancelledWifiConnection(camera, attempt);
+          return;
+        }
+        this.connected = false;
+        this.liveView = false;
+        this.videoRecording = false;
+        this.cameraName = '未连接';
+        this.cameraVendor = 'Nikon';
+      }
+
+      await this.persistWifiConnectionSettings();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      const name: string = await camera.connect(
         this.wifiHost.trim(),
         port
       );
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting ||
+        this.wifiReconnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
       // E4 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；尼康/佳能
       // 自动开实时取景并拉帧，刷新参数（镜像 Windows E3 连接路径与 Android
       // E4 同构；Android/Harmony 不做 autoStartLiveViewOnConnect 门控）。
-      this.wifiVendor = await this.wifiCamera.detectVendor();
-      const autoLiveView: boolean = this.wifiVendorSupportsRecording();
+      const detectedVendor: CameraVendor = await camera.detectVendor();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting ||
+        this.wifiReconnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      const autoLiveView: boolean = detectedVendor === CameraVendor.NIKON ||
+        detectedVendor === CameraVendor.CANON;
+      let liveViewStarted: boolean = false;
       if (autoLiveView) {
         try {
-          await this.wifiCamera.startLiveView();
-          this.wifiLiveView = true;
+          await camera.startLiveView();
+          liveViewStarted = true;
         } catch (liveViewError) {
           this.diagnostics?.warning(
             'wifi-liveview',
@@ -11024,7 +11161,22 @@ struct Index {
           );
         }
       }
-      await this.refreshWifiParameters();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting ||
+        this.wifiReconnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      await this.refreshWifiParametersFor(camera, attempt);
+      camera.assertHealthy();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting ||
+        this.wifiReconnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      this.wifiVendor = detectedVendor;
+      this.wifiLiveView = liveViewStarted;
       this.diagnostics?.info(
         'wifi-camera',
         `PTP/IP 已连接；模式=${this.wifiConnectionMode.toUpperCase()}；` +
@@ -11042,26 +11194,66 @@ struct Index {
       this.startWifiHeartbeat();
       this.registerWifiNetConnection();
     } catch (error) {
+      try {
+        await camera.disconnect();
+      } catch (_) {
+      }
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        this.wifiManualDisconnect || !this.wifiConnecting ||
+        this.wifiReconnecting) {
+        return;
+      }
       this.wifiConnected = false;
+      this.wifiLiveView = false;
+      this.wifiMovieRecording = false;
+      this.wifiVendor = CameraVendor.UNKNOWN;
       this.lastConnectionError = (error as Error).message !== undefined
         ? (error as Error).message
         : this.tr('连接失败');
       this.wifiStatus = `Wi‑Fi 连接失败：${(error as Error).message}`;
       this.status = this.wifiStatus;
     } finally {
-      this.wifiConnecting = false;
+      if (this.isCurrentWifiAttempt(attempt, camera)) {
+        this.wifiConnecting = false;
+      }
     }
   }
 
-  private async disconnectWifiCamera(): Promise<void> {
+  private async discardCancelledWifiConnection(
+    camera: PtpIpCamera,
+    attempt: number
+  ): Promise<void> {
+    try {
+      await camera.disconnect();
+    } catch (error) {
+      this.diagnostics?.warning(
+        'wifi-camera',
+        `取消连接后关闭 PTP/IP 会话失败：${(error as Error).message}`
+      );
+    } finally {
+      if (this.isCurrentWifiAttempt(attempt, camera)) {
+        this.wifiConnecting = false;
+      }
+    }
+  }
+
+  private async disconnectWifiCamera(
+    sourceGeneration?: number
+  ): Promise<void> {
+    const claimedSourceGeneration: number = sourceGeneration === undefined
+      ? ++this.sourceSwitchGeneration
+      : sourceGeneration;
+    if (this.sourceSwitchGeneration !== claimedSourceGeneration) return;
+    const camera: PtpIpCamera = this.wifiCamera;
+    const cleanupAttempt: number = ++this.wifiAttemptGeneration;
     this.wifiManualDisconnect = true;
     this.wifiReconnecting = false;
+    this.wifiConnecting = false;
     this.stopWifiHeartbeat();
     this.stopWifiReconnect();
     this.unregisterWifiNetConnection();
-    // E4 1.5.9：手动断开——停 Wi‑Fi 取景/录像并清控制状态
-    // （镜像 Windows StopWifiPreviewLoop + DisconnectAsync 与 Android
-    // disconnectWifiCamera 的 E4 清理）。
+    // 先发布 attempt 失效并直接关闭捕获实例的 TCP；失联时若先等待
+    // EndLiveView，源切换会被命令超时拖住，旧回调也可能碰到新实例。
     if (this.wifiLiveView || this.wifiMovieRecording || this.liveView) {
       this.previewGeneration++;
       this.liveView = false;
@@ -11069,12 +11261,7 @@ struct Index {
     if (this.wifiMovieRecording) {
       this.videoRecording = false;
     }
-    if (this.wifiLiveView) {
-      try {
-        await this.wifiCamera.stopLiveView();
-      } catch (error) {
-      }
-    }
+    this.wifiConnected = false;
     this.wifiLiveView = false;
     this.wifiMovieRecording = false;
     this.wifiVendor = CameraVendor.UNKNOWN;
@@ -11082,12 +11269,18 @@ struct Index {
     this.wifiAperture = 0;
     this.wifiShutterSeconds = 0;
     this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
-    await this.wifiCamera.disconnect();
-    this.wifiConnected = false;
-    this.wifiCameraName = 'PTP/IP Camera';
-    this.wifiStatus = 'Wi‑Fi 相机未连接';
-    this.status = 'Wi‑Fi 相机已断开';
-    this.lastConnectionError = '';
+    try {
+      await camera.disconnect();
+    } catch (_) {
+    }
+    if (this.wifiAttemptGeneration === cleanupAttempt &&
+      this.wifiCamera === camera &&
+      this.sourceSwitchGeneration === claimedSourceGeneration) {
+      this.wifiCameraName = 'PTP/IP Camera';
+      this.wifiStatus = 'Wi‑Fi 相机未连接';
+      this.status = 'Wi‑Fi 相机已断开';
+      this.lastConnectionError = '';
+    }
   }
 
   // ── E4 1.5.9：Wi‑Fi PTP/IP 参数读取与步进（镜像 Windows RefreshWifiParametersAsync
@@ -11099,46 +11292,67 @@ struct Index {
    * （单属性失败不阻断其余；解码口径与 Windows/Android 一致：
    * ISO UINT16；光圈 UINT16（f 数×100）；快门 UINT32（秒×10000），均小端）。
    */
-  private async refreshWifiParameters(): Promise<void> {
-    if (!this.wifiCamera.isConnected) {
+  private async refreshWifiParametersFor(
+    camera: PtpIpCamera,
+    attempt: number
+  ): Promise<void> {
+    if (!this.isCurrentWifiAttempt(attempt, camera) ||
+      !camera.isConnected) {
       return;
     }
     try {
-      const iso: Uint8Array = await this.wifiCamera.readProperty(0x500f);
+      const iso: Uint8Array = await camera.readProperty(0x500f);
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
       if (iso.length >= 2) {
         this.wifiIso = iso[0] | (iso[1] << 8);
       }
     } catch (error) {
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
+      if (!PtpIpCamera.isCapabilityFallbackError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
       this.diagnostics?.warning(
         'wifi-params',
         `读取 Wi‑Fi ISO 失败：${(error as Error).message}`
       );
     }
     try {
-      const aperture: Uint8Array = await this.wifiCamera.readProperty(0x5007);
+      const aperture: Uint8Array = await camera.readProperty(0x5007);
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
       if (aperture.length >= 2) {
         const scaled: number = aperture[0] | (aperture[1] << 8);
         this.wifiAperture = scaled / 100.0;
       }
     } catch (error) {
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
+      if (!PtpIpCamera.isCapabilityFallbackError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
       this.diagnostics?.warning(
         'wifi-params',
         `读取 Wi‑Fi 光圈失败：${(error as Error).message}`
       );
     }
     try {
-      const shutter: Uint8Array = await this.wifiCamera.readProperty(0x500d);
+      const shutter: Uint8Array = await camera.readProperty(0x500d);
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
       if (shutter.length >= 4) {
         const scaled: number = (shutter[0] | (shutter[1] << 8) |
           (shutter[2] << 16) | (shutter[3] << 24)) >>> 0;
         this.wifiShutterSeconds = scaled / 10000.0;
       }
     } catch (error) {
+      if (!this.isCurrentWifiAttempt(attempt, camera)) return;
+      if (!PtpIpCamera.isCapabilityFallbackError(error as Error)) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
       this.diagnostics?.warning(
         'wifi-params',
         `读取 Wi‑Fi 快门失败：${(error as Error).message}`
       );
     }
+    camera.assertHealthy();
+    if (!this.isCurrentWifiAttempt(attempt, camera)) return;
     this.wifiParameterReadout = this.wifiParameterReadoutText();
   }
 
@@ -11164,6 +11378,8 @@ struct Index {
     if (!this.wifiConnected) {
       return;
     }
+    const camera: PtpIpCamera = this.wifiCamera;
+    const attempt: number = this.wifiAttemptGeneration;
     const ladder: Array<number> = [
       64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800, 1000,
       1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400, 8000, 10000,
@@ -11176,9 +11392,11 @@ struct Index {
       (ladder[next] >> 8) & 0xff
     ]);
     try {
-      await this.wifiCamera.writeProperty(0x500f, payload);
-      await this.refreshWifiParameters();
+      await camera.writeProperty(0x500f, payload);
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
+      await this.refreshWifiParametersFor(camera, attempt);
     } catch (error) {
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
       this.showError(`写入 Wi‑Fi ISO 失败：${(error as Error).message}`);
     }
   }
@@ -11188,6 +11406,8 @@ struct Index {
     if (!this.wifiConnected) {
       return;
     }
+    const camera: PtpIpCamera = this.wifiCamera;
+    const attempt: number = this.wifiAttemptGeneration;
     const ladder: Array<number> = [
       1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5, 4.0, 4.5, 5.0,
       5.6, 6.3, 7.1, 8.0, 9.0, 10.0, 11.0, 13.0, 14.0, 16.0, 18.0,
@@ -11201,9 +11421,11 @@ struct Index {
       (scaled >> 8) & 0xff
     ]);
     try {
-      await this.wifiCamera.writeProperty(0x5007, payload);
-      await this.refreshWifiParameters();
+      await camera.writeProperty(0x5007, payload);
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
+      await this.refreshWifiParametersFor(camera, attempt);
     } catch (error) {
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
       this.showError(`写入 Wi‑Fi 光圈失败：${(error as Error).message}`);
     }
   }
@@ -11217,6 +11439,8 @@ struct Index {
     if (!this.wifiConnected) {
       return;
     }
+    const camera: PtpIpCamera = this.wifiCamera;
+    const attempt: number = this.wifiAttemptGeneration;
     // 快门档位（秒），升序：1/8000 → 1″。
     const ladder: Array<number> = [
       1.0 / 8000, 1.0 / 4000, 1.0 / 2000, 1.0 / 1000, 1.0 / 500,
@@ -11235,9 +11459,11 @@ struct Index {
       (scaled >> 24) & 0xff
     ]);
     try {
-      await this.wifiCamera.writeProperty(0x500d, payload);
-      await this.refreshWifiParameters();
+      await camera.writeProperty(0x500d, payload);
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
+      await this.refreshWifiParametersFor(camera, attempt);
     } catch (error) {
+      if (!this.isCurrentWifiOperation(attempt, camera)) return;
       this.showError(`写入 Wi‑Fi 快门失败：${(error as Error).message}`);
     }
   }
@@ -11265,8 +11491,10 @@ struct Index {
 
   private startWifiHeartbeat(): void {
     this.stopWifiHeartbeat();
+    const attempt: number = this.wifiAttemptGeneration;
+    const camera: PtpIpCamera = this.wifiCamera;
     this.wifiHeartbeatTimer = setTimeout((): void => {
-      this.wifiHeartbeatTick();
+      this.wifiHeartbeatTick(attempt, camera);
     }, Index.WIFI_HEARTBEAT_INTERVAL_MS);
   }
 
@@ -11277,19 +11505,24 @@ struct Index {
     }
   }
 
-  private async wifiHeartbeatTick(): Promise<void> {
-    if (!this.wifiConnected || this.wifiReconnecting ||
+  private async wifiHeartbeatTick(
+    attempt: number,
+    camera: PtpIpCamera
+  ): Promise<void> {
+    if (!this.isCurrentWifiAttempt(attempt, camera) ||
+      !this.wifiConnected || this.wifiReconnecting ||
       this.wifiManualDisconnect) {
       return;
     }
     let alive: boolean = false;
     try {
-      await this.wifiCamera.probe(3000);
+      await camera.probe(3000);
       alive = true;
     } catch (error) {
       alive = false;
     }
-    if (!this.wifiConnected || this.wifiManualDisconnect) {
+    if (!this.isCurrentWifiAttempt(attempt, camera) ||
+      !this.wifiConnected || this.wifiManualDisconnect) {
       return;
     }
     if (alive) {
@@ -11298,44 +11531,51 @@ struct Index {
       this.wifiMissedHeartbeats++;
       if (this.wifiMissedHeartbeats >= Index.WIFI_OFFLINE_THRESHOLD) {
         this.wifiMissedHeartbeats = 0;
-        this.enterWifiReconnecting();
+        await this.enterWifiReconnecting();
         return;
       }
     }
     this.startWifiHeartbeat();
   }
 
-  private enterWifiReconnecting(): void {
+  private async enterWifiReconnecting(): Promise<void> {
     if (!this.wifiConnected || this.wifiReconnecting ||
       this.wifiManualDisconnect) {
       return;
     }
+    const camera: PtpIpCamera = this.wifiCamera;
+    const reconnectGeneration: number = ++this.wifiAttemptGeneration;
     this.wifiReconnecting = true;
+    this.wifiConnecting = false;
+    this.wifiConnected = false;
     this.wifiReconnectAttempt = 0;
     this.stopWifiHeartbeat();
+    this.unregisterWifiNetConnection();
     // E4 1.5.9：链路离线即停 Wi‑Fi 取景/录像并清控制状态
     // （重连成功后再恢复，镜像 Android enterWifiReconnecting 与 Windows
     // AttemptWifiReconnectAsync 的清理路径）。
-    if (this.wifiLiveView || this.wifiMovieRecording || this.liveView) {
-      this.previewGeneration++;
-      this.liveView = false;
-      if (this.wifiMovieRecording) {
-        this.videoRecording = false;
-      }
-      if (this.wifiLiveView) {
-        try {
-          this.wifiCamera.stopLiveView();
-        } catch (error) {
-        }
-      }
-      this.wifiLiveView = false;
-      this.wifiMovieRecording = false;
-      this.wifiVendor = CameraVendor.UNKNOWN;
-      this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
+    // 先使取景 generation 失效，阻止旧循环在断线异常后继续发事务；随后完整
+    // 关闭旧双通道。只有 disconnect 落定后才允许退避计时器创建新会话。
+    this.previewGeneration++;
+    this.liveView = false;
+    if (this.wifiMovieRecording) {
+      this.videoRecording = false;
     }
+    this.wifiLiveView = false;
+    this.wifiMovieRecording = false;
+    this.wifiVendor = CameraVendor.UNKNOWN;
+    this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
     this.wifiStatus = 'Wi‑Fi 链路已断开，正在自动重连…';
     this.status = this.wifiStatus;
+    await camera.disconnect();
+    if (this.wifiAttemptGeneration !== reconnectGeneration ||
+      this.wifiCamera !== camera || !this.wifiReconnecting ||
+      this.wifiManualDisconnect) {
+      return;
+    }
     this.scheduleWifiReconnect();
+    // 重连等待期仍监听 Wi-Fi 恢复；netAvailable 可提前结束当前退避。
+    this.registerWifiNetConnection();
   }
 
   private wifiBackoffDelayMs(attempt: number): number {
@@ -11352,9 +11592,10 @@ struct Index {
     }
     this.wifiReconnectAttempt++;
     const delay: number = this.wifiBackoffDelayMs(this.wifiReconnectAttempt);
+    const scheduledGeneration: number = this.wifiAttemptGeneration;
     this.stopWifiReconnect();
     this.wifiReconnectTimer = setTimeout((): void => {
-      this.attemptWifiReconnect();
+      this.attemptWifiReconnect(scheduledGeneration);
     }, delay);
   }
 
@@ -11365,29 +11606,66 @@ struct Index {
     }
   }
 
-  private async attemptWifiReconnect(): Promise<void> {
-    if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+  private wakeWifiReconnect(): void {
+    if (!this.wifiReconnecting || this.wifiManualDisconnect ||
+      this.wifiConnecting) {
       return;
     }
+    const scheduledGeneration: number = this.wifiAttemptGeneration;
+    this.stopWifiReconnect();
+    this.wifiReconnectTimer = setTimeout((): void => {
+      this.attemptWifiReconnect(scheduledGeneration);
+    }, 0);
+  }
+
+  private async attemptWifiReconnect(
+    scheduledGeneration: number
+  ): Promise<void> {
+    if (this.wifiAttemptGeneration !== scheduledGeneration ||
+      !this.wifiReconnecting || this.wifiManualDisconnect) {
+      return;
+    }
+    const previousCamera: PtpIpCamera = this.wifiCamera;
+    const attempt: number = ++this.wifiAttemptGeneration;
+    const camera: PtpIpCamera = new PtpIpCamera();
+    this.wifiCamera = camera;
     this.wifiConnecting = true;
     this.wifiStatus = `正在重连 Wi‑Fi 相机（第 ${this.wifiReconnectAttempt} 次）…`;
     this.status = this.wifiStatus;
     try {
-      const name: string = await this.wifiCamera.connect(
+      await previousCamera.disconnect();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      const name: string = await camera.connect(
         this.wifiHost.trim(),
         Number(this.wifiPort)
       );
-      if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
         return;
       }
       // E4 1.5.9：重连成功后恢复厂商识别、自动取景与参数刷新
       // （对齐 Windows AttemptWifiReconnectAsync 与 Android 重连路径）。
-      this.wifiVendor = await this.wifiCamera.detectVendor();
-      const autoLiveView: boolean = this.wifiVendorSupportsRecording();
+      const detectedVendor: CameraVendor = await camera.detectVendor();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      const autoLiveView: boolean = detectedVendor === CameraVendor.NIKON ||
+        detectedVendor === CameraVendor.CANON;
+      let liveViewStarted: boolean = false;
       if (autoLiveView) {
         try {
-          await this.wifiCamera.startLiveView();
-          this.wifiLiveView = true;
+          await camera.startLiveView();
+          liveViewStarted = true;
         } catch (liveViewError) {
           this.diagnostics?.warning(
             'wifi-liveview',
@@ -11395,44 +11673,94 @@ struct Index {
           );
         }
       }
-      await this.refreshWifiParameters();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      await this.refreshWifiParametersFor(camera, attempt);
+      camera.assertHealthy();
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
+        await this.discardCancelledWifiConnection(camera, attempt);
+        return;
+      }
+      this.wifiVendor = detectedVendor;
+      this.wifiLiveView = liveViewStarted;
       this.wifiReconnecting = false;
-      this.wifiConnecting = false;
       this.wifiConnected = true;
       this.wifiCameraName = name;
       this.wifiReconnectAttempt = 0;
       this.lastConnectionError = '';
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已重连（PTP/IP）`;
       this.status = this.wifiStatus;
-      if (autoLiveView && this.wifiLiveView && this.wifiSourceActive()) {
+      if (autoLiveView && liveViewStarted && this.wifiSourceActive()) {
         this.liveView = true;
         this.startPreviewLoop();
       }
       this.startWifiHeartbeat();
+      this.registerWifiNetConnection();
     } catch (error) {
-      if (!this.wifiReconnecting || this.wifiManualDisconnect) {
+      try {
+        await camera.disconnect();
+      } catch (_) {
+      }
+      if (!this.isCurrentWifiAttempt(attempt, camera) ||
+        !this.wifiReconnecting || this.wifiManualDisconnect ||
+        !this.wifiConnecting) {
         return;
       }
-      this.wifiConnecting = false;
+      this.wifiLiveView = false;
+      this.wifiMovieRecording = false;
+      this.wifiVendor = CameraVendor.UNKNOWN;
       this.wifiStatus = `Wi‑Fi 重连失败：${(error as Error).message}`;
       this.status = this.wifiStatus;
       this.scheduleWifiReconnect();
+    } finally {
+      if (this.isCurrentWifiAttempt(attempt, camera)) {
+        this.wifiConnecting = false;
+      }
     }
   }
 
   private registerWifiNetConnection(): void {
     this.unregisterWifiNetConnection();
     try {
+      const attempt: number = this.wifiAttemptGeneration;
+      const camera: PtpIpCamera = this.wifiCamera;
+      const sourceGeneration: number = this.wifiSourceGeneration;
+      const specifier: connection.NetSpecifier = {
+        netCapabilities: {
+          bearerTypes: [connection.NetBearType.BEARER_WIFI]
+        }
+      };
       const netConnection: connection.NetConnection =
-        connection.createNetConnection();
+        connection.createNetConnection(specifier);
       this.wifiNetConnection = netConnection;
       netConnection.on('netLost', (): void => {
-        if (this.wifiConnected && !this.wifiManualDisconnect) {
+        if (this.wifiNetConnection === netConnection &&
+          this.isCurrentWifiAttempt(attempt, camera) &&
+          this.wifiConnected && !this.wifiManualDisconnect) {
           this.enterWifiReconnecting();
         }
       });
+      netConnection.on(
+        'netAvailable',
+        (netHandle: connection.NetHandle): void => {
+          if (this.wifiNetConnection === netConnection &&
+            this.wifiSourceGeneration === sourceGeneration &&
+            this.sourceSwitchGeneration === sourceGeneration &&
+            this.wifiReconnecting && !this.wifiManualDisconnect) {
+            this.wakeWifiReconnect();
+          }
+        }
+      );
       netConnection.register((error: BusinessError): void => {
-        if (error) {
+        if (error && this.wifiNetConnection === netConnection &&
+          this.wifiSourceGeneration === sourceGeneration &&
+          this.sourceSwitchGeneration === sourceGeneration) {
           this.wifiNetConnection = undefined;
         }
       });
@@ -11443,15 +11771,20 @@ struct Index {
 
   private unregisterWifiNetConnection(): void {
     if (this.wifiNetConnection !== undefined) {
+      const netConnection: connection.NetConnection = this.wifiNetConnection;
+      // 先摘除共享所有权；旧 unregister 回调绝不能清掉随后注册的新 listener。
+      this.wifiNetConnection = undefined;
       try {
-        this.wifiNetConnection.unregister((error: BusinessError): void => {
+        netConnection.unregister((error: BusinessError): void => {
           if (error) {
-            this.wifiNetConnection = undefined;
+            this.diagnostics?.warning(
+              'wifi-network',
+              `注销 Wi‑Fi 网络监听失败：${error.message}`
+            );
           }
         });
       } catch (error) {
       }
-      this.wifiNetConnection = undefined;
     }
   }
 
@@ -11654,12 +11987,23 @@ struct Index {
     if ((!this.connected && !this.wifiConnected) || this.busy) {
       return;
     }
+    const wifiSource: boolean = this.wifiSourceActive();
+    const wifiCamera: PtpIpCamera = this.wifiCamera;
+    const wifiAttempt: number = this.wifiAttemptGeneration;
     if (this.liveView) {
       this.previewGeneration++;
       await this.runBusy('正在停止实时取景…', async (): Promise<void> => {
         await this.finishExternalRecordingForDisconnect();
-        if (this.wifiSourceActive()) {
-          await this.wifiCamera.stopLiveView();
+        if (wifiSource) {
+          if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
+          try {
+            await wifiCamera.stopLiveView();
+          } catch (error) {
+            if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
+            this.showError((error as Error).message);
+            return;
+          }
+          if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
           this.wifiLiveView = false;
         } else {
           await this.camera.stopLiveView();
@@ -11674,8 +12018,16 @@ struct Index {
       return;
     }
     await this.runBusy('正在开启实时取景…', async (): Promise<void> => {
-      if (this.wifiSourceActive()) {
-        await this.wifiCamera.startLiveView();
+      if (wifiSource) {
+        if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
+        try {
+          await wifiCamera.startLiveView();
+        } catch (error) {
+          if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
+          this.showError((error as Error).message);
+          return;
+        }
+        if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
         this.wifiLiveView = true;
       } else {
         await this.camera.startLiveView();
@@ -11690,17 +12042,25 @@ struct Index {
     const generation: number = ++this.previewGeneration;
     let failures: number = 0;
     const wifiSource: boolean = this.wifiSourceActive();
+    const wifiCamera: PtpIpCamera = this.wifiCamera;
+    const wifiAttempt: number = this.wifiAttemptGeneration;
     this.syncLivePhotoRing();
     while (
       generation === this.previewGeneration &&
       (wifiSource
-        ? this.wifiCamera.isConnected && this.wifiCamera.isLiveView
+        ? this.isCurrentWifiOperation(wifiAttempt, wifiCamera) &&
+          wifiCamera.isConnected && wifiCamera.isLiveView
         : this.camera.isConnected && this.camera.isLiveView)
     ) {
       try {
         const jpeg: Uint8Array = wifiSource
-          ? await this.wifiCamera.getLiveViewFrame()
+          ? await wifiCamera.getLiveViewFrame()
           : await this.camera.getLiveViewFrame();
+        if (generation !== this.previewGeneration ||
+          (wifiSource &&
+            !this.isCurrentWifiOperation(wifiAttempt, wifiCamera))) {
+          return;
+        }
         failures = 0;
         // E5 1.5.9：live 图环形缓冲常开（取景帧同源喂入，仅当开关开启）。
         this.syncLivePhotoRing();
@@ -11716,8 +12076,17 @@ struct Index {
             );
           }
         }
-        await this.displayJpeg(jpeg);
+        await this.displayJpeg(jpeg, (): boolean => {
+          return generation === this.previewGeneration &&
+            (!wifiSource ||
+              this.isCurrentWifiOperation(wifiAttempt, wifiCamera));
+        });
       } catch (error) {
+        if (generation !== this.previewGeneration ||
+          (wifiSource &&
+            !this.isCurrentWifiOperation(wifiAttempt, wifiCamera))) {
+          return;
+        }
         failures++;
         const message: string = (error as BusinessError).message;
         this.diagnostics?.warning(
@@ -11728,10 +12097,12 @@ struct Index {
           this.previewGeneration++;
           await this.finishExternalRecordingForDisconnect();
           if (wifiSource) {
+            if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
             try {
-              await this.wifiCamera.stopLiveView();
+              await wifiCamera.stopLiveView();
             } catch (stopError) {
             }
+            if (!this.isCurrentWifiOperation(wifiAttempt, wifiCamera)) return;
             this.wifiLiveView = false;
           } else {
             await this.camera.stopLiveView();
@@ -11831,11 +12202,21 @@ struct Index {
       return;
     }
     if (!this.connected && this.wifiConnected && !this.busy) {
+      const camera: PtpIpCamera = this.wifiCamera;
+      const attempt: number = this.wifiAttemptGeneration;
+      const cameraName: string = this.wifiCameraName;
       await this.runBusy('正在通过 Wi‑Fi 触发相机快门…', async (): Promise<void> => {
         // E5 1.5.9：Wi‑Fi PTP 拍照不生成 live 图切片——原片在相机
         // 存储卡内，本地无照片文件可配对，切片会导致孤儿 AVI。
-        await this.wifiCamera.capture();
-        this.status = `${this.wifiCameraName} 已收到拍摄指令 · 原片保存在相机存储卡`;
+        try {
+          await camera.capture();
+        } catch (error) {
+          if (!this.isCurrentWifiOperation(attempt, camera)) return;
+          this.showError((error as Error).message);
+          return;
+        }
+        if (!this.isCurrentWifiOperation(attempt, camera)) return;
+        this.status = `${cameraName} 已收到拍摄指令 · 原片保存在相机存储卡`;
       });
       return;
     }
@@ -12054,26 +12435,34 @@ struct Index {
     // E4 1.5.9：Wi‑Fi 源走机身录像（Nikon 0x920a/0x920b；Canon
     // EVFRecordStatus，TBC-awaiting-hardware；文件保存在相机卡内）。
     if (this.wifiSourceActive()) {
+      const camera: PtpIpCamera = this.wifiCamera;
+      const attempt: number = this.wifiAttemptGeneration;
+      const wasRecording: boolean = this.wifiMovieRecording;
+      const supportsRecording: boolean = this.wifiVendorSupportsRecording();
       await this.runBusy(
-        this.wifiMovieRecording ? '正在停止录制…' : '正在开始录制…',
+        wasRecording ? '正在停止录制…' : '正在开始录制…',
         async (): Promise<void> => {
+          if (!this.isCurrentWifiOperation(attempt, camera)) return;
           try {
-            if (this.wifiMovieRecording) {
-              await this.wifiCamera.stopMovieRecording();
+            if (wasRecording) {
+              await camera.stopMovieRecording();
+              if (!this.isCurrentWifiOperation(attempt, camera)) return;
               this.wifiMovieRecording = false;
               this.videoRecording = false;
               this.status = 'Wi‑Fi 录像已停止 · 文件保存在相机卡内';
             } else {
-              if (!this.wifiVendorSupportsRecording()) {
+              if (!supportsRecording) {
                 throw new Error('已连相机暂不支持 PTP/IP 远程录像');
               }
-              await this.wifiCamera.startMovieRecording();
+              await camera.startMovieRecording();
+              if (!this.isCurrentWifiOperation(attempt, camera)) return;
               this.wifiMovieRecording = true;
               this.videoRecording = true;
               this.status = '● REC · 正在录制到相机存储卡（Wi‑Fi）';
             }
           } catch (error) {
-            this.wifiMovieRecording = this.wifiCamera.isMovieRecording;
+            if (!this.isCurrentWifiOperation(attempt, camera)) return;
+            this.wifiMovieRecording = camera.isMovieRecording;
             this.videoRecording = this.wifiMovieRecording;
             this.showError(`Wi‑Fi 录像失败：${(error as Error).message}`);
           }
@@ -15307,7 +15696,10 @@ struct Index {
     }
   }
 
-  private async displayJpeg(jpeg: Uint8Array): Promise<void> {
+  private async displayJpeg(
+    jpeg: Uint8Array,
+    ownerIsCurrent?: () => boolean
+  ): Promise<void> {
     const decodeOpts: image.DecodingOptions = {
       editable: false,
       desiredPixelFormat: image.PixelMapFormat.RGBA_8888
@@ -15318,6 +15710,10 @@ struct Index {
     const source: image.ImageSource = image.createImageSource(jpeg.buffer);
     const sourceMap: image.PixelMap = await source.createPixelMap(decodeOpts);
     source.release();
+    if (ownerIsCurrent !== undefined && !ownerIsCurrent()) {
+      sourceMap.release();
+      return;
+    }
     let pixelMap: image.PixelMap = sourceMap;
     // v1.5.7 拍照页监看恢复：拍照页（capture）也参与帧分析（更新 RGB 直方图），
     // 但预览保持原始帧（对齐 Android showProcessedPreview：仅 monitor/预设显示处理图）。
@@ -15341,6 +15737,13 @@ struct Index {
           this.falseColorEnabled,
           nikonCloudPreset
         );
+      if (ownerIsCurrent !== undefined && !ownerIsCurrent()) {
+        if (result.pixelMap !== sourceMap) {
+          result.pixelMap.release();
+        }
+        sourceMap.release();
+        return;
+      }
       pixelMap = (monitoring || nikonCloudPreset !== undefined)
         ? result.pixelMap : sourceMap;
       this.redHistogram = result.redHistogram;

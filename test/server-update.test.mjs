@@ -105,6 +105,12 @@ async function withServer(options, fn) {
   }
 }
 
+function localDayKey(ts) {
+  const date = new Date(ts);
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 test("HTTP API supports canonical and compatibility routes with CORS and health checks", async () => {
   const updateService = createUpdateService({
     fetchImpl: async () => ({ ok: true, status: 200, json: async () => release }),
@@ -219,8 +225,9 @@ test("E1 security: static server rejects /data/ prefix (403) without auth", asyn
     async (base) => {
       // 造一个真实 usage 文件（无鉴权暴露即漏洞）。
       const usageStore = createUsageStore({ dataDir, fs: null });
-      usageStore.record("windows", "1.5.9", "install-abc", Date.now());
-      const usageFile = path.join(dataDir, `usage-${new Date().toISOString().slice(0, 10)}.json`);
+      const recordedAt = Date.now();
+      usageStore.record("windows", "1.5.9", "install-abc", recordedAt);
+      const usageFile = path.join(dataDir, `usage-${localDayKey(recordedAt)}.json`);
       assert.equal(fs.existsSync(usageFile), true, "usage file must exist for the test");
 
       // /data/usage-*.json 无鉴权 → 403（不得放行）。
@@ -248,8 +255,9 @@ test("E1 security: uppercase /DATA/ variant forbidden (case-insensitive FS)", as
     },
     async (base) => {
       const usageStore = createUsageStore({ dataDir, fs: null });
-      usageStore.record("windows", "1.5.9", "install-upper", Date.now());
-      const usageFile = path.join(dataDir, `usage-${new Date().toISOString().slice(0, 10)}.json`);
+      const recordedAt = Date.now();
+      usageStore.record("windows", "1.5.9", "install-upper", recordedAt);
+      const usageFile = path.join(dataDir, `usage-${localDayKey(recordedAt)}.json`);
       assert.equal(fs.existsSync(usageFile), true);
 
       // APFS 等大小写不敏感 FS 上 /DATA/ 变体此前可绕过 403——统一小写后封死。

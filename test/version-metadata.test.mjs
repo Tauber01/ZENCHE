@@ -8,7 +8,7 @@ const read = async (path) => readFile(new URL(path, root), "utf8");
 test("release version is consistent across packages and build scripts", async () => {
   const packageMetadata = JSON.parse(await read("package.json"));
   const version = packageMetadata.version;
-  assert.equal(version, "1.5.13");
+  assert.equal(version, "1.5.14");
   const sources = await Promise.all([
     read("scripts/build-android.sh"),
     read("scripts/build-harmony.sh"),
@@ -61,7 +61,7 @@ test("native package build numbers stay aligned", async () => {
   ]);
   const buildNumber = android.match(/versionCode (\d+)/)?.[1];
 
-  assert.equal(buildNumber, "40");
+  assert.equal(buildNumber, "41");
   assert.match(harmony, new RegExp(`versionCode: ${buildNumber}`));
   assert.match(ios, new RegExp(`CURRENT_PROJECT_VERSION = ${buildNumber};`, "g"));
   assert.match(
@@ -70,11 +70,11 @@ test("native package build numbers stay aligned", async () => {
   );
   assert.match(
     windows,
-    new RegExp(`<AssemblyVersion>1\\.5\\.13\\.${buildNumber}</AssemblyVersion>`),
+    new RegExp(`<AssemblyVersion>1\\.5\\.14\\.${buildNumber}</AssemblyVersion>`),
   );
   assert.match(
     windows,
-    new RegExp(`<FileVersion>1\\.5\\.13\\.${buildNumber}</FileVersion>`),
+    new RegExp(`<FileVersion>1\\.5\\.14\\.${buildNumber}</FileVersion>`),
   );
   assert.match(windowsBuild, new RegExp(`\\$BuildNumber = ${buildNumber}`));
 });

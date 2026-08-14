@@ -16,6 +16,20 @@ const HARMONY = 'native/harmony/entry/src/main/ets/pages/Index.ets';
 const WINDOWS_XAML = 'native/windows/MainWindow.xaml';
 const WINDOWS_CODE = 'native/windows/MainWindow.xaml.cs';
 
+const blockStartingAt = (source, marker) => {
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, `missing marker: ${marker}`);
+  const openingBrace = source.indexOf('{', start);
+  assert.notEqual(openingBrace, -1, `missing body: ${marker}`);
+  let depth = 0;
+  for (let index = openingBrace; index < source.length; index++) {
+    if (source[index] === '{') depth++;
+    if (source[index] === '}') depth--;
+    if (depth === 0) return source.slice(start, index + 1);
+  }
+  assert.fail(`unterminated body: ${marker}`);
+};
+
 test('W14 iOS bridge is local-network-only and does not persist its session code', async () => {
   const source = await read(IOS_REMOTE);
   assert.match(source, /URLSessionConfiguration\.ephemeral/);
@@ -93,8 +107,14 @@ test('W14 monitoring switch stops live view but keeps capture connection paths i
   ]);
   assert.match(ios, /func setLiveMonitoringEnabled[\s\S]{0,520}stopLiveViewIfNeeded\(\)/);
   assert.match(mac, /func setLiveMonitoringEnabled[\s\S]{0,800}toggleLiveView\(\)/);
-  assert.match(android, /private void toggleLiveView\(\)[\s\S]{0,1000}stopLiveView\(\)/);
-  assert.match(harmony, /private async toggleLiveView\(\)[\s\S]{0,750}stopLiveView\(\)/);
+  assert.match(
+    blockStartingAt(android, 'private void toggleLiveView()'),
+    /stopLiveViewForSource\(operationSource\)/,
+  );
+  assert.match(
+    blockStartingAt(harmony, 'private async toggleLiveView()'),
+    /stopLiveView\(\)/,
+  );
   assert.match(windows, /LiveViewButton_Click[\s\S]{0,2200}StopLiveViewAsync/);
   for (const source of [ios, mac, android, harmony, windows]) {
     assert.match(source, /capture|Capture|快门/, 'camera capture path must remain present');
@@ -111,8 +131,8 @@ test('W14 Android, HarmonyOS and Windows clear stale preview frames when monitor
   );
   assert.match(android, /boolean showPreviewPlaceholder = !liveViewEnabled \|\| previewFrame == null/);
   assert.match(
-    harmony,
-    /if \(this\.liveView\)[\s\S]{0,720}this\.preview\.release\(\);[\s\S]{0,80}this\.preview = undefined;/
+    blockStartingAt(harmony, 'private async toggleLiveView()'),
+    /if \(this\.liveView\)[\s\S]*this\.preview\.release\(\);[\s\S]*this\.preview = undefined;/,
   );
   assert.match(harmony, /if \(this\.liveView && this\.preview !== undefined\)/);
   assert.match(
@@ -148,7 +168,7 @@ test('W14 macOS ignores cached frames and gates bridge JPEG when monitoring stop
   );
   assert.match(
     remote,
-    /func stopLiveViewIfNeeded\(\)[\s\S]{0,120}liveViewTask = nil[\s\S]{0,80}liveViewFrame = nil/
+    /func stopLiveViewIfNeeded\(ifOwnedBy explicitAttempt: UInt64\? = nil\)[\s\S]{0,180}liveViewTask = nil[\s\S]{0,80}liveViewFrame = nil/
   );
 });
 

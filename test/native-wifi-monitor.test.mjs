@@ -32,9 +32,9 @@ test('iOS/macOS shared service exposes heartbeat, probe, backoff and reconnectin
   assert.match(service, /offlineThreshold = 3/);
   assert.match(service, /reconnectMaxDelaySeconds: UInt64 = 30/);
 
-  // GetDeviceInfo 探测（0x1002）与竞速超时
+  // PTP/IP event 通道 Probe Request/Response（type 13/14）与竞速超时
   assert.match(service, /func probe\(timeoutMilliseconds: UInt64 = 3000\)/);
-  assert.match(service, /operation: 0x1002/);
+  assert.match(service, /writeEventPacket\([\s\S]{0,80}type: 13/);
 
   // 指数退避纯函数 + 状态机
   assert.match(service, /static func backoffDelay\(forAttempt attempt: Int\)/);
@@ -43,8 +43,11 @@ test('iOS/macOS shared service exposes heartbeat, probe, backoff and reconnectin
   assert.match(service, /private var missedHeartbeats = 0/);
   assert.match(service, /private var reconnectAttempt = 0/);
 
-  // NWPathMonitor 网络监听
+  // iOS 监听 Wi-Fi 专用路径；macOS 仍保留默认路径，并绑定会话 attempt。
+  assert.match(service, /NWPathMonitor\(requiredInterfaceType: \.wifi\)/);
   assert.match(service, /NWPathMonitor\(\)/);
+  assert.match(service, /let monitoredAttempt = activeSessionAttempt/);
+  assert.match(service, /isCurrentSessionAttempt\(monitoredAttempt\)/);
   assert.match(service, /path\.status != \.satisfied/);
 
   // UI 呈现：重连中
@@ -58,10 +61,11 @@ test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () =
   const activity = await read(
     'native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java');
 
-  // 传输层探测：synchronized 串行 + 3s 超时
-  assert.match(transport, /synchronized void probe\(\)/);
+  // 传输层探测：event 通道 type 13/14 + 3s 超时
+  assert.match(transport, /void probe\(\)/);
   assert.match(transport, /PROBE_TIMEOUT_MS = 3000/);
-  assert.match(transport, /0x1002/);
+  assert.match(transport, /PACKET_PROBE_REQUEST/);
+  assert.match(transport, /PACKET_PROBE_RESPONSE/);
 
   // 心跳参数
   assert.match(activity, /WIFI_HEARTBEAT_INTERVAL_MS = 5000/);
@@ -78,6 +82,24 @@ test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () =
   assert.match(activity, /ConnectivityManager\.NetworkCallback/);
   assert.match(activity, /registerNetworkCallback/);
   assert.match(activity, /addTransportType\(NetworkCapabilities\.TRANSPORT_WIFI\)/);
+  assert.match(activity, /callbackGeneration = wifiConnectionGeneration/);
+  assert.match(activity, /activeNetwork = manager\.getActiveNetwork\(\)/);
+  assert.match(
+    activity,
+    /activeCapabilities[\s\S]{0,160}hasTransport\([\s\S]{0,80}NetworkCapabilities\.TRANSPORT_WIFI/
+  );
+  assert.match(activity, /final Network cameraNetwork = activeNetwork/);
+  assert.match(activity, /if \(!cameraNetwork\.equals\(network\)\) return/);
+  assert.match(
+    activity,
+    /无法把当前 PTP\/IP socket 可靠归属[\s\S]{0,260}return;/,
+  );
+  assert.match(activity, /wifiNetworkCallback == this/);
+  assert.match(activity, /heartbeatGeneration != wifiConnectionGeneration/);
+  assert.match(
+    activity,
+    /enterWifiReconnecting\(\)[\s\S]{0,300}wifiConnected = false[\s\S]{0,180}unregisterWifiNetworkCallback\(\)/,
+  );
 
   // UI 呈现：重连中
   assert.match(activity, /正在自动重连|正在重连 Wi‑Fi 相机/);
@@ -90,7 +112,10 @@ test('Harmony exposes probe, heartbeat, backoff and NetConnection', async () => 
     'native/harmony/entry/src/main/ets/pages/Index.ets');
 
   assert.match(transport, /async probe\(timeoutMilliseconds: number = 3000\)/);
-  assert.match(transport, /0x1002/);
+  assert.match(
+    transport,
+    /sendEventPacket\([\s\S]*13,[\s\S]*new Uint8Array\(0\)/,
+  );
 
   assert.match(index, /WIFI_HEARTBEAT_INTERVAL_MS: number = 5000/);
   assert.match(index, /WIFI_OFFLINE_THRESHOLD: number = 3/);
@@ -99,8 +124,19 @@ test('Harmony exposes probe, heartbeat, backoff and NetConnection', async () => 
   assert.match(index, /wifiManualDisconnect/);
 
   // NetConnection 网络监听
-  assert.match(index, /createNetConnection\(\)/);
+  assert.match(index, /connection\.createNetConnection\(specifier\)/);
+  assert.match(index, /bearerTypes: \[connection\.NetBearType\.BEARER_WIFI\]/);
   assert.match(index, /netLost/);
+  assert.match(index, /netAvailable/);
+  assert.match(index, /this\.wifiNetConnection === netConnection/);
+  assert.match(
+    index,
+    /netAvailable[\s\S]*this\.wifiSourceGeneration === sourceGeneration[\s\S]*this\.sourceSwitchGeneration === sourceGeneration[\s\S]*this\.wakeWifiReconnect\(\)/,
+  );
+  assert.match(
+    index,
+    /private wakeWifiReconnect\(\)[\s\S]*this\.stopWifiReconnect\(\)[\s\S]*this\.attemptWifiReconnect\(scheduledGeneration\)/,
+  );
 
   // UI 呈现：重连中
   assert.match(index, /正在自动重连|正在重连…/);
@@ -112,7 +148,7 @@ test('Windows exposes probe, heartbeat, backoff and NetworkAvailabilityChanged',
 
   assert.match(transport, /public async Task ProbeAsync/);
   assert.match(transport, /ProbeTimeoutMilliseconds = 3000/);
-  assert.match(transport, /0x1002/);
+  assert.match(transport, /SendEventPacketAsync\(13/);
 
   assert.match(window, /_wifiHeartbeatTimer = new\(\)/);
   assert.match(window, /Interval = TimeSpan\.FromMilliseconds\(5000\)/);

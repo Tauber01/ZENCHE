@@ -316,6 +316,32 @@ enum PTPIPError: LocalizedError {
     case rejected(UInt16)
     case notConnected
 
+    /// DeviceInfo 能力探测可安全降级为名称启发式的响应码。
+    /// 其他 rejected（特别是会话/事务号失配）必须向上传播。
+    static func allowsVendorDetectionFallback(_ code: UInt16) -> Bool {
+        switch code {
+        case 0x2005, // OperationNotSupported
+             0x200A, // DevicePropNotSupported
+             0x2019: // DeviceBusy：保留已有连接期间的兼容降级
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 这些响应表示本地会话/事务序列已与相机分叉，
+    /// 继续复用当前 socket 不再可靠。
+    static func isSessionFatalResponse(_ code: UInt16) -> Bool {
+        switch code {
+        case 0x2003, // SessionNotOpen
+             0x2004, // InvalidTransactionID
+             0x201E: // SessionAlreadyOpen
+            return true
+        default:
+            return false
+        }
+    }
+
     var errorDescription: String? {
         switch self {
         case .invalidEndpoint: return "Wi‑Fi 相机地址或端口无效"
@@ -341,35 +367,119 @@ private final class PTPIPContinuationGate: @unchecked Sendable {
     }
 }
 
+/// 将 UI 发起的一次连接生命周期一路带进 PTPIPSession actor。actor 除了
+/// 校验自己的 socket generation，还会校验这个 attempt，防止旧任务在新会话
+/// 建立后才进入 actor、误把新会话当成自己的会话操作。
+private enum PTPIPSessionOwnership {
+    @TaskLocal static var attempt: UInt64?
+}
+
+private struct PTPIPGateWaiter {
+    let epoch: UInt64
+    let continuation: CheckedContinuation<Bool, Never>
+}
+
+/// start/send 的续体容器。取消可能先于 continuation 安装发生，因此需要保存
+/// pending error；否则恰好在安装窗口取消时会永远挂起。
+private final class PTPIPVoidContinuationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var pendingError: Error?
+    private var finished = false
+
+    func install(_ continuation: CheckedContinuation<Void, Error>) {
+        lock.lock()
+        if finished {
+            let error = pendingError
+            lock.unlock()
+            continuation.resume(
+                throwing: error ?? PTPIPError.connectionFailed("操作已取消")
+            )
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func resume() {
+        lock.lock()
+        guard !finished else {
+            lock.unlock()
+            return
+        }
+        finished = true
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume()
+    }
+
+    func resume(throwing error: Error) {
+        lock.lock()
+        guard !finished else {
+            lock.unlock()
+            return
+        }
+        finished = true
+        let continuation = self.continuation
+        self.continuation = nil
+        if continuation == nil {
+            pendingError = error
+        }
+        lock.unlock()
+        continuation?.resume(throwing: error)
+    }
+}
+
 /// 单次续体容器：保证 receive 回调与 onCancel 竞速时只恢复一次，
 /// 且 onCancel（Task 取消路径）也能拿到 continuation 主动恢复。
 private final class PTPIPReceiveBox: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Data, Error>?
+    private var pendingError: Error?
     private var finished = false
 
     func install(_ continuation: CheckedContinuation<Data, Error>) {
         lock.lock()
-        defer { lock.unlock() }
+        if finished {
+            let error = pendingError
+            lock.unlock()
+            continuation.resume(
+                throwing: error ?? PTPIPError.connectionFailed("操作已取消")
+            )
+            return
+        }
         self.continuation = continuation
+        lock.unlock()
     }
 
     func resume(returning value: Data) {
         lock.lock()
-        defer { lock.unlock() }
-        guard !finished, let continuation else { return }
+        guard !finished else {
+            lock.unlock()
+            return
+        }
         finished = true
+        let continuation = self.continuation
         self.continuation = nil
-        continuation.resume(returning: value)
+        lock.unlock()
+        continuation?.resume(returning: value)
     }
 
     func resume(throwing error: Error) {
         lock.lock()
-        defer { lock.unlock() }
-        guard !finished, let continuation else { return }
+        guard !finished else {
+            lock.unlock()
+            return
+        }
         finished = true
+        let continuation = self.continuation
         self.continuation = nil
-        continuation.resume(throwing: error)
+        if continuation == nil {
+            pendingError = error
+        }
+        lock.unlock()
+        continuation?.resume(throwing: error)
     }
 }
 
@@ -715,6 +825,27 @@ private enum JSONValue: Decodable {
 private actor PTPIPSession {
     private var command: NWConnection?
     private var event: NWConnection?
+    private var connectingCommand: NWConnection?
+    private var connectingEvent: NWConnection?
+    private var sessionGeneration: UInt64 = 0
+    private var sessionOwnerAttempt: UInt64?
+    private var highestOwnerAttempt: UInt64 = 0
+    private var handshakeTimeoutGeneration: UInt64?
+    private var eventReaderTask: Task<Void, Never>?
+    private var eventGeneration: UInt64 = 0
+    private var probeResponseSequence: UInt64 = 0
+    private var probeInProgress = false
+    private var commandChannelFailure: String?
+    private var commandDeadlineToken: UInt64 = 0
+    private var activeCommandDeadlineToken: UInt64?
+    private var eventDeadlineToken: UInt64 = 0
+    private var activeEventDeadlineToken: UInt64?
+    private var commandGateHeld = false
+    private var commandGateEpoch: UInt64 = 0
+    private var commandGateWaiters: [PTPIPGateWaiter] = []
+    private var eventWriteGateHeld = false
+    private var eventWriteGateEpoch: UInt64 = 0
+    private var eventWriteGateWaiters: [PTPIPGateWaiter] = []
     private var transactionID: UInt32 = 1
     // C3 状态：厂商识别结果与取景/录像标记（断连时清零）。
     private var detectedVendor: PTPIPCameraVendor = .unknown
@@ -722,7 +853,16 @@ private actor PTPIPSession {
     private var movieRecording = false
 
     func connect(host: String, port: UInt16) async throws -> String {
-        await disconnect()
+        try Task.checkCancellation()
+        guard let ownerAttempt = PTPIPSessionOwnership.attempt else {
+            throw PTPIPError.connectionFailed("PTP/IP 连接缺少会话所有权")
+        }
+        guard ownerAttempt > highestOwnerAttempt else {
+            throw PTPIPError.connectionFailed("PTP/IP 连接尝试已过期")
+        }
+        highestOwnerAttempt = ownerAttempt
+        let generation = invalidateSession()
+        sessionOwnerAttempt = ownerAttempt
         guard let endpointPort = NWEndpoint.Port(rawValue: port),
               !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw PTPIPError.invalidEndpoint }
@@ -732,58 +872,142 @@ private actor PTPIPSession {
             port: endpointPort,
             using: .tcp
         )
-        try await start(command)
-        self.command = command
-
-        var payload = Data()
-        payload.append(contentsOf: withUnsafeBytes(of: UUID().uuid) {
-            Array($0)
-        })
-        appendUTF16("ZENCHE", to: &payload)
-        appendLE(UInt32(0x0001_0000), to: &payload)
-        try await send(packet(type: 1, payload: payload), on: command)
-        let acknowledgment = try await receivePacket(on: command)
-        guard acknowledgment.type == 2,
-              acknowledgment.data.count >= 28 else {
-            throw PTPIPError.invalidPacket
+        var event: NWConnection?
+        connectingCommand = command
+        let handshakeDeadlineTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 12_000_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await self?.expireConnectionAttempt(
+                generation: generation,
+                ownerAttempt: ownerAttempt
+            )
         }
-        let connectionNumber = readUInt32(acknowledgment.data, at: 8)
-        let cameraName = readUTF16(acknowledgment.data, from: 28)
+        defer { handshakeDeadlineTask.cancel() }
 
-        let event = NWConnection(
-            host: NWEndpoint.Host(host),
-            port: endpointPort,
-            using: .tcp
-        )
-        try await start(event)
-        var eventPayload = Data()
-        appendLE(connectionNumber, to: &eventPayload)
-        try await send(packet(type: 3, payload: eventPayload), on: event)
-        let eventAcknowledgment = try await receivePacket(on: event)
-        guard eventAcknowledgment.type == 4 else {
-            throw PTPIPError.invalidPacket
-        }
-        self.event = event
+        do {
+            try await start(command)
+            try validateConnectionAttempt(
+                command: command,
+                event: nil,
+                generation: generation
+            )
 
-        let response = try await commandRequest(
-            operation: 0x1002,
-            transaction: 0,
-            parameters: [1]
-        )
-        guard response == 0x2001 else {
-            throw PTPIPError.rejected(response)
+            var payload = Data()
+            payload.append(contentsOf: withUnsafeBytes(of: UUID().uuid) {
+                Array($0)
+            })
+            appendUTF16("ZENCHE", to: &payload)
+            appendLE(UInt32(0x0001_0000), to: &payload)
+            try await send(packet(type: 1, payload: payload), on: command)
+            try validateConnectionAttempt(
+                command: command,
+                event: nil,
+                generation: generation
+            )
+            let acknowledgment = try await receivePacket(on: command)
+            try validateConnectionAttempt(
+                command: command,
+                event: nil,
+                generation: generation
+            )
+            guard acknowledgment.type == 2,
+                  let initAcknowledgment = parseInitCommandAcknowledgment(
+                    acknowledgment.data
+                  ) else {
+                throw PTPIPError.invalidPacket
+            }
+            let connectionNumber = initAcknowledgment.connectionNumber
+            let cameraName = initAcknowledgment.cameraName
+
+            let eventConnection = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: endpointPort,
+                using: .tcp
+            )
+            event = eventConnection
+            connectingEvent = eventConnection
+            try await start(eventConnection)
+            try validateConnectionAttempt(
+                command: command,
+                event: eventConnection,
+                generation: generation
+            )
+            var eventPayload = Data()
+            appendLE(connectionNumber, to: &eventPayload)
+            try await send(
+                packet(type: 3, payload: eventPayload),
+                on: eventConnection
+            )
+            try validateConnectionAttempt(
+                command: command,
+                event: eventConnection,
+                generation: generation
+            )
+            let eventAcknowledgment = try await receivePacket(
+                on: eventConnection
+            )
+            try validateConnectionAttempt(
+                command: command,
+                event: eventConnection,
+                generation: generation
+            )
+            guard eventAcknowledgment.type == 4 else {
+                throw PTPIPError.invalidPacket
+            }
+
+            // InitEventAck 后先用局部握手通道启动 reader，确保 OpenSession 等待期间
+            // 收到的 Probe Request(type 13) 也能应答；OpenSession 成功前不得把半成品
+            // 通道发布成可供业务事务使用的活动会话。
+            transactionID = 1
+            startEventReader(
+                on: eventConnection,
+                command: command,
+                sessionGeneration: generation
+            )
+
+            let response = try await openSession(
+                on: command,
+                event: eventConnection,
+                generation: generation
+            )
+            try validateConnectionAttempt(
+                command: command,
+                event: eventConnection,
+                generation: generation
+            )
+            guard response == 0x2001 else {
+                throw PTPIPError.rejected(response)
+            }
+
+            self.command = command
+            self.event = eventConnection
+            connectingCommand = nil
+            connectingEvent = nil
+            return cameraName.isEmpty ? "PTP/IP Camera" : cameraName
+        } catch {
+            let didReachHandshakeDeadline =
+                handshakeTimeoutGeneration == generation
+            cleanupConnectionAttempt(
+                command: command,
+                event: event,
+                generation: generation
+            )
+            if didReachHandshakeDeadline {
+                throw PTPIPError.connectionFailed("PTP/IP 握手超时（12 秒）")
+            }
+            throw error
         }
-        transactionID = 1
-        return cameraName.isEmpty ? "PTP/IP Camera" : cameraName
     }
 
     func capture() async throws {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
-        let current = transactionID
-        transactionID &+= 1
         let response = try await commandRequest(
             operation: 0x100E,
-            transaction: current,
             parameters: [0, 0]
         )
         guard response == 0x2001 else {
@@ -853,15 +1077,16 @@ private actor PTPIPSession {
     }
 
     func storageObject(handle: UInt32) async throws -> Data {
-        try await dataRequest(operation: 0x1009, parameters: [handle])
+        try await dataRequest(
+            operation: 0x1009,
+            parameters: [handle],
+            timeoutMilliseconds: 180_000
+        )
     }
 
     func deleteStorageObject(handle: UInt32) async throws {
-        let current = transactionID
-        transactionID &+= 1
         let response = try await commandRequest(
             operation: 0x100B,
-            transaction: current,
             parameters: [handle, 0]
         )
         guard response == 0x2001 else {
@@ -876,18 +1101,34 @@ private actor PTPIPSession {
     /// 此时退回连接握手返回的相机名启发式。结果按会话缓存。
     /// （E2 1.5.9：0x1002→0x1001——ISO 15740 中 GetDeviceInfo 为 0x1001，
     /// 0x1002 实为 OpenSession；pro 复审观察项收口。）
-    func detectVendor(using cameraName: String) async -> PTPIPCameraVendor {
+    func detectVendor(using cameraName: String) async throws
+        -> PTPIPCameraVendor {
+        // ISO 15740 GetDeviceInfo 的 operation code 为 0x1001。
+        let ownerAttempt = PTPIPSessionOwnership.attempt
+        guard sessionBelongs(to: ownerAttempt) else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作所属会话已失效")
+        }
         if detectedVendor != .unknown { return detectedVendor }
         let nameBased = Self.vendor(forName: cameraName)
         var resolved = nameBased
-        if let info = try? await dataRequest(
-            operation: 0x1001,
-            parameters: [1]
-        ), let manufacturer = deviceInfoManufacturer(info) {
-            resolved = Self.vendor(
-                forManufacturer: manufacturer,
-                fallback: nameBased
+        do {
+            let info = try await dataRequest(
+                operation: 0x1001,
+                parameters: []
             )
+            if let manufacturer = deviceInfoManufacturer(info) {
+                resolved = Self.vendor(
+                    forManufacturer: manufacturer,
+                    fallback: nameBased
+                )
+            }
+        } catch PTPIPError.rejected(let code)
+            where PTPIPError.allowsVendorDetectionFallback(code) {
+            // 仅明确的能力缺失/忙状态可回退到名称识别；
+            // SessionNotOpen / InvalidTransactionID 等会话错误继续抛出。
+        }
+        guard sessionBelongs(to: ownerAttempt) else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作所属会话已失效")
         }
         detectedVendor = resolved
         return resolved
@@ -897,46 +1138,48 @@ private actor PTPIPSession {
     /// TBC-awaiting-hardware），数据帧走 GetViewFinderData(0x9153)；
     /// 其余厂商走尼康 0x9201。
     func startLiveView(vendor: PTPIPCameraVendor) async throws {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         if liveViewActive { return }
         if vendor == .canon {
             try? await canonWriteEosProp(PTPIPVendorOps.canonEVFMode, 1)
             try? await canonWriteEosProp(PTPIPVendorOps.canonEVFOutputDevice, 2)
         } else {
-            let current = transactionID
-            transactionID &+= 1
             let response = try await commandRequest(
                 operation: PTPIPVendorOps.startLiveView,
-                transaction: current,
                 parameters: []
             )
             guard response == 0x2001 else {
                 throw PTPIPError.rejected(response)
             }
         }
+        try validateSessionOwner()
         liveViewActive = true
     }
 
     /// 实时取景结束（尽力而为，不抛错）。
-    func endLiveView(vendor: PTPIPCameraVendor) async {
-        guard command != nil else { return }
-        defer { liveViewActive = false }
+    func endLiveView(
+        vendor: PTPIPCameraVendor,
+        ifOwnedBy ownerAttempt: UInt64? = nil
+    ) async {
+        let expectedOwner = ownerAttempt ?? PTPIPSessionOwnership.attempt
+        guard sessionBelongs(to: expectedOwner), command != nil else { return }
         if vendor == .canon {
             try? await canonWriteEosProp(PTPIPVendorOps.canonEVFOutputDevice, 0)
             try? await canonWriteEosProp(PTPIPVendorOps.canonEVFMode, 0)
         } else {
-            let current = transactionID
-            transactionID &+= 1
             _ = try? await commandRequest(
                 operation: PTPIPVendorOps.endLiveView,
-                transaction: current,
                 parameters: []
             )
         }
+        guard sessionBelongs(to: expectedOwner) else { return }
+        liveViewActive = false
     }
 
     /// 取一帧实时取景 JPEG。尼康 0x9203 / 佳能 0x9153（TBC-awaiting-hardware）。
     func getLiveViewFrame(vendor: PTPIPCameraVendor) async throws -> Data {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         if vendor == .canon {
             return try await dataRequest(
@@ -953,6 +1196,7 @@ private actor PTPIPSession {
     /// 开始录像。尼康 0x920a（未处取景态先开取景）；佳能走 EVFRecordStatus=1
     /// （TBC-awaiting-hardware，与 C2 序列一致）。
     func startMovieRecording(vendor: PTPIPCameraVendor) async throws {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         if movieRecording { return }
         if vendor == .canon {
@@ -962,42 +1206,48 @@ private actor PTPIPSession {
             if !liveViewActive {
                 try await startLiveView(vendor: vendor)
             }
-            let current = transactionID
-            transactionID &+= 1
             let response = try await commandRequest(
                 operation: PTPIPVendorOps.startMovieRecording,
-                transaction: current,
                 parameters: []
             )
             guard response == 0x2001 else {
                 throw PTPIPError.rejected(response)
             }
         }
+        try validateSessionOwner()
         movieRecording = true
     }
 
     /// 停止录像。尼康 0x920b；佳能 EVFRecordStatus=0（TBC-awaiting-hardware）。
-    func stopMovieRecording(vendor: PTPIPCameraVendor) async throws {
+    func stopMovieRecording(
+        vendor: PTPIPCameraVendor,
+        ifOwnedBy ownerAttempt: UInt64? = nil
+    ) async throws {
+        let expectedOwner = ownerAttempt ?? PTPIPSessionOwnership.attempt
+        guard sessionBelongs(to: expectedOwner) else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作所属会话已失效")
+        }
         guard command != nil else { throw PTPIPError.notConnected }
-        defer { movieRecording = false }
         if vendor == .canon {
             try await canonWriteEosProp(PTPIPVendorOps.canonEVFRecordStatus, 0)
         } else {
-            let current = transactionID
-            transactionID &+= 1
             let response = try await commandRequest(
                 operation: PTPIPVendorOps.endMovieRecording,
-                transaction: current,
                 parameters: []
             )
             guard response == 0x2001 else {
                 throw PTPIPError.rejected(response)
             }
         }
+        guard sessionBelongs(to: expectedOwner) else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作所属会话已失效")
+        }
+        movieRecording = false
     }
 
     /// 读取设备属性原始值（GetDevicePropValue 0x1015）。
     func readProperty(_ property: UInt16) async throws -> Data {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         return try await dataRequest(
             operation: PTPIPVendorOps.getDevicePropValue,
@@ -1007,6 +1257,7 @@ private actor PTPIPSession {
 
     /// 读取设备属性描述符（GetDevicePropDesc 0x1014），用于校验可写性。
     func readPropertyDescriptor(_ property: UInt16) async throws -> Data {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         return try await dataRequest(
             operation: PTPIPVendorOps.getDevicePropDesc,
@@ -1016,6 +1267,7 @@ private actor PTPIPSession {
 
     /// 写入设备属性（SetDevicePropValue 0x1016，数据段携带属性值）。
     func writeProperty(_ property: UInt16, value: Data) async throws {
+        try validateSessionOwner()
         guard command != nil else { throw PTPIPError.notConnected }
         let response = try await dataOutRequest(
             operation: PTPIPVendorOps.setDevicePropValue,
@@ -1052,69 +1304,130 @@ private actor PTPIPSession {
         parameters: [UInt32],
         data: Data
     ) async throws -> UInt16 {
-        guard let command else { throw PTPIPError.notConnected }
-        let current = transactionID
-        transactionID &+= 1
-        var payload = Data()
-        appendLE(UInt32(2), to: &payload)
-        appendLE(operation, to: &payload)
-        appendLE(current, to: &payload)
-        parameters.forEach { appendLE($0, to: &payload) }
-        try await send(packet(type: 6, payload: payload), on: command)
-
-        var startPayload = Data()
-        appendLE(UInt32(0), to: &startPayload)
-        appendLE(current, to: &startPayload)
-        appendLE(UInt64(data.count), to: &startPayload)
-        startPayload.append(data)
-        try await send(packet(type: 9, payload: startPayload), on: command)
-
-        var endPayload = Data()
-        appendLE(UInt32(0), to: &endPayload)
-        appendLE(current, to: &endPayload)
-        try await send(packet(type: 12, payload: endPayload), on: command)
-
-        let response = try await receivePacket(on: command)
-        guard response.type == 7, response.data.count >= 14 else {
-            throw PTPIPError.invalidPacket
+        guard let expectedCommand = command else {
+            throw PTPIPError.notConnected
         }
-        return readUInt16(response.data, at: 8)
+        let expectedGeneration = sessionGeneration
+        let gateLease = try await acquireCommandGate()
+        defer { releaseCommandGate(gateLease) }
+        var transactionStarted = false
+        do {
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            let deadline = startCommandDeadline(
+                command: expectedCommand,
+                generation: expectedGeneration,
+                timeoutMilliseconds: 12_000
+            )
+            defer { finishCommandDeadline(deadline) }
+            let current = nextTransactionID()
+            var payload = Data()
+            appendLE(UInt32(2), to: &payload)
+            appendLE(operation, to: &payload)
+            appendLE(current, to: &payload)
+            parameters.forEach { appendLE($0, to: &payload) }
+            transactionStarted = true
+            try await send(
+                packet(type: 6, payload: payload),
+                on: expectedCommand
+            )
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+
+            var startPayload = Data()
+            appendLE(current, to: &startPayload)
+            appendLE(UInt64(data.count), to: &startPayload)
+            try await send(
+                packet(type: 9, payload: startPayload),
+                on: expectedCommand
+            )
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+
+            var endPayload = Data()
+            appendLE(current, to: &endPayload)
+            endPayload.append(data)
+            try await send(
+                packet(type: 12, payload: endPayload),
+                on: expectedCommand
+            )
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+
+            let response = try await receivePacket(on: expectedCommand)
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            guard response.type == 7,
+                  response.data.count >= 14,
+                  readUInt32(response.data, at: 10) == current else {
+                throw PTPIPError.invalidPacket
+            }
+            let responseCode = readUInt16(response.data, at: 8)
+            if PTPIPError.isSessionFatalResponse(responseCode) {
+                throw PTPIPError.rejected(responseCode)
+            }
+            return responseCode
+        } catch {
+            recordCommandChannelFailure(
+                error,
+                command: expectedCommand,
+                generation: expectedGeneration,
+                transactionStarted: transactionStarted
+            )
+            throw error
+        }
     }
 
     // MARK: - C3 厂商识别解析
 
-    /// 从 GetDeviceInfo 数据段解析厂商名（Manufacturer，UTF-8）。
+    /// 从 GetDeviceInfo 数据段解析厂商名（Manufacturer，PTP STR）。
     /// 布局：StandardVersion(2)+VendorExtensionID(4)+VendorExtensionVersion(2)+
-    /// VendorExtensionDesc(UTF8)+FunctionalMode(2)+五个数组(各 2 字节长度+条目)+
-    /// Manufacturer(UTF8)+Model(UTF8)+DeviceVersion(UTF8)+SerialNumber(UTF8)。
+    /// VendorExtensionDesc(PTP STR)+FunctionalMode(2)+五个 AUINT16 数组+
+    /// Manufacturer(PTP STR)+Model(PTP STR)+DeviceVersion(PTP STR)+SerialNumber(PTP STR)。
     private func deviceInfoManufacturer(_ data: Data) -> String? {
         guard data.count >= 8 else { return nil }
         var offset = 8
-        guard Self.readUTF8(data, &offset) != nil else { return nil }  // VendorExtensionDesc
+        guard Self.readPTPString(data, &offset) != nil else { return nil }
         guard offset + 2 <= data.count else { return nil }
         offset += 2  // FunctionalMode
-        for _ in 0..<4 {  // Operations/Events/DeviceProperties/CaptureFormats
-            guard offset + 2 <= data.count else { return nil }
-            let count = Int(readUInt16(data, at: offset))
-            offset += 2
-            guard offset + count * 2 <= data.count else { return nil }
+        for _ in 0..<5 {
+            guard offset + 4 <= data.count else { return nil }
+            let count = Int(readUInt32(data, at: offset))
+            offset += 4
+            guard count <= (data.count - offset) / 2 else { return nil }
             offset += count * 2
         }
-        guard offset + 2 <= data.count else { return nil }
-        let imageCount = Int(readUInt16(data, at: offset))  // ImageFormats
-        offset += 2
-        guard offset + imageCount * 2 <= data.count else { return nil }
-        offset += imageCount * 2
-        return Self.readUTF8(data, &offset)
+        return Self.readPTPString(data, &offset)
     }
 
-    private static func readUTF8(_ data: Data, _ offset: inout Int) -> String? {
+    private static func readPTPString(
+        _ data: Data,
+        _ offset: inout Int
+    ) -> String? {
         guard offset < data.count else { return nil }
-        var end = offset
-        while end < data.count, data[end] != 0 { end += 1 }
-        guard end < data.count else { return nil }
-        let text = String(data: data[offset..<end], encoding: .utf8)
-        offset = end + 1
+        let characterCount = Int(data[offset])
+        offset += 1
+        if characterCount == 0 { return "" }
+        let byteCount = characterCount * 2
+        guard byteCount <= data.count - offset,
+              data[offset + byteCount - 2] == 0,
+              data[offset + byteCount - 1] == 0 else { return nil }
+        let textEnd = offset + byteCount - 2
+        let text = String(
+            data: data[offset..<textEnd],
+            encoding: .utf16LittleEndian
+        )
+        offset += byteCount
         return text
     }
 
@@ -1139,171 +1452,888 @@ private actor PTPIPSession {
         return .unknown
     }
 
-    func disconnect() async {
+    private func validateConnectionAttempt(
+        command expectedCommand: NWConnection,
+        event expectedEvent: NWConnection?,
+        generation expectedGeneration: UInt64
+    ) throws {
+        try Task.checkCancellation()
+        try validateSessionOwner()
+        guard expectedGeneration == sessionGeneration,
+              let currentCommand = connectingCommand,
+              currentCommand === expectedCommand else {
+            throw PTPIPError.connectionFailed("PTP/IP 连接会话已失效")
+        }
+        if let expectedEvent {
+            guard let currentEvent = connectingEvent,
+                  currentEvent === expectedEvent else {
+                throw PTPIPError.connectionFailed("PTP/IP 连接会话已失效")
+            }
+        }
+    }
+
+    /// 12 秒 deadline 不是只让一个 timer 抛错，而是直接终止当前 generation
+    /// 的 NWConnection，使 start/send/receive 的 continuation 都能实际恢复。
+    /// generation + owner 双重校验保证旧 watchdog 不能取消随后建立的新会话。
+    private func expireConnectionAttempt(
+        generation: UInt64,
+        ownerAttempt: UInt64?
+    ) {
+        guard generation == sessionGeneration,
+              sessionOwnerAttempt == ownerAttempt,
+              connectingCommand != nil else { return }
+        handshakeTimeoutGeneration = generation
+        connectingCommand?.cancel()
+        connectingEvent?.cancel()
+    }
+
+    private func cleanupConnectionAttempt(
+        command: NWConnection,
+        event: NWConnection?,
+        generation: UInt64
+    ) {
+        command.cancel()
+        event?.cancel()
+        guard generation == sessionGeneration else { return }
+        _ = invalidateSession()
+    }
+
+    @discardableResult
+    private func invalidateSession() -> UInt64 {
+        sessionGeneration &+= 1
+        eventGeneration &+= 1
+        invalidateCommandGate()
+        invalidateEventWriteGate()
+        eventReaderTask?.cancel()
+        eventReaderTask = nil
+        connectingCommand?.cancel()
+        connectingEvent?.cancel()
         command?.cancel()
         event?.cancel()
+        connectingCommand = nil
+        connectingEvent = nil
         command = nil
         event = nil
+        sessionOwnerAttempt = nil
+        handshakeTimeoutGeneration = nil
+        commandDeadlineToken &+= 1
+        activeCommandDeadlineToken = nil
+        eventDeadlineToken &+= 1
+        activeEventDeadlineToken = nil
+        commandChannelFailure = nil
         transactionID = 1
         // C3 会话状态复位（取景/录像/厂商识别随连接一起清空）。
         liveViewActive = false
         movieRecording = false
         detectedVendor = .unknown
+        return sessionGeneration
     }
 
-    /// 无副作用链路探测：OpenSession（0x1002，transaction=0）并等待 OK，
-    /// 用于心跳保活。（E3 1.5.9：注释勘正——0x1002 实为 OpenSession 而非
-    /// GetDeviceInfo；厂商识别用 0x1001 见 detectVendor，pro 复审观察项收口。）
-    /// 超时通过竞速实现：NWConnection 的 receive 无超时参数，故用 Task 竞速。
+    /// 只允许拥有当前 actor 会话的 UI attempt 清理它。旧 attempt 的迟到
+    /// cleanup 会在 actor 内原子地变成 no-op，不能误断开新会话。
+    func disconnect(ifOwnedBy attempt: UInt64) async {
+        guard sessionOwnerAttempt == attempt else { return }
+        _ = invalidateSession()
+    }
+
+    /// PTP/IP event 通道保活：发 Probe Request(type 13)，等待 reader 收到
+    /// Probe Response(type 14)。命令通道保持空闲，不会与在途 PTP 事务争抢响应。
     func probe(timeoutMilliseconds: UInt64 = 3000) async throws {
-        guard command != nil else { throw PTPIPError.notConnected }
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            group.addTask {
-                let response = try await self.commandRequest(
-                    operation: 0x1002,
-                    transaction: 0,
-                    parameters: [1]
-                )
-                guard response == 0x2001 else {
-                    throw PTPIPError.rejected(response)
-                }
+        try validateSessionOwner()
+        if let commandChannelFailure {
+            throw PTPIPError.connectionFailed(commandChannelFailure)
+        }
+        let context = try beginProbe()
+        defer { probeInProgress = false }
+
+        do {
+            let writeDeadline = startEventDeadline(
+                command: context.command,
+                event: context.event,
+                generation: context.generation,
+                timeoutMilliseconds: timeoutMilliseconds
+            )
+            defer { finishEventDeadline(writeDeadline) }
+            try await writeEventPacket(
+                type: 13,
+                on: context.event,
+                generation: context.generation
+            )
+        }
+        // 写入 watchdog 到此结束；ProbeResponse 超时独立计为
+        // heartbeat miss，单次无响应不会先拆除会话。
+        let responseDeadlineNanoseconds = DispatchTime.now().uptimeNanoseconds
+            &+ timeoutMilliseconds &* 1_000_000
+        while probeResponseSequence == context.baseline {
+            try Task.checkCancellation()
+            guard context.generation == sessionGeneration,
+                  let currentEvent = self.event,
+                  currentEvent === context.event,
+                  let currentCommand = command,
+                  currentCommand === context.command,
+                  commandChannelFailure == nil else {
+                throw PTPIPError.connectionFailed("PTP/IP 事件通道已断开")
             }
-            group.addTask {
-                try await Task.sleep(
-                    nanoseconds: timeoutMilliseconds * 1_000_000
-                )
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < responseDeadlineNanoseconds else {
                 throw PTPIPError.connectionFailed("心跳探测超时")
             }
-            _ = try await group.next()
-            group.cancelAll()
+            try await Task.sleep(
+                nanoseconds: min(
+                    UInt64(25_000_000),
+                    responseDeadlineNanoseconds - now
+                )
+            )
         }
+        try validateEventSession(
+            event: context.event,
+            generation: context.generation
+        )
+    }
+
+    /// 发布 UI ready 前的双通道健康屏障：厂商识别已经完成了一次 command
+    /// 事务，这里再校验该命令会话仍属于当前 generation，并要求 event 通道
+    /// 完成一次 Probe 往返。Probe 结束后再次校验 command，防止探测期间命令
+    /// 通道被 reader/超时处理退休却仍发布为已连接。
+    func assertHealthy(timeoutMilliseconds: UInt64 = 3000) async throws {
+        try validateSessionOwner()
+        guard let expectedCommand = command else {
+            throw PTPIPError.notConnected
+        }
+        let expectedGeneration = sessionGeneration
+        try validateCommandSession(
+            command: expectedCommand,
+            generation: expectedGeneration
+        )
+        try await probe(timeoutMilliseconds: timeoutMilliseconds)
+        try validateCommandSession(
+            command: expectedCommand,
+            generation: expectedGeneration
+        )
+    }
+
+    private func beginProbe() throws -> (
+        command: NWConnection,
+        event: NWConnection,
+        generation: UInt64,
+        baseline: UInt64
+    ) {
+        guard let command, let event else { throw PTPIPError.notConnected }
+        guard !probeInProgress else {
+            throw PTPIPError.connectionFailed("已有心跳探测正在进行")
+        }
+        probeInProgress = true
+        return (command, event, sessionGeneration, probeResponseSequence)
     }
 
     private func commandRequest(
         operation: UInt16,
-        transaction: UInt32,
-        parameters: [UInt32]
+        parameters: [UInt32],
+        transaction explicitTransaction: UInt32? = nil
     ) async throws -> UInt16 {
-        guard let command else { throw PTPIPError.notConnected }
+        guard let expectedCommand = command else {
+            throw PTPIPError.notConnected
+        }
+        let expectedGeneration = sessionGeneration
+        let gateLease = try await acquireCommandGate()
+        defer { releaseCommandGate(gateLease) }
+        var transactionStarted = false
+        do {
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            let deadline = startCommandDeadline(
+                command: expectedCommand,
+                generation: expectedGeneration,
+                timeoutMilliseconds: 12_000
+            )
+            defer { finishCommandDeadline(deadline) }
+            let transaction = explicitTransaction ?? nextTransactionID()
+            var payload = Data()
+            appendLE(UInt32(1), to: &payload)
+            appendLE(operation, to: &payload)
+            appendLE(transaction, to: &payload)
+            parameters.forEach { appendLE($0, to: &payload) }
+            transactionStarted = true
+            try await send(
+                packet(type: 6, payload: payload),
+                on: expectedCommand
+            )
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            let response = try await receivePacket(on: expectedCommand)
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            guard response.type == 7,
+                  response.data.count >= 14,
+                  readUInt32(response.data, at: 10) == transaction else {
+                throw PTPIPError.invalidPacket
+            }
+            let responseCode = readUInt16(response.data, at: 8)
+            if PTPIPError.isSessionFatalResponse(responseCode) {
+                throw PTPIPError.rejected(responseCode)
+            }
+            return responseCode
+        } catch {
+            recordCommandChannelFailure(
+                error,
+                command: expectedCommand,
+                generation: expectedGeneration,
+                transactionStarted: transactionStarted
+            )
+            throw error
+        }
+    }
+
+    private func dataRequest(
+        operation: UInt16,
+        parameters: [UInt32],
+        timeoutMilliseconds: UInt64 = 12_000
+    ) async throws -> Data {
+        guard let expectedCommand = command else {
+            throw PTPIPError.notConnected
+        }
+        let expectedGeneration = sessionGeneration
+        let gateLease = try await acquireCommandGate()
+        defer { releaseCommandGate(gateLease) }
+        var transactionStarted = false
+        do {
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            let deadline = startCommandDeadline(
+                command: expectedCommand,
+                generation: expectedGeneration,
+                timeoutMilliseconds: timeoutMilliseconds
+            )
+            defer { finishCommandDeadline(deadline) }
+            let current = nextTransactionID()
+            var payload = Data()
+            // PTP/IP value 1 is used for data-in and no-data operations.
+            appendLE(UInt32(1), to: &payload)
+            appendLE(operation, to: &payload)
+            appendLE(current, to: &payload)
+            parameters.forEach { appendLE($0, to: &payload) }
+            transactionStarted = true
+            try await send(
+                packet(type: 6, payload: payload),
+                on: expectedCommand
+            )
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+
+            let first = try await receivePacket(on: expectedCommand)
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            if first.type == 7 {
+                guard first.data.count >= 14,
+                      readUInt32(first.data, at: 10) == current else {
+                    throw PTPIPError.invalidPacket
+                }
+                let response = readUInt16(first.data, at: 8)
+                throw PTPIPError.rejected(response)
+            }
+            guard first.type == 9,
+                  first.data.count >= 20,
+                  readUInt32(first.data, at: 8) == current else {
+                throw PTPIPError.invalidPacket
+            }
+            let announcedLength = readUInt64(first.data, at: 12)
+            let lengthIsKnown = announcedLength != UInt64.max
+            let maximumObjectBytes = UInt64(512 * 1024 * 1024)
+            guard !lengthIsKnown || announcedLength <= maximumObjectBytes else {
+                throw PTPIPError.connectionFailed(
+                    "机内文件超过当前 512 MB 单文件传输上限"
+                )
+            }
+            var data = Data()
+            let initialCapacity = lengthIsKnown
+                ? min(announcedLength, 8 * 1024 * 1024)
+                : 8 * 1024 * 1024
+            data.reserveCapacity(Int(initialCapacity))
+            while true {
+                let packet = try await receivePacket(on: expectedCommand)
+                try validateCommandSession(
+                    command: expectedCommand,
+                    generation: expectedGeneration
+                )
+                guard (packet.type == 10 || packet.type == 12),
+                      packet.data.count >= 12,
+                      readUInt32(packet.data, at: 8) == current else {
+                    throw PTPIPError.invalidPacket
+                }
+                data.append(packet.data.subdata(in: 12..<packet.data.count))
+                guard data.count <= Int(maximumObjectBytes) else {
+                    throw PTPIPError.connectionFailed(
+                        "机内文件超过当前 512 MB 单文件传输上限"
+                    )
+                }
+                if packet.type == 12 { break }
+            }
+            guard !lengthIsKnown || UInt64(data.count) == announcedLength else {
+                throw PTPIPError.invalidPacket
+            }
+            let response = try await receivePacket(on: expectedCommand)
+            try validateCommandSession(
+                command: expectedCommand,
+                generation: expectedGeneration
+            )
+            guard response.type == 7,
+                  response.data.count >= 14,
+                  readUInt32(response.data, at: 10) == current else {
+                throw PTPIPError.invalidPacket
+            }
+            let code = readUInt16(response.data, at: 8)
+            guard code == 0x2001 else { throw PTPIPError.rejected(code) }
+            return data
+        } catch {
+            recordCommandChannelFailure(
+                error,
+                command: expectedCommand,
+                generation: expectedGeneration,
+                transactionStarted: transactionStarted
+            )
+            throw error
+        }
+    }
+
+    private func openSession(
+        on expectedCommand: NWConnection,
+        event expectedEvent: NWConnection,
+        generation expectedGeneration: UInt64
+    ) async throws -> UInt16 {
+        let gateLease = try await acquireCommandGate()
+        defer { releaseCommandGate(gateLease) }
+        try validateConnectionAttempt(
+            command: expectedCommand,
+            event: expectedEvent,
+            generation: expectedGeneration
+        )
+
+        let transaction: UInt32 = 0
         var payload = Data()
         appendLE(UInt32(1), to: &payload)
-        appendLE(operation, to: &payload)
+        appendLE(UInt16(0x1002), to: &payload)
         appendLE(transaction, to: &payload)
-        parameters.forEach { appendLE($0, to: &payload) }
-        try await send(packet(type: 6, payload: payload), on: command)
-        let response = try await receivePacket(on: command)
-        guard response.type == 7, response.data.count >= 14 else {
+        appendLE(UInt32(1), to: &payload)
+        try await send(
+            packet(type: 6, payload: payload),
+            on: expectedCommand
+        )
+        try validateConnectionAttempt(
+            command: expectedCommand,
+            event: expectedEvent,
+            generation: expectedGeneration
+        )
+        let response = try await receivePacket(on: expectedCommand)
+        try validateConnectionAttempt(
+            command: expectedCommand,
+            event: expectedEvent,
+            generation: expectedGeneration
+        )
+        guard response.type == 7,
+              response.data.count >= 14,
+              readUInt32(response.data, at: 10) == transaction else {
             throw PTPIPError.invalidPacket
         }
         return readUInt16(response.data, at: 8)
     }
 
-    private func dataRequest(
-        operation: UInt16,
-        parameters: [UInt32]
-    ) async throws -> Data {
-        guard let command else { throw PTPIPError.notConnected }
-        let current = transactionID
-        transactionID &+= 1
-        var payload = Data()
-        // PTP/IP value 1 is used for data-in and no-data operations.
-        appendLE(UInt32(1), to: &payload)
-        appendLE(operation, to: &payload)
-        appendLE(current, to: &payload)
-        parameters.forEach { appendLE($0, to: &payload) }
-        try await send(packet(type: 6, payload: payload), on: command)
-
-        let first = try await receivePacket(on: command)
-        if first.type == 7 {
-            let response = first.data.count >= 10
-                ? readUInt16(first.data, at: 8)
-                : UInt16(0x2002)
-            throw PTPIPError.rejected(response)
+    private func validateCommandSession(
+        command expectedCommand: NWConnection,
+        generation expectedGeneration: UInt64
+    ) throws {
+        try Task.checkCancellation()
+        try validateSessionOwner()
+        guard expectedGeneration == sessionGeneration,
+              let currentCommand = command,
+              currentCommand === expectedCommand else {
+            throw PTPIPError.connectionFailed("PTP/IP 命令会话已失效")
         }
-        guard first.type == 9,
-              first.data.count >= 20,
-              readUInt32(first.data, at: 8) == current else {
-            throw PTPIPError.invalidPacket
-        }
-        let announcedLength = readUInt64(first.data, at: 12)
-        let maximumObjectBytes = UInt64(512 * 1024 * 1024)
-        guard announcedLength <= maximumObjectBytes else {
+        if let commandChannelFailure {
             throw PTPIPError.connectionFailed(
-                "机内文件超过当前 512 MB 单文件传输上限"
+                "PTP/IP 命令通道已失败：\(commandChannelFailure)"
             )
         }
-        var data = Data()
-        data.reserveCapacity(Int(min(announcedLength, 8 * 1024 * 1024)))
-        while true {
-            let packet = try await receivePacket(on: command)
-            guard (packet.type == 10 || packet.type == 12),
-                  packet.data.count >= 12,
-                  readUInt32(packet.data, at: 8) == current else {
-                throw PTPIPError.invalidPacket
+    }
+
+    private func recordCommandChannelFailure(
+        _ error: Error,
+        command expectedCommand: NWConnection,
+        generation expectedGeneration: UInt64,
+        transactionStarted: Bool
+    ) {
+        guard expectedGeneration == sessionGeneration,
+              let currentCommand = command,
+              currentCommand === expectedCommand,
+              commandChannelFailure == nil else { return }
+        guard let ptpipError = error as? PTPIPError else {
+            if transactionStarted {
+                commandChannelFailure = error.localizedDescription
             }
-            data.append(packet.data.subdata(in: 12..<packet.data.count))
-            guard data.count <= Int(maximumObjectBytes) else {
-                throw PTPIPError.connectionFailed(
-                    "机内文件超过当前 512 MB 单文件传输上限"
+            return
+        }
+        switch ptpipError {
+        case .connectionFailed(let message):
+            commandChannelFailure = message
+        case .invalidPacket:
+            commandChannelFailure = "命令通道返回无效 PTP/IP 帧"
+        case .rejected(let code):
+            if PTPIPError.isSessionFatalResponse(code) {
+                commandChannelFailure = String(
+                    format: "PTP/IP 会话已失效（0x%04X）",
+                    code
                 )
             }
-            if packet.type == 12 { break }
+        case .invalidEndpoint, .notConnected:
+            break
         }
-        let response = try await receivePacket(on: command)
-        guard response.type == 7, response.data.count >= 14 else {
-            throw PTPIPError.invalidPacket
+    }
+
+    /// 每个完整 PTP 命令事务都有 deadline。到期时必须退役该 generation 的
+    /// command socket；继续复用带有迟到响应的字节流会污染下一事务。
+    private func startCommandDeadline(
+        command expectedCommand: NWConnection,
+        generation expectedGeneration: UInt64,
+        timeoutMilliseconds: UInt64
+    ) -> (token: UInt64, task: Task<Void, Never>) {
+        commandDeadlineToken &+= 1
+        let token = commandDeadlineToken
+        activeCommandDeadlineToken = token
+        let task = Task { [weak self] in
+            do {
+                try await Task.sleep(
+                    nanoseconds: timeoutMilliseconds * 1_000_000
+                )
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await self?.expireCommandTransaction(
+                command: expectedCommand,
+                generation: expectedGeneration,
+                token: token,
+                timeoutMilliseconds: timeoutMilliseconds
+            )
         }
-        let code = readUInt16(response.data, at: 8)
-        guard code == 0x2001 else { throw PTPIPError.rejected(code) }
-        return data
+        return (token, task)
+    }
+
+    private func finishCommandDeadline(
+        _ deadline: (token: UInt64, task: Task<Void, Never>)
+    ) {
+        if activeCommandDeadlineToken == deadline.token {
+            activeCommandDeadlineToken = nil
+        }
+        deadline.task.cancel()
+    }
+
+    private func expireCommandTransaction(
+        command expectedCommand: NWConnection,
+        generation expectedGeneration: UInt64,
+        token expectedToken: UInt64,
+        timeoutMilliseconds: UInt64
+    ) {
+        guard expectedGeneration == sessionGeneration,
+              activeCommandDeadlineToken == expectedToken,
+              let currentCommand = command,
+              currentCommand === expectedCommand else { return }
+        activeCommandDeadlineToken = nil
+        commandChannelFailure =
+            "命令事务超时（\(timeoutMilliseconds) 毫秒）"
+        expectedCommand.cancel()
+    }
+
+    private func acquireCommandGate() async throws -> UInt64 {
+        try Task.checkCancellation()
+        let epoch = commandGateEpoch
+        if !commandGateHeld {
+            commandGateHeld = true
+            return epoch
+        }
+        let acquired = await withCheckedContinuation {
+            (continuation: CheckedContinuation<Bool, Never>) in
+            commandGateWaiters.append(PTPIPGateWaiter(
+                epoch: epoch,
+                continuation: continuation
+            ))
+        }
+        guard acquired, epoch == commandGateEpoch else {
+            throw PTPIPError.connectionFailed("PTP/IP 命令等待已失效")
+        }
+        do {
+            try Task.checkCancellation()
+        } catch {
+            // waiter 被授予 lease 的同时也可能已经取消；先把 lease 交给下一位，
+            // 再传播取消，避免 gate 永久保持 held。
+            releaseCommandGate(epoch)
+            throw error
+        }
+        return epoch
+    }
+
+    private func releaseCommandGate(_ lease: UInt64) {
+        guard lease == commandGateEpoch else { return }
+        while !commandGateWaiters.isEmpty {
+            let waiter = commandGateWaiters.removeFirst()
+            if waiter.epoch == commandGateEpoch {
+                waiter.continuation.resume(returning: true)
+                return
+            }
+            waiter.continuation.resume(returning: false)
+        }
+        commandGateHeld = false
+    }
+
+    private func invalidateCommandGate() {
+        commandGateEpoch &+= 1
+        commandGateHeld = false
+        let waiters = commandGateWaiters
+        commandGateWaiters.removeAll()
+        waiters.forEach { $0.continuation.resume(returning: false) }
+    }
+
+    private func writeEventPacket(
+        type: UInt32,
+        on expectedEvent: NWConnection,
+        command expectedCommand: NWConnection? = nil,
+        generation expectedGeneration: UInt64
+    ) async throws {
+        let gateLease = try await acquireEventWriteGate()
+        defer { releaseEventWriteGate(gateLease) }
+        if let expectedCommand {
+            try validateEventReaderSession(
+                command: expectedCommand,
+                event: expectedEvent,
+                generation: expectedGeneration
+            )
+        } else {
+            try validateEventSession(
+                event: expectedEvent,
+                generation: expectedGeneration
+            )
+        }
+        try await send(
+            packet(type: type, payload: Data()),
+            on: expectedEvent
+        )
+        if let expectedCommand {
+            try validateEventReaderSession(
+                command: expectedCommand,
+                event: expectedEvent,
+                generation: expectedGeneration
+            )
+        } else {
+            try validateEventSession(
+                event: expectedEvent,
+                generation: expectedGeneration
+            )
+        }
+    }
+
+    private func validateEventSession(
+        event expectedEvent: NWConnection,
+        generation expectedGeneration: UInt64
+    ) throws {
+        try Task.checkCancellation()
+        try validateSessionOwner()
+        guard expectedGeneration == sessionGeneration,
+              let currentEvent = event,
+              currentEvent === expectedEvent,
+              command != nil,
+              commandChannelFailure == nil else {
+            throw PTPIPError.connectionFailed("PTP/IP 事件会话已失效")
+        }
+    }
+
+    /// event reader 在 OpenSession 完成前绑定 connecting 双通道，完成后无缝切换为
+    /// 已发布双通道；任一旧 generation/旧连接都不能向新会话写 ProbeResponse。
+    private func validateEventReaderSession(
+        command expectedCommand: NWConnection,
+        event expectedEvent: NWConnection,
+        generation expectedGeneration: UInt64
+    ) throws {
+        try Task.checkCancellation()
+        try validateSessionOwner()
+        guard expectedGeneration == sessionGeneration,
+              commandChannelFailure == nil else {
+            throw PTPIPError.connectionFailed("PTP/IP 事件 reader 会话已失效")
+        }
+        let isConnecting = connectingCommand === expectedCommand
+            && connectingEvent === expectedEvent
+        let isPublished = command === expectedCommand && event === expectedEvent
+        guard isConnecting || isPublished else {
+            throw PTPIPError.connectionFailed("PTP/IP 事件 reader 通道已失效")
+        }
+    }
+
+    private func validateSessionOwner() throws {
+        guard let expectedOwner = PTPIPSessionOwnership.attempt else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作缺少会话所有权")
+        }
+        guard sessionBelongs(to: expectedOwner) else {
+            throw PTPIPError.connectionFailed("PTP/IP 操作所属会话已失效")
+        }
+    }
+
+    private func sessionBelongs(to expectedOwner: UInt64?) -> Bool {
+        guard let expectedOwner else { return false }
+        return sessionOwnerAttempt == expectedOwner
+    }
+
+    private func acquireEventWriteGate() async throws -> UInt64 {
+        try Task.checkCancellation()
+        let epoch = eventWriteGateEpoch
+        if !eventWriteGateHeld {
+            eventWriteGateHeld = true
+            return epoch
+        }
+        let acquired = await withCheckedContinuation {
+            (continuation: CheckedContinuation<Bool, Never>) in
+            eventWriteGateWaiters.append(PTPIPGateWaiter(
+                epoch: epoch,
+                continuation: continuation
+            ))
+        }
+        guard acquired, epoch == eventWriteGateEpoch else {
+            throw PTPIPError.connectionFailed("PTP/IP 事件写入等待已失效")
+        }
+        do {
+            try Task.checkCancellation()
+        } catch {
+            releaseEventWriteGate(epoch)
+            throw error
+        }
+        return epoch
+    }
+
+    private func releaseEventWriteGate(_ lease: UInt64) {
+        guard lease == eventWriteGateEpoch else { return }
+        while !eventWriteGateWaiters.isEmpty {
+            let waiter = eventWriteGateWaiters.removeFirst()
+            if waiter.epoch == eventWriteGateEpoch {
+                waiter.continuation.resume(returning: true)
+                return
+            }
+            waiter.continuation.resume(returning: false)
+        }
+        eventWriteGateHeld = false
+    }
+
+    private func invalidateEventWriteGate() {
+        eventWriteGateEpoch &+= 1
+        eventWriteGateHeld = false
+        let waiters = eventWriteGateWaiters
+        eventWriteGateWaiters.removeAll()
+        waiters.forEach { $0.continuation.resume(returning: false) }
+    }
+
+    private func startEventDeadline(
+        command expectedCommand: NWConnection,
+        event expectedEvent: NWConnection,
+        generation expectedGeneration: UInt64,
+        timeoutMilliseconds: UInt64
+    ) -> (token: UInt64, task: Task<Void, Never>) {
+        eventDeadlineToken &+= 1
+        let token = eventDeadlineToken
+        activeEventDeadlineToken = token
+        let task = Task { [weak self] in
+            do {
+                try await Task.sleep(
+                    nanoseconds: timeoutMilliseconds * 1_000_000
+                )
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            await self?.expireEventOperation(
+                command: expectedCommand,
+                event: expectedEvent,
+                generation: expectedGeneration,
+                token: token
+            )
+        }
+        return (token, task)
+    }
+
+    private func finishEventDeadline(
+        _ deadline: (token: UInt64, task: Task<Void, Never>)
+    ) {
+        if activeEventDeadlineToken == deadline.token {
+            activeEventDeadlineToken = nil
+        }
+        deadline.task.cancel()
+    }
+
+    private func expireEventOperation(
+        command expectedCommand: NWConnection,
+        event expectedEvent: NWConnection,
+        generation expectedGeneration: UInt64,
+        token expectedToken: UInt64
+    ) {
+        guard expectedGeneration == sessionGeneration,
+              activeEventDeadlineToken == expectedToken,
+              command === expectedCommand,
+              event === expectedEvent else { return }
+        // PTP/IP 的双通道属于同一会话。event 写入或 Probe 挂死后不能只复用
+        // command 半边，否则迟到帧会让 UI 继续显示一个实际不可恢复的连接。
+        _ = invalidateSession()
+    }
+
+    private func nextTransactionID() -> UInt32 {
+        let current = transactionID
+        transactionID = current >= 0xffff_fffe ? 1 : current + 1
+        return current
+    }
+
+    private func startEventReader(
+        on connection: NWConnection,
+        command commandConnection: NWConnection,
+        sessionGeneration: UInt64
+    ) {
+        eventReaderTask?.cancel()
+        eventGeneration &+= 1
+        let readerGeneration = eventGeneration
+        eventReaderTask = Task { [weak self] in
+            guard let self else { return }
+            await self.runEventReader(
+                on: connection,
+                command: commandConnection,
+                sessionGeneration: sessionGeneration,
+                readerGeneration: readerGeneration
+            )
+        }
+    }
+
+    private func runEventReader(
+        on connection: NWConnection,
+        command commandConnection: NWConnection,
+        sessionGeneration expectedSessionGeneration: UInt64,
+        readerGeneration: UInt64
+    ) async {
+        while !Task.isCancelled {
+            do {
+                let eventPacket = try await receivePacket(on: connection)
+                try validateEventReaderSession(
+                    command: commandConnection,
+                    event: connection,
+                    generation: expectedSessionGeneration
+                )
+                guard readerGeneration == eventGeneration else { return }
+                switch eventPacket.type {
+                case 13:
+                    let expectedEvent = connection
+                    let expectedCommand = commandConnection
+                    let expectedGeneration = expectedSessionGeneration
+                    try await writeEventPacket(
+                        type: 14,
+                        on: expectedEvent,
+                        command: expectedCommand,
+                        generation: expectedGeneration
+                    )
+                case 14:
+                    probeResponseSequence &+= 1
+                case 8:
+                    // 事件已从 TCP 流中完整取走；业务层事件接入时可在此分发。
+                    continue
+                default:
+                    continue
+                }
+            } catch {
+                guard readerGeneration == eventGeneration,
+                      expectedSessionGeneration == sessionGeneration else {
+                    return
+                }
+                let ownsConnecting = connectingCommand === commandConnection
+                    && connectingEvent === connection
+                let ownsPublished = command === commandConnection
+                    && event === connection
+                guard ownsConnecting || ownsPublished else { return }
+                connection.cancel()
+                commandConnection.cancel()
+                if ownsConnecting {
+                    connectingEvent = nil
+                    connectingCommand = nil
+                }
+                if ownsPublished {
+                    event = nil
+                    command = nil
+                }
+                return
+            }
+        }
     }
 
     private func start(_ connection: NWConnection) async throws {
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, Error>) in
-            let gate = PTPIPContinuationGate()
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    guard gate.claim() else { return }
-                    continuation.resume()
-                case .failed(let error), .waiting(let error):
-                    guard gate.claim() else { return }
-                    continuation.resume(
-                        throwing: PTPIPError.connectionFailed(
-                            error.localizedDescription
+        let box = PTPIPVoidContinuationBox()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Void, Error>) in
+                box.install(continuation)
+                connection.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        box.resume()
+                    case .failed(let error), .waiting(let error):
+                        box.resume(
+                            throwing: PTPIPError.connectionFailed(
+                                error.localizedDescription
+                            )
                         )
-                    )
-                case .cancelled:
-                    guard gate.claim() else { return }
-                    continuation.resume(
-                        throwing: PTPIPError.connectionFailed("连接已取消")
-                    )
-                default:
-                    break
+                    case .cancelled:
+                        box.resume(
+                            throwing: PTPIPError.connectionFailed("连接已取消")
+                        )
+                    default:
+                        break
+                    }
                 }
+                connection.start(queue: DispatchQueue(
+                    label: "com.tauber.nikonlink.ptpip.socket"
+                ))
             }
-            connection.start(queue: DispatchQueue(
-                label: "com.tauber.nikonlink.ptpip.socket"
-            ))
+        } onCancel: {
+            box.resume(
+                throwing: PTPIPError.connectionFailed("连接操作已取消")
+            )
+            connection.cancel()
         }
     }
 
     private func send(_ data: Data, on connection: NWConnection) async throws {
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, Error>) in
-            connection.send(content: data, completion: .contentProcessed {
-                error in
-                if let error {
-                    continuation.resume(
-                        throwing: PTPIPError.connectionFailed(
-                            error.localizedDescription
+        let box = PTPIPVoidContinuationBox()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<Void, Error>) in
+                box.install(continuation)
+                connection.send(content: data, completion: .contentProcessed {
+                    error in
+                    if let error {
+                        box.resume(
+                            throwing: PTPIPError.connectionFailed(
+                                error.localizedDescription
+                            )
                         )
-                    )
-                } else {
-                    continuation.resume()
-                }
-            })
+                    } else {
+                        box.resume()
+                    }
+                })
+            }
+        } onCancel: {
+            box.resume(
+                throwing: PTPIPError.connectionFailed("发送操作已取消")
+            )
+            connection.cancel()
         }
     }
 
@@ -1383,17 +2413,32 @@ private actor PTPIPSession {
         appendLE(UInt16(0), to: &data)
     }
 
-    private func readUTF16(_ data: Data, from offset: Int) -> String {
-        guard data.count > offset else { return "" }
-        var values: [UInt16] = []
-        var index = offset
-        while index + 1 < data.count {
-            let value = readUInt16(data, at: index)
-            if value == 0 { break }
-            values.append(value)
-            index += 2
+    private func parseInitCommandAcknowledgment(
+        _ data: Data
+    ) -> (connectionNumber: UInt32, cameraName: String)? {
+        // Header(8) + connection(4) + responder GUID(16) + UTF-16 NUL(2)
+        // + protocol version(4).
+        guard data.count >= 34 else { return nil }
+        var terminatorOffset: Int?
+        var offset = 28
+        while offset + 1 < data.count {
+            if readUInt16(data, at: offset) == 0 {
+                terminatorOffset = offset
+                break
+            }
+            offset += 2
         }
-        return String(decoding: values, as: UTF16.self)
+        guard let terminatorOffset,
+              terminatorOffset + 6 == data.count,
+              readUInt32(data, at: terminatorOffset + 2) == 0x0001_0000,
+              let cameraName = String(
+                data: data.subdata(in: 28..<terminatorOffset),
+                encoding: .utf16LittleEndian
+              ) else { return nil }
+        return (
+            connectionNumber: readUInt32(data, at: 8),
+            cameraName: cameraName
+        )
     }
 
     private func appendLE<T: FixedWidthInteger>(
@@ -1444,6 +2489,7 @@ enum WifiConnectionMode: String, CaseIterable, Identifiable {
     }
 }
 
+@MainActor
 final class WifiCameraService: ObservableObject {
     enum State: Equatable {
         case disconnected
@@ -1505,9 +2551,17 @@ final class WifiCameraService: ObservableObject {
     private var reconnectTask: Task<Void, Never>?
     private var liveViewTask: Task<Void, Never>?
     private var pathMonitor: NWPathMonitor?
+    private var pathMonitorGeneration: UInt64 = 0
+    private var lastPathSatisfied: Bool?
+    private var expediteNextReconnect = false
     private var manualDisconnect = false
     private var missedHeartbeats = 0
     private var reconnectAttempt = 0
+    /// UI 连接生命周期代际，同时也是 PTPIPSession 的所有权 token。每次初连、
+    /// 重连调度或手动断开都先递增；旧 Task 的迟到清理只能关闭自己拥有的会话。
+    private var connectionGeneration: UInt64 = 0
+    private var activeSessionAttempt: UInt64?
+    private var liveViewGeneration: UInt64 = 0
 
     // B2 保活参数（契约测试锚点，勿改数值）：
     // 心跳间隔 5s / 单次探测超时 3s / 连续 3 次判离线 /
@@ -1532,6 +2586,26 @@ final class WifiCameraService: ObservableObject {
     var isConnected: Bool { state == .ready }
     var isLiveViewActive: Bool { liveViewTask != nil }
 
+    @discardableResult
+    private func beginSessionAttempt() -> UInt64 {
+        connectionGeneration &+= 1
+        activeSessionAttempt = connectionGeneration
+        return connectionGeneration
+    }
+
+    private func isCurrentSessionAttempt(_ attempt: UInt64) -> Bool {
+        connectionGeneration == attempt && activeSessionAttempt == attempt
+    }
+
+    private func withSessionOwnership<T>(
+        _ attempt: UInt64,
+        operation: () async throws -> T
+    ) async rethrows -> T {
+        try await PTPIPSessionOwnership.$attempt.withValue(attempt) {
+            try await operation()
+        }
+    }
+
     func connect() {
         guard state != .connecting else { return }
         guard let port = UInt16(portText) else {
@@ -1540,12 +2614,15 @@ final class WifiCameraService: ObservableObject {
             return
         }
         manualDisconnect = false
+        let previousOwner = activeSessionAttempt
         connectionTask?.cancel()
         reconnectTask?.cancel()
         heartbeatTask?.cancel()
-        stopLiveViewIfNeeded()
+        stopPathMonitor()
+        stopLiveViewIfNeeded(ifOwnedBy: previousOwner)
         missedHeartbeats = 0
         reconnectAttempt = 0
+        expediteNextReconnect = false
         vendor = .unknown
         supportsMovieRecording = false
         isRecording = false
@@ -1556,40 +2633,78 @@ final class WifiCameraService: ObservableObject {
         shutterSpeedValue = 0
         state = .connecting
         status = "正在连接 Wi‑Fi 相机…"
+        let attempt = beginSessionAttempt()
+        let endpointHost = host.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         connectionTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                let name = try await self.session.connect(
-                    host: self.host.trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    ),
-                    port: port
-                )
-                let vendor = await self.session.detectVendor(using: name)
-                guard !Task.isCancelled else { return }
-                self.cameraName = name
-                self.vendor = vendor
-                self.supportsMovieRecording = vendor == .nikon || vendor == .canon
-                self.state = .ready
-                self.status = "Wi‑Fi 已连接 · \(name)"
-                self.startHeartbeat()
-                self.startPathMonitor()
-                if vendor != .unknown {
-                    if self.autoStartLiveViewOnConnect {
-                        self.startLiveViewIfNeeded()
+            await self.withSessionOwnership(attempt) {
+                guard !Task.isCancelled,
+                      self.isCurrentSessionAttempt(attempt),
+                      !self.manualDisconnect else { return }
+                do {
+                    let name = try await self.session.connect(
+                        host: endpointHost,
+                        port: port
+                    )
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(attempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: attempt)
+                        return
                     }
-                    self.refreshParameters()
+                    let vendor = try await self.session.detectVendor(using: name)
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(attempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: attempt)
+                        return
+                    }
+                    try await self.session.assertHealthy(
+                        timeoutMilliseconds: Self.probeTimeoutMilliseconds
+                    )
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(attempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: attempt)
+                        return
+                    }
+                    self.cameraName = name
+                    self.vendor = vendor
+                    self.supportsMovieRecording =
+                        vendor == .nikon || vendor == .canon
+                    self.state = .ready
+                    self.status = "Wi‑Fi 已连接 · \(name)"
+                    self.startHeartbeat()
+                    self.startPathMonitor()
+                    if vendor != .unknown {
+                        if self.autoStartLiveViewOnConnect {
+                            self.startLiveViewIfNeeded()
+                        }
+                        self.refreshParameters()
+                    }
+                } catch {
+                    let failure = error.localizedDescription
+                    // connect 已可能发布了完整双通道；厂商识别失败
+                    // 也必须先按 attempt 收回会话，不留下幽灵 socket。
+                    await self.session.disconnect(ifOwnedBy: attempt)
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(attempt),
+                          !self.manualDisconnect else { return }
+                    self.activeSessionAttempt = nil
+                    self.cameraName = "—"
+                    self.state = .failed(failure)
+                    self.status = failure
                 }
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.cameraName = "—"
-                self.state = .failed(error.localizedDescription)
-                self.status = error.localizedDescription
             }
         }
     }
 
     func disconnect() {
+        connectionGeneration &+= 1
+        let ownedAttempt = activeSessionAttempt
+        activeSessionAttempt = nil
         manualDisconnect = true
         connectionTask?.cancel()
         connectionTask = nil
@@ -1597,15 +2712,31 @@ final class WifiCameraService: ObservableObject {
         heartbeatTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        expediteNextReconnect = false
         stopPathMonitor()
-        stopLiveViewIfNeeded()
+        // 手动断连只启动一个 owned cleanup：先让在途取帧事务自然
+        // 结束，再依次尝试停录像、停取景，最后拆除双通道。
+        liveViewGeneration &+= 1
+        let liveViewTaskToFinish = liveViewTask
+        liveViewTask = nil
+        liveViewFrame = nil
         let recordingVendor = self.vendor
-        Task { [weak self] in
-            guard let self else { return }
-            if self.isRecording {
-                try? await self.session.stopMovieRecording(vendor: recordingVendor)
+        Task { [session] in
+            guard let ownedAttempt else { return }
+            await liveViewTaskToFinish?.value
+            await PTPIPSessionOwnership.$attempt.withValue(ownedAttempt) {
+                if recordingVendor == .nikon || recordingVendor == .canon {
+                    try? await session.stopMovieRecording(
+                        vendor: recordingVendor,
+                        ifOwnedBy: ownedAttempt
+                    )
+                }
+                await session.endLiveView(
+                    vendor: recordingVendor,
+                    ifOwnedBy: ownedAttempt
+                )
+                await session.disconnect(ifOwnedBy: ownedAttempt)
             }
-            await self.session.disconnect()
         }
         vendor = .unknown
         supportsMovieRecording = false
@@ -1626,26 +2757,39 @@ final class WifiCameraService: ObservableObject {
     /// 连续 3 次无响应判离线，进入退避重连。
     private func startHeartbeat() {
         heartbeatTask?.cancel()
+        guard let sessionAttempt = activeSessionAttempt else { return }
         heartbeatTask = Task { [weak self] in
             guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(
-                    nanoseconds: Self.heartbeatIntervalSeconds * 1_000_000_000
-                )
-                guard !Task.isCancelled else { return }
-                guard self.state == .ready else { return }
-                do {
-                    try await self.session.probe(
-                        timeoutMilliseconds: Self.probeTimeoutMilliseconds
+            await self.withSessionOwnership(sessionAttempt) {
+                while !Task.isCancelled {
+                    try? await Task.sleep(
+                        nanoseconds: Self.heartbeatIntervalSeconds
+                            * 1_000_000_000
                     )
-                    self.missedHeartbeats = 0
-                } catch {
                     guard !Task.isCancelled else { return }
-                    self.missedHeartbeats += 1
-                    if self.missedHeartbeats >= Self.offlineThreshold {
-                        self.missedHeartbeats = 0
-                        self.enterReconnecting()
+                    guard self.state == .ready,
+                          self.isCurrentSessionAttempt(sessionAttempt) else {
                         return
+                    }
+                    do {
+                        try await self.session.probe(
+                            timeoutMilliseconds: Self.probeTimeoutMilliseconds
+                        )
+                        guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.missedHeartbeats = 0
+                    } catch {
+                        guard !Task.isCancelled,
+                              self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.missedHeartbeats += 1
+                        if self.missedHeartbeats >= Self.offlineThreshold {
+                            self.missedHeartbeats = 0
+                            self.enterReconnecting()
+                            return
+                        }
                     }
                 }
             }
@@ -1665,30 +2809,65 @@ final class WifiCameraService: ObservableObject {
 
     private func scheduleReconnect() {
         reconnectTask?.cancel()
-        let attempt = reconnectAttempt + 1
-        reconnectAttempt = attempt
-        let delay = Self.backoffDelay(forAttempt: attempt)
+        let retryNumber = reconnectAttempt + 1
+        reconnectAttempt = retryNumber
+        let delay = expediteNextReconnect
+            ? 0
+            : Self.backoffDelay(forAttempt: retryNumber)
+        expediteNextReconnect = false
+        let previousOwner = activeSessionAttempt
+        let sessionAttempt = beginSessionAttempt()
+        let endpointHost = host.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         reconnectTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                try await Task.sleep(nanoseconds: delay * 1_000_000_000)
-                guard !Task.isCancelled, !self.manualDisconnect else { return }
-                self.state = .reconnecting(attempt: attempt)
-                self.status = "正在重连 Wi‑Fi 相机（第 \(attempt) 次）…"
-                let port = UInt16(self.portText)
-                guard let port else {
-                    self.state = .failed("端口无效")
-                    return
-                }
+            if let previousOwner {
+                await self.session.disconnect(ifOwnedBy: previousOwner)
+            }
+            await self.withSessionOwnership(sessionAttempt) {
+                guard !Task.isCancelled,
+                      self.isCurrentSessionAttempt(sessionAttempt),
+                      !self.manualDisconnect else { return }
                 do {
+                    try await Task.sleep(nanoseconds: delay * 1_000_000_000)
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else { return }
+                    self.state = .reconnecting(attempt: retryNumber)
+                    self.status = "正在重连 Wi‑Fi 相机（第 \(retryNumber) 次）…"
+                    let port = UInt16(self.portText)
+                    guard let port else {
+                        self.activeSessionAttempt = nil
+                        self.state = .failed("端口无效")
+                        return
+                    }
                     let name = try await self.session.connect(
-                        host: self.host.trimmingCharacters(
-                            in: .whitespacesAndNewlines
-                        ),
+                        host: endpointHost,
                         port: port
                     )
-                    let vendor = await self.session.detectVendor(using: name)
-                    guard !Task.isCancelled else { return }
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: sessionAttempt)
+                        return
+                    }
+                    let vendor = try await self.session.detectVendor(using: name)
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: sessionAttempt)
+                        return
+                    }
+                    try await self.session.assertHealthy(
+                        timeoutMilliseconds: Self.probeTimeoutMilliseconds
+                    )
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: sessionAttempt)
+                        return
+                    }
                     self.reconnectAttempt = 0
                     self.cameraName = name
                     self.vendor = vendor
@@ -1697,6 +2876,7 @@ final class WifiCameraService: ObservableObject {
                     self.state = .ready
                     self.status = "Wi‑Fi 已重连 · \(name)"
                     self.startHeartbeat()
+                    self.startPathMonitor()
                     if vendor != .unknown {
                         if self.autoStartLiveViewOnConnect {
                             self.startLiveViewIfNeeded()
@@ -1704,13 +2884,16 @@ final class WifiCameraService: ObservableObject {
                         self.refreshParameters()
                     }
                 } catch {
-                    guard !Task.isCancelled, !self.manualDisconnect else { return }
-                    self.state = .reconnecting(attempt: attempt)
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else {
+                        await self.session.disconnect(ifOwnedBy: sessionAttempt)
+                        return
+                    }
+                    self.state = .reconnecting(attempt: retryNumber)
                     self.status = "Wi‑Fi 重连失败：\(error.localizedDescription)"
                     self.scheduleReconnect()
                 }
-            } catch {
-                // Task.sleep 被取消：重连调度已被新调度或断开取代。
             }
         }
     }
@@ -1729,16 +2912,36 @@ final class WifiCameraService: ObservableObject {
 
     // MARK: - B2 网络层监听
 
-    /// NWPathMonitor：Wi-Fi 断开即判链路不可用（不等心跳超时）。
+    /// iOS 只监听 Wi-Fi 路径，避免蜂窝网络仍可用时掩盖相机热点断开；
+    /// macOS 保留默认路径以兼容经以太网访问相机。回调同时绑定会话 attempt。
     private func startPathMonitor() {
         stopPathMonitor()
+        guard let monitoredAttempt = activeSessionAttempt else { return }
+        let monitorGeneration = pathMonitorGeneration
+#if os(iOS)
+        let monitor = NWPathMonitor(requiredInterfaceType: .wifi)
+#else
         let monitor = NWPathMonitor()
+#endif
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
-                guard let self, !self.manualDisconnect else { return }
+                guard let self,
+                      !self.manualDisconnect,
+                      self.pathMonitorGeneration == monitorGeneration,
+                      self.isCurrentSessionAttempt(monitoredAttempt) else {
+                    return
+                }
+                let wasSatisfied = self.lastPathSatisfied
+                let isSatisfied = path.status == .satisfied
+                self.lastPathSatisfied = isSatisfied
                 if path.status != .satisfied {
                     self.missedHeartbeats = 0
                     self.enterReconnecting()
+                } else if wasSatisfied == false,
+                          self.state.isReconnecting {
+                    // 网络已恢复时不继续空等原先的指数退避。
+                    self.expediteNextReconnect = true
+                    self.scheduleReconnect()
                 }
             }
         }
@@ -1749,25 +2952,40 @@ final class WifiCameraService: ObservableObject {
     }
 
     private func stopPathMonitor() {
+        pathMonitorGeneration &+= 1
+        lastPathSatisfied = nil
         pathMonitor?.cancel()
         pathMonitor = nil
     }
 
     func capture() {
-        guard isConnected else {
+        guard isConnected, let sessionAttempt = activeSessionAttempt else {
             status = "请先连接 Wi‑Fi 相机"
             return
         }
         status = "正在通过 Wi‑Fi 触发快门…"
         Task { [weak self] in
             guard let self else { return }
-            do {
-                try await self.session.capture()
-                self.status = "Wi‑Fi 快门已触发 · 原图保存在相机卡内"
-                self.onShutterTriggered?()
-            } catch {
-                self.status = error.localizedDescription
-                self.state = .failed(error.localizedDescription)
+            await self.withSessionOwnership(sessionAttempt) {
+                do {
+                    try await self.session.capture()
+                    guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                        return
+                    }
+                    self.status = "Wi‑Fi 快门已触发 · 原图保存在相机卡内"
+                    self.onShutterTriggered?()
+                } catch {
+                    guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                        return
+                    }
+                    self.status = error.localizedDescription
+                    if case PTPIPError.rejected(let code) = error {
+                        guard PTPIPError.isSessionFatalResponse(code) else {
+                            return
+                        }
+                    }
+                    self.enterReconnecting()
+                }
             }
         }
     }
@@ -1777,44 +2995,81 @@ final class WifiCameraService: ObservableObject {
     /// 连接就绪后自动开实时取景：约 10fps 拉帧，单帧失败退避 300ms 重试。
     /// 佳能路径 TBC-awaiting-hardware（与 C2 序列一致）。
     func startLiveViewIfNeeded() {
-        guard isConnected, vendor != .unknown, liveViewTask == nil else { return }
+        guard isConnected,
+              vendor != .unknown,
+              liveViewTask == nil,
+              let sessionAttempt = activeSessionAttempt else { return }
+        liveViewGeneration &+= 1
+        let viewGeneration = liveViewGeneration
         liveViewTask = Task { [weak self] in
             guard let self else { return }
             let vendor = self.vendor
-            do {
-                try await self.session.startLiveView(vendor: vendor)
-            } catch {
-                self.liveViewStatus = error.localizedDescription
-                self.liveViewTask = nil
-                return
-            }
-            self.liveViewStatus = ""
-            while !Task.isCancelled {
+            await self.withSessionOwnership(sessionAttempt) {
                 do {
-                    let jpeg = try await self.session.getLiveViewFrame(
-                        vendor: vendor
-                    )
-                    // E5 1.5.9：live 图环形缓冲喂帧（宿主端注入，仅当开关开启）。
-                    self.livePhotoFrameSink?(jpeg)
-                    if let frame = Self.decodeLiveViewJPEG(jpeg) {
-                        self.liveViewFrame = frame
-                    }
-                    try await Task.sleep(nanoseconds: 100_000_000)
+                    try await self.session.startLiveView(vendor: vendor)
                 } catch {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    guard self.isCurrentSessionAttempt(sessionAttempt),
+                          self.liveViewGeneration == viewGeneration else { return }
+                    self.liveViewStatus = error.localizedDescription
+                    self.liveViewTask = nil
+                    return
+                }
+                guard self.isCurrentSessionAttempt(sessionAttempt),
+                      self.liveViewGeneration == viewGeneration else { return }
+                self.liveViewStatus = ""
+                while !Task.isCancelled {
+                    guard self.isCurrentSessionAttempt(sessionAttempt),
+                          self.liveViewGeneration == viewGeneration else {
+                        return
+                    }
+                    do {
+                        let jpeg = try await self.session.getLiveViewFrame(
+                            vendor: vendor
+                        )
+                        guard self.isCurrentSessionAttempt(sessionAttempt),
+                              self.liveViewGeneration == viewGeneration else {
+                            return
+                        }
+                        // E5 1.5.9：live 图环形缓冲喂帧（宿主端注入，仅当开关开启）。
+                        self.livePhotoFrameSink?(jpeg)
+                        if let frame = Self.decodeLiveViewJPEG(jpeg) {
+                            self.liveViewFrame = frame
+                        }
+                        try await Task.sleep(nanoseconds: 100_000_000)
+                    } catch {
+                        guard !Task.isCancelled,
+                              self.isCurrentSessionAttempt(sessionAttempt),
+                              self.liveViewGeneration == viewGeneration else {
+                            return
+                        }
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                    }
                 }
             }
         }
     }
 
-    func stopLiveViewIfNeeded() {
-        liveViewTask?.cancel()
+    func stopLiveViewIfNeeded(ifOwnedBy explicitAttempt: UInt64? = nil) {
+        liveViewGeneration &+= 1
+        let stoppingGeneration = liveViewGeneration
+        let taskToFinish = liveViewTask
         liveViewTask = nil
         liveViewFrame = nil
         let vendor = self.vendor
+        let ownedAttempt = explicitAttempt ?? activeSessionAttempt
         Task { [weak self] in
-            guard let self else { return }
-            await self.session.endLiveView(vendor: vendor)
+            guard let self, let ownedAttempt else { return }
+            // 不取消正在读取共用 command stream 的取帧 Task；让有 deadline 的
+            // 当前事务自然结束，避免取消处理直接关闭健康 socket。若期间又启动
+            // 了新取景，旧 stop 也不得迟到关闭它。
+            await taskToFinish?.value
+            guard self.liveViewGeneration == stoppingGeneration else { return }
+            await self.withSessionOwnership(ownedAttempt) {
+                await self.session.endLiveView(
+                    vendor: vendor,
+                    ifOwnedBy: ownedAttempt
+                )
+            }
         }
     }
 
@@ -1830,18 +3085,28 @@ final class WifiCameraService: ObservableObject {
     /// Wi‑Fi 录像开关：尼康 0x920a/0x920b，佳能 EVFRecordStatus
     /// （TBC-awaiting-hardware）。文件保存在相机卡内，不走外录。
     func toggleVideoRecording() {
-        guard isConnected else { return }
+        guard isConnected, let sessionAttempt = activeSessionAttempt else { return }
         if isRecording {
+            let recordingVendor = self.vendor
             Task { [weak self] in
                 guard let self else { return }
-                do {
-                    try await self.session.stopMovieRecording(
-                        vendor: self.vendor
-                    )
-                    self.isRecording = false
-                    self.status = "Wi‑Fi 录像已停止"
-                } catch {
-                    self.status = error.localizedDescription
+                await self.withSessionOwnership(sessionAttempt) {
+                    do {
+                        try await self.session.stopMovieRecording(
+                            vendor: recordingVendor,
+                            ifOwnedBy: sessionAttempt
+                        )
+                        guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.isRecording = false
+                        self.status = "Wi‑Fi 录像已停止"
+                    } catch {
+                        guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.status = error.localizedDescription
+                    }
                 }
             }
         } else {
@@ -1851,14 +3116,23 @@ final class WifiCameraService: ObservableObject {
             }
             Task { [weak self] in
                 guard let self else { return }
-                do {
-                    try await self.session.startMovieRecording(
-                        vendor: self.vendor
-                    )
-                    self.isRecording = true
-                    self.status = "Wi‑Fi 录像中 · 文件保存在相机卡内"
-                } catch {
-                    self.status = error.localizedDescription
+                let recordingVendor = self.vendor
+                await self.withSessionOwnership(sessionAttempt) {
+                    do {
+                        try await self.session.startMovieRecording(
+                            vendor: recordingVendor
+                        )
+                        guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.isRecording = true
+                        self.status = "Wi‑Fi 录像中 · 文件保存在相机卡内"
+                    } catch {
+                        guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                            return
+                        }
+                        self.status = error.localizedDescription
+                    }
                 }
             }
         }
@@ -1869,23 +3143,28 @@ final class WifiCameraService: ObservableObject {
     /// 从相机读取常用参数（GetDevicePropValue 0x1015）。单属性失败不阻断
     /// 其余属性（部分机型不暴露个别属性）。
     func refreshParameters() {
-        guard isConnected else { return }
+        guard isConnected, let sessionAttempt = activeSessionAttempt else { return }
         Task { [weak self] in
             guard let self else { return }
-            if let iso = try? await self.session.readProperty(
-                PTPIPVendorOps.propISO
-            ), let value = Self.leUInt16(iso), value > 0 {
-                self.isoValue = Int(value)
-            }
-            if let fNumber = try? await self.session.readProperty(
-                PTPIPVendorOps.propFNumber
-            ), let value = Self.leUInt16(fNumber), value > 0 {
-                self.apertureValue = Float(value) / 100
-            }
-            if let exposure = try? await self.session.readProperty(
-                PTPIPVendorOps.propExposureTime
-            ), let value = Self.leUInt32(exposure), value > 0 {
-                self.shutterSpeedValue = Double(value) / 10000
+            await self.withSessionOwnership(sessionAttempt) {
+                if let iso = try? await self.session.readProperty(
+                    PTPIPVendorOps.propISO
+                ), let value = Self.leUInt16(iso), value > 0,
+                   self.isCurrentSessionAttempt(sessionAttempt) {
+                    self.isoValue = Int(value)
+                }
+                if let fNumber = try? await self.session.readProperty(
+                    PTPIPVendorOps.propFNumber
+                ), let value = Self.leUInt16(fNumber), value > 0,
+                   self.isCurrentSessionAttempt(sessionAttempt) {
+                    self.apertureValue = Float(value) / 100
+                }
+                if let exposure = try? await self.session.readProperty(
+                    PTPIPVendorOps.propExposureTime
+                ), let value = Self.leUInt32(exposure), value > 0,
+                   self.isCurrentSessionAttempt(sessionAttempt) {
+                    self.shutterSpeedValue = Double(value) / 10000
+                }
             }
         }
     }
@@ -1937,15 +3216,24 @@ final class WifiCameraService: ObservableObject {
         payload: Data,
         label: String
     ) {
-        guard isConnected else { return }
+        guard isConnected, let sessionAttempt = activeSessionAttempt else { return }
         Task { [weak self] in
             guard let self else { return }
-            do {
-                try await self.session.writeProperty(property, value: payload)
-                self.status = "Wi‑Fi \(label)已写入 · 相机已更新"
-                self.refreshParameters()
-            } catch {
-                self.status = "Wi‑Fi \(label)写入失败：\(error.localizedDescription)"
+            await self.withSessionOwnership(sessionAttempt) {
+                do {
+                    try await self.session.writeProperty(property, value: payload)
+                    guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                        return
+                    }
+                    self.status = "Wi‑Fi \(label)已写入 · 相机已更新"
+                    self.refreshParameters()
+                } catch {
+                    guard self.isCurrentSessionAttempt(sessionAttempt) else {
+                        return
+                    }
+                    self.status =
+                        "Wi‑Fi \(label)写入失败：\(error.localizedDescription)"
+                }
             }
         }
     }
@@ -1980,22 +3268,38 @@ final class WifiCameraService: ObservableObject {
     }
 
     func listStorage() async throws -> CameraStorageSnapshot {
-        guard isConnected else { throw PTPIPError.notConnected }
-        return try await session.listStorage()
+        guard isConnected, let sessionAttempt = activeSessionAttempt else {
+            throw PTPIPError.notConnected
+        }
+        return try await withSessionOwnership(sessionAttempt) {
+            try await session.listStorage()
+        }
     }
 
     func storageThumbnail(handle: UInt32) async throws -> Data {
-        guard isConnected else { throw PTPIPError.notConnected }
-        return try await session.storageThumbnail(handle: handle)
+        guard isConnected, let sessionAttempt = activeSessionAttempt else {
+            throw PTPIPError.notConnected
+        }
+        return try await withSessionOwnership(sessionAttempt) {
+            try await session.storageThumbnail(handle: handle)
+        }
     }
 
     func storageObject(handle: UInt32) async throws -> Data {
-        guard isConnected else { throw PTPIPError.notConnected }
-        return try await session.storageObject(handle: handle)
+        guard isConnected, let sessionAttempt = activeSessionAttempt else {
+            throw PTPIPError.notConnected
+        }
+        return try await withSessionOwnership(sessionAttempt) {
+            try await session.storageObject(handle: handle)
+        }
     }
 
     func deleteStorageObject(handle: UInt32) async throws {
-        guard isConnected else { throw PTPIPError.notConnected }
-        try await session.deleteStorageObject(handle: handle)
+        guard isConnected, let sessionAttempt = activeSessionAttempt else {
+            throw PTPIPError.notConnected
+        }
+        try await withSessionOwnership(sessionAttempt) {
+            try await session.deleteStorageObject(handle: handle)
+        }
     }
 }
