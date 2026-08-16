@@ -971,8 +971,11 @@ private struct AppHeader: View {
     }
 
     private var connectionColor: Color {
+        if model.sdkBridge.isConnected { return IPalette.positive }
         if model.wifiCamera.state.isReconnecting { return .orange }
+        if model.wifiCamera.state == .connecting { return .orange }
         if model.wifiCamera.isConnected { return IPalette.positive }
+        if case .failed = model.wifiCamera.state { return .red }
         switch model.camera.state {
         case .ready: return IPalette.positive
         case .connecting: return .orange
@@ -5336,7 +5339,13 @@ private struct ControlStatusRow: View {
     @EnvironmentObject private var model: AppModel
 
     private var connected: Bool {
-        model.camera.state == .ready || model.wifiCamera.isConnected
+        model.camera.state == .ready || model.wifiCamera.isConnected ||
+            model.sdkBridge.isConnected
+    }
+
+    private var wifiFailure: String? {
+        if case .failed(let message) = model.wifiCamera.state { return message }
+        return nil
     }
 
     var body: some View {
@@ -5372,7 +5381,12 @@ private struct ControlStatusRow: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("连接相机"))
             }
-            if case .failed(let message) = model.camera.state {
+            if let message = wifiFailure {
+                RuntimeLocalizedText(message)
+                    .font(.system(size: FontToken.body, weight: .medium))
+                    .foregroundStyle(.red)
+                    .lineLimit(2)
+            } else if case .failed(let message) = model.camera.state {
                 Text(message)
                     .font(.system(size: FontToken.body, weight: .medium))
                     .foregroundStyle(.red)
@@ -5382,8 +5396,11 @@ private struct ControlStatusRow: View {
     }
 
     private var statusColor: Color {
+        if model.sdkBridge.isConnected { return IPalette.positive }
         if model.wifiCamera.state.isReconnecting { return .orange }
+        if model.wifiCamera.state == .connecting { return .orange }
         if model.wifiCamera.isConnected { return IPalette.positive }
+        if wifiFailure != nil { return .red }
         switch model.camera.state {
         case .ready: return IPalette.positive
         case .connecting: return .orange
@@ -5397,7 +5414,9 @@ private struct ControlStatusRow: View {
             return model.sdkBridge.officialSDK ? "SONY SDK" : "MAC BRIDGE"
         }
         if model.wifiCamera.state.isReconnecting { return "重连中" }
+        if model.wifiCamera.state == .connecting { return "正在连接" }
         if model.wifiCamera.isConnected { return "Wi-Fi" }
+        if wifiFailure != nil { return "重试" }
         switch model.camera.state {
         case .ready:
             return model.camera.isExternalCamera ? "UVC" : "SYSTEM"
@@ -5412,6 +5431,7 @@ private struct ControlStatusRow: View {
 
     private var capsuleTint: Color {
         if connected { return IPalette.uiAccent }
+        if wifiFailure != nil { return .red }
         if case .failed = model.camera.state { return .red }
         return IPalette.uiLabel
     }
@@ -10420,6 +10440,45 @@ private struct LibraryThumbnail: View {
 
 private struct WifiCameraTransferCard: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.locale) private var locale
+
+    private var connectionActive: Bool {
+        model.wifiCamera.state == .connecting ||
+            model.wifiCamera.state.isReconnecting
+    }
+
+    private var connectionFailed: Bool {
+        if case .failed = model.wifiCamera.state { return true }
+        return false
+    }
+
+    private var actionTitle: String {
+        if model.wifiCamera.state == .connecting { return "取消连接" }
+        if model.wifiCamera.state.isReconnecting { return "停止重连" }
+        if model.wifiCamera.isConnected { return "断开 Wi‑Fi 相机" }
+        if connectionFailed { return "重试连接" }
+        return "连接 Wi‑Fi 相机"
+    }
+
+    private var actionSymbol: String {
+        if connectionActive { return "xmark.circle" }
+        if model.wifiCamera.isConnected { return "wifi.slash" }
+        if connectionFailed { return "arrow.clockwise" }
+        return "wifi"
+    }
+
+    private var recoveryText: String? {
+        if model.wifiCamera.state == .connecting {
+            return "正在建立 PTP/IP 通道，可随时取消。"
+        }
+        if model.wifiCamera.state.isReconnecting {
+            return "正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。"
+        }
+        if connectionFailed {
+            return "确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。"
+        }
+        return nil
+    }
 
     var body: some View {
         SettingsCard {
@@ -10459,8 +10518,7 @@ private struct WifiCameraTransferCard: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(
-                    model.wifiCamera.isConnected ||
-                        model.wifiCamera.state == .connecting
+                    model.wifiCamera.isConnected || connectionActive
                 )
                 RuntimeLocalizedText(model.wifiCamera.connectionMode.guidance)
                     .font(.caption)
@@ -10476,6 +10534,7 @@ private struct WifiCameraTransferCard: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .textFieldStyle(.roundedBorder)
+                        .disabled(model.wifiCamera.isConnected || connectionActive)
                     TextField(
                         "端口",
                         text: Binding(
@@ -10486,37 +10545,61 @@ private struct WifiCameraTransferCard: View {
                         .keyboardType(.numberPad)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 92)
+                        .disabled(model.wifiCamera.isConnected || connectionActive)
                 }
-                RuntimeLocalizedText(model.wifiCamera.status)
-                    .font(.caption)
-                    .foregroundStyle(
-                        model.wifiCamera.state.isReconnecting
-                            ? Color.orange
-                            : model.wifiCamera.isConnected
-                                ? Color.green
-                                : IPalette.muted
-                    )
+                HStack(spacing: SpaceToken.s8) {
+                    if connectionActive {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel(
+                                Text(
+                                    RuntimeLocalization.text(
+                                        model.wifiCamera.status,
+                                        locale: locale
+                                    )
+                                )
+                            )
+                    }
+                    RuntimeLocalizedText(model.wifiCamera.status)
+                        .font(.caption)
+                        .foregroundStyle(
+                            connectionActive
+                                ? Color.orange
+                                : model.wifiCamera.isConnected
+                                    ? Color.green
+                                    : connectionFailed ? Color.red : IPalette.muted
+                        )
+                }
+                .accessibilityElement(children: .combine)
+                if let recoveryText {
+                    RuntimeLocalizedText(recoveryText)
+                        .font(.caption)
+                        .foregroundStyle(connectionFailed ? Color.red : IPalette.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Button {
-                    model.wifiCamera.isConnected
-                        ? model.wifiCamera.disconnect()
-                        : model.wifiCamera.connect()
+                    if model.wifiCamera.isConnected || connectionActive {
+                        model.wifiCamera.disconnect()
+                    } else {
+                        model.wifiCamera.connect()
+                    }
                 } label: {
-                    Label(
-                        model.wifiCamera.state.isReconnecting
-                            ? "正在重连 Wi‑Fi 相机…"
-                            : model.wifiCamera.isConnected
-                                ? "断开 Wi‑Fi 相机"
-                                : "连接 Wi‑Fi 相机",
-                        systemImage: model.wifiCamera.isConnected
-                            ? "wifi.slash"
-                            : "wifi"
-                    )
+                    Label {
+                        RuntimeLocalizedText(actionTitle)
+                    } icon: {
+                        Image(systemName: actionSymbol)
+                    }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(
-                    model.wifiCamera.state == .connecting ||
-                        model.wifiCamera.state.isReconnecting
+                .tint(connectionActive ? .orange : nil)
+                .accessibilityHint(
+                    Text(
+                        RuntimeLocalization.text(
+                            recoveryText ?? model.wifiCamera.status,
+                            locale: locale
+                        )
+                    )
                 )
             }
         }
@@ -11321,7 +11404,7 @@ private struct LaunchAnnouncementSheet: View {
                         }
                     }
 
-                    Text("• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业显影结果都可以通过系统保存器另存到用户选择的位置。\n• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业显影提供直达入口；“保存到系统相册”继续作为独立操作保留。\n• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n• GitHub Release 提供 1.5.13 五端安装包，官网自动更新仍保持 1.5.10。各平台签名与安装边界，以及系统保存器、权限、同名文件、大文件和存储空间不足等场景，请参阅发布说明并按需真机验证。")
+                    Text("• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n• Android 与 HarmonyOS 补齐网络状态权限；Windows 单轮重连使用有限超时，并在取景与参数恢复完成前保持重连状态。\n• 1.5.14 是本地候选版本，尚未发布。自动化与本地构建不能替代真实相机、移动设备和 Windows 主机验收；安装包签名及验证边界以候选说明为准。")
                     .font(.subheadline)
                     .lineSpacing(5)
 
@@ -11423,6 +11506,8 @@ private struct ConnectionSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: SpaceToken.s16) {
+                    WifiCameraTransferCard()
+
                     VStack(alignment: .leading, spacing: SpaceToken.s8) {
                         Text("本机摄像头与 UVC")
                             .font(.headline)
@@ -11599,7 +11684,9 @@ private struct ConnectionSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { dismiss() }
                 }
-                if model.hasAnyCameraConnection {
+                if model.hasAnyCameraConnection ||
+                    model.wifiCamera.state == .connecting ||
+                    model.wifiCamera.state.isReconnecting {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("断开", role: .destructive) {
                             model.disconnectAllCameras()

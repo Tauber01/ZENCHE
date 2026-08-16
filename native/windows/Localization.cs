@@ -242,9 +242,9 @@ internal static class AppLocalization
                 "You’re signed out, but some sign-in data remains on this device. Sign in and sign out again.",
                 "ログアウトしましたが、端末にログイン情報が残っています。再度ログインして、もう一度ログアウトしてください。"),
             ["相机连接"] = new("Camera Connections", "カメラ接続"),
-            ["本机摄像头、USB/PTP 与官方 SDK"] = new(
-                "Local camera, USB/PTP, and official SDKs",
-                "ローカルカメラ、USB/PTP、公式 SDK"),
+            ["本机摄像头、Wi‑Fi/PTP‑IP 与 USB/PTP"] = new(
+                "Local camera, Wi-Fi/PTP-IP, and USB/PTP",
+                "ローカルカメラ、Wi-Fi/PTP-IP、USB/PTP"),
             ["相机控制"] = new("Camera Control", "カメラ制御"),
             ["文件接收"] = new("File Receiving", "ファイル受信"),
             ["拍摄辅助"] = new("Capture Assistants", "撮影アシスト"),
@@ -281,6 +281,61 @@ internal static class AppLocalization
             ["请先让电脑加入相机热点；标准 PTP/IP 默认端口为 15740。"] = new(
                 "Join the camera hotspot on this PC first. Standard PTP/IP uses port 15740 by default.",
                 "先に PC をカメラのアクセスポイントへ接続してください。標準 PTP/IP の既定ポートは 15740 です。"),
+            ["正在连接 Wi‑Fi 相机…"] = new(
+                "Connecting to the Wi‑Fi camera…",
+                "Wi‑Fi カメラに接続しています…"),
+            ["Wi‑Fi 已断开，正在重连…"] = new(
+                "Wi‑Fi disconnected. Reconnecting…",
+                "Wi‑Fi が切断されました。再接続しています…"),
+            ["重连中"] = new("Reconnecting", "再接続中"),
+            ["连接 Wi‑Fi 相机"] = new(
+                "Connect Wi‑Fi Camera",
+                "Wi‑Fi カメラに接続"),
+            ["断开 Wi‑Fi 相机"] = new(
+                "Disconnect Wi‑Fi Camera",
+                "Wi‑Fi カメラを切断"),
+            ["取消连接"] = new(
+                "Cancel Connection",
+                "接続をキャンセル"),
+            ["停止重连"] = new(
+                "Stop Reconnecting",
+                "再接続を停止"),
+            ["重试连接"] = new(
+                "Retry Connection",
+                "接続を再試行"),
+            ["配置并连接"] = new(
+                "Configure and Connect",
+                "設定して接続"),
+            ["正在建立 PTP/IP 通道，可随时取消。"] = new(
+                "Establishing the PTP/IP channel. You can cancel at any time.",
+                "PTP/IP チャンネルを確立しています。いつでもキャンセルできます。"),
+            ["正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。"] = new(
+                "Restoring the connection automatically. Stop reconnection to change the Wi‑Fi network, IP address, or port.",
+                "接続を自動的に復元しています。停止すると Wi‑Fi、IP アドレス、ポートを変更できます。"),
+            ["确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。"] = new(
+                "Make sure PTP/IP is enabled on the camera, then check the current Wi‑Fi network, IP address, and port before retrying.",
+                "カメラで PTP/IP が有効になっていることを確認し、現在の Wi‑Fi、IP アドレス、ポートを確認してから再試行してください。"),
+            ["Wi‑Fi 相机地址或端口无效"] = new(
+                "The Wi‑Fi camera address or port is invalid",
+                "Wi‑Fi カメラのアドレスまたはポートが無効です"),
+            ["无法建立 Wi‑Fi/PTP‑IP 连接"] = new(
+                "Unable to establish the Wi‑Fi/PTP‑IP connection",
+                "Wi‑Fi/PTP‑IP 接続を確立できません"),
+            ["无法恢复 Wi‑Fi/PTP‑IP 连接"] = new(
+                "Unable to restore the Wi‑Fi/PTP‑IP connection",
+                "Wi‑Fi/PTP‑IP 接続を復元できません"),
+            ["无法停止 Wi‑Fi/PTP‑IP 重连"] = new(
+                "Unable to stop Wi‑Fi/PTP‑IP reconnection",
+                "Wi‑Fi/PTP‑IP の再接続を停止できません"),
+            ["无法断开 Wi‑Fi/PTP‑IP 连接"] = new(
+                "Unable to disconnect the Wi‑Fi/PTP‑IP connection",
+                "Wi‑Fi/PTP‑IP 接続を切断できません"),
+            ["Wi‑Fi 相机连接超时"] = new(
+                "The Wi‑Fi camera connection timed out",
+                "Wi‑Fi カメラへの接続がタイムアウトしました"),
+            ["Wi‑Fi 相机重连超时"] = new(
+                "The Wi‑Fi camera reconnection timed out",
+                "Wi‑Fi カメラへの再接続がタイムアウトしました"),
             ["蓝牙遥控拍摄"] = new(
                 "Bluetooth Remote Capture",
                 "Bluetooth リモート撮影"),
@@ -1055,22 +1110,22 @@ internal static class AppLocalization
                 new(
                     "Could not verify the file identity",
                     "ファイルの同一性を確認できませんでした"),
-            ["• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业显影结果都可以通过系统保存器另存到用户选择的位置。\n" +
-             "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业显影提供直达入口；“保存到系统相册”继续作为独立操作保留。\n" +
-             "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n" +
-             "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n" +
-             "• GitHub Release 提供 1.5.13 五端安装包，官网自动更新仍保持 1.5.10。各平台签名与安装边界，以及系统保存器、权限、同名文件、大文件和存储空间不足等场景，请参阅发布说明并按需真机验证。"] =
+            ["• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n" +
+             "• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n" +
+             "• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n" +
+             "• Android 与 HarmonyOS 补齐网络状态权限；Windows 单轮重连使用有限超时，并在取景与参数恢复完成前保持重连状态。\n" +
+             "• 1.5.14 是本地候选版本，尚未发布。自动化与本地构建不能替代真实相机、移动设备和 Windows 主机验收；安装包签名及验证边界以候选说明为准。"] =
                 new(
-                    "• Added “Save a Local Copy”: tethered captures, camera-card downloads, AI edits and generated images, and Pro Develop results can now be saved to a location chosen in the system picker.\n" +
-                    "• Every file library offers the same action. Supported in-app previews also provide a shortcut, while AI and Pro Develop have direct actions of their own. “Save to Photos” remains separate.\n" +
-                    "• Export creates a copy and never moves or deletes the source in the ZENCHE library. On macOS and Windows, AI edits now always create new files instead of overwriting the originals.\n" +
-                    "• Cancelling does not show an error. Success is shown only after the copy finishes, data is flushed to storage, and the file size is verified. Failures remove temporary files and make a best effort to delete an incomplete destination.\n" +
-                    "• GitHub Release provides the five-platform 1.5.13 packages, while the website update feed remains on 1.5.10. See the release notes for platform signing and installation limits, and verify system pickers, permissions, name collisions, large files, and out-of-space behavior on devices as needed.",
-                    "• 「ローカルコピーを保存」を追加しました。テザー撮影、カメラカードからのダウンロード、AI 編集／画像生成、プロ現像の結果を、システムの保存画面で選んだ場所へ保存できます。\n" +
-                    "• 5 つのネイティブ版のファイルライブラリに共通の操作を用意し、ZENCHE 内でプレビューできる画面にもショートカットを設けました。AI とプロ現像には直接保存する操作があります。「写真に保存」は独立した操作として残しています。\n" +
-                    "• 書き出しではコピーだけを作成し、ZENCHE ファイルライブラリの元ファイルを移動・削除しません。macOS と Windows の AI 編集も、元画像を上書きせず常に新規ファイルとして保存します。\n" +
-                    "• キャンセル時はエラーを表示しません。コピー、ストレージへの同期、ファイルサイズの確認が完了してから成功を表示します。失敗時は一時ファイルを削除し、未完了の保存先も可能な範囲で取り除きます。\n" +
-                    "• GitHub Release では 5 プラットフォーム向けの 1.5.13 パッケージを提供し、公式サイトの更新配信は 1.5.10 のままです。プラットフォームごとの署名・インストール上の制約はリリースノートを参照し、システムの保存画面、権限、同名ファイル、大容量ファイル、空き容量不足の動作は必要に応じて実機で確認してください。"),
+                    "• Strengthened Wi‑Fi/PTP‑IP connections: command transactions stay serialized, while the event channel, heartbeat, and dual-channel handshake no longer misclassify one another.\n" +
+                    "• Connection and automatic-reconnect status now updates live. You can cancel a connection or stop reconnecting at any time, then retry directly with guidance to check Wi‑Fi, the IP address, and the port.\n" +
+                    "• Session-generation isolation prevents an old connection, stale callback, or late response from replacing the current session during recovery.\n" +
+                    "• Android and HarmonyOS now include network-state permissions. Each Windows reconnect attempt has a bounded timeout and remains in the reconnecting state until live view and parameters are restored.\n" +
+                    "• 1.5.14 is a local candidate and has not been released. Automation and local builds do not replace validation with real cameras, mobile devices, and Windows hosts; see the candidate notes for package signing and validation boundaries.",
+                    "• Wi‑Fi／PTP-IP 接続を強化しました。コマンド処理を直列化し、イベントチャンネル、ハートビート、2 チャンネルのハンドシェイクが互いを誤判定しないようにしました。\n" +
+                    "• 接続と自動再接続の状態をリアルタイムで表示します。接続のキャンセルや再接続の停止がいつでも可能で、失敗後は Wi‑Fi、IP アドレス、ポートの確認案内から直接再試行できます。\n" +
+                    "• セッション世代の分離により、復旧中の古い接続、古いコールバック、遅延応答が現在のセッションを上書きしません。\n" +
+                    "• Android と HarmonyOS にネットワーク状態権限を追加しました。Windows の各再接続試行には有限のタイムアウトを設け、ライブビューとパラメータの復旧完了まで再接続中の状態を維持します。\n" +
+                    "• 1.5.14 は未公開のローカル候補です。自動テストとローカルビルドは、実機カメラ、モバイル端末、Windows ホストでの検証を代替しません。パッケージの署名と検証範囲は候補版の説明を参照してください。"),
 
         // D1 1.5.8：未处理异常对话框（可复制完整堆栈）
         ["未处理异常"] = new("Unhandled Exception", "未処理の例外"),

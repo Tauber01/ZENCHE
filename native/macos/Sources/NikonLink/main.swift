@@ -2786,7 +2786,10 @@ private final class CameraModel: ObservableObject {
     var connectionTitle: String {
         if connected { return status }
         if localCameraConnected { return localCamera.deviceName }
+        if wifiCamera.state == .connecting { return "正在连接 Wi‑Fi 相机…" }
+        if wifiCamera.state.isReconnecting { return "正在重连 Wi‑Fi 相机…" }
         if wifiCamera.isConnected { return wifiCamera.cameraName }
+        if case .failed = wifiCamera.state { return "Wi‑Fi 连接失败" }
         return status
     }
 
@@ -2798,9 +2801,12 @@ private final class CameraModel: ObservableObject {
                 : "本机摄像头 · 可取景与拍照"
         }
         if wifiCamera.isConnected { return "Wi‑Fi/PTP‑IP 已连接 · 机身快门可用" }
-        return wifiCamera.state == .connecting
-            ? wifiCamera.status
-            : detail
+        if wifiCamera.state == .connecting ||
+            wifiCamera.state.isReconnecting {
+            return wifiCamera.status
+        }
+        if case .failed = wifiCamera.state { return wifiCamera.status }
+        return detail
     }
 
     var availableVideoCodecs: [MonitorVideoCodec] {
@@ -6239,7 +6245,7 @@ private struct ControlStatusRow: View {
                         .font(.system(size: TypeScale.body, weight: .semibold))
                         .foregroundStyle(capsuleTint)
                         .padding(.horizontal, SpaceToken.s12)
-                        .frame(height: 28)
+                        .frame(minHeight: 44)
                         .background(capsuleTint.opacity(0.14), in: Capsule())
                         .overlay {
                             Capsule()
@@ -6269,6 +6275,7 @@ private struct ControlStatusRow: View {
         if model.connected { return "USB/PTP" }
         if model.localCameraConnected { return "SYSTEM" }
         if model.wifiCamera.isConnected { return "Wi-Fi" }
+        if model.wifiCamera.state.isReconnecting { return "重连中" }
         if connecting { return "正在连接" }
         if failureText != nil { return "重试" }
         return "待连接"
@@ -13531,6 +13538,36 @@ private struct TransferView: View {
         _wireless = ObservedObject(wrappedValue: model.wirelessTransfer)
     }
 
+    private var wifiConnectionActive: Bool {
+        wifiCamera.state == .connecting || wifiCamera.state.isReconnecting
+    }
+
+    private var wifiConnectionFailed: Bool {
+        if case .failed = wifiCamera.state { return true }
+        return false
+    }
+
+    private var wifiActionTitle: String {
+        if wifiCamera.state == .connecting { return "取消连接" }
+        if wifiCamera.state.isReconnecting { return "停止重连" }
+        if wifiCamera.isConnected { return "断开 Wi‑Fi 相机" }
+        if wifiConnectionFailed { return "重试连接" }
+        return "连接 Wi‑Fi 相机"
+    }
+
+    private var wifiRecoveryText: String? {
+        if wifiCamera.state == .connecting {
+            return "正在建立 PTP/IP 通道，可随时取消。"
+        }
+        if wifiCamera.state.isReconnecting {
+            return "正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。"
+        }
+        if wifiConnectionFailed {
+            return "确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。"
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SpaceToken.s20) {
@@ -13566,31 +13603,48 @@ private struct TransferView: View {
                         VStack(alignment: .leading, spacing: SpaceToken.s4) {
                             Label("Wi‑Fi 相机 · PTP/IP", systemImage: "camera.fill")
                                 .font(.title3.bold())
-                            RuntimeLocalizedText(wifiCamera.status)
-                                .foregroundStyle(
-                                    wifiCamera.state.isReconnecting
-                                        ? Color.orange
-                                        : wifiCamera.isConnected
-                                            ? Palette.positive : Palette.muted
-                                )
+                            HStack(spacing: SpaceToken.s8) {
+                                if wifiConnectionActive {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                                RuntimeLocalizedText(wifiCamera.status)
+                            }
+                            .foregroundStyle(
+                                wifiConnectionActive
+                                    ? Color.orange
+                                    : wifiCamera.isConnected
+                                        ? Palette.positive
+                                        : wifiConnectionFailed
+                                            ? Color.red : Palette.muted
+                            )
+                            .accessibilityElement(children: .combine)
                         }
                         Spacer()
-                        Button(
-                            wifiCamera.state.isReconnecting
-                                ? "正在重连…"
-                                : wifiCamera.isConnected ? "断开" : "连接"
-                        ) {
-                            wifiCamera.isConnected
-                                ? wifiCamera.disconnect()
-                                : wifiCamera.connect()
+                        Button {
+                            if wifiCamera.isConnected || wifiConnectionActive {
+                                wifiCamera.disconnect()
+                            } else {
+                                wifiCamera.connect()
+                            }
+                        } label: {
+                            RuntimeLocalizedText(wifiActionTitle)
                         }
                         .buttonStyle(
-                            NativeButtonStyle(primary: !wifiCamera.isConnected)
+                            NativeButtonStyle(
+                                primary: !wifiCamera.isConnected &&
+                                    !wifiConnectionActive
+                            )
                         )
-                        .disabled(
-                            wifiCamera.state == .connecting ||
-                                wifiCamera.state.isReconnecting
-                        )
+                    }
+
+                    if let wifiRecoveryText {
+                        RuntimeLocalizedText(wifiRecoveryText)
+                            .font(.system(size: TypeScale.caption))
+                            .foregroundStyle(
+                                wifiConnectionFailed ? Color.red : Palette.muted
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Divider()
@@ -13602,7 +13656,7 @@ private struct TransferView: View {
                     }
                     .pickerStyle(.segmented)
                     .disabled(
-                        wifiCamera.isConnected || wifiCamera.state == .connecting
+                        wifiCamera.isConnected || wifiConnectionActive
                     )
 
                     RuntimeLocalizedText(wifiCamera.connectionMode.guidance)
@@ -13613,9 +13667,11 @@ private struct TransferView: View {
                     HStack(spacing: SpaceToken.s8) {
                         TextField("相机 IP 地址", text: $wifiCamera.host)
                             .textFieldStyle(.roundedBorder)
+                            .disabled(wifiCamera.isConnected || wifiConnectionActive)
                         TextField("端口", text: $wifiCamera.portText)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 120)
+                            .disabled(wifiCamera.isConnected || wifiConnectionActive)
                     }
                 }
                 .padding(SpaceToken.s20)
@@ -13931,12 +13987,15 @@ private struct RememberedDeviceCard: View {
 
 private struct ConnectionSheet: View {
     @ObservedObject var model: CameraModel
+    @ObservedObject private var wifiCamera: WifiCameraService
     @ObservedObject private var nikonOfficialSDK: NikonOfficialSDKService
     @ObservedObject private var sonyOfficialSDK: SonyOfficialSDKService
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
 
     init(model: CameraModel) {
         self.model = model
+        _wifiCamera = ObservedObject(wrappedValue: model.wifiCamera)
         _nikonOfficialSDK = ObservedObject(
             wrappedValue: model.nikonOfficialSDK
         )
@@ -13945,13 +14004,54 @@ private struct ConnectionSheet: View {
         )
     }
 
+    private var wifiConnectionActive: Bool {
+        wifiCamera.state == .connecting || wifiCamera.state.isReconnecting
+    }
+
+    private var wifiConnectionFailed: Bool {
+        if case .failed = wifiCamera.state { return true }
+        return false
+    }
+
+    private var wifiActionTitle: String {
+        if wifiCamera.state == .connecting { return "取消连接" }
+        if wifiCamera.state.isReconnecting { return "停止重连" }
+        if wifiCamera.isConnected { return "断开 Wi‑Fi 相机" }
+        if wifiConnectionFailed { return "重试连接" }
+        return "配置并连接"
+    }
+
+    private var wifiRecoveryText: String? {
+        if wifiCamera.state == .connecting {
+            return "正在建立 PTP/IP 通道，可随时取消。"
+        }
+        if wifiCamera.state.isReconnecting {
+            return "正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。"
+        }
+        if wifiConnectionFailed {
+            return "确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。"
+        }
+        return nil
+    }
+
+    private func performWifiAction() {
+        if wifiCamera.isConnected || wifiConnectionActive {
+            wifiCamera.disconnect()
+        } else if wifiConnectionFailed {
+            wifiCamera.connect()
+        } else {
+            model.section = .library
+            dismiss()
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: SpaceToken.s16) {
             HStack {
                 VStack(alignment: .leading, spacing: SpaceToken.s4) {
                     Text("相机连接")
                         .font(.system(size: TypeScale.display, weight: .bold))
-                    Text("本机摄像头、USB/PTP 与官方 SDK")
+                    Text("本机摄像头、USB/PTP、Wi‑Fi 与官方 SDK")
                         .foregroundStyle(Palette.muted)
                 }
                 Spacer()
@@ -13960,6 +14060,72 @@ private struct ConnectionSheet: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: SpaceToken.s12) {
+                    HStack(alignment: .top, spacing: SpaceToken.s16) {
+                        Image(systemName: "wifi")
+                            .font(.system(size: TypeScale.display))
+                            .foregroundStyle(
+                                wifiConnectionFailed ? Color.red : Palette.cobalt
+                            )
+                            .frame(width: 48, height: 48)
+                            .background(Palette.cobaltSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
+                        VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                            Text("Wi‑Fi 相机 · PTP/IP")
+                                .font(.system(size: TypeScale.title, weight: .bold))
+                            RuntimeLocalizedText(wifiCamera.status)
+                                .font(.system(size: TypeScale.body))
+                                .foregroundStyle(
+                                    wifiConnectionActive
+                                        ? Color.orange
+                                        : wifiCamera.isConnected
+                                            ? Palette.positive
+                                            : wifiConnectionFailed
+                                                ? Color.red : Palette.muted
+                                )
+                            HStack(spacing: SpaceToken.s4) {
+                                RuntimeLocalizedText(wifiCamera.connectionMode.title)
+                                Text("·")
+                                Text("\(wifiCamera.host):\(wifiCamera.portText)")
+                            }
+                            .font(.system(size: TypeScale.caption, design: .monospaced))
+                            .foregroundStyle(Palette.muted)
+                            if let wifiRecoveryText {
+                                RuntimeLocalizedText(wifiRecoveryText)
+                                    .font(.system(size: TypeScale.caption))
+                                    .foregroundStyle(
+                                        wifiConnectionFailed ? Color.red : Palette.muted
+                                    )
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Spacer()
+                        if wifiConnectionActive {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityLabel(
+                                    Text(
+                                        RuntimeLocalization.text(
+                                            wifiCamera.status,
+                                            locale: locale
+                                        )
+                                    )
+                                )
+                        }
+                        Button(action: performWifiAction) {
+                            RuntimeLocalizedText(wifiActionTitle)
+                        }
+                            .buttonStyle(
+                                NativeButtonStyle(
+                                    primary: !wifiCamera.isConnected &&
+                                        !wifiConnectionActive
+                                )
+                            )
+                            .frame(minHeight: 44)
+                    }
+                    .padding(SpaceToken.s16)
+                    .background(Palette.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
+
                     HStack(spacing: SpaceToken.s16) {
                         Image(systemName: "web.camera.fill")
                             .font(.system(size: TypeScale.display))

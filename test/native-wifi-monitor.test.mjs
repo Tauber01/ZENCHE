@@ -52,7 +52,11 @@ test('iOS/macOS shared service exposes heartbeat, probe, backoff and reconnectin
 
   // UI 呈现：重连中
   const rootView = await read('native/ios/NikonLink/Views/RootView.swift');
-  assert.match(rootView, /isReconnecting[\s\S]*正在重连 Wi‑Fi 相机/);
+  assert.match(rootView, /state\.isReconnecting[\s\S]{0,120}停止重连/);
+  assert.match(
+    rootView,
+    /if model\.wifiCamera\.isConnected \|\| connectionActive \{[\s\S]{0,100}model\.wifiCamera\.disconnect\(\)/,
+  );
 });
 
 test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () => {
@@ -103,6 +107,14 @@ test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () =
 
   // UI 呈现：重连中
   assert.match(activity, /正在自动重连|正在重连 Wi‑Fi 相机/);
+  assert.match(
+    activity,
+    /boolean loading = connecting[\s\S]{0,120}wifiReconnecting/,
+  );
+  assert.match(
+    activity,
+    /connectButton\.setEnabled\([\s\S]{0,100}!connecting && !localCameraConnecting/,
+  );
 });
 
 test('Harmony exposes probe, heartbeat, backoff and NetConnection', async () => {
@@ -140,6 +152,10 @@ test('Harmony exposes probe, heartbeat, backoff and NetConnection', async () => 
 
   // UI 呈现：重连中
   assert.match(index, /正在自动重连|正在重连…/);
+  assert.match(
+    index,
+    /if \(this\.wifiConnected \|\| this\.wifiConnectionActive\(\)\) \{[\s\S]{0,100}this\.disconnectWifiCamera\(\)/,
+  );
 });
 
 test('Windows exposes probe, heartbeat, backoff and NetworkAvailabilityChanged', async () => {
@@ -164,6 +180,16 @@ test('Windows exposes probe, heartbeat, backoff and NetworkAvailabilityChanged',
 
   // UI 呈现：重连中
   assert.match(window, /正在重连|重连中/);
+  assert.match(window, /private void CancelWifiConnectionAttempt\(\)/);
+  assert.match(window, /private async Task StopWifiReconnectAsync\(\)/);
+  assert.match(
+    window,
+    /ReconnectAfterDelayAsync\([\s\S]{0,160}CancellationTokenSource cancellation[\s\S]{0,900}cancellation\.Dispose\(\)/,
+  );
+  assert.match(
+    window,
+    /CleanupFailedWifiConnectionAsync\([\s\S]{0,260}if \(!IsWifiConnectionAttemptCurrent\(/,
+  );
 });
 
 test('all five targets avoid reconnect when the user disconnected manually', async () => {

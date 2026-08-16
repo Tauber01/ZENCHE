@@ -1048,6 +1048,8 @@ struct Index {
   // v1.5.5 fig1 control page: transport-capsule failure state and grid edit
   // mode are pure UI state; lastConnectionError only drives the status row.
   @State private lastConnectionError: string = '';
+  // Wi-Fi 卡片只消费 PTP/IP 自身的失败，避免 USB/本机相机错误串台。
+  @State private wifiLastConnectionError: string = '';
   @State private gridEditMode: boolean = false;
   @State private gridHiddenTiles: Array<boolean> = [];
   private readonly gridScroller: Scroller = new Scroller();
@@ -2083,6 +2085,10 @@ struct Index {
     this.wifiManualDisconnect = true;
     this.wifiReconnecting = false;
     this.wifiConnecting = false;
+    this.wifiLastConnectionError = '';
+    this.lastConnectionError = '';
+    this.wifiReconnectAttempt = 0;
+    this.wifiMissedHeartbeats = 0;
     this.stopWifiHeartbeat();
     this.stopWifiReconnect();
     this.unregisterWifiNetConnection();
@@ -2148,6 +2154,10 @@ struct Index {
       this.wifiVendor = CameraVendor.UNKNOWN;
       this.wifiCameraName = 'PTP/IP Camera';
       this.wifiStatus = 'Wi‑Fi 相机未连接';
+      this.wifiIso = 0;
+      this.wifiAperture = 0;
+      this.wifiShutterSeconds = 0;
+      this.wifiParameterReadout = '参数待读取 · 连接后自动刷新';
     }
     this.localCameraSelected = false;
     this.liveView = false;
@@ -2382,7 +2392,11 @@ struct Index {
                   ? `${this.tr('本机摄像头')} · HARMONYOS`
                 : (this.wifiConnected
                   ? `${this.wifiCameraName} · WI‑FI/PTP‑IP`
-                  : `${this.tr('未连接')} · HARMONYOS USB/PTP`))
+                  : (this.wifiReconnecting
+                    ? `${this.tr('Wi‑Fi 已断开，正在重连…')} · WI‑FI/PTP‑IP`
+                    : (this.wifiConnecting
+                      ? `${this.tr('正在连接 Wi‑Fi 相机…')} · WI‑FI/PTP‑IP`
+                      : `${this.tr('未连接')} · HARMONYOS USB/PTP`))))
             )
               .fontSize(EDITOR_FS_SMALL)
               .fontFamily('monospace')
@@ -2401,7 +2415,9 @@ struct Index {
         .fontColor(
           this.connected || this.wifiConnected || this.localCameraSelected
             ? $r('app.color.positive')
-            : $r('app.color.muted')
+            : this.wifiConnecting || this.wifiReconnecting
+              ? $r('app.color.accent')
+              : $r('app.color.muted')
         )
         .margin({ right: 8 })
       Button(
@@ -5267,7 +5283,7 @@ struct Index {
   private controlStatusLoading(): boolean {
     // Wi‑Fi connect carries its own flag; USB connect runs inside runBusy with
     // a '正在连接…' status line, so busy+status is the honest loading signal.
-    return this.wifiConnecting ||
+    return this.wifiConnecting || this.wifiReconnecting ||
       (this.busy && this.status.indexOf('正在连接') === 0);
   }
 
@@ -5287,10 +5303,9 @@ struct Index {
 
   private controlStatusTextValue(): string {
     if (this.controlStatusLoading()) {
-      return this.wifiConnecting ? '正在连接 Wi‑Fi 相机…' : '正在连接…';
-    }
-    if (this.wifiReconnecting) {
-      return 'Wi‑Fi 已断开，正在重连…';
+      return this.wifiReconnecting
+        ? 'Wi‑Fi 已断开，正在重连…'
+        : this.wifiConnecting ? '正在连接 Wi‑Fi 相机…' : '正在连接…';
     }
     if (this.controlAnyCamera()) {
       return '就绪';
@@ -5300,10 +5315,7 @@ struct Index {
 
   private controlStatusRateValue(): string {
     if (this.controlStatusLoading()) {
-      return '连接中';
-    }
-    if (this.wifiReconnecting) {
-      return '重连中';
+      return this.wifiReconnecting ? '重连中' : '连接中';
     }
     if (this.controlAnyCamera()) {
       return this.connected ? 'USB/PTP'
@@ -5340,7 +5352,8 @@ struct Index {
           .onClick((): void => {
             // fig1: tapping the transport capsule opens the connection panel
             // whenever no camera is live (covers both 待连接 and 重试 states).
-            if (!this.controlAnyCamera() && !this.controlStatusLoading()) {
+            if (!this.controlAnyCamera() &&
+              (!this.controlStatusLoading() || this.wifiConnectionActive())) {
               this.connectionPanelVisible = true;
             }
           })
@@ -7357,6 +7370,44 @@ struct Index {
     })
   }
 
+  private wifiConnectionActive(): boolean {
+    return this.wifiConnecting || this.wifiReconnecting;
+  }
+
+  private wifiConnectionFailed(): boolean {
+    return !this.wifiConnected && !this.wifiConnectionActive() &&
+      this.wifiLastConnectionError.length > 0;
+  }
+
+  private wifiConnectionActionLabel(): string {
+    if (this.wifiReconnecting) return '停止重连';
+    if (this.wifiConnecting) return '取消连接';
+    if (this.wifiConnected) return '断开 Wi‑Fi 相机';
+    if (this.wifiConnectionFailed()) return '重试连接';
+    return '连接 Wi‑Fi 相机';
+  }
+
+  private wifiConnectionBridgeActionLabel(): string {
+    if (this.wifiConnected || this.wifiConnectionActive() ||
+      this.wifiConnectionFailed()) {
+      return this.wifiConnectionActionLabel();
+    }
+    return '配置并连接';
+  }
+
+  private wifiConnectionRecoveryHint(): string {
+    if (this.wifiReconnecting) {
+      return '正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。';
+    }
+    if (this.wifiConnecting) {
+      return '正在建立 PTP/IP 通道，可随时取消。';
+    }
+    if (this.wifiConnectionFailed()) {
+      return '确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。';
+    }
+    return '';
+  }
+
   @Builder
   private WifiCameraTransferSection() {
     Column({ space: 10 }) {
@@ -7379,17 +7430,18 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-        Button(this.tr(this.wifiReconnecting ? '正在重连…' :
-          (this.wifiConnected ? '断开' : '连接')), {
+        Button(this.tr(this.wifiConnectionActionLabel()), {
           type: ButtonType.Normal
         })
           .height(44)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
           .borderRadius(RADIUS_8)
-          .enabled(!this.wifiConnecting && !this.wifiReconnecting && !this.busy)
+          .enabled(
+            this.wifiConnectionActive() || this.wifiConnected || !this.busy
+          )
           .onClick((): void => {
-            if (this.wifiConnected) {
+            if (this.wifiConnected || this.wifiConnectionActive()) {
               this.disconnectWifiCamera();
             } else {
               this.connectWifiCamera();
@@ -7397,6 +7449,22 @@ struct Index {
           })
       }
       .width('100%')
+      if (this.wifiConnectionActive() || this.wifiConnectionFailed()) {
+        Row({ space: 8 }) {
+          if (this.wifiConnectionActive()) {
+            LoadingProgress()
+              .width(24)
+              .height(24)
+              .color($r('app.color.accent'))
+          }
+          Text(this.tr(this.wifiConnectionRecoveryHint()))
+            .fontSize(TS_CAPTION)
+            .fontColor($r('app.color.muted'))
+            .layoutWeight(1)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center)
+      }
       Text(this.tr('连接模式'))
         .fontSize(TS_CAPTION)
         .fontWeight(FontWeight.Bold)
@@ -7408,7 +7476,7 @@ struct Index {
       ])
         .selected(this.wifiConnectionMode === 'sta' ? 1 : 0)
         .width('100%')
-        .enabled(!this.wifiConnected && !this.wifiConnecting)
+        .enabled(!this.wifiConnected && !this.wifiConnectionActive())
         .onSelect((index: number): void => {
           this.wifiConnectionMode = index === 1 ? 'sta' : 'ap';
           this.persistWifiConnectionSettings();
@@ -7425,6 +7493,7 @@ struct Index {
         TextInput({ placeholder: '192.168.1.1', text: this.wifiHost })
           .height(44)
           .layoutWeight(1)
+          .enabled(!this.wifiConnected && !this.wifiConnectionActive())
           .onChange((value: string): void => {
             this.wifiHost = value;
           })
@@ -7432,6 +7501,7 @@ struct Index {
           .height(44)
           .width(108)
           .type(InputType.Number)
+          .enabled(!this.wifiConnected && !this.wifiConnectionActive())
           .onChange((value: string): void => {
             this.wifiPort = value;
           })
@@ -7633,7 +7703,7 @@ struct Index {
             .fontSize(TS_DISPLAY)
             .fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.ink'))
-          Text(this.tr('本机摄像头、USB/PTP 与官方 SDK'))
+          Text(this.tr('本机摄像头、Wi‑Fi/PTP‑IP 与 USB/PTP'))
             .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
         }
@@ -7650,79 +7720,141 @@ struct Index {
       }
       .width('100%')
 
-      Row({ space: 12 }) {
-        Column({ space: 4 }) {
-          Text(this.tr('本机摄像头'))
-            .fontSize(TS_TITLE)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
-          Text(this.tr(
-            this.localCameraSelected
-              ? '已选择 · 拍摄时由 HarmonyOS 系统相机接管取景'
-              : '调用设备内置镜头拍照，并自动保存到帧澈文件库'
-          ))
-            .fontSize(TS_CAPTION)
-            .fontColor(this.localCameraSelected
-              ? $r('app.color.positive')
-              : $r('app.color.muted'))
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Button(this.tr(this.localCameraSelected ? '取消选择' : '使用'), {
-          type: ButtonType.Normal
-        })
-          .height(44)
-          .fontColor($r('app.color.accent_ink'))
-          .backgroundColor($r('app.color.accent'))
-          .borderRadius(RADIUS_8)
-          .enabled(!this.busy)
-          .onClick((): void => {
-            if (this.localCameraSelected) {
-              this.localCameraSelected = false;
-              this.status = '已取消本机摄像头';
-            } else {
-              this.selectLocalCamera();
+      Scroll() {
+        Column({ space: 14 }) {
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text(this.tr('本机摄像头'))
+                .fontSize(TS_TITLE)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+              Text(this.tr(
+                this.localCameraSelected
+                  ? '已选择 · 拍摄时由 HarmonyOS 系统相机接管取景'
+                  : '调用设备内置镜头拍照，并自动保存到帧澈文件库'
+              ))
+                .fontSize(TS_CAPTION)
+                .fontColor(this.localCameraSelected
+                  ? $r('app.color.positive')
+                  : $r('app.color.muted'))
             }
-          })
-      }
-      .width('100%')
-      .padding(14)
-      .backgroundColor($r('app.color.accent_soft'))
-      .borderRadius(RADIUS_10)
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Button(this.tr(this.localCameraSelected ? '取消选择' : '使用'), {
+              type: ButtonType.Normal
+            })
+              .height(44)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(RADIUS_8)
+              .enabled(!this.busy)
+              .onClick((): void => {
+                if (this.localCameraSelected) {
+                  this.localCameraSelected = false;
+                  this.status = '已取消本机摄像头';
+                } else {
+                  this.selectLocalCamera();
+                }
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.accent_soft'))
+          .borderRadius(RADIUS_10)
 
-      Row({ space: 12 }) {
-        Column({ space: 4 }) {
-          Text(this.tr('USB / PTP'))
-            .fontSize(TS_TITLE)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
-          Text(this.connected
-            ? `${this.cameraName} · ${this.tr('已连接')}`
-            : this.tr('使用数据线连接受支持的相机'))
-            .fontSize(TS_CAPTION)
-            .fontColor($r('app.color.muted'))
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text(this.tr('Wi‑Fi 相机 · PTP/IP'))
+                .fontSize(TS_TITLE)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+              Row({ space: 8 }) {
+                if (this.wifiConnectionActive()) {
+                  LoadingProgress()
+                    .width(24)
+                    .height(24)
+                    .color($r('app.color.accent'))
+                }
+                Text(this.tr(this.wifiStatus))
+                  .fontSize(TS_CAPTION)
+                  .fontColor(this.wifiConnected
+                    ? $r('app.color.positive')
+                    : this.wifiConnectionActive()
+                      ? $r('app.color.accent')
+                      : $r('app.color.muted'))
+                  .maxLines(2)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .layoutWeight(1)
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Center)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Button(this.tr(this.wifiConnectionBridgeActionLabel()), {
+              type: ButtonType.Normal
+            })
+              .height(44)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(RADIUS_8)
+              .onClick((): void => {
+                if (this.wifiConnected || this.wifiConnectionActive()) {
+                  this.disconnectWifiCamera();
+                } else if (this.wifiConnectionFailed()) {
+                  this.connectWifiCamera();
+                } else {
+                  this.connectionPanelVisible = false;
+                  this.section = 'library';
+                  this.wirelessExpanded = true;
+                }
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_10)
+
+          Row({ space: 12 }) {
+            Column({ space: 4 }) {
+              Text(this.tr('USB / PTP'))
+                .fontSize(TS_TITLE)
+                .fontWeight(FontWeight.Bold)
+                .fontColor($r('app.color.ink'))
+              Text(this.connected
+                ? `${this.cameraName} · ${this.tr('已连接')}`
+                : this.tr('使用数据线连接受支持的相机'))
+                .fontSize(TS_CAPTION)
+                .fontColor($r('app.color.muted'))
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Button(this.tr(this.connected ? '断开' : '连接'), {
+              type: ButtonType.Normal
+            })
+              .height(44)
+              .fontColor($r('app.color.accent_ink'))
+              .backgroundColor($r('app.color.accent'))
+              .borderRadius(RADIUS_8)
+              .enabled(!this.busy)
+              .onClick((): void => {
+                this.toggleCameraConnection();
+              })
+          }
+          .width('100%')
+          .padding(14)
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_10)
         }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-        Button(this.tr(this.connected ? '断开' : '连接'), {
-          type: ButtonType.Normal
-        })
-          .height(44)
-          .fontColor($r('app.color.accent_ink'))
-          .backgroundColor($r('app.color.accent'))
-          .borderRadius(RADIUS_8)
-          .enabled(!this.busy)
-          .onClick((): void => {
-            this.toggleCameraConnection();
-          })
+        .width('100%')
       }
       .width('100%')
-      .padding(14)
-      .backgroundColor($r('app.color.paper_2'))
-      .borderRadius(RADIUS_10)
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
 
     }
     .width('92%')
+    .height(this.isCompact() ? '94%' : '88%')
     .constraintSize({ maxWidth: 680 })
     .padding(20)
     .backgroundColor($r('app.color.surface'))
@@ -8555,11 +8687,11 @@ struct Index {
                 .fontColor($r('app.color.ink'))
                 .width('100%')
               Text(this.tr(
-                '• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业显影结果都可以通过系统保存器另存到用户选择的位置。\n' +
-                '• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业显影提供直达入口；“保存到系统相册”继续作为独立操作保留。\n' +
-                '• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n' +
-                '• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n' +
-                '• GitHub Release 提供 1.5.13 五端安装包，官网自动更新仍保持 1.5.10。各平台签名与安装边界，以及系统保存器、权限、同名文件、大文件和存储空间不足等场景，请参阅发布说明并按需真机验证。'
+                '• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n' +
+                '• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n' +
+                '• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n' +
+                '• Android 与 HarmonyOS 补齐网络状态权限；Windows 单轮重连使用有限超时，并在取景与参数恢复完成前保持重连状态。\n' +
+                '• 1.5.14 是本地候选版本，尚未发布。自动化与本地构建不能替代真实相机、移动设备和 Windows 主机验收；安装包签名及验证边界以候选说明为准。'
               ))
                 .fontSize(EDITOR_FS_MEDIUM)
                 .lineHeight(23)
@@ -11070,6 +11202,8 @@ struct Index {
     if (this.wifiHost.trim().length === 0 || !Number.isInteger(port) ||
       port < 1 || port > 65535) {
       this.wifiStatus = 'Wi‑Fi 相机地址或端口无效';
+      this.wifiLastConnectionError = this.wifiStatus;
+      this.lastConnectionError = this.wifiStatus;
       return;
     }
     const sourceGeneration: number = ++this.sourceSwitchGeneration;
@@ -11082,6 +11216,7 @@ struct Index {
     this.wifiReconnecting = false;
     this.wifiReconnectAttempt = 0;
     this.wifiMissedHeartbeats = 0;
+    this.wifiLastConnectionError = '';
     this.wifiConnecting = true;
     this.localCameraSelected = false;
     this.wifiStatus = '正在连接 Wi‑Fi 相机…';
@@ -11187,6 +11322,7 @@ struct Index {
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已通过 PTP/IP 连接`;
       this.status = this.wifiStatus;
       this.lastConnectionError = '';
+      this.wifiLastConnectionError = '';
       if (autoLiveView && this.wifiLiveView && this.wifiSourceActive()) {
         this.liveView = true;
         this.startPreviewLoop();
@@ -11207,10 +11343,11 @@ struct Index {
       this.wifiLiveView = false;
       this.wifiMovieRecording = false;
       this.wifiVendor = CameraVendor.UNKNOWN;
-      this.lastConnectionError = (error as Error).message !== undefined
+      this.wifiLastConnectionError = (error as Error).message !== undefined
         ? (error as Error).message
         : this.tr('连接失败');
-      this.wifiStatus = `Wi‑Fi 连接失败：${(error as Error).message}`;
+      this.lastConnectionError = this.wifiLastConnectionError;
+      this.wifiStatus = `Wi‑Fi 连接失败：${this.wifiLastConnectionError}`;
       this.status = this.wifiStatus;
     } finally {
       if (this.isCurrentWifiAttempt(attempt, camera)) {
@@ -11280,6 +11417,7 @@ struct Index {
       this.wifiStatus = 'Wi‑Fi 相机未连接';
       this.status = 'Wi‑Fi 相机已断开';
       this.lastConnectionError = '';
+      this.wifiLastConnectionError = '';
     }
   }
 
@@ -11548,6 +11686,7 @@ struct Index {
     this.wifiReconnecting = true;
     this.wifiConnecting = false;
     this.wifiConnected = false;
+    this.wifiLastConnectionError = '';
     this.wifiReconnectAttempt = 0;
     this.stopWifiHeartbeat();
     this.unregisterWifiNetConnection();
@@ -11694,6 +11833,7 @@ struct Index {
       this.wifiCameraName = name;
       this.wifiReconnectAttempt = 0;
       this.lastConnectionError = '';
+      this.wifiLastConnectionError = '';
       this.wifiStatus = `${this.wifiConnectionMode.toUpperCase()} · ${name} 已重连（PTP/IP）`;
       this.status = this.wifiStatus;
       if (autoLiveView && liveViewStarted && this.wifiSourceActive()) {

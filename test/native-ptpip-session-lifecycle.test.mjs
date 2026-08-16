@@ -212,8 +212,14 @@ test('Windows manual disconnect cancels restoration and reconnect starts clean',
   assert.match(schedule, /connectionGeneration = BeginWifiConnectionAttempt\(\)/);
   assert.match(
     schedule,
-    /ReconnectAfterDelayAsync\(\s*delay,\s*cts\.Token,\s*connectionGeneration\)/,
+    /ReconnectAfterDelayAsync\(\s*delay,\s*cts,\s*connectionGeneration\)/,
   );
+  const delayedReconnect = blockStartingAt(
+    source,
+    'private async Task ReconnectAfterDelayAsync(',
+  );
+  assert.match(delayedReconnect, /CancellationTokenSource cancellation/);
+  assert.match(delayedReconnect, /cancellation\.Dispose\(\)/);
 
   const cleanup = blockStartingAt(
     source,
@@ -224,7 +230,7 @@ test('Windows manual disconnect cancels restoration and reconnect starts clean',
 
   assert.match(
     source,
-    /InvalidateWifiConnectionAttempts\(\);\s*ClearWifiSessionOwnership\(\);\s*_wifiManualDisconnect = true;\s*_wifiReconnecting = false;\s*StopWifiMonitoring\(\);\s*StopWifiPreviewLoop\(\);\s*await _wifiCamera\.DisconnectAsync\(\)/,
+    /InvalidateWifiConnectionAttempts\(\);\s*ClearWifiSessionOwnership\(\);\s*_wifiManualDisconnect = true;\s*_wifiReconnecting = false;\s*_wifiConnectCts\?\.Cancel\(\);\s*StopWifiMonitoring\(\);\s*StopWifiPreviewLoop\(\);\s*await _wifiCamera\.DisconnectAsync\(\)/,
   );
 });
 
@@ -480,7 +486,13 @@ test('Android auth cleanup invalidates in-flight Wi-Fi and local-camera connects
   const closeAuth = blockStartingAt(source, 'private void closeAuthSensitiveState()');
   const localConnect = blockStartingAt(source, 'private void connectLocalCamera()');
 
-  assert.match(closeAuth, /wifiManualDisconnect = true;\s*wifiConnectionGeneration\+\+/);
+  assert.match(closeAuth, /wifiManualDisconnect = true/);
+  assert.match(closeAuth, /wifiConnectionGeneration\+\+/);
+  assert.ok(
+    closeAuth.indexOf('wifiManualDisconnect = true') <
+      closeAuth.indexOf('wifiConnectionGeneration++'),
+    'auth cleanup must mark manual disconnect before invalidating Wi-Fi callbacks',
+  );
   assert.match(closeAuth, /usbCameraConnectionGeneration\+\+/);
   assert.match(closeAuth, /localCameraConnectionGeneration\+\+/);
   assert.match(localConnect, /connectionGeneration = \+\+localCameraConnectionGeneration/);

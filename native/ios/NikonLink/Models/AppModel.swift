@@ -907,8 +907,17 @@ final class AppModel: ObservableObject {
                 ? "Sony 官方 SDK 已连接"
                 : "相机桥接已连接"
         }
+        if wifiCamera.state == .connecting {
+            return "正在连接 Wi‑Fi 相机…"
+        }
+        if wifiCamera.state.isReconnecting {
+            return "正在重连 Wi‑Fi 相机…"
+        }
         if wifiCamera.isConnected {
             return "Wi‑Fi 已连接"
+        }
+        if case .failed = wifiCamera.state {
+            return "Wi‑Fi 连接失败"
         }
         return camera.state.title
     }

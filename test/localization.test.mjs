@@ -143,6 +143,13 @@ test("language packs cover the main capture screen and dynamic connection state"
     "ISO感光度",
     "设定优化校准",
     "拍摄模式下由相机控制",
+    "取消连接",
+    "停止重连",
+    "重试连接",
+    "配置并连接",
+    "正在建立 PTP/IP 通道，可随时取消。",
+    "正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。",
+    "确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。",
   ];
 
   for (const key of requiredKeys) {

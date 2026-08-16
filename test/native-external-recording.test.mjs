@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.13 launch announcements describe local-copy exports and release boundaries', async () => {
+test('version 1.5.14 launch announcements describe recoverable PTP/IP connections and candidate boundaries', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,20 +95,18 @@ test('version 1.5.13 launch announcements describe local-copy exports and releas
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /新增“下载到本地”/);
-    assert.match(announcement, /联机拍摄、相机卡下载、AI 修图\/生图与专业显影结果/);
-    assert.doesNotMatch(announcement, /专业编辑结果|AI 与专业编辑提供直达入口/);
-    assert.match(announcement, /“保存到系统相册”继续作为独立操作保留/);
-    assert.match(announcement, /不移动或删除 ZENCHE 文件库中的源文件/);
-    assert.match(announcement, /macOS 与 Windows 的 AI 修图也改为始终生成新文件/);
-    assert.match(announcement, /同步落盘且大小校验通过后才显示成功/);
-    assert.match(announcement, /尽力删除未完成的目标/);
-    assert.match(announcement, /GitHub Release 提供 1\.5\.13 五端安装包/);
-    assert.match(announcement, /官网自动更新仍保持 1\.5\.10/);
-    assert.match(announcement, /请参阅发布说明并按需真机验证/);
+    assert.match(announcement, /加固 Wi‑Fi\/PTP‑IP 连接/);
+    assert.match(announcement, /连接与自动重连现在会实时显示状态/);
+    assert.match(announcement, /取消连接或停止重连/);
+    assert.match(announcement, /断线恢复使用会话代际隔离/);
+    assert.match(announcement, /Android 与 HarmonyOS 补齐网络状态权限/);
+    assert.match(announcement, /Windows 单轮重连使用有限超时/);
+    assert.match(announcement, /1\.5\.14 是本地候选版本，尚未发布/);
+    assert.match(announcement, /不能替代真实相机、移动设备和 Windows 主机验收/);
+    assert.doesNotMatch(announcement, /GitHub Release 提供 1\.5\.13 五端安装包/);
   }
 
-  assert.match(announcements[1], /tr\("• 新增“下载到本地”/);
+  assert.match(announcements[1], /tr\("• 加固 Wi‑Fi\/PTP‑IP 连接/);
 
   const englishAnnouncements = await Promise.all([
     read('native/ios/NikonLink/en.lproj/Localizable.strings'),
@@ -124,21 +122,17 @@ test('version 1.5.13 launch announcements describe local-copy exports and releas
   ]);
 
   for (const announcement of englishAnnouncements) {
-    assert.match(announcement, /Added “Save a Local Copy”/);
-    assert.match(announcement, /Pro Develop results/);
-    assert.doesNotMatch(announcement, /professional-editor results|the professional editor/);
-    assert.match(announcement, /Export creates a copy and never moves or deletes the source/);
-    assert.match(announcement, /make a best effort to delete an incomplete destination/);
-    assert.match(announcement, /GitHub Release provides the five-platform 1\.5\.13 packages/);
-    assert.match(announcement, /website update feed remains on 1\.5\.10/);
+    assert.match(announcement, /Strengthened Wi‑Fi\/PTP‑IP connections/);
+    assert.match(announcement, /cancel a connection or stop reconnecting/);
+    assert.match(announcement, /Session-generation isolation/);
+    assert.match(announcement, /1\.5\.14 is a local candidate and has not been released/);
+    assert.match(announcement, /real cameras, mobile devices, and Windows hosts/);
   }
   for (const announcement of japaneseAnnouncements) {
-    assert.match(announcement, /「ローカルコピーを保存」を追加しました/);
-    assert.match(announcement, /プロ現像の結果/);
-    assert.doesNotMatch(announcement, /プロ編集の結果|AI とプロ編集/);
-    assert.match(announcement, /元ファイルを移動・削除しません/);
-    assert.match(announcement, /未完了の保存先も可能な範囲で取り除きます/);
-    assert.match(announcement, /GitHub Release では 5 プラットフォーム向けの 1\.5\.13 パッケージ/);
-    assert.match(announcement, /公式サイトの更新配信は 1\.5\.10 のまま/);
+    assert.match(announcement, /Wi‑Fi／PTP-IP 接続を強化しました/);
+    assert.match(announcement, /接続のキャンセルや再接続の停止/);
+    assert.match(announcement, /セッション世代の分離/);
+    assert.match(announcement, /1\.5\.14 は未公開のローカル候補/);
+    assert.match(announcement, /実機カメラ、モバイル端末、Windows ホスト/);
   }
 });

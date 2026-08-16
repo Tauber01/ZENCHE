@@ -1381,6 +1381,8 @@ public final class MainActivity extends Activity {
     private boolean[] gridHiddenTiles;
     private LinearLayout controlParameterTilesHost;
     private String lastConnectionError;
+    /** Wi-Fi 卡片只展示 PTP/IP 自身的失败，避免 USB/本机相机错误串台。 */
+    private String wifiLastConnectionError;
     private TextView statusText;
     private TextView countText;
     private Button connectButton;
@@ -1393,6 +1395,17 @@ public final class MainActivity extends Activity {
     private Button wirelessButton;
     private TextView wirelessStatusText;
     private TextView wirelessAddressText;
+    private Spinner wifiModeControl;
+    private EditText wifiHostInput;
+    private EditText wifiPortInput;
+    private TextView wifiConnectionStatusText;
+    private LinearLayout wifiRecoveryRow;
+    private ProgressBar wifiConnectionProgress;
+    private TextView wifiRecoveryText;
+    private Button wifiConnectionButton;
+    private TextView wifiDialogStatusText;
+    private ProgressBar wifiDialogProgress;
+    private Button wifiDialogActionButton;
     private TextView lutStatusText;
     private TextView updateStatusText;
     private WaveformScopeView monitorRgbScopeView;
@@ -3546,6 +3559,14 @@ public final class MainActivity extends Activity {
         lutSwitch = null;
         liveMonitoringSwitch = null;
         liveMonitoringDetail = null;
+        wifiModeControl = null;
+        wifiHostInput = null;
+        wifiPortInput = null;
+        wifiConnectionStatusText = null;
+        wifiRecoveryRow = null;
+        wifiConnectionProgress = null;
+        wifiRecoveryText = null;
+        wifiConnectionButton = null;
         contentHost.removeAllViews();
         View content;
         switch (section) {
@@ -3757,7 +3778,7 @@ public final class MainActivity extends Activity {
             // fig1: tapping the transport capsule opens the connection dialog
             // whenever no camera is live (covers both 待连接 and 重试 states).
             if (!(connected || wifiConnected || localCameraConnected)
-                    && !(connecting || wifiConnecting || localCameraConnecting)) {
+                    && !(connecting || localCameraConnecting)) {
                 showConnectionDialog();
             }
         });
@@ -3775,18 +3796,23 @@ public final class MainActivity extends Activity {
             return;
         }
         boolean anyCamera = connected || wifiConnected || localCameraConnected;
-        boolean loading = connecting || wifiConnecting || localCameraConnecting;
+        boolean loading = connecting
+                || wifiConnecting
+                || wifiReconnecting
+                || localCameraConnecting;
         boolean failed = lastConnectionError != null && !anyCamera && !loading;
         controlStatusRate.setBackground(rounded(UI_SECONDARY, 15, 0));
         controlStatusRate.setTextColor(Color.WHITE);
         if (loading) {
             controlStatusDot.setTextColor(UI_ACCENT);
-            controlStatusText.setText(tr(connecting
-                    ? "正在连接…"
-                    : wifiConnecting
-                            ? "正在连接 Wi‑Fi 相机…"
-                            : "正在打开本机摄像头…"));
-            controlStatusRate.setText(tr("连接中"));
+            controlStatusText.setText(tr(wifiReconnecting
+                    ? "Wi‑Fi 已断开，正在重连…"
+                    : connecting
+                            ? "正在连接…"
+                            : wifiConnecting
+                                    ? "正在连接 Wi‑Fi 相机…"
+                                    : "正在打开本机摄像头…"));
+            controlStatusRate.setText(tr(wifiReconnecting ? "重连中" : "连接中"));
         } else if (anyCamera) {
             controlStatusDot.setTextColor(UI_ACCENT);
             controlStatusText.setText(tr("就绪"));
@@ -11853,7 +11879,7 @@ public final class MainActivity extends Activity {
                 MUTED),
                 marginParams(-1, -2, 0, 5, 0, 10));
         wifiCard.addView(text("连接模式", TS_BODY, Typeface.BOLD, INK));
-        Spinner wifiMode = new Spinner(this);
+        wifiModeControl = new Spinner(this);
         String[] wifiModeLabels = {tr("AP 直连"), tr("STA 局域网")};
         ArrayAdapter<String> wifiModeAdapter = new ArrayAdapter<>(
                 this,
@@ -11861,12 +11887,11 @@ public final class MainActivity extends Activity {
                 wifiModeLabels);
         wifiModeAdapter.setDropDownViewResource(
                 android.R.layout.simple_spinner_dropdown_item);
-        wifiMode.setAdapter(wifiModeAdapter);
+        wifiModeControl.setAdapter(wifiModeAdapter);
         wifiConnectionMode = getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("wifiCameraConnectionMode", "ap");
-        wifiMode.setSelection("sta".equals(wifiConnectionMode) ? 1 : 0);
-        wifiMode.setEnabled(!wifiConnected && !wifiConnecting);
-        wifiCard.addView(wifiMode, marginParams(-1, dp(48), 0, 0, 0, 4));
+        wifiModeControl.setSelection("sta".equals(wifiConnectionMode) ? 1 : 0);
+        wifiCard.addView(wifiModeControl, marginParams(-1, dp(48), 0, 0, 0, 4));
         TextView wifiModeHelp = text(
                 "sta".equals(wifiConnectionMode)
                         ? "STA 模式：让相机与手机加入同一局域网，并输入路由器分配给相机的 IP 地址。"
@@ -11875,7 +11900,7 @@ public final class MainActivity extends Activity {
                 Typeface.NORMAL,
                 MUTED);
         wifiCard.addView(wifiModeHelp, marginParams(-1, -2, 0, 0, 0, 8));
-        wifiMode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        wifiModeControl.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(
                     AdapterView<?> parent,
                     View view,
@@ -11892,61 +11917,68 @@ public final class MainActivity extends Activity {
         });
         LinearLayout wifiAddress = new LinearLayout(this);
         wifiAddress.setOrientation(LinearLayout.HORIZONTAL);
-        EditText host = new EditText(this);
-        host.setSingleLine(true);
-        host.setInputType(InputType.TYPE_CLASS_PHONE);
-        host.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
+        wifiHostInput = new EditText(this);
+        wifiHostInput.setSingleLine(true);
+        wifiHostInput.setInputType(InputType.TYPE_CLASS_PHONE);
+        wifiHostInput.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("wifiCameraHost", "192.168.1.1"));
-        host.setHint(tr("相机 IP 地址"));
-        wifiAddress.addView(host, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        EditText port = new EditText(this);
-        port.setSingleLine(true);
-        port.setInputType(InputType.TYPE_CLASS_NUMBER);
-        port.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
+        wifiHostInput.setHint(tr("相机 IP 地址"));
+        wifiAddress.addView(
+                wifiHostInput,
+                new LinearLayout.LayoutParams(0, dp(48), 1f));
+        wifiPortInput = new EditText(this);
+        wifiPortInput.setSingleLine(true);
+        wifiPortInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        wifiPortInput.setText(getSharedPreferences("nikon-link", MODE_PRIVATE)
                 .getString("wifiCameraPort", "15740"));
-        port.setHint(tr("端口"));
+        wifiPortInput.setHint(tr("端口"));
         LinearLayout.LayoutParams portParams = new LinearLayout.LayoutParams(
                 dp(104), dp(48));
         portParams.setMargins(dp(8), 0, 0, 0);
-        wifiAddress.addView(port, portParams);
+        wifiAddress.addView(wifiPortInput, portParams);
         wifiCard.addView(wifiAddress);
-        wifiCard.addView(text(
-                wifiConnecting
-                        ? "正在连接 Wi‑Fi 相机…"
-                        : wifiReconnecting
-                                ? "Wi‑Fi 链路已断开，正在自动重连…"
-                                : wifiConnected
-                                        ? "Wi‑Fi 已连接 · " + wifiCameraName
-                                        : "Wi‑Fi 相机未连接",
+        wifiConnectionStatusText = text(
+                "Wi‑Fi 相机未连接",
                 TS_BODY,
                 Typeface.NORMAL,
-                wifiConnected ? POSITIVE
-                        : (wifiReconnecting || wifiConnecting) ? UI_ACCENT : MUTED),
-                marginParams(-1, -2, 0, 8, 0, 10));
-        Button wifiButton = nativeButton(
-                wifiConnecting
-                        ? "正在连接 Wi‑Fi 相机…"
-                        : wifiReconnecting
-                                ? "正在重连 Wi‑Fi 相机…"
-                                : wifiConnected
-                                        ? "断开 Wi‑Fi 相机"
-                                        : "连接 Wi‑Fi 相机",
-                !wifiConnected && !wifiReconnecting && !wifiConnecting);
-        wifiButton.setOnClickListener(view -> {
-            if (wifiConnected) {
+                MUTED);
+        wifiCard.addView(
+                wifiConnectionStatusText,
+                marginParams(-1, -2, 0, 8, 0, 8));
+
+        wifiRecoveryRow = new LinearLayout(this);
+        wifiRecoveryRow.setOrientation(LinearLayout.HORIZONTAL);
+        wifiRecoveryRow.setGravity(Gravity.CENTER_VERTICAL);
+        wifiConnectionProgress = new ProgressBar(this);
+        wifiConnectionProgress.setIndeterminate(true);
+        wifiRecoveryRow.addView(
+                wifiConnectionProgress,
+                new LinearLayout.LayoutParams(dp(28), dp(28)));
+        wifiRecoveryText = text("", TS_BODY, Typeface.NORMAL, MUTED);
+        LinearLayout.LayoutParams recoveryTextParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        recoveryTextParams.setMargins(dp(8), 0, 0, 0);
+        wifiRecoveryRow.addView(wifiRecoveryText, recoveryTextParams);
+        wifiCard.addView(
+                wifiRecoveryRow,
+                marginParams(-1, -2, 0, 0, 0, 10));
+
+        wifiConnectionButton = nativeButton("连接 Wi‑Fi 相机", true);
+        wifiConnectionButton.setOnClickListener(view -> {
+            if (wifiConnected || wifiConnecting || wifiReconnecting) {
                 disconnectWifiCamera();
-                showSection("library");
                 return;
             }
             int targetPort;
             try {
-                targetPort = Integer.parseInt(port.getText().toString().trim());
+                targetPort = Integer.parseInt(
+                        wifiPortInput.getText().toString().trim());
             } catch (NumberFormatException error) {
                 showError("Wi‑Fi 相机端口无效");
                 return;
             }
-            String targetHost = host.getText().toString().trim();
-            String targetMode = wifiMode.getSelectedItemPosition() == 1
+            String targetHost = wifiHostInput.getText().toString().trim();
+            String targetMode = wifiModeControl.getSelectedItemPosition() == 1
                     ? "sta"
                     : "ap";
             wifiConnectionMode = targetMode;
@@ -11957,7 +11989,10 @@ public final class MainActivity extends Activity {
                     .apply();
             connectWifiCamera(targetHost, targetPort, targetMode);
         });
-        wifiCard.addView(wifiButton, new LinearLayout.LayoutParams(-1, dp(48)));
+        wifiCard.addView(
+                wifiConnectionButton,
+                new LinearLayout.LayoutParams(-1, dp(48)));
+        updateWifiConnectionPanelUi();
 
         // ── E4 1.5.9：Wi‑Fi PTP/IP 控制卡（取景 / 录像 / 参数步进，镜像
         //    Windows E3 MainWindow.xaml.cs 接法；全部 TBC-awaiting-hardware）──
@@ -12077,6 +12112,106 @@ public final class MainActivity extends Activity {
             PtpIpCamera.CameraVendor vendor) {
         return vendor == PtpIpCamera.CameraVendor.NIKON
                 || vendor == PtpIpCamera.CameraVendor.CANON;
+    }
+
+    private boolean wifiConnectionActive() {
+        return wifiConnecting || wifiReconnecting;
+    }
+
+    private boolean wifiConnectionFailed() {
+        return !wifiConnected
+                && !wifiConnectionActive()
+                && wifiLastConnectionError != null
+                && !wifiLastConnectionError.trim().isEmpty();
+    }
+
+    private String wifiConnectionActionLabel() {
+        if (wifiReconnecting) return "停止重连";
+        if (wifiConnecting) return "取消连接";
+        if (wifiConnected) return "断开 Wi‑Fi 相机";
+        if (wifiConnectionFailed()) return "重试连接";
+        return "连接 Wi‑Fi 相机";
+    }
+
+    private String wifiConnectionBridgeActionLabel() {
+        if (wifiConnected || wifiConnectionActive() || wifiConnectionFailed()) {
+            return wifiConnectionActionLabel();
+        }
+        return "配置并连接";
+    }
+
+    private String wifiConnectionStatusLabel() {
+        if (wifiReconnecting) {
+            return tr("Wi‑Fi 链路已断开，正在自动重连…");
+        }
+        if (wifiConnecting) {
+            return tr("正在连接 Wi‑Fi 相机…");
+        }
+        if (wifiConnected) {
+            return tr("Wi‑Fi 已连接") + " · " + wifiCameraName;
+        }
+        if (wifiConnectionFailed()) {
+            return tr("连接失败") + " · " + wifiLastConnectionError;
+        }
+        return tr("Wi‑Fi 相机未连接");
+    }
+
+    private String wifiConnectionRecoveryHint() {
+        if (wifiReconnecting) {
+            return "正在自动恢复连接；停止后可修改 Wi‑Fi、IP 地址或端口。";
+        }
+        if (wifiConnecting) {
+            return "正在建立 PTP/IP 通道，可随时取消。";
+        }
+        if (wifiConnectionFailed()) {
+            return "确认相机已开启 PTP/IP，并检查当前 Wi‑Fi、IP 地址和端口后重试。";
+        }
+        return "";
+    }
+
+    private void updateWifiConnectionPanelUi() {
+        boolean active = wifiConnectionActive();
+        boolean failed = wifiConnectionFailed();
+        boolean controlsLocked = active || wifiConnected;
+        String status = wifiConnectionStatusLabel();
+
+        if (wifiModeControl != null) wifiModeControl.setEnabled(!controlsLocked);
+        if (wifiHostInput != null) wifiHostInput.setEnabled(!controlsLocked);
+        if (wifiPortInput != null) wifiPortInput.setEnabled(!controlsLocked);
+        if (wifiConnectionStatusText != null) {
+            wifiConnectionStatusText.setText(status);
+            wifiConnectionStatusText.setTextColor(
+                    wifiConnected ? POSITIVE : active ? UI_ACCENT : failed ? VIDEO : MUTED);
+        }
+        if (wifiConnectionButton != null) {
+            wifiConnectionButton.setText(tr(wifiConnectionActionLabel()));
+            wifiConnectionButton.setContentDescription(
+                    tr(wifiConnectionActionLabel()));
+        }
+        if (wifiRecoveryRow != null) {
+            wifiRecoveryRow.setVisibility(active || failed ? View.VISIBLE : View.GONE);
+        }
+        if (wifiConnectionProgress != null) {
+            wifiConnectionProgress.setVisibility(active ? View.VISIBLE : View.GONE);
+            wifiConnectionProgress.setContentDescription(status);
+        }
+        if (wifiRecoveryText != null) {
+            wifiRecoveryText.setText(tr(wifiConnectionRecoveryHint()));
+        }
+        if (wifiDialogStatusText != null) {
+            wifiDialogStatusText.setText(status);
+            wifiDialogStatusText.setTextColor(
+                    wifiConnected ? POSITIVE : active ? UI_ACCENT : failed ? VIDEO : MUTED);
+        }
+        if (wifiDialogProgress != null) {
+            wifiDialogProgress.setVisibility(active ? View.VISIBLE : View.GONE);
+            wifiDialogProgress.setContentDescription(status);
+        }
+        if (wifiDialogActionButton != null) {
+            String action = wifiConnectionBridgeActionLabel();
+            wifiDialogActionButton.setText(tr(action));
+            wifiDialogActionButton.setContentDescription(tr(action));
+        }
     }
 
     /** E4：Wi‑Fi 控制卡状态刷新（可见性/文案/可用性，镜像 Windows UpdateWifiControlState）。 */
@@ -12732,6 +12867,12 @@ public final class MainActivity extends Activity {
         wifiConnecting = false;
         wifiReconnecting = false;
         wifiManualDisconnect = true;
+        wifiLastConnectionError = null;
+        lastConnectionError = null;
+        wifiCameraName = "PTP/IP Camera";
+        wifiVendor = PtpIpCamera.CameraVendor.UNKNOWN;
+        wifiReconnectAttempt = 0;
+        wifiMissedHeartbeats = 0;
         wifiConnectionGeneration++;
         wifiLiveView = false;
         wifiMovieRecording = false;
@@ -13717,6 +13858,48 @@ public final class MainActivity extends Activity {
         localCard.addView(localButton, new LinearLayout.LayoutParams(-1, dp(48)));
         content.addView(localCard, marginParams(-1, -2, 0, 0, 0, 16));
 
+        LinearLayout wifiCard = verticalContainer();
+        wifiCard.setPadding(dp(18), dp(16), dp(18), dp(16));
+        wifiCard.setBackground(rounded(COBALT_SOFT, 14, 0));
+        wifiCard.addView(text("Wi‑Fi 相机 · PTP/IP", TS_TITLE, Typeface.BOLD, INK));
+        LinearLayout wifiStatusRow = new LinearLayout(this);
+        wifiStatusRow.setOrientation(LinearLayout.HORIZONTAL);
+        wifiStatusRow.setGravity(Gravity.CENTER_VERTICAL);
+        wifiDialogProgress = new ProgressBar(this);
+        wifiDialogProgress.setIndeterminate(true);
+        wifiStatusRow.addView(
+                wifiDialogProgress,
+                new LinearLayout.LayoutParams(dp(28), dp(28)));
+        wifiDialogStatusText = text("", TS_BODY, Typeface.NORMAL, MUTED);
+        LinearLayout.LayoutParams wifiDialogStatusParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        wifiDialogStatusParams.setMargins(dp(8), 0, 0, 0);
+        wifiStatusRow.addView(wifiDialogStatusText, wifiDialogStatusParams);
+        wifiCard.addView(
+                wifiStatusRow,
+                marginParams(-1, -2, 0, 5, 0, 10));
+        wifiDialogActionButton = nativeButton("配置并连接", true);
+        wifiDialogActionButton.setOnClickListener(view -> {
+            if (wifiConnected || wifiConnecting || wifiReconnecting) {
+                disconnectWifiCamera();
+                return;
+            }
+            if (wifiConnectionFailed()) {
+                connectWifiCamera(
+                        wifiCameraHost,
+                        wifiCameraPort,
+                        wifiConnectionMode);
+                return;
+            }
+            disclosureStates.put("wireless-transfer", true);
+            dismissConnectionDialog();
+            showSection("library");
+        });
+        wifiCard.addView(
+                wifiDialogActionButton,
+                new LinearLayout.LayoutParams(-1, dp(48)));
+        content.addView(wifiCard, marginParams(-1, -2, 0, 0, 0, 16));
+
         LinearLayout card = verticalContainer();
         card.setPadding(dp(18), dp(16), dp(18), dp(16));
         card.setBackground(rounded(COBALT_SOFT, 14, 0));
@@ -13760,15 +13943,24 @@ public final class MainActivity extends Activity {
                 .create();
         connectionDialog = dialog;
         dialog.setOnDismissListener(ignored -> {
-            if (connectionDialog == dialog) connectionDialog = null;
+            if (connectionDialog == dialog) {
+                connectionDialog = null;
+                wifiDialogStatusText = null;
+                wifiDialogProgress = null;
+                wifiDialogActionButton = null;
+            }
         });
         dialog.show();
+        updateWifiConnectionPanelUi();
     }
 
     private void dismissConnectionDialog() {
         AlertDialog dialog = connectionDialog;
         connectionDialog = null;
         if (dialog != null && dialog.isShowing()) dialog.dismiss();
+        wifiDialogStatusText = null;
+        wifiDialogProgress = null;
+        wifiDialogActionButton = null;
     }
 
     private void connectWifiCamera(String host, int port, String connectionMode) {
@@ -13785,6 +13977,7 @@ public final class MainActivity extends Activity {
         wifiReconnecting = false;
         wifiReconnectAttempt = 0;
         wifiMissedHeartbeats = 0;
+        wifiLastConnectionError = null;
         wifiConnecting = true;
         final long connectionGeneration = ++wifiConnectionGeneration;
         updateConnectionUi();
@@ -13837,6 +14030,7 @@ public final class MainActivity extends Activity {
                     wifiConnected = true;
                     wifiConnecting = false;
                     lastConnectionError = null;
+                    wifiLastConnectionError = null;
                     if (autoLiveView && restoredLiveView && wifiSourceActive()) {
                         liveViewEnabled = true;
                         updateConnectionUi();
@@ -13861,9 +14055,10 @@ public final class MainActivity extends Activity {
                     if (!wifiConnectAttemptActive(connectionGeneration, false)) return;
                     wifiConnected = false;
                     wifiConnecting = false;
-                    lastConnectionError = error.getMessage() != null
+                    wifiLastConnectionError = error.getMessage() != null
                             ? error.getMessage()
                             : tr("连接失败");
+                    lastConnectionError = wifiLastConnectionError;
                     updateConnectionUi();
                     if ("library".equals(currentSection)) showSection("library");
                     showError(error.getMessage());
@@ -14011,6 +14206,7 @@ public final class MainActivity extends Activity {
         wifiParameterReadout = "参数待读取 · 连接后自动刷新";
         wifiConnected = false;
         lastConnectionError = null;
+        wifiLastConnectionError = null;
         wifiConnecting = false;
         capturing = false;
         wifiCameraName = "PTP/IP Camera";
@@ -14093,6 +14289,7 @@ public final class MainActivity extends Activity {
                         wifiCameraName = name;
                         wifiReconnectAttempt = 0;
                         lastConnectionError = null;
+                        wifiLastConnectionError = null;
                         if (autoLiveView && restoredLiveView && wifiSourceActive()) {
                             liveViewEnabled = true;
                             updateConnectionUi();
@@ -14114,6 +14311,7 @@ public final class MainActivity extends Activity {
                     mainHandler.post(() -> {
                         if (!wifiConnectAttemptActive(connectionGeneration, true)) return;
                         wifiConnecting = false;
+                        updateConnectionUi();
                         scheduleWifiReconnect();
                     });
                 }
@@ -14132,6 +14330,7 @@ public final class MainActivity extends Activity {
         wifiConnectionGeneration++;
         wifiReconnecting = true;
         wifiConnected = false;
+        wifiLastConnectionError = null;
         wifiReconnectAttempt = 0;
         mainHandler.removeCallbacks(wifiHeartbeatRunnable);
         unregisterWifiNetworkCallback();
@@ -15408,13 +15607,20 @@ public final class MainActivity extends Activity {
 
     private void updateConnectionUi() {
         boolean anyCamera = connected || wifiConnected || localCameraConnected;
+        boolean loading = connecting
+                || wifiConnecting
+                || wifiReconnecting
+                || localCameraConnecting;
         if (connectionDot != null) {
-            connectionDot.setTextColor(anyCamera ? POSITIVE : MUTED);
+            connectionDot.setTextColor(
+                    anyCamera ? POSITIVE : loading ? UI_ACCENT : MUTED);
         }
         if (connectButton != null) {
             connectButton.setText(tr(
-                    connecting || wifiConnecting || localCameraConnecting
-                            ? "正在连接…"
+                    wifiReconnecting
+                            ? "正在重连…"
+                            : connecting || wifiConnecting || localCameraConnecting
+                                    ? "正在连接…"
                             : anyCamera
                                     ? "断开 "
                                             + (connected
@@ -15424,15 +15630,17 @@ public final class MainActivity extends Activity {
                                                             : "Wi‑Fi")
                                     : "连接相机"));
             connectButton.setEnabled(
-                    !connecting && !wifiConnecting && !localCameraConnecting);
+                    !connecting && !localCameraConnecting);
         }
         if (statusText != null) {
-            statusText.setText(tr(connecting || wifiConnecting || localCameraConnecting
-                    ? (wifiConnecting
-                            ? "正在连接 Wi‑Fi 相机"
-                            : localCameraConnecting
-                                    ? "正在打开本机摄像头"
-                                    : "正在检测 Nikon 相机")
+            statusText.setText(tr(loading
+                    ? (wifiReconnecting
+                            ? "Wi‑Fi 已断开，正在重连…"
+                            : wifiConnecting
+                                    ? "正在连接 Wi‑Fi 相机"
+                                    : localCameraConnecting
+                                            ? "正在打开本机摄像头"
+                                            : "正在检测 Nikon 相机")
                     : connected
                             ? connectedCameraName + " · USB/PTP"
                             : localCameraConnected
@@ -15457,6 +15665,7 @@ public final class MainActivity extends Activity {
         }
         updateCameraControls();
         updateRecordingButtons();
+        updateWifiConnectionPanelUi();
         updateWifiControlCard();
         updateFileCount();
         // fig1: keep the capture-page status row in sync with connection state
@@ -16430,11 +16639,11 @@ public final class MainActivity extends Activity {
         content.addView(text("本次更新", 19, Typeface.BOLD, INK));
         content.addView(
                 text(
-                        tr("• 新增“下载到本地”：联机拍摄、相机卡下载、AI 修图/生图与专业显影结果都可以通过系统保存器另存到用户选择的位置。\n"
-                                + "• 五端文件库均提供统一入口；支持应用内预览的页面也提供快捷入口。AI 与专业显影提供直达入口；“保存到系统相册”继续作为独立操作保留。\n"
-                                + "• 导出只创建副本，不移动或删除 ZENCHE 文件库中的源文件；macOS 与 Windows 的 AI 修图也改为始终生成新文件，不再覆盖原图。\n"
-                                + "• 用户取消时不显示错误；只有复制完成、同步落盘且大小校验通过后才显示成功。失败时会清理临时文件，并尽力删除未完成的目标。\n"
-                                + "• GitHub Release 提供 1.5.13 五端安装包，官网自动更新仍保持 1.5.10。各平台签名与安装边界，以及系统保存器、权限、同名文件、大文件和存储空间不足等场景，请参阅发布说明并按需真机验证。"),
+                        tr("• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n"
+                                + "• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n"
+                                + "• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n"
+                                + "• Android 与 HarmonyOS 补齐网络状态权限；Windows 单轮重连使用有限超时，并在取景与参数恢复完成前保持重连状态。\n"
+                                + "• 1.5.14 是本地候选版本，尚未发布。自动化与本地构建不能替代真实相机、移动设备和 Windows 主机验收；安装包签名及验证边界以候选说明为准。"),
                         14,
                         Typeface.NORMAL,
                         INK),
