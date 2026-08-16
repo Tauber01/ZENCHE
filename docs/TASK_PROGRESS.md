@@ -1,9 +1,9 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-15（Asia/Shanghai）
+> 快照时间：2026-08-16（Asia/Shanghai）
 > 当前公开版本：1.5.13 / build 40；最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`，注释标签 `v1.5.13` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`
 > 公开状态：v1.5.13 已于 2026-08-12T03:33:52Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
-> 当前源码候选：1.5.14 / build 41，PTP/IP 与网络重连可靠性修复，尚未发布
+> 当前源码候选：1.5.14 / build 41，冻结实现 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903`，PTP/IP、网络重连与可恢复连接体验已收口，尚未发布
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -22,6 +22,7 @@
 - 当前 GitHub 公开稳定版为 [**1.5.13 / build 40**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)，新增五端“下载到本地”入口与副本保护，并继承 1.5.12 的 Windows 启动初始化修复、1.5.11 的桌面工作区、移动端相册与 AI 代理能力。官网自动更新继续提供 1.5.10 / build 37。
 - Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已随 v1.5.12 发布：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518 通过。六个 1.5.12 包、侧车及聚合包已完成本地重建与校验；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60、§12.61 与 `docs/releases/v1.5.12.md`。
 - 1.5.13 / build 40 的“下载到本地”发布实现冻结于 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`：exact HEAD 与标签提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98` 的完整 `npm test` 均为 532/532；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车均从最终实现重建并回验。聚合包含 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，线上名称、字节数、GitHub SHA-256 摘要和回下载字节均与本地一致，14/14 零差异；逐包表和签名边界见 `docs/releases/v1.5.13.md`。
+- 1.5.14 / build 41 当前冻结实现为 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903`：在协议勘正基础上，五端顶层连接管理直接纳入 Wi‑Fi/PTP‑IP，并提供连接取消、停止重连、失败重试、原生进度、端点锁定和恢复提示。Windows 快门、取景、LIVE、录像与相机存储统一受真实 Wi‑Fi ready 门禁；Android/HarmonyOS/Windows 隔离连接源错误，HarmonyOS 小视口面板可滚动，Apple 动态操作标题走运行时三语本地化。完整自动化 579/579、连接体验/协议专项 55/55、五端构建与六包/六侧车回验通过；精确包哈希与签名边界见 `docs/releases/v1.5.14.md`。旧 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 候选包已被本地替代；本轮未推送、未打标签、未创建 Release 或部署官网。
 - 1.5.11 的完整 `npm test` 514/514、五端原生构建、包结构、侧车、签名边界与 GitHub 14/14 线上回验均作为历史发布事实保留。1.5.12 在发布前重新执行全部自动化与六包校验，不沿用旧包哈希；发布后 14 个线上附件的名称、字节数与 GitHub SHA-256 摘要逐项一致。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
@@ -1258,3 +1259,13 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **冻结回归**：新增 `test/native-ptpip-connection-regressions.test.mjs` 与 `test/native-ptpip-session-lifecycle.test.mjs`，锁定 event probe、双向 reader、GetDeviceInfo 参数/数据集、data-out 帧、事务 gate、会话代际、取消清理、移动端网络权限及 Windows 重连时序；同步修正旧 B2/E2 测试与 `docs/PTPIP_PROTOCOL.md` 中固化的错误契约。冻结实现 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 的完整 `npm test -- --test-reporter=dot` 573/573、连接专项 61/61；Android、iOS、HarmonyOS、macOS 与 Windows 的原生打包均成功。
 - **本地候选交付**：六包与六份同名侧车均由上述实现提交重建，6/6 `shasum -a 256 -c` 为 `OK`。APK/IPA/HAP/Windows ZIP 压缩完整，Android 为 1.5.14/41 且包含 `ACCESS_NETWORK_STATE`、v2 Debug 证书连续；iOS 为 1.5.14/41 且完全未签名；HarmonyOS 为 1.5.14/41 且未配置签名；macOS arm64 app 为 1.5.14/41、ad-hoc 签名，深度严格验签和 DMG 校验通过；Windows ZIP 主程序为 PE32+ x86-64，NSIS 引导器为既有 PE32 i386 stub、安装到 `$PROGRAMFILES64` 并写 64 位注册表，两者 PE Security Directory 均为 0。精确字节数和 SHA-256 见 `docs/releases/v1.5.14.md`。
 - **授权与实机边界**：本轮未推送分支、未打标签、未创建 Release、未覆盖公开资产、未切换官网。没有真实相机、移动设备或 Windows 主机时，不得把静态契约、编译、交叉包或容器校验扩大为 PTP/IP 主动/被动 Probe、并发取景、断网重连、安装、驱动或 SmartScreen 实机 PASS。iOS/HarmonyOS 未签名、macOS 未公证、Windows 无 Authenticode、Android 使用 Debug 证书的边界不变。
+
+## 12.64 v1.5.14 可恢复连接体验与顶层入口收口（2026-08-16，GPT5.6）
+
+- **工作现场与继承关系**：独立工作树 `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.14-connection-ux`，分支 `agent/1.5.14-connection-ux`，实现提交 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903`。本节继承 §12.63 的 PTP/IP 协议勘正，并以新的五端源码和候选包替代 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 本地候选；旧包不发布。
+- **体验收口**：iOS/iPadOS、Android、HarmonyOS、macOS、Windows 的顶层连接管理均可直接看到 Wi‑Fi/PTP‑IP。动作按真实状态切换为“取消连接 / 停止重连 / 断开 / 重试”，活跃态显示原生进度并锁定模式、IP 与端口，失败态提示检查当前 Wi‑Fi、相机 PTP/IP、IP 和端口。全局拍摄状态同步呈现连接中、重连中和失败，不再要求用户从文件库猜入口。
+- **恢复真实性**：Android、HarmonyOS、Windows 使用 Wi‑Fi 专属错误状态，USB/本机相机错误不再串入 Wi‑Fi 卡；退出登录清除源错误与全局错误。HarmonyOS 连接面板采用固定标题与有界 Scroll，保证小屏、横屏和分屏下底部动作可达。Apple 动态按钮通过运行时本地化视图渲染，英日界面不再泄漏中文。Windows `IsWifiCameraReady()` 统一门禁快门、实时取景、LIVE、录像和相机存储，进入重连立即禁用，完整恢复后再启用；初连/重连 CTS、连接代际和会话代际共同阻止旧任务覆盖新会话。首次连接、自动恢复、停止重连和主动断开的用户错误使用稳定三语 key，原始协议异常只进入诊断日志。
+- **审查与自动化**：两轮独立只读复审关闭了 Apple 动态标题未本地化、Windows 重连假可用、移动端鉴权后旧错误残留和 HarmonyOS 小视口裁切；最终结论 P0/P1=0。Impeccable polish/craft-floor 检测按要求只运行一次并返回 0 条反模式。`git diff --check`、完整 `npm test` 579/579 和连接体验/协议专项 55/55 通过；新增测试锁定五端可恢复动作、进度与端点门禁、源错误隔离、三语动态标题、鉴权清理、HarmonyOS 滚动以及 Windows ready 门禁。源码结构契约不能替代真实操作与硬件验收。
+- **五端构建**：Android `assembleDebug` 31 项成功；iOS generic/device Release unsigned、HarmonyOS Release `assembleHap`、macOS arm64 应用/DMG、Windows x64 Release publish/NSIS/ZIP 均从与实现提交相同的源码树完成。Windows 只有既有 `PtpCamera.cs` CS8629 与 `_aiGenerating` CS0414，新增 CS4014 已在最终重建前消除；HarmonyOS、macOS 保留项目既有 throw/deprecation/actor 隔离警告，没有新增编译错误。
+- **候选包证据**：六份 `.sha256` 6/6 回验 `OK`；APK、IPA、HAP、Windows ZIP 压缩完整，DMG 校验有效，macOS app 深度严格验签通过。最终字节数与 SHA-256 见 `docs/releases/v1.5.14.md`。Android 为 v2 Debug 证书，证书 SHA-256 `45499c18366356314c10ad8a98939908e47855fb6ba7fc21fe8a809549c7df3c`；iOS/HarmonyOS 未签名，macOS ad-hoc 且未公证，Windows Setup 与 x64 主程序 Security Directory 为 0、无 Authenticode。
+- **授权与待验收**：本轮未推送分支、未打标签、未创建 Release、未替换 GitHub 资产、未切换官网。GitHub Latest 仍为 1.5.13，官网仍为 1.5.10 / build 37。真实 Nikon/Sony/Canon PTP/IP 相机的 Probe、并发取景、断网重连和取消/重试流程，移动端安装/权限，Windows 启动/驱动/SmartScreen，以及 macOS Gatekeeper/公证继续待对应设备与可信签名验收。

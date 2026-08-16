@@ -2,6 +2,24 @@
 
 ## [1.5.14] - Unreleased
 
+### Changed
+
+- Added Wi‑Fi/PTP‑IP directly to the top-level connection manager on all five
+  native targets. The primary action now changes with the real state: cancel
+  while connecting, stop while reconnecting, disconnect when connected, and
+  retry after failure.
+- Added native progress indicators, endpoint locking during active sessions,
+  and recovery guidance for the current Wi‑Fi network, IP address, and port.
+  The global capture status now reflects Wi‑Fi connecting, reconnecting, and
+  failure instead of presenting stale ready controls.
+- Isolated Wi‑Fi failures from USB and system-camera errors on Android,
+  HarmonyOS, and Windows. Signing out clears stale connection failures, and
+  the HarmonyOS connection panel remains scrollable on small or split-screen
+  viewports.
+- Localized the new dynamic actions and stable Windows recovery errors in
+  Simplified Chinese, English, and Japanese. The in-app announcement now
+  describes 1.5.14 as an unpublished local candidate.
+
 ### Fixed
 
 - Replaced the invalid PTP/IP heartbeat that repeatedly reopened an active
@@ -46,10 +64,10 @@
 ### Validation status
 
 - Source version is `1.5.14 / build 41`. Frozen implementation commit
-  `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` passes the full automated suite
-  573/573 and the 61/61 connection regression suite. All five native package
-  builds completed from that commit; six local candidate packages and their
-  SHA-256 sidecars pass container, metadata, architecture, and applicable
+  `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903` passes the full automated suite
+  579/579 and the 55/55 focused connection UX/protocol suite. All five native
+  package builds completed from that commit; six local candidate packages and
+  their SHA-256 sidecars pass container, metadata, architecture, and applicable
   signature checks. Camera-hardware, trusted-signing, installation, and
   reconnect testing remain pending while this entry is marked Unreleased;
   package details are in `docs/releases/v1.5.14.md`. Nothing was pushed,

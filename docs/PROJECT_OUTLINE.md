@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 项目大纲
 
 > 文档状态：工作基线
-> 最近核对：2026-08-15（Asia/Shanghai）
+> 最近核对：2026-08-16（Asia/Shanghai）
 > 使用方式：开始产品、界面、技术或发布工作前，先阅读根目录 `AGENTS.md`，再阅读本文、`docs/TECHNICAL_APPROACH.md` 与 `docs/TASK_PROGRESS.md`。
 
 ## 1. 项目定位
@@ -20,18 +20,23 @@
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
 
-1.5.14 / build 41 为五端连接可靠性修复候选。PTP/IP 心跳改用 event 通道的标准
-Probe Request/Response(type 13/14)，常驻 reader 同时响应相机主动探测并排空事件；
-Apple、HarmonyOS、Windows 为完整 command transaction 增加显式串行 gate。GetDeviceInfo
-恢复无参数请求及 PIMA STR/AUINT16 解析，data-out 按 StartData(tx,length) +
-EndData(tx,data) 组帧并校验响应 transaction。Android/HarmonyOS 补齐网络监听权限，
-Windows 自动重连每轮有 12 秒上限且只在会话恢复完成后退出重连态；五端连接取消
-均以代际或等价门禁阻止旧回调复活。冻结实现
-`6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 的完整自动化 573/573、连接专项
-61/61 与五端原生打包全部通过；六包、六份侧车、版本、容器、架构和适用签名边界
-均已回验，逐包状态见 `docs/releases/v1.5.14.md`。GitHub Latest 仍是 1.5.13，官网
-仍为 1.5.10；本地候选未推送或发布，五端真机相机、断网恢复、正式签名与安装仍待
-验收。
+1.5.14 / build 41 为五端连接可靠性与恢复体验候选。PTP/IP 心跳改用 event 通道的
+标准 Probe Request/Response(type 13/14)，常驻 reader 同时响应相机主动探测并排空
+事件；Apple、HarmonyOS、Windows 为完整 command transaction 增加显式串行 gate。
+GetDeviceInfo 恢复无参数请求及 PIMA STR/AUINT16 解析，data-out 按
+StartData(tx,length) + EndData(tx,data) 组帧并校验响应 transaction。Android/HarmonyOS
+补齐网络监听权限，Windows 自动重连每轮有 12 秒上限且只在会话恢复完成后退出重连
+态；五端连接取消均以代际或等价门禁阻止旧回调复活。五端顶层连接管理现可直接发现
+Wi‑Fi/PTP‑IP，并按连接中、重连中、已连接和失败提供取消、停止重连、断开与重试；
+进度、端点锁定和 Wi‑Fi/IP/端口恢复提示与全局拍摄状态同步。Android、HarmonyOS、
+Windows 隔离 Wi‑Fi 与其他连接源错误，HarmonyOS 小视口面板可滚动，Windows 重连
+期间不会保留假可用的快门、LIVE 或存储入口。冻结实现
+`9eaa7c314b7e51f1e6e91d87b284e317d0c3d903` 的完整自动化 579/579、连接体验/协议
+专项 55/55 与五端原生打包全部通过；六包、六份侧车、版本、容器、架构和适用签名
+边界均已回验，逐包状态见 `docs/releases/v1.5.14.md`。此前
+`6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 候选包已被本地替代且不会发布。GitHub
+Latest 仍是 1.5.13，官网仍为 1.5.10；本地候选未推送或发布，五端真机相机、断网
+恢复、正式签名与安装仍待验收。
 
 W15 修复五端登录页中“模式标签”和“提交按钮”同名造成的误触歧义，并为 macOS、Windows 增加可保存的桌面工作区。两端会恢复主窗口大小和位置，Windows 还会恢复最大化状态；主导航、拍摄参数、编辑媒体池、工具面板及底部工具区可在拖动中实时连续调节，Windows AI 工具面板另有独立分隔条。桌面编辑器将“专业显影 / AI 工具”固定为一级模式，色轮、曲线、蒙版等归入二级“调整类别”；RGB 示波器会填满底部可用空间。预览和示波器复用同一受控尺寸图像，Windows 另合并高频刷新、按录制状态启停时间码，并在替换结果、切换照片或模式、离开编辑页及关闭窗口时清理受限命名的 AI 临时文件和编辑位图。第一版不包含任意浮动面板或跨屏面板停靠；Windows 多显示器/DPI 与两端真实拖拽、重启恢复及长时间性能仍需真机验收。最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，完整测试 503/503 通过；Windows 两包已按该基线重建，未受后续 Windows 专属改动影响的 macOS DMG 复用 `0faeccdc987146c104fd73d742547c9baf9db221` 已验证产物。最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，14 项逐字节一致。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、签名事实、生产边界、去 AI 痕迹与交付内容无实体问题，其唯一状态 P2 已完成回填。
 

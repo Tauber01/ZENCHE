@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-15（Asia/Shanghai）
+> 最近核对：2026-08-16（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -326,7 +326,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - 重名文件生成唯一名称，不覆盖已有素材；缺少 `Content-Length` 或鉴权失败时不创建空文件。
 - 服务只在用户明确开启且应用生命周期允许时监听，退出后释放全部端口。
 
-### 5.1 PTP/IP 链路与连接监看（B2，1.5.14 协议勘正）
+### 5.1 PTP/IP 链路、连接监看与恢复体验（B2，1.5.14）
 
 - **链路**：五端（iOS/macOS/Android/Harmony/Windows）均以 PTP/IP（TCP 15740 默认端口）直连相机。握手依次建立 command 与 event TCP、完成 Init Command/Event Request/ACK，再在 command 通道发送一次 OpenSession(0x1002, transaction=0, session=1)。event 握手完成后立即启动单 reader，持续排空 type 8 事件并处理双向 type 13/14 probe。
 - **心跳保活**：连接建立后每 5s 在 event 通道发送 ProbeRequest(type 13)，等待 ProbeResponse(type 14)，单次超时 3s；相机主动 type 13 由 reader 立即回 type 14。旧实现重复发送 OpenSession(0x1002)，合规相机会返回 SessionAlreadyOpen 并触发假离线，该行为已禁止。
@@ -338,8 +338,10 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **自动重连**：指数退避序列 1/2/4/8/16s，封顶 30s（`backoffDelay(forAttempt:)` / `wifiBackoffDelayMs` 等纯函数）；用户主动断开（`manualDisconnect` 标志）一律不触发自动重连。Windows 单轮握手与恢复使用 12s linked deadline，恢复厂商、取景、参数与监看前保持 reconnecting，失败必须继续调度而不能卡死。
 - **Probe 策略边界**：5s 周期 / 3s 超时是产品为快速恢复采用的策略，并非 CIPA 的规范值；DC-X005 将 Initiator Probe 描述为事务期间的可选探测并给出 10s 响应等待。当前策略须经 Nikon/Sony/Canon 真机验证，严格或低资源 responder 的兼容性不能由静态测试推出。
 - **网络层监听联动**：丢网即判离线，不等心跳超时——iOS/macOS `NWPathMonitor`、Android `NetworkCallback`（TRANSPORT_WIFI onLost）、Harmony `NetConnection`（`BEARER_WIFI` + `netLost`）、Windows `NetworkChange.NetworkAvailabilityChanged`；移动端回调绑定网络/attempt 所有权，旧 callback 不得关闭新实例。Android manifest 必须声明 `ACCESS_NETWORK_STATE`，HarmonyOS module 必须声明 `GET_NETWORK_INFO`。监听到位后走同一退避重连流程，网络恢复可提前唤醒下一轮重连。
-- **UI 呈现**：仅文本分支——`reconnecting` 态显示「重连中 / 正在重连 Wi‑Fi 相机…」并禁用连接按钮，橙色状态点；断连文案与既有样式语言一致，无新控件。
-- **冻结证据**：实现提交 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 的完整自动化 573/573、连接专项 61/61 与五端原生打包通过；六包和六份侧车的版本、容器、架构及适用签名边界均已回验。该证据只覆盖静态回归、编译与本地候选产物，不替代真实 Nikon/Sony/Canon 相机的 probe、并发命令、半关闭与断网重连验证。
+- **顶层入口**：五端连接管理必须直接呈现 Wi‑Fi/PTP‑IP，不要求用户先猜测并进入文件库。空闲态可以跳到既有端点配置；连接中、重连中、已连接与失败态则在原位提供取消、停止重连、断开和重试。Windows 跳转后还会把 Wi‑Fi 卡滚入视野并聚焦地址输入。
+- **恢复反馈**：活跃连接显示原生进度并锁定模式、IP 与端口，动作本身保持可取消；失败态保留稳定重试入口，并提示检查当前 Wi‑Fi、相机 PTP/IP、IP 地址和端口。Android、HarmonyOS 与 Windows 使用 Wi‑Fi 专属错误字段，USB/本机相机失败不得污染 Wi‑Fi 卡；退出登录同步清理源错误和全局错误。HarmonyOS 连接面板以固定标题 + 有界 Scroll 保证小屏、横屏和分屏可达。
+- **全局控件真实性**：拍摄页状态必须覆盖 Wi‑Fi `connecting/reconnecting/failed`。Windows 以 `IsWifiCameraReady()` 统一门禁快门、取景、LIVE、录像和相机存储；重连进入即禁用，完整会话恢复后才重新启用。用户可见错误存稳定三语 key，原始协议异常只写诊断日志。
+- **冻结证据**：实现提交 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903` 的完整自动化 579/579、连接体验/协议专项 55/55 与五端原生打包通过；六包和六份侧车的版本、容器、架构及适用签名边界均已回验。旧协议候选 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 的包已被本地替代且不会发布。该证据只覆盖静态回归、编译与本地候选产物，不替代真实 Nikon/Sony/Canon 相机的 probe、并发命令、半关闭、断网重连与操作可达性验证。
 
 ## 6. 本地工作流与图像处理
 
