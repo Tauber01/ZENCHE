@@ -535,18 +535,15 @@ internal sealed class SonyOfficialSdkCamera
 
     private static CameraProfile MatchProfile(string model)
     {
-        var normalized = model.Replace("ILCE-", "A", StringComparison.OrdinalIgnoreCase)
-            .Replace("ILME-", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("-", "", StringComparison.Ordinal)
-            .Replace(" ", "", StringComparison.Ordinal);
-        var match = CameraProfile.Supported.FirstOrDefault(candidate =>
-            candidate.VendorId == 0x054c &&
-            normalized.Contains(
-                candidate.Name.Replace("Sony", "", StringComparison.OrdinalIgnoreCase)
-                    .Replace(" ", "", StringComparison.Ordinal)
-                    .Replace("-", "", StringComparison.Ordinal),
-                StringComparison.OrdinalIgnoreCase));
-        return match ?? new CameraProfile(
+        // Longest-alias matching against the shared Sony registry keeps
+        // ZV-E10M2 on ZV-E10 II and ILCE-1M2 on A1 II instead of their
+        // base models (see CameraProfile.MatchSonyModel).
+        var matched = CameraProfile.MatchSonyModel(model);
+        if (matched is not null)
+        {
+            return matched;
+        }
+        return new CameraProfile(
             model.StartsWith("Sony", StringComparison.OrdinalIgnoreCase)
                 ? model
                 : $"Sony {model}",

@@ -27,7 +27,7 @@ final class PtpCamera {
     static final String SUPPORTED_CAMERA_SUMMARY =
             "Nikon D500、Z7、Z6、Z50、D7500、D780、D6、Z5、D850、Z7II、Z6II、Z fc、Z9、Z8、Z30、"
                     + "Z f、Z6III、Z50II、Z5II、ZR"
-                    + "、Sony A1、A7R V、A7 IV、A7S III、A7C II"
+                    + "、Sony A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6100、A6400、A6600、A6700、FX30、ZV-E10、ZV-E10 II"
                     + "、Canon EOS R5、R6 Mark II、R3、R7、R8、R6 Mark III、R6、R5 C、R50 V";
     private static final CameraProfile[] SUPPORTED_CAMERAS = new CameraProfile[]{
             // ── Nikon EXPEED 5 ──
@@ -65,8 +65,12 @@ final class PtpCamera {
             new CameraProfile("Sony A7C R", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony ZV-E1", "Sony", 0x054c, 0x0000, 80, 102400),
             // APS-C E-mount
+            new CameraProfile("Sony A6100", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony A6400", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony A6600", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony A6700", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony FX30", "Sony", 0x054c, 0x0000, 100, 32000),
+            new CameraProfile("Sony ZV-E10", "Sony", 0x054c, 0x0000, 100, 32000),
             new CameraProfile("Sony ZV-E10 II", "Sony", 0x054c, 0x0000, 100, 32000),
             // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
             new CameraProfile("Canon EOS R1", "Canon", 0x04a9, 0x0000, 100, 102400),
@@ -2269,6 +2273,35 @@ final class PtpCamera {
         return null;
     }
 
+    /** Canonical model-name normalization shared by the incoming USB
+     *  descriptor and the registry candidates so both sides apply the same
+     *  rules: lowercase first, drop the vendor prefix, then strip separators
+     *  and whitespace before comparing. Lowercasing first keeps the vendor
+     *  removal case-insensitive for both the descriptor ("SONY ILCE-…") and
+     *  registry names ("Sony A6100"). Sony descriptor prefixes fold onto the
+     *  registry naming so ILCE-6100 -> A6100, ILME-FX30 -> FX30 and
+     *  ILCE-ZV-E10 -> ZV-E10 share one comparison domain. */
+    private static String normalizeModelName(String value, String vendorName) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        String withoutVendor = vendorName == null || vendorName.isEmpty()
+                ? lower
+                : lower.replace(vendorName.toLowerCase(Locale.ROOT), "");
+        String folded = withoutVendor
+                .replace("ilce", "a")
+                .replace("ilme", "");
+        return folded
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "");
+    }
+
+    private static String vendorNameFor(int vendorId) {
+        for (CameraProfile candidate : SUPPORTED_CAMERAS) {
+            if (candidate.vendorId == vendorId) return candidate.vendorName;
+        }
+        return null;
+    }
+
     private static CameraProfile profileFor(UsbDevice device) {
         CameraProfile byProductId = profileFor(device.getVendorId(), device.getProductId());
         if (byProductId != null) return byProductId;
@@ -2276,19 +2309,16 @@ final class PtpCamera {
         CameraProfile bestMatch = null;
         int bestMatchLength = 0;
         if (descriptor != null) {
-            String normalized = descriptor
-                    .toLowerCase(Locale.ROOT)
-                    .replace("_", "")
-                    .replace("-", "")
-                    .replace(" ", "");
+            String normalized = normalizeModelName(
+                    descriptor, vendorNameFor(device.getVendorId()));
             String generationAlias = normalized
                     .replace("iii", "3")
-                    .replace("ii", "2");
+                    .replace("ii", "2")
+                    .replace("m3", "3")
+                    .replace("m2", "2");
             for (CameraProfile candidate : SUPPORTED_CAMERAS) {
-                String candidateName = candidate.name
-                        .toLowerCase(Locale.ROOT)
-                        .replace(candidate.vendorName.toLowerCase(Locale.ROOT), "")
-                        .replace(" ", "");
+                String candidateName = normalizeModelName(
+                        candidate.name, candidate.vendorName);
                 String candidateAlias = candidateName
                         .replace("iii", "3")
                         .replace("ii", "2");

@@ -63,8 +63,12 @@ export const SUPPORTED_CAMERAS: Array<CameraProfile> = [
   new CameraProfile('Sony A7C R', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony ZV-E1', 'Sony', 0x054c, 0x0000, 80, 102400),
   // APS-C E-mount
+  new CameraProfile('Sony A6100', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony A6400', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony A6600', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony A6700', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony FX30', 'Sony', 0x054c, 0x0000, 100, 32000),
+  new CameraProfile('Sony ZV-E10', 'Sony', 0x054c, 0x0000, 100, 32000),
   new CameraProfile('Sony ZV-E10 II', 'Sony', 0x054c, 0x0000, 100, 32000),
   // ── Canon EOS R ── (Product IDs: TODO — confirm with gphoto2 --auto-detect)
   new CameraProfile('Canon EOS R1', 'Canon', 0x04a9, 0x0000, 100, 102400),

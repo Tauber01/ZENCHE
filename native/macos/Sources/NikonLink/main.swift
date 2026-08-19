@@ -227,7 +227,7 @@ private struct SupportedCamera: Equatable {
             vendorName: "Sony",
             vendorID: 0x054c,
             productID: 0x0000,
-            detectionTokens: ["sony a1 ii", "sony a1 2", "sony a1ii", "sony a1 mk2", "sony ilce-1m2"],
+            detectionTokens: ["sony a1 ii", "sony a1 2", "sony a1ii", "sony a1 mk2", "sony ilce-1m2", "sony ilce 1m2"],
             minimumISO: 100,
             maximumISO: 32000
         ),
@@ -296,6 +296,33 @@ private struct SupportedCamera: Equatable {
         ),
         // APS-C E-mount
         SupportedCamera(
+            name: "Sony A6100",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a6100", "sony a 6100", "sony ilce 6100", "sony ilce-6100", "sony a6100a", "sony ilce 6100a", "sony ilce-6100a"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A6400",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a6400", "sony a 6400", "sony ilce 6400", "sony ilce-6400", "sony a6400a", "sony ilce 6400a", "sony ilce-6400a"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
+            name: "Sony A6600",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony a6600", "sony a 6600", "sony ilce 6600", "sony ilce-6600"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
             name: "Sony A6700",
             vendorName: "Sony",
             vendorID: 0x054c,
@@ -314,11 +341,20 @@ private struct SupportedCamera: Equatable {
             maximumISO: 32000
         ),
         SupportedCamera(
+            name: "Sony ZV-E10",
+            vendorName: "Sony",
+            vendorID: 0x054c,
+            productID: 0x0000,
+            detectionTokens: ["sony zv-e10", "sony zv e10", "sony zve10", "sony ilce zve10"],
+            minimumISO: 100,
+            maximumISO: 32000
+        ),
+        SupportedCamera(
             name: "Sony ZV-E10 II",
             vendorName: "Sony",
             vendorID: 0x054c,
             productID: 0x0000,
-            detectionTokens: ["sony zv-e10 ii", "sony zv e10 ii", "sony zv-e10 2", "sony zve10 ii", "sony zve10 2", "sony zve10m2"],
+            detectionTokens: ["sony zv-e10 ii", "sony zv e10 ii", "sony zv-e10 2", "sony zve10 ii", "sony zve10 2", "sony zve10m2", "sony zv e10m2", "sony ilce zve10m2"],
             minimumISO: 100,
             maximumISO: 32000
         ),
