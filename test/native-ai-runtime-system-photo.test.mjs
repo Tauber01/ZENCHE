@@ -142,7 +142,14 @@ test("mobile system-photo and AI result states use exact runtime localization pa
       read("native/harmony/entry/src/main/ets/localization/Localization.ets"),
     ]);
 
-  assert.match(android, /private TextView text[\s\S]*?text\.setText\(tr\(value\)\)/);
+  assert.match(
+    android,
+    /private TextView text[\s\S]*?return localizedText\(tr\(value\), sp, style, color\)/,
+  );
+  assert.match(
+    android,
+    /private TextView localizedText[\s\S]*?text\.setText\(localizedValue\)/,
+  );
   assert.match(android, /private Button nativeButton[\s\S]*?button\.setText\(tr\(label\)\)/);
   assert.match(android, /setContentDescription\(\s*tr\("从系统相册选择照片并创建可编辑副本"\)\s*\)/);
   assert.match(android, /setContentDescription\(\s*tr\("将当前 AI 结果作为新照片保存到系统相册"\)\s*\)/);

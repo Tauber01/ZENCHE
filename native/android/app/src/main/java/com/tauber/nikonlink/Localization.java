@@ -520,6 +520,27 @@ final class Localization {
         add("选择文件并加入", "Choose Files to Add", "追加するファイルを選択");
         add("本地图库还是空的", "The local library is empty", "ローカルライブラリは空です");
         add("无线收件箱未开启", "Wireless inbox is off", "ワイヤレス受信箱は停止中");
+        add("收件箱已停止", "Inbox stopped", "受信箱は停止中");
+        add("Wi‑Fi 未连接", "Wi‑Fi disconnected", "Wi‑Fi 未接続");
+        add("等待 FTP / HTTP / WebDAV 图片",
+                "Waiting for FTP / HTTP / WebDAV images",
+                "FTP / HTTP / WebDAV 画像を待機中");
+        add("相机已连接，等待图片",
+                "Camera connected; waiting for images",
+                "カメラ接続済み、画像を待機中");
+        add("无线连接已断开，等待相机重连",
+                "Wireless connection lost; waiting for the camera to reconnect",
+                "ワイヤレス接続が切断されました。カメラの再接続を待機中");
+        add("等待相机无线传输",
+                "Waiting for camera wireless transfer",
+                "カメラからのワイヤレス転送を待機中");
+        add("正在通过 HTTP / WebDAV 接收 %1$s",
+                "Receiving %1$s over HTTP / WebDAV",
+                "HTTP / WebDAV で %1$s を受信中");
+        add("FTP 启动失败：", "FTP failed to start: ", "FTP の起動に失敗：");
+        add("HTTP / WebDAV 启动失败：",
+                "HTTP / WebDAV failed to start: ",
+                "HTTP / WebDAV の起動に失敗：");
         add("开启无线接收", "Start Wireless Receiver", "ワイヤレス受信を開始");
         add("停止接收", "Stop Receiving", "受信を停止");
         add("更新、诊断与支持。", "Updates, diagnostics, and support.", "アップデート、診断、サポート。");
@@ -748,6 +769,17 @@ final class Localization {
         add("个文件", "files", "件");
         add("文件库", "Library", "ライブラリ");
         add("所有文件", "All Files", "すべてのファイル");
+        add("%1$d 个帧澈 ZENCHE 文件 · %2$d 个系统相册项目",
+                "%1$d ZENCHE files · %2$d system album items",
+                "ZENCHE ファイル %1$d 件 · システムアルバム %2$d 項目");
+        add("%1$d 个文件", "%1$d files", "%1$d 件");
+        add("%1$d 个项目", "%1$d items", "%1$d 項目");
+        add("%1$d 个根分支 · %2$d 个未分类文件",
+                "%1$d root projects · %2$d unclassified files",
+                "ルートプロジェクト %1$d 件 · 未分類ファイル %2$d 件");
+        add("%1$d 个项目 · 来源：系统相册",
+                "%1$d items · Source: System Album",
+                "%1$d 項目 · ソース：システムアルバム");
         add("搜索文件名", "Search file names", "ファイル名を検索");
         add("全部", "All", "すべて");
         add("最近", "Recent", "最近");
@@ -759,6 +791,58 @@ final class Localization {
         add("来源：相机", "Source: Camera", "ソース：カメラ");
         add("来源：无线传输", "Source: Wireless Transfer", "ソース：ワイヤレス転送");
         add("来源：系统相册", "Source: System Album", "ソース：システムアルバム");
+        add("移动到项目", "Move to Project", "プロジェクトに移動");
+        add("在 %1$s 下新建分支",
+                "Create a branch under %1$s",
+                "%1$s の下にブランチを作成");
+        add("删除分支 %1$s", "Delete branch %1$s", "ブランチ %1$s を削除");
+        add("将在“%1$s”下创建可继续展开的节点。",
+                "Create an expandable node under \"%1$s\".",
+                "「%1$s」の下に展開可能なノードを作成します。");
+        add("将同时删除“%1$s”下的子分支；其中的文件会回到“未分类”，原文件不受影响。",
+                "Delete the child branches under \"%1$s\" as well. Their files return to Unclassified; original files are unchanged.",
+                "「%1$s」の子ブランチも削除します。ファイルは未分類に戻り、元ファイルは変更されません。");
+        add("已移到项目", "Moved to project", "プロジェクトに移動しました");
+        add("已移到未分类", "Moved to unclassified", "未分類に移動しました");
+        add("显示更多", "Show More", "さらに表示");
+        add("显示更多（剩余 %1$d 个文件）",
+                "Show more (%1$d remaining)",
+                "さらに表示（残り %1$d 件）");
+        add("收起列表", "Collapse List", "リストを折りたたむ");
+        add("更多操作", "More Actions", "その他の操作");
+        add("预览：%1$s", "Preview: %1$s", "プレビュー：%1$s");
+        add("更多操作：%1$s", "More actions: %1$s", "その他の操作：%1$s");
+        add("播放：%1$s", "Play: %1$s", "再生：%1$s");
+        add("查看：%1$s", "View: %1$s", "表示：%1$s");
+        add("点击播放视频", "Tap to play video", "タップして動画を再生");
+        add("点击查看大图", "Tap to view full size", "タップして大きく表示");
+        add("上一页", "Previous", "前へ");
+        add("下一页", "Next", "次へ");
+        add("第 %1$d / %2$d 页", "Page %1$d of %2$d", "%1$d / %2$d ページ");
+        add("暂无%1$s", "No %1$s", "%1$sはありません");
+        add("%1$s 已用 / %2$s", "%1$s used / %2$s", "%1$s 使用済み / %2$s");
+        add("正在下载 %1$s", "Downloading %1$s", "ダウンロード中 %1$s");
+        add("已下载 %1$s 个文件到 ZENCHE 文件库",
+                "Downloaded %1$s files to the ZENCHE library",
+                "%1$s 件を ZENCHE ライブラリにダウンロードしました");
+        add("已从相机删除 %1$s 个文件",
+                "Deleted %1$s files from the camera",
+                "カメラから %1$s 件を削除しました");
+        add("已接收 %1$s", "Received %1$s", "%1$s を受信しました");
+        add("去拍摄", "Go to Capture", "撮影へ");
+        add("已选择", "Selected", "選択済み");
+        add("未选择", "Not selected", "未選択");
+        add("筛选", "Filter", "フィルター");
+        add("排序", "Sort", "並び順");
+        add("导出", "Export", "書き出す");
+        add("导出副本", "Export Copy", "コピーを書き出す");
+        add("删除文件？", "Delete file?", "ファイルを削除しますか？");
+        add("将永久删除所选文件，此操作无法撤销。",
+                "The selected file will be permanently deleted. This cannot be undone.",
+                "選択したファイルは完全に削除され、元に戻せません。");
+        add("拍摄新照片，或连接相机后下载到文件库。",
+                "Capture new photos, or connect a camera and download them to the library.",
+                "新しい写真を撮影するか、カメラに接続してライブラリにダウンロードしてください。");
         add("还没有文件\n拍摄新照片、从相机下载，或从系统相册导入。",
                 "No files yet\nCapture new photos, download from the camera, or import from the system album.",
                 "ファイルはまだありません\n新しい写真を撮影するか、カメラからダウンロードするか、システムアルバムから読み込んでください。");
@@ -879,11 +963,16 @@ final class Localization {
         add("正在读取存储卡…", "Reading camera card…", "カメラ内カードを読み込み中…");
         add("读取完成", "Ready", "読み込み完了");
         add("读取失败", "Unable to read storage", "ストレージを読み込めません");
+        add("下载失败", "Download failed", "ダウンロードに失敗しました");
+        add("删除失败", "Delete failed", "削除に失敗しました");
         add("全选", "Select All", "すべて選択");
         add("取消全选", "Deselect All", "すべての選択を解除");
         add("下载到 ZENCHE", "Download to ZENCHE", "ZENCHE へダウンロード");
         add("从相机删除", "Delete from Camera", "カメラから削除");
         add("从相机永久删除？", "Permanently delete from camera?", "カメラから完全に削除しますか？");
+        add("将从相机存储卡永久删除所选 %1$d 个文件；此操作无法撤销。已保护文件不会被选择。",
+                "Permanently delete the selected %1$d files from the camera card? This cannot be undone. Protected files are not selected.",
+                "選択した %1$d 件をカメラのカードから完全に削除します。この操作は取り消せません。保護されたファイルは選択されません。");
         add("永久删除", "Delete Permanently", "完全に削除");
         add("此操作无法撤销；已保护文件不会被选择。", "This cannot be undone. Protected files are not selected.", "この操作は取り消せません。保護されたファイルは選択されません。");
         add("正在下载", "Downloading", "ダウンロード中");
@@ -891,6 +980,7 @@ final class Localization {
         add("正在从相机删除…", "Deleting from camera…", "カメラから削除中…");
         add("已从相机删除", "Deleted from camera", "カメラから削除しました");
         add("受保护", "Protected", "保護済み");
+        add("已保护", "Protected", "保護済み");
         add("传输", "Transfer", "転送");
         add("对焦", "Focus", "フォーカス");
         add("色轮", "Color Wheels", "カラーホイール");

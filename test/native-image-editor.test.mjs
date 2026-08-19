@@ -682,10 +682,11 @@ test("mobile project categories default to collapsed progressive disclosure", as
   assert.match(ios, /DisclosureGroup\(isExpanded: \$projectCategoriesExpanded\)/);
   assert.match(ios, /Label\("项目分类", systemImage: "folder"\)/);
 
-  assert.match(
-    android,
-    /collapsibleGroup\(\s*"project-categories",[\s\S]{0,200}?false\)\)/,
+  const androidProjectCategories = android.slice(
+    android.indexOf('collapsibleGroupLocalizedLazy(\n                "project-categories"'),
+    android.indexOf('collapsibleGroupLocalizedLazy(\n                "project-categories"') + 1_800,
   );
+  assert.match(androidProjectCategories, /false\)\);/);
 
   assert.match(harmony, /projectCategoriesExpanded: boolean = false/);
   assert.match(harmony, /› \$\{|\$\{this\.projectCategoriesExpanded/);

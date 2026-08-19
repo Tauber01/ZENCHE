@@ -66,7 +66,7 @@ test("Harmony editor download statuses stay localized in English and Japanese", 
 
   assert.match(
     harmony,
-    /this\.showError\(\s*this\.tr\(`保存编辑副本失败：\$\{\(error as BusinessError\)\.message\}`\)\s*\)/,
+    /this\.showError\(\s*this\.trf\(\s*'保存编辑副本失败：\{0\}',\s*\[\(error as BusinessError\)\.message\]/,
   );
   assert.match(localization, /'已保存编辑副本',[\s\S]{0,100}?'Saved edited copy',[\s\S]{0,100}?'編集したコピーを保存しました'/);
   assert.match(localization, /'保存编辑副本失败',[\s\S]{0,120}?'Failed to save the edited copy',[\s\S]{0,120}?'編集したコピーの保存に失敗しました'/);
@@ -306,14 +306,21 @@ test("iOS coordinates provider verification and exposes export results accessibl
     ios,
     /Task\.detached\(priority: \.utility\)[\s\S]{0,900}?NSFileCoordinator\(filePresenter: nil\)[\s\S]{0,400}?coordinate\(/,
   );
-  assert.match(
-    ios,
-    /private struct LibraryPage: View[\s\S]{0,12500}?@State private var localExportResult: String\?[\s\S]{0,12500}?model\.statusMessage = result[\s\S]{0,1200}?\.alert\(/,
+  const libraryPage = ios.slice(
+    ios.indexOf("private struct LibraryPage: View"),
+    ios.indexOf("private struct CameraStorageItemRow: View")
   );
-  assert.match(
-    ios,
-    /private struct LibraryLargePhotoView: View[\s\S]{0,6500}?ViewThatFits\(in: \.horizontal\)[\s\S]{0,6500}?localExportResult = result[\s\S]{0,1200}?\.alert\(/,
+  assert.match(libraryPage, /@State private var localExportResult: String\?/);
+  assert.match(libraryPage, /model\.statusMessage = result/);
+  assert.match(libraryPage, /\.alert\(/);
+
+  const largePhotoView = ios.slice(
+    ios.indexOf("private struct LibraryLargePhotoView: View"),
+    ios.indexOf("private struct LibraryThumbnail: View")
   );
+  assert.match(largePhotoView, /ViewThatFits\(in: \.horizontal\)/);
+  assert.match(largePhotoView, /localExportResult = result/);
+  assert.match(largePhotoView, /\.alert\(/);
   for (const label of ["关闭", "编辑", "下载到本地", "分享到社交平台"]) {
     assert.match(ios, new RegExp(`accessibilityLabel\\(\"${label}\"\\)`));
   }

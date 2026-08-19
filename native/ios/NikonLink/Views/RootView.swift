@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import CoreImage
 import Foundation
+import ImageIO
 import Photos
 import Security
 import SwiftUI
@@ -5282,7 +5283,7 @@ private struct ControlTopBar: View {
                 Button {
                     model.section = .library
                 } label: {
-                    Label("分支", systemImage: AppSection.library.icon)
+                    Label("文件", systemImage: AppSection.library.icon)
                 }
             } label: {
                 controlBarButton("line.3.horizontal")
@@ -5798,7 +5799,7 @@ private struct ControlCaptureDock: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(Text("分支"))
+        .accessibilityLabel(Text("文件"))
     }
 
     private var afOnButton: some View {
@@ -8776,7 +8777,11 @@ private final class LibraryBranchStore: ObservableObject {
             [String: UUID].self,
             from: data
         ) {
-            assignments = saved
+            let validIDs = allBranchIDs(in: branches)
+            assignments = saved.filter { validIDs.contains($0.value) }
+            if assignments.count != saved.count {
+                persistAssignments()
+            }
         }
     }
 
@@ -8807,11 +8812,16 @@ private final class LibraryBranchStore: ObservableObject {
     }
 
     func branchID(for itemID: String) -> UUID? {
-        assignments[itemID]
+        guard let branchID = assignments[itemID],
+              allBranchIDs(in: branches).contains(branchID)
+        else {
+            return nil
+        }
+        return branchID
     }
 
     func assign(_ itemID: String, to branchID: UUID?) {
-        if let branchID {
+        if let branchID, allBranchIDs(in: branches).contains(branchID) {
             assignments[itemID] = branchID
             expandedIDs.insert(branchID)
         } else {
@@ -8873,6 +8883,14 @@ private final class LibraryBranchStore: ObservableObject {
         }
     }
 
+    private func allBranchIDs(
+        in branches: [UserLibraryBranch]
+    ) -> Set<UUID> {
+        branches.reduce(into: Set<UUID>()) { ids, branch in
+            ids.formUnion(branchIDs(in: branch))
+        }
+    }
+
     private func persist() {
         guard let data = try? JSONEncoder().encode(branches) else { return }
         UserDefaults.standard.set(data, forKey: Self.storageKey)
@@ -8885,6 +8903,7 @@ private final class LibraryBranchStore: ObservableObject {
 }
 
 private struct LibraryBranchRow: View {
+    @Environment(\.locale) private var locale
     @ObservedObject var store: LibraryBranchStore
     let branch: UserLibraryBranch
     let depth: Int
@@ -8917,18 +8936,30 @@ private struct LibraryBranchRow: View {
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
                         Spacer()
-                        Text("\(assignedItems.count) 文件")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(IPalette.muted)
+                        Text(
+                            RuntimeLocalization.format(
+                                "%lld 文件",
+                                locale: locale,
+                                Int64(assignedItems.count)
+                            )
+                        )
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(IPalette.muted)
                     }
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(
-                    store.expandedIDs.contains(branch.id)
-                        ? "收起 \(branch.name)"
-                        : "展开 \(branch.name)"
+                    Text(
+                        RuntimeLocalization.format(
+                            store.expandedIDs.contains(branch.id)
+                                ? "收起 %@"
+                                : "展开 %@",
+                            locale: locale,
+                            branch.name
+                        )
+                    )
                 )
                 Button {
                     addChild(branch)
@@ -8937,7 +8968,15 @@ private struct LibraryBranchRow: View {
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("在 \(branch.name) 下新建分支")
+                .accessibilityLabel(
+                    Text(
+                        RuntimeLocalization.format(
+                            "在 %@ 下新建分支",
+                            locale: locale,
+                            branch.name
+                        )
+                    )
+                )
                 Button(role: .destructive) {
                     deleteBranch(branch)
                 } label: {
@@ -8945,7 +8984,15 @@ private struct LibraryBranchRow: View {
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("删除分支 \(branch.name)")
+                .accessibilityLabel(
+                    Text(
+                        RuntimeLocalization.format(
+                            "删除分支 %@",
+                            locale: locale,
+                            branch.name
+                        )
+                    )
+                )
             }
             .frame(minHeight: 52)
             .padding(.leading, CGFloat(depth) * SpaceToken.s16)
@@ -9087,6 +9134,141 @@ private struct LibraryBranchFileRow: View {
     }
 }
 
+private final class LibraryThumbnailBox: NSObject, @unchecked Sendable {
+    let image: CGImage
+    let cost: Int
+
+    init(image: CGImage) {
+        self.image = image
+        cost = image.bytesPerRow * image.height
+    }
+}
+
+private final class LibraryThumbnailCache: @unchecked Sendable {
+    static let shared = LibraryThumbnailCache()
+
+    private let cache = NSCache<NSString, LibraryThumbnailBox>()
+
+    private init() {
+        cache.countLimit = 96
+        cache.totalCostLimit = 48 * 1_024 * 1_024
+    }
+
+    func thumbnail(
+        at url: URL,
+        identity: String,
+        maxPixelSize: Int
+    ) async -> CGImage? {
+        let key = identity as NSString
+        if let cached = cache.object(forKey: key) {
+            return cached.image
+        }
+
+        return await Task.detached(priority: .utility) { [self] in
+            guard !Task.isCancelled else { return nil }
+            let sourceOptions: [CFString: Any] = [
+                kCGImageSourceShouldCache: false
+            ]
+            guard let source = CGImageSourceCreateWithURL(
+                url as CFURL,
+                sourceOptions as CFDictionary
+            ) else {
+                return nil
+            }
+            let thumbnailOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+            ]
+            guard !Task.isCancelled,
+                  let image = CGImageSourceCreateThumbnailAtIndex(
+                      source,
+                      0,
+                      thumbnailOptions as CFDictionary
+                  )
+            else {
+                return nil
+            }
+            let box = LibraryThumbnailBox(image: image)
+            cache.setObject(box, forKey: key, cost: box.cost)
+            return image
+        }.value
+    }
+}
+
+private struct LibraryFileThumbnail: View {
+    let item: LibraryItem
+
+    @Environment(\.displayScale) private var displayScale
+    @State private var thumbnail: UIImage?
+    @State private var representedIdentity: String?
+
+    private let width: CGFloat = 76
+    private let height: CGFloat = 54
+
+    private var maxPixelSize: Int {
+        max(1, Int(ceil(max(width, height) * displayScale)))
+    }
+
+    private var requestIdentity: String {
+        [
+            item.url.path,
+            String(item.modifiedAt.timeIntervalSinceReferenceDate.bitPattern),
+            String(maxPixelSize)
+        ].joined(separator: "|")
+    }
+
+    var body: some View {
+        Group {
+            if item.isVideo {
+                ZStack {
+                    IPalette.graphite
+                    Image(systemName: "play.fill")
+                        .foregroundStyle(.white)
+                }
+            } else if let thumbnail {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    IPalette.paperSecondary
+                    Image(systemName: "photo")
+                        .foregroundStyle(IPalette.cobalt)
+                }
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
+        .task(id: requestIdentity) {
+            let identity = requestIdentity
+            representedIdentity = identity
+            thumbnail = nil
+            guard !item.isVideo else { return }
+            let image = await LibraryThumbnailCache.shared.thumbnail(
+                at: item.url,
+                identity: identity,
+                maxPixelSize: maxPixelSize
+            )
+            guard !Task.isCancelled,
+                  representedIdentity == identity,
+                  let image
+            else {
+                return
+            }
+            thumbnail = UIImage(
+                cgImage: image,
+                scale: displayScale,
+                orientation: .up
+            )
+        }
+        .onDisappear {
+            representedIdentity = nil
+        }
+    }
+}
+
 private enum LibraryFileFilter: String, CaseIterable, Identifiable {
     case all = "全部"
     case photos = "照片"
@@ -9100,6 +9282,94 @@ private enum LibraryFileSort: String, CaseIterable, Identifiable {
     case name = "名称"
 
     var id: String { rawValue }
+}
+
+private enum CameraStorageStatus {
+    case connectionHint
+    case connectFirst
+    case reading
+    case readComplete(Int)
+    case readFailed(String)
+    case downloading(current: Int, total: Int, filename: String)
+    case downloaded(Int)
+    case downloadFailed(String)
+    case deleting
+    case deleted(Int)
+    case deleteFailed(String)
+
+    func text(locale: Locale) -> String {
+        switch self {
+        case .connectionHint:
+            return RuntimeLocalization.text(
+                "连接 Wi‑Fi/PTP‑IP 相机后可浏览存储卡",
+                locale: locale
+            )
+        case .connectFirst:
+            return RuntimeLocalization.text(
+                "请先连接 Wi‑Fi/PTP‑IP 相机",
+                locale: locale
+            )
+        case .reading:
+            return RuntimeLocalization.text(
+                "正在读取存储卷与文件信息…",
+                locale: locale
+            )
+        case .readComplete(let count):
+            return RuntimeLocalization.format(
+                "读取完成 · %lld 个文件",
+                locale: locale,
+                Int64(count)
+            )
+        case .readFailed(let message):
+            return RuntimeLocalization.format(
+                "读取失败 · %@",
+                locale: locale,
+                message
+            )
+        case .downloading(let current, let total, let filename):
+            return RuntimeLocalization.format(
+                "正在下载 %lld / %lld · %@",
+                locale: locale,
+                Int64(current),
+                Int64(total),
+                filename
+            )
+        case .downloaded(let count):
+            return RuntimeLocalization.format(
+                "已下载 %lld 个文件到 ZENCHE 文件库",
+                locale: locale,
+                Int64(count)
+            )
+        case .downloadFailed(let message):
+            return RuntimeLocalization.format(
+                "下载失败 · %@",
+                locale: locale,
+                message
+            )
+        case .deleting:
+            return RuntimeLocalization.text(
+                "正在从相机删除…",
+                locale: locale
+            )
+        case .deleted(let count):
+            return RuntimeLocalization.format(
+                "已从相机删除 %lld 个文件",
+                locale: locale,
+                Int64(count)
+            )
+        case .deleteFailed(let message):
+            return RuntimeLocalization.format(
+                "删除失败 · %@",
+                locale: locale,
+                message
+            )
+        }
+    }
+}
+
+private struct LibraryBranchChoice: Identifiable {
+    let id: UUID
+    let title: String
 }
 
 private struct LibraryPage: View {
@@ -9118,6 +9388,9 @@ private struct LibraryPage: View {
     @State private var allFilesQuery = ""
     @State private var allFilesFilter: LibraryFileFilter = .all
     @State private var allFilesSort: LibraryFileSort = .recent
+    @State private var allFilesVisibleLimit = 12
+    @State private var libraryActionMessage = ""
+    @State private var libraryActionFailed = false
     @State private var itemPendingDeletion: LibraryItem?
     @State private var previewItem: LibraryItem?
     @State private var localExportRequest: LocalFileExportRequest?
@@ -9125,19 +9398,19 @@ private struct LibraryPage: View {
     @State private var systemPreviewItem: SystemAlbumItem?
     @State private var systemAlbumItems: [SystemAlbumItem] = []
     @State private var systemAlbumStatus = "正在读取系统相册…"
-    @State private var systemAlbumExpanded = true
+    @State private var systemAlbumExpanded = false
     @State private var systemPhotosExpanded = true
     @State private var systemVideosExpanded = true
-    @State private var wirelessExpanded = true
+    @State private var wirelessExpanded = false
     @State private var uncategorizedExpanded = true
     @State private var localPhotosExpanded = true
     @State private var localVideosExpanded = true
     @State private var unclassifiedDropTargeted = false
     @State private var cameraStorageSnapshot = CameraStorageSnapshot.empty
     @State private var selectedCameraStorageHandles: Set<UInt32> = []
-    @State private var cameraStorageStatus = "连接 Wi‑Fi/PTP‑IP 相机后可浏览存储卡"
+    @State private var cameraStorageStatus = CameraStorageStatus.connectionHint
     @State private var cameraStorageBusy = false
-    @State private var cameraStorageExpanded = true
+    @State private var cameraStorageExpanded = false
     @State private var confirmingCameraStorageDeletion = false
     // ── E6 1.5.9：延时合成视频（帧多选 + 帧率/编码 + 进度/取消）──
     @State private var showingTimelapseComposer = false
@@ -9150,7 +9423,11 @@ private struct LibraryPage: View {
                 HStack {
                     PageTitle(
                         title: "文件库",
-                        subtitle: "\(model.library.items.count) 个本地文件 · 拖动整理，不改动原文件"
+                        subtitle: RuntimeLocalization.format(
+                            "%lld 个本地文件 · 拖动整理，不改动原文件",
+                            locale: locale,
+                            Int64(model.library.items.count)
+                        )
                     )
                     Spacer()
                     Button {
@@ -9168,7 +9445,20 @@ private struct LibraryPage: View {
                 }
 
                 allFilesSection
-                moreToolsSection
+                if !libraryActionMessage.isEmpty {
+                    Label(
+                        libraryActionMessage,
+                        systemImage: libraryActionFailed
+                            ? "exclamationmark.triangle.fill"
+                            : "checkmark.circle.fill"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(
+                        libraryActionFailed ? IPalette.video : IPalette.positive
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(Text(libraryActionMessage))
+                }
                 branchWorkspace
                 cameraStorageWorkspace
                 DisclosureGroup(isExpanded: $wirelessExpanded) {
@@ -9181,8 +9471,22 @@ private struct LibraryPage: View {
                         )
                         .font(.headline)
                         Text(
-                            "Wi‑Fi 相机\(model.wifiCamera.isConnected ? "已连接" : "未连接") · " +
-                                "收件箱\(model.wireless.isRunning ? "运行中" : "已停止")"
+                            RuntimeLocalization.format(
+                                "Wi‑Fi 相机%@ · 收件箱%@",
+                                locale: locale,
+                                RuntimeLocalization.text(
+                                    model.wifiCamera.isConnected
+                                        ? "已连接"
+                                        : "未连接",
+                                    locale: locale
+                                ),
+                                RuntimeLocalization.text(
+                                    model.wireless.isRunning
+                                        ? "运行中"
+                                        : "已停止",
+                                    locale: locale
+                                )
+                            )
                         )
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
@@ -9191,7 +9495,6 @@ private struct LibraryPage: View {
                             .foregroundStyle(IPalette.muted)
                     }
                 }
-
                 DisclosureGroup(isExpanded: $systemAlbumExpanded) {
                     if systemAlbumItems.isEmpty {
                         ContentUnavailableView(
@@ -9203,13 +9506,23 @@ private struct LibraryPage: View {
                         .frame(minHeight: 180)
                     } else {
                         DisclosureGroup(
-                            "照片 · \(systemAlbumItems.filter { !$0.isVideo }.count)",
+                            RuntimeLocalization.format(
+                                "照片 · %lld",
+                                locale: locale,
+                                Int64(
+                                    systemAlbumItems.filter { !$0.isVideo }.count
+                                )
+                            ),
                             isExpanded: $systemPhotosExpanded
                         ) {
                             systemAlbumGrid(systemAlbumItems.filter { !$0.isVideo })
                         }
                         DisclosureGroup(
-                            "视频 · \(systemAlbumItems.filter(\.isVideo).count)",
+                            RuntimeLocalization.format(
+                                "视频 · %lld",
+                                locale: locale,
+                                Int64(systemAlbumItems.filter(\.isVideo).count)
+                            ),
                             isExpanded: $systemVideosExpanded
                         ) {
                             systemAlbumGrid(systemAlbumItems.filter(\.isVideo))
@@ -9221,7 +9534,11 @@ private struct LibraryPage: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
                         Label(
-                            "系统相册 · \(systemAlbumItems.count)",
+                            RuntimeLocalization.format(
+                                "系统相册 · %lld",
+                                locale: locale,
+                                Int64(systemAlbumItems.count)
+                            ),
                             systemImage: "photo.on.rectangle"
                         )
                         .font(.headline)
@@ -9230,6 +9547,7 @@ private struct LibraryPage: View {
                             .foregroundStyle(IPalette.muted)
                     }
                 }
+                moreToolsSection
 
             }
             .padding(SpaceToken.s20)
@@ -9287,7 +9605,13 @@ private struct LibraryPage: View {
                 ).isEmpty
             )
         } message: {
-            Text("将在“\(branchParentName)”下创建可继续展开的节点。")
+            Text(
+                RuntimeLocalization.format(
+                    "将在“%@”下创建可继续展开的节点。",
+                    locale: locale,
+                    branchParentName
+                )
+            )
         }
         .confirmationDialog(
             "删除分支？",
@@ -9312,7 +9636,11 @@ private struct LibraryPage: View {
             }
         } message: {
             Text(
-                "将同时删除“\(branchPendingDeletion?.name ?? "")”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"
+                RuntimeLocalization.format(
+                    "将同时删除“%@”下的子分支；其中的文件会回到“未分类”，原文件不受影响。",
+                    locale: locale,
+                    branchPendingDeletion?.name ?? ""
+                )
             )
         }
         .confirmationDialog(
@@ -9350,7 +9678,11 @@ private struct LibraryPage: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text(
-                "将从相机存储卡永久删除所选 \(selectedCameraStorageItems.count) 个文件；此操作无法撤销。已保护文件不会被选择。"
+                RuntimeLocalization.format(
+                    "将从相机存储卡永久删除所选 %lld 个文件；此操作无法撤销。已保护文件不会被选择。",
+                    locale: locale,
+                    Int64(selectedCameraStorageItems.count)
+                )
             )
         }
         .fullScreenCover(item: $previewItem) { item in
@@ -9366,8 +9698,19 @@ private struct LibraryPage: View {
                         destinationURL: destination
                     )
                     let result = matches
-                        ? "已下载到本地 · \(destination.lastPathComponent)"
-                        : "下载到本地失败：下载文件大小校验失败"
+                        ? RuntimeLocalization.format(
+                            "已下载到本地 · %@",
+                            locale: locale,
+                            destination.lastPathComponent
+                        )
+                        : RuntimeLocalization.format(
+                            "下载到本地失败：%@",
+                            locale: locale,
+                            RuntimeLocalization.text(
+                                "下载文件大小校验失败",
+                                locale: locale
+                            )
+                        )
                     model.library.message = result
                     model.statusMessage = result
                     localExportResult = result
@@ -9383,7 +9726,7 @@ private struct LibraryPage: View {
         ) {
             Button("好") { localExportResult = nil }
         } message: {
-            Text(RuntimeLocalization.text(localExportResult ?? "", locale: locale))
+            Text(localExportResult ?? "")
         }
         .fullScreenCover(item: $systemPreviewItem) { item in
             SystemAlbumPreviewView(item: item)
@@ -9519,7 +9862,7 @@ private struct LibraryPage: View {
                     }
                 }
 
-                Text(cameraStorageStatus)
+                Text(cameraStorageStatus.text(locale: locale))
                     .font(.caption.monospaced())
                     .foregroundStyle(IPalette.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -9528,7 +9871,11 @@ private struct LibraryPage: View {
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Label(
-                    "相机机内存储 · \(cameraStorageSnapshot.items.count)",
+                    RuntimeLocalization.format(
+                        "相机机内存储 · %lld",
+                        locale: locale,
+                        Int64(cameraStorageSnapshot.items.count)
+                    ),
                     systemImage: "externaldrive.fill"
                 )
                 .font(.headline)
@@ -9550,11 +9897,18 @@ private struct LibraryPage: View {
 
     private var cameraStorageCapacitySummary: String {
         let capacity = cameraStorageSnapshot.capacityBytes
-        guard capacity > 0 else { return cameraStorageStatus }
+        guard capacity > 0 else {
+            return cameraStorageStatus.text(locale: locale)
+        }
         let used = capacity >= cameraStorageSnapshot.freeBytes
             ? capacity - cameraStorageSnapshot.freeBytes
             : 0
-        return "\(formatCameraStorageBytes(used)) 已用 / \(formatCameraStorageBytes(capacity))"
+        return RuntimeLocalization.format(
+            "%@ 已用 / %@",
+            locale: locale,
+            formatCameraStorageBytes(used),
+            formatCameraStorageBytes(capacity)
+        )
     }
 
     private func formatCameraStorageBytes(_ bytes: UInt64) -> String {
@@ -9567,11 +9921,11 @@ private struct LibraryPage: View {
     @MainActor
     private func refreshCameraStorage() async {
         guard model.wifiCamera.isConnected, !cameraStorageBusy else {
-            cameraStorageStatus = "请先连接 Wi‑Fi/PTP‑IP 相机"
+            cameraStorageStatus = .connectFirst
             return
         }
         cameraStorageBusy = true
-        cameraStorageStatus = "正在读取存储卷与文件信息…"
+        cameraStorageStatus = .reading
         defer { cameraStorageBusy = false }
         do {
             let snapshot = try await model.wifiCamera.listStorage()
@@ -9579,10 +9933,13 @@ private struct LibraryPage: View {
             selectedCameraStorageHandles.formIntersection(
                 Set(snapshot.items.map(\.handle))
             )
-            cameraStorageStatus = "读取完成 · \(snapshot.items.count) 个文件"
+            cameraStorageStatus = .readComplete(snapshot.items.count)
         } catch {
-            cameraStorageStatus = "读取失败 · \(error.localizedDescription)"
-            DiagnosticLogger.shared.error("camera-storage", cameraStorageStatus)
+            cameraStorageStatus = .readFailed(error.localizedDescription)
+            DiagnosticLogger.shared.error(
+                "camera-storage",
+                cameraStorageStatus.text(locale: locale)
+            )
         }
     }
 
@@ -9594,8 +9951,11 @@ private struct LibraryPage: View {
         defer { cameraStorageBusy = false }
         do {
             for (index, item) in selected.enumerated() {
-                cameraStorageStatus =
-                    "正在下载 \(index + 1) / \(selected.count) · \(item.filename)"
+                cameraStorageStatus = .downloading(
+                    current: index + 1,
+                    total: selected.count,
+                    filename: item.filename
+                )
                 let data = try await model.wifiCamera.storageObject(
                     handle: item.handle
                 )
@@ -9608,10 +9968,13 @@ private struct LibraryPage: View {
                 }
             }
             selectedCameraStorageHandles.removeAll()
-            cameraStorageStatus = "已下载 \(selected.count) 个文件到 ZENCHE 文件库"
+            cameraStorageStatus = .downloaded(selected.count)
         } catch {
-            cameraStorageStatus = "下载失败 · \(error.localizedDescription)"
-            DiagnosticLogger.shared.error("camera-storage", cameraStorageStatus)
+            cameraStorageStatus = .downloadFailed(error.localizedDescription)
+            DiagnosticLogger.shared.error(
+                "camera-storage",
+                cameraStorageStatus.text(locale: locale)
+            )
         }
     }
 
@@ -9620,7 +9983,7 @@ private struct LibraryPage: View {
         let selected = selectedCameraStorageItems
         guard !selected.isEmpty, !cameraStorageBusy else { return }
         cameraStorageBusy = true
-        cameraStorageStatus = "正在从相机删除…"
+        cameraStorageStatus = .deleting
         do {
             for item in selected {
                 try await model.wifiCamera.deleteStorageObject(
@@ -9629,12 +9992,15 @@ private struct LibraryPage: View {
             }
             selectedCameraStorageHandles.removeAll()
             cameraStorageBusy = false
-            cameraStorageStatus = "已从相机删除 \(selected.count) 个文件"
+            cameraStorageStatus = .deleted(selected.count)
             await refreshCameraStorage()
         } catch {
             cameraStorageBusy = false
-            cameraStorageStatus = "删除失败 · \(error.localizedDescription)"
-            DiagnosticLogger.shared.error("camera-storage", cameraStorageStatus)
+            cameraStorageStatus = .deleteFailed(error.localizedDescription)
+            DiagnosticLogger.shared.error(
+                "camera-storage",
+                cameraStorageStatus.text(locale: locale)
+            )
         }
     }
 
@@ -9670,13 +10036,20 @@ private struct LibraryPage: View {
             .frame(minHeight: 44)
 
             if model.library.items.isEmpty {
-                ContentUnavailableView(
-                    "文件库为空",
-                    systemImage: "photo.on.rectangle",
-                    description: Text("拍摄新照片、从相机下载，或从系统相册导入。")
-                )
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 180)
+                VStack(spacing: SpaceToken.s12) {
+                    ContentUnavailableView(
+                        "文件库为空",
+                        systemImage: "photo.on.rectangle",
+                        description: Text("拍摄新照片，或连接相机后下载到文件库。")
+                    )
+                    Button {
+                        model.section = .capture
+                    } label: {
+                        Label("去拍摄", systemImage: "camera")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, minHeight: 180)
             } else if visibleAllFiles.isEmpty {
                 ContentUnavailableView(
                     "没有匹配的文件",
@@ -9687,9 +10060,25 @@ private struct LibraryPage: View {
                 .frame(minHeight: 150)
             } else {
                 LazyVStack(spacing: SpaceToken.s8) {
-                    ForEach(visibleAllFiles) { item in
+                    ForEach(displayedAllFiles) { item in
                         allFileRow(item)
                     }
+                }
+                if displayedAllFiles.count < visibleAllFiles.count {
+                    Button {
+                        allFilesVisibleLimit += 12
+                    } label: {
+                        Label("显示更多", systemImage: "chevron.down")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(minHeight: 44)
+                } else if visibleAllFiles.count > 12 {
+                    Button("收起列表") {
+                        allFilesVisibleLimit = 12
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                 }
             }
         }
@@ -9702,31 +10091,20 @@ private struct LibraryPage: View {
             RoundedRectangle(cornerRadius: RadiusToken.r18)
                 .stroke(IPalette.rule, lineWidth: 1)
         }
+        .onChange(of: allFilesQuery) { _, _ in
+            allFilesVisibleLimit = 12
+        }
+        .onChange(of: allFilesFilter) { _, _ in
+            allFilesVisibleLimit = 12
+        }
+        .onChange(of: allFilesSort) { _, _ in
+            allFilesVisibleLimit = 12
+        }
     }
 
     private func allFileRow(_ item: LibraryItem) -> some View {
         HStack(spacing: SpaceToken.s12) {
-            Group {
-                if item.isVideo {
-                    ZStack {
-                        IPalette.graphite
-                        Image(systemName: "play.fill")
-                            .foregroundStyle(.white)
-                    }
-                } else if let image = UIImage(contentsOfFile: item.url.path) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ZStack {
-                        IPalette.paperSecondary
-                        Image(systemName: "photo")
-                            .foregroundStyle(IPalette.cobalt)
-                    }
-                }
-            }
-            .frame(width: 76, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
+            LibraryFileThumbnail(item: item)
 
             VStack(alignment: .leading, spacing: SpaceToken.s4) {
                 Text(item.filename)
@@ -9754,31 +10132,59 @@ private struct LibraryPage: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("预览 \(item.filename)")
+            .accessibilityLabel(
+                Text(
+                    RuntimeLocalization.format(
+                        "预览 %@",
+                        locale: locale,
+                        item.filename
+                    )
+                )
+            )
 
-            Button {
-                beginLocalExport(item)
+            Menu {
+                Button {
+                    beginLocalExport(item)
+                } label: {
+                    Label("导出副本", systemImage: "arrow.down.to.line")
+                }
+                ShareLink(item: item.url) {
+                    Label("分享", systemImage: "square.and.arrow.up")
+                }
+                Menu {
+                    Button {
+                        moveLibraryItem(item, to: nil)
+                    } label: {
+                        Label("未分类", systemImage: "tray")
+                    }
+                    ForEach(libraryBranchChoices) { choice in
+                        Button(choice.title) {
+                            moveLibraryItem(item, to: choice.id)
+                        }
+                    }
+                } label: {
+                    Label("移动到项目", systemImage: "folder")
+                }
+                Divider()
+                Button(role: .destructive) {
+                    itemPendingDeletion = item
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
             } label: {
-                Image(systemName: "arrow.down.to.line")
+                Image(systemName: "ellipsis.circle")
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("下载到本地 \(item.filename)")
-
-            ShareLink(item: item.url) {
-                Image(systemName: "square.and.arrow.up")
-                    .frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("分享 \(item.filename)")
-
-            Button(role: .destructive) {
-                itemPendingDeletion = item
-            } label: {
-                Image(systemName: "trash")
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("删除 \(item.filename)")
+            .accessibilityLabel(
+                Text(
+                    RuntimeLocalization.format(
+                        "更多操作 %@",
+                        locale: locale,
+                        item.filename
+                    )
+                )
+            )
         }
         .padding(SpaceToken.s8)
         .background(
@@ -9848,6 +10254,25 @@ private struct LibraryPage: View {
         return result
     }
 
+    private var displayedAllFiles: [LibraryItem] {
+        Array(visibleAllFiles.prefix(allFilesVisibleLimit))
+    }
+
+    private var libraryBranchChoices: [LibraryBranchChoice] {
+        flattenBranchChoices(branchStore.branches, depth: 0)
+    }
+
+    private func flattenBranchChoices(
+        _ branches: [UserLibraryBranch],
+        depth: Int
+    ) -> [LibraryBranchChoice] {
+        branches.flatMap { branch in
+            let prefix = String(repeating: "  ", count: depth)
+            return [LibraryBranchChoice(id: branch.id, title: prefix + branch.name)]
+                + flattenBranchChoices(branch.children, depth: depth + 1)
+        }
+    }
+
     private func branchName(for item: LibraryItem) -> String? {
         guard let branchID = branchStore.branchID(for: item.id) else {
             return nil
@@ -9869,9 +10294,31 @@ private struct LibraryPage: View {
     }
 
     private func deleteLibraryFile(_ item: LibraryItem) {
-        branchStore.assign(item.id, to: nil)
         model.library.selectedItemID = item.id
-        model.library.deleteSelected()
+        let deleted = model.library.deleteSelected(locale: locale)
+        libraryActionMessage = model.library.message
+        libraryActionFailed = !deleted
+        if deleted {
+            branchStore.assign(item.id, to: nil)
+        }
+    }
+
+    private func moveLibraryItem(_ item: LibraryItem, to branchID: UUID?) {
+        branchStore.assign(item.id, to: branchID)
+        libraryActionFailed = false
+        if let branchID,
+           let branch = findBranch(branchID, in: branchStore.branches) {
+            libraryActionMessage = RuntimeLocalization.format(
+                "已移到项目 · %@",
+                locale: locale,
+                branch.name
+            )
+        } else {
+            libraryActionMessage = String(
+                localized: "已移到未分类",
+                locale: locale
+            )
+        }
     }
 
     @ViewBuilder
@@ -9883,7 +10330,12 @@ private struct LibraryPage: View {
                 Label("项目分类", systemImage: "folder")
                     .font(.headline)
                 Text(
-                    "\(branchStore.branches.count) 个根分支 · \(unclassifiedItems.count) 个未分类文件"
+                    RuntimeLocalization.format(
+                        "%lld 个根分支 · %lld 个未分类文件",
+                        locale: locale,
+                        Int64(branchStore.branches.count),
+                        Int64(unclassifiedItems.count)
+                    )
                 )
                 .font(.caption)
                 .foregroundStyle(IPalette.muted)
@@ -9959,7 +10411,11 @@ private struct LibraryPage: View {
             }
 
             DisclosureGroup(
-                "未分类 · \(unclassifiedItems.count)",
+                RuntimeLocalization.format(
+                    "未分类 · %lld",
+                    locale: locale,
+                    Int64(unclassifiedItems.count)
+                ),
                 isExpanded: $uncategorizedExpanded
             ) {
                 if unclassifiedItems.isEmpty {
@@ -9972,13 +10428,23 @@ private struct LibraryPage: View {
                     .frame(minHeight: 150)
                 } else {
                     DisclosureGroup(
-                        "照片 · \(unclassifiedItems.filter { !$0.isVideo }.count)",
+                        RuntimeLocalization.format(
+                            "照片 · %lld",
+                            locale: locale,
+                            Int64(
+                                unclassifiedItems.filter { !$0.isVideo }.count
+                            )
+                        ),
                         isExpanded: $localPhotosExpanded
                     ) {
                         localLibraryGrid(unclassifiedItems.filter { !$0.isVideo })
                     }
                     DisclosureGroup(
-                        "视频 · \(unclassifiedItems.filter(\.isVideo).count)",
+                        RuntimeLocalization.format(
+                            "视频 · %lld",
+                            locale: locale,
+                            Int64(unclassifiedItems.filter(\.isVideo).count)
+                        ),
                         isExpanded: $localVideosExpanded
                     ) {
                         localLibraryGrid(unclassifiedItems.filter(\.isVideo))
@@ -10069,7 +10535,10 @@ private struct LibraryPage: View {
         guard FileManager.default.fileExists(atPath: item.url.path),
               sourceSize > 0
         else {
-            let result = "文件不存在或为空，无法下载"
+            let result = RuntimeLocalization.text(
+                "文件不存在或为空，无法下载",
+                locale: locale
+            )
             model.library.message = result
             model.statusMessage = result
             localExportResult = result
@@ -10090,7 +10559,10 @@ private struct LibraryPage: View {
         }
         guard status == .authorized || status == .limited else {
             systemAlbumItems = []
-            systemAlbumStatus = "未获得相册读取权限"
+            systemAlbumStatus = RuntimeLocalization.text(
+                "未获得相册读取权限",
+                locale: locale
+            )
             return
         }
 
@@ -10105,13 +10577,18 @@ private struct LibraryPage: View {
             loaded.append(SystemAlbumItem(asset: asset))
         }
         systemAlbumItems = loaded
-        systemAlbumStatus = status == .limited
-            ? "已显示允许访问的 \(loaded.count) 项"
-            : "最近 \(loaded.count) 项"
+        systemAlbumStatus = RuntimeLocalization.format(
+            status == .limited
+                ? "已显示允许访问的 %lld 项"
+                : "最近 %lld 项",
+            locale: locale,
+            Int64(loaded.count)
+        )
     }
 }
 
 private struct CameraStorageItemRow: View {
+    @Environment(\.locale) private var locale
     let item: CameraStorageItem
     let selected: Bool
     let loadThumbnail: () async throws -> Data
@@ -10134,7 +10611,15 @@ private struct CameraStorageItemRow: View {
             }
             .buttonStyle(.plain)
             .disabled(item.isProtected)
-            .accessibilityLabel("选择 \(item.filename)")
+            .accessibilityLabel(
+                Text(
+                    RuntimeLocalization.format(
+                        "选择 %@",
+                        locale: locale,
+                        item.filename
+                    )
+                )
+            )
 
             ZStack {
                 Color.black
@@ -10189,8 +10674,13 @@ private struct CameraStorageItemRow: View {
         let dimensions = item.width > 0 && item.height > 0
             ? " · \(item.width) × \(item.height)"
             : ""
-        return "\(size)\(dimensions) · \(item.capturedAt)"
-            + (item.isProtected ? " · 已保护" : "")
+        let base = "\(size)\(dimensions) · \(item.capturedAt)"
+        guard item.isProtected else { return base }
+        return RuntimeLocalization.format(
+            "%@ · 已保护",
+            locale: locale,
+            base
+        )
     }
 }
 
@@ -10271,6 +10761,7 @@ private struct SystemAlbumThumbnail: View {
 
 private struct SystemAlbumPreviewView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     let item: SystemAlbumItem
     @State private var image: UIImage?
     @State private var player: AVPlayer?
@@ -10310,7 +10801,13 @@ private struct SystemAlbumPreviewView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(IPalette.hudBg)
                     Spacer()
-                    Text("系统相册 · \(item.name)")
+                    Text(
+                        RuntimeLocalization.format(
+                            "系统相册 · %@",
+                            locale: locale,
+                            item.name
+                        )
+                    )
                         .font(.caption.monospaced())
                         .lineLimit(1)
                         .padding(.horizontal, SpaceToken.s12)

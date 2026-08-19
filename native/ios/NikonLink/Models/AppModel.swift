@@ -140,6 +140,7 @@ enum ShootingTaskKind: String, CaseIterable, Identifiable {
 struct LibraryItem: Identifiable, Hashable {
     let url: URL
     let createdAt: Date
+    let modifiedAt: Date
 
     var id: String { url.path }
     var filename: String { url.lastPathComponent }
@@ -497,19 +498,23 @@ final class MediaLibrary: ObservableObject {
         }
     }
 
-    func deleteSelected() {
-        guard let selectedItem else { return }
+    @discardableResult
+    func deleteSelected(locale: Locale = .current) -> Bool {
+        guard let selectedItem else { return false }
         do {
             try fileManager.removeItem(at: selectedItem.url)
             selectedItemID = nil
             reload()
-            message = "文件已删除"
+            message = String(localized: "文件已删除", locale: locale)
+            return true
         } catch {
             DiagnosticLogger.shared.error(
                 "library",
                 "删除文件失败：\(error.localizedDescription)"
             )
-            message = "删除失败：\(error.localizedDescription)"
+            message = String(localized: "删除失败", locale: locale)
+                + "：\(error.localizedDescription)"
+            return false
         }
     }
 
@@ -575,7 +580,8 @@ final class MediaLibrary: ObservableObject {
                 let values = try? url.resourceValues(forKeys: keys)
                 return LibraryItem(
                     url: url,
-                    createdAt: values?.creationDate ?? values?.contentModificationDate ?? .distantPast
+                    createdAt: values?.creationDate ?? values?.contentModificationDate ?? .distantPast,
+                    modifiedAt: values?.contentModificationDate ?? .distantPast
                 )
             }
             .sorted { $0.createdAt > $1.createdAt }

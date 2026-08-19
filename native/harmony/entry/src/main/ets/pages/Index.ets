@@ -65,7 +65,8 @@ import {
   LANGUAGE_PREFERENCE_KEY,
   LANGUAGE_SIMPLIFIED_CHINESE,
   normalizeLanguage,
-  translate
+  translate,
+  translateTemplate
 } from '../localization/Localization';
 
 const STUDIO_CANVAS: string = '#06090D'; // 沉浸 HUD 底（两处实际使用：L7378/7383）
@@ -1153,8 +1154,8 @@ struct Index {
   @State private immersiveParametersExpanded: boolean = true;
   @State private immersiveMoreParametersExpanded: boolean = false;
   @State private immersiveLandscape: boolean = false;
-  @State private systemExpanded: boolean = true;
-  @State private cameraStorageExpanded: boolean = true;
+  @State private systemExpanded: boolean = false;
+  @State private cameraStorageExpanded: boolean = false;
   @State private cameraStorageBusy: boolean = false;
   @State private cameraStorageStatus: string = '连接相机后可浏览存储卡';
   @State private cameraStorageSnapshot: CameraStorageSnapshot =
@@ -1162,7 +1163,7 @@ struct Index {
   @State private selectedCameraStorageHandles: Array<number> = [];
   @State private systemPhotosExpanded: boolean = true;
   @State private systemVideosExpanded: boolean = true;
-  @State private wirelessExpanded: boolean = true;
+  @State private wirelessExpanded: boolean = false;
   @State private localPhotosExpanded: boolean = true;
   @State private localVideosExpanded: boolean = true;
   @State private localUnclassifiedExpanded: boolean = true;
@@ -1179,6 +1180,7 @@ struct Index {
   @State private branchDeleteVisible: boolean = false;
   @State private branchDeleteId: string = '';
   @State private branchDeleteName: string = '';
+  @State private librarySearchInput: string = '';
   @State private librarySearchQuery: string = '';
   @State private libraryTypeFilter: string = 'all'; // all | photo | video
   @State private librarySortOrder: string = 'recent'; // recent | name
@@ -1283,6 +1285,7 @@ struct Index {
   @State private editorAIAnalysis: EditorAIAnalysis | undefined = undefined;
   @State private editorAICopiedTone: Array<EditorToneValue> = [];
   private editorAIBackup: Array<EditorToneValue> = [];
+  private librarySearchDebounceTimer: number = -1;
   @State private currentFocusMode: string = 'single-shot';
   @State private currentWhiteBalance: string = 'continuous';
   @State private currentPictureControl: string = 'standard';
@@ -1446,9 +1449,25 @@ struct Index {
           LIBRARY_FILE_ASSIGNMENTS_KEY,
           '[]'
         );
-      this.libraryFileAssignments = JSON.parse(
+      const parsedAssignments: Array<LibraryFileAssignmentData> = JSON.parse(
         savedAssignments as string
       ) as Array<LibraryFileAssignmentData>;
+      this.libraryFileAssignments = parsedAssignments.filter(
+        (assignment: LibraryFileAssignmentData): boolean =>
+          assignment.path.length > 0 &&
+          assignment.branchId.length > 0 &&
+          this.findLibraryBranch(
+            this.userLibraryBranches,
+            assignment.branchId
+          ) !== undefined
+      );
+      if (this.libraryFileAssignments.length !== parsedAssignments.length) {
+        await this.settingsPreferences.put(
+          LIBRARY_FILE_ASSIGNMENTS_KEY,
+          JSON.stringify(this.libraryFileAssignments)
+        );
+        await this.settingsPreferences.flush();
+      }
       const savedDevices: preferences.ValueType =
         await this.settingsPreferences.get(
           'rememberedCameraDevices.v1',
@@ -1534,6 +1553,10 @@ struct Index {
     return translate(this.language, source);
   }
 
+  private trf(source: string, values: Array<string>): string {
+    return translateTemplate(this.language, source, values);
+  }
+
   aboutToDisappear(): void {
     const wifiCameraToDisconnect: PtpIpCamera = this.wifiCamera;
     this.sourceSwitchGeneration++;
@@ -1542,6 +1565,10 @@ struct Index {
     this.wifiConnecting = false;
     this.wifiReconnecting = false;
     this.stopImmersiveOrientationTracking();
+    if (this.librarySearchDebounceTimer >= 0) {
+      clearTimeout(this.librarySearchDebounceTimer);
+      this.librarySearchDebounceTimer = -1;
+    }
     this.diagnostics?.endSession();
     this.previewGeneration++;
     this.finishExternalRecordingForDisconnect();
@@ -6410,21 +6437,27 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
         .width('100%')
-      Text(this.tr(
-        `${this.photos.length} 个 帧澈 ZENCHE 文件 · ` +
-        `${this.systemMedia.length} 个系统相册项目 · 拖动整理`
+      Text(this.trf(
+        '{0} 个帧澈 ZENCHE 文件 · {1} 个系统相册项目 · 拖动整理',
+        [`${this.photos.length}`, `${this.systemMedia.length}`]
       ))
         .fontSize(LIBRARY_FS_TITLE)
         .fontColor($r('app.color.muted'))
         .width('100%')
-      this.AllFilesWorkspace()
+      this.AllFilesWorkspace(this.allFilesFiltered())
       this.BranchWorkspace()
       Button(
-        this.tr(
-          `${this.wirelessExpanded ? '⌄' : '›'} 无线传输 · ` +
-          `${this.wifiConnected ? 'Wi‑Fi 已连接' : 'Wi‑Fi 未连接'} · ` +
-          `${this.wirelessRunning ? '收件箱运行中' : '收件箱已停止'}`
-        ),
+        `${this.wirelessExpanded ? '⌄' : '›'} ${this.trf(
+          '无线传输 · {0} · {1}',
+          [
+            this.tr(
+              this.wifiConnected ? 'Wi‑Fi 已连接' : 'Wi‑Fi 未连接'
+            ),
+            this.tr(
+              this.wirelessRunning ? '收件箱运行中' : '收件箱已停止'
+            )
+          ]
+        )}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -6443,7 +6476,7 @@ struct Index {
       }
       this.CameraStorageWorkspace()
       Button(
-        this.tr(`${this.moreToolsExpanded ? '⌄' : '›'} 更多工具`),
+        `${this.moreToolsExpanded ? '⌄' : '›'} ${this.tr('更多工具')}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -6502,10 +6535,10 @@ struct Index {
         .fontColor($r('app.color.muted'))
         .width('100%')
       Button(
-        this.tr(
-          `${this.systemExpanded ? '⌄' : '›'} 系统相册 · ` +
-          `${this.systemMedia.length}`
-        ),
+        `${this.systemExpanded ? '⌄' : '›'} ${this.trf(
+          '系统相册 · {0}',
+          [`${this.systemMedia.length}`]
+        )}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -6540,10 +6573,12 @@ struct Index {
       } else if (this.systemExpanded) {
         Row({ space: 8 }) {
           Button(
-            this.tr(
-              `${this.systemPhotosExpanded ? '⌄' : '›'} 照片 · ` +
-              `${this.systemMedia.filter((item: SystemMediaItem): boolean => !item.isVideo).length}`
-            )
+            `${this.systemPhotosExpanded ? '⌄' : '›'} ${this.trf(
+              '照片 · {0}',
+              [`${this.systemMedia.filter(
+                (item: SystemMediaItem): boolean => !item.isVideo
+              ).length}`]
+            )}`
           )
             .height(44)
             .layoutWeight(1)
@@ -6551,10 +6586,12 @@ struct Index {
               this.systemPhotosExpanded = !this.systemPhotosExpanded;
             })
           Button(
-            this.tr(
-              `${this.systemVideosExpanded ? '⌄' : '›'} 视频 · ` +
-              `${this.systemMedia.filter((item: SystemMediaItem): boolean => item.isVideo).length}`
-            )
+            `${this.systemVideosExpanded ? '⌄' : '›'} ${this.trf(
+              '视频 · {0}',
+              [`${this.systemMedia.filter(
+                (item: SystemMediaItem): boolean => item.isVideo
+              ).length}`]
+            )}`
           )
             .height(44)
             .layoutWeight(1)
@@ -6641,10 +6678,10 @@ struct Index {
   private CameraStorageWorkspace() {
     Column({ space: 10 }) {
       Button(
-        this.tr(
-          `${this.cameraStorageExpanded ? '⌄' : '›'} 相机机内存储 · ` +
-          `${this.cameraStorageSnapshot.items.length}`
-        ),
+        `${this.cameraStorageExpanded ? '⌄' : '›'} ${this.trf(
+          '相机机内存储 · {0}',
+          [`${this.cameraStorageSnapshot.items.length}`]
+        )}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -6662,12 +6699,15 @@ struct Index {
       if (this.cameraStorageExpanded) {
         Text(
           this.cameraStorageSnapshot.capacityBytes > 0
-            ? `${this.formatStorageSize(
-              this.cameraStorageSnapshot.capacityBytes -
-                this.cameraStorageSnapshot.freeBytes
-            )} 已用 / ${this.formatStorageSize(
-              this.cameraStorageSnapshot.capacityBytes
-            )}`
+            ? this.trf('{0} 已用 / {1}', [
+              this.formatStorageSize(
+                this.cameraStorageSnapshot.capacityBytes -
+                  this.cameraStorageSnapshot.freeBytes
+              ),
+              this.formatStorageSize(
+                this.cameraStorageSnapshot.capacityBytes
+              )
+            ])
             : this.tr(this.cameraStorageStatus)
         )
           .fontSize(LIBRARY_FS_SUB)
@@ -6790,7 +6830,8 @@ struct Index {
                         `${item.width > 0 && item.height > 0
                           ? ` · ${item.width} × ${item.height}` : ''}` +
                         ` · ${item.capturedAt}` +
-                        `${item.protectedObject ? ' · 已保护' : ''}`
+                        `${item.protectedObject
+                          ? ` · ${this.tr('已保护')}` : ''}`
                       )
                         .fontSize(TS_CAPTION)
                         .fontFamily('monospace')
@@ -6841,11 +6882,17 @@ struct Index {
   private BranchWorkspace() {
     Column({ space: 8 }) {
       Button(
-        this.tr(`${this.projectCategoriesExpanded ? '⌄' : '›'} 项目分类`),
+        `${this.projectCategoriesExpanded ? '⌄' : '›'} ${this.trf(
+          '项目分类 · {0} 个根分支 · {1} 个未分类文件',
+          [
+            `${this.userLibraryBranches.length}`,
+            `${this.unclassifiedPhotos().length}`
+          ]
+        )}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
-        .height(44)
+        .height(48)
         .fontColor($r('app.color.ink'))
         .backgroundColor($r('app.color.paper_2'))
         .onClick((): void => {
@@ -6879,10 +6926,10 @@ struct Index {
       .width('100%')
       this.UserLibraryBranchTree()
       Button(
-        this.tr(
-          `${this.localUnclassifiedExpanded ? '⌄' : '›'} 未分类 · ` +
-          `${this.unclassifiedPhotos().length}`
-        ),
+        `${this.localUnclassifiedExpanded ? '⌄' : '›'} ${this.trf(
+          '未分类 · {0}',
+          [`${this.unclassifiedPhotos().length}`]
+        )}`,
         { type: ButtonType.Normal }
       )
         .width('100%')
@@ -6949,23 +6996,27 @@ struct Index {
   private LocalPhotoCollection(items: Array<PhotoItem>) {
     Row({ space: 8 }) {
       Button(
-        this.tr(
-          `${this.localPhotosExpanded ? '⌄' : '›'} 照片 · ` +
-          `${items.filter((item: PhotoItem): boolean => !item.isVideo).length}`
-        )
+        `${this.localPhotosExpanded ? '⌄' : '›'} ${this.trf(
+          '照片 · {0}',
+          [`${items.filter(
+            (item: PhotoItem): boolean => !item.isVideo
+          ).length}`]
+        )}`
       )
-        .height(44)
+        .height(48)
         .layoutWeight(1)
         .onClick((): void => {
           this.localPhotosExpanded = !this.localPhotosExpanded;
         })
       Button(
-        this.tr(
-          `${this.localVideosExpanded ? '⌄' : '›'} 视频 · ` +
-          `${items.filter((item: PhotoItem): boolean => item.isVideo).length}`
-        )
+        `${this.localVideosExpanded ? '⌄' : '›'} ${this.trf(
+          '视频 · {0}',
+          [`${items.filter(
+            (item: PhotoItem): boolean => item.isVideo
+          ).length}`]
+        )}`
       )
-        .height(44)
+        .height(48)
         .layoutWeight(1)
         .onClick((): void => {
           this.localVideosExpanded = !this.localVideosExpanded;
@@ -7038,7 +7089,7 @@ struct Index {
           .onClick((): void => {
             this.previewPhoto(item);
           })
-        Button(this.tr('下载'), { type: ButtonType.Normal })
+        Button(this.tr('导出'), { type: ButtonType.Normal })
           .height(44)
           .layoutWeight(1)
           .fontColor($r('app.color.accent_ink'))
@@ -7094,7 +7145,7 @@ struct Index {
   }
 
   @Builder
-  private AllFilesWorkspace() {
+  private AllFilesWorkspace(items: Array<PhotoItem>) {
     Column({ space: 10 }) {
       Row({ space: 12 }) {
         Text(this.tr('所有文件'))
@@ -7102,7 +7153,10 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .layoutWeight(1)
-        Text(`${this.allFilesFiltered().length} / ${this.photos.length}`)
+        Text(this.trf(
+          '{0} / {1}',
+          [`${items.length}`, `${this.photos.length}`]
+        ))
           .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -7110,15 +7164,22 @@ struct Index {
       .width('100%')
       TextInput({
         placeholder: this.tr('搜索文件名'),
-        text: this.librarySearchQuery
+        text: this.librarySearchInput
       })
-        .height(44)
+        .height(48)
         .onChange((value: string): void => {
-          this.librarySearchQuery = value;
+          this.librarySearchInput = value;
+          if (this.librarySearchDebounceTimer >= 0) {
+            clearTimeout(this.librarySearchDebounceTimer);
+          }
+          this.librarySearchDebounceTimer = setTimeout((): void => {
+            this.librarySearchQuery = this.librarySearchInput;
+            this.librarySearchDebounceTimer = -1;
+          }, 180);
         })
       Row({ space: 8 }) {
         Button(this.tr('全部'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor(
             this.libraryTypeFilter === 'all'
@@ -7131,11 +7192,17 @@ struct Index {
               : $r('app.color.paper_2')
           )
           .borderRadius(RADIUS_6)
+          .accessibilityText(this.trf('筛选：{0}，{1}', [
+            this.tr('全部'),
+            this.tr(
+              this.libraryTypeFilter === 'all' ? '已选择' : '未选择'
+            )
+          ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'all';
           })
         Button(this.tr('照片'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor(
             this.libraryTypeFilter === 'photo'
@@ -7148,11 +7215,17 @@ struct Index {
               : $r('app.color.paper_2')
           )
           .borderRadius(RADIUS_6)
+          .accessibilityText(this.trf('筛选：{0}，{1}', [
+            this.tr('照片'),
+            this.tr(
+              this.libraryTypeFilter === 'photo' ? '已选择' : '未选择'
+            )
+          ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'photo';
           })
         Button(this.tr('视频'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor(
             this.libraryTypeFilter === 'video'
@@ -7165,6 +7238,12 @@ struct Index {
               : $r('app.color.paper_2')
           )
           .borderRadius(RADIUS_6)
+          .accessibilityText(this.trf('筛选：{0}，{1}', [
+            this.tr('视频'),
+            this.tr(
+              this.libraryTypeFilter === 'video' ? '已选择' : '未选择'
+            )
+          ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'video';
           })
@@ -7172,7 +7251,7 @@ struct Index {
       .width('100%')
       Row({ space: 8 }) {
         Button(this.tr('最近'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor(
             this.librarySortOrder === 'recent'
@@ -7185,11 +7264,17 @@ struct Index {
               : $r('app.color.paper_2')
           )
           .borderRadius(RADIUS_6)
+          .accessibilityText(this.trf('排序：{0}，{1}', [
+            this.tr('最近'),
+            this.tr(
+              this.librarySortOrder === 'recent' ? '已选择' : '未选择'
+            )
+          ]))
           .onClick((): void => {
             this.librarySortOrder = 'recent';
           })
         Button(this.tr('名称'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor(
             this.librarySortOrder === 'name'
@@ -7202,6 +7287,12 @@ struct Index {
               : $r('app.color.paper_2')
           )
           .borderRadius(RADIUS_6)
+          .accessibilityText(this.trf('排序：{0}，{1}', [
+            this.tr('名称'),
+            this.tr(
+              this.librarySortOrder === 'name' ? '已选择' : '未选择'
+            )
+          ]))
           .onClick((): void => {
             this.librarySortOrder = 'name';
           })
@@ -7212,12 +7303,20 @@ struct Index {
           Text(this.tr('还没有文件'))
             .fontSize(LIBRARY_FS_HEAD)
             .fontWeight(FontWeight.Bold)
-          Text(this.tr('拍摄新照片、从相机下载，或从系统相册导入。'))
+          Text(this.tr('拍摄新照片，或连接相机后下载到文件库。'))
             .fontSize(TS_BODY)
             .fontColor($r('app.color.muted'))
+          Button(this.tr('去拍摄'), { type: ButtonType.Normal })
+            .height(48)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .borderRadius(RADIUS_6)
+            .onClick((): void => {
+              this.section = 'capture';
+            })
         }
         .width('100%')
-        .height(120)
+        .height(164)
         .justifyContent(FlexAlign.Center)
         .backgroundColor($r('app.color.surface'))
         .border({
@@ -7225,7 +7324,7 @@ struct Index {
           color: $r('app.color.rule'),
           radius: RADIUS_14
         })
-      } else if (this.allFilesFiltered().length === 0) {
+      } else if (items.length === 0) {
         Text(this.tr('没有匹配的文件'))
           .fontSize(TS_BODY)
           .fontColor($r('app.color.muted'))
@@ -7234,7 +7333,7 @@ struct Index {
       } else {
         List({ space: 8 }) {
           ForEach(
-            this.allFilesFiltered(),
+            items,
             (item: PhotoItem) => {
               ListItem() {
                 this.AllFilesRow(item)
@@ -7244,7 +7343,7 @@ struct Index {
           )
         }
         .width('100%')
-        .height(Math.min(520, Math.max(132, this.allFilesFiltered().length * 132)))
+        .height(Math.min(520, Math.max(192, items.length * 192)))
       }
     }
     .width('100%')
@@ -7292,9 +7391,9 @@ struct Index {
         .layoutWeight(1)
       }
       .width('100%')
-      Row({ space: 6 }) {
+      Row({ space: 8 }) {
         Button(this.tr('预览'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
@@ -7302,8 +7401,8 @@ struct Index {
           .onClick((): void => {
             this.previewPhoto(item);
           })
-        Button(this.tr('下载'), { type: ButtonType.Normal })
-          .height(44)
+        Button(this.tr('导出'), { type: ButtonType.Normal })
+          .height(48)
           .layoutWeight(1)
           .fontColor($r('app.color.accent_ink'))
           .backgroundColor($r('app.color.accent'))
@@ -7312,7 +7411,7 @@ struct Index {
             this.downloadPhotoToLocal(item);
           })
         Button(this.tr('分享'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor($r('app.color.ink'))
           .backgroundColor($r('app.color.paper_2'))
@@ -7321,7 +7420,7 @@ struct Index {
             this.sharePhoto(item);
           })
         Button(this.tr('删除'), { type: ButtonType.Normal })
-          .height(44)
+          .height(48)
           .layoutWeight(1)
           .fontColor($r('app.color.error'))
           .backgroundColor($r('app.color.surface'))
@@ -7335,6 +7434,15 @@ struct Index {
           })
       }
       .width('100%')
+      Button(this.tr('移动到项目'), { type: ButtonType.Normal })
+        .height(48)
+        .width('100%')
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .borderRadius(RADIUS_6)
+        .onClick((): void => {
+          this.showMoveLibraryFileDialog(item);
+        })
     }
     .width('100%')
     .padding(12)
@@ -7361,7 +7469,10 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .layoutWeight(1)
-        Text(this.tr(`${this.userLibraryBranches.length} 个根节点`))
+        Text(this.trf(
+          '{0} 个根节点',
+          [`${this.userLibraryBranches.length}`]
+        ))
           .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -7416,7 +7527,10 @@ struct Index {
           .onClick((): void => {
             this.toggleLibraryBranch(branch.id);
           })
-        Text(`${this.photosForBranch(branch.id).length} 文件`)
+        Text(this.trf(
+          '{0} 个文件',
+          [`${this.photosForBranch(branch.id).length}`]
+        ))
           .fontSize(TS_CAPTION)
           .fontFamily('monospace')
           .fontColor($r('app.color.muted'))
@@ -8790,8 +8904,9 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text(this.tr(
-          `将在“${this.branchParentName}”下创建可继续展开的节点。`
+        Text(this.trf(
+          '将在“{0}”下创建可继续展开的节点。',
+          [this.branchParentName]
         ))
           .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.muted'))
@@ -8854,8 +8969,9 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('app.color.ink'))
           .width('100%')
-        Text(this.tr(
-          `将同时删除“${this.branchDeleteName}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。`
+        Text(this.trf(
+          '将同时删除“{0}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。',
+          [this.branchDeleteName]
         ))
           .fontSize(EDITOR_FS_SUB)
           .fontColor($r('app.color.muted'))
@@ -13461,7 +13577,16 @@ struct Index {
         (candidate: LibraryFileAssignmentData): boolean =>
           candidate.path === path
       );
-    return assignment?.branchId ?? '';
+    if (
+      assignment === undefined ||
+      this.findLibraryBranch(
+        this.userLibraryBranches,
+        assignment.branchId
+      ) === undefined
+    ) {
+      return '';
+    }
+    return assignment.branchId;
   }
 
   private photosForBranch(branchId: string): Array<PhotoItem> {
@@ -13518,27 +13643,80 @@ struct Index {
     if (path.length === 0) {
       return;
     }
+    const targetBranchId: string = branchId.length > 0 &&
+      this.findLibraryBranch(this.userLibraryBranches, branchId) !== undefined
+      ? branchId
+      : '';
     const remaining: Array<LibraryFileAssignmentData> =
       this.libraryFileAssignments.filter(
         (assignment: LibraryFileAssignmentData): boolean =>
           assignment.path !== path
       );
-    this.libraryFileAssignments = branchId.length === 0
+    this.libraryFileAssignments = targetBranchId.length === 0
       ? remaining
-      : [...remaining, { path: path, branchId: branchId }];
+      : [...remaining, { path: path, branchId: targetBranchId }];
     if (
-      branchId.length > 0 &&
-      !this.isLibraryBranchExpanded(branchId)
+      targetBranchId.length > 0 &&
+      !this.isLibraryBranchExpanded(targetBranchId)
     ) {
       this.expandedLibraryBranchIds = [
         ...this.expandedLibraryBranchIds,
-        branchId
+        targetBranchId
       ];
     }
-    this.status = branchId.length === 0
+    this.status = targetBranchId.length === 0
       ? '已移到未分类'
-      : '已移到分支';
+      : '已移到项目';
     this.persistLibraryFileAssignments();
+  }
+
+  private showMoveLibraryFileDialog(item: PhotoItem): void {
+    const labels: Array<string> = [this.tr('未分类')];
+    const branchIds: Array<string> = [''];
+    this.appendLibraryBranchChoices(
+      this.userLibraryBranches,
+      0,
+      labels,
+      branchIds
+    );
+    const currentId: string = this.branchIdForPhoto(item.path);
+    const selectedIndex: number = Math.max(0, branchIds.indexOf(currentId));
+    TextPickerDialog.show({
+      range: labels,
+      selected: selectedIndex,
+      canLoop: false,
+      onAccept: (result: TextPickerResult): void => {
+        const index: number = typeof result.index === 'number'
+          ? result.index
+          : result.index[0];
+        const branchId: string = branchIds[index] ?? '';
+        this.assignPhotoToBranch(item.path, branchId);
+        promptAction.showToast({
+          message: branchId.length === 0
+            ? this.tr('已移到未分类')
+            : this.tr('已移到项目')
+        });
+      }
+    });
+  }
+
+  private appendLibraryBranchChoices(
+    branches: Array<LibraryBranch>,
+    depth: number,
+    labels: Array<string>,
+    branchIds: Array<string>
+  ): void {
+    const prefix: string = '　'.repeat(depth);
+    branches.forEach((branch: LibraryBranch): void => {
+      labels.push(`${prefix}${branch.name}`);
+      branchIds.push(branch.id);
+      this.appendLibraryBranchChoices(
+        branch.children,
+        depth + 1,
+        labels,
+        branchIds
+      );
+    });
   }
 
   private async persistLibraryBranches(): Promise<void> {
@@ -13606,7 +13784,10 @@ struct Index {
       }
     } catch (error) {
       this.showError(
-        `无法切换无线收件箱：${(error as BusinessError).message}`
+        this.trf(
+          '无法切换无线收件箱：{0}',
+          [(error as BusinessError).message]
+        )
       );
     }
   }
@@ -13625,7 +13806,10 @@ struct Index {
     } catch (error) {
       const businessError: BusinessError = error as BusinessError;
       if (businessError.code !== 13900012) {
-        this.showError(`无法打开机主相册：${businessError.message}`);
+        this.showError(this.trf(
+          '无法打开机主相册：{0}',
+          [businessError.message]
+        ));
       }
     }
   }
@@ -13671,7 +13855,10 @@ struct Index {
       if (businessError.code === 13900012) {
         this.systemPhotoEditStatus = '需要照片访问权限，请在系统设置中允许后重试';
       } else {
-        this.systemPhotoEditStatus = `系统照片导入失败：${businessError.message}`;
+        this.systemPhotoEditStatus = this.trf(
+          '系统照片导入失败：{0}',
+          [businessError.message]
+        );
       }
       this.showError(this.systemPhotoEditStatus);
     }
@@ -13719,7 +13906,7 @@ struct Index {
       const businessError: BusinessError = error as BusinessError;
       this.systemPhotoEditStatus = businessError.code === 13900012
         ? '需要照片写入权限，请在系统设置中允许后重试'
-        : `系统相册保存失败：${businessError.message}`;
+        : this.trf('系统相册保存失败：{0}', [businessError.message]);
       this.showError(this.systemPhotoEditStatus);
     }
   }
@@ -13763,7 +13950,7 @@ struct Index {
       );
     } catch (error) {
       const message: string = (error as Error).message;
-      this.cameraStorageStatus = `读取失败 · ${message}`;
+      this.cameraStorageStatus = this.trf('读取失败 · {0}', [message]);
       this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
       this.showError(message);
     } finally {
@@ -13803,17 +13990,23 @@ struct Index {
     try {
       for (let index: number = 0; index < selected.length; index++) {
         const item: CameraStorageItem = selected[index];
-        this.cameraStorageStatus = `正在下载 ${index + 1} / ${selected.length}`;
+        this.cameraStorageStatus = this.trf('正在下载 {0} / {1}', [
+          `${index + 1}`,
+          `${selected.length}`
+        ]);
         const bytes: Uint8Array = await this.activeStorageObject(item.handle);
         library.saveReceived(item.filename, bytes);
       }
       this.selectedCameraStorageHandles = [];
-      this.cameraStorageStatus = `已下载 ${selected.length} 个文件到 ZENCHE 文件库`;
+      this.cameraStorageStatus = this.trf(
+        '已下载 {0} 个文件到 ZENCHE 文件库',
+        [`${selected.length}`]
+      );
       this.refreshPhotos();
       promptAction.showToast({ message: this.tr(this.cameraStorageStatus) });
     } catch (error) {
       const message: string = (error as Error).message;
-      this.cameraStorageStatus = `下载失败 · ${message}`;
+      this.cameraStorageStatus = this.trf('下载失败 · {0}', [message]);
       this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
       this.showError(message);
     } finally {
@@ -13830,9 +14023,12 @@ struct Index {
     try {
       const result = await promptAction.showDialog({
         title: this.tr('从相机永久删除？'),
-        message: this.tr(
-          `将从相机存储卡永久删除所选 ${selected.length} 个文件；` +
-          '此操作无法撤销。已保护文件不会被选择。'
+        message: this.trf(
+          '将从相机存储卡永久删除所选 {0} 个文件；{1}',
+          [
+            `${selected.length}`,
+            this.tr('此操作无法撤销。已保护文件不会被选择。')
+          ]
         ),
         buttons: [
           { text: this.tr('取消'), color: MUTED_INK },
@@ -13849,12 +14045,15 @@ struct Index {
       }
       this.selectedCameraStorageHandles = [];
       this.cameraStorageBusy = false;
-      this.cameraStorageStatus = `已从相机删除 ${selected.length} 个文件`;
+      this.cameraStorageStatus = this.trf(
+        '已从相机删除 {0} 个文件',
+        [`${selected.length}`]
+      );
       await this.refreshCameraStorage();
     } catch (error) {
       this.cameraStorageBusy = false;
       const message: string = (error as Error).message;
-      this.cameraStorageStatus = `删除失败 · ${message}`;
+      this.cameraStorageStatus = this.trf('删除失败 · {0}', [message]);
       this.diagnostics?.error('camera-storage', this.cameraStorageStatus);
       this.showError(message);
     }
@@ -13924,7 +14123,10 @@ struct Index {
           );
         }
       );
-      this.systemAlbumStatus = `最近 ${this.systemMedia.length} 项`;
+      this.systemAlbumStatus = this.trf(
+        '最近 {0} 项',
+        [`${this.systemMedia.length}`]
+      );
     } catch (error) {
       this.systemMedia = [];
       this.systemAlbumStatus = '系统相册读取失败';
@@ -13993,7 +14195,10 @@ struct Index {
     } catch (error) {
       const businessError: BusinessError = error as BusinessError;
       if (businessError.code !== 13900012) {
-        this.showError(`无法打开网盘文件提供器：${businessError.message}`);
+        this.showError(this.trf(
+          '无法打开网盘文件提供器：{0}',
+          [businessError.message]
+        ));
       }
     }
   }
@@ -15831,7 +16036,10 @@ struct Index {
       this.resetImageEditor();
       this.refreshEditorImageMetrics();
       if (!exportToLocal) {
-        this.status = `已保存编辑副本 · ${destination.split('/').pop()}`;
+        this.status = this.trf(
+          '已保存编辑副本 · {0}',
+          [destination.split('/').pop() ?? '']
+        );
       }
       if (exportToLocal) {
         const stat: fs.Stat = fs.statSync(destination);
@@ -15846,7 +16054,10 @@ struct Index {
       }
     } catch (error) {
       this.showError(
-        this.tr(`保存编辑副本失败：${(error as BusinessError).message}`)
+        this.trf(
+          '保存编辑副本失败：{0}',
+          [(error as BusinessError).message]
+        )
       );
     } finally {
       if (packer !== undefined) {
@@ -15963,7 +16174,7 @@ struct Index {
     if (this.library === undefined) {
       return;
     }
-    if (item.isVideo) {
+      if (item.isVideo) {
       const context: common.UIAbilityContext =
         getContext(this) as common.UIAbilityContext;
       try {
@@ -15974,7 +16185,10 @@ struct Index {
         });
       } catch (error) {
         this.showError(
-          `无法播放视频：${(error as BusinessError).message}`
+          this.trf(
+            '无法播放视频：{0}',
+            [(error as BusinessError).message]
+          )
         );
       }
       return;
@@ -15995,7 +16209,7 @@ struct Index {
       this.largePreviewName = item.name;
       this.largePreviewPath = item.path;
       this.largePreviewVisible = true;
-      this.status = `正在查看 ${item.name}`;
+      this.status = this.trf('正在查看 {0}', [item.name]);
     } catch (error) {
       this.showError(
         '当前格式已安全保存，但系统无法显示这张照片的大图。'
@@ -16032,7 +16246,10 @@ struct Index {
       });
     } catch (error) {
       this.showError(
-        `无法打开系统分享面板：${(error as BusinessError).message}`
+        this.trf(
+          '无法打开系统分享面板：{0}',
+          [(error as BusinessError).message]
+        )
       );
     }
   }
@@ -16053,7 +16270,7 @@ struct Index {
         `读取源文件失败：${(error as Error).message}`
       );
       this.showError(
-        this.tr(`下载到本地失败：${(error as Error).message}`)
+        this.trf('下载到本地失败：{0}', [(error as Error).message])
       );
       return;
     }
@@ -16086,7 +16303,7 @@ struct Index {
         this.showError(this.tr('该文件已位于所选位置'));
         return;
       }
-      this.status = `已下载到本地：${item.name}`;
+      this.status = this.trf('已下载到本地：{0}', [item.name]);
       this.diagnostics?.info(
         'local-download',
         `文件副本已保存；源=${item.name}；大小=${copiedBytes}`
@@ -16105,7 +16322,10 @@ struct Index {
             );
           }
         }
-        this.showError(this.tr(`下载到本地失败：${businessError.message}`));
+        this.showError(this.trf(
+          '下载到本地失败：{0}',
+          [businessError.message]
+        ));
       }
     } finally {
       this.localExportBusy = false;
@@ -16143,9 +16363,9 @@ struct Index {
       );
       this.persistLibraryFileAssignments();
       this.refreshPhotos();
-      this.status = `已删除 ${item.name}`;
+      this.status = this.trf('已删除 {0}', [item.name]);
     } catch (error) {
-      this.showError(`无法删除 ${item.name}。`);
+      this.showError(this.trf('无法删除 {0}。', [item.name]));
     }
   }
 

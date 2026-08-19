@@ -691,6 +691,144 @@ const TRANSLATIONS: Array<TranslationEntry> = [
   new TranslationEntry('来源：相机', 'Source: Camera', 'ソース：カメラ'),
   new TranslationEntry('来源：无线传输', 'Source: Wireless Transfer', 'ソース：ワイヤレス転送'),
   new TranslationEntry('来源：系统相册', 'Source: System Library', 'ソース：システムライブラリ'),
+  new TranslationEntry('移动到项目', 'Move to Project', 'プロジェクトに移動'),
+  new TranslationEntry('已移到项目', 'Moved to project', 'プロジェクトに移動しました'),
+  new TranslationEntry('已移到未分类', 'Moved to unclassified', '未分類に移動しました'),
+  new TranslationEntry('去拍摄', 'Go to Capture', '撮影へ'),
+  new TranslationEntry('已选择', 'Selected', '選択済み'),
+  new TranslationEntry('未选择', 'Not selected', '未選択'),
+  new TranslationEntry('筛选', 'Filter', 'フィルター'),
+  new TranslationEntry('排序', 'Sort', '並び順'),
+  new TranslationEntry('导出', 'Export', '書き出す'),
+  new TranslationEntry('导出副本', 'Export Copy', 'コピーを書き出す'),
+  new TranslationEntry(
+    '{0} 个帧澈 ZENCHE 文件 · {1} 个系统相册项目 · 拖动整理',
+    '{0} ZENCHE files · {1} system-library items · drag to organize',
+    '帧澈 ZENCHE ファイル {0} 件 · システムライブラリ {1} 件 · ドラッグして整理'
+  ),
+  new TranslationEntry(
+    '无线传输 · {0} · {1}',
+    'Wireless Transfer · {0} · {1}',
+    'ワイヤレス転送 · {0} · {1}'
+  ),
+  new TranslationEntry('Wi‑Fi 已连接', 'Wi‑Fi connected', 'Wi‑Fi 接続済み'),
+  new TranslationEntry('Wi‑Fi 未连接', 'Wi‑Fi not connected', 'Wi‑Fi 未接続'),
+  new TranslationEntry('收件箱运行中', 'Inbox running', '受信箱は稼働中'),
+  new TranslationEntry('收件箱已停止', 'Inbox stopped', '受信箱は停止中'),
+  new TranslationEntry('系统相册 · {0}', 'System Library · {0}', 'システムライブラリ · {0}'),
+  new TranslationEntry('照片 · {0}', 'Photos · {0}', '写真 · {0}'),
+  new TranslationEntry('视频 · {0}', 'Videos · {0}', '動画 · {0}'),
+  new TranslationEntry('相机机内存储 · {0}', 'In-Camera Storage · {0}', 'カメラ内ストレージ · {0}'),
+  new TranslationEntry('{0} 已用 / {1}', '{0} used / {1}', '{0} 使用済み / {1}'),
+  new TranslationEntry(
+    '项目分类 · {0} 个根分支 · {1} 个未分类文件',
+    'Project Categories · {0} root projects · {1} unclassified files',
+    'プロジェクト分類 · ルート {0} 件 · 未分類 {1} 件'
+  ),
+  new TranslationEntry('未分类 · {0}', 'Unclassified · {0}', '未分類 · {0}'),
+  new TranslationEntry('{0} 个根节点', '{0} root nodes', 'ルートノード {0} 件'),
+  new TranslationEntry('{0} 个文件', '{0} files', '{0} 件'),
+  new TranslationEntry('{0} / {1}', '{0} / {1}', '{0} / {1}'),
+  new TranslationEntry('筛选：{0}，{1}', 'Filter: {0}, {1}', 'フィルター：{0}、{1}'),
+  new TranslationEntry('排序：{0}，{1}', 'Sort: {0}, {1}', '並び順：{0}、{1}'),
+  new TranslationEntry(
+    '将在“{0}”下创建可继续展开的节点。',
+    'A nested project will be created under “{0}”.',
+    '「{0}」の下に展開可能なプロジェクトを作成します。'
+  ),
+  new TranslationEntry(
+    '将同时删除“{0}”下的子分支；其中的文件会回到“未分类”，原文件不受影响。',
+    'Nested projects under “{0}” will also be removed. Their files return to Unclassified; the original files remain unchanged.',
+    '「{0}」配下の子プロジェクトも削除されます。ファイルは未分類に戻り、元のファイルは変更されません。'
+  ),
+  new TranslationEntry(
+    '分支已删除，文件已回到未分类',
+    'Project deleted; its files returned to Unclassified',
+    'プロジェクトを削除し、ファイルを未分類に戻しました'
+  ),
+  new TranslationEntry('读取失败 · {0}', 'Unable to read storage · {0}', '読み込みに失敗しました · {0}'),
+  new TranslationEntry('正在下载 {0} / {1}', 'Downloading {0} / {1}', 'ダウンロード中 {0} / {1}'),
+  new TranslationEntry(
+    '已下载 {0} 个文件到 ZENCHE 文件库',
+    'Downloaded {0} files to the ZENCHE library',
+    '{0} 件を ZENCHE ライブラリにダウンロードしました'
+  ),
+  new TranslationEntry('下载失败 · {0}', 'Download failed · {0}', 'ダウンロードに失敗しました · {0}'),
+  new TranslationEntry(
+    '已从相机删除 {0} 个文件',
+    'Deleted {0} files from the camera',
+    'カメラから {0} 件を削除しました'
+  ),
+  new TranslationEntry('删除失败 · {0}', 'Delete failed · {0}', '削除に失敗しました · {0}'),
+  new TranslationEntry(
+    '无法切换无线收件箱：{0}',
+    'Unable to switch the wireless inbox: {0}',
+    'ワイヤレス受信箱を切り替えられません：{0}'
+  ),
+  new TranslationEntry(
+    '无法打开机主相册：{0}',
+    'Unable to open the owner library: {0}',
+    '所有者のライブラリを開けません：{0}'
+  ),
+  new TranslationEntry(
+    '系统照片导入失败：{0}',
+    'Unable to import the system photo: {0}',
+    'システム写真を読み込めません：{0}'
+  ),
+  new TranslationEntry(
+    '系统相册保存失败：{0}',
+    'Unable to save to the system library: {0}',
+    'システムライブラリに保存できません：{0}'
+  ),
+  new TranslationEntry('最近 {0} 项', '{0} recent items', '最近の項目 {0} 件'),
+  new TranslationEntry(
+    '无法打开网盘文件提供器：{0}',
+    'Unable to open the cloud file provider: {0}',
+    'クラウドファイルプロバイダーを開けません：{0}'
+  ),
+  new TranslationEntry(
+    '保存编辑副本失败：{0}',
+    'Unable to save the edited copy: {0}',
+    '編集済みコピーを保存できません：{0}'
+  ),
+  new TranslationEntry(
+    '已保存编辑副本 · {0}',
+    'Edited copy saved · {0}',
+    '編集済みコピーを保存しました · {0}'
+  ),
+  new TranslationEntry('正在查看 {0}', 'Viewing {0}', '{0} を表示中'),
+  new TranslationEntry(
+    '无法播放视频：{0}',
+    'Unable to play the video: {0}',
+    '動画を再生できません：{0}'
+  ),
+  new TranslationEntry(
+    '无法打开系统分享面板：{0}',
+    'Unable to open the system share sheet: {0}',
+    'システム共有パネルを開けません：{0}'
+  ),
+  new TranslationEntry(
+    '下载到本地失败：{0}',
+    'Unable to export locally: {0}',
+    'ローカルに書き出せません：{0}'
+  ),
+  new TranslationEntry(
+    '已下载到本地：{0}',
+    'Exported locally: {0}',
+    'ローカルに書き出しました：{0}'
+  ),
+  new TranslationEntry(
+    '将从相机存储卡永久删除所选 {0} 个文件；{1}',
+    'The selected {0} files will be permanently deleted from the camera card. {1}',
+    '選択した {0} 件をカメラのメモリーカードから完全に削除します。{1}'
+  ),
+  new TranslationEntry('已删除 {0}', 'Deleted {0}', '{0} を削除しました'),
+  new TranslationEntry('无法删除 {0}。', 'Unable to delete {0}.', '{0} を削除できません。'),
+  new TranslationEntry(
+    '拍摄新照片，或连接相机后下载到文件库。',
+    'Capture new photos, or connect a camera and download them to the library.',
+    '新しい写真を撮影するか、カメラに接続してライブラリにダウンロードしてください。'
+  ),
   new TranslationEntry('还没有文件', 'No files yet', 'ファイルはまだありません'),
   new TranslationEntry(
     '拍摄新照片、从相机下载，或从系统相册导入。',
@@ -1428,4 +1566,32 @@ export function translate(language: string, source: string): string {
     }
   }
   return translated;
+}
+
+/**
+ * Translate an exact template first, then insert caller-owned dynamic values.
+ * This keeps file names, counts, arrows, and error details out of fragment
+ * translation while allowing each language to control word order.
+ */
+export function translateTemplate(
+  language: string,
+  source: string,
+  values: Array<string>
+): string {
+  const normalized: string = normalizeLanguage(language);
+  let template: string = source;
+  if (normalized !== LANGUAGE_SIMPLIFIED_CHINESE) {
+    const entry: TranslationEntry | undefined = TRANSLATIONS.find(
+      (candidate: TranslationEntry): boolean => candidate.chinese === source
+    );
+    if (entry !== undefined) {
+      template = normalized === LANGUAGE_ENGLISH
+        ? entry.english
+        : entry.japanese;
+    }
+  }
+  values.forEach((value: string, index: number): void => {
+    template = template.split(`{${index}}`).join(value);
+  });
+  return template;
 }
