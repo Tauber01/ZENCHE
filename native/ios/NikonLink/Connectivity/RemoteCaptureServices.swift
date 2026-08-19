@@ -2994,11 +2994,20 @@ final class WifiCameraService: ObservableObject {
 
     /// 连接就绪后自动开实时取景：约 10fps 拉帧，单帧失败退避 300ms 重试。
     /// 佳能路径 TBC-awaiting-hardware（与 C2 序列一致）。
+    /// PTP/IP 实时取景仅对已实现的 Nikon（0x9201 系）/Canon（EOS 序列）
+    /// 自动启动/恢复；Sony 不适用 Nikon opcode，保持连接但取景关闭，
+    /// 并给出诚实状态（pro 复审 P1-3 收口）。
     func startLiveViewIfNeeded() {
         guard isConnected,
               vendor != .unknown,
               liveViewTask == nil,
               let sessionAttempt = activeSessionAttempt else { return }
+        guard vendor == .nikon || vendor == .canon else {
+            if vendor == .sony {
+                liveViewStatus = "已连相机暂不支持 PTP/IP 实时取景"
+            }
+            return
+        }
         liveViewGeneration &+= 1
         let viewGeneration = liveViewGeneration
         liveViewTask = Task { [weak self] in

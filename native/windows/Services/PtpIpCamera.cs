@@ -963,7 +963,9 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
-        await _commandGate.WaitAsync(cancellationToken);
+        using var deadline = CreateCommandDeadline(cancellationToken);
+        var token = deadline.Token;
+        await _commandGate.WaitAsync(token);
         var transactionStarted = false;
         try
         {
@@ -978,7 +980,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 WriteUInt32(payload, parameter);
             }
             transactionStarted = true;
-            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            await SendPacketAsync(stream, 6, payload.ToArray(), token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
 
             using var startPayload = new MemoryStream();
@@ -988,7 +991,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 stream,
                 9,
                 startPayload.ToArray(),
-                cancellationToken);
+                token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
 
             using var endPayload = new MemoryStream();
@@ -998,10 +1002,12 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 stream,
                 12,
                 endPayload.ToArray(),
-                cancellationToken);
+                token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
 
-            var response = await ReceivePacketAsync(stream, cancellationToken);
+            var response = await ReceivePacketAsync(stream, token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
             if (response.Type != 7 || response.Data.Length < 14 ||
                 ReadUInt32(response.Data, 10) != transaction)
@@ -1022,8 +1028,23 @@ public sealed class PtpIpCamera : IAsyncDisposable
         }
         catch (OperationCanceledException error) when (transactionStarted)
         {
-            RetireCommandSession(stream, sessionGeneration, error);
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                RetireCommandSession(stream, sessionGeneration, error);
+                throw;
+            }
+            var timeout = new TimeoutException(
+                "PTP/IP 命令事务超时",
+                error);
+            RetireCommandSession(stream, sessionGeneration, timeout);
+            throw timeout;
+        }
+        catch (OperationCanceledException error)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            // 内部 deadline 在事务开始前到期（例如等待命令 gate 超时）：
+            // 尚未发送任何字节，无需退休；但要与用户取消区分开。
+            throw new TimeoutException("PTP/IP 命令事务超时", error);
         }
         finally
         {
@@ -1310,6 +1331,33 @@ public sealed class PtpIpCamera : IAsyncDisposable
     /// <summary>B2 保活参数（契约测试锚点）：单次探测超时 3s。</summary>
     public const int ProbeTimeoutMilliseconds = 3000;
 
+    /// <summary>B4 保活参数（契约测试锚点）：命令事务空闲超时 12s。</summary>
+    public const int CommandTransactionTimeoutMilliseconds = 12000;
+
+    /// <summary>
+    /// 为命令事务建立内部空闲超时：deadline 覆盖调用方 token（用户取消直接
+    /// 传导），但内部计时是"连续 12 秒无 I/O 进展"而非整笔总时长——每个成功
+    /// 收/发都会重置（ResetCommandDeadline）。这样大视频持续传输不受总时长
+    /// 限制（与 Android setSoTimeout(12000) 的单次无进展语义一致），而卡死读
+    /// 会在最后进展 12 秒后到期：退休 exact captured session 并置
+    /// command-channel failure，让 event probe 在心跳中判离线进入统一重连。
+    /// </summary>
+    private static CancellationTokenSource CreateCommandDeadline(
+        CancellationToken cancellationToken)
+    {
+        var deadline = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken);
+        ResetCommandDeadline(deadline);
+        return deadline;
+    }
+
+    /// <summary>每次成功收发后调用，把空闲计时器重置为 12 秒。</summary>
+    private static void ResetCommandDeadline(CancellationTokenSource deadline)
+    {
+        deadline.CancelAfter(
+            TimeSpan.FromMilliseconds(CommandTransactionTimeoutMilliseconds));
+    }
+
     public async ValueTask DisposeAsync() => await DisconnectAsync();
 
     private async Task<ushort> SendCommandAsync(
@@ -1330,7 +1378,9 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
-        await _commandGate.WaitAsync(cancellationToken);
+        using var deadline = CreateCommandDeadline(cancellationToken);
+        var token = deadline.Token;
+        await _commandGate.WaitAsync(token);
         var transactionStarted = false;
         try
         {
@@ -1345,9 +1395,11 @@ public sealed class PtpIpCamera : IAsyncDisposable
                 WriteUInt32(payload, parameter);
             }
             transactionStarted = true;
-            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            await SendPacketAsync(stream, 6, payload.ToArray(), token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
-            var response = await ReceivePacketAsync(stream, cancellationToken);
+            var response = await ReceivePacketAsync(stream, token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
             if (response.Type != 7 || response.Data.Length < 14 ||
                 ReadUInt32(response.Data, 10) != transaction)
@@ -1368,8 +1420,23 @@ public sealed class PtpIpCamera : IAsyncDisposable
         }
         catch (OperationCanceledException error) when (transactionStarted)
         {
-            RetireCommandSession(stream, sessionGeneration, error);
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                RetireCommandSession(stream, sessionGeneration, error);
+                throw;
+            }
+            var timeout = new TimeoutException(
+                "PTP/IP 命令事务超时",
+                error);
+            RetireCommandSession(stream, sessionGeneration, timeout);
+            throw timeout;
+        }
+        catch (OperationCanceledException error)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            // 内部 deadline 在事务开始前到期（例如等待命令 gate 超时）：
+            // 尚未发送任何字节，无需退休；但要与用户取消区分开。
+            throw new TimeoutException("PTP/IP 命令事务超时", error);
         }
         finally
         {
@@ -1395,7 +1462,9 @@ public sealed class PtpIpCamera : IAsyncDisposable
         {
             throw new InvalidOperationException("请先连接 Wi‑Fi 相机");
         }
-        await _commandGate.WaitAsync(cancellationToken);
+        using var deadline = CreateCommandDeadline(cancellationToken);
+        var token = deadline.Token;
+        await _commandGate.WaitAsync(token);
         var transactionStarted = false;
         try
         {
@@ -1408,10 +1477,12 @@ public sealed class PtpIpCamera : IAsyncDisposable
             WriteUInt32(payload, transaction);
             foreach (var parameter in parameters) WriteUInt32(payload, parameter);
             transactionStarted = true;
-            await SendPacketAsync(stream, 6, payload.ToArray(), cancellationToken);
+            await SendPacketAsync(stream, 6, payload.ToArray(), token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
 
-            var first = await ReceivePacketAsync(stream, cancellationToken);
+            var first = await ReceivePacketAsync(stream, token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
             if (first.Type == 7)
             {
@@ -1445,7 +1516,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
                     8UL * 1024 * 1024));
             while (true)
             {
-                var packet = await ReceivePacketAsync(stream, cancellationToken);
+                var packet = await ReceivePacketAsync(stream, token);
+                ResetCommandDeadline(deadline);
                 EnsureCommandSession(stream, sessionGeneration);
                 if ((packet.Type != 10 && packet.Type != 12) ||
                     packet.Data.Length < 12 ||
@@ -1468,7 +1540,8 @@ public sealed class PtpIpCamera : IAsyncDisposable
             {
                 throw new IOException("相机返回的数据与 StartData 声明长度不一致");
             }
-            var response = await ReceivePacketAsync(stream, cancellationToken);
+            var response = await ReceivePacketAsync(stream, token);
+            ResetCommandDeadline(deadline);
             EnsureCommandSession(stream, sessionGeneration);
             if (response.Type != 7 || response.Data.Length < 14 ||
                 ReadUInt32(response.Data, 10) != transaction)
@@ -1488,8 +1561,23 @@ public sealed class PtpIpCamera : IAsyncDisposable
         }
         catch (OperationCanceledException error) when (transactionStarted)
         {
-            RetireCommandSession(stream, sessionGeneration, error);
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                RetireCommandSession(stream, sessionGeneration, error);
+                throw;
+            }
+            var timeout = new TimeoutException(
+                "PTP/IP 命令事务超时",
+                error);
+            RetireCommandSession(stream, sessionGeneration, timeout);
+            throw timeout;
+        }
+        catch (OperationCanceledException error)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            // 内部 deadline 在事务开始前到期（例如等待命令 gate 超时）：
+            // 尚未发送任何字节，无需退休；但要与用户取消区分开。
+            throw new TimeoutException("PTP/IP 命令事务超时", error);
         }
         finally
         {

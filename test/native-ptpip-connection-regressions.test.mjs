@@ -154,7 +154,7 @@ test('shared PTP/IP command streams serialize complete transactions', async () =
     'private async Task<ushort> SendCommandWithDataOutAsync(',
   ]) {
     const method = blockStartingAt(windows, marker);
-    assert.match(method, /await _commandGate\.WaitAsync\(cancellationToken\)/);
+    assert.match(method, /await _commandGate\.WaitAsync\(token\)/);
     assert.match(method, /_commandGate\.Release\(\)/);
   }
 });
@@ -814,4 +814,120 @@ test('Windows reconnect attempts are bounded and stay reconnecting until restora
     /DisconnectIfOwnedAsync\(\s*ownedSessionGeneration\)/,
   );
   assert.doesNotMatch(transition, /_wifiCamera\.DisconnectAsync\(\)/);
+});
+
+test('iOS auto live view stays vendor-gated: Sony keeps the connection without Nikon 0x9201', async () => {
+  const apple = await read(
+    'native/ios/NikonLink/Connectivity/RemoteCaptureServices.swift');
+  const start = blockStartingAt(apple, 'func startLiveViewIfNeeded()');
+  const initial = blockStartingAt(apple, 'func connect()');
+  const reconnect = blockStartingAt(apple, 'private func scheduleReconnect()');
+
+  // 门控：仅已实现的 Nikon/Canon 自动启动/恢复取景；Sony 永不进入 Nikon
+  // 0x9201 取景路径，保持连接但取景关闭并给出诚实状态。
+  assert.match(
+    start,
+    /guard vendor == \.nikon \|\| vendor == \.canon else \{[\s\S]*if vendor == \.sony \{[\s\S]*liveViewStatus = "已连相机暂不支持 PTP\/IP 实时取景"[\s\S]*return/,
+    'startLiveViewIfNeeded must gate on Nikon/Canon and report Sony honestly',
+  );
+  assert.ok(
+    (start.match(/session\.startLiveView\(vendor: vendor\)/g) ?? []).length === 1,
+    'the live-view task body must remain the single vendor-gated entry',
+  );
+  assert.doesNotMatch(start, /startLiveView\(vendor: \.sony\)/);
+
+  // 连接/重连成功路径仍调用同一门控入口：Nikon/Canon 行为保留。
+  for (const flow of [initial, reconnect]) {
+    assert.match(
+      flow,
+      /supportsMovieRecording =\s*vendor == \.nikon \|\| vendor == \.canon/,
+    );
+    assert.match(flow, /startLiveViewIfNeeded\(\)/);
+    assert.match(flow, /if vendor != \.unknown \{/);
+    assert.match(flow, /self\.refreshParameters\(\)/);
+  }
+});
+
+test('Windows command transactions use a 12s idle timeout reset on every I/O', async () => {
+  const windows = await read('native/windows/Services/PtpIpCamera.cs');
+  const create = blockStartingAt(
+    windows,
+    'private static CancellationTokenSource CreateCommandDeadline(',
+  );
+  const reset = blockStartingAt(
+    windows,
+    'private static void ResetCommandDeadline(CancellationTokenSource deadline)',
+  );
+
+  // 单一常量 + 单一帮助函数：三处命令入口共用，避免语义漂移。
+  assert.match(
+    windows,
+    /public const int CommandTransactionTimeoutMilliseconds = 12000/,
+  );
+  assert.match(
+    create,
+    /CancellationTokenSource\.CreateLinkedTokenSource\(\s*cancellationToken\)/,
+  );
+  assert.match(create, /ResetCommandDeadline\(deadline\)/);
+  assert.match(
+    reset,
+    /deadline\.CancelAfter\([\s\S]*CommandTransactionTimeoutMilliseconds\)/,
+  );
+
+  // 空闲超时语义（与 Android setSoTimeout(12000) 一致）：每个成功收/发后
+  // 重置计时，持续传输（如 DownloadStorageObject 大视频）不受总时长限制。
+  const ioSites = {
+    'private async Task<ushort> SendCommandAsync(': 2,
+    'private async Task<byte[]> SendCommandWithDataAsync(': 4,
+    'private async Task<ushort> SendCommandWithDataOutAsync(': 4,
+  };
+  for (const [marker, expected] of Object.entries(ioSites)) {
+    const method = blockStartingAt(windows, marker);
+    assert.match(method, /using var deadline = CreateCommandDeadline\(cancellationToken\)/);
+    assert.match(method, /await _commandGate\.WaitAsync\(token\)/);
+    const resets = (method.match(/ResetCommandDeadline\(deadline\)/g) ?? []).length;
+    assert.equal(
+      resets,
+      expected,
+      `${marker} must reset the idle timer after every successful I/O`,
+    );
+    // 大对象数据包循环：每包成功接收都重置，卡死读才会在最后进展后 12s 退休。
+    if (marker.includes('SendCommandWithDataAsync')) {
+      assert.match(
+        method,
+        /var packet = await ReceivePacketAsync\(stream, token\);[\s\S]*ResetCommandDeadline\(deadline\)/,
+        'the data-in loop must refresh the idle timer per packet',
+      );
+    }
+  }
+
+  // 到期退休 exact captured session 并置 command-channel failure；用户取消
+  // 保留 OperationCanceled 语义（不吞取消）；旧事务不能关闭新 generation。
+  for (const marker of [
+    'private async Task<ushort> SendCommandAsync(',
+    'private async Task<byte[]> SendCommandWithDataAsync(',
+    'private async Task<ushort> SendCommandWithDataOutAsync(',
+  ]) {
+    const method = blockStartingAt(windows, marker);
+    assert.match(
+      method,
+      /catch \(OperationCanceledException error\) when \(transactionStarted\)[\s\S]*if \(cancellationToken\.IsCancellationRequested\)[\s\S]*RetireCommandSession\(stream, sessionGeneration, error\)[\s\S]*throw;[\s\S]*var timeout = new TimeoutException\([\s\S]*RetireCommandSession\(stream, sessionGeneration, timeout\)[\s\S]*throw timeout/,
+      `${marker} must retire the exact captured session on idle timeout and preserve user cancellation`,
+    );
+    assert.match(
+      method,
+      /catch \(OperationCanceledException error\)[\s\S]*when \(!cancellationToken\.IsCancellationRequested\)[\s\S]*throw new TimeoutException\("PTP\/IP 命令事务超时", error\)/,
+      `${marker} must surface pre-transaction deadline expiry without retiring`,
+    );
+  }
+
+  // 退休本身只作用于 exact captured stream + generation（新会话不受影响）。
+  assert.match(
+    blockStartingAt(windows, 'private void RetireCommandSession('),
+    /if \(!ReferenceEquals\(_commandStream, expectedStream\) \|\|[\s\S]*Volatile\.Read\(ref _sessionGeneration\) != expectedGeneration\)[\s\S]*return;/,
+  );
+  assert.match(
+    blockStartingAt(windows, 'private void RetireCommandSession('),
+    /_commandChannelFailure \?\?= error/,
+  );
 });
