@@ -352,6 +352,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **缩略图边界**：macOS `NSCache` 与 Windows `ThumbnailCache` 均限 128 项并下采样；Windows 只在虚拟化行真正加载时解码，冻结 `BitmapSource` 后跨线程交付。视频使用明确占位，不把完整视频或 RAW 载入缩略图缓存。
 - **本地删除语义**：删除先确认并把主文件送入系统 Trash/Recycle Bin，成功后才清除项目归属。清单、Backup 与 XMP 必须从 `Sessions/<owner>/Primary/<file>` 推导真实历史会话，不能使用当前活动会话；同 stem 的 RAW/JPEG 仍存在时保留共享 XMP。主文件已进废纸篓但关联项同步失败时要报告“部分完成”，不能伪装为整体失败或恢复归属。
 - **回归边界**：`test/native-desktop-import*.test.mjs` 锁定流式/取消/回滚，`test/native-desktop-library-simple.test.mjs` 锁定信息架构、缓存、虚拟化、Trash 与历史会话，`test/native-library-tree.test.mjs` 锁定五端归类仍可用，`test/launch-announcement.test.mjs` 锁定五端 1.5.14 公告内容。结构契约和编译不替代 Sony 真机、真实文件提供器、低磁盘、系统废纸篓、Windows UI 或长时间内存验收。
+- **1.5.14 封板证据**：总实现 `5e8b7f1e81c91d99848c619ba583784f5a20cb57` 的完整自动化为 629 通过、0 失败、1 项 Windows 主机专属用例跳过；五端包均从该实现重建。六份侧车 6/6 一致；Android v2 Debug 证书连续，iOS/HarmonyOS 未签名，macOS arm64 为 ad-hoc 且 DMG/深度严格校验通过，Windows x64 Setup/主程序无 Authenticode。精确字节数与摘要见 `docs/releases/v1.5.14.md`。
 
 ## 6. 本地工作流与图像处理
 
