@@ -1512,21 +1512,24 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     '選択した保存先は無効です'
   ),
   new TranslationEntry(
-    '• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n' +
-      '• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n' +
-      '• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n' +
-      '• Android 与 HarmonyOS 补齐网络状态权限；Windows 单轮重连使用有限超时，并在取景与参数恢复完成前保持重连状态。\n' +
-      '• 1.5.14 是本地候选版本，尚未发布。自动化与本地构建不能替代真实相机、移动设备和 Windows 主机验收；安装包签名及验证边界以候选说明为准。',
-    '• Strengthened Wi‑Fi/PTP‑IP connections: command transactions stay serialized, while the event channel, heartbeat, and dual-channel handshake no longer misclassify one another.\n' +
-      '• Connection and automatic-reconnect status now updates live. You can cancel a connection or stop reconnecting at any time, then retry directly with guidance to check Wi‑Fi, the IP address, and the port.\n' +
-      '• Session-generation isolation prevents an old connection, stale callback, or late response from replacing the current session during recovery.\n' +
-      '• Android and HarmonyOS now include network-state permissions. Each Windows reconnect attempt has a bounded timeout and remains in the reconnecting state until live view and parameters are restored.\n' +
-      '• 1.5.14 is a local candidate and has not been released. Automation and local builds do not replace validation with real cameras, mobile devices, and Windows hosts; see the candidate notes for package signing and validation boundaries.',
-    '• Wi‑Fi／PTP-IP 接続を強化しました。コマンド処理を直列化し、イベントチャンネル、ハートビート、2 チャンネルのハンドシェイクが互いを誤判定しないようにしました。\n' +
-      '• 接続と自動再接続の状態をリアルタイムで表示します。接続のキャンセルや再接続の停止がいつでも可能で、失敗後は Wi‑Fi、IP アドレス、ポートの確認案内から直接再試行できます。\n' +
-      '• セッション世代の分離により、復旧中の古い接続、古いコールバック、遅延応答が現在のセッションを上書きしません。\n' +
-      '• Android と HarmonyOS にネットワーク状態権限を追加しました。Windows の各再接続試行には有限のタイムアウトを設け、ライブビューとパラメータの復旧完了まで再接続中の状態を維持します。\n' +
-      '• 1.5.14 は未公開のローカル候補です。自動テストとローカルビルドは、実機カメラ、モバイル端末、Windows ホストでの検証を代替しません。パッケージの署名と検証範囲は候補版の説明を参照してください。'
+    '• 修复 Wi‑Fi/PTP‑IP 与桌面 USB 连接不上、连接中断：命令、事件、心跳和重连按会话隔离，失败可取消、停止重连或直接重试。\n' +
+      '• 新增 Sony ZV‑E10、A6100/A6100A、A6400/A6400A、A6600 识别与兼容配置；完整遥控能力仍需对应真机验证。\n' +
+      '• macOS 与 Windows 新增一键导入照片和视频，支持多选、取消、流式写入、RAW+JPEG 配对、双备份与校验清单。\n' +
+      '• 五端文件库改为“所有文件”优先，可搜索、筛选、排序；项目分类与来源工具默认收起，归类不移动原文件。\n' +
+      '• 桌面删除改用系统废纸篓/回收站，并同步正确历史会话的备份、校验清单与共享 XMP。\n' +
+      '• 1.5.14 已通过 GitHub 与官网发布；安装包签名和实机验证边界请查看发布说明。',
+    '• Fixed Wi‑Fi/PTP-IP and desktop USB connection failures and interruptions. Commands, events, probes, and reconnects are isolated by session; you can cancel, stop reconnecting, or retry directly.\n' +
+      '• Added identification and compatibility profiles for Sony ZV-E10, A6100/A6100A, A6400/A6400A, and A6600; complete remote control still requires matching-camera validation.\n' +
+      '• macOS and Windows add one-click multi-file photo/video import with cancellation, streaming I/O, RAW+JPEG pairing, dual backup, and checksum manifests.\n' +
+      '• All five libraries now lead with All Files and provide search, filtering, and sorting. Project categories and secondary sources/tools start collapsed; categorizing never moves originals.\n' +
+      '• Desktop deletion now uses the OS Trash/Recycle Bin and reconciles the correct historical session, backup, checksum manifest, and shared XMP.\n' +
+      '• 1.5.14 is published through GitHub and the official website; see the release notes for package signing and hardware-validation limits.',
+    '• Wi‑Fi／PTP-IP とデスクトップ USB の接続失敗・切断を修正しました。コマンド、イベント、プローブ、再接続をセッション単位で分離し、キャンセル、再接続停止、直接再試行に対応します。\n' +
+      '• Sony ZV-E10、A6100/A6100A、A6400/A6400A、A6600 の識別・互換プロファイルを追加しました。完全なリモート制御は各実機での検証が必要です。\n' +
+      '• macOS／Windows に写真・動画のワンクリック複数読み込みを追加し、キャンセル、ストリーミング I/O、RAW+JPEG ペア、二重バックアップ、チェックサムマニフェストに対応しました。\n' +
+      '• 5 プラットフォームのファイル画面は「すべてのファイル」を先頭にし、検索、絞り込み、並び替えを提供します。プロジェクト分類と追加ソース／ツールは既定で折りたたみ、分類しても元ファイルは移動しません。\n' +
+      '• デスクトップの削除は OS のゴミ箱を使い、正しい過去セッション、バックアップ、チェックサムマニフェスト、共有 XMP を同期します。\n' +
+      '• 1.5.14 は GitHub と公式サイトで公開済みです。パッケージの署名と実機検証範囲はリリースノートを参照してください。'
   )
 ];
 

@@ -668,7 +668,7 @@ test("all native AI activation settings link to official redemption and show Afd
   assert.match(windows, /AiOfficialWebsite_Click/);
 });
 
-test("mobile project categories default to collapsed progressive disclosure", async () => {
+test("project organization defaults to collapsed progressive disclosure", async () => {
   const [ios, android, harmony, design] = await Promise.all([
     read("native/ios/NikonLink/Views/RootView.swift"),
     read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
@@ -676,8 +676,8 @@ test("mobile project categories default to collapsed progressive disclosure", as
     read("design.md"),
   ]);
 
-  // 1.5.14：分支树降级为「项目分类」，全移动端布局默认收起（不再区分
-  // phone drawer 与平板展开）；桌面端保持分支树可见。
+  // 1.5.14：移动端把分支树降级为「项目分类」，桌面端收进「来源与工具」；
+  // 五端都让“所有文件”成为默认入口，并把项目组织默认收起。
   assert.match(ios, /@State private var projectCategoriesExpanded = false/);
   assert.match(ios, /DisclosureGroup\(isExpanded: \$projectCategoriesExpanded\)/);
   assert.match(ios, /Label\("项目分类", systemImage: "folder"\)/);
@@ -694,5 +694,5 @@ test("mobile project categories default to collapsed progressive disclosure", as
 
   assert.match(design, /All Files view/);
   assert.match(design, /collapsed by default/);
-  assert.match(design, /Desktop layouts\s+keep the branch tree visible/);
+  assert.match(design, /desktop labels it Sources & Tools and keeps the nested project\s+tree inside/);
 });

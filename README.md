@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- GitHub 公开稳定版：**v1.5.13**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)）
-- 当前源码版本：**1.5.13 / build 40**
+- GitHub 公开稳定版：**v1.5.14**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
+- 当前源码版本：**1.5.14 / build 41**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
-- 相机档案：**46 款 Nikon / Sony / Canon 相机**（20 Nikon、12 Sony、14 Canon）
+- 相机档案：**50 款 Nikon / Sony / Canon 相机**（20 Nikon、16 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[GitHub 公开稳定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[GitHub 公开稳定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[http://zenche.top/](http://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -41,6 +41,14 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > [!IMPORTANT]
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.14 GitHub 与官网更新
+
+- 修复 Wi‑Fi/PTP‑IP 与桌面 USB 连接不上、连接中断和旧会话误恢复问题：命令、事件、心跳与重连按会话隔离，连接可取消、重连可停止，失败后可直接重试；桌面外部命令也有空闲超时与明确诊断。
+- 新增 Sony ZV‑E10、A6100/A6100A、A6400/A6400A、A6600 的识别与兼容配置。它们使用兼容路径，未列入当前 Sony Camera Remote SDK 的公开支持清单，完整遥控能力仍需对应真机验证。
+- macOS 与 Windows 新增一键导入照片和视频：支持多选、取消、流式写入、RAW+JPEG 配对、双备份与 SHA‑256 清单，不把大文件整体读入内存。
+- 五端文件库统一改为“所有文件”优先，可搜索、筛选和排序；项目分类与来源工具默认收起，归类不会移动原文件。桌面缩略图按需解码并限额缓存，删除使用系统废纸篓/回收站并同步正确历史会话的备份、清单与共享 XMP。
+- `1.5.14 / build 41` 同步发布到 GitHub 与官网更新服务。六个安装包、逐包 SHA‑256、签名状态、验证结果与已知限制见 [1.5.14 发布说明](docs/releases/v1.5.14.md)。
 
 ### v1.5.13 GitHub 发布
 
@@ -186,7 +194,7 @@ iOS/iPadOS 的公开 API 不向普通应用开放 Nikon 厂商 USB/PTP 控制，
 - **Nikon EXPEED 5** (3)：D500、D7500、D850
 - **Nikon EXPEED 6** (10)：Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **Nikon EXPEED 7** (7)：Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
-- **Sony α** (12)：A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II — ⚠️ 实验性，待实机验证
+- **Sony α** (16)：A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II、ZV-E10、A6100（含 A6100A 识别别名）、A6400（含 A6400A 识别别名）、A6600 — ⚠️ 实验性，待实机验证
 - **Canon EOS R** (14)：EOS R1、R3、R5、R5 Mark II、R6 Mark III、R6 Mark II、R6、R5 C、R7、R8、R10、R50 V、R50、R100 — ⚠️ 实验性，待实机验证
 
 <details>
@@ -215,7 +223,7 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [GitHub 公开稳定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)
+前往 [GitHub 公开稳定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
@@ -431,12 +439,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- GitHub public stable release: **v1.5.13** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13))
-- Source version: **1.5.13 / build 40**
+- GitHub public stable release: **v1.5.14** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14))
+- Source version: **1.5.14 / build 41**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
-- Camera profiles: **46 Nikon / Sony / Canon cameras** (20 Nikon, 12 Sony, 14 Canon)
-- Downloads: [GitHub public stable release v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Camera profiles: **50 Nikon / Sony / Canon cameras** (20 Nikon, 16 Sony, 14 Canon)
+- Downloads: [GitHub public stable release v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](http://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -447,6 +455,14 @@ in a local library for review and export.
 > against their respective release notes and SHA-256 manifests.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### GitHub and official-site update in v1.5.14
+
+- Fixed Wi‑Fi/PTP‑IP and desktop USB connection failures, interrupted sessions, and stale-session recovery. Commands, events, probes, and reconnects are isolated by session; connection can be cancelled, reconnecting can be stopped, and failures can be retried directly. Desktop helper commands also use idle timeouts and explicit diagnostics.
+- Added identification and compatibility profiles for Sony ZV‑E10, A6100/A6100A, A6400/A6400A, and A6600. These models use compatibility paths and are not listed by the current public Sony Camera Remote SDK support table, so complete remote-control behavior still requires matching-camera validation.
+- macOS and Windows add one-click multi-file photo/video import with cancellation, streaming I/O, RAW+JPEG pairing, dual backup, and SHA‑256 manifests without loading an entire large file into memory.
+- All five libraries now lead with All Files and provide search, filtering, and sorting. Project categories and secondary sources/tools start collapsed; categorizing never relocates the original. Desktop thumbnails decode lazily into bounded caches, and deletion uses the OS Trash/Recycle Bin while reconciling the correct historical session, backup, manifest, and shared XMP.
+- `1.5.14 / build 41` is published through both GitHub and the official update service. See the [1.5.14 release notes](docs/releases/v1.5.14.md) for all six packages, per-file SHA‑256, signing status, validation, and known limits.
 
 ### v1.5.13 GitHub release
 
@@ -588,7 +604,7 @@ foreground FTP/HTTP/WebDAV receiving.
 - **EXPEED 5:** D500, D7500, and D850
 - **EXPEED 6:** Z7, Z6, Z50, D780, D6, Z5, Z7II, Z6II, Z fc, and Z30
 - **EXPEED 7:** Z9, Z8, Z f, Z6III, Z50II, Z5II, and ZR
-- **Sony α (experimental):** A1, A1 II, A9 III, A7R V, A7 IV, A7S III, A7C II, A7C R, ZV-E1, A6700, FX30, and ZV-E10 II
+- **Sony α (16 profiles, experimental):** A1, A1 II, A9 III, A7R V, A7 IV, A7S III, A7C II, A7C R, ZV-E1, A6700, FX30, ZV-E10 II, ZV-E10, A6100 (including the A6100A identification alias), A6400 (including the A6400A alias), and A6600
 - **Canon EOS R (experimental):** EOS R1, R3, R5, R5 Mark II, R6 Mark III, R6 Mark II, R6, R5 C, R7, R8, R10, R50 V, R50, and R100
 
 Nikon uses USB Vendor ID `0x04b0`, Sony uses `0x054c`, and Canon uses `0x04a9`.
@@ -617,7 +633,7 @@ completed hardware validation.
 ### Download and install
 
 Download packages and their matching `.sha256` files from the
-[latest stable v1.5.13 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13).
+[latest stable v1.5.14 release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14).
 The delivery names are:
 
 | Platform | File | Installation note |
@@ -790,12 +806,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- GitHub 公開安定版：**v1.5.13**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)）
-- 現在のソースバージョン：**1.5.13 / build 40**
+- GitHub 公開安定版：**v1.5.14**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
+- 現在のソースバージョン：**1.5.14 / build 41**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
-- カメラプロファイル：**Nikon / Sony / Canon の 46 機種**（Nikon 20、Sony 12、Canon 14）
-- ダウンロード：[GitHub 公開安定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- カメラプロファイル：**Nikon / Sony / Canon の 50 機種**（Nikon 20、Sony 16、Canon 14）
+- ダウンロード：[GitHub 公開安定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](http://zenche.top/)
 - Afdian 引き換えコード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -805,6 +821,14 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > GitHub 公開安定版と公式サイトの自動更新版は、それぞれのリリースノートと
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.14 GitHub／公式サイト更新
+
+- Wi‑Fi/PTP-IP とデスクトップ USB の接続失敗、切断、古いセッションの誤復旧を修正しました。コマンド、イベント、プローブ、再接続をセッション単位で分離し、接続のキャンセル、再接続の停止、失敗後の直接再試行に対応。デスクトップの補助コマンドにはアイドルタイムアウトと明確な診断も追加しました。
+- Sony ZV‑E10、A6100/A6100A、A6400/A6400A、A6600 の識別・互換プロファイルを追加しました。これらは互換経路を使用し、現在公開されている Sony Camera Remote SDK の対応一覧には含まれないため、完全なリモート制御は各実機での検証が必要です。
+- macOS／Windows に写真・動画のワンクリック複数読み込みを追加しました。キャンセル、ストリーミング I/O、RAW+JPEG ペア、二重バックアップ、SHA‑256 マニフェストに対応し、大容量ファイル全体をメモリへ読み込みません。
+- 5 プラットフォームのファイル画面は「すべてのファイル」を先頭にし、検索、絞り込み、並び替えを提供します。プロジェクト分類と追加ソース／ツールは既定で折りたたまれ、分類しても元ファイルは移動しません。デスクトップのサムネイルは遅延デコードと上限付きキャッシュを使い、削除は OS のゴミ箱へ送り、正しい過去セッションのバックアップ、マニフェスト、共有 XMP を同期します。
+- `1.5.14 / build 41` を GitHub と公式更新サービスの両方で公開します。6 パッケージ、個別 SHA‑256、署名状態、検証結果、既知の制限は [1.5.14 リリースノート](docs/releases/v1.5.14.md)を参照してください。
 
 ### v1.5.13 GitHub リリース
 
@@ -942,7 +966,7 @@ iOS/iPadOS の公開 API は、一般アプリに Nikon 固有の USB/PTP 制御
 - **EXPEED 5：** D500、D7500、D850
 - **EXPEED 6：** Z7、Z6、Z50、D780、D6、Z5、Z7II、Z6II、Z fc、Z30
 - **EXPEED 7：** Z9、Z8、Z f、Z6III、Z50II、Z5II、ZR
-- **Sony α（実験的）：** A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II
+- **Sony α（16 プロファイル、実験的）：** A1、A1 II、A9 III、A7R V、A7 IV、A7S III、A7C II、A7C R、ZV-E1、A6700、FX30、ZV-E10 II、ZV-E10、A6100（A6100A 識別別名を含む）、A6400（A6400A 別名を含む）、A6600
 - **Canon EOS R（実験的）：** EOS R1、R3、R5、R5 Mark II、R6 Mark III、R6 Mark II、R6、R5 C、R7、R8、R10、R50 V、R50、R100
 
 USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` です。内蔵プロファイルは、
@@ -970,7 +994,7 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[GitHub 公開安定版 v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) から
+[GitHub 公開安定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 

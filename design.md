@@ -273,15 +273,21 @@ rather than exposing one undifferentiated list of camera properties:
   branches. A branch may contain child branches at any depth and persists across
   launches. Creating a branch never moves, duplicates, or mutates the underlying
   media file; unassigned media remains under a clearly labelled Unclassified node.
-- On mobile the library page leads with an All Files view listing every local
-  file regardless of branch assignment, with filename search, an
-  All/Photos/Videos type filter, and Recent/Name sorting. Its
-  primary-navigation label is Files; desktop platforms keep the branch library
-  as the primary workspace.
-- Branch organization continues on mobile as a Project Categories section that
-  is collapsed by default so the file page opens at a practical density. The
-  disclosure header shows root-branch and unclassified counts. Desktop layouts
-  keep the branch tree visible.
+- Every platform leads with an All Files view listing every local file regardless
+  of project assignment, with filename search, an All/Photos/Videos type filter,
+  and Recent/Name sorting. Mobile primary navigation calls this destination
+  Files. Desktop presents Import Photos and Videos as the only visually primary
+  action; preview, export, share, reveal, move-to-project, and trash remain
+  secondary actions.
+- Project organization and secondary sources/tools are collapsed by default so
+  the page opens at a practical density. Mobile labels the disclosure Project
+  Categories; desktop labels it Sources & Tools and keeps the nested project
+  tree inside. Disclosure summaries expose useful project, unclassified, source,
+  or file counts before expansion.
+- Desktop thumbnails are decoded on demand, downsampled, cached with an explicit
+  memory/count bound, and paired with a virtualized or lazy file view. Searching,
+  filtering, and sorting operate on the current in-memory metadata snapshot and
+  do not rescan the filesystem on every keystroke.
 - Local library files can be dragged between branches or back to Unclassified.
   Desktop platforms start dragging directly; touch platforms use the native
   press-and-hold drag gesture. Valid targets gain a cobalt border/background,
@@ -292,6 +298,12 @@ rather than exposing one undifferentiated list of camera properties:
 - Deleting a branch requires a destructive confirmation and recursively removes
   its child-branch structure. Assigned media returns to Unclassified; the
   underlying files remain untouched.
+- Deleting a local library file requires a native destructive confirmation and
+  sends the primary file to the operating-system Trash or Recycle Bin. Only after
+  that succeeds may the project assignment be removed. Session backup, checksum
+  manifest, and sidecar reconciliation must target the historical session that
+  actually owns the file; a shared XMP remains while a same-stem RAW/JPEG sibling
+  still exists.
 - Tree rows use restrained guide lines, indentation, native disclosure affordances,
   and counts. New-branch actions are available both at the library root and on
   every user branch so hierarchy creation is discoverable without a context menu.
@@ -316,6 +328,11 @@ rather than exposing one undifferentiated list of camera properties:
   users to enter a cloud-drive password.
 - The supported guide set is Baidu Netdisk, Aliyun Drive, Tencent Weiyun, Quark
   Cloud Drive, Xunlei Cloud Drive, and 115.
+- macOS and Windows provide a native multi-select Import Photos and Videos action
+  for supported photo, RAW, and video extensions. Import streams through a
+  same-directory temporary file, verifies byte count before atomic publication,
+  supports cancellation, preserves RAW+JPEG pairing, and applies the active
+  session's backup, metadata, and checksum behavior without blocking the UI.
 
 ## In-camera storage
 

@@ -1,6 +1,16 @@
 # Changelog
 
-## [1.5.14] - Unreleased
+## [1.5.14] - 2026-08-20
+
+### Added
+
+- Added Sony ZV-E10, A6100/A6100A, A6400/A6400A, and A6600
+  identification and compatibility profiles across all five native targets.
+  These older models use compatibility paths and remain pending matching-camera
+  validation rather than being represented as Camera Remote SDK-certified.
+- Added one-click multi-select photo and video import to macOS and Windows,
+  with cancellation, streaming I/O, RAW+JPEG pairing, dual backup, metadata,
+  and checksum-manifest integration.
 
 ### Changed
 
@@ -17,8 +27,14 @@
   the HarmonyOS connection panel remains scrollable on small or split-screen
   viewports.
 - Localized the new dynamic actions and stable Windows recovery errors in
-  Simplified Chinese, English, and Japanese. The in-app announcement now
-  describes 1.5.14 as an unpublished local candidate.
+  Simplified Chinese, English, and Japanese.
+- Reworked all five file libraries around an All Files-first layout with search,
+  photo/video filtering, recent/name sorting, and collapsed project/source
+  organization. Categorizing never relocates the original file.
+- Added bounded lazy thumbnail decoding and virtualized/lazy desktop file views.
+  Desktop deletion now uses the operating-system Trash/Recycle Bin and reconciles
+  the exact historical session, backup, checksum entry, and shared XMP state.
+- Updated the five-platform in-app announcement for the published 1.5.14 release.
 
 ### Fixed
 
@@ -60,18 +76,15 @@
 - Accepted the PTP/IP unknown-length StartData sentinel and verified declared
   lengths after EndData. The existing 64 MiB per-packet defensive limit remains
   documented for cameras that send a large object in one EndData packet.
+- Added bounded idle timeouts to desktop external-camera commands so a silent
+  helper cannot leave the app connected forever, and prevented iOS from routing
+  Sony profiles into the Nikon-compatible bridge path.
 
 ### Validation status
 
-- Source version is `1.5.14 / build 41`. Frozen implementation commit
-  `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903` passes the full automated suite
-  579/579 and the 55/55 focused connection UX/protocol suite. All five native
-  package builds completed from that commit; six local candidate packages and
-  their SHA-256 sidecars pass container, metadata, architecture, and applicable
-  signature checks. Camera-hardware, trusted-signing, installation, and
-  reconnect testing remain pending while this entry is marked Unreleased;
-  package details are in `docs/releases/v1.5.14.md`. Nothing was pushed,
-  tagged, published, or deployed.
+- Source version is `1.5.14 / build 41`. Full validation, six package hashes,
+  signing state, hardware-test limits, GitHub publication, and official-site
+  deployment evidence are recorded in `docs/releases/v1.5.14.md`.
 
 ## [1.5.13] - 2026-08-12
 

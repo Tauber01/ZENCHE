@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.14 launch announcements describe recoverable PTP/IP connections and candidate boundaries', async () => {
+test('version 1.5.14 launch announcements describe the durable published release', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,18 +95,17 @@ test('version 1.5.14 launch announcements describe recoverable PTP/IP connection
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /加固 Wi‑Fi\/PTP‑IP 连接/);
-    assert.match(announcement, /连接与自动重连现在会实时显示状态/);
-    assert.match(announcement, /取消连接或停止重连/);
-    assert.match(announcement, /断线恢复使用会话代际隔离/);
-    assert.match(announcement, /Android 与 HarmonyOS 补齐网络状态权限/);
-    assert.match(announcement, /Windows 单轮重连使用有限超时/);
-    assert.match(announcement, /1\.5\.14 是本地候选版本，尚未发布/);
-    assert.match(announcement, /不能替代真实相机、移动设备和 Windows 主机验收/);
-    assert.doesNotMatch(announcement, /GitHub Release 提供 1\.5\.13 五端安装包/);
+    assert.match(announcement, /修复 Wi‑Fi\/PTP‑IP 与桌面 USB 连接不上、连接中断/);
+    assert.match(announcement, /Sony ZV‑E10/);
+    assert.match(announcement, /一键导入照片和视频/);
+    assert.match(announcement, /五端文件库改为“所有文件”优先/);
+    assert.match(announcement, /系统废纸篓\/回收站/);
+    assert.match(announcement, /1\.5\.14 已通过 GitHub 与官网发布/);
+    assert.match(announcement, /安装包签名和实机验证边界请查看发布说明/);
+    assert.doesNotMatch(announcement, /本地候选版本，尚未发布/);
   }
 
-  assert.match(announcements[1], /tr\("• 加固 Wi‑Fi\/PTP‑IP 连接/);
+  assert.match(announcements[1], /tr\("• 修复 Wi‑Fi\/PTP‑IP 与桌面 USB/);
 
   const englishAnnouncements = await Promise.all([
     read('native/ios/NikonLink/en.lproj/Localizable.strings'),
@@ -122,17 +121,21 @@ test('version 1.5.14 launch announcements describe recoverable PTP/IP connection
   ]);
 
   for (const announcement of englishAnnouncements) {
-    assert.match(announcement, /Strengthened Wi‑Fi\/PTP‑IP connections/);
-    assert.match(announcement, /cancel a connection or stop reconnecting/);
-    assert.match(announcement, /Session-generation isolation/);
-    assert.match(announcement, /1\.5\.14 is a local candidate and has not been released/);
-    assert.match(announcement, /real cameras, mobile devices, and Windows hosts/);
+    assert.match(announcement, /Fixed Wi‑Fi\/PTP-IP and desktop USB connection failures and interruptions/);
+    assert.match(announcement, /Sony ZV-E10/);
+    assert.match(announcement, /one-click multi-file photo\/video import/);
+    assert.match(announcement, /All five libraries now lead with All Files/);
+    assert.match(announcement, /OS Trash\/Recycle Bin/);
+    assert.match(announcement, /1\.5\.14 is published through GitHub and the official website/);
+    assert.doesNotMatch(announcement, /local candidate and has not been released/);
   }
   for (const announcement of japaneseAnnouncements) {
-    assert.match(announcement, /Wi‑Fi／PTP-IP 接続を強化しました/);
-    assert.match(announcement, /接続のキャンセルや再接続の停止/);
-    assert.match(announcement, /セッション世代の分離/);
-    assert.match(announcement, /1\.5\.14 は未公開のローカル候補/);
-    assert.match(announcement, /実機カメラ、モバイル端末、Windows ホスト/);
+    assert.match(announcement, /Wi‑Fi／PTP-IP とデスクトップ USB の接続失敗・切断を修正しました/);
+    assert.match(announcement, /Sony ZV-E10/);
+    assert.match(announcement, /写真・動画のワンクリック複数読み込み/);
+    assert.match(announcement, /5 プラットフォームのファイル画面は「すべてのファイル」を先頭/);
+    assert.match(announcement, /OS のゴミ箱/);
+    assert.match(announcement, /1\.5\.14 は GitHub と公式サイトで公開済みです/);
+    assert.doesNotMatch(announcement, /未公開のローカル候補/);
   }
 });

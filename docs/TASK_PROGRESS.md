@@ -3,7 +3,7 @@
 > 快照时间：2026-08-16（Asia/Shanghai）
 > 当前公开版本：1.5.13 / build 40；最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`，注释标签 `v1.5.13` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`
 > 公开状态：v1.5.13 已于 2026-08-12T03:33:52Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
-> 当前源码候选：1.5.14 / build 41，冻结实现 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903`，PTP/IP、网络重连与可恢复连接体验已收口，尚未发布
+> 当前源码：1.5.14 / build 41，总集成分支已合入连接可靠性、Sony 旧机型兼容、桌面一键导入与五端文件库简化；发布封板、六包、GitHub 与官网生产回验以 §12.65 最终记录为准
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1269,3 +1269,14 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **五端构建**：Android `assembleDebug` 31 项成功；iOS generic/device Release unsigned、HarmonyOS Release `assembleHap`、macOS arm64 应用/DMG、Windows x64 Release publish/NSIS/ZIP 均从与实现提交相同的源码树完成。Windows 只有既有 `PtpCamera.cs` CS8629 与 `_aiGenerating` CS0414，新增 CS4014 已在最终重建前消除；HarmonyOS、macOS 保留项目既有 throw/deprecation/actor 隔离警告，没有新增编译错误。
 - **候选包证据**：六份 `.sha256` 6/6 回验 `OK`；APK、IPA、HAP、Windows ZIP 压缩完整，DMG 校验有效，macOS app 深度严格验签通过。最终字节数与 SHA-256 见 `docs/releases/v1.5.14.md`。Android 为 v2 Debug 证书，证书 SHA-256 `45499c18366356314c10ad8a98939908e47855fb6ba7fc21fe8a809549c7df3c`；iOS/HarmonyOS 未签名，macOS ad-hoc 且未公证，Windows Setup 与 x64 主程序 Security Directory 为 0、无 Authenticode。
 - **授权与待验收**：本轮未推送分支、未打标签、未创建 Release、未替换 GitHub 资产、未切换官网。GitHub Latest 仍为 1.5.13，官网仍为 1.5.10 / build 37。真实 Nikon/Sony/Canon PTP/IP 相机的 Probe、并发取景、断网重连和取消/重试流程，移动端安装/权限，Windows 启动/驱动/SmartScreen，以及 macOS Gatekeeper/公证继续待对应设备与可信签名验收。
+
+## 12.65 v1.5.14 Sony 兼容、桌面导入、五端文件库与正式发布（2026-08-19—20，GPT5.6）
+
+- **授权与统筹**：Tauber 在 Buzz 线程 `241f17e9…fd427` 明确要求统筹所有 agent，修复相机连接不上/中断，新增 Sony ZV-E10 及同代机型，增加桌面照片/视频一键导入，重构文件管理并上传 GitHub 与官网。本轮遵守既有禁派边界，没有向 GPT5.6luna 或 AI审查派工，视觉工作也没有交给 DeepSeek；连接、Sony、桌面导入、移动文件库和发布工作在独立工作树完成后汇入 `agent/1.5.14-integration`。
+- **连接与 Sony**：在 §12.63—12.64 基础上，Windows 外部相机命令改为有活动即续期的空闲超时并终止整个进程组，防止静默挂死；iOS 不再把 Sony 误送 Nikon 兼容桥。五端规范档案由 46 增至 50，Sony 由 12 增至 16：新增 ZV-E10、A6100、A6400、A6600，A6100A/A6400A 作为识别别名。macOS 官方 SDK 明确不支持时可回退 gphoto2 兼容路径。Sony 官方 Camera Remote SDK 当前公开支持表未列出这些旧机型，因此发布文案只写“识别与兼容配置”，完整遥控仍待对应真机。
+- **桌面一键导入**：macOS 与 Windows 都提供“导入照片与视频”原生多选入口；文件流式写入目标目录内临时文件、同步并核验字节数后原子发布，支持取消、去重、RAW+JPEG 同目录配对、双备份、XMP 与 SHA-256 清单。批次逐项报告成功/跳过/失败/取消，失败不会撤销已提交的其他文件，Windows 文件 I/O 不占 UI 线程。
+- **五端文件库**：移动端既有改造与本轮桌面改造汇合后，五端均以“所有文件”为首屏，提供搜索、照片/视频筛选、最近/名称排序；项目分类与来源工具默认收起，拖动/移动只改持久化分类映射，不改原文件位置。macOS 使用 `LazyVGrid` 与 128 项 `NSCache`，Windows 使用回收虚拟化与 128 项后台缩略图缓存，搜索只处理已加载元数据。
+- **删除安全**：桌面删除先确认并送入系统废纸篓/回收站，成功后才清除项目归属。Backup、`checksums.sha256` 与 XMP 由目标路径推导真实历史会话，不再误用当前会话；同 stem RAW/JPEG 兄弟仍在时保留共享 XMP。关联项失败会诚实报告主文件已删除但同步不完整。
+- **验证进度**：桌面实现提交 `cbccb44ac1e66e0973d1378767d25605c18de9e4` 的 Windows Release 编译为 0 错误（4 条既有警告），macOS 完整 Swift 类型检查为 0 错误（既有 actor/deprecation 警告）；新增 5 项桌面文件库契约、相关 27 项导入/树契约通过，Impeccable 检测按要求只运行一次并返回空数组。合入连接、Sony、导入、移动文件库和桌面文件库后的总集成实现为 `64b50b57bad428db67c20a8d8772c00a0e45f211`；完整测试、五端打包、逐包 SHA、签名与最终封板提交将在本节发布闭环中回填。
+- **文档与公告**：根 `design.md` 固化“所有文件优先、导入唯一主操作、分类元数据、限额缩略图、系统废纸篓”的长期契约；README 简中/英/日、CHANGELOG、1.5.14 中文发布说明与五端启动公告同步覆盖连接、Sony、导入和文件库。公告按版本持久化，1.5.14 文字明确 GitHub/官网发布与签名/实机边界。
+- **待完成门禁**：从最终封板精确 HEAD 运行完整测试并重建 Android APK、unsigned iOS IPA、unsigned HarmonyOS HAP、ad-hoc macOS DMG、Windows x64 Setup/ZIP 及六份 SHA-256；随后推送 `main`、创建注释标签与详细中文 Draft Release，用加固后的 workflow 原子公开，再原子切换官网清单并逐平台回验公网下载。真实 Sony/Nikon/Canon 相机、可信签名、公证、Windows 实机安装/驱动/SmartScreen 与移动端设备安装仍是不可由自动化替代的边界。

@@ -21,6 +21,12 @@ const fastFeedbackMessage =
   "公开问题可继续在 GitHub 免费提交；在爱发电赞助后，可获取快速问题反馈渠道。";
 const officialQqGroup = "官方 QQ 群：165315727";
 const afdianUrl = "https://www.ifdian.net/a/Tauber";
+const announcementHighlights = [
+  "Sony ZV‑E10",
+  "一键导入照片和视频",
+  "五端文件库改为“所有文件”优先",
+  "1.5.14 已通过 GitHub 与官网发布",
+];
 
 test("all native targets show the launch announcement and scam warning", async () => {
   for (const [platform, paths] of Object.entries(targets)) {
@@ -53,6 +59,20 @@ test("all native targets persist announcement dismissal by app version", async (
       /dismissed.*announcement.*version/i,
       `${Object.keys(targets)[index]} is missing version-scoped dismissal`,
     );
+  }
+});
+
+test("all native targets describe the complete 1.5.14 release", async () => {
+  for (const [platform, paths] of Object.entries(targets)) {
+    const source = (
+      await Promise.all(paths.map((path) => readFile(path, "utf8")))
+    ).join("\n");
+    for (const highlight of announcementHighlights) {
+      assert.ok(
+        source.includes(highlight),
+        `${platform} launch announcement is missing: ${highlight}`,
+      );
+    }
   }
 });
 
