@@ -1225,20 +1225,54 @@ private final class GPhotoCamera {
         if matchedProfile.vendorName == "Sony" {
             let saveDirectory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("ZENCHE/SonySDK", isDirectory: true)
-            let sdkModel = try sonyOfficialSDK.connect(
-                saveDirectory: saveDirectory
-            )
-            let officialProfile =
-                SupportedCamera.matching(detection: "Sony \(sdkModel)")
-                ?? matchedProfile
-            profile = officialProfile
-            connected = true
-            refreshParameterCapabilities()
-            logger.info(
-                "sony-sdk",
-                "已通过 Sony Camera Remote SDK 2.02.00 连接 \(sdkModel)"
-            )
-            return officialProfile
+            do {
+                let sdkModel = try sonyOfficialSDK.connect(
+                    saveDirectory: saveDirectory
+                )
+                let officialProfile =
+                    SupportedCamera.matching(detection: "Sony \(sdkModel)")
+                    ?? matchedProfile
+                profile = officialProfile
+                connected = true
+                refreshParameterCapabilities()
+                logger.info(
+                    "sony-sdk",
+                    "已通过 Sony Camera Remote SDK 2.02.00 连接 \(sdkModel)"
+                )
+                return officialProfile
+            } catch {
+                // Camera Remote SDK 2.02.00 does not enumerate several
+                // legacy Camera Remote Command models (including the first
+                // ZV-E10, A6100, A6400, and A6600). The bridge releases SDK
+                // state on every failed connect path; keep the already-detected
+                // model and verify a real USB/PTP session through gphoto2.
+                // Do not publish `connected` until that verification succeeds.
+                let sdkError = error.localizedDescription
+                logger.warning(
+                    "sony-sdk",
+                    "官方 SDK 未建立会话，准备回退 USB/PTP：\(sdkError)"
+                )
+                do {
+                    _ = try run(["--summary"])
+                } catch {
+                    let ptpError = error.localizedDescription
+                    logger.error(
+                        "camera",
+                        "Sony 官方 SDK 与 USB/PTP 回退均失败；SDK=\(sdkError)；PTP=\(ptpError)"
+                    )
+                    throw CameraError.command(
+                        "Sony 官方 SDK 未能建立会话，USB/PTP 回退也失败：\(ptpError)"
+                    )
+                }
+                profile = matchedProfile
+                connected = true
+                refreshParameterCapabilities()
+                logger.info(
+                    "camera",
+                    "已通过 gphoto2 USB/PTP 回退连接 \(matchedProfile.name)"
+                )
+                return matchedProfile
+            }
         }
         profile = matchedProfile
         _ = try run(["--summary"])

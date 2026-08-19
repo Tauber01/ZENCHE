@@ -52,6 +52,29 @@ test("macOS routes Sony camera operations through the official SDK bridge", () =
   assert.match(camera, /sonyOfficialSDK\.setMovieRecording/);
 });
 
+test("macOS falls back to a verified gphoto2 USB/PTP session when Sony SDK connection fails", () => {
+  const camera = read("native/macos/Sources/NikonLink/main.swift");
+
+  const sonyBranch = camera.match(
+    /if matchedProfile\.vendorName == "Sony" \{([\s\S]*?)\n        \}\n        profile = matchedProfile/,
+  )?.[1] ?? "";
+  assert.ok(sonyBranch, "expected the Sony connection branch");
+  assert.match(sonyBranch, /do \{[\s\S]*sonyOfficialSDK\.connect/);
+  assert.match(sonyBranch, /catch \{/);
+  assert.match(sonyBranch, /_ = try run\(\["--summary"\]\)/);
+  assert.match(sonyBranch, /profile = matchedProfile[\s\S]*connected = true/);
+  assert.match(sonyBranch, /gphoto2 USB\/PTP 回退/);
+
+  const fallbackVerification = sonyBranch.indexOf(
+    '_ = try run(["--summary"])',
+  );
+  const fallbackPublish = sonyBranch.lastIndexOf("connected = true");
+  assert.ok(
+    fallbackVerification >= 0 && fallbackVerification < fallbackPublish,
+    "USB/PTP verification must finish before fallback connection is published",
+  );
+});
+
 test("macOS isolates Sony and Nikon native SDK runtimes before connecting", () => {
   const camera = read("native/macos/Sources/NikonLink/main.swift");
   const nikonService = read(
