@@ -1,54 +1,206 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "要验证并发布的 Draft Release 标签（例如 v1.5.14）"
+        required: true
+        default: "v1.5.14"
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
 jobs:
-  package:
-    runs-on: macos-15
+  verify-and-publish:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.10.2"
-      - run: brew install gphoto2
-      - run: ./scripts/build-all.sh
-      - name: Publish release assets
+      - name: Validate release tag input
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          notes_file="docs/releases/$GITHUB_REF_NAME.md"
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::release_tag 必须是稳定版标签，例如 v1.5.14。"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Verify checked-out tag and release notes
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          expected_commit="$(git rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")"
+          actual_commit="$(git rev-parse HEAD)"
+          if [[ "$actual_commit" != "$expected_commit" ]]; then
+            echo "::error::checkout HEAD 与 ${RELEASE_TAG} 指向的提交不一致。"
+            exit 1
+          fi
+
+          notes_file="docs/releases/${RELEASE_TAG}.md"
           if [[ ! -s "$notes_file" ]]; then
             echo "::error file=$notes_file::缺少详细的简体中文 Release 说明。"
             exit 1
           fi
 
-          assets=()
-          for asset in dist/*; do
-            [[ -f "$asset" ]] && assets+=("$asset")
+      - name: Verify Draft Release assets and SHA-256
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          version="${RELEASE_TAG#v}"
+          packages=(
+            "ZENCHE-${version}-android.apk"
+            "ZENCHE-${version}-ios-unsigned.ipa"
+            "ZENCHE-${version}-HarmonyOS.hap"
+            "ZENCHE-${version}-macOS-arm64.dmg"
+            "ZENCHE-${version}-Windows-x64-Setup.exe"
+            "ZENCHE-${version}-Windows-x64.zip"
+          )
+          expected_assets=("${packages[@]}")
+          for package in "${packages[@]}"; do
+            expected_assets+=("${package}.sha256")
           done
-          if (( ${#assets[@]} == 0 )); then
-            echo "::error::没有可发布的安装包。"
+
+          temp_root="$(mktemp -d "${RUNNER_TEMP}/zenche-release.XXXXXX")"
+          trap 'rm -rf "$temp_root"' EXIT
+          releases_json="$temp_root/releases.json"
+          assets_json="$temp_root/assets.json"
+          expected_names="$temp_root/expected-assets.txt"
+          actual_names="$temp_root/actual-assets.txt"
+          asset_dir="$temp_root/assets"
+          mkdir -p "$asset_dir"
+
+          gh api --paginate --slurp \
+            "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            | jq '[.[][]]' > "$releases_json"
+
+          release_count="$(jq --arg tag "$RELEASE_TAG" \
+            '[.[] | select(.tag_name == $tag)] | length' "$releases_json")"
+          if [[ "$release_count" != "1" ]]; then
+            echo "::error::必须恰好存在一个标签为 ${RELEASE_TAG} 的 Draft Release。"
             exit 1
           fi
 
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" \
-              --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
-              --notes-file "$notes_file"
-            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
-              --title "帧澈 ZENCHE $GITHUB_REF_NAME" \
-              --notes-file "$notes_file"
+          release_id="$(jq -r --arg tag "$RELEASE_TAG" \
+            '.[] | select(.tag_name == $tag) | .id' "$releases_json")"
+          if [[ ! "$release_id" =~ ^[0-9]+$ ]]; then
+            echo "::error::Draft Release ID 无效。"
+            exit 1
           fi
+          if ! jq -e --arg tag "$RELEASE_TAG" \
+            '.[] | select(.tag_name == $tag and .draft == true and .prerelease == false)' \
+            "$releases_json" >/dev/null; then
+            echo "::error::${RELEASE_TAG} 必须仍是非预发布的 Draft Release。"
+            exit 1
+          fi
+
+          gh api --paginate --slurp \
+            "/repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+            | jq '[.[][]]' > "$assets_json"
+
+          printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort > "$expected_names"
+          jq -r '.[].name' "$assets_json" | LC_ALL=C sort > "$actual_names"
+          if ! cmp -s "$expected_names" "$actual_names"; then
+            echo "::error::Draft Release 资产必须恰好是固定六包及六份同名 .sha256。"
+            diff -u "$expected_names" "$actual_names" || true
+            exit 1
+          fi
+          if ! jq -e --argjson count "${#expected_assets[@]}" \
+            'length == $count and all(.[]; (.size // 0) > 0)' \
+            "$assets_json" >/dev/null; then
+            echo "::error::Draft Release 存在空资产或资产数量异常。"
+            exit 1
+          fi
+
+          for asset in "${expected_assets[@]}"; do
+            asset_id="$(jq -r --arg name "$asset" \
+              '.[] | select(.name == $name) | .id' "$assets_json")"
+            if [[ ! "$asset_id" =~ ^[0-9]+$ ]]; then
+              echo "::error::无法解析资产 ${asset} 的 ID。"
+              exit 1
+            fi
+            gh api \
+              -H "Accept: application/octet-stream" \
+              "/repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+              > "$asset_dir/$asset"
+          done
+
+          find "$asset_dir" -maxdepth 1 -type f -exec basename {} \; \
+            | LC_ALL=C sort > "$actual_names"
+          if ! cmp -s "$expected_names" "$actual_names"; then
+            echo "::error::下载后的资产集合与固定白名单不一致。"
+            diff -u "$expected_names" "$actual_names" || true
+            exit 1
+          fi
+
+          for package in "${packages[@]}"; do
+            checksum="${package}.sha256"
+            mapfile -t checksum_lines < "$asset_dir/$checksum"
+            if (( ${#checksum_lines[@]} != 1 )); then
+              echo "::error file=$checksum::侧车必须恰好包含一条 SHA-256 记录。"
+              exit 1
+            fi
+            checksum_line="${checksum_lines[0]}"
+            if [[ ! "$checksum_line" =~ ^([[:xdigit:]]{64})[[:space:]]+(\*?)([^/[:space:]]+)$ ]] ||
+               [[ "${BASH_REMATCH[3]:-}" != "$package" ]]; then
+              echo "::error file=$checksum::侧车只能引用同目录同名包 ${package}。"
+              exit 1
+            fi
+            (cd "$asset_dir" && sha256sum -c "$checksum")
+          done
+
+          asset_fingerprint="$(jq -S -c \
+            'sort_by(.name) | map({id, name, size})' "$assets_json" \
+            | sha256sum | cut -d ' ' -f 1)"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "asset_fingerprint=$asset_fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Publish verified Draft Release atomically
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.verify.outputs.release_id }}
+          VERIFIED_ASSET_FINGERPRINT: ${{ steps.verify.outputs.asset_fingerprint }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          notes_file="docs/releases/${RELEASE_TAG}.md"
+          current_release="$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}")"
+          if ! jq -e --arg tag "$RELEASE_TAG" \
+            '.tag_name == $tag and .draft == true and .prerelease == false' \
+            <<< "$current_release" >/dev/null; then
+            echo "::error::发布前状态已变化；Release 必须仍是对应标签的非预发布 Draft。"
+            exit 1
+          fi
+
+          current_assets="$(gh api --paginate --slurp \
+            "/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?per_page=100" \
+            | jq -S -c '[.[][]] | sort_by(.name) | map({id, name, size})')"
+          current_asset_fingerprint="$(printf '%s\n' "$current_assets" \
+            | sha256sum | cut -d ' ' -f 1)"
+          if [[ "$current_asset_fingerprint" != "$VERIFIED_ASSET_FINGERPRINT" ]]; then
+            echo "::error::校验完成后 Draft Release 资产发生变化，拒绝发布；请重新运行工作流。"
+            exit 1
+          fi
+
+          gh api --method PATCH \
+            "/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" \
+            --field draft=false \
+            --raw-field make_latest=true \
+            --field "body=@${notes_file}" \
+            --silent

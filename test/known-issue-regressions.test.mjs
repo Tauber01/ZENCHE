@@ -219,15 +219,60 @@ test("native device IDs remain stable across app version upgrades", async () => 
   }
 });
 
-test("release workflow is idempotent and requires detailed release notes", async () => {
+test("release workflow only publishes an exact verified Draft Release", async () => {
   const workflow = await readFile(".github/workflows/release.yml", "utf8");
 
-  assert.match(workflow, /docs\/releases\/\$GITHUB_REF_NAME\.md/);
-  assert.match(workflow, /gh release view/);
-  assert.match(workflow, /\[\[ -f "\$asset" \]\]/);
-  assert.match(
-    workflow,
-    /gh release upload "\$GITHUB_REF_NAME" "\$\{assets\[@\]\}" --clobber/,
-  );
+  assert.match(workflow, /^on:\n  workflow_dispatch:/m);
+  assert.match(workflow, /release_tag:/);
+  assert.doesNotMatch(workflow, /^\s+push:/m);
+  assert.doesNotMatch(workflow, /build-all\.sh|gh release (?:create|upload)|--clobber|dist\/\*/);
   assert.doesNotMatch(workflow, /--generate-notes/);
+
+  assert.match(workflow, /ref: \$\{\{ inputs\.release_tag \}\}/);
+  assert.match(workflow, /refs\/tags\/\$\{RELEASE_TAG\}\^\{commit\}/);
+  assert.match(workflow, /docs\/releases\/\$\{RELEASE_TAG\}\.md/);
+
+  const packageBlock = workflow.match(/packages=\(\n([\s\S]*?)\n\s*\)/);
+  assert.ok(packageBlock, "release package allowlist is missing");
+  const packages = [...packageBlock[1].matchAll(/"([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(packages, [
+    "ZENCHE-${version}-android.apk",
+    "ZENCHE-${version}-ios-unsigned.ipa",
+    "ZENCHE-${version}-HarmonyOS.hap",
+    "ZENCHE-${version}-macOS-arm64.dmg",
+    "ZENCHE-${version}-Windows-x64-Setup.exe",
+    "ZENCHE-${version}-Windows-x64.zip",
+  ]);
+  assert.match(workflow, /expected_assets\+=\("\$\{package\}\.sha256"\)/);
+  assert.match(workflow, /\.draft == true and \.prerelease == false/);
+  assert.match(workflow, /cmp -s "\$expected_names" "\$actual_names"/);
+  assert.match(workflow, /Accept: application\/octet-stream/);
+  assert.match(workflow, /BASH_REMATCH\[3\].*"\$package"/);
+  assert.match(workflow, /sha256sum -c "\$checksum"/);
+  assert.match(workflow, /asset_fingerprint=.*sort_by\(\.name\).*map\(\{id, name, size\}\)/s);
+  assert.match(workflow, /VERIFIED_ASSET_FINGERPRINT/);
+  assert.match(workflow, /current_asset_fingerprint/);
+  assert.match(workflow, /资产发生变化，拒绝发布/);
+
+  const downloadIndex = workflow.indexOf("Accept: application/octet-stream");
+  const hashIndex = workflow.indexOf('sha256sum -c "$checksum"');
+  const publishIndex = workflow.indexOf("gh api --method PATCH");
+  assert.ok(downloadIndex >= 0 && downloadIndex < hashIndex);
+  assert.ok(hashIndex < publishIndex);
+  assert.equal(workflow.match(/gh api --method PATCH/g)?.length, 1);
+  const finalStepIndex = workflow.indexOf(
+    "- name: Publish verified Draft Release atomically",
+  );
+  assert.ok(finalStepIndex >= 0 && finalStepIndex < publishIndex);
+  const publishBlock = workflow.slice(finalStepIndex);
+  assert.match(publishBlock, /\.tag_name == \$tag and \.draft == true/);
+  const recheckIndex = publishBlock.indexOf("current_asset_fingerprint");
+  const patchIndex = publishBlock.indexOf("gh api --method PATCH");
+  assert.ok(recheckIndex >= 0 && recheckIndex < patchIndex);
+  assert.match(publishBlock, /--field draft=false/);
+  assert.match(publishBlock, /--raw-field make_latest=true/);
+  assert.match(publishBlock, /--field "body=@\$\{notes_file\}"/);
+  assert.doesNotMatch(workflow.slice(0, publishIndex), /draft=false|make_latest=true/);
 });
