@@ -178,7 +178,7 @@
             <Button x:Name="LibraryNav"
                     Style="{DynamicResource NavButton}"
                     Tag="library"
-                    Content="分支"
+                    Content="文件"
                     Click="Navigate_Click" />
           </StackPanel>
         </DockPanel>
@@ -916,268 +916,465 @@
         <Grid x:Name="LibraryPanel" Visibility="Collapsed">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Border Padding="18"
+          <Border Grid.Row="0"
+                  Padding="18"
                   Background="{DynamicResource AccentSoftBrush}"
                   BorderBrush="{DynamicResource AccentBrush}"
                   BorderThickness="1"
                   CornerRadius="{StaticResource CornerRadius14}">
             <Grid>
-              <StackPanel>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <StackPanel Grid.Row="0" VerticalAlignment="Center">
                 <TextBlock Style="{DynamicResource LibraryHeaderTitle}"
-                           Text="分支文件库" />
-                <TextBlock Margin="0,4,0,0"
+                           Text="所有文件"
+                           AutomationProperties.Name="所有文件" />
+                <TextBlock x:Name="AllFilesSubtitleText"
+                           Margin="0,4,0,0"
                            Foreground="{DynamicResource MutedBrush}"
-                           Text="拖动本地文件到任意分支；拖回“未分类”即可移出分支，原文件位置保持不变。" />
+                           Text="0 张照片 · 0 个视频"
+                           AutomationProperties.Name="照片与视频统计" />
               </StackPanel>
-              <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                <Button Width="112"
-                        Style="{DynamicResource ButtonBase}"
-                        Content="刷新相册"
-                        Click="OpenOwnerAlbum_Click" />
+              <TextBlock x:Name="AllFilesCountText"
+                         Grid.Row="0"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Top"
+                         Foreground="{DynamicResource MutedBrush}"
+                         Text="0 个文件"
+                         AutomationProperties.Name="文件计数" />
+              <WrapPanel Grid.Row="1"
+                         Margin="0,12,0,0"
+                         HorizontalAlignment="Right"
+                         Orientation="Horizontal">
+                <TextBox x:Name="AllFilesSearchBox"
+                         Width="180"
+                         Height="44"
+                         Margin="0,0,8,0"
+                         VerticalContentAlignment="Center"
+                         AutomationProperties.Name="搜索文件名"
+                         TextChanged="AllFilesSearchBox_TextChanged" />
+                <ComboBox x:Name="AllFilesFilterBox"
+                          Width="88"
+                          Height="44"
+                          Margin="0,0,8,0"
+                          VerticalContentAlignment="Center"
+                          AutomationProperties.Name="文件类型筛选"
+                          SelectionChanged="AllFilesFilterBox_SelectionChanged">
+                  <ComboBoxItem Content="全部" Tag="all" IsSelected="True" />
+                  <ComboBoxItem Content="照片" Tag="photo" />
+                  <ComboBoxItem Content="视频" Tag="video" />
+                </ComboBox>
+                <ComboBox x:Name="AllFilesSortBox"
+                          Width="88"
+                          Height="44"
+                          Margin="0,0,8,0"
+                          VerticalContentAlignment="Center"
+                          AutomationProperties.Name="排序方式"
+                          SelectionChanged="AllFilesSortBox_SelectionChanged">
+                  <ComboBoxItem Content="最近" Tag="recent" IsSelected="True" />
+                  <ComboBoxItem Content="名称" Tag="name" />
+                </ComboBox>
                 <Button Width="128"
-                        Margin="8,0,0,0"
+                        Height="44"
                         Style="{DynamicResource PrimaryButton}"
                         Content="导入照片与视频"
-                        Click="ImportMedia_Click" />
-                <Button Width="112"
+                        Click="ImportMedia_Click"
+                        AutomationProperties.Name="导入照片与视频" />
+                <Button x:Name="AllFilesPreviewButton"
+                        Width="88"
+                        Height="44"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"
-                        Content="链接网盘"
-                        Click="LinkCloudDrive_Click" />
-                <Button Width="112"
-                        Margin="8,0,0,0"
-                        Style="{DynamicResource PrimaryButton}"
-                        Content="新建分支"
-                        Click="CreateLibraryBranch_Click" />
-                <Button Width="128"
-                        Margin="8,0,0,0"
-                        Style="{DynamicResource ButtonBase}"
-                        Content="合成延时视频"
-                        Click="ComposeTimelapse_Click" />
-                <Button Width="112"
+                        Content="预览"
+                        IsEnabled="False"
+                        Click="AllFilesPreviewButton_Click"
+                        AutomationProperties.Name="预览所选文件" />
+                <Button x:Name="AllFilesDownloadButton"
+                        Width="96"
+                        Height="44"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"
-                        Content="焦点合成"
-                        Click="ComposeFocusStack_Click" />
-                <Button Width="112"
+                        Content="导出副本"
+                        IsEnabled="False"
+                        Click="AllFilesDownloadButton_Click"
+                        AutomationProperties.Name="导出所选文件副本" />
+                <Button x:Name="AllFilesShareButton"
+                        Width="112"
+                        Height="44"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource ButtonBase}"
+                        Content="分享到社交平台"
+                        IsEnabled="False"
+                        Click="AllFilesShareButton_Click"
+                        AutomationProperties.Name="分享到社交平台" />
+                <Button x:Name="AllFilesMoveButton"
+                        Width="104"
+                        Height="44"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource ButtonBase}"
+                        Content="移动到项目"
+                        IsEnabled="False"
+                        Click="AllFilesMoveButton_Click"
+                        AutomationProperties.Name="将所选文件移动到项目" />
+                <Button x:Name="AllFilesOpenFolderButton"
+                        Width="104"
+                        Height="44"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"
                         Content="打开目录"
-                        Click="OpenPhotoFolder_Click" />
-              </StackPanel>
+                        Click="OpenPhotoFolder_Click"
+                        AutomationProperties.Name="打开目录" />
+                <Button x:Name="AllFilesDeleteButton"
+                        Width="104"
+                        Height="44"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource DangerButton}"
+                        Content="移到废纸篓"
+                        IsEnabled="False"
+                        Click="AllFilesDeleteButton_Click"
+                        AutomationProperties.Name="移到废纸篓" />
+              </WrapPanel>
             </Grid>
           </Border>
-          <Expander x:Name="CameraStorageExpander"
-                    Grid.Row="1"
-                    Margin="0,18,0,0"
-                    Header="相机机内存储"
-                    IsExpanded="True">
-            <Border Padding="16" Style="{DynamicResource PanelCard}">
-              <StackPanel>
-                <DockPanel LastChildFill="True">
-                  <WrapPanel DockPanel.Dock="Right"
-                             Margin="18,0,0,0">
-                    <Button x:Name="RefreshCameraStorageButton"
-                            Width="126"
-                            Height="40"
-                            Style="{DynamicResource PrimaryButton}"
-                            Content="刷新机内文件"
-                            Click="RefreshCameraStorageButton_Click" />
-                    <Button x:Name="SelectAllCameraStorageButton"
-                            Width="88"
-                            Height="40"
-                            Margin="8,0,0,0"
-                            Style="{DynamicResource ButtonBase}"
-                            Content="全选"
-                            IsEnabled="False"
-                            Click="SelectAllCameraStorageButton_Click" />
-                  </WrapPanel>
-                  <StackPanel>
-                    <TextBlock Style="{DynamicResource SectionTitle}"
-                               Text="相机存储卡" />
-                    <TextBlock x:Name="CameraStorageSummaryText"
-                               Margin="0,3,0,0"
-                               Foreground="{DynamicResource MutedBrush}"
-                               Text="连接相机后可浏览存储卡" />
-                  </StackPanel>
-                </DockPanel>
-                <ListView x:Name="CameraStorageList"
-                          Height="260"
-                          Margin="0,14,0,10"
-                          SelectionMode="Extended"
-                          SelectionChanged="CameraStorageList_SelectionChanged">
-                  <ListView.ItemTemplate>
-                    <DataTemplate>
-                      <Grid MinHeight="64" Margin="4,3">
-                        <Grid.ColumnDefinitions>
-                          <ColumnDefinition Width="80" />
-                          <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Width="72"
-                                Height="52"
+          <Grid Grid.Row="1" Margin="0,18,0,12">
+            <ListView x:Name="AllFilesListView"
+                      SelectionMode="Single"
+                      ScrollViewer.CanContentScroll="True"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling"
+                      AutomationProperties.Name="所有文件列表"
+                      SelectionChanged="AllFilesListView_SelectionChanged"
+                      MouseDoubleClick="AllFilesListView_MouseDoubleClick"
+                      KeyDown="AllFilesListView_KeyDown">
+              <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel VirtualizationMode="Recycling" />
+                </ItemsPanelTemplate>
+              </ListView.ItemsPanel>
+              <ListView.ItemContainerStyle>
+                <Style TargetType="{x:Type ListViewItem}">
+                  <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                </Style>
+              </ListView.ItemContainerStyle>
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="缩略图" Width="96">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <Border Width="80"
+                                Height="60"
                                 Background="{DynamicResource GraphiteBrush}"
                                 CornerRadius="{StaticResource CornerRadius6}">
                           <Grid>
-                            <Image Source="{Binding Thumbnail}"
-                                   Stretch="UniformToFill" />
-                            <!-- 图标尺寸 16，豁免族（不受样式库约束） -->
-                            <TextBlock HorizontalAlignment="Center"
+                            <Image Source="{Binding ThumbnailSource}"
+                                   Stretch="UniformToFill"
+                                   Loaded="AllFilesThumbnail_Loaded" />
+                            <TextBlock x:Name="AllFilesVideoIcon"
+                                       HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource GraphiteInkBrush}"
                                        FontSize="16"
-                                       Text="{Binding Icon}" />
+                                       Text="▶"
+                                       Visibility="Collapsed" />
                           </Grid>
                         </Border>
-                        <StackPanel Grid.Column="1"
-                                    VerticalAlignment="Center">
-                          <TextBlock FontWeight="SemiBold"
-                                     Text="{Binding Name}" />
-                          <TextBlock Margin="0,3,0,0"
-                                     Style="{DynamicResource MetaText}"
-                                     Text="{Binding Detail}" />
-                        </StackPanel>
-                      </Grid>
-                    </DataTemplate>
-                  </ListView.ItemTemplate>
-                </ListView>
-                <DockPanel LastChildFill="True">
-                  <WrapPanel DockPanel.Dock="Right">
-                    <Button x:Name="DownloadCameraStorageButton"
-                            Width="126"
-                            Height="40"
-                            Style="{DynamicResource PrimaryButton}"
-                            Content="下载所选"
-                            IsEnabled="False"
-                            Click="DownloadCameraStorageButton_Click" />
-                    <Button x:Name="DeleteCameraStorageButton"
-                            Width="126"
-                            Height="40"
-                            Margin="8,0,0,0"
-                            Style="{DynamicResource DangerButton}"
-                            Content="从相机删除"
-                            IsEnabled="False"
-                            Click="DeleteCameraStorageButton_Click" />
-                  </WrapPanel>
-                  <TextBlock x:Name="CameraStorageStatusText"
-                             VerticalAlignment="Center"
-                             Style="{DynamicResource MetaText}"
-                             Text="请连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机" />
-                </DockPanel>
-              </StackPanel>
-            </Border>
-          </Expander>
-          <Expander Grid.Row="2"
+                        <DataTemplate.Triggers>
+                          <DataTrigger Binding="{Binding IsVideo}" Value="True">
+                            <Setter TargetName="AllFilesVideoIcon"
+                                    Property="Visibility"
+                                    Value="Visible" />
+                          </DataTrigger>
+                        </DataTemplate.Triggers>
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
+                  <GridViewColumn Header="名称"
+                                  Width="320"
+                                  DisplayMemberBinding="{Binding Name}" />
+                  <GridViewColumn Header="类型"
+                                  Width="80"
+                                  DisplayMemberBinding="{Binding MediaTypeGroup}" />
+                  <GridViewColumn Header="详情"
+                                  Width="260"
+                                  DisplayMemberBinding="{Binding Detail}" />
+                </GridView>
+              </ListView.View>
+            </ListView>
+            <TextBlock x:Name="AllFilesEmptyText"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedBrush}"
+                       Text="暂无匹配文件。拍摄、从相机下载或导入照片与视频后会显示在这里。"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed"
+                       AutomationProperties.Name="文件列表为空" />
+          </Grid>
+          <Expander x:Name="SourcesAndToolsExpander"
+                    Grid.Row="2"
                     Margin="0,18,0,0"
-                    Header="无线传输 · Wi‑Fi / FTP / HTTP / WebDAV"
-                    IsExpanded="True">
-          <StackPanel>
-          <ContentControl x:Name="WifiCameraTransferHost"
-                          Margin="0,0,0,12" />
-          <Border Padding="16"
-                  Style="{DynamicResource PanelCard}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Style="{DynamicResource SectionTitle}" Text="多协议无线图片收件箱" />
-                <TextBlock x:Name="WirelessStatusText"
-                           FontWeight="SemiBold"
-                           Text="无线收件箱未开启" />
-                <TextBlock x:Name="WirelessAddressText"
-                           Margin="0,6,0,0"
-                           FontFamily="{DynamicResource MonoFont}"
-                           Foreground="{DynamicResource AccentBrush}"
-                           Text="—" />
-                <TextBlock Margin="0,8,0,0"
-                           Foreground="{DynamicResource MutedBrush}"
-                           TextWrapping="Wrap"
-                           Text="FTP/PASV 端口 2121 · HTTP/WebDAV 端口 8080 · 用户名/密码 nikonlink · 接收完成后自动进入文件库" />
-              </StackPanel>
-              <Button x:Name="WirelessButton"
-                      Grid.Column="1"
-                      Width="150"
-                      Margin="18,0,0,0"
-                      VerticalAlignment="Center"
-                      Style="{DynamicResource PrimaryButton}"
-                      Content="开启无线接收"
-                      Click="WirelessButton_Click" />
-            </Grid>
-          </Border>
-          </StackPanel>
-          </Expander>
-          <TreeView x:Name="PhotoTree"
-                    Grid.Row="3"
-                    Margin="0,20,0,12"
-                    Padding="8"
-                    AllowDrop="True"
-                    Background="{DynamicResource SurfaceBrush}"
-                    BorderBrush="{DynamicResource RuleBrush}"
-                    BorderThickness="1"
-                    DragLeave="PhotoTree_DragLeave"
-                    DragOver="PhotoTree_DragOver"
-                    Drop="PhotoTree_Drop"
-                    MouseDoubleClick="PhotoTree_MouseDoubleClick"
-                    PreviewMouseLeftButtonDown="PhotoTree_PreviewMouseLeftButtonDown"
-                    PreviewMouseLeftButtonUp="PhotoTree_PreviewMouseLeftButtonUp"
-                    PreviewMouseMove="PhotoTree_PreviewMouseMove"
-                    SelectedItemChanged="PhotoTree_SelectedItemChanged">
-            <TreeView.ItemContainerStyle>
-              <Style TargetType="{x:Type TreeViewItem}">
-                <Setter Property="IsExpanded"
-                        Value="{Binding IsExpanded, Mode=TwoWay}" />
-                <Setter Property="Padding" Value="4" />
-              </Style>
-            </TreeView.ItemContainerStyle>
-            <TreeView.ItemTemplate>
-              <HierarchicalDataTemplate ItemsSource="{Binding Children}">
-                <Grid Margin="4,3">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="64" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
-                  <Grid Width="56"
-                        Height="42"
-                        VerticalAlignment="Top">
-                    <Image x:Name="NodeThumbnail"
-                           Source="{Binding Thumbnail}"
-                           Stretch="UniformToFill" />
-                    <TextBlock x:Name="NodeIcon"
-                               Visibility="Collapsed"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"
-                               Style="{DynamicResource LibraryNodeIcon}"
-                               Text="{Binding Icon}" />
-                  </Grid>
-                  <StackPanel Grid.Column="1">
-                    <TextBlock FontWeight="SemiBold"
-                               Text="{Binding Name}" />
-                    <TextBlock Margin="0,2,0,0"
-                               Style="{DynamicResource MetaText}"
-                               Text="{Binding Detail}" />
+                    IsExpanded="False"
+                    Expanded="SourcesAndToolsExpander_Expanded"
+                    Collapsed="SourcesAndToolsExpander_Collapsed">
+            <Expander.Header>
+              <TextBlock x:Name="SourcesAndToolsExpanderHeader"
+                         Text="显示来源与工具"
+                         AutomationProperties.Name="显示来源与工具" />
+            </Expander.Header>
+            <StackPanel>
+              <Border Padding="18"
+                      Background="{DynamicResource AccentSoftBrush}"
+                      BorderBrush="{DynamicResource AccentBrush}"
+                      BorderThickness="1"
+                      CornerRadius="{StaticResource CornerRadius14}">
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                  <Button Width="112"
+                          Height="36"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="刷新相册"
+                          Click="OpenOwnerAlbum_Click"
+                          AutomationProperties.Name="刷新相册" />
+                  <Button Width="112"
+                          Height="36"
+                          Margin="8,0,0,0"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="链接网盘"
+                          Click="LinkCloudDrive_Click"
+                          AutomationProperties.Name="链接网盘" />
+                  <Button Width="112"
+                          Height="36"
+                          Margin="8,0,0,0"
+                          Style="{DynamicResource PrimaryButton}"
+                          Content="新建分支"
+                          Click="CreateLibraryBranch_Click"
+                          AutomationProperties.Name="新建分支" />
+                  <Button Width="128"
+                          Height="36"
+                          Margin="8,0,0,0"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="合成延时视频"
+                          Click="ComposeTimelapse_Click"
+                          AutomationProperties.Name="合成延时视频" />
+                  <Button Width="112"
+                          Height="36"
+                          Margin="8,0,0,0"
+                          Style="{DynamicResource ButtonBase}"
+                          Content="焦点合成"
+                          Click="ComposeFocusStack_Click"
+                          AutomationProperties.Name="焦点合成" />
+                </StackPanel>
+              </Border>
+              <Expander x:Name="CameraStorageExpander"
+                        Margin="0,18,0,0"
+                        Header="相机机内存储"
+                        IsExpanded="True">
+                <Border Padding="16" Style="{DynamicResource PanelCard}">
+                  <StackPanel>
+                    <DockPanel LastChildFill="True">
+                      <WrapPanel DockPanel.Dock="Right"
+                                 Margin="18,0,0,0">
+                        <Button x:Name="RefreshCameraStorageButton"
+                                Width="126"
+                                Height="40"
+                                Style="{DynamicResource PrimaryButton}"
+                                Content="刷新机内文件"
+                                Click="RefreshCameraStorageButton_Click" />
+                        <Button x:Name="SelectAllCameraStorageButton"
+                                Width="88"
+                                Height="40"
+                                Margin="8,0,0,0"
+                                Style="{DynamicResource ButtonBase}"
+                                Content="全选"
+                                IsEnabled="False"
+                                Click="SelectAllCameraStorageButton_Click" />
+                      </WrapPanel>
+                      <StackPanel>
+                        <TextBlock Style="{DynamicResource SectionTitle}"
+                                   Text="相机存储卡" />
+                        <TextBlock x:Name="CameraStorageSummaryText"
+                                   Margin="0,3,0,0"
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   Text="连接相机后可浏览存储卡" />
+                      </StackPanel>
+                    </DockPanel>
+                    <ListView x:Name="CameraStorageList"
+                              Height="260"
+                              Margin="0,14,0,10"
+                              SelectionMode="Extended"
+                              SelectionChanged="CameraStorageList_SelectionChanged">
+                      <ListView.ItemTemplate>
+                        <DataTemplate>
+                          <Grid MinHeight="64" Margin="4,3">
+                            <Grid.ColumnDefinitions>
+                              <ColumnDefinition Width="80" />
+                              <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="72"
+                                    Height="52"
+                                    Background="{DynamicResource GraphiteBrush}"
+                                    CornerRadius="{StaticResource CornerRadius6}">
+                              <Grid>
+                                <Image Source="{Binding Thumbnail}"
+                                       Stretch="UniformToFill" />
+                                <!-- 图标尺寸 16，豁免族（不受样式库约束） -->
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource GraphiteInkBrush}"
+                                           FontSize="16"
+                                           Text="{Binding Icon}" />
+                              </Grid>
+                            </Border>
+                            <StackPanel Grid.Column="1"
+                                        VerticalAlignment="Center">
+                              <TextBlock FontWeight="SemiBold"
+                                         Text="{Binding Name}" />
+                              <TextBlock Margin="0,3,0,0"
+                                         Style="{DynamicResource MetaText}"
+                                         Text="{Binding Detail}" />
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ListView.ItemTemplate>
+                    </ListView>
+                    <DockPanel LastChildFill="True">
+                      <WrapPanel DockPanel.Dock="Right">
+                        <Button x:Name="DownloadCameraStorageButton"
+                                Width="126"
+                                Height="40"
+                                Style="{DynamicResource PrimaryButton}"
+                                Content="下载所选"
+                                IsEnabled="False"
+                                Click="DownloadCameraStorageButton_Click" />
+                        <Button x:Name="DeleteCameraStorageButton"
+                                Width="126"
+                                Height="40"
+                                Margin="8,0,0,0"
+                                Style="{DynamicResource DangerButton}"
+                                Content="从相机删除"
+                                IsEnabled="False"
+                                Click="DeleteCameraStorageButton_Click" />
+                      </WrapPanel>
+                      <TextBlock x:Name="CameraStorageStatusText"
+                                 VerticalAlignment="Center"
+                                 Style="{DynamicResource MetaText}"
+                                 Text="请连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机" />
+                    </DockPanel>
                   </StackPanel>
-                </Grid>
-                <HierarchicalDataTemplate.Triggers>
-                  <DataTrigger Binding="{Binding Thumbnail}"
-                               Value="{x:Null}">
-                    <Setter TargetName="NodeThumbnail"
-                            Property="Visibility"
-                            Value="Collapsed" />
-                    <Setter TargetName="NodeIcon"
-                            Property="Visibility"
-                            Value="Visible" />
-                  </DataTrigger>
-                </HierarchicalDataTemplate.Triggers>
-              </HierarchicalDataTemplate>
-            </TreeView.ItemTemplate>
-          </TreeView>
-          <StackPanel Grid.Row="4"
+                </Border>
+              </Expander>
+              <Expander Margin="0,18,0,0"
+                        Header="无线传输 · Wi‑Fi / FTP / HTTP / WebDAV"
+                        IsExpanded="True">
+                <StackPanel>
+                  <ContentControl x:Name="WifiCameraTransferHost"
+                                  Margin="0,0,0,12" />
+                  <Border Padding="16"
+                          Style="{DynamicResource PanelCard}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Style="{DynamicResource SectionTitle}" Text="多协议无线图片收件箱" />
+                        <TextBlock x:Name="WirelessStatusText"
+                                   FontWeight="SemiBold"
+                                   Text="无线收件箱未开启" />
+                        <TextBlock x:Name="WirelessAddressText"
+                                   Margin="0,6,0,0"
+                                   FontFamily="{DynamicResource MonoFont}"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   Text="—" />
+                        <TextBlock Margin="0,8,0,0"
+                                   Foreground="{DynamicResource MutedBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="FTP/PASV 端口 2121 · HTTP/WebDAV 端口 8080 · 用户名/密码 nikonlink · 接收完成后自动进入文件库" />
+                      </StackPanel>
+                      <Button x:Name="WirelessButton"
+                              Grid.Column="1"
+                              Width="150"
+                              Margin="18,0,0,0"
+                              VerticalAlignment="Center"
+                              Style="{DynamicResource PrimaryButton}"
+                              Content="开启无线接收"
+                              Click="WirelessButton_Click" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Expander>
+              <TreeView x:Name="PhotoTree"
+                        Margin="0,20,0,12"
+                        Padding="8"
+                        AllowDrop="True"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource RuleBrush}"
+                        BorderThickness="1"
+                        DragLeave="PhotoTree_DragLeave"
+                        DragOver="PhotoTree_DragOver"
+                        Drop="PhotoTree_Drop"
+                        MouseDoubleClick="PhotoTree_MouseDoubleClick"
+                        PreviewMouseLeftButtonDown="PhotoTree_PreviewMouseLeftButtonDown"
+                        PreviewMouseLeftButtonUp="PhotoTree_PreviewMouseLeftButtonUp"
+                        PreviewMouseMove="PhotoTree_PreviewMouseMove"
+                        SelectedItemChanged="PhotoTree_SelectedItemChanged">
+                <TreeView.ItemContainerStyle>
+                  <Style TargetType="{x:Type TreeViewItem}">
+                    <Setter Property="IsExpanded"
+                            Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="Padding" Value="4" />
+                  </Style>
+                </TreeView.ItemContainerStyle>
+                <TreeView.ItemTemplate>
+                  <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                    <Grid Margin="4,3">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <Grid Width="56"
+                            Height="42"
+                            VerticalAlignment="Top">
+                        <Image x:Name="NodeThumbnail"
+                               Source="{Binding Thumbnail}"
+                               Stretch="UniformToFill" />
+                        <TextBlock x:Name="NodeIcon"
+                                   Visibility="Collapsed"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   Style="{DynamicResource LibraryNodeIcon}"
+                                   Text="{Binding Icon}" />
+                      </Grid>
+                      <StackPanel Grid.Column="1">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="{Binding Name}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   Style="{DynamicResource MetaText}"
+                                   Text="{Binding Detail}" />
+                      </StackPanel>
+                    </Grid>
+                    <HierarchicalDataTemplate.Triggers>
+                      <DataTrigger Binding="{Binding Thumbnail}"
+                                   Value="{x:Null}">
+                        <Setter TargetName="NodeThumbnail"
+                                Property="Visibility"
+                                Value="Collapsed" />
+                        <Setter TargetName="NodeIcon"
+                                Property="Visibility"
+                                Value="Visible" />
+                      </DataTrigger>
+                    </HierarchicalDataTemplate.Triggers>
+                  </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+              </TreeView>
+            </StackPanel>
+          </Expander>
+          <StackPanel Grid.Row="3"
                       HorizontalAlignment="Right"
                       Orientation="Horizontal">
             <TextBlock Margin="0,0,18,0"

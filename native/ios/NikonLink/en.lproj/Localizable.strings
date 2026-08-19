@@ -1075,3 +1075,13 @@
 "选择 %@" = "Select %@";
 "%@ · 已保护" = "%@ · Protected";
 "系统相册 · %@" = "System Library · %@";
+// ── Desktop file library simplification ──
+"搜索文件名…" = "Search file names…";
+"%d 个文件" = "%d files";
+"%d 张照片 · %d 个视频" = "%d photos · %d videos";
+"将 %@ 移到废纸篓？" = "Move “%@” to trash?";
+"外录文件仍被当前会话引用" = "External recording is still referenced by the current session";
+"显示来源与工具" = "Show sources & tools";
+"隐藏来源与工具" = "Hide sources & tools";
+"双击预览，右键查看操作" = "Double-click to preview; right-click for actions";
+"拖动到项目" = "Drag to a project";

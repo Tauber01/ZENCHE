@@ -2,6 +2,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.VisualBasic.FileIO;
 
 namespace NikonLink.Windows.Services;
 
@@ -24,6 +25,12 @@ public sealed record CaptureSessionConfiguration(
 
 public sealed class CaptureWorkflow
 {
+    private static readonly HashSet<string> LibraryMediaExtensions = new(
+        [
+            ".jpg", ".jpeg", ".png", ".nef", ".nrw", ".arw", ".cr2", ".cr3",
+            ".heif", ".heic", ".tif", ".tiff", ".mov", ".mp4", ".m4v", ".avi"
+        ],
+        StringComparer.OrdinalIgnoreCase);
     private readonly string _rootDirectory;
     private readonly string _statePath;
     private readonly object _stateLock = new();
@@ -572,6 +579,197 @@ public sealed class CaptureWorkflow
         {
             throw new InvalidOperationException("导入期间不能切换拍摄会话。");
         }
+    }
+
+    /// <summary>
+    /// Sends a library file to the Windows Recycle Bin, then reconciles the
+    /// exact session that owns it. A same-stem sidecar remains while another
+    /// media file still references it (for example a RAW + JPEG pair).
+    /// </summary>
+    public async Task RecycleLibraryFileAsync(
+        string primary,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_stateLock)
+        {
+            if (_importOperationActive)
+            {
+                throw new InvalidOperationException(
+                    "当前有导入任务正在进行，请稍后再删除。");
+            }
+        }
+
+        await _finalizeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var normalizedPrimary = Path.GetFullPath(primary);
+            if (!IsDescendantPath(normalizedPrimary, _rootDirectory))
+            {
+                throw new UnauthorizedAccessException(
+                    "只能移除帧澈 ZENCHE 文件库内的文件。");
+            }
+            if (!File.Exists(normalizedPrimary))
+            {
+                throw new FileNotFoundException(
+                    "文件不存在，无法移到回收站。",
+                    normalizedPrimary);
+            }
+
+            var sessionRoot = SessionRootOwning(normalizedPrimary);
+            var sidecar = Path.ChangeExtension(normalizedPrimary, ".xmp");
+            var backup = sessionRoot is not null
+                ? Path.Combine(
+                    sessionRoot,
+                    "Backup",
+                    Path.GetFileName(normalizedPrimary))
+                : null;
+            var backupSidecar = backup is null
+                ? null
+                : Path.ChangeExtension(backup, ".xmp");
+            var keepSharedSidecar = HasSameStemMediaSibling(normalizedPrimary);
+
+            FileSystem.DeleteFile(
+                normalizedPrimary,
+                UIOption.OnlyErrorDialogs,
+                RecycleOption.SendToRecycleBin,
+                UICancelOption.ThrowException);
+
+            var failures = new List<Exception>();
+
+            void AttemptRecycle(string? path)
+            {
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                {
+                    return;
+                }
+                try
+                {
+                    FileSystem.DeleteFile(
+                        path,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin,
+                        UICancelOption.ThrowException);
+                }
+                catch (Exception failure)
+                {
+                    failures.Add(failure);
+                }
+            }
+
+            if (sessionRoot is not null)
+            {
+                var manifest = Path.Combine(sessionRoot, "checksums.sha256");
+                if (File.Exists(manifest))
+                {
+                    try
+                    {
+                        var relative =
+                            $"Primary/{Path.GetFileName(normalizedPrimary)}";
+                        var existing = await File.ReadAllTextAsync(
+                            manifest,
+                            cancellationToken).ConfigureAwait(false);
+                        var lines = existing
+                            .Split('\n')
+                            .Where(line => !line.TrimEnd().EndsWith(
+                                $"  {relative}",
+                                StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                        var updated = string.Join(
+                            Environment.NewLine,
+                            lines.Where(line => !string.IsNullOrWhiteSpace(line)));
+                        if (!string.IsNullOrEmpty(updated))
+                        {
+                            updated += Environment.NewLine;
+                        }
+                        await WriteTextAtomicallyAsync(
+                            manifest,
+                            updated,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception failure)
+                    {
+                        failures.Add(failure);
+                    }
+                }
+            }
+
+            AttemptRecycle(backup);
+            if (!keepSharedSidecar)
+            {
+                AttemptRecycle(sidecar);
+                AttemptRecycle(backupSidecar);
+            }
+
+            if (failures.Count > 0)
+            {
+                throw new IOException(
+                    "移到回收站时有部分关联项未能处理。",
+                    new AggregateException(failures));
+            }
+        }
+        finally
+        {
+            _finalizeGate.Release();
+        }
+    }
+
+    private static bool IsDescendantPath(string candidate, string root)
+    {
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(root));
+        var normalizedCandidate = Path.GetFullPath(candidate);
+        return normalizedCandidate.StartsWith(
+            normalizedRoot + Path.DirectorySeparatorChar,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? SessionRootOwning(string primary)
+    {
+        var primaryDirectory = Path.GetDirectoryName(primary);
+        if (primaryDirectory is null ||
+            !string.Equals(
+                Path.GetFileName(primaryDirectory),
+                "Primary",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+        var candidate = Directory.GetParent(primaryDirectory)?.FullName;
+        var sessionsDirectory = candidate is null
+            ? null
+            : Directory.GetParent(candidate)?.FullName;
+        if (candidate is null ||
+            sessionsDirectory is null ||
+            !string.Equals(
+                Path.GetFileName(sessionsDirectory),
+                "Sessions",
+                StringComparison.OrdinalIgnoreCase) ||
+            !IsDescendantPath(candidate, _rootDirectory))
+        {
+            return null;
+        }
+        return candidate;
+    }
+
+    private static bool HasSameStemMediaSibling(string primary)
+    {
+        var directory = Path.GetDirectoryName(primary);
+        if (directory is null || !Directory.Exists(directory))
+        {
+            return false;
+        }
+        var stem = Path.GetFileNameWithoutExtension(primary);
+        return Directory.EnumerateFiles(directory)
+            .Any(candidate =>
+                !string.Equals(
+                    Path.GetFullPath(candidate),
+                    Path.GetFullPath(primary),
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    Path.GetFileNameWithoutExtension(candidate),
+                    stem,
+                    StringComparison.OrdinalIgnoreCase) &&
+                LibraryMediaExtensions.Contains(Path.GetExtension(candidate)));
     }
 
     private static ImportPairKind ImportPairKindForPath(string path)

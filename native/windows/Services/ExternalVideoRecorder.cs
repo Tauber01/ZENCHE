@@ -37,6 +37,11 @@ public sealed class ExternalVideoRecorder : IDisposable
         get { lock (_gate) return _path is not null; }
     }
 
+    public string? CurrentPath
+    {
+        get { lock (_gate) return _path; }
+    }
+
     public void Start(string path, int frameRate)
     {
         lock (_gate)

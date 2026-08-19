@@ -170,7 +170,8 @@ test("desktop UI exposes a primary import entry and routes cloud guide to the sa
   const windowsXaml = await readSource("native/windows/MainWindow.xaml");
   const windowsCode = await readSource("native/windows/MainWindow.xaml.cs");
 
-  assert.match(macosXaml, /Button\("导入照片与视频"\).*openMediaImporter/);
+  assert.match(macosXaml, /RuntimeLocalization\.text\("导入照片与视频"/);
+  assert.match(macosXaml, /Button \{\s*openMediaImporter\(\)/);
   assert.match(macosXaml, /MacCloudDriveGuide \{[\s\S]*?openMediaImporter\(\)/);
   assert.match(macosXaml, /NSOpenPanel/);
 

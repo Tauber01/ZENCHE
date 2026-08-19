@@ -104,6 +104,32 @@ public partial class MainWindow : Window
         public ObservableCollection<LibraryTreeNode> Children { get; } = [];
     }
 
+    private sealed class AllFilesListItem : INotifyPropertyChanged
+    {
+        private BitmapSource? _thumbnailSource;
+
+        public required PhotoItem Item { get; init; }
+        public string Name => Item.Name;
+        public string Detail => Item.Detail;
+        public bool IsVideo => Item.IsVideo;
+        public string MediaTypeGroup => Item.MediaTypeGroup;
+
+        public BitmapSource? ThumbnailSource
+        {
+            get => _thumbnailSource;
+            set
+            {
+                if (ReferenceEquals(_thumbnailSource, value)) return;
+                _thumbnailSource = value;
+                PropertyChanged?.Invoke(
+                    this,
+                    new PropertyChangedEventArgs(nameof(ThumbnailSource)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
     private sealed class CameraStorageListItem : INotifyPropertyChanged
     {
         private BitmapSource? _thumbnail;
@@ -773,6 +799,13 @@ public partial class MainWindow : Window
     private string _currentDestination = "capture";
     private readonly List<LibraryBranch> _libraryBranches;
     private readonly Dictionary<string, string> _libraryFileAssignments;
+    private readonly ThumbnailCache _thumbnailCache = new();
+    private readonly ObservableCollection<AllFilesListItem> _allFilesItems = [];
+    private IReadOnlyList<PhotoItem> _allFilesSourceItems = [];
+    private string _allFilesSearch = "";
+    private string _allFilesFilter = "all";
+    private string _allFilesSort = "recent";
+    private AllFilesListItem? _selectedLibraryItem;
     private readonly List<RememberedCameraDevice> _rememberedDevices;
     private readonly ObservableCollection<CameraStorageListItem>
         _cameraStorageRows = [];
@@ -1415,6 +1448,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _authCodeTimer.Tick += AuthCodeTimer_Tick;
         CameraStorageList.ItemsSource = _cameraStorageRows;
+        AllFilesListView.ItemsSource = _allFilesItems;
         _monitorTimecodeTimer.Tick += (_, _) => UpdateMonitorTimecode();
         _editorPreviewTimer.Tick += (_, _) =>
         {
@@ -8481,9 +8515,8 @@ public partial class MainWindow : Window
             : suggestedFileName;
         var extension = Path.GetExtension(fileName);
         var extensionLabel = string.IsNullOrWhiteSpace(extension)
-            ? AppLocalization.T("文件")
-            : extension.TrimStart('.').ToUpperInvariant() + " "
-                + AppLocalization.T("文件");
+            ? ""
+            : extension.TrimStart('.').ToUpperInvariant();
         var dialog = new SaveFileDialog
         {
             Title = AppLocalization.T("下载到本地"),
@@ -8867,7 +8900,7 @@ public partial class MainWindow : Window
         viewer.ShowDialog();
     }
 
-    private void DeletePhotoButton_Click(object sender, RoutedEventArgs e)
+    private async void DeletePhotoButton_Click(object sender, RoutedEventArgs e)
     {
         if ((PhotoTree.SelectedItem as LibraryTreeNode)?.Item is not
             {
@@ -8876,19 +8909,410 @@ public partial class MainWindow : Window
         {
             return;
         }
+        await ConfirmAndRecycleLibraryItemAsync(item);
+    }
+
+    private void RefreshAllFilesList()
+    {
+        var query = _allFilesSearch.Trim();
+        var items = _allFilesSourceItems
+            .Where(item =>
+            {
+                if (string.IsNullOrWhiteSpace(query))
+                {
+                    return true;
+                }
+                return item.Name.Contains(
+                    query,
+                    StringComparison.OrdinalIgnoreCase);
+            })
+            .Where(item => _allFilesFilter switch
+            {
+                "photo" => !item.IsVideo,
+                "video" => item.IsVideo,
+                _ => true
+            })
+            .ToList();
+
+        if (_allFilesSort == "name")
+        {
+            items.Sort((a, b) => string.Compare(
+                a.Name,
+                b.Name,
+                StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            items.Sort((a, b) =>
+            {
+                var result = b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc);
+                if (result != 0)
+                {
+                    return result;
+                }
+                return string.Compare(
+                    a.Name,
+                    b.Name,
+                    StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
+        _allFilesItems.Clear();
+        _selectedLibraryItem = null;
+        UpdateAllFilesSelectionState();
+
+        var photoCount = items.Count(item => !item.IsVideo);
+        var videoCount = items.Count(item => item.IsVideo);
+        AllFilesSubtitleText.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            AppLocalization.T("{0} 张照片 · {1} 个视频"),
+            photoCount,
+            videoCount);
+        AllFilesCountText.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            AppLocalization.T("{0} 个文件"),
+            items.Count);
+        AllFilesEmptyText.Visibility = items.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        foreach (var item in items)
+        {
+            _allFilesItems.Add(new AllFilesListItem { Item = item });
+        }
+    }
+
+    private async void AllFilesThumbnail_Loaded(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is not Image image ||
+            image.DataContext is not AllFilesListItem listItem ||
+            listItem.IsVideo ||
+            listItem.ThumbnailSource is not null ||
+            _shutdownStarted)
+        {
+            return;
+        }
+        var source = await _thumbnailCache.GetAsync(listItem.Item.Path)
+            .ConfigureAwait(true);
+        if (_shutdownStarted ||
+            source is null ||
+            !ReferenceEquals(image.DataContext, listItem))
+        {
+            return;
+        }
+        listItem.ThumbnailSource = source;
+    }
+
+    private void UpdateAllFilesSelectionState()
+    {
+        var hasSelection = _selectedLibraryItem is not null;
+        AllFilesPreviewButton.IsEnabled = hasSelection;
+        AllFilesDownloadButton.IsEnabled =
+            hasSelection && _selectedLibraryItem!.Item.IsLibraryItem;
+        AllFilesShareButton.IsEnabled = hasSelection;
+        AllFilesMoveButton.IsEnabled =
+            hasSelection && _selectedLibraryItem!.Item.IsLibraryItem;
+        AllFilesDeleteButton.IsEnabled =
+            hasSelection && _selectedLibraryItem!.Item.IsLibraryItem;
+    }
+
+    private void AllFilesSearchBox_TextChanged(
+        object sender,
+        TextChangedEventArgs e)
+    {
+        if (AllFilesEmptyText is null)
+        {
+            return;
+        }
+        _allFilesSearch = AllFilesSearchBox.Text;
+        RefreshAllFilesList();
+    }
+
+    private void AllFilesFilterBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (AllFilesEmptyText is null)
+        {
+            return;
+        }
+        _allFilesFilter = (AllFilesFilterBox.SelectedItem as ComboBoxItem)
+            ?.Tag?.ToString() ?? "all";
+        RefreshAllFilesList();
+    }
+
+    private void AllFilesSortBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (AllFilesEmptyText is null)
+        {
+            return;
+        }
+        _allFilesSort = (AllFilesSortBox.SelectedItem as ComboBoxItem)
+            ?.Tag?.ToString() ?? "recent";
+        RefreshAllFilesList();
+    }
+
+    private void AllFilesListView_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        _selectedLibraryItem = AllFilesListView.SelectedItem as AllFilesListItem;
+        UpdateAllFilesSelectionState();
+        if (_selectedLibraryItem?.Item is { } item && !item.IsVideo)
+        {
+            _editorSelectedPath = item.Path;
+        }
+    }
+
+    private void AllFilesListView_MouseDoubleClick(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is { } item)
+        {
+            ShowLargePhoto(item);
+        }
+    }
+
+    private void AllFilesListView_KeyDown(
+        object sender,
+        KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && _selectedLibraryItem is not null)
+        {
+            AllFilesDeleteButton_Click(sender, e);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && _selectedLibraryItem is not null)
+        {
+            AllFilesPreviewButton_Click(sender, e);
+            e.Handled = true;
+        }
+    }
+
+    private void AllFilesPreviewButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is { } item)
+        {
+            ShowLargePhoto(item);
+        }
+    }
+
+    private async void AllFilesDownloadButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is { IsLibraryItem: true } item)
+        {
+            await DownloadPhotoToLocalAsync(item);
+        }
+    }
+
+    private void AllFilesShareButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is { } item)
+        {
+            BeginShare(item.Path);
+        }
+    }
+
+    private async void AllFilesDeleteButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is not
+            {
+                IsLibraryItem: true
+            } item)
+        {
+            return;
+        }
+        await ConfirmAndRecycleLibraryItemAsync(item);
+    }
+
+    private void AllFilesMoveButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_selectedLibraryItem?.Item is { IsLibraryItem: true } item)
+        {
+            ShowMoveToProjectDialog(item);
+        }
+    }
+
+    private void ShowMoveToProjectDialog(PhotoItem item)
+    {
+        var listBox = new ListBox
+        {
+            MinWidth = 280,
+            MinHeight = 120,
+            MaxHeight = 320,
+            Margin = new Thickness(0, 10, 0, 14)
+        };
+        listBox.Items.Add(new ListBoxItem
+        {
+            Content = AppLocalization.T("未分类"),
+            Tag = null
+        });
+        AppendLibraryBranchChoices(listBox, _libraryBranches, 0);
+        listBox.SelectedIndex = 0;
+        var dialog = new Window
+        {
+            Owner = this,
+            Title = AppLocalization.T("移动到项目"),
+            Width = 380,
+            Height = 320,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = (Brush)FindResource("PaperBrush")
+        };
+        var layout = new StackPanel { Margin = new Thickness(22) };
+        layout.Children.Add(new TextBlock
+        {
+            Text = AppLocalization.T("选择要移动到的项目；文件位置保持不变。"),
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (Brush)FindResource("MutedBrush")
+        });
+        layout.Children.Add(listBox);
+        var actions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var cancel = new Button
+        {
+            Content = AppLocalization.T("取消"),
+            Width = 88,
+            Height = 40,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        cancel.Click += (_, _) => dialog.Close();
+        actions.Children.Add(cancel);
+        var move = new Button
+        {
+            Content = AppLocalization.T("移动"),
+            Width = 88,
+            Height = 40,
+            Margin = new Thickness(8, 0, 0, 0),
+            Style = (Style)FindResource("PrimaryButton")
+        };
+        move.Click += (_, _) =>
+        {
+            var selected = listBox.SelectedItem as ListBoxItem;
+            var branchId = selected?.Tag as string;
+            if (branchId is null)
+            {
+                _libraryFileAssignments.Remove(item.Path);
+                OperationStatusText.Text = AppLocalization.T("已移到未分类");
+            }
+            else
+            {
+                _libraryFileAssignments[item.Path] = branchId;
+                OperationStatusText.Text = AppLocalization.T(
+                    $"已移到项目“{selected?.Content}”");
+            }
+            SaveLibraryFileAssignments();
+            RefreshPhotoList();
+            dialog.Close();
+        };
+        actions.Children.Add(move);
+        layout.Children.Add(actions);
+        dialog.Content = layout;
+        dialog.Loaded += (_, _) => listBox.Focus();
+        dialog.ShowDialog();
+    }
+
+    private static void AppendLibraryBranchChoices(
+        ItemsControl list,
+        IEnumerable<LibraryBranch> branches,
+        int depth)
+    {
+        foreach (var branch in branches)
+        {
+            list.Items.Add(new ListBoxItem
+            {
+                Content = $"{new string('—', depth)}{branch.Name}",
+                Tag = branch.Id
+            });
+            AppendLibraryBranchChoices(list, branch.Children, depth + 1);
+        }
+    }
+
+    private async Task ConfirmAndRecycleLibraryItemAsync(PhotoItem item)
+    {
+        var message = string.Format(
+            CultureInfo.CurrentCulture,
+            AppLocalization.T("将 {0} 移到废纸篓？"),
+            item.Name);
+        var confirmation = MessageBox.Show(
+            this,
+            message,
+            AppLocalization.T("移到废纸篓"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var recordingPath = _externalVideoRecorder.CurrentPath;
+        if (!string.IsNullOrWhiteSpace(recordingPath) &&
+            string.Equals(
+                Path.GetFullPath(recordingPath),
+                Path.GetFullPath(item.Path),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var result = _externalVideoRecorder.StopIfRecording();
+                if (result is not null)
+                {
+                    await _workflow.CompleteExternalRecordingAsync(result.Path)
+                        .ConfigureAwait(true);
+                }
+            }
+            catch (Exception error)
+            {
+                ShowError($"无法停止外录：{error.Message}");
+                return;
+            }
+        }
+
         try
         {
-            File.Delete(item.Path);
+            await _workflow.RecycleLibraryFileAsync(item.Path)
+                .ConfigureAwait(true);
             _libraryFileAssignments.Remove(item.Path);
             SaveLibraryFileAssignments();
             RefreshPhotoList();
-            OperationStatusText.Text = AppLocalization.T(
-                $"已删除 {item.Name}");
+            OperationStatusText.Text = AppLocalization.T("文件已移到回收站");
         }
         catch (Exception error)
         {
-            ShowError($"无法删除 {item.Name}：{error.Message}");
+            ShowError($"无法移到回收站：{error.Message}");
         }
+    }
+
+    private void SourcesAndToolsExpander_Expanded(
+        object sender,
+        RoutedEventArgs e)
+    {
+        SourcesAndToolsExpanderHeader.Text =
+            AppLocalization.T("隐藏来源与工具");
+    }
+
+    private void SourcesAndToolsExpander_Collapsed(
+        object sender,
+        RoutedEventArgs e)
+    {
+        SourcesAndToolsExpanderHeader.Text =
+            AppLocalization.T("显示来源与工具");
     }
 
     private void StartPreviewLoop()
@@ -9874,6 +10298,7 @@ public partial class MainWindow : Window
     private void RefreshPhotoList()
     {
         var libraryItems = _library.List();
+        _allFilesSourceItems = libraryItems;
         var systemItems = _library.ListSystemAlbum();
         var roots = new ObservableCollection<LibraryTreeNode>
         {
@@ -9899,6 +10324,7 @@ public partial class MainWindow : Window
         DeleteBranchButton.IsEnabled = false;
         SharePhotoButton.IsEnabled = false;
         DownloadPhotoButton.IsEnabled = false;
+        RefreshAllFilesList();
     }
 
     private LibraryTreeNode BuildSourceNode(

@@ -15,6 +15,8 @@ public sealed record PhotoItem(string Path, bool IsLibraryItem = true)
             _info.Extension,
             StringComparer.OrdinalIgnoreCase);
     public string MediaTypeGroup => IsVideo ? "视频" : "照片";
+    public DateTime LastWriteTimeUtc =>
+        _info.Exists ? _info.LastWriteTimeUtc : DateTime.MinValue;
 
     public string Detail =>
         $"{Source} · {FormatBytes(_info.Exists ? _info.Length : 0)} · " +

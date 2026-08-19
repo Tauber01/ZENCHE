@@ -10,6 +10,181 @@ import Security
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Bounded in-memory thumbnail cache for the desktop file library. Decoding
+/// happens off the main thread and down-samples to a bounded pixel size.
+private final class MacThumbnailCache: ObservableObject, @unchecked Sendable {
+    private let cache = NSCache<NSString, NSImage>()
+
+    init() {
+        cache.countLimit = 128
+        cache.totalCostLimit = 64 * 1024 * 1024
+    }
+
+    func thumbnail(for url: URL, size: CGFloat = 240) async -> NSImage? {
+        let key = "\(url.path)_\(Int(size))" as NSString
+        if let cached = cache.object(forKey: key) { return cached }
+
+        return await Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return nil }
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil)
+            else { return nil }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceShouldCache: false,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: Int(size * 2)
+            ]
+            guard let cgImage = CGImageSourceCreateThumbnailAtIndex(
+                source,
+                0,
+                options as CFDictionary
+            ) else { return nil }
+            let image = NSImage(
+                cgImage: cgImage,
+                size: NSSize(width: size, height: size)
+            )
+            image.cacheMode = .never
+            let cost = cgImage.width * cgImage.height * 4
+            self.cache.setObject(image, forKey: key, cost: cost)
+            return image
+        }.value
+    }
+}
+
+private struct MacLocalPhotoCell: View {
+    let photo: PhotoRecord
+    let selected: Bool
+    let thumbnailCache: MacThumbnailCache
+    let select: () -> Void
+    let preview: () -> Void
+    let moveToProject: () -> Void
+    let exportCopy: () -> Void
+    let delete: () -> Void
+    @State private var thumbnail: NSImage?
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        Button {
+            select()
+        } label: {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
+                thumbnailContent
+                    .frame(height: 132)
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r10))
+                Text(photo.name)
+                    .font(.system(size: TypeScale.body, weight: .semibold))
+                    .lineLimit(1)
+                Text(
+                    photo.createdAt.formatted(
+                        date: .abbreviated,
+                        time: .shortened
+                    )
+                )
+                .font(.system(size: TypeScale.caption))
+                .foregroundStyle(Palette.muted)
+            }
+            .padding(SpaceToken.s8)
+            .background(Palette.surface)
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
+            .overlay {
+                RoundedRectangle(cornerRadius: RadiusToken.r12)
+                    .stroke(
+                        selected ? Palette.cobalt : Palette.rule,
+                        lineWidth: selected ? 2 : 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(photo.name)
+        .accessibilityHint(
+            RuntimeLocalization.text(
+                "双击预览，右键查看操作",
+                locale: locale
+            )
+        )
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded(preview)
+        )
+        .draggable(photo.url.path) {
+            Label(
+                photo.name,
+                systemImage: "arrow.up.and.down.and.arrow.left.and.right"
+            )
+            .font(.system(size: TypeScale.body, weight: .semibold))
+            .padding(SpaceToken.s8)
+            .background(
+                .regularMaterial,
+                in: RoundedRectangle(cornerRadius: RadiusToken.r8)
+            )
+        }
+        .contextMenu {
+            Button {
+                preview()
+            } label: {
+                Label(
+                    RuntimeLocalization.text("预览", locale: locale),
+                    systemImage: "eye"
+                )
+            }
+            Button {
+                exportCopy()
+            } label: {
+                Label(
+                    RuntimeLocalization.text("导出副本", locale: locale),
+                    systemImage: "arrow.down.to.line"
+                )
+            }
+            Button {
+                moveToProject()
+            } label: {
+                Label(
+                    RuntimeLocalization.text("移动到项目", locale: locale),
+                    systemImage: "folder"
+                )
+            }
+            Divider()
+            Button(role: .destructive) {
+                delete()
+            } label: {
+                Label(
+                    RuntimeLocalization.text("移到废纸篓", locale: locale),
+                    systemImage: "trash"
+                )
+            }
+        }
+        .help(
+            RuntimeLocalization.text("拖动到项目", locale: locale)
+        )
+        .task(id: photo.url.path) {
+            guard !photo.isVideo else { return }
+            thumbnail = await thumbnailCache.thumbnail(for: photo.url, size: 264)
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnailContent: some View {
+        if photo.isVideo {
+            ZStack {
+                Rectangle().fill(Palette.graphite)
+                Image(systemName: "play.rectangle.fill")
+                    .font(.system(size: 34)) // 图标尺寸，不受 TypeScale 约束
+                    .foregroundStyle(Palette.whiteLo)
+            }
+        } else if let thumbnail {
+            Image(nsImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+        } else {
+            ZStack {
+                Rectangle().fill(Palette.graphite)
+                Image(systemName: "photo")
+                    .font(.system(size: TypeScale.title))
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+    }
+}
+
 private struct SupportedCamera: Equatable {
     let name: String
     let vendorName: String
@@ -2310,7 +2485,7 @@ private enum AppSection: String, CaseIterable, Identifiable {
     case monitor = "视频"
     case editor = "编辑"
     case devices = "我的设备"
-    case library = "分支"
+    case library = "文件"
 
     var id: String { rawValue }
     var icon: String {
@@ -4147,18 +4322,55 @@ private final class CameraModel: ObservableObject {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    func deleteSelectedPhoto() {
-        guard let selectedPhoto else { return }
+    @discardableResult
+    func deleteSelectedPhoto() -> Bool {
+        guard let selectedPhoto else { return false }
+
+        externalRecordingLifecycleLock.lock()
+        let isExternalRecordingTarget =
+            externalRecordingOperation?.target.standardizedFileURL
+                .resolvingSymlinksInPath() ==
+            selectedPhoto.url.standardizedFileURL
+                .resolvingSymlinksInPath()
+        externalRecordingLifecycleLock.unlock()
+
+        if isExternalRecordingTarget {
+            do {
+                _ = try finishExternalRecordingOperation()
+            } catch {
+                logger.error(
+                    "library",
+                    "停止外录失败：\(error.localizedDescription)"
+                )
+                errorMessage = "无法停止外录：\(error.localizedDescription)"
+                return false
+            }
+        }
+
+        let token: UUID
         do {
-            try FileManager.default.trashItem(at: selectedPhoto.url, resultingItemURL: nil)
+            token = try captureWorkflow.beginNonImportOperation()
+        } catch {
+            errorMessage = "当前有导入或拍摄任务正在进行，请稍后再删除。"
+            return false
+        }
+        defer { captureWorkflow.endNonImportOperation(token) }
+
+        do {
+            try captureWorkflow.deleteLibraryFile(
+                at: selectedPhoto.url,
+                operationToken: token
+            )
             self.selectedPhoto = nil
             reloadPhotos()
+            return true
         } catch {
             logger.error(
                 "library",
-                "照片移到废纸篓失败：\(error.localizedDescription)"
+                "照片删除失败：\(error.localizedDescription)"
             )
-            errorMessage = "无法移到废纸篓：\(error.localizedDescription)"
+            errorMessage = "无法删除文件：\(error.localizedDescription)"
+            return false
         }
     }
 
@@ -8850,7 +9062,7 @@ private final class MacLibraryBranchStore: ObservableObject {
             from: data
            ) {
             branches = saved
-            expandedIDs = Set(saved.map(\.id))
+            expandedIDs = []
         }
         if let data = UserDefaults.standard.data(
             forKey: Self.assignmentStorageKey
@@ -8973,6 +9185,7 @@ private struct MacLibraryBranchRow: View {
     let depth: Int
     let photos: [PhotoRecord]
     let selectedPhoto: PhotoRecord?
+    let thumbnailCache: MacThumbnailCache
     let addChild: (MacLibraryBranch) -> Void
     let deleteBranch: (MacLibraryBranch) -> Void
     let selectPhoto: (PhotoRecord) -> Void
@@ -9064,6 +9277,7 @@ private struct MacLibraryBranchRow: View {
                         photo: photo,
                         selected: selectedPhoto == photo,
                         depth: depth + 1,
+                        thumbnailCache: thumbnailCache,
                         selectPhoto: selectPhoto,
                         previewPhoto: previewPhoto
                     )
@@ -9082,6 +9296,7 @@ private struct MacLibraryBranchRow: View {
                         depth: depth + 1,
                         photos: photos,
                         selectedPhoto: selectedPhoto,
+                        thumbnailCache: thumbnailCache,
                         addChild: addChild,
                         deleteBranch: deleteBranch,
                         selectPhoto: selectPhoto,
@@ -9097,13 +9312,10 @@ private struct MacLibraryBranchFileRow: View {
     let photo: PhotoRecord
     let selected: Bool
     let depth: Int
+    let thumbnailCache: MacThumbnailCache
     let selectPhoto: (PhotoRecord) -> Void
     let previewPhoto: (PhotoRecord) -> Void
-
-    private var thumbnail: NSImage? {
-        guard !photo.isVideo else { return nil }
-        return NSImage(contentsOf: photo.url)
-    }
+    @State private var thumbnail: NSImage?
 
     var body: some View {
         HStack(spacing: SpaceToken.s8) {
@@ -9164,6 +9376,10 @@ private struct MacLibraryBranchFileRow: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: RadiusToken.r8))
         }
         .help("拖动到其他分支")
+        .task(id: photo.url.path) {
+            guard !photo.isVideo else { return }
+            thumbnail = await thumbnailCache.thumbnail(for: photo.url, size: 96)
+        }
     }
 }
 
@@ -9224,10 +9440,27 @@ private struct CameraStorageMacRow: View {
     }
 }
 
+private enum AllFilesFilter: String, CaseIterable {
+    case all = "全部"
+    case photo = "照片"
+    case video = "视频"
+}
+
+private enum AllFilesSort: String, CaseIterable {
+    case recent = "最近"
+    case name = "名称"
+}
+
+private struct MacLibraryBranchChoice: Identifiable {
+    let id: UUID
+    let name: String
+}
+
 private struct LibraryView: View {
     @Environment(\.locale) private var locale
     @ObservedObject var model: CameraModel
     @StateObject private var branchStore = MacLibraryBranchStore()
+    @StateObject private var thumbnailCache = MacThumbnailCache()
     @State private var confirmDelete = false
     @State private var showCloudGuide = false
     @State private var showBranchCreator = false
@@ -9239,13 +9472,13 @@ private struct LibraryView: View {
     @State private var systemLargePhoto: SystemMacAlbumItem?
     @State private var systemAlbum: [SystemMacAlbumItem] = []
     @State private var systemAlbumStatus = "正在读取系统相册…"
-    @State private var systemExpanded = true
+    @State private var systemExpanded = false
     @State private var systemPhotosExpanded = true
     @State private var systemVideosExpanded = true
-    @State private var uncategorizedExpanded = true
+    @State private var uncategorizedExpanded = false
     @State private var localPhotosExpanded = true
     @State private var localVideosExpanded = true
-    @State private var wirelessExpanded = true
+    @State private var wirelessExpanded = false
     @State private var unclassifiedDropTargeted = false
     @State private var cameraStorageExpanded = false
     @State private var cameraStorageSnapshot = CameraStorageSnapshot.empty
@@ -9253,6 +9486,12 @@ private struct LibraryView: View {
     @State private var cameraStorageStatus = "连接相机后可查看存储卡中的照片和视频。"
     @State private var cameraStorageBusy = false
     @State private var confirmCameraStorageDelete = false
+    @State private var showSourcesAndTools = false
+    @State private var searchText = ""
+    @State private var filterMode: AllFilesFilter = .all
+    @State private var sortMode: AllFilesSort = .recent
+    @FocusState private var searchFocused: Bool
+    @State private var photoPendingMove: PhotoRecord?
     // ── E6 1.5.9：延时合成视频（帧多选 + 帧率/编码 + 进度/取消）──
     @State private var showTimelapseComposer = false
     // ── E7 1.5.9：焦点包围合成（帧多选 + 逐像素清晰度融合 + 进度/取消）──
@@ -9262,112 +9501,382 @@ private struct LibraryView: View {
         GridItem(.adaptive(minimum: 180, maximum: 260), spacing: SpaceToken.s16)
     ]
 
-    var body: some View {
-        HSplitView {
-            VStack(spacing: SpaceToken.s0) {
-                HStack {
+    private var filteredPhotos: [PhotoRecord] {
+        var result = model.photos
+        if !searchText.isEmpty {
+            let query = searchText.lowercased()
+            result = result.filter {
+                $0.name.lowercased().contains(query)
+            }
+        }
+        switch filterMode {
+        case .all: break
+        case .photo: result = result.filter { !$0.isVideo }
+        case .video: result = result.filter { $0.isVideo }
+        }
+        switch sortMode {
+        case .recent:
+            result.sort { $0.createdAt > $1.createdAt }
+        case .name:
+            result.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+        return result
+    }
+
+    private var photoCount: Int { model.photos.filter { !$0.isVideo }.count }
+    private var videoCount: Int { model.photos.filter { $0.isVideo }.count }
+    private var visibleSelectedPhoto: PhotoRecord? {
+        guard let selected = model.selectedPhoto,
+              filteredPhotos.contains(selected) else { return nil }
+        return selected
+    }
+    private var branchChoices: [MacLibraryBranchChoice] {
+        func flatten(
+            _ branches: [MacLibraryBranch],
+            depth: Int
+        ) -> [MacLibraryBranchChoice] {
+            branches.flatMap { branch in
+                let prefix = String(repeating: "—", count: depth)
+                return [MacLibraryBranchChoice(
+                    id: branch.id,
+                    name: "\(prefix)\(branch.name)"
+                )] + flatten(branch.children, depth: depth + 1)
+            }
+        }
+        return flatten(branchStore.branches, depth: 0)
+    }
+
+    @ViewBuilder
+    private var allFilesToolbar: some View {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+            HStack(spacing: SpaceToken.s12) {
                 WorkspaceHeading(
-                    title: "分支文件库",
-                    subtitle: "\(model.photos.count) 个本地文件 · 拖动整理，不改动原文件"
+                    title: RuntimeLocalization.text("所有文件", locale: locale),
+                    subtitle: String(
+                        format: RuntimeLocalization.text(
+                            "%d 张照片 · %d 个视频",
+                            locale: locale
+                        ),
+                        photoCount,
+                        videoCount
+                    )
                 )
                 Spacer()
-                Button("刷新相册") {
-                    Task { await loadSystemAlbum() }
+                Button {
+                    openMediaImporter()
+                } label: {
+                    Label(
+                        RuntimeLocalization.text("导入照片与视频", locale: locale),
+                        systemImage: "plus"
+                    )
                 }
-                    .buttonStyle(NativeButtonStyle())
-                Button("导入照片与视频") { openMediaImporter() }
-                    .buttonStyle(NativeButtonStyle(primary: true))
-                Button("链接网盘") { showCloudGuide = true }
-                    .buttonStyle(NativeButtonStyle())
-                Button("合成延时视频") { showTimelapseComposer = true }
-                    .buttonStyle(NativeButtonStyle(primary: true))
-                Button("焦点合成") { showFocusStackComposer = true }
-                    .buttonStyle(NativeButtonStyle(primary: true))
-                if let selectedPhoto = model.selectedPhoto {
+                .buttonStyle(NativeButtonStyle(primary: true))
+                if let selectedPhoto = visibleSelectedPhoto {
                     Button {
                         model.downloadPhotoToLocal(selectedPhoto)
                     } label: {
                         Label(
-                            LocalizedStringKey(
+                            RuntimeLocalization.text(
                                 model.localDownloadBusy
                                     ? "正在保存…"
-                                    : "下载到本地"
+                                    : "导出副本",
+                                locale: locale
                             ),
                             systemImage: "arrow.down.to.line"
                         )
                     }
-                    .buttonStyle(NativeButtonStyle(primary: true))
+                    .buttonStyle(NativeButtonStyle())
                     .disabled(model.localDownloadBusy)
                     ShareLink(item: selectedPhoto.url) {
-                        Label("分享到社交平台", systemImage: "square.and.arrow.up")
+                        Label(
+                            RuntimeLocalization.text("分享到社交平台", locale: locale),
+                            systemImage: "square.and.arrow.up"
+                        )
                     }
-                    .buttonStyle(NativeButtonStyle(primary: true))
+                    .buttonStyle(NativeButtonStyle())
                 }
-                Button("在访达中显示") { model.revealLibrary() }
+                Button {
+                    model.revealLibrary()
+                } label: {
+                    Label(
+                        RuntimeLocalization.text("在访达中显示", locale: locale),
+                        systemImage: "folder"
+                    )
+                }
+                .buttonStyle(NativeButtonStyle())
+                Button {
+                    if visibleSelectedPhoto != nil {
+                        confirmDelete = true
+                    }
+                } label: {
+                    Label(
+                        RuntimeLocalization.text("移到废纸篓", locale: locale),
+                        systemImage: "trash"
+                    )
+                }
+                .buttonStyle(NativeButtonStyle())
+                .disabled(visibleSelectedPhoto == nil)
+            }
+
+            HStack(spacing: SpaceToken.s12) {
+                HStack(spacing: SpaceToken.s4) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(Palette.muted)
+                    TextField(
+                        RuntimeLocalization.text("搜索文件名…", locale: locale),
+                        text: $searchText
+                    )
+                    .textFieldStyle(.plain)
+                    .focused($searchFocused)
+                    .accessibilityLabel(
+                        RuntimeLocalization.text("搜索文件名…", locale: locale)
+                    )
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Palette.muted)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, SpaceToken.s12)
+                .padding(.vertical, SpaceToken.s8)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r10))
+                .overlay {
+                    RoundedRectangle(cornerRadius: RadiusToken.r10)
+                        .stroke(Palette.rule)
+                }
+                .frame(maxWidth: 320)
+
+                Picker("", selection: $filterMode) {
+                    ForEach(AllFilesFilter.allCases, id: \.self) { mode in
+                        Text(RuntimeLocalization.text(mode.rawValue, locale: locale))
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .accessibilityLabel(
+                    RuntimeLocalization.text("筛选", locale: locale)
+                )
+
+                Picker("", selection: $sortMode) {
+                    ForEach(AllFilesSort.allCases, id: \.self) { mode in
+                        Text(RuntimeLocalization.text(mode.rawValue, locale: locale))
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .accessibilityLabel(
+                    RuntimeLocalization.text("排序", locale: locale)
+                )
+
+                Spacer()
+
+                Text(
+                    String(
+                        format: RuntimeLocalization.text("%d 个文件", locale: locale),
+                        filteredPhotos.count
+                    )
+                )
+                .font(.system(size: TypeScale.caption, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+                .accessibilityValue(
+                    String(
+                        format: RuntimeLocalization.text(
+                            "%d 个文件",
+                            locale: locale
+                        ),
+                        filteredPhotos.count
+                    )
+                )
+            }
+
+            HStack {
+                Button("") { searchFocused = true }
+                    .keyboardShortcut("f", modifiers: .command)
+                    .opacity(0)
+                    .frame(width: 0, height: 0)
+                    .accessibilityLabel("聚焦搜索")
+                Button("") {
+                    if visibleSelectedPhoto != nil { confirmDelete = true }
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .opacity(0)
+                .frame(width: 0, height: 0)
+                .accessibilityLabel("删除所选")
+            }
+            .frame(width: 0, height: 0)
+        }
+    }
+
+    @ViewBuilder
+    private var allFilesGrid: some View {
+        if filteredPhotos.isEmpty {
+            ContentUnavailableView(
+                RuntimeLocalization.text("本地图库还是空的", locale: locale),
+                systemImage: "photo.on.rectangle",
+                description: Text(
+                    RuntimeLocalization.text(
+                        "拍摄、导入或无线接收的文件会显示在这里。",
+                        locale: locale
+                    )
+                )
+            )
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 240)
+        } else {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: SpaceToken.s16) {
+                    ForEach(filteredPhotos) { photo in
+                        MacLocalPhotoCell(
+                            photo: photo,
+                            selected: model.selectedPhoto == photo,
+                            thumbnailCache: thumbnailCache,
+                            select: {
+                                model.selectedPhoto = photo
+                            },
+                            preview: {
+                                model.selectedPhoto = photo
+                                largePhoto = photo
+                            },
+                            moveToProject: {
+                                photoPendingMove = photo
+                            },
+                            exportCopy: {
+                                model.downloadPhotoToLocal(photo)
+                            },
+                            delete: {
+                                model.selectedPhoto = photo
+                                confirmDelete = true
+                            }
+                        )
+                    }
+                }
+                .padding(.vertical, SpaceToken.s4)
+            }
+            .background(Palette.paperSecondary, in: RoundedRectangle(cornerRadius: RadiusToken.r12))
+            .overlay {
+                RoundedRectangle(cornerRadius: RadiusToken.r12)
+                    .stroke(Palette.rule)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var systemAlbumWorkspace: some View {
+        DisclosureGroup(
+            "系统相册 · \(systemAlbum.count)",
+            isExpanded: $systemExpanded
+        ) {
+            if systemAlbum.isEmpty {
+                ContentUnavailableView(
+                    "系统相册暂不可见",
+                    systemImage: "photo.on.rectangle",
+                    description: Text("允许照片访问后，照片和视频会直接显示在文件页。")
+                )
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 180)
+            } else {
+                DisclosureGroup(
+                    "照片 · \(systemAlbum.filter { !$0.isVideo }.count)",
+                    isExpanded: $systemPhotosExpanded
+                ) {
+                    systemAlbumGrid(systemAlbum.filter { !$0.isVideo })
+                }
+                DisclosureGroup(
+                    "视频 · \(systemAlbum.filter(\.isVideo).count)",
+                    isExpanded: $systemVideosExpanded
+                ) {
+                    systemAlbumGrid(systemAlbum.filter(\.isVideo))
+                }
+            }
+        }
+        .font(.system(size: TypeScale.title, weight: .bold))
+    }
+
+    @ViewBuilder
+    private var wirelessTransferWorkspace: some View {
+        DisclosureGroup(
+            "无线传输 · FTP / HTTP / WebDAV",
+            isExpanded: $wirelessExpanded
+        ) {
+            TransferView(model: model)
+        }
+        .font(.system(size: TypeScale.title, weight: .bold))
+        .padding(.top, SpaceToken.s8)
+    }
+
+    @ViewBuilder
+    private var advancedToolsWorkspace: some View {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+            Text("高级工具")
+                .font(.system(size: TypeScale.title, weight: .bold))
+            HStack(spacing: SpaceToken.s12) {
+                Button("合成延时视频") { showTimelapseComposer = true }
+                    .buttonStyle(NativeButtonStyle(primary: true))
+                Button("焦点合成") { showFocusStackComposer = true }
+                    .buttonStyle(NativeButtonStyle(primary: true))
+                Button("链接网盘") { showCloudGuide = true }
                     .buttonStyle(NativeButtonStyle())
-                Button("移到废纸篓") { confirmDelete = true }
-                    .buttonStyle(NativeButtonStyle())
-                    .disabled(model.selectedPhoto == nil)
+                Button("刷新相册") {
+                    Task { await loadSystemAlbum() }
+                }
+                .buttonStyle(NativeButtonStyle())
+            }
+        }
+        .padding(.top, SpaceToken.s8)
+    }
+
+    var body: some View {
+        VStack(spacing: SpaceToken.s0) {
+            VStack(alignment: .leading, spacing: SpaceToken.s12) {
+                allFilesToolbar
+                allFilesGrid
             }
             .padding(SpaceToken.s24)
-            Divider()
-            ScrollView {
+            .frame(minWidth: 560)
+
+            DisclosureGroup(
+                RuntimeLocalization.text(
+                    showSourcesAndTools ? "隐藏来源与工具" : "显示来源与工具",
+                    locale: locale
+                ),
+                isExpanded: $showSourcesAndTools
+            ) {
                 VStack(alignment: .leading, spacing: SpaceToken.s16) {
                     branchWorkspace
                     cameraStorageWorkspace
-                    DisclosureGroup(
-                        "系统相册 · \(systemAlbum.count)",
-                        isExpanded: $systemExpanded
-                    ) {
-                        if systemAlbum.isEmpty {
-                            ContentUnavailableView(
-                                "系统相册暂不可见",
-                                systemImage: "photo.on.rectangle",
-                                description: Text("允许照片访问后，照片和视频会直接显示在文件页。")
-                            )
-                            .frame(maxWidth: .infinity)
-                            .frame(minHeight: 180)
-                        } else {
-                            DisclosureGroup(
-                                "照片 · \(systemAlbum.filter { !$0.isVideo }.count)",
-                                isExpanded: $systemPhotosExpanded
-                            ) {
-                                systemAlbumGrid(systemAlbum.filter { !$0.isVideo })
-                            }
-                            DisclosureGroup(
-                                "视频 · \(systemAlbum.filter(\.isVideo).count)",
-                                isExpanded: $systemVideosExpanded
-                            ) {
-                                systemAlbumGrid(systemAlbum.filter(\.isVideo))
-                            }
-                        }
-                    }
-                    .font(.system(size: TypeScale.title, weight: .bold))
+                    systemAlbumWorkspace
+                    wirelessTransferWorkspace
+                    advancedToolsWorkspace
+                }
+                .padding(.top, SpaceToken.s16)
+            }
+            .font(.system(size: TypeScale.title, weight: .bold))
+            .padding([.horizontal, .bottom], SpaceToken.s24)
 
-                }
-                .padding(SpaceToken.s24)
-            }
-            }
-            .frame(minWidth: 560)
-            VStack(alignment: .leading, spacing: SpaceToken.s0) {
-                DisclosureGroup(
-                    "无线传输 · FTP / HTTP / WebDAV",
-                    isExpanded: $wirelessExpanded
-                ) {
-                    TransferView(model: model)
-                }
-                .font(.system(size: TypeScale.title, weight: .bold))
-                .padding(SpaceToken.s16)
-            }
-            .frame(minWidth: 380, idealWidth: 440, maxWidth: 520)
+            Spacer()
         }
-        .alert("将照片移到废纸篓？", isPresented: $confirmDelete) {
+        .alert(
+            String(
+                format: RuntimeLocalization.text(
+                    "将 %@ 移到废纸篓？",
+                    locale: locale
+                ),
+                model.selectedPhoto?.name ?? ""
+            ),
+            isPresented: $confirmDelete
+        ) {
             Button("取消", role: .cancel) {}
             Button("移到废纸篓", role: .destructive) {
-                if let path = model.selectedPhoto?.url.path {
+                if let path = model.selectedPhoto?.url.path,
+                   model.deleteSelectedPhoto() {
                     branchStore.assign(path, to: nil)
                 }
-                model.deleteSelectedPhoto()
             }
         } message: {
             RuntimeLocalizedText(model.selectedPhoto?.name ?? "")
@@ -9421,6 +9930,38 @@ private struct LibraryView: View {
             Text(
                 "将同时删除“\(branchPendingDeletion?.name ?? "")”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"
             )
+        }
+        .confirmationDialog(
+            RuntimeLocalization.text("移动到项目", locale: locale),
+            isPresented: Binding(
+                get: { photoPendingMove != nil },
+                set: {
+                    if !$0 {
+                        photoPendingMove = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("未分类") {
+                if let photo = photoPendingMove {
+                    branchStore.assign(photo.url.path, to: nil)
+                }
+                photoPendingMove = nil
+            }
+            ForEach(branchChoices) { branch in
+                Button(branch.name) {
+                    if let photo = photoPendingMove {
+                        branchStore.assign(photo.url.path, to: branch.id)
+                    }
+                    photoPendingMove = nil
+                }
+            }
+            Button("取消", role: .cancel) {
+                photoPendingMove = nil
+            }
+        } message: {
+            Text("选择要移动到的项目；文件位置保持不变。")
         }
         .sheet(item: $largePhoto) { photo in
             LargePhotoView(
@@ -9751,6 +10292,7 @@ private struct LibraryView: View {
                         depth: 0,
                         photos: model.photos,
                         selectedPhoto: model.selectedPhoto,
+                        thumbnailCache: thumbnailCache,
                         addChild: {
                             beginCreatingBranch(parent: $0)
                         },
@@ -9850,73 +10392,23 @@ private struct LibraryView: View {
     private func localPhotoGrid(_ items: [PhotoRecord]) -> some View {
         LazyVGrid(columns: columns, spacing: SpaceToken.s16) {
             ForEach(items) { photo in
-                Button {
+                MacLocalPhotoCell(
+                    photo: photo,
+                    selected: model.selectedPhoto == photo,
+                    thumbnailCache: thumbnailCache
+                ) {
                     model.selectedPhoto = photo
-                } label: {
-                    VStack(alignment: .leading, spacing: SpaceToken.s8) {
-                        if photo.isVideo {
-                            ZStack {
-                                Rectangle().fill(Palette.graphite)
-                                Image(systemName: "play.rectangle.fill")
-                                    .font(.system(size: 34)) // 图标尺寸，不受 TypeScale 约束
-                                    .foregroundStyle(Palette.whiteLo)
-                            }
-                            .frame(height: 132)
-                        } else if let image = NSImage(contentsOf: photo.url) {
-                            Image(nsImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 132)
-                                .clipped()
-                        } else {
-                            Rectangle()
-                                .fill(Palette.graphite)
-                                .frame(height: 132)
-                        }
-                        Text(photo.name)
-                            .font(.system(size: TypeScale.body, weight: .semibold))
-                            .lineLimit(1)
-                        Text(
-                            photo.createdAt.formatted(
-                                date: .abbreviated,
-                                time: .shortened
-                            )
-                        )
-                        .font(.system(size: TypeScale.caption))
-                        .foregroundStyle(Palette.muted)
-                    }
-                    .padding(SpaceToken.s8)
-                    .background(Palette.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r12))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: RadiusToken.r12)
-                            .stroke(
-                                model.selectedPhoto == photo
-                                    ? Palette.cobalt : Palette.rule,
-                                lineWidth: model.selectedPhoto == photo ? 2 : 1
-                            )
-                    }
+                } preview: {
+                    model.selectedPhoto = photo
+                    largePhoto = photo
+                } moveToProject: {
+                    photoPendingMove = photo
+                } exportCopy: {
+                    model.downloadPhotoToLocal(photo)
+                } delete: {
+                    model.selectedPhoto = photo
+                    confirmDelete = true
                 }
-                .buttonStyle(.plain)
-                .simultaneousGesture(
-                    TapGesture(count: 2).onEnded {
-                        model.selectedPhoto = photo
-                        largePhoto = photo
-                    }
-                )
-                .draggable(photo.url.path) {
-                    Label(
-                        photo.name,
-                        systemImage: "arrow.up.and.down.and.arrow.left.and.right"
-                    )
-                    .font(.system(size: TypeScale.body, weight: .semibold))
-                    .padding(SpaceToken.s8)
-                    .background(
-                        .regularMaterial,
-                        in: RoundedRectangle(cornerRadius: RadiusToken.r8)
-                    )
-                }
-                .help("拖动到分支")
             }
         }
     }

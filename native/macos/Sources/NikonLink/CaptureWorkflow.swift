@@ -213,6 +213,144 @@ final class CaptureWorkflow: ObservableObject {
         }
     }
 
+    /// Moves a library file to the system Trash, then reconciles the exact
+    /// session that owns it. A same-stem sidecar is retained while another
+    /// media file still references it (for example a RAW + JPEG pair).
+    func deleteLibraryFile(
+        at primary: URL,
+        operationToken: UUID
+    ) throws {
+        try validateNonImportOperation(operationToken)
+        let normalizedPrimary = primary.standardizedFileURL
+        guard isDescendant(normalizedPrimary, of: rootDirectory) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let primaryDirectory = normalizedPrimary.deletingLastPathComponent()
+        let sessionRoot = sessionRootOwning(normalizedPrimary)
+        let sidecar = normalizedPrimary
+            .deletingPathExtension()
+            .appendingPathExtension("xmp")
+        let backup = sessionRoot?
+            .appendingPathComponent("Backup", isDirectory: true)
+            .appendingPathComponent(normalizedPrimary.lastPathComponent)
+        let backupSidecar = backup?
+            .deletingPathExtension()
+            .appendingPathExtension("xmp")
+        let keepSharedSidecar = hasSameStemMediaSibling(
+            as: normalizedPrimary,
+            in: primaryDirectory
+        )
+
+        guard fileManager.fileExists(atPath: normalizedPrimary.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try fileManager.trashItem(
+            at: normalizedPrimary,
+            resultingItemURL: nil
+        )
+
+        var failures: [Error] = []
+        func attemptTrash(_ url: URL?) {
+            guard let url,
+                  fileManager.fileExists(atPath: url.path) else { return }
+            do {
+                try fileManager.trashItem(at: url, resultingItemURL: nil)
+            } catch {
+                failures.append(error)
+            }
+        }
+
+        if let sessionRoot {
+            let manifest = sessionRoot.appendingPathComponent("checksums.sha256")
+            if fileManager.fileExists(atPath: manifest.path) {
+                do {
+                    let relative = "Primary/\(normalizedPrimary.lastPathComponent)"
+                    let existing = try String(
+                        contentsOf: manifest,
+                        encoding: .utf8
+                    )
+                    let lines = existing
+                        .split(separator: "\n", omittingEmptySubsequences: true)
+                        .map(String.init)
+                        .filter { !$0.hasSuffix("  \(relative)") }
+                    let updated = lines.joined(separator: "\n")
+                        .appending(lines.isEmpty ? "" : "\n")
+                    try updated.write(
+                        to: manifest,
+                        atomically: true,
+                        encoding: .utf8
+                    )
+                } catch {
+                    failures.append(error)
+                }
+            }
+        }
+
+        attemptTrash(backup)
+        if !keepSharedSidecar {
+            attemptTrash(sidecar)
+            attemptTrash(backupSidecar)
+        }
+
+        if !failures.isEmpty {
+            throw LibraryDeletionError(failures: failures)
+        }
+    }
+
+    private let libraryMediaExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "nef", "nrw", "arw", "cr2", "cr3",
+        "heif", "heic", "tif", "tiff", "mov", "mp4", "m4v", "avi"
+    ]
+
+    private func isDescendant(_ candidate: URL, of root: URL) -> Bool {
+        let rootComponents = root.standardizedFileURL.pathComponents
+        let candidateComponents = candidate.standardizedFileURL.pathComponents
+        return candidateComponents.count > rootComponents.count &&
+            candidateComponents.prefix(rootComponents.count)
+                .elementsEqual(rootComponents)
+    }
+
+    private func sessionRootOwning(_ primary: URL) -> URL? {
+        let primaryDirectory = primary.deletingLastPathComponent()
+        guard primaryDirectory.lastPathComponent == "Primary" else {
+            return nil
+        }
+        let candidate = primaryDirectory.deletingLastPathComponent()
+        guard candidate.deletingLastPathComponent().lastPathComponent == "Sessions",
+              isDescendant(candidate, of: rootDirectory) else {
+            return nil
+        }
+        return candidate
+    }
+
+    private func hasSameStemMediaSibling(
+        as primary: URL,
+        in directory: URL
+    ) -> Bool {
+        let stem = primary.deletingPathExtension().lastPathComponent
+        let siblings = (try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return siblings.contains { sibling in
+            sibling.standardizedFileURL != primary.standardizedFileURL &&
+                sibling.deletingPathExtension().lastPathComponent == stem &&
+                libraryMediaExtensions.contains(
+                    sibling.pathExtension.lowercased()
+                )
+        }
+    }
+
+    struct LibraryDeletionError: LocalizedError {
+        let failures: [Error]
+
+        var errorDescription: String? {
+            "文件已移到废纸篓，但有 \(failures.count) 个会话关联项未能同步。"
+        }
+    }
+
     private func withNonImportOperation<T>(
         token: UUID?,
         _ body: () throws -> T
