@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-16（Asia/Shanghai）
+> 最近核对：2026-08-20（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -353,6 +353,10 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **本地删除语义**：删除先确认并把主文件送入系统 Trash/Recycle Bin，成功后才清除项目归属。清单、Backup 与 XMP 必须从 `Sessions/<owner>/Primary/<file>` 推导真实历史会话，不能使用当前活动会话；同 stem 的 RAW/JPEG 仍存在时保留共享 XMP。主文件已进废纸篓但关联项同步失败时要报告“部分完成”，不能伪装为整体失败或恢复归属。
 - **回归边界**：`test/native-desktop-import*.test.mjs` 锁定流式/取消/回滚，`test/native-desktop-library-simple.test.mjs` 锁定信息架构、缓存、虚拟化、Trash 与历史会话，`test/native-library-tree.test.mjs` 锁定五端归类仍可用，`test/launch-announcement.test.mjs` 锁定五端 1.5.14 公告内容。结构契约和编译不替代 Sony 真机、真实文件提供器、低磁盘、系统废纸篓、Windows UI 或长时间内存验收。
 - **1.5.14 封板证据**：总实现 `5e8b7f1e81c91d99848c619ba583784f5a20cb57` 的完整自动化为 629 通过、0 失败、1 项 Windows 主机专属用例跳过；五端包均从该实现重建。六份侧车 6/6 一致；Android v2 Debug 证书连续，iOS/HarmonyOS 未签名，macOS arm64 为 ad-hoc 且 DMG/深度严格校验通过，Windows x64 Setup/主程序无 Authenticode。精确字节数与摘要见 `docs/releases/v1.5.14.md`。
+- **1.5.14 发布证据**：注释标签 `v1.5.14` 解引用到
+  `17e87ce6c39aad07f712cd0605efe90899e6e72c`；[GitHub Release](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)
+  于 `2026-08-19T19:58:12Z` 公开为 Latest。Actions run `32295909168` 在原子公开前核对
+  12 个固定名称资产与六份侧车；GitHub 端六包字节数和摘要与本地一致。
 
 ## 6. 本地工作流与图像处理
 
@@ -411,10 +415,12 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
   服务完全读取本地清单且不请求 GitHub；未设置时保留 GitHub Release 缓存/stale 模式。
   客户端校验 product/schema 后才使用结果，服务不可用仍按 MirrorChyan → GitHub 顺序回退。
   生产实例位于 `ubuntu@101.34.255.115`：`zenche-update.service` 监听 `127.0.0.1:4174`，
-  Nginx 反代 API 并从 `/var/www/zenche.top/downloads/` 公网提供版本化资产；
-  `UPDATE_ASSET_BASE_URL=https://zenche.top/downloads` 使清单 URL 指向官网。2026-08-10
-  已将 1.5.10 / build 37 自托管清单切入生产，五端公网更新响应、兼容路由、1.5.10
-  不重复提示与六个公开包 SHA-256 均通过；1.5.9 资产继续保留用于回滚。部署参数和反向代理要求见
+  1Panel OpenResty 反代 API 并从 `/opt/1panel/www/sites/zenche-top/index/downloads/`
+  公网提供版本化资产；`UPDATE_ASSET_BASE_URL=https://zenche.top/downloads`
+  使清单 URL 指向官网。2026-08-20 已将 `1.5.14 / build 41` 自托管清单原子切入生产，
+  `/healthz`、`/api/update`、`/api/updates` 的五端响应与六个公网包流式 SHA-256
+  均通过；旧版资产继续保留，回滚备份为
+  `/opt/zenche-update-backups/20260819T200402Z-v1514`。部署参数和反向代理要求见
   `docs/AUTOMATIC_UPDATES.md`。
 - 敏感 CDK 不进入诊断日志；各平台使用对应安全存储。
 - 诊断日志需要限量滚动、保留周期、隐私脱敏和可操作错误上下文。

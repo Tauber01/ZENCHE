@@ -16,11 +16,17 @@
 - 标准标语：连接相机，也连接完整工作流
 - 当前源码版本：1.5.14（连接可靠性、Sony 兼容、桌面导入与五端文件库更新）
 - 当前原生构建号：41
-- 发布状态：[GitHub Release v1.5.13](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13) 已于 `2026-08-12T03:33:52Z` 发布为 Latest，非草稿、非预发布；注释标签解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`。六个五端安装包及六份 SHA-256 侧车已从最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd` 重建并回验；聚合交付包为 275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，发布 run `31560420972` 对全部线上资产重新下载并逐字节比对，14/14 一致；官网自动更新不在本次范围内，继续提供 W14 的 1.5.10 / build 37。
+- 发布状态：[GitHub Release v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)
+  已于 `2026-08-19T19:58:12Z` 发布为 Latest，非草稿、非预发布；注释标签对象
+  `fea9c2a8774c5b96d409940fb7b55e2f5e907c22` 解引用到发布提交
+  `17e87ce6c39aad07f712cd0605efe90899e6e72c`。Release ID `373311624`，包含六个五端安装包与
+  六份 SHA-256 侧车；发布 run `32295909168` 公开前完成全资产侧车验证并原子切换，
+  GitHub 端名称、字节数和六包摘要 12/12 一致。官网自托管更新已同步切换到
+  `1.5.14 / build 41`，双 API 五端响应与六包公网 SHA-256 均已回验。
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
 
-1.5.14 / build 41 为五端连接可靠性与恢复体验候选。PTP/IP 心跳改用 event 通道的
+1.5.14 / build 41 为五端连接可靠性与恢复体验正式稳定版。PTP/IP 心跳改用 event 通道的
 标准 Probe Request/Response(type 13/14)，常驻 reader 同时响应相机主动探测并排空
 事件；Apple、HarmonyOS、Windows 为完整 command transaction 增加显式串行 gate。
 GetDeviceInfo 恢复无参数请求及 PIMA STR/AUINT16 解析，data-out 按
@@ -47,6 +53,8 @@ Camera Remote SDK 公开支持表，完整遥控能力仍需对应真机验证�
 0 失败、1 项 Windows 主机专属用例跳过；六个正式资产和六份同名 SHA-256 已由该
 实现重建并通过版本、容器、架构和适用签名回验。正式签名、真机相机、断网、安装
 与 Windows 主机验收边界不变。
+正式 GitHub 资产已从封板实现重建；官网生产清单、两套 API 与六个公网下载均已对
+1.5.14 回验，详细证据和回滚路径见 `docs/releases/v1.5.14.md`。
 
 W15 修复五端登录页中“模式标签”和“提交按钮”同名造成的误触歧义，并为 macOS、Windows 增加可保存的桌面工作区。两端会恢复主窗口大小和位置，Windows 还会恢复最大化状态；主导航、拍摄参数、编辑媒体池、工具面板及底部工具区可在拖动中实时连续调节，Windows AI 工具面板另有独立分隔条。桌面编辑器将“专业显影 / AI 工具”固定为一级模式，色轮、曲线、蒙版等归入二级“调整类别”；RGB 示波器会填满底部可用空间。预览和示波器复用同一受控尺寸图像，Windows 另合并高频刷新、按录制状态启停时间码，并在替换结果、切换照片或模式、离开编辑页及关闭窗口时清理受限命名的 AI 临时文件和编辑位图。第一版不包含任意浮动面板或跨屏面板停靠；Windows 多显示器/DPI 与两端真实拖拽、重启恢复及长时间性能仍需真机验收。最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`，完整测试 503/503 通过；Windows 两包已按该基线重建，未受后续 Windows 专属改动影响的 macOS DMG 复用 `0faeccdc987146c104fd73d742547c9baf9db221` 已验证产物。最终聚合包 SHA-256 为 `46515bba169afe3a495f1265dec9ab2a3ac409ecaf20d2466b041fe2144992e1`，14 项逐字节一致。AI审查 最终门禁 PASS（P0/P1/P2=0）；GPT5.6luna 确认三语、签名事实、生产边界、去 AI 痕迹与交付内容无实体问题，其唯一状态 P2 已完成回填。
 
@@ -164,7 +172,12 @@ macOS、Windows 承担，iOS 受 Apple 公开 API 限制无厂商 USB/PTP 能力
 - **W14 实时监看与 iOS 相机桥接官网发布**：五端拍照页新增“实时监看”开关，iOS / iPadOS 可在同一可信局域网连接 Mac 相机桥接。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 当前明确走 PTP 兼容路径。两家公开的桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本，因此 iOS 没有伪装或改写厂商桌面 SDK。1.5.10 / build 37 官网自动更新已上线；Sony/Nikon 真机联调及正式签名发布验收仍待完成。
 - **W15 登录动作清晰化与桌面工作区**：生产 Nginx 专用访问日志在用户报告“点登录没反应”前后未发现 `/api/v1/auth/login` 请求，说明故障发生于客户端提交前。五端登录模式标签改为“已有账号 / 创建账号”，Apple 提交按钮在忙碌态保留动作文字并补齐中英日 exact key；macOS/Windows 新增窗口几何和面板尺寸持久化、越界恢复、可访问分隔条、五种工作区预设及重置。本轮进一步把桌面分隔条改为实时连续调节，增加 Windows AI 工具面板独立宽度，释放 macOS AI 区被重复导航和通用底栏占用的高度，并在窄窗下联动限制侧栏、参数栏和 AI 分栏；Windows AI 临时结果在受限路径和命名守卫下覆盖全部正常生命周期清理。公告不再把各平台一概称为“未签名”，而是引导用户查阅逐包签名状态。最终源码基线为 `831a82315c3586a8c8933c76ef6e8e3612bbcba5`；相关能力已随 1.5.11 / build 38 GitHub Release 公开，并由当前 1.5.12 / build 39 继承。官网生产清单继续保持 1.5.10 / build 37。
 - **服务器端自动更新**：`server.mjs` 提供只读 `GET /api/update`（兼容 `/api/updates`）和 `/healthz`。生产可用 `UPDATE_RELEASE_MANIFEST` 完全切换到自托管清单，按五端规范化平台键返回版本、完整包 URL、SHA-256、公告和 `update_available`；未设置清单时继续兼容 GitHub Release 缓存/stale 模式。五端原生客户端默认请求 `https://zenche.top/api/update`，失败后继续 MirrorChyan/GitHub 回退，不直接覆盖应用文件。
-- **生产部署状态**：`zenche-update.service` 监听 `127.0.0.1:4174`，Nginx 已将更新 API 和 `/downloads/` 公网发布到 `https://zenche.top`。截至 2026-08-10，1.5.10 / build 37 自托管清单已生效；五端公网更新响应、兼容路由、1.5.10 不重复提示与六个公开包 SHA-256 均已通过。1.5.9 资产继续保留，回滚备份位于 `/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
+- **生产部署状态**：`zenche-update.service` 监听 `127.0.0.1:4174`，1Panel OpenResty 将更新
+  API 和 `/downloads/` 公网发布到 `https://zenche.top`；实际静态根为
+  `/opt/1panel/www/sites/zenche-top/index/downloads/`。截至 2026-08-20，
+  `1.5.14 / build 41` 自托管清单已生效；`/api/update` 与 `/api/updates` 的五端
+  响应、健康检查与六个公开包 SHA-256 均已通过。旧版资产继续保留，本次回滚备份位于
+  `/opt/zenche-update-backups/20260819T200402Z-v1514`。
 
 ## 5. 品牌、文档与发布约束
 

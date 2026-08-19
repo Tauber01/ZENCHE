@@ -98,13 +98,13 @@ PORT=4173 HOST=127.0.0.1 npm start
 ### 当前生产部署
 
 更新服务已部署在 `ubuntu@101.34.255.115`：systemd 单元为
-`zenche-update.service`，监听 `127.0.0.1:4174`；Nginx 将 `/api/update`、
-`/api/updates` 和 `/healthz` 反代到该服务，并将 `/downloads/` 映射到
-`/var/www/zenche.top/downloads/`。`UPDATE_ASSET_BASE_URL` 已设置为
-`https://zenche.top/downloads`。截至 2026-08-10，1.5.10 / build 37 自托管清单
-已在生产生效；公网健康检查、五端更新响应、兼容路由与六个公开包的 SHA-256 均已
-回归通过。1.5.9 / build 36 资产继续保留用于回滚，生产备份位于
-`/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
+`zenche-update.service`，监听 `127.0.0.1:4174`；1Panel OpenResty 将 `/api/update`、
+`/api/updates` 和 `/healthz` 反代到该服务，并从
+`/opt/1panel/www/sites/zenche-top/index/downloads/` 提供 `/downloads/`。
+`UPDATE_ASSET_BASE_URL` 已设置为 `https://zenche.top/downloads`。截至
+2026-08-20，`1.5.14 / build 41` 自托管清单已在生产生效；公网健康检查、
+两个 API 的五端更新响应与六个公开包的流式 SHA-256 均已通过。旧版资产继续保留，
+生产备份位于 `/opt/zenche-update-backups/20260819T200402Z-v1514`。
 
 ## English
 
@@ -147,12 +147,12 @@ monitor `/healthz` and 5xx rates, and do not expose a write/admin surface. GitHu
 are restricted to the configured HTTPS repository API.
 
 The production instance runs as `zenche-update.service` on `101.34.255.115` at
-`127.0.0.1:4174`. Nginx proxies the API routes and serves `/downloads/` from
-`/var/www/zenche.top/downloads/`. As of 2026-08-10, the 1.5.10 / build 37 self-hosted
-manifest is active in production. The public health endpoint, all five update responses,
-the compatibility route, and the SHA-256 of all six public packages passed regression checks.
-The 1.5.9 / build 36 assets remain available for rollback; the production backup is stored at
-`/opt/zenche-update-backups/20260809T163105Z-v1510-r2`.
+`127.0.0.1:4174`. 1Panel OpenResty proxies the API routes and serves `/downloads/` from
+`/opt/1panel/www/sites/zenche-top/index/downloads/`. As of 2026-08-20, the
+1.5.14 / build 41 self-hosted manifest is active in production. The public health endpoint,
+both update routes for all five platforms, and streaming SHA-256 checks of all six public
+packages passed. Older versioned assets remain available for rollback; the production backup
+is stored at `/opt/zenche-update-backups/20260819T200402Z-v1514`.
 
 ## 日本語
 
@@ -197,9 +197,9 @@ channel ごとにキャッシュされ、GitHub が一時停止しても古い�
 API に限定され、任意 URL のプロキシにはなりません。
 
 本番インスタンスは `101.34.255.115` の `zenche-update.service` として稼働し、
-`127.0.0.1:4174` を待ち受けます。Nginx は API ルートをリバースプロキシし、
-`/var/www/zenche.top/downloads/` から `/downloads/` を配信します。2026-08-10 時点で、
-1.5.10 / build 37 の自社サーバー上のマニフェストは本番環境で有効です。公開ヘルスチェック、
-5 プラットフォームの更新応答、互換ルート、公開中の 6 パッケージすべての SHA-256 を確認済みです。
-1.5.9 / build 36 のアセットはロールバック用に保持し、本番バックアップは
-`/opt/zenche-update-backups/20260809T163105Z-v1510-r2` に保存しています。
+`127.0.0.1:4174` を待ち受けます。1Panel OpenResty は API ルートをリバースプロキシし、
+`/opt/1panel/www/sites/zenche-top/index/downloads/` から `/downloads/` を配信します。
+2026-08-20 時点で、1.5.14 / build 41 の自社サーバー上のマニフェストが本番環境で有効です。
+公開ヘルスチェック、2 つの更新ルートに対する 5 プラットフォームの応答、および公開中の
+6 パッケージすべてのストリーミング SHA-256 を確認済みです。旧版アセットはロールバック用に保持し、
+本番バックアップは `/opt/zenche-update-backups/20260819T200402Z-v1514` に保存しています。

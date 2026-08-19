@@ -1,9 +1,9 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-16（Asia/Shanghai）
-> 当前公开版本：1.5.13 / build 40；最终实现提交 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`，注释标签 `v1.5.13` 解引用到发布提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98`
-> 公开状态：v1.5.13 已于 2026-08-12T03:33:52Z 发布为 GitHub Latest；官网自动更新继续提供 W14 的 1.5.10 / build 37，本次未部署官网
-> 当前源码：1.5.14 / build 41，总集成分支已合入连接可靠性、Sony 旧机型兼容、桌面一键导入与五端文件库简化；发布封板、六包、GitHub 与官网生产回验以 §12.65 最终记录为准
+> 快照时间：2026-08-20（Asia/Shanghai）
+> 当前公开版本：1.5.14 / build 41；最终实现提交 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`，注释标签 `v1.5.14` 解引用到发布提交 `17e87ce6c39aad07f712cd0605efe90899e6e72c`
+> 公开状态：v1.5.14 已于 `2026-08-19T19:58:12Z` 发布为 GitHub Latest；官网自托管更新已同步切换到 1.5.14 / build 41
+> 当前源码：1.5.14 / build 41，连接可靠性、Sony 旧机型兼容、桌面一键导入与五端文件库简化已封板、打包、公开并完成生产回验，见 §12.65
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -19,18 +19,24 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前 GitHub 公开稳定版为 [**1.5.13 / build 40**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.13)，新增五端“下载到本地”入口与副本保护，并继承 1.5.12 的 Windows 启动初始化修复、1.5.11 的桌面工作区、移动端相册与 AI 代理能力。官网自动更新继续提供 1.5.10 / build 37。
+- 当前 GitHub 公开稳定版为 [**1.5.14 / build 41**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)，
+  官网自托管更新同步提供该版本。本版修复 PTP/IP 假断线、跨事务串读、取消/重连旧会话复活与桌面外部命令挂死，
+  新增 Sony ZV-E10 及同代机型识别/兼容配置、macOS/Windows 照片视频一键导入，并简化五端文件库。
 - Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已随 v1.5.12 发布：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518 通过。六个 1.5.12 包、侧车及聚合包已完成本地重建与校验；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60、§12.61 与 `docs/releases/v1.5.12.md`。
 - 1.5.13 / build 40 的“下载到本地”发布实现冻结于 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`：exact HEAD 与标签提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98` 的完整 `npm test` 均为 532/532；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车均从最终实现重建并回验。聚合包含 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，线上名称、字节数、GitHub SHA-256 摘要和回下载字节均与本地一致，14/14 零差异；逐包表和签名边界见 `docs/releases/v1.5.13.md`。
-- 1.5.14 / build 41 当前冻结实现为 `9eaa7c314b7e51f1e6e91d87b284e317d0c3d903`：在协议勘正基础上，五端顶层连接管理直接纳入 Wi‑Fi/PTP‑IP，并提供连接取消、停止重连、失败重试、原生进度、端点锁定和恢复提示。Windows 快门、取景、LIVE、录像与相机存储统一受真实 Wi‑Fi ready 门禁；Android/HarmonyOS/Windows 隔离连接源错误，HarmonyOS 小视口面板可滚动，Apple 动态操作标题走运行时三语本地化。完整自动化 579/579、连接体验/协议专项 55/55、五端构建与六包/六侧车回验通过；精确包哈希与签名边界见 `docs/releases/v1.5.14.md`。旧 `6dbdb0d4802328629ffcbf0a97371a92d5862fd1` 候选包已被本地替代；本轮未推送、未打标签、未创建 Release 或部署官网。
+- 1.5.14 / build 41 最终实现为 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`：完整自动化
+  630 项中 629 通过、0 失败、1 项 Windows 主机专属用例跳过。六包/六侧车从该实现重建并完成版本、容器、架构、签名和摘要回验；
+  GitHub Release 12/12 资产通过发布工作流门禁，官网双 API 五端响应与六个公网包 SHA-256 通过。精确证据见
+  `docs/releases/v1.5.14.md` 与 §12.65。
 - 1.5.11 的完整 `npm test` 514/514、五端原生构建、包结构、侧车、签名边界与 GitHub 14/14 线上回验均作为历史发布事实保留。1.5.12 在发布前重新执行全部自动化与六包校验，不沿用旧包哈希；发布后 14 个线上附件的名称、字节数与 GitHub SHA-256 摘要逐项一致。Nikon Z50、OPPO Camera2、移动端系统照片权限/iCloud/另存和真实 AI 服务仍需对应真机验收；真实桌面拖拽/重启恢复、Windows 多显示器/DPI、辅助功能与长时间性能边界保持不变。
 - v1.5.3 已实现五端界面主体：全屏监看的影像优先 HUD、RGB 三色叠加波形示波器与静音音频基线；拍摄页的设备摘要、自适应参数卡、常驻拍摄操作区；编辑器的媒体池、中央预览、工具检查器和分析示波器。所有新面板读取既有真实状态，相机、AI、传输和非破坏保存链路不变。
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0、v1.5.3、v1.5.11 与 v1.5.12 已作为历史 GitHub Release 保留；v1.5.13 为当前 GitHub Latest。官网生产更新继续提供 1.5.10 / build 37；1.5.9 使用旧文件名继续保留，不被新版覆盖，以便回滚。
+- v1.5.0、v1.5.3、v1.5.11、v1.5.12 与 v1.5.13 已作为历史 GitHub Release 保留；
+  v1.5.14 为当前 GitHub Latest 与官网生产更新。旧版使用版本化文件名继续保留，不被新版覆盖，以便回滚。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
-- 最大未闭环风险仍是跨 46 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
+- 最大未闭环风险仍是跨 50 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
 - 本次编辑器迭代已同步五端：AI 工作台增加显式“分析画面”步骤、曝光/动态范围/色彩/细节指标，以及 AI 调整复制/粘贴；原有强度、智能优化、撤销、预设、前后对比和高质量副本保持不变。
 - 本轮增量 UI 修复已完成：五端编辑器主身份恢复为“专业显影”，AI 保留为可选增强区并明确“照片不会上传”；Android 恢复原有底部连接状态与文件计数栏及其更新链路，未删除编辑或拍摄功能。
@@ -40,7 +46,11 @@
 - 本轮设备码与兑换入口恢复已完成：五端 AI 激活卡均显示并支持复制当前设备 ID，保留激活码输入、验证和旧购买入口；新增显眼的 `https://zenche.top` 官网兑换按钮、兑换步骤说明，以及“在爱发电购买兑换码”提示、可点击二维码和购买按钮。兑换码仅用于 AI 云服务次数，未改变帧澈本体免费开源属性。
 - 本轮服务器端自动更新系统已实现：`server.mjs` 新增 `/api/update`、`/api/updates` 和 `/healthz`，按 platform/architecture/channel 解析 GitHub Release 完整包，提供 SHA-256、公告、最低支持版本、版本比较、ETag/CORS、安全响应头、5 分钟缓存与 stale 回退；五端客户端默认接入 `https://zenche.top/api/update`，服务异常继续 MirrorChyan → GitHub 回退。
 - 本轮五端外录已实现：照片直接进入当前设备文件库；Android、HarmonyOS、macOS、Windows 将 PTP/本机实时取景流式封装为 MJPEG AVI，iOS / iPadOS 本机与 UVC 继续以 MOV 外录。PTP 机身录制可与设备外录并行，停止、断开和写入失败会安全完成已写入帧；AVI 已纳入四端媒体库视频分类，会话命名、双目标备份与 SHA-256 同步生效。
-- 本轮官网更新已完成：`zenche-update.service` 在 `101.34.255.115` 的 `127.0.0.1:4174` 运行，Nginx 公网提供 `/api/update`、`/api/updates`、`/healthz` 和 `/downloads/`。1.5.10 / build 37 已于 2026-08-10（Asia/Shanghai）切入自托管生产清单；1.5.9 请求在五端均返回 1.5.10、`update_available=true`、`stale=false` 和正确 URL/SHA-256，1.5.10 请求不重复提示，六个公开包均完成流式 SHA-256 回验。旧服务与清单备份位于 `/opt/zenche-update-backups/20260809T163105Z-v1510-r2`。
+- 官网更新已切换到 `1.5.14 / build 41`：`zenche-update.service` 在 `101.34.255.115`
+  的 `127.0.0.1:4174` 运行，1Panel OpenResty 公网提供 `/api/update`、`/api/updates`、
+  `/healthz` 和 `/downloads/`。双 API 五端均返回 1.5.14、`update_available=true`、
+  `stale=false` 和正确 URL/SHA-256；六个公网包完成流式 SHA-256 回验。旧版资产保留，本次回滚备份位于
+  `/opt/zenche-update-backups/20260819T200402Z-v1514`。
 
 ## 3. 能力进度
 
@@ -61,7 +71,7 @@
 | 分支图库 | 已实现待验收 | 嵌套分支、拖拽、删除恢复和移动抽屉测试通过 | 真机手势、可访问性和大图库性能 |
 | 非破坏性编辑 | 已实现待验收 | 五端主导航、分组参数与导出语义检查；三移动端可见系统照片入口、工作副本与新相册项目契约通过 | 真机权限/iCloud/厂商相册、像素结果、色彩空间和超大图验证 |
 | **AI 修图与生图** | **已实现待验收** | 五端 HTTPS 账号代理、原图 data URL、结果解析；三移动端 AI 新副本保存和系统相册导出回归通过 | 有效激活码真实生成、各平台真机 UI、服务器容灾与激活码发放流程 |
-| **Sony / Canon 相机适配** | **已实现待验收** | Nikon 20 款、Sony 12 款、Canon 14 款，共 46 款注册表静态覆盖；vendor ID 过滤、macOS detection tokens、Windows PTP vendor ops | Sony/Canon 真机 PTP、实时取景、参数写入和不同固件验证 |
+| **Sony / Canon 相机适配** | **已实现待验收** | Nikon 20 款、Sony 16 款、Canon 14 款，共 50 款注册表静态覆盖；ZV-E10、A6100/A6100A、A6400/A6400A、A6600 识别/兼容配置 | Sony/Canon 真机 PTP、实时取景、参数写入和不同固件验证 |
 | 三语本地化 | 已实现待验收 | 简中/英/日资源与动态状态测试通过 | 人工校对、截断、窄屏与新增文案持续同步 |
 | 更新与公告 | 已实现待验收 | 自有 `/api/update` + MirrorChyan + GitHub fallback；1.5.10 五端公网响应、兼容路由与六个公开包 SHA-256 已通过 | 各平台真实安装、断网 stale 回退和签名后正式分发验收 |
 | 诊断与隐私 | 已实现待验收 | 脱敏日志和预填 Issue 实现存在 | 敏感信息专项审计与异常日志压力测试 |
@@ -1280,4 +1290,14 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **验证与封板**：桌面实现提交 `cbccb44ac1e66e0973d1378767d25605c18de9e4` 的 Windows Release 编译为 0 错误（4 条既有警告），macOS 完整 Swift 类型检查为 0 错误（既有 actor/deprecation 警告）；新增 5 项桌面文件库契约、相关 27 项导入/树契约通过，Impeccable 检测按要求只运行一次并返回空数组。合入连接、Sony、导入、移动/桌面文件库、三语公告和正式文档后的总实现封板为 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`；精确 HEAD 的完整测试 630 项为 629 通过、0 失败、1 项 Windows 主机专属用例跳过，测试前后 HEAD/工作树不变。
 - **文档与公告**：根 `design.md` 固化“所有文件优先、导入唯一主操作、分类元数据、限额缩略图、系统废纸篓”的长期契约；README 简中/英/日、CHANGELOG、1.5.14 中文发布说明与五端启动公告同步覆盖连接、Sony、导入和文件库。公告按版本持久化，1.5.14 文字明确 GitHub/官网发布与签名/实机边界。
 - **六包与签名事实**：Android APK、unsigned iOS IPA、unsigned HarmonyOS HAP、ad-hoc macOS DMG、Windows x64 Setup/ZIP 及六份同名侧车均从封板实现重建，6/6 `shasum -a 256 -c` 通过；APK/IPA/HAP/Windows ZIP 结构、DMG、macOS 深度签名、版本/构建号、目标架构与 SDK/libusb 运行库均已回验。Android v2 Debug 证书 SHA-256 连续为 `45499c18366356314c10ad8a98939908e47855fb6ba7fc21fe8a809549c7df3c`；iOS/HarmonyOS 未签名，macOS 为 ad-hoc 且未公证，Windows Setup 与主程序 Security Directory 均为 0。六包精确字节数和摘要见 `docs/releases/v1.5.14.md`。
-- **待完成门禁**：推送 `main`、创建注释标签与详细中文 Draft Release，用加固后的 workflow 原子公开，再原子切换官网清单并逐平台回验公网下载。真实 Sony/Nikon/Canon 相机、可信签名、公证、Windows 实机安装/驱动/SmartScreen 与移动端设备安装仍是不可由自动化替代的边界。
+- **GitHub 正式发布**：`main` 与注释标签 `v1.5.14` 已原子推送；标签对象
+  `fea9c2a8774c5b96d409940fb7b55e2f5e907c22` 解引用到发布提交
+  `17e87ce6c39aad07f712cd0605efe90899e6e72c`。Release ID `373311624` 于
+  `2026-08-19T19:58:12Z` 公开为 Latest；[run 32295909168](https://github.com/Tauber01/ZENCHE/actions/runs/32295909168)
+  在公开前验证六包/六侧车并原子切换，GitHub 端 12/12 资产的名称、字节数与六包摘要和本地一致。
+- **官网生产发布**：清单已原子切换到 1.5.14；`/healthz` 正常，`/api/update`
+  与 `/api/updates` 对 Android、iOS/iPadOS、HarmonyOS、macOS arm64、Windows x64 的公网响应均返回正确版本、URL 和 SHA-256。
+  六个公网包已逐个流式下载并与本地摘要 6/6 一致。实际静态根为
+  `/opt/1panel/www/sites/zenche-top/index/downloads/`，回滚备份为
+  `/opt/zenche-update-backups/20260819T200402Z-v1514`。
+- **剩余实机边界**：真实 Sony/Nikon/Canon 相机、可信签名、公证、Windows 实机安装/驱动/SmartScreen 与移动端设备安装仍是不可由自动化替代的边界。
