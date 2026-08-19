@@ -264,7 +264,10 @@ test("all-files lists are bounded and source groups start collapsed", async () =
   assert.match(harmony, /systemExpanded: boolean = false/);
   assert.match(harmony, /cameraStorageExpanded: boolean = false/);
   assert.match(harmony, /wirelessExpanded: boolean = false/);
-  assert.match(harmony, /Math\.min\(520, Math\.max\(192,/);
+  assert.match(harmony, /libraryVisibleLimit: number = 12/);
+  assert.match(harmony, /items\.slice\(0, this\.libraryVisibleLimit\)/);
+  assert.match(harmony, /this\.libraryVisibleLimit \+= 12/);
+  assert.match(harmony, /Math\.min\(\s*520,\s*Math\.max\(192,/);
 });
 
 test("Android and Harmony category summaries include root and unclassified counts", async () => {
@@ -314,11 +317,13 @@ test("iOS all-files thumbnails are asynchronously downsampled and bounded", asyn
 });
 
 test("dangling project assignments are pruned and count as unclassified", async () => {
-  const [ios, , harmony] = await readMobile();
+  const [ios, android, harmony] = await readMobile();
 
   assert.match(ios, /assignments = saved\.filter \{ validIDs\.contains\(\$0\.value\) \}/);
   assert.match(ios, /if assignments\.count != saved\.count \{\s*persistAssignments\(\)/);
   assert.match(ios, /allBranchIDs\(in: branches\)\.contains\(branchID\)/);
+  assert.match(android, /if \(path\.isEmpty\(\) \|\| findLibraryBranch\(branchId\) == null\)/);
+  assert.match(android, /if \(prunedAssignments\) \{\s*saveLibraryFileAssignments\(\)/);
   assert.match(harmony, /parsedAssignments\.filter\([\s\S]{0,360}this\.findLibraryBranch\([\s\S]{0,120}assignment\.branchId/);
   assert.match(harmony, /if \(this\.libraryFileAssignments\.length !== parsedAssignments\.length\)/);
   assert.match(harmony, /private branchIdForPhoto\(path: string\): string/);

@@ -1184,6 +1184,7 @@ struct Index {
   @State private librarySearchQuery: string = '';
   @State private libraryTypeFilter: string = 'all'; // all | photo | video
   @State private librarySortOrder: string = 'recent'; // recent | name
+  @State private libraryVisibleLimit: number = 12;
   @State private projectCategoriesExpanded: boolean = false;
   @State private moreToolsExpanded: boolean = false;
   @State private editorSelectedPath: string = '';
@@ -7174,6 +7175,7 @@ struct Index {
           }
           this.librarySearchDebounceTimer = setTimeout((): void => {
             this.librarySearchQuery = this.librarySearchInput;
+            this.libraryVisibleLimit = 12;
             this.librarySearchDebounceTimer = -1;
           }, 180);
         })
@@ -7200,6 +7202,7 @@ struct Index {
           ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'all';
+            this.libraryVisibleLimit = 12;
           })
         Button(this.tr('照片'), { type: ButtonType.Normal })
           .height(48)
@@ -7223,6 +7226,7 @@ struct Index {
           ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'photo';
+            this.libraryVisibleLimit = 12;
           })
         Button(this.tr('视频'), { type: ButtonType.Normal })
           .height(48)
@@ -7246,6 +7250,7 @@ struct Index {
           ]))
           .onClick((): void => {
             this.libraryTypeFilter = 'video';
+            this.libraryVisibleLimit = 12;
           })
       }
       .width('100%')
@@ -7272,6 +7277,7 @@ struct Index {
           ]))
           .onClick((): void => {
             this.librarySortOrder = 'recent';
+            this.libraryVisibleLimit = 12;
           })
         Button(this.tr('名称'), { type: ButtonType.Normal })
           .height(48)
@@ -7295,6 +7301,7 @@ struct Index {
           ]))
           .onClick((): void => {
             this.librarySortOrder = 'name';
+            this.libraryVisibleLimit = 12;
           })
       }
       .width('100%')
@@ -7333,7 +7340,7 @@ struct Index {
       } else {
         List({ space: 8 }) {
           ForEach(
-            items,
+            items.slice(0, this.libraryVisibleLimit),
             (item: PhotoItem) => {
               ListItem() {
                 this.AllFilesRow(item)
@@ -7343,7 +7350,21 @@ struct Index {
           )
         }
         .width('100%')
-        .height(Math.min(520, Math.max(192, items.length * 192)))
+        .height(Math.min(
+          520,
+          Math.max(192, Math.min(items.length, this.libraryVisibleLimit) * 192)
+        ))
+        if (items.length > this.libraryVisibleLimit) {
+          Button(this.tr('显示更多'), { type: ButtonType.Normal })
+            .width('100%')
+            .height(48)
+            .fontColor($r('app.color.ink'))
+            .backgroundColor($r('app.color.paper_2'))
+            .borderRadius(RADIUS_6)
+            .onClick((): void => {
+              this.libraryVisibleLimit += 12;
+            })
+        }
       }
     }
     .width('100%')

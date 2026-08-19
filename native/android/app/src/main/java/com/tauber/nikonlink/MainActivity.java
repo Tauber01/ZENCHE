@@ -11558,11 +11558,18 @@ public final class MainActivity extends Activity {
                             LIBRARY_FILE_ASSIGNMENTS_KEY,
                             "{}"));
             java.util.Iterator<String> keys = assignments.keys();
+            boolean prunedAssignments = false;
             while (keys.hasNext()) {
                 String path = keys.next();
-                libraryFileAssignments.put(
-                        path,
-                        assignments.optString(path, ""));
+                String branchId = assignments.optString(path, "");
+                if (path.isEmpty() || findLibraryBranch(branchId) == null) {
+                    prunedAssignments = true;
+                    continue;
+                }
+                libraryFileAssignments.put(path, branchId);
+            }
+            if (prunedAssignments) {
+                saveLibraryFileAssignments();
             }
         } catch (Exception ignored) {
             libraryFileAssignments.clear();

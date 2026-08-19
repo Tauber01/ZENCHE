@@ -781,6 +781,7 @@ const TRANSLATIONS: Array<TranslationEntry> = [
     'システムライブラリに保存できません：{0}'
   ),
   new TranslationEntry('最近 {0} 项', '{0} recent items', '最近の項目 {0} 件'),
+  new TranslationEntry('显示更多', 'Show more', 'さらに表示'),
   new TranslationEntry(
     '无法打开网盘文件提供器：{0}',
     'Unable to open the cloud file provider: {0}',
