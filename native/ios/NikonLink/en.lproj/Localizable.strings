@@ -995,3 +995,20 @@
 "所选保存位置不可写" = "The selected save location is not writable";
 "该文件已位于所选位置" = "The file is already in the selected location";
 "所选保存位置无效" = "The selected save location is invalid";
+
+// ── Desktop media import ──
+"导入照片与视频" = "Import Photos and Videos";
+"选择要导入的照片或视频" = "Choose Photos or Videos to Import";
+"从网盘选择照片或视频" = "Choose Photos or Videos from a Cloud Drive";
+"导入完成" = "Import Complete";
+"已导入" = "Imported";
+"正在处理" = "Processing";
+"已处理" = "Processed";
+"跳过" = "Skipped";
+"导入已取消" = "Import cancelled";
+"正在取消导入…" = "Cancelling import…";
+"无法导入照片或视频" = "Could not import photos or videos";
+"正在导入照片与视频…" = "Importing photos and videos…";
+"准备导入…" = "Preparing import…";
+"已有导入任务正在进行。" = "An import is already in progress.";
+"导入期间不能切换拍摄会话。" = "The capture session cannot be changed during import.";

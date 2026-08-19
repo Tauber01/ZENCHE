@@ -1110,6 +1110,41 @@ internal static class AppLocalization
                 new(
                     "Could not verify the file identity",
                     "ファイルの同一性を確認できませんでした"),
+            ["导入照片与视频"] = new(
+                "Import Photos and Videos",
+                "写真と動画を読み込む"),
+            ["选择要导入的照片或视频"] = new(
+                "Choose Photos or Videos to Import",
+                "読み込む写真や動画を選択"),
+            ["导入完成"] = new("Import Complete", "読み込み完了"),
+            ["已导入"] = new("Imported", "読み込み済み"),
+            ["正在处理"] = new("Processing", "処理中"),
+            ["已处理"] = new("Processed", "処理済み"),
+            ["跳过"] = new("Skipped", "スキップ"),
+            ["失败"] = new("Failed", "失敗"),
+            ["取消"] = new("Cancel", "キャンセル"),
+            ["导入已取消"] = new("Import cancelled", "読み込みをキャンセルしました"),
+            ["正在取消导入…"] = new(
+                "Cancelling import…",
+                "読み込みをキャンセル中…"),
+            ["无法导入照片或视频"] = new(
+                "Could not import photos or videos",
+                "写真と動画を読み込めませんでした"),
+            ["正在导入照片与视频…"] = new(
+                "Importing photos and videos…",
+                "写真と動画を読み込み中…"),
+            ["已有导入任务正在进行。"] = new(
+                "An import is already in progress.",
+                "すでに読み込みを実行中です。"),
+            ["导入期间不能切换拍摄会话。"] = new(
+                "The capture session cannot be changed during import.",
+                "読み込み中は撮影セッションを切り替えられません。"),
+            ["备份目录已存在同名文件，未覆盖既有数据。"] = new(
+                "A file with the same name already exists in the backup; existing data was not overwritten.",
+                "バックアップに同名ファイルがあるため、既存データは上書きしませんでした。"),
+            ["导入失败且元数据回滚失败。"] = new(
+                "The import failed and its metadata could not be rolled back.",
+                "読み込みに失敗し、メタデータも元に戻せませんでした。"),
             ["• 加固 Wi‑Fi/PTP‑IP 连接：命令事务保持串行，事件通道、心跳与双通道握手不再互相误判。\n" +
              "• 连接与自动重连现在会实时显示状态；可随时取消连接或停止重连，失败后可直接重试并获得检查 Wi‑Fi、IP 地址和端口的提示。\n" +
              "• 断线恢复使用会话代际隔离，旧连接、旧回调与迟到响应不会覆盖当前会话。\n" +

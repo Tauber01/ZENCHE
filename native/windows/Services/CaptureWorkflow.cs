@@ -26,7 +26,10 @@ public sealed class CaptureWorkflow
 {
     private readonly string _rootDirectory;
     private readonly string _statePath;
+    private readonly object _stateLock = new();
+    private readonly SemaphoreSlim _finalizeGate = new(1, 1);
     private int _counter = 1;
+    private bool _importOperationActive;
 
     public CaptureWorkflow(string rootDirectory)
     {
@@ -61,31 +64,42 @@ public sealed class CaptureWorkflow
 
     public void Begin(CaptureSessionConfiguration requested)
     {
-        Configuration = Normalize(requested);
-        IsActive = true;
-        _counter = 1;
-        EnsureDirectories();
-        Persist();
-        Status = $"会话进行中 · {Configuration.Name}";
+        lock (_stateLock)
+        {
+            ThrowIfImportOperationActive();
+            Configuration = Normalize(requested);
+            IsActive = true;
+            _counter = 1;
+            EnsureDirectories();
+            Persist();
+            Status = $"会话进行中 · {Configuration.Name}";
+        }
     }
 
     public void End()
     {
-        IsActive = false;
-        Persist();
-        Status = "拍摄会话已结束";
+        lock (_stateLock)
+        {
+            ThrowIfImportOperationActive();
+            IsActive = false;
+            Persist();
+            Status = "拍摄会话已结束";
+        }
     }
 
     public string ReserveBaseName(string cameraName)
     {
-        var value = Configuration.NamingTemplate
-            .Replace("{session}", Configuration.Name)
-            .Replace("{date}", DateTime.Now.ToString("yyyyMMdd_HHmmss"))
-            .Replace("{counter}", _counter.ToString("0000"))
-            .Replace("{camera}", cameraName);
-        _counter++;
-        Persist();
-        return Sanitize(value);
+        lock (_stateLock)
+        {
+            var value = Configuration.NamingTemplate
+                .Replace("{session}", Configuration.Name)
+                .Replace("{date}", DateTime.Now.ToString("yyyyMMdd_HHmmss"))
+                .Replace("{counter}", _counter.ToString("0000"))
+                .Replace("{camera}", cameraName);
+            _counter++;
+            Persist();
+            return Sanitize(value);
+        }
     }
 
     public async Task<string> StoreAsync(
@@ -205,19 +219,417 @@ public sealed class CaptureWorkflow
         return destination;
     }
 
+    public static readonly string[] SupportedImportExtensions =
+    [
+        ".jpg", ".jpeg", ".png", ".heic", ".heif",
+        ".tif", ".tiff", ".nef", ".nrw", ".arw", ".cr2", ".cr3",
+        ".mov", ".mp4", ".m4v", ".avi"
+    ];
+
+    public static bool IsSupportedImportExtension(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return !string.IsNullOrEmpty(extension) &&
+            SupportedImportExtensions.Contains(
+                extension,
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     public async Task<string> ImportAsync(
         string source,
         string cameraName,
         string? reservedBaseName = null,
         CancellationToken cancellationToken = default)
     {
-        var bytes = await File.ReadAllBytesAsync(source, cancellationToken);
-        return await StoreAsync(
-            bytes,
-            Path.GetFileName(source),
-            cameraName,
-            reservedBaseName,
-            cancellationToken);
+        EnterImportOperation();
+        try
+        {
+            return await ImportCoreAsync(
+                source,
+                cameraName,
+                reservedBaseName,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExitImportOperation();
+        }
+    }
+
+    private async Task<string> ImportCoreAsync(
+        string source,
+        string cameraName,
+        string? reservedBaseName,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new ArgumentException("Source path is empty.", nameof(source));
+        }
+
+        var sourceFull = Path.GetFullPath(source);
+        if (!File.Exists(sourceFull))
+        {
+            throw new FileNotFoundException("Source file not found.", sourceFull);
+        }
+
+        if (!IsSupportedImportExtension(sourceFull))
+        {
+            throw new IOException("不支持的文件格式。");
+        }
+
+        var sourceContainmentPath = ResolvePathForContainment(
+            new FileInfo(sourceFull));
+        var rootContainmentPath = ResolvePathForContainment(
+            new DirectoryInfo(_rootDirectory));
+        if (sourceContainmentPath.StartsWith(
+                rootContainmentPath + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException("源文件已在文件库中。");
+        }
+
+        EnsureDirectories();
+        var extension = Path.GetExtension(sourceFull).ToLowerInvariant();
+        var baseName = reservedBaseName is null
+            ? ReserveBaseName(cameraName)
+            : Sanitize(reservedBaseName);
+        var destination = UniquePath(PrimaryDirectory, baseName, extension);
+        var tempPath = Path.Combine(
+            PrimaryDirectory,
+            $".zenche-import-{Guid.NewGuid():N}.part");
+
+        var published = false;
+        try
+        {
+            var sourceInfo = new FileInfo(sourceFull);
+            if (sourceInfo.Length <= 0)
+            {
+                throw new IOException("源文件为空。");
+            }
+
+            await using var sourceStream = new FileStream(
+                sourceFull,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 81920,
+                useAsync: true);
+            await using var tempStream = new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 81920,
+                useAsync: true);
+
+            await sourceStream.CopyToAsync(
+                tempStream,
+                81920,
+                cancellationToken).ConfigureAwait(false);
+            await tempStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            tempStream.Flush(flushToDisk: true);
+
+            sourceStream.Close();
+            tempStream.Close();
+
+            sourceInfo.Refresh();
+            var tempInfo = new FileInfo(tempPath);
+            if (!tempInfo.Exists ||
+                sourceInfo.Length <= 0 ||
+                tempInfo.Length != sourceInfo.Length)
+            {
+                throw new IOException("临时文件大小与源文件不一致。");
+            }
+
+            File.Move(tempPath, destination);
+            published = true;
+            await FinalizeAsync(
+                destination,
+                cancellationToken,
+                null,
+                transactionalImport: true).ConfigureAwait(false);
+            Status = $"已写入会话 · {Path.GetFileName(destination)}";
+            return destination;
+        }
+        catch (Exception failure)
+        {
+            var cleanupFailures = new List<Exception>();
+            try
+            {
+                await DeleteImportArtifactAsync(tempPath, PrimaryDirectory)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception cleanupFailure)
+            {
+                cleanupFailures.Add(cleanupFailure);
+            }
+            if (published)
+            {
+                try
+                {
+                    await DeleteImportArtifactAsync(destination, PrimaryDirectory)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception cleanupFailure)
+                {
+                    cleanupFailures.Add(cleanupFailure);
+                }
+            }
+            if (cleanupFailures.Count > 0)
+            {
+                var failures = new List<Exception> { failure };
+                failures.AddRange(cleanupFailures);
+                throw new IOException(
+                    "导入失败且文件回滚失败。",
+                    new AggregateException(failures));
+            }
+            throw;
+        }
+    }
+
+    public sealed record BatchImportResult(
+        int Imported,
+        int Skipped,
+        int Failed,
+        int Cancelled,
+        int Total,
+        string? NewestPath);
+
+    private enum ImportPairKind
+    {
+        Other,
+        Jpeg,
+        Raw
+    }
+
+    private sealed class ImportPairReservation
+    {
+        public required string BaseName { get; init; }
+        public bool HasJpeg { get; set; }
+        public bool HasRaw { get; set; }
+    }
+
+    public async Task<BatchImportResult> BatchImportAsync(
+        IReadOnlyList<string> sourcePaths,
+        string cameraName,
+        IProgress<(int Processed, int Total)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnterImportOperation();
+        try
+        {
+            return await BatchImportCoreAsync(
+                sourcePaths,
+                cameraName,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ExitImportOperation();
+        }
+    }
+
+    private async Task<BatchImportResult> BatchImportCoreAsync(
+        IReadOnlyList<string> sourcePaths,
+        string cameraName,
+        IProgress<(int Processed, int Total)>? progress,
+        CancellationToken cancellationToken)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = new List<string>();
+        foreach (var path in sourcePaths)
+        {
+            var full = Path.GetFullPath(path);
+            if (seen.Add(full))
+            {
+                ordered.Add(full);
+            }
+        }
+
+        var pairNames = new Dictionary<string, ImportPairReservation>(
+            StringComparer.OrdinalIgnoreCase);
+        var imported = 0;
+        var skipped = 0;
+        var failed = 0;
+        var cancelled = 0;
+        string? newestPath = null;
+        var total = ordered.Count;
+
+        for (var index = 0; index < ordered.Count; index++)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                cancelled = total - index;
+                break;
+            }
+            var source = ordered[index];
+
+            try
+            {
+                if (!File.Exists(source))
+                {
+                    skipped++;
+                    progress?.Report((index + 1, total));
+                    continue;
+                }
+
+                var pairKind = ImportPairKindForPath(source);
+                string reservedBase;
+                if (pairKind != ImportPairKind.Other)
+                {
+                    var canonicalSource = ResolvePathForContainment(
+                        new FileInfo(source));
+                    var pairKey = Path.Combine(
+                        Path.GetDirectoryName(canonicalSource) ?? "",
+                        Path.GetFileNameWithoutExtension(canonicalSource));
+                    if (pairNames.TryGetValue(pairKey, out var pair) &&
+                        ((pairKind == ImportPairKind.Jpeg && pair.HasRaw && !pair.HasJpeg) ||
+                         (pairKind == ImportPairKind.Raw && pair.HasJpeg && !pair.HasRaw)))
+                    {
+                        reservedBase = pair.BaseName;
+                        pair.HasJpeg |= pairKind == ImportPairKind.Jpeg;
+                        pair.HasRaw |= pairKind == ImportPairKind.Raw;
+                    }
+                    else
+                    {
+                        reservedBase = ReserveBaseName(cameraName);
+                        if (!pairNames.ContainsKey(pairKey))
+                        {
+                            pairNames[pairKey] = new ImportPairReservation
+                            {
+                                BaseName = reservedBase,
+                                HasJpeg = pairKind == ImportPairKind.Jpeg,
+                                HasRaw = pairKind == ImportPairKind.Raw
+                            };
+                        }
+                    }
+                }
+                else
+                {
+                    reservedBase = ReserveBaseName(cameraName);
+                }
+
+                var destination = await ImportCoreAsync(
+                    source,
+                    cameraName,
+                    reservedBase,
+                    cancellationToken).ConfigureAwait(false);
+                imported++;
+                newestPath = destination;
+            }
+            catch (OperationCanceledException)
+            {
+                cancelled = total - index;
+                break;
+            }
+            catch
+            {
+                failed++;
+            }
+
+            progress?.Report((index + 1, total));
+        }
+
+        if (cancelled == 0 && cancellationToken.IsCancellationRequested)
+        {
+            cancelled = total - imported - skipped - failed;
+        }
+
+        return new BatchImportResult(
+            imported,
+            skipped,
+            failed,
+            cancelled,
+            total,
+            newestPath);
+    }
+
+    private void EnterImportOperation()
+    {
+        lock (_stateLock)
+        {
+            if (_importOperationActive)
+            {
+                throw new InvalidOperationException("已有导入任务正在进行。");
+            }
+            _importOperationActive = true;
+        }
+    }
+
+    private void ExitImportOperation()
+    {
+        lock (_stateLock)
+        {
+            _importOperationActive = false;
+        }
+    }
+
+    private void ThrowIfImportOperationActive()
+    {
+        if (_importOperationActive)
+        {
+            throw new InvalidOperationException("导入期间不能切换拍摄会话。");
+        }
+    }
+
+    private static ImportPairKind ImportPairKindForPath(string path)
+    {
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => ImportPairKind.Jpeg,
+            ".nef" or ".nrw" or ".arw" or ".cr2" or ".cr3" =>
+                ImportPairKind.Raw,
+            _ => ImportPairKind.Other
+        };
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup; leave temp-leak handling to diagnostics.
+        }
+    }
+
+    private async Task DeleteImportArtifactAsync(
+        string destination,
+        string expectedParent)
+    {
+        var destinationParent = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(Path.GetDirectoryName(destination)!));
+        var allowedParent = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(expectedParent));
+        if (!string.Equals(
+                destinationParent,
+                allowedParent,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new IOException(
+                $"回滚目标不属于本次导入目录，已保留：{destination}");
+        }
+        await DeleteRollbackFileAsync(destination).ConfigureAwait(false);
+    }
+
+    private static string ResolvePathForContainment(FileSystemInfo item)
+    {
+        try
+        {
+            item = item.ResolveLinkTarget(returnFinalTarget: true) ?? item;
+        }
+        catch
+        {
+            // Fall back to the normalized picker path when link resolution is unavailable.
+        }
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(item.FullName));
     }
 
     public string ReserveExternalRecording(
@@ -251,44 +663,290 @@ public sealed class CaptureWorkflow
         CancellationToken cancellationToken,
         CaptureLocation? location,
         string? pairedWithFilename = null,
-        int? stackSourceCount = null)
+        int? stackSourceCount = null,
+        bool transactionalImport = false)
     {
-        if (!IsActive && location is null && pairedWithFilename is null && stackSourceCount is null)
+        await _finalizeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return;
+            if (!IsActive && location is null && pairedWithFilename is null && stackSourceCount is null)
+            {
+                return;
+            }
+            var sidecar = Path.ChangeExtension(primary, ".xmp");
+            var snapshot = transactionalImport
+                ? await CaptureImportMetadataSnapshotAsync(
+                    primary,
+                    sidecar,
+                    cancellationToken).ConfigureAwait(false)
+                : null;
+            try
+            {
+                await WriteTextAtomicallyAsync(
+                    sidecar,
+                    Xmp(Path.GetFileName(primary), location, pairedWithFilename, stackSourceCount),
+                    cancellationToken).ConfigureAwait(false);
+                if (!IsActive || SessionRoot is null)
+                {
+                    return;
+                }
+                await using var stream = File.OpenRead(primary);
+                var digest = Convert.ToHexString(
+                    await SHA256.HashDataAsync(stream, cancellationToken)
+                        .ConfigureAwait(false))
+                    .ToLowerInvariant();
+                stream.Close();
+                if (BackupDirectory is not null)
+                {
+                    Directory.CreateDirectory(BackupDirectory);
+                    await CopyFileAtomicallyAsync(
+                        primary,
+                        Path.Combine(BackupDirectory, Path.GetFileName(primary)),
+                        cancellationToken).ConfigureAwait(false);
+                    await CopyFileAtomicallyAsync(
+                        sidecar,
+                        Path.Combine(BackupDirectory, Path.GetFileName(sidecar)),
+                        cancellationToken).ConfigureAwait(false);
+                }
+                var manifest = Path.Combine(SessionRoot, "checksums.sha256");
+                var existingManifest = File.Exists(manifest)
+                    ? await File.ReadAllTextAsync(manifest, cancellationToken)
+                        .ConfigureAwait(false)
+                    : "";
+                await WriteTextAtomicallyAsync(
+                    manifest,
+                    existingManifest +
+                        $"{digest}  Primary/{Path.GetFileName(primary)}{Environment.NewLine}",
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (snapshot is not null)
+            {
+                try
+                {
+                    await RestoreImportMetadataAsync(snapshot)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception rollbackFailure)
+                {
+                    throw new IOException(
+                        "导入失败且元数据回滚失败。",
+                        new AggregateException(failure, rollbackFailure));
+                }
+                throw;
+            }
         }
-        var sidecar = Path.ChangeExtension(primary, ".xmp");
-        await File.WriteAllTextAsync(
+        finally
+        {
+            _finalizeGate.Release();
+        }
+    }
+
+    private sealed record ImportMetadataSnapshot(
+        string Sidecar,
+        byte[]? SidecarData,
+        string? Backup,
+        string? BackupSidecar,
+        byte[]? BackupSidecarData);
+
+    private async Task<ImportMetadataSnapshot> CaptureImportMetadataSnapshotAsync(
+        string primary,
+        string sidecar,
+        CancellationToken cancellationToken)
+    {
+        var sidecarData = File.Exists(sidecar)
+            ? await File.ReadAllBytesAsync(sidecar, cancellationToken)
+                .ConfigureAwait(false)
+            : null;
+        var backup = IsActive && BackupDirectory is not null
+            ? Path.Combine(BackupDirectory, Path.GetFileName(primary))
+            : null;
+        if (backup is not null &&
+            (File.Exists(backup) || Directory.Exists(backup)))
+        {
+            throw new IOException("备份目录已存在同名文件，未覆盖既有数据。");
+        }
+        var backupSidecar = backup is null
+            ? null
+            : Path.ChangeExtension(backup, ".xmp");
+        var backupSidecarData =
+            backupSidecar is not null && File.Exists(backupSidecar)
+                ? await File.ReadAllBytesAsync(
+                    backupSidecar,
+                    cancellationToken).ConfigureAwait(false)
+                : null;
+        return new ImportMetadataSnapshot(
             sidecar,
-            Xmp(Path.GetFileName(primary), location, pairedWithFilename, stackSourceCount),
-            Encoding.UTF8,
-            cancellationToken);
-        if (!IsActive || SessionRoot is null)
+            sidecarData,
+            backup,
+            backupSidecar,
+            backupSidecarData);
+    }
+
+    private static async Task RestoreImportMetadataAsync(
+        ImportMetadataSnapshot snapshot)
+    {
+        var failures = new List<Exception>();
+
+        async Task AttemptAsync(Func<Task> operation)
+        {
+            try
+            {
+                await operation().ConfigureAwait(false);
+            }
+            catch (Exception failure)
+            {
+                failures.Add(failure);
+            }
+        }
+
+        await AttemptAsync(
+            () => DeleteRollbackFileAsync(snapshot.Backup))
+            .ConfigureAwait(false);
+        await AttemptAsync(
+            () => RestoreFileAsync(
+                snapshot.BackupSidecar,
+                snapshot.BackupSidecarData)).ConfigureAwait(false);
+        await AttemptAsync(
+            () => RestoreFileAsync(snapshot.Sidecar, snapshot.SidecarData))
+            .ConfigureAwait(false);
+
+        if (failures.Count > 0)
+        {
+            throw new AggregateException(
+                "元数据回滚有一个或多个步骤失败。",
+                failures);
+        }
+    }
+
+    private static async Task RestoreFileAsync(
+        string? destination,
+        byte[]? data)
+    {
+        if (destination is null)
         {
             return;
         }
-        await using var stream = File.OpenRead(primary);
-        var digest = Convert.ToHexString(
-            await SHA256.HashDataAsync(stream, cancellationToken))
-            .ToLowerInvariant();
-        if (BackupDirectory is not null)
+        if (data is null)
         {
-            Directory.CreateDirectory(BackupDirectory);
-            File.Copy(
-                primary,
-                Path.Combine(BackupDirectory, Path.GetFileName(primary)),
-                true);
-            File.Copy(
-                sidecar,
-                Path.Combine(BackupDirectory, Path.GetFileName(sidecar)),
-                true);
+            await DeleteRollbackFileAsync(destination).ConfigureAwait(false);
+            return;
         }
-        var manifest = Path.Combine(SessionRoot, "checksums.sha256");
-        await File.AppendAllTextAsync(
-            manifest,
-            $"{digest}  Primary/{Path.GetFileName(primary)}{Environment.NewLine}",
-            Encoding.UTF8,
-            cancellationToken);
+        await WriteBytesAtomicallyAsync(
+            destination,
+            data,
+            CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private static Task DeleteRollbackFileAsync(string? destination)
+    {
+        if (destination is null)
+        {
+            return Task.CompletedTask;
+        }
+        if (Directory.Exists(destination))
+        {
+            throw new IOException(
+                $"回滚目标不是文件，已保留：{destination}");
+        }
+        if (File.Exists(destination))
+        {
+            File.Delete(destination);
+        }
+        if (File.Exists(destination) || Directory.Exists(destination))
+        {
+            throw new IOException($"回滚后目标仍然存在：{destination}");
+        }
+        return Task.CompletedTask;
+    }
+
+    private static async Task CopyFileAtomicallyAsync(
+        string source,
+        string destination,
+        CancellationToken cancellationToken)
+    {
+        var temporary = Path.Combine(
+            Path.GetDirectoryName(destination)!,
+            $".zenche-copy-{Guid.NewGuid():N}.part");
+        try
+        {
+            var sourceInfo = new FileInfo(source);
+            await using var sourceStream = new FileStream(
+                source,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                useAsync: true);
+            await using var temporaryStream = new FileStream(
+                temporary,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                useAsync: true);
+            await sourceStream.CopyToAsync(
+                temporaryStream,
+                81920,
+                cancellationToken).ConfigureAwait(false);
+            await temporaryStream.FlushAsync(cancellationToken)
+                .ConfigureAwait(false);
+            temporaryStream.Flush(flushToDisk: true);
+            sourceStream.Close();
+            temporaryStream.Close();
+            sourceInfo.Refresh();
+            var temporaryInfo = new FileInfo(temporary);
+            if (!temporaryInfo.Exists ||
+                sourceInfo.Length <= 0 ||
+                temporaryInfo.Length != sourceInfo.Length)
+            {
+                throw new IOException("备份文件大小与源文件不一致。");
+            }
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            TryDelete(temporary);
+        }
+    }
+
+    private static async Task WriteTextAtomicallyAsync(
+        string destination,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        await WriteBytesAtomicallyAsync(
+            destination,
+            Encoding.UTF8.GetBytes(content),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WriteBytesAtomicallyAsync(
+        string destination,
+        byte[] bytes,
+        CancellationToken cancellationToken)
+    {
+        var temporary = Path.Combine(
+            Path.GetDirectoryName(destination)!,
+            $".zenche-metadata-{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await using var stream = new FileStream(
+                temporary,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                4096,
+                useAsync: true);
+            await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            stream.Flush(flushToDisk: true);
+            stream.Close();
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally
+        {
+            TryDelete(temporary);
+        }
     }
 
     private string Xmp(

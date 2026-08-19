@@ -939,6 +939,11 @@
                         Style="{DynamicResource ButtonBase}"
                         Content="刷新相册"
                         Click="OpenOwnerAlbum_Click" />
+                <Button Width="128"
+                        Margin="8,0,0,0"
+                        Style="{DynamicResource PrimaryButton}"
+                        Content="导入照片与视频"
+                        Click="ImportMedia_Click" />
                 <Button Width="112"
                         Margin="8,0,0,0"
                         Style="{DynamicResource ButtonBase}"

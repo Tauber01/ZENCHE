@@ -887,6 +887,7 @@ public partial class MainWindow : Window
     private Point _libraryDragStart;
     private bool _libraryDragInProgress;
     private TreeViewItem? _libraryDropTarget;
+    private bool _mediaImportInProgress;
     private string? _editorSelectedPath;
     private readonly EditorAdjustments _editorAdjustments = new();
     private readonly NikonCloudCatalog _nikonCloudCatalog =
@@ -7858,14 +7859,25 @@ public partial class MainWindow : Window
         ShowCloudDriveGuide();
     }
 
-    private async void OpenCloudFilePicker()
+    private async void ImportMedia_Click(object sender, RoutedEventArgs e)
     {
+        await OpenMediaFilePicker(
+            AppLocalization.T("选择要导入的照片或视频"));
+    }
+
+    private async Task OpenMediaFilePicker(string? dialogTitle = null)
+    {
+        if (_mediaImportInProgress)
+        {
+            return;
+        }
+
         var dialog = new OpenFileDialog
         {
-            Title = "从网盘选择照片或视频",
+            Title = dialogTitle ?? AppLocalization.T("选择要导入的照片或视频"),
             Filter =
-                "照片与视频|*.jpg;*.jpeg;*.png;*.heic;*.heif;*.tif;*.tiff;*.nef;*.nrw;*.mp4;*.mov;*.m4v|" +
-                "所有文件|*.*",
+                $"{AppLocalization.T("照片与视频")}|*.jpg;*.jpeg;*.png;*.heic;*.heif;*.tif;*.tiff;*.nef;*.nrw;*.arw;*.cr2;*.cr3;*.mp4;*.mov;*.m4v;*.avi|" +
+                $"{AppLocalization.T("所有文件")}|*.*",
             Multiselect = true,
             CheckFileExists = true
         };
@@ -7873,34 +7885,165 @@ public partial class MainWindow : Window
         {
             return;
         }
+
+        using var cancellationSource = new CancellationTokenSource();
+        var progressWindow = CreateImportProgressWindow(cancellationSource);
+        progressWindow.Show();
+
+        CaptureWorkflow.BatchImportResult? result = null;
+        var cancelled = false;
+        _mediaImportInProgress = true;
         try
         {
-            var pairNames = new Dictionary<string, string>(
-                StringComparer.OrdinalIgnoreCase);
-            var imported = new List<string>();
-            foreach (var source in dialog.FileNames)
+            var progress = new Progress<(int Processed, int Total)>(value =>
             {
-                var pairKey = Path.GetFileNameWithoutExtension(source);
-                if (!pairNames.TryGetValue(pairKey, out var reservedBase))
+                if (progressWindow.Content is Grid root &&
+                    root.Children[0] is StackPanel panel)
                 {
-                    reservedBase = _workflow.ReserveBaseName("Imported");
-                    pairNames[pairKey] = reservedBase;
+                    if (panel.Children[0] is TextBlock status)
+                    {
+                        status.Text = AppLocalization.T(
+                            $"已处理 {value.Processed} / {value.Total}");
+                    }
+
+                    if (panel.Children[1] is ProgressBar bar)
+                    {
+                        bar.Maximum = Math.Max(1, value.Total);
+                        bar.Value = value.Processed;
+                    }
                 }
-                imported.Add(await _workflow.ImportAsync(
-                    source,
+            });
+
+            result = await Task.Run(
+                () => _workflow.BatchImportAsync(
+                    dialog.FileNames,
                     "Imported",
-                    reservedBase));
-            }
-            RefreshPhotoList();
-            OperationStatusText.Text = AppLocalization.T(
-                imported.Count > 0
-                    ? $"已从网盘加入 {imported.Count} 张照片"
-                    : "没有可加入文件库的照片");
+                    progress,
+                    cancellationSource.Token),
+                cancellationSource.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
         }
         catch (Exception error)
         {
-            ShowError($"无法从网盘加入照片：{error.Message}");
+            ShowError(AppLocalization.T($"无法导入照片或视频：{error.Message}"));
+            return;
         }
+        finally
+        {
+            _mediaImportInProgress = false;
+            progressWindow.Close();
+        }
+
+        RefreshPhotoList();
+        if (result is not null)
+        {
+            SelectLibraryItemByPath(result.NewestPath);
+            OperationStatusText.Text = AppLocalization.T(
+                $"导入完成：已导入 {result.Imported}，" +
+                $"跳过 {result.Skipped}，失败 {result.Failed}，取消 {result.Cancelled}");
+        }
+        else if (cancelled)
+        {
+            OperationStatusText.Text = AppLocalization.T("导入已取消");
+        }
+    }
+
+    private Window CreateImportProgressWindow(CancellationTokenSource cancellationSource)
+    {
+        var window = new Window
+        {
+            Owner = this,
+            Title = AppLocalization.T("导入照片与视频"),
+            Width = 360,
+            Height = 160,
+            MinWidth = 320,
+            MinHeight = 140,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = (Brush)FindResource("PaperBrush")
+        };
+        var root = new Grid { Margin = new Thickness(20) };
+        var panel = new StackPanel();
+        var status = new TextBlock
+        {
+            Text = AppLocalization.T("正在导入照片与视频…"),
+            Foreground = (Brush)FindResource("InkBrush"),
+            Margin = new Thickness(0, 0, 0, 12)
+        };
+        var bar = new ProgressBar
+        {
+            Height = 8,
+            Minimum = 0,
+            Maximum = 1,
+            Value = 0
+        };
+        var cancel = new Button
+        {
+            Content = AppLocalization.T("取消"),
+            Margin = new Thickness(0, 16, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Style = (Style)FindResource("ButtonBase")
+        };
+        cancel.Click += (_, _) => cancellationSource.Cancel();
+        window.Closing += (_, _) => cancellationSource.Cancel();
+        panel.Children.Add(status);
+        panel.Children.Add(bar);
+        panel.Children.Add(cancel);
+        root.Children.Add(panel);
+        window.Content = root;
+        return window;
+    }
+
+    private void SelectLibraryItemByPath(string? path)
+    {
+        if (path is null)
+        {
+            return;
+        }
+
+        PhotoTree.UpdateLayout();
+        foreach (var root in PhotoTree.Items.OfType<LibraryTreeNode>())
+        {
+            if (SelectLibraryTreeNode(PhotoTree, root, path))
+            {
+                return;
+            }
+        }
+    }
+
+    private static bool SelectLibraryTreeNode(
+        ItemsControl parent,
+        LibraryTreeNode node,
+        string path)
+    {
+        if (parent.ItemContainerGenerator.ContainerFromItem(node)
+            is not TreeViewItem container)
+        {
+            return false;
+        }
+
+        if (node.Item is { } item &&
+            item.Path.Equals(path, StringComparison.OrdinalIgnoreCase))
+        {
+            container.IsSelected = true;
+            container.BringIntoView();
+            return true;
+        }
+
+        container.IsExpanded = true;
+        container.UpdateLayout();
+        foreach (var child in node.Children)
+        {
+            if (SelectLibraryTreeNode(container, child, path))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ShowCloudDriveGuide()
@@ -8009,10 +8152,11 @@ public partial class MainWindow : Window
             Height = 40,
             Style = (Style)FindResource("PrimaryButton")
         };
-        choose.Click += (_, _) =>
+        choose.Click += async (_, _) =>
         {
             guide.Close();
-            OpenCloudFilePicker();
+            await OpenMediaFilePicker(
+                AppLocalization.T("从网盘选择照片或视频"));
         };
         DockPanel.SetDock(choose, Dock.Right);
         actions.Children.Add(choose);

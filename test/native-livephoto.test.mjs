@@ -38,7 +38,7 @@ test('macOS: capture path pairs photo and clip under one base + XMP', async () =
   assert.match(workflow, /xmp:Label=\\"live-photo\\"/);
   assert.match(workflow, /dc:relation=\\"/);
   // 本机/USB 快门：reserveBaseName → 切片 → store 配对（同 base 双文件）。
-  assert.match(main, /reserveBaseName\(cameraName:/);
+  assert.match(main, /reserveBaseName\(\s*cameraName:/);
   assert.match(main, /captureSlice\(\s*to:/);
   assert.match(main, /storeLivePhotoClip\(/);
   // Wi‑Fi PTP 遥控快门：不切片（原片在相机卡，避免孤儿 AVI）。

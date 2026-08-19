@@ -2554,9 +2554,38 @@ private final class CameraModel: ObservableObject {
     @Published var shootingTaskStep = 1
     @Published var shootingTaskRunning = false
     @Published var shootingTaskProgress = "尚未开始拍摄任务"
+    @Published var isImporting = false
+    @Published var importProgress = ""
+    @Published var importProcessed = 0
+    @Published var importTotal = 0
 
     private let camera = GPhotoCamera()
     private let externalVideoRecorder = ExternalVideoRecorder()
+    private struct ExternalRecordingOperation {
+        let token: UUID
+        let target: URL
+    }
+    private struct ExternalRecordingFinalizeError: LocalizedError {
+        let fileURL: URL
+        let underlyingError: Error
+
+        var errorDescription: String? {
+            "外录文件已保留（\(fileURL.lastPathComponent)），" +
+                "但入库元数据未完成：\(underlyingError.localizedDescription)"
+        }
+    }
+    private struct ExternalRecordingStopError: LocalizedError {
+        let fileURL: URL
+        let underlyingError: Error
+
+        var errorDescription: String? {
+            "外录停止未完整确认；已产生的文件会保留（" +
+                "\(fileURL.lastPathComponent)）以便检查：" +
+                underlyingError.localizedDescription
+        }
+    }
+    private let externalRecordingLifecycleLock = NSLock()
+    private var externalRecordingOperation: ExternalRecordingOperation?
     private var authSensitiveStateClosed = false
     let localCamera = LocalCameraService()
     let wifiCamera = WifiCameraService()
@@ -3385,11 +3414,20 @@ private final class CameraModel: ObservableObject {
     func capture() {
         if localCameraConnected {
             guard !capturing else { return }
+            let operationToken: UUID
+            do {
+                operationToken = try captureWorkflow.beginNonImportOperation()
+            } catch {
+                errorMessage = "文件库正在执行另一项任务，请稍后再拍摄。"
+                return
+            }
             capturing = true
             detail = "正在使用本机摄像头拍摄…"
             if locationTagging.enabled { locationTagging.refresh() }
             let captureLocation = locationTagging.snapshot()
-            localCamera.capture { [weak self] result in
+            let workflow = captureWorkflow
+            localCamera.capture { [weak self, workflow, operationToken] result in
+                defer { workflow.endNonImportOperation(operationToken) }
                 guard let self else { return }
                 switch result {
                 case .success(let data):
@@ -3419,14 +3457,16 @@ private final class CameraModel: ObservableObject {
                             location: captureLocation,
                             pairedWithFilename: liveClipURL == nil
                                 ? nil
-                                : "\(base)_live.avi"
+                                : "\(base)_live.avi",
+                            operationToken: operationToken
                         )
                         if let liveClipURL {
                             _ = try self.captureWorkflow.storeLivePhotoClip(
                                 from: liveClipURL,
                                 baseName: base,
                                 pairedPhotoFilename: url.lastPathComponent,
-                                cameraName: self.localCamera.deviceName
+                                cameraName: self.localCamera.deviceName,
+                                operationToken: operationToken
                             )
                         }
                         let image = NSImage(data: data)
@@ -3479,6 +3519,13 @@ private final class CameraModel: ObservableObject {
             return
         }
         guard !capturing else { return }
+        let operationToken: UUID
+        do {
+            operationToken = try captureWorkflow.beginNonImportOperation()
+        } catch {
+            errorMessage = "文件库正在执行另一项任务，请稍后再拍摄。"
+            return
+        }
         logger.info("workflow", "用户请求拍摄")
         capturing = true
         detail = "正在触发 \(activeCameraName) 快门…"
@@ -3486,7 +3533,9 @@ private final class CameraModel: ObservableObject {
             locationTagging.refresh()
         }
         let captureLocation = locationTagging.snapshot()
-        cameraQueue.async { [weak self] in
+        let workflow = captureWorkflow
+        cameraQueue.async { [weak self, workflow, operationToken] in
+            defer { workflow.endNonImportOperation(operationToken) }
             guard let self else { return }
             do {
                 let duration = self.exposureMode == "bulb" ? self.bulbSeconds : nil
@@ -3517,14 +3566,16 @@ private final class CameraModel: ObservableObject {
                     // 避免 XMP 指向不存在的 AVI。
                     pairedWithFilename: liveClipURL == nil
                         ? nil
-                        : "\(base)_live.avi"
+                        : "\(base)_live.avi",
+                    operationToken: operationToken
                 )
                 if let liveClipURL {
                     _ = try self.captureWorkflow.storeLivePhotoClip(
                         from: liveClipURL,
                         baseName: base,
                         pairedPhotoFilename: url.lastPathComponent,
-                        cameraName: self.activeCameraName
+                        cameraName: self.activeCameraName,
+                        operationToken: operationToken
                     )
                 }
                 self.logger.info(
@@ -3570,6 +3621,13 @@ private final class CameraModel: ObservableObject {
             return
         }
         guard !shootingTaskRunning else { return }
+        let libraryOperationToken: UUID
+        do {
+            libraryOperationToken = try captureWorkflow.beginNonImportOperation()
+        } catch {
+            errorMessage = "文件库正在执行另一项任务，请稍后再启动拍摄任务。"
+            return
+        }
         let token = UUID()
         shootingTaskToken = token
         let kind = shootingTaskKind
@@ -3583,7 +3641,12 @@ private final class CameraModel: ObservableObject {
             locationTagging.refresh()
         }
         let taskLocation = locationTagging.snapshot()
-        cameraQueue.async { [weak self] in
+        let workflow = captureWorkflow
+        cameraQueue.async {
+            [weak self, workflow, libraryOperationToken] in
+            defer {
+                workflow.endNonImportOperation(libraryOperationToken)
+            }
             guard let self else { return }
             do {
                 var total = kind == .bulb ? 1 : count
@@ -3620,7 +3683,8 @@ private final class CameraModel: ObservableObject {
                         data: data,
                         originalFilename: "capture.jpg",
                         cameraName: self.activeCameraName,
-                        location: taskLocation
+                        location: taskLocation,
+                        operationToken: libraryOperationToken
                     )
                     DispatchQueue.main.async {
                         self.photoFrame = NSImage(data: data)
@@ -3679,6 +3743,101 @@ private final class CameraModel: ObservableObject {
     func cancelShootingTask() {
         shootingTaskToken = UUID()
         shootingTaskProgress = "正在取消拍摄任务…"
+    }
+
+    private func startExternalRecordingOperation(
+        token: UUID,
+        target: URL,
+        frameRate: Double
+    ) throws {
+        externalRecordingLifecycleLock.lock()
+        defer { externalRecordingLifecycleLock.unlock() }
+        guard externalRecordingOperation == nil else {
+            captureWorkflow.endNonImportOperation(token)
+            throw CaptureWorkflow.ImportError.sessionLocked
+        }
+        externalRecordingOperation = ExternalRecordingOperation(
+            token: token,
+            target: target
+        )
+        do {
+            try externalVideoRecorder.start(
+                at: target,
+                frameRate: frameRate
+            )
+        } catch {
+            externalRecordingOperation = nil
+            externalVideoRecorder.abort()
+            try? FileManager.default.removeItem(at: target)
+            captureWorkflow.endNonImportOperation(token)
+            throw error
+        }
+    }
+
+    private func abortExternalRecordingOperation() {
+        externalRecordingLifecycleLock.lock()
+        defer { externalRecordingLifecycleLock.unlock() }
+        externalVideoRecorder.abort()
+        guard let operation = externalRecordingOperation else { return }
+        externalRecordingOperation = nil
+        try? FileManager.default.removeItem(at: operation.target)
+        captureWorkflow.endNonImportOperation(operation.token)
+    }
+
+    /// A single lifecycle lock owns claim + recorder stop + finalize/abort.
+    /// Concurrent stop/disconnect/frame-failure callers become no-op losers;
+    /// none can consume another caller's exact operation token.
+    private func finishExternalRecordingOperation()
+        throws -> ExternalVideoRecorder.Result? {
+        externalRecordingLifecycleLock.lock()
+        defer { externalRecordingLifecycleLock.unlock() }
+        guard let operation = externalRecordingOperation else {
+            if externalVideoRecorder.isRecording {
+                externalVideoRecorder.abort()
+                throw CaptureWorkflow.ImportError.sessionLocked
+            }
+            return nil
+        }
+        externalRecordingOperation = nil
+        defer {
+            captureWorkflow.endNonImportOperation(operation.token)
+        }
+        let result: ExternalVideoRecorder.Result
+        do {
+            guard let stoppedResult = try externalVideoRecorder.stopIfRecording() else {
+                throw CaptureWorkflow.ImportError.sessionLocked
+            }
+            result = stoppedResult
+        } catch {
+            externalVideoRecorder.abort()
+            if FileManager.default.fileExists(atPath: operation.target.path) {
+                throw ExternalRecordingStopError(
+                    fileURL: operation.target,
+                    underlyingError: error
+                )
+            }
+            throw error
+        }
+
+        guard result.url.standardizedFileURL ==
+                operation.target.standardizedFileURL else {
+            throw ExternalRecordingFinalizeError(
+                fileURL: result.url,
+                underlyingError: CaptureWorkflow.ImportError.sessionLocked
+            )
+        }
+        do {
+            try captureWorkflow.completeExternalRecording(
+                at: result.url,
+                operationToken: operation.token
+            )
+            return result
+        } catch {
+            throw ExternalRecordingFinalizeError(
+                fileURL: result.url,
+                underlyingError: error
+            )
+        }
     }
 
     func toggleMovieRecording() {
@@ -3751,11 +3910,9 @@ private final class CameraModel: ObservableObject {
                             bodyError = error
                         }
                     }
-                    if let result = try self.externalVideoRecorder
-                        .stopIfRecording() {
-                        try self.captureWorkflow.completeExternalRecording(
-                            at: result.url
-                        )
+                    let externalResult = try self
+                        .finishExternalRecordingOperation()
+                    if let result = externalResult {
                         self.logger.info(
                             "external-recording",
                             "外录完成；文件=\(result.url.lastPathComponent)；" +
@@ -3765,12 +3922,23 @@ private final class CameraModel: ObservableObject {
                     if let bodyError { throw bodyError }
                 } else {
                     if self.externalRecordToDevice {
-                        let target = try self.captureWorkflow
-                            .reserveExternalRecording(
-                                cameraName: self.activeCameraName
+                        let operationToken = try self.captureWorkflow
+                            .beginNonImportOperation()
+                        let target: URL
+                        do {
+                            target = try self.captureWorkflow.reserveExternalRecording(
+                                cameraName: self.activeCameraName,
+                                operationToken: operationToken
                             )
-                        try self.externalVideoRecorder.start(
-                            at: target,
+                        } catch {
+                            self.captureWorkflow.endNonImportOperation(
+                                operationToken
+                            )
+                            throw error
+                        }
+                        try self.startExternalRecordingOperation(
+                            token: operationToken,
+                            target: target,
                             frameRate: self.videoFrameRate
                         )
                     }
@@ -3803,13 +3971,30 @@ private final class CameraModel: ObservableObject {
                     }
                 }
             } catch {
+                if shouldStop || !self.externalVideoRecorder.isRecording {
+                    self.abortExternalRecordingOperation()
+                }
+                let preservedRecordingURL: URL?
+                if let preserved = error as? ExternalRecordingFinalizeError {
+                    preservedRecordingURL = preserved.fileURL
+                } else if let preserved = error as? ExternalRecordingStopError {
+                    preservedRecordingURL = preserved.fileURL
+                } else {
+                    preservedRecordingURL = nil
+                }
                 self.logger.error(
                     "recording",
                     "视频录制切换失败：\(error.localizedDescription)"
                 )
                 DispatchQueue.main.async {
                     self.capturing = false
-                    self.detail = "视频录制操作失败"
+                    if preservedRecordingURL != nil {
+                        self.reloadPhotos()
+                        self.selectedPhoto = self.photos.first
+                    }
+                    self.detail = preservedRecordingURL == nil
+                        ? "视频录制操作失败"
+                        : "外录文件已保留 · 入库元数据失败"
                     self.errorMessage = error.localizedDescription
                 }
             }
@@ -3873,31 +4058,36 @@ private final class CameraModel: ObservableObject {
         do {
             try externalVideoRecorder.append(jpeg: data)
         } catch {
+            let appendFailure = error
             logger.error(
                 "external-recording",
-                "外录写入失败：\(error.localizedDescription)"
+                "外录写入失败：\(appendFailure.localizedDescription)"
             )
+            var completionFailure: Error?
             do {
-                if let result = try externalVideoRecorder.stopIfRecording() {
-                    try captureWorkflow.completeExternalRecording(at: result.url)
-                }
+                _ = try finishExternalRecordingOperation()
             } catch {
-                externalVideoRecorder.abort()
+                completionFailure = error
+                abortExternalRecordingOperation()
             }
+            let reportedFailure = completionFailure.map {
+                "外录写入失败（\(appendFailure.localizedDescription)）；" +
+                    $0.localizedDescription
+            } ?? appendFailure.localizedDescription
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.videoRecording = self.connected && self.camera.isMovieRecording
                 if !self.videoRecording { self.videoRecordingStartedAt = nil }
                 self.reloadPhotos()
-                self.errorMessage = "外录已停止：\(error.localizedDescription)"
+                self.errorMessage = "外录已停止：\(reportedFailure)"
             }
         }
     }
 
     private func finishExternalRecordingForDisconnect() {
         do {
-            if let result = try externalVideoRecorder.stopIfRecording() {
-                try captureWorkflow.completeExternalRecording(at: result.url)
+            let result = try finishExternalRecordingOperation()
+            if let result {
                 logger.info(
                     "external-recording",
                     "连接结束，已安全保存外录：\(result.url.lastPathComponent)"
@@ -3905,7 +4095,11 @@ private final class CameraModel: ObservableObject {
                 reloadPhotos()
             }
         } catch {
-            externalVideoRecorder.abort()
+            abortExternalRecordingOperation()
+            if error is ExternalRecordingFinalizeError ||
+                error is ExternalRecordingStopError {
+                reloadPhotos()
+            }
             logger.error(
                 "external-recording",
                 "连接结束时无法完成外录：\(error.localizedDescription)"
@@ -3968,35 +4162,137 @@ private final class CameraModel: ObservableObject {
         }
     }
 
-    func importPhotos(from urls: [URL]) {
-        var imported = 0
-        var pairNames: [String: String] = [:]
-        for source in urls {
-            let pairKey = source.deletingPathExtension()
-                .lastPathComponent
-                .lowercased()
-            let reservedBase = pairNames[pairKey] ?? captureWorkflow
-                .reserveBaseName(cameraName: activeCameraName)
-            pairNames[pairKey] = reservedBase
-            do {
-                _ = try captureWorkflow.importFile(
-                    from: source,
-                    cameraName: activeCameraName,
-                    reservedBaseName: reservedBase
-                )
-                imported += 1
-            } catch {
-                logger.error(
-                    "library",
-                    "从网盘导入失败：\(error.localizedDescription)"
-                )
-            }
+    private var importTask: Task<Void, Never>?
+
+    func cancelImport() {
+        importProgress = "正在取消导入…"
+        importTask?.cancel()
+    }
+
+    func importMedia(from urls: [URL]) {
+        guard !urls.isEmpty, !isImporting else { return }
+        let importToken: UUID
+        do {
+            importToken = try captureWorkflow.beginImportBatch()
+        } catch {
+            detail = "已有导入任务正在进行。"
+            return
         }
-        reloadPhotos()
-        selectedPhoto = photos.first
-        detail = imported > 0
-            ? "已从网盘加入 \(imported) 张照片"
-            : "没有可加入文件库的照片"
+        let workflow = captureWorkflow
+        importTask = Task { @MainActor [weak self, workflow, importToken] in
+            guard let self else {
+                workflow.endImportBatch(importToken)
+                return
+            }
+            self.isImporting = true
+            self.importProgress = "准备导入…"
+            self.importProcessed = 0
+            self.importTotal = urls.count
+            defer {
+                self.captureWorkflow.endImportBatch(importToken)
+                self.isImporting = false
+                self.importTask = nil
+            }
+
+            var seen = Set<URL>()
+            let ordered = urls.filter {
+                seen.insert($0.standardizedFileURL.resolvingSymlinksInPath())
+                    .inserted
+            }
+            var jpegPairBases: [String: String] = [:]
+            var rawPairBases: [String: String] = [:]
+            var imported = 0
+            var skipped = 0
+            var failed = 0
+            var cancelled = 0
+            var newestURL: URL?
+            let total = ordered.count
+            self.importTotal = total
+
+            for (index, source) in ordered.enumerated() {
+                if Task.isCancelled {
+                    cancelled = total - index
+                    break
+                }
+
+                guard FileManager.default.fileExists(atPath: source.path) else {
+                    skipped += 1
+                    self.importProcessed = index + 1
+                    self.importProgress = "已处理 \(index + 1) / \(total)"
+                    continue
+                }
+
+                let canonicalSource = source.standardizedFileURL
+                    .resolvingSymlinksInPath()
+                let pairKey = canonicalSource.deletingLastPathComponent().path
+                    + "\u{0}" + canonicalSource
+                    .deletingPathExtension().lastPathComponent.lowercased()
+                let fileExtension = canonicalSource.pathExtension.lowercased()
+                let reservedBase: String
+                switch fileExtension {
+                case "jpg", "jpeg":
+                    if let rawBase = rawPairBases[pairKey],
+                       jpegPairBases[pairKey] == nil {
+                        reservedBase = rawBase
+                        jpegPairBases[pairKey] = rawBase
+                    } else {
+                        reservedBase = self.captureWorkflow.reserveBaseName(
+                            cameraName: self.activeCameraName
+                        )
+                        if jpegPairBases[pairKey] == nil {
+                            jpegPairBases[pairKey] = reservedBase
+                        }
+                    }
+                case "nef", "nrw", "arw", "cr2", "cr3":
+                    if let jpegBase = jpegPairBases[pairKey],
+                       rawPairBases[pairKey] == nil {
+                        reservedBase = jpegBase
+                        rawPairBases[pairKey] = jpegBase
+                    } else {
+                        reservedBase = self.captureWorkflow.reserveBaseName(
+                            cameraName: self.activeCameraName
+                        )
+                        if rawPairBases[pairKey] == nil {
+                            rawPairBases[pairKey] = reservedBase
+                        }
+                    }
+                default:
+                    reservedBase = self.captureWorkflow.reserveBaseName(
+                        cameraName: self.activeCameraName
+                    )
+                }
+                self.importProgress = "正在处理 \(index + 1) / \(total)"
+
+                do {
+                    let destination = try await self.captureWorkflow
+                        .importFileAsync(
+                            from: source,
+                            cameraName: self.activeCameraName,
+                            reservedBaseName: reservedBase,
+                            importToken: importToken
+                        )
+                    imported += 1
+                    newestURL = destination
+                } catch is CancellationError {
+                    cancelled = total - index
+                    break
+                } catch {
+                    failed += 1
+                    self.logger.error(
+                        "library",
+                        "导入失败：\(error.localizedDescription)"
+                    )
+                }
+                self.importProcessed = index + 1
+                self.importProgress = "已处理 \(index + 1) / \(total)"
+            }
+
+            self.reloadPhotos()
+            self.selectedPhoto = self.photos.first(where: {
+                $0.url == newestURL
+            }) ?? self.photos.first
+            self.detail = "导入完成：已导入 \(imported)，跳过 \(skipped)，失败 \(failed)，取消 \(cancelled)"
+        }
     }
 
     @discardableResult
@@ -8929,10 +9225,10 @@ private struct CameraStorageMacRow: View {
 }
 
 private struct LibraryView: View {
+    @Environment(\.locale) private var locale
     @ObservedObject var model: CameraModel
     @StateObject private var branchStore = MacLibraryBranchStore()
     @State private var confirmDelete = false
-    @State private var showCloudImporter = false
     @State private var showCloudGuide = false
     @State private var showBranchCreator = false
     @State private var branchDraft = ""
@@ -8979,6 +9275,8 @@ private struct LibraryView: View {
                     Task { await loadSystemAlbum() }
                 }
                     .buttonStyle(NativeButtonStyle())
+                Button("导入照片与视频") { openMediaImporter() }
+                    .buttonStyle(NativeButtonStyle(primary: true))
                 Button("链接网盘") { showCloudGuide = true }
                     .buttonStyle(NativeButtonStyle())
                 Button("合成延时视频") { showTimelapseComposer = true }
@@ -9124,24 +9422,6 @@ private struct LibraryView: View {
                 "将同时删除“\(branchPendingDeletion?.name ?? "")”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"
             )
         }
-        .fileImporter(
-            isPresented: $showCloudImporter,
-            allowedContentTypes: [
-                .image,
-                .movie,
-                UTType(filenameExtension: "nef") ?? .data,
-                UTType(filenameExtension: "nrw") ?? .data
-            ],
-            allowsMultipleSelection: true
-        ) { result in
-            switch result {
-            case .success(let urls):
-                model.importPhotos(from: urls)
-            case .failure(let error):
-                model.errorMessage =
-                    "无法从网盘导入照片：\(error.localizedDescription)"
-            }
-        }
         .sheet(item: $largePhoto) { photo in
             LargePhotoView(
                 photo: photo,
@@ -9157,7 +9437,7 @@ private struct LibraryView: View {
             MacCloudDriveGuide {
                 showCloudGuide = false
                 DispatchQueue.main.async {
-                    showCloudImporter = true
+                    openMediaImporter()
                 }
             }
         }
@@ -9171,8 +9451,64 @@ private struct LibraryView: View {
                 showFocusStackComposer = false
             }
         }
+        .overlay {
+            if model.isImporting {
+                ZStack {
+                    Color.black.opacity(0.18)
+                        .ignoresSafeArea()
+                    VStack(spacing: SpaceToken.s16) {
+                        RuntimeLocalizedText(model.importProgress)
+                            .font(.system(size: TypeScale.emphasis, weight: .semibold))
+                            .foregroundStyle(Palette.ink)
+                        ProgressView(
+                            value: Double(model.importProcessed),
+                            total: Double(max(1, model.importTotal))
+                        )
+                            .controlSize(.small)
+                        Button {
+                            model.cancelImport()
+                        } label: {
+                            RuntimeLocalizedText("取消")
+                                .font(.system(size: TypeScale.body, weight: .semibold))
+                        }
+                        .buttonStyle(NativeButtonStyle())
+                    }
+                    .padding(SpaceToken.s24)
+                    .background(Palette.paper)
+                    .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r14))
+                    .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
+                }
+            }
+        }
         .task {
             await loadSystemAlbum()
+        }
+    }
+
+    private func openMediaImporter() {
+        let panel = NSOpenPanel()
+        panel.title = RuntimeLocalization.text(
+            "选择要导入的照片或视频",
+            locale: locale
+        )
+        panel.allowsMultipleSelection = true
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [
+            "jpg", "jpeg", "png", "heic", "heif", "tif", "tiff",
+            "nef", "nrw", "arw", "cr2", "cr3", "mov", "mp4",
+            "m4v", "avi"
+        ].compactMap { UTType(filenameExtension: $0) }
+        guard let window = NSApp.mainWindow ?? NSApp.keyWindow else {
+            if panel.runModal() == .OK {
+                model.importMedia(from: panel.urls)
+            }
+            return
+        }
+        panel.beginSheetModal(for: window) { result in
+            if result == .OK {
+                model.importMedia(from: panel.urls)
+            }
         }
     }
 

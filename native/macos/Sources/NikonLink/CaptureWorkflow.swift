@@ -11,6 +11,34 @@ struct CaptureSessionConfiguration: Codable, Equatable {
     var dualBackupEnabled = true
 }
 
+private final class ImportCancellationSignal: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelled = true
+        lock.unlock()
+    }
+}
+
+/// The batch token and the workflow's state/finalization locks serialize every
+/// import mutation. This narrow wrapper makes that audited ownership explicit
+/// without declaring the UI-facing ObservableObject itself Sendable.
+private final class ImportWorkflowReference: @unchecked Sendable {
+    let workflow: CaptureWorkflow
+
+    init(_ workflow: CaptureWorkflow) {
+        self.workflow = workflow
+    }
+}
+
 final class CaptureWorkflow: ObservableObject {
     @Published private(set) var configuration: CaptureSessionConfiguration
     @Published private(set) var isActive: Bool
@@ -22,6 +50,10 @@ final class CaptureWorkflow: ObservableObject {
     private let fileManager = FileManager.default
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let stateLock = NSLock()
+    private let finalizeLock = NSLock()
+    private var importOperationToken: UUID?
+    private var nonImportOperationToken: UUID?
     private let stateKey = "captureSessionConfiguration"
     private let activeKey = "captureSessionActive"
     private let counterKey = "captureSessionCounter"
@@ -67,6 +99,12 @@ final class CaptureWorkflow: ObservableObject {
     }
 
     func begin(_ configuration: CaptureSessionConfiguration) throws {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard importOperationToken == nil,
+              nonImportOperationToken == nil else {
+            throw ImportError.sessionLocked
+        }
         self.configuration = normalized(configuration)
         isActive = true
         counter = 1
@@ -76,12 +114,21 @@ final class CaptureWorkflow: ObservableObject {
     }
 
     func end() {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard importOperationToken == nil,
+              nonImportOperationToken == nil else {
+            status = "导入期间不能切换拍摄会话。"
+            return
+        }
         isActive = false
         persist()
         status = "拍摄会话已结束"
     }
 
     func reserveBaseName(cameraName: String, date: Date = Date()) -> String {
+        stateLock.lock()
+        defer { stateLock.unlock() }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd_HHmmss"
         var value = configuration.namingTemplate
@@ -106,6 +153,79 @@ final class CaptureWorkflow: ObservableObject {
         return sanitized(value)
     }
 
+    func beginImportBatch() throws -> UUID {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard importOperationToken == nil,
+              nonImportOperationToken == nil else {
+            throw ImportError.importInProgress
+        }
+        let token = UUID()
+        importOperationToken = token
+        return token
+    }
+
+    func endImportBatch(_ token: UUID) {
+        stateLock.lock()
+        if importOperationToken == token {
+            importOperationToken = nil
+        }
+        stateLock.unlock()
+    }
+
+    private func validateImportBatch(_ token: UUID) throws {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard importOperationToken == token else {
+            throw ImportError.importInProgress
+        }
+    }
+
+    /// Claims exclusive ownership of session/library mutations outside import.
+    /// Composite operations keep the returned token for their entire lifetime
+    /// and pass it through every store/finalize step.
+    func beginNonImportOperation() throws -> UUID {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard importOperationToken == nil,
+              nonImportOperationToken == nil else {
+            throw ImportError.sessionLocked
+        }
+        let token = UUID()
+        nonImportOperationToken = token
+        return token
+    }
+
+    func endNonImportOperation(_ token: UUID) {
+        stateLock.lock()
+        if nonImportOperationToken == token {
+            nonImportOperationToken = nil
+        }
+        stateLock.unlock()
+    }
+
+    private func validateNonImportOperation(_ token: UUID) throws {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard nonImportOperationToken == token,
+              importOperationToken == nil else {
+            throw ImportError.sessionLocked
+        }
+    }
+
+    private func withNonImportOperation<T>(
+        token: UUID?,
+        _ body: () throws -> T
+    ) throws -> T {
+        if let token {
+            try validateNonImportOperation(token)
+            return try body()
+        }
+        let ownedToken = try beginNonImportOperation()
+        defer { endNonImportOperation(ownedToken) }
+        return try body()
+    }
+
     @discardableResult
     func store(
         data: Data,
@@ -113,28 +233,31 @@ final class CaptureWorkflow: ObservableObject {
         cameraName: String,
         reservedBaseName: String? = nil,
         location: CaptureLocation? = nil,
-        pairedWithFilename: String? = nil
+        pairedWithFilename: String? = nil,
+        operationToken: UUID? = nil
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let original = URL(fileURLWithPath: originalFilename)
-        let fileExtension = original.pathExtension.isEmpty
-            ? "jpg"
-            : original.pathExtension.lowercased()
-        let base = reservedBaseName
-            ?? reserveBaseName(cameraName: cameraName)
-        let destination = uniqueURL(
-            in: primaryDirectory,
-            base: base,
-            extension: fileExtension
-        )
-        try data.write(to: destination, options: .atomic)
-        try finalize(
-            destination,
-            location: location,
-            pairedWithFilename: pairedWithFilename
-        )
-        status = "已写入会话 · \(destination.lastPathComponent)"
-        return destination
+        try withNonImportOperation(token: operationToken) {
+            try ensureSessionDirectories()
+            let original = URL(fileURLWithPath: originalFilename)
+            let fileExtension = original.pathExtension.isEmpty
+                ? "jpg"
+                : original.pathExtension.lowercased()
+            let base = reservedBaseName
+                ?? reserveBaseName(cameraName: cameraName)
+            let destination = uniqueURL(
+                in: primaryDirectory,
+                base: base,
+                extension: fileExtension
+            )
+            try data.write(to: destination, options: .atomic)
+            try finalize(
+                destination,
+                location: location,
+                pairedWithFilename: pairedWithFilename
+            )
+            status = "已写入会话 · \(destination.lastPathComponent)"
+            return destination
+        }
     }
 
     /// E5 live 图：把快门切片 AVI 以照片同 base 存入会话，
@@ -145,25 +268,28 @@ final class CaptureWorkflow: ObservableObject {
         from sourceURL: URL,
         baseName: String,
         pairedPhotoFilename: String,
-        cameraName: String
+        cameraName: String,
+        operationToken: UUID? = nil
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let destination = uniqueURL(
-            in: primaryDirectory,
-            base: "\(baseName)_live",
-            extension: "avi"
-        )
-        if fileManager.fileExists(atPath: destination.path) {
-            try? fileManager.removeItem(at: destination)
+        try withNonImportOperation(token: operationToken) {
+            try ensureSessionDirectories()
+            let destination = uniqueURL(
+                in: primaryDirectory,
+                base: "\(baseName)_live",
+                extension: "avi"
+            )
+            if fileManager.fileExists(atPath: destination.path) {
+                try? fileManager.removeItem(at: destination)
+            }
+            try fileManager.moveItem(at: sourceURL, to: destination)
+            try finalize(
+                destination,
+                location: nil,
+                pairedWithFilename: pairedPhotoFilename
+            )
+            status = "live 图视频已写入会话 · \(destination.lastPathComponent)"
+            return destination
         }
-        try fileManager.moveItem(at: sourceURL, to: destination)
-        try finalize(
-            destination,
-            location: nil,
-            pairedWithFilename: pairedPhotoFilename
-        )
-        status = "live 图视频已写入会话 · \(destination.lastPathComponent)"
-        return destination
     }
 
     /// E6 延时合成：把渲染好的 MP4 以新 base 存入会话，
@@ -174,19 +300,21 @@ final class CaptureWorkflow: ObservableObject {
         from sourceURL: URL,
         cameraName: String
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let destination = uniqueURL(
-            in: primaryDirectory,
-            base: reserveBaseName(cameraName: cameraName),
-            extension: "mp4"
-        )
-        if fileManager.fileExists(atPath: destination.path) {
-            try? fileManager.removeItem(at: destination)
+        try withNonImportOperation(token: nil) {
+            try ensureSessionDirectories()
+            let destination = uniqueURL(
+                in: primaryDirectory,
+                base: reserveBaseName(cameraName: cameraName),
+                extension: "mp4"
+            )
+            if fileManager.fileExists(atPath: destination.path) {
+                try? fileManager.removeItem(at: destination)
+            }
+            try fileManager.moveItem(at: sourceURL, to: destination)
+            try finalize(destination, location: nil, pairedWithFilename: nil)
+            status = "延时视频已写入会话 · \(destination.lastPathComponent)"
+            return destination
         }
-        try fileManager.moveItem(at: sourceURL, to: destination)
-        try finalize(destination, location: nil, pairedWithFilename: nil)
-        status = "延时视频已写入会话 · \(destination.lastPathComponent)"
-        return destination
     }
 
     /// E7 焦点合成：把合成好的 JPEG 以新 base 存入会话，
@@ -199,24 +327,26 @@ final class CaptureWorkflow: ObservableObject {
         cameraName: String,
         stackSourceCount: Int
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let destination = uniqueURL(
-            in: primaryDirectory,
-            base: reserveBaseName(cameraName: cameraName),
-            extension: "jpg"
-        )
-        if fileManager.fileExists(atPath: destination.path) {
-            try? fileManager.removeItem(at: destination)
+        try withNonImportOperation(token: nil) {
+            try ensureSessionDirectories()
+            let destination = uniqueURL(
+                in: primaryDirectory,
+                base: reserveBaseName(cameraName: cameraName),
+                extension: "jpg"
+            )
+            if fileManager.fileExists(atPath: destination.path) {
+                try? fileManager.removeItem(at: destination)
+            }
+            try fileManager.moveItem(at: sourceURL, to: destination)
+            try finalize(
+                destination,
+                location: nil,
+                pairedWithFilename: nil,
+                stackSourceCount: stackSourceCount
+            )
+            status = "焦点合成已写入会话 · \(destination.lastPathComponent)"
+            return destination
         }
-        try fileManager.moveItem(at: sourceURL, to: destination)
-        try finalize(
-            destination,
-            location: nil,
-            pairedWithFilename: nil,
-            stackSourceCount: stackSourceCount
-        )
-        status = "焦点合成已写入会话 · \(destination.lastPathComponent)"
-        return destination
     }
 
     @discardableResult
@@ -226,82 +356,284 @@ final class CaptureWorkflow: ObservableObject {
         originalFilename: String,
         cameraName: String
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let temporary = destination
-            .deletingLastPathComponent()
-            .appendingPathComponent(".replace-\(UUID().uuidString).tmp")
-        try data.write(to: temporary, options: .atomic)
-        do {
-            if fileManager.fileExists(atPath: destination.path) {
-                _ = try fileManager.replaceItem(
-                    at: destination,
-                    withItemAt: temporary,
-                    backupItemName: nil,
-                    options: .usingNewMetadataOnly,
-                    resultingItemURL: nil
-                )
-            } else {
-                try fileManager.moveItem(at: temporary, to: destination)
+        try withNonImportOperation(token: nil) {
+            try ensureSessionDirectories()
+            let temporary = destination
+                .deletingLastPathComponent()
+                .appendingPathComponent(".replace-\(UUID().uuidString).tmp")
+            try data.write(to: temporary, options: .atomic)
+            do {
+                if fileManager.fileExists(atPath: destination.path) {
+                    _ = try fileManager.replaceItem(
+                        at: destination,
+                        withItemAt: temporary,
+                        backupItemName: nil,
+                        options: .usingNewMetadataOnly,
+                        resultingItemURL: nil
+                    )
+                } else {
+                    try fileManager.moveItem(at: temporary, to: destination)
+                }
+            } catch {
+                try? fileManager.removeItem(at: temporary)
+                throw error
             }
-        } catch {
-            try? fileManager.removeItem(at: temporary)
-            throw error
+            try finalize(destination, location: nil)
+            try replaceChecksumEntry(for: destination)
+            status = "已替换原图 · \(destination.lastPathComponent)"
+            return destination
         }
-        try finalize(destination, location: nil)
-        replaceChecksumEntry(for: destination)
-        status = "已替换原图 · \(destination.lastPathComponent)"
-        return destination
+    }
+
+    static let supportedImportExtensions: Set<String> = [
+        "jpg", "jpeg", "png", "heic", "heif",
+        "tif", "tiff", "nef", "nrw", "arw", "cr2", "cr3",
+        "mov", "mp4", "m4v", "avi"
+    ]
+
+    enum ImportError: Error {
+        case unsupportedExtension
+        case emptySource
+        case sourceInsideLibrary
+        case sizeMismatch
+        case cannotCreateTemp
+        case importInProgress
+        case sessionLocked
+        case backupCollision
+        case rollbackTargetNotFile
+        case rollbackIncomplete
     }
 
     @discardableResult
     func importFile(
         from source: URL,
         cameraName: String,
-        reservedBaseName: String? = nil
+        reservedBaseName: String? = nil,
+        shouldCancel: () -> Bool = { false }
     ) throws -> URL {
+        let token = try beginImportBatch()
+        defer { endImportBatch(token) }
+        return try importFileInBatch(
+            from: source,
+            cameraName: cameraName,
+            reservedBaseName: reservedBaseName,
+            importToken: token,
+            shouldCancel: shouldCancel
+        )
+    }
+
+    private func importFileInBatch(
+        from source: URL,
+        cameraName: String,
+        reservedBaseName: String?,
+        importToken: UUID,
+        shouldCancel: () -> Bool
+    ) throws -> URL {
+        try validateImportBatch(importToken)
+        guard !shouldCancel() else { throw CancellationError() }
         let scoped = source.startAccessingSecurityScopedResource()
         defer {
             if scoped {
                 source.stopAccessingSecurityScopedResource()
             }
         }
-        let data = try Data(contentsOf: source)
-        return try store(
-            data: data,
-            originalFilename: source.lastPathComponent,
-            cameraName: cameraName,
-            reservedBaseName: reservedBaseName
+
+        let fileExtension = source.pathExtension.lowercased()
+        guard CaptureWorkflow.supportedImportExtensions.contains(fileExtension) else {
+            throw ImportError.unsupportedExtension
+        }
+
+        let canonicalSource = source.standardizedFileURL.resolvingSymlinksInPath()
+        let canonicalRoot = rootDirectory.standardizedFileURL
+            .resolvingSymlinksInPath()
+        var relationship = FileManager.URLRelationship.other
+        try fileManager.getRelationship(
+            &relationship,
+            ofDirectoryAt: canonicalRoot,
+            toItemAt: canonicalSource
         )
+        if relationship == .contains || relationship == .same {
+            throw ImportError.sourceInsideLibrary
+        }
+
+        let sourcePath = source.path
+        let sourceSize = (try? fileManager.attributesOfItem(
+            atPath: sourcePath
+        )[.size] as? Int64) ?? 0
+        guard sourceSize > 0 else {
+            throw ImportError.emptySource
+        }
+
+        try ensureSessionDirectories()
+        let base = reservedBaseName
+            ?? reserveBaseName(cameraName: cameraName)
+        let destination = uniqueURL(
+            in: primaryDirectory,
+            base: base,
+            extension: fileExtension
+        )
+        let temp = primaryDirectory
+            .appendingPathComponent(".zenche-import-\(UUID().uuidString).part")
+
+        var published = false
+        do {
+            let sourceHandle = try FileHandle(forReadingFrom: source)
+            defer { try? sourceHandle.close() }
+
+            guard fileManager.createFile(
+                atPath: temp.path,
+                contents: nil,
+                attributes: nil
+            ) else {
+                throw ImportError.cannotCreateTemp
+            }
+            let tempHandle = try FileHandle(forWritingTo: temp)
+            defer { try? tempHandle.close() }
+
+            let bufferSize = 256 * 1024
+            while let chunk = try sourceHandle.read(upToCount: bufferSize),
+                  !chunk.isEmpty {
+                guard !shouldCancel() else { throw CancellationError() }
+                try tempHandle.write(contentsOf: chunk)
+            }
+            guard !shouldCancel() else { throw CancellationError() }
+            try tempHandle.synchronize()
+
+            let finalSourceSize = (try? fileManager.attributesOfItem(
+                atPath: sourcePath
+            )[.size] as? Int64) ?? 0
+            let tempSize = (try? fileManager.attributesOfItem(
+                atPath: temp.path
+            )[.size] as? Int64) ?? 0
+            guard finalSourceSize == sourceSize,
+                  tempSize == sourceSize else {
+                throw ImportError.sizeMismatch
+            }
+
+            try fileManager.moveItem(at: temp, to: destination)
+            published = true
+            guard !shouldCancel() else { throw CancellationError() }
+            try finalize(
+                destination,
+                location: nil,
+                shouldCancel: shouldCancel,
+                transactionalImport: true
+            )
+            return destination
+        } catch {
+            let originalError = error
+            var cleanupErrors: [Error] = []
+
+            do {
+                try removeImportArtifact(
+                    at: temp,
+                    expectedParent: primaryDirectory
+                )
+            } catch {
+                cleanupErrors.append(error)
+            }
+            if published {
+                do {
+                    try removeImportArtifact(
+                        at: destination,
+                        expectedParent: primaryDirectory
+                    )
+                } catch {
+                    cleanupErrors.append(error)
+                }
+            }
+
+            guard !cleanupErrors.isEmpty else {
+                throw originalError
+            }
+            if let rollbackError = originalError as? ImportFinalizeRollbackError {
+                throw ImportFinalizeRollbackError(
+                    originalError: rollbackError.originalError,
+                    rollbackErrors: rollbackError.rollbackErrors + cleanupErrors
+                )
+            }
+            throw ImportFinalizeRollbackError(
+                originalError: originalError,
+                rollbackErrors: cleanupErrors
+            )
+        }
+    }
+
+    func importFileAsync(
+        from source: URL,
+        cameraName: String,
+        reservedBaseName: String? = nil,
+        importToken: UUID
+    ) async throws -> URL {
+        let cancellation = ImportCancellationSignal()
+        let workflowReference = ImportWorkflowReference(self)
+        return try await withTaskCancellationHandler(operation: {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        let url = try workflowReference.workflow.importFileInBatch(
+                            from: source,
+                            cameraName: cameraName,
+                            reservedBaseName: reservedBaseName,
+                            importToken: importToken,
+                            shouldCancel: { cancellation.isCancelled }
+                        )
+                        continuation.resume(returning: url)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+        }, onCancel: {
+            cancellation.cancel()
+        })
     }
 
     func reserveExternalRecording(
         cameraName: String,
-        extension fileExtension: String = "avi"
+        extension fileExtension: String = "avi",
+        operationToken: UUID
     ) throws -> URL {
-        try ensureSessionDirectories()
-        let normalized = fileExtension.lowercased() == "avi" ? "avi" : "avi"
-        return uniqueURL(
-            in: primaryDirectory,
-            base: reserveBaseName(cameraName: cameraName),
-            extension: normalized
-        )
+        try withNonImportOperation(token: operationToken) {
+            try ensureSessionDirectories()
+            let normalized = fileExtension.lowercased() == "avi" ? "avi" : "avi"
+            return uniqueURL(
+                in: primaryDirectory,
+                base: reserveBaseName(cameraName: cameraName),
+                extension: normalized
+            )
+        }
     }
 
-    func completeExternalRecording(at url: URL) throws {
-        let values = try url.resourceValues(forKeys: [.fileSizeKey])
-        guard (values.fileSize ?? 0) > 0 else {
-            throw CocoaError(.fileReadCorruptFile)
+    func completeExternalRecording(
+        at url: URL,
+        operationToken: UUID
+    ) throws {
+        try withNonImportOperation(token: operationToken) {
+            let values = try url.resourceValues(forKeys: [.fileSizeKey])
+            guard (values.fileSize ?? 0) > 0 else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            try finalize(
+                url,
+                location: nil,
+                transactionalImport: true
+            )
+            status = "外录已写入会话 · \(url.lastPathComponent)"
         }
-        try finalize(url, location: nil)
-        status = "外录已写入会话 · \(url.lastPathComponent)"
     }
 
     private func finalize(
         _ primary: URL,
         location: CaptureLocation?,
         pairedWithFilename: String? = nil,
-        stackSourceCount: Int? = nil
+        stackSourceCount: Int? = nil,
+        shouldCancel: () -> Bool = { false },
+        transactionalImport: Bool = false
     ) throws {
+        finalizeLock.lock()
+        defer { finalizeLock.unlock() }
         if isActive || location != nil || pairedWithFilename != nil || stackSourceCount != nil {
             let xmp = xmpSidecar(
                 for: primary.lastPathComponent,
@@ -312,58 +644,212 @@ final class CaptureWorkflow: ObservableObject {
             let sidecar = primary
                 .deletingPathExtension()
                 .appendingPathExtension("xmp")
-            try xmp.write(to: sidecar, atomically: true, encoding: .utf8)
-            if isActive, let backupDirectory {
-                let backup = backupDirectory
-                    .appendingPathComponent(primary.lastPathComponent)
-                try? fileManager.removeItem(at: backup)
-                try fileManager.copyItem(at: primary, to: backup)
-                let backupSidecar = backup
-                    .deletingPathExtension()
-                    .appendingPathExtension("xmp")
-                try? fileManager.removeItem(at: backupSidecar)
-                try fileManager.copyItem(at: sidecar, to: backupSidecar)
-            }
-            if isActive, let sessionRoot {
-                let digest = SHA256.hash(data: try Data(contentsOf: primary))
-                    .map { String(format: "%02x", $0) }
-                    .joined()
-                let manifest = sessionRoot.appendingPathComponent(
-                    "checksums.sha256"
-                )
-                let line = "\(digest)  Primary/\(primary.lastPathComponent)\n"
-                if fileManager.fileExists(atPath: manifest.path),
-                   let handle = try? FileHandle(forWritingTo: manifest) {
-                    try handle.seekToEnd()
-                    try handle.write(contentsOf: Data(line.utf8))
-                    try handle.close()
-                } else {
-                    try line.write(
-                        to: manifest,
-                        atomically: true,
-                        encoding: .utf8
+            let snapshot = transactionalImport
+                ? try importMetadataSnapshot(primary: primary, sidecar: sidecar)
+                : nil
+            do {
+                try xmp.write(to: sidecar, atomically: true, encoding: .utf8)
+                guard !shouldCancel() else { throw CancellationError() }
+                if isActive, let backupDirectory {
+                    let backup = backupDirectory
+                        .appendingPathComponent(primary.lastPathComponent)
+                    try copyFileAtomically(
+                        from: primary,
+                        to: backup,
+                        shouldCancel: shouldCancel
+                    )
+                    let backupSidecar = backup
+                        .deletingPathExtension()
+                        .appendingPathExtension("xmp")
+                    try copyFileAtomically(
+                        from: sidecar,
+                        to: backupSidecar,
+                        shouldCancel: shouldCancel
                     )
                 }
+                if isActive, let sessionRoot {
+                    let digest = try sha256Hex(
+                        of: primary,
+                        shouldCancel: shouldCancel
+                    )
+                    let manifest = sessionRoot.appendingPathComponent(
+                        "checksums.sha256"
+                    )
+                    guard !shouldCancel() else { throw CancellationError() }
+                    let line = "\(digest)  Primary/\(primary.lastPathComponent)\n"
+                    try appendChecksumAtomically(line, to: manifest)
+                }
+            } catch {
+                let originalError = error
+                if let snapshot {
+                    do {
+                        try restoreImportMetadata(snapshot)
+                    } catch let rollbackError as MetadataRollbackError {
+                        throw ImportFinalizeRollbackError(
+                            originalError: originalError,
+                            rollbackErrors: rollbackError.failures
+                        )
+                    } catch {
+                        throw ImportFinalizeRollbackError(
+                            originalError: originalError,
+                            rollbackErrors: [error]
+                        )
+                    }
+                }
+                throw originalError
             }
         }
     }
 
-    private func replaceChecksumEntry(for primary: URL) {
+    private func replaceChecksumEntry(for primary: URL) throws {
+        finalizeLock.lock()
+        defer { finalizeLock.unlock() }
         guard let sessionRoot else { return }
         let manifest = sessionRoot.appendingPathComponent("checksums.sha256")
-        guard let data = try? Data(contentsOf: primary) else { return }
-        let digest = SHA256.hash(data: data)
-            .map { String(format: "%02x", $0) }
-            .joined()
+        let digest = try sha256Hex(of: primary)
         let relative = "Primary/\(primary.lastPathComponent)"
-        let lines = (try? String(contentsOf: manifest, encoding: .utf8))?
+        let existing = fileManager.fileExists(atPath: manifest.path)
+            ? try String(contentsOf: manifest, encoding: .utf8)
+            : ""
+        let lines = existing
             .split(separator: "\n", omittingEmptySubsequences: true)
             .map(String.init)
-            .filter { !$0.hasSuffix("  \(relative)") } ?? []
-        try? (lines + ["\(digest)  \(relative)"])
+            .filter { !$0.hasSuffix("  \(relative)") }
+        try (lines + ["\(digest)  \(relative)"])
             .joined(separator: "\n")
             .appending("\n")
             .write(to: manifest, atomically: true, encoding: .utf8)
+    }
+
+    private struct ImportMetadataSnapshot {
+        let sidecar: URL
+        let sidecarData: Data?
+        let backup: URL?
+        let backupSidecar: URL?
+        let backupSidecarData: Data?
+    }
+
+    private struct MetadataRollbackError: LocalizedError {
+        let failures: [Error]
+
+        var errorDescription: String? {
+            "元数据回滚有 \(failures.count) 个步骤失败。"
+        }
+    }
+
+    private struct ImportFinalizeRollbackError: LocalizedError {
+        let originalError: Error
+        let rollbackErrors: [Error]
+
+        var errorDescription: String? {
+            let rollbackSummary = rollbackErrors
+                .map { $0.localizedDescription }
+                .joined(separator: "；")
+            return "导入失败（\(originalError.localizedDescription)），" +
+                "且文件回滚失败（\(rollbackSummary)）。"
+        }
+    }
+
+    private func importMetadataSnapshot(
+        primary: URL,
+        sidecar: URL
+    ) throws -> ImportMetadataSnapshot {
+        let sidecarData = fileManager.fileExists(atPath: sidecar.path)
+            ? try Data(contentsOf: sidecar)
+            : nil
+        let backup = isActive
+            ? backupDirectory?.appendingPathComponent(primary.lastPathComponent)
+            : nil
+        if let backup,
+           fileManager.fileExists(atPath: backup.path) {
+            throw ImportError.backupCollision
+        }
+        let backupSidecar = backup?
+            .deletingPathExtension()
+            .appendingPathExtension("xmp")
+        let backupSidecarData: Data?
+        if let backupSidecar,
+           fileManager.fileExists(atPath: backupSidecar.path) {
+            backupSidecarData = try Data(contentsOf: backupSidecar)
+        } else {
+            backupSidecarData = nil
+        }
+        return ImportMetadataSnapshot(
+            sidecar: sidecar,
+            sidecarData: sidecarData,
+            backup: backup,
+            backupSidecar: backupSidecar,
+            backupSidecarData: backupSidecarData
+        )
+    }
+
+    private func restoreImportMetadata(
+        _ snapshot: ImportMetadataSnapshot
+    ) throws {
+        var failures: [Error] = []
+        func attempt(_ operation: () throws -> Void) {
+            do {
+                try operation()
+            } catch {
+                failures.append(error)
+            }
+        }
+        if let backup = snapshot.backup {
+            attempt { try removeRollbackFile(at: backup) }
+        }
+        attempt {
+            try restoreFile(
+                at: snapshot.backupSidecar,
+                data: snapshot.backupSidecarData
+            )
+        }
+        attempt {
+            try restoreFile(at: snapshot.sidecar, data: snapshot.sidecarData)
+        }
+        if !failures.isEmpty {
+            throw MetadataRollbackError(failures: failures)
+        }
+    }
+
+    private func restoreFile(at url: URL?, data: Data?) throws {
+        guard let url else { return }
+        if let data {
+            try data.write(to: url, options: .atomic)
+        } else {
+            try removeRollbackFile(at: url)
+        }
+    }
+
+    private func removeRollbackFile(at url: URL) throws {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(
+            atPath: url.path,
+            isDirectory: &isDirectory
+        ) else { return }
+        guard !isDirectory.boolValue else {
+            throw ImportError.rollbackTargetNotFile
+        }
+        try fileManager.removeItem(at: url)
+        if fileManager.fileExists(atPath: url.path) {
+            throw ImportError.rollbackIncomplete
+        }
+    }
+
+    private func removeImportArtifact(
+        at url: URL,
+        expectedParent: URL
+    ) throws {
+        let actualParent = url
+            .deletingLastPathComponent()
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let allowedParent = expectedParent
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard actualParent.path == allowedParent.path else {
+            throw ImportError.rollbackTargetNotFile
+        }
+        try removeRollbackFile(at: url)
     }
 
     private func xmpSidecar(
@@ -477,6 +963,94 @@ final class CaptureWorkflow: ObservableObject {
             suffix += 1
         }
         return result
+    }
+
+    private func copyFileAtomically(
+        from source: URL,
+        to destination: URL,
+        shouldCancel: () -> Bool
+    ) throws {
+        let temp = destination.deletingLastPathComponent()
+            .appendingPathComponent(".zenche-backup-\(UUID().uuidString).part")
+        defer { try? fileManager.removeItem(at: temp) }
+        guard fileManager.createFile(
+            atPath: temp.path,
+            contents: nil,
+            attributes: nil
+        ) else {
+            throw ImportError.cannotCreateTemp
+        }
+        let sourceHandle = try FileHandle(forReadingFrom: source)
+        defer { try? sourceHandle.close() }
+        let tempHandle = try FileHandle(forWritingTo: temp)
+        defer { try? tempHandle.close() }
+        let expectedSize = try source.resourceValues(forKeys: [.fileSizeKey])
+            .fileSize ?? 0
+        var copied = 0
+        while let chunk = try sourceHandle.read(upToCount: 256 * 1024),
+              !chunk.isEmpty {
+            guard !shouldCancel() else { throw CancellationError() }
+            try tempHandle.write(contentsOf: chunk)
+            copied += chunk.count
+        }
+        guard !shouldCancel(), copied == expectedSize else {
+            if shouldCancel() { throw CancellationError() }
+            throw ImportError.sizeMismatch
+        }
+        try tempHandle.synchronize()
+        try tempHandle.close()
+        try sourceHandle.close()
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(destination, withItemAt: temp)
+        } else {
+            try fileManager.moveItem(at: temp, to: destination)
+        }
+    }
+
+    private func sha256Hex(
+        of url: URL,
+        shouldCancel: () -> Bool = { false }
+    ) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 256 * 1024),
+              !chunk.isEmpty {
+            guard !shouldCancel() else { throw CancellationError() }
+            hasher.update(data: chunk)
+        }
+        return hasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private func appendChecksumAtomically(
+        _ line: String,
+        to manifest: URL
+    ) throws {
+        let existing = fileManager.fileExists(atPath: manifest.path)
+            ? try String(contentsOf: manifest, encoding: .utf8)
+            : ""
+        let temporary = manifest.deletingLastPathComponent()
+            .appendingPathComponent(".zenche-manifest-\(UUID().uuidString).tmp")
+        defer { try? fileManager.removeItem(at: temporary) }
+        guard fileManager.createFile(
+            atPath: temporary.path,
+            contents: nil,
+            attributes: nil
+        ) else {
+            throw ImportError.cannotCreateTemp
+        }
+        let handle = try FileHandle(forWritingTo: temporary)
+        defer { try? handle.close() }
+        try handle.write(contentsOf: Data((existing + line).utf8))
+        try handle.synchronize()
+        try handle.close()
+        if fileManager.fileExists(atPath: manifest.path) {
+            _ = try fileManager.replaceItemAt(manifest, withItemAt: temporary)
+        } else {
+            try fileManager.moveItem(at: temporary, to: manifest)
+        }
     }
 
     private func persist() {
