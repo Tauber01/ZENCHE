@@ -80,13 +80,14 @@ test('global file counts use honest library semantics with exact three-language 
 test('the iOS shell follows the in-app locale for navigation and monitor state', async () => {
   const ios = await read('native/ios/NikonLink/Views/RootView.swift');
 
-  assert.match(ios, /private struct SideNavigation[\s\S]{0,2400}RuntimeLocalizedText\(section\.rawValue\)/);
-  // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/分支；
+  assert.match(ios, /private struct SideNavigation[\s\S]{0,2400}RuntimeLocalizedText\(section\.displayTitle\)/);
+  // v1.5.7 F6（Tauber 拍板）：五端一级导航统一 拍照/视频/编辑/我的设备/文件
+  // （1.5.14 起「分支」更名「文件」，rawValue 保持不变）；
   // 紧凑底栏提回编辑与视频为一级 tab。
   assert.match(ios, /private struct BottomNavigation[\s\S]*?RuntimeLocalizedText\(title\)/);
   assert.match(ios, /navTab\(\.capture, title: "拍照"\)/);
-  assert.match(ios, /navTab\(\.library, title: "分支"\)/);
-  assert.doesNotMatch(ios, /section == \.library\s*\?\s*"分支"/);
+  assert.match(ios, /navTab\(\.library, title: "文件"\)/);
+  assert.doesNotMatch(ios, /section == \.library\s*\?\s*"文件"/);
   assert.match(
     ios,
     /private struct NikonCloudMonitorBar[\s\S]{0,1200}RuntimeLocalizedText\([\s\S]{0,100}model\.monitorNikonCloudPreset\?\.name \?\? "已关闭"/,

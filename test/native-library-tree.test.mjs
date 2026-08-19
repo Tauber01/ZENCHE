@@ -71,7 +71,7 @@ test("all native file managers persist nested user-created branches", async () =
   assert.match(windowsXaml, /<TreeView/);
 });
 
-test("branch library is prominent and supports persistent file drag moves", async () => {
+test("branch tree persists as collapsed project categories with file drag moves", async () => {
   const [ios, android, harmony, macos, windows, windowsXaml] =
     await Promise.all([
       read("native/ios/NikonLink/Views/RootView.swift"),
@@ -82,9 +82,17 @@ test("branch library is prominent and supports persistent file drag moves", asyn
       read("native/windows/MainWindow.xaml"),
     ]);
 
-  for (const source of [ios, android, harmony, macos, windowsXaml]) {
+  // 1.5.14 文件库 UX 重构：移动端页标题改为「文件库」，分支树降级为
+  // 默认收起的「项目分类」，拖动归类保留；桌面端未参与本次重构，
+  // 仍保持分支文件库一级结构。
+  for (const source of [macos, windowsXaml]) {
     assert.match(source, /分支文件库/);
     assert.match(source, /分支工作台|拖动本地文件到任意分支/);
+  }
+  for (const source of [ios, android, harmony]) {
+    assert.match(source, /文件库/);
+    assert.match(source, /项目分类/);
+    assert.match(source, /拖到任意分支/);
   }
 
   assert.match(ios, /file-branch-assignments/);

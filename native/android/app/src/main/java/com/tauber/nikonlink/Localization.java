@@ -746,6 +746,22 @@ final class Localization {
                 "ライブラリに編集可能な写真がありません\nシステム写真から写真を読み込めます。動画と、まだデコードできない RAW ファイルは編集リストに表示されません。");
         add("文件库 · %lld 个文件", "Library · %lld files", "ライブラリ · %lld 件");
         add("个文件", "files", "件");
+        add("文件库", "Library", "ライブラリ");
+        add("所有文件", "All Files", "すべてのファイル");
+        add("搜索文件名", "Search file names", "ファイル名を検索");
+        add("全部", "All", "すべて");
+        add("最近", "Recent", "最近");
+        add("名称", "Name", "名前");
+        add("未分类", "Unclassified", "未分類");
+        add("暂无匹配的文件", "No matching files", "一致するファイルがありません");
+        add("项目分类", "Project Categories", "プロジェクト分類");
+        add("更多工具", "More Tools", "その他のツール");
+        add("来源：相机", "Source: Camera", "ソース：カメラ");
+        add("来源：无线传输", "Source: Wireless Transfer", "ソース：ワイヤレス転送");
+        add("来源：系统相册", "Source: System Album", "ソース：システムアルバム");
+        add("还没有文件\n拍摄新照片、从相机下载，或从系统相册导入。",
+                "No files yet\nCapture new photos, download from the camera, or import from the system album.",
+                "ファイルはまだありません\n新しい写真を撮影するか、カメラからダウンロードするか、システムアルバムから読み込んでください。");
         add("未选择照片", "No photo selected", "写真が選択されていません");
         add("视频与暂不支持解码的 RAW 文件不会进入编辑列表。",
                 "Videos and RAW files that cannot yet be decoded are excluded from the editor.",

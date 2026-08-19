@@ -118,7 +118,7 @@ const LIBRARY_FS_TINY: number = 10;     // 文件库微标注（时长徽标、�
 const LIBRARY_FS_SUB: number = 13;      // 文件库次级文本（说明/容量摘要/空态/无线地址）
 const LIBRARY_FS_TITLE: number = 14;    // 文件库行标题（分支名/文件名/无线状态）
 const LIBRARY_FS_HEAD: number = 16;     // 文件库空态/区块标题（系统相册暂不可见、未分类已清空）
-const LIBRARY_FS_WORKBENCH: number = 20; // 分支工作台标题（hero）
+const LIBRARY_FS_WORKBENCH: number = 20; // 文件库主视图标题（所有文件）
 // ── v1.5.7 P6: 设置页归档档位——TS 五档之外的既有值（只归档不改值，字号统一收口归 F5）──
 const SETTINGS_FS_TINY: number = 10;    // 设置页微标注（恢复说明）
 const SETTINGS_FS_SUB: number = 13;     // 设置页次级文本（SDK 说明、激活状态、更新状态）
@@ -1179,7 +1179,11 @@ struct Index {
   @State private branchDeleteVisible: boolean = false;
   @State private branchDeleteId: string = '';
   @State private branchDeleteName: string = '';
-  @State private mobileBranchDrawerExpanded: boolean = false;
+  @State private librarySearchQuery: string = '';
+  @State private libraryTypeFilter: string = 'all'; // all | photo | video
+  @State private librarySortOrder: string = 'recent'; // recent | name
+  @State private projectCategoriesExpanded: boolean = false;
+  @State private moreToolsExpanded: boolean = false;
   @State private editorSelectedPath: string = '';
   @State private editorPickerVisible: boolean = false;
   @State private editorPanel: string = 'light';
@@ -2483,12 +2487,12 @@ struct Index {
         .fontColor($r('app.color.muted'))
         .width('100%')
         .margin({ bottom: 8 })
-      // v1.5.7 F6（Tauber 拍板）：五端一级导航统一短词 拍照/视频/编辑/我的设备/分支
+      // v1.5.7 F6（Tauber 拍板）：五端一级导航统一短词 拍照/视频/编辑/我的设备/文件
       this.NavButton('拍照', 'capture')
       this.NavButton('视频', 'monitor')
       this.NavButton('编辑', 'editor')
       this.NavButton('我的设备', 'devices')
-      this.NavButton('分支', 'library')
+      this.NavButton('文件', 'library')
       Blank()
       Text(`ZENCHE ${CURRENT_VERSION}`)
         .fontSize(EDITOR_FS_SMALL)
@@ -2509,11 +2513,11 @@ struct Index {
   private CompactBottomNavigation() {
     Row() {
       // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
-      // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
+      // 拍照/视频/编辑/文件；我的设备与设置收入拍照页右上角 ⋯ 气泡。
       this.NavButton('拍照', 'capture')
       this.NavButton('视频', 'monitor')
       this.NavButton('编辑', 'editor')
-      this.NavButton('分支', 'library')
+      this.NavButton('文件', 'library')
     }
     .width('100%')
     .height(64)
@@ -6401,7 +6405,7 @@ struct Index {
   @Builder
   private LibraryWorkspace() {
     Column({ space: 16 }) {
-      Text(this.tr('分支文件库'))
+      Text(this.tr('文件库'))
         .fontSize(TS_DISPLAY)
         .fontWeight(FontWeight.Bold)
         .fontColor($r('app.color.ink'))
@@ -6413,6 +6417,7 @@ struct Index {
         .fontSize(LIBRARY_FS_TITLE)
         .fontColor($r('app.color.muted'))
         .width('100%')
+      this.AllFilesWorkspace()
       this.BranchWorkspace()
       Button(
         this.tr(
@@ -6429,31 +6434,48 @@ struct Index {
         .onClick((): void => {
           this.wirelessExpanded = !this.wirelessExpanded;
         })
+      Text(this.tr('来源：无线传输'))
+        .fontSize(TS_CAPTION)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
       if (this.wirelessExpanded) {
         this.WirelessTransferCard()
       }
       this.CameraStorageWorkspace()
-      Row({ space: 8 }) {
-        Button(this.tr('合成延时视频'), { type: ButtonType.Normal })
-          .height(44)
-          .layoutWeight(1)
-          .fontColor($r('app.color.accent_ink'))
-          .backgroundColor($r('app.color.accent'))
-          .borderRadius(RADIUS_6)
-          .onClick((): void => {
-            this.openTimelapseComposer();
-          })
-        Button(this.tr('焦点合成'), { type: ButtonType.Normal })
-          .height(44)
-          .layoutWeight(1)
-          .fontColor($r('app.color.accent_ink'))
-          .backgroundColor($r('app.color.accent'))
-          .borderRadius(RADIUS_6)
-          .onClick((): void => {
-            this.openFocusStackComposer();
-          })
+      Button(
+        this.tr(`${this.moreToolsExpanded ? '⌄' : '›'} 更多工具`),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.moreToolsExpanded = !this.moreToolsExpanded;
+        })
+      if (this.moreToolsExpanded) {
+        Row({ space: 8 }) {
+          Button(this.tr('合成延时视频'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .borderRadius(RADIUS_6)
+            .onClick((): void => {
+              this.openTimelapseComposer();
+            })
+          Button(this.tr('焦点合成'), { type: ButtonType.Normal })
+            .height(44)
+            .layoutWeight(1)
+            .fontColor($r('app.color.accent_ink'))
+            .backgroundColor($r('app.color.accent'))
+            .borderRadius(RADIUS_6)
+            .onClick((): void => {
+              this.openFocusStackComposer();
+            })
+        }
+        .width('100%')
       }
-      .width('100%')
       Row({ space: 8 }) {
         Button(this.tr('刷新系统相册'), { type: ButtonType.Normal })
           .height(44)
@@ -6493,6 +6515,10 @@ struct Index {
         .onClick((): void => {
           this.systemExpanded = !this.systemExpanded;
         })
+      Text(this.tr('来源：系统相册'))
+        .fontSize(TS_CAPTION)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
       if (this.systemExpanded && this.systemMedia.length === 0) {
         Column({ space: 8 }) {
           Text(this.tr('系统相册暂不可见'))
@@ -6629,6 +6655,10 @@ struct Index {
         .onClick((): void => {
           this.cameraStorageExpanded = !this.cameraStorageExpanded;
         })
+      Text(this.tr('来源：相机'))
+        .fontSize(TS_CAPTION)
+        .fontColor($r('app.color.muted'))
+        .width('100%')
       if (this.cameraStorageExpanded) {
         Text(
           this.cameraStorageSnapshot.capacityBytes > 0
@@ -6809,65 +6839,34 @@ struct Index {
 
   @Builder
   private BranchWorkspace() {
-    if (this.isCompact()) {
-      Column({ space: 8 }) {
-        Button(
-          this.tr(
-            `${this.mobileBranchDrawerExpanded ? '⌄' : '›'} 分支抽屉 · ` +
-            `${this.userLibraryBranches.length} 个根分支`
-          ),
-          { type: ButtonType.Normal }
-        )
-          .width('100%')
-          .height(56)
-          .fontSize(TS_EMPHASIS)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ink'))
-          .backgroundColor($r('app.color.surface'))
-          .border({
-            width: 1,
-            color: $r('app.color.accent'),
-            radius: RADIUS_12
-          })
-          .onClick((): void => {
-            this.mobileBranchDrawerExpanded =
-              !this.mobileBranchDrawerExpanded;
-          })
-        if (this.mobileBranchDrawerExpanded) {
-          this.BranchWorkspaceContent()
-        }
+    Column({ space: 8 }) {
+      Button(
+        this.tr(`${this.projectCategoriesExpanded ? '⌄' : '›'} 项目分类`),
+        { type: ButtonType.Normal }
+      )
+        .width('100%')
+        .height(44)
+        .fontColor($r('app.color.ink'))
+        .backgroundColor($r('app.color.paper_2'))
+        .onClick((): void => {
+          this.projectCategoriesExpanded = !this.projectCategoriesExpanded;
+        })
+      if (this.projectCategoriesExpanded) {
+        this.BranchWorkspaceContent()
       }
-      .width('100%')
-    } else {
-      this.BranchWorkspaceContent()
     }
+    .width('100%')
   }
 
   @Builder
   private BranchWorkspaceContent() {
     Column({ space: 10 }) {
       Row({ space: 12 }) {
-        Text('分支')
-          .fontSize(16) // 徽标方块文字，图标豁免族（不受 TS/LIBRARY_FS 约束）
-          .fontWeight(FontWeight.Bold)
-          .fontColor(Color.White)
-          .width(54)
-          .height(54)
-          .textAlign(TextAlign.Center)
-          .backgroundColor($r('app.color.accent'))
-          .borderRadius(RADIUS_14)
-        Column({ space: 3 }) {
-          Text(this.tr('分支工作台'))
-            .fontSize(LIBRARY_FS_WORKBENCH)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ink'))
-          Text(this.tr('长按文件并拖到任意分支；拖回“未分类”即可移出分支。'))
-            .fontSize(TS_BODY)
-            .fontColor($r('app.color.muted'))
-            .maxLines(2)
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
+        Text(this.tr('长按文件并拖到任意分支；拖回“未分类”即可移出分支。'))
+          .fontSize(TS_BODY)
+          .fontColor($r('app.color.muted'))
+          .maxLines(2)
+          .layoutWeight(1)
         Button(this.tr('＋ 新建分支'), { type: ButtonType.Normal })
           .height(44)
           .fontColor(Color.White)
@@ -7092,6 +7091,265 @@ struct Index {
       return { extraInfo: item.path };
     })
     .dragPreview(item.name)
+  }
+
+  @Builder
+  private AllFilesWorkspace() {
+    Column({ space: 10 }) {
+      Row({ space: 12 }) {
+        Text(this.tr('所有文件'))
+          .fontSize(LIBRARY_FS_WORKBENCH)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('app.color.ink'))
+          .layoutWeight(1)
+        Text(`${this.allFilesFiltered().length} / ${this.photos.length}`)
+          .fontSize(TS_CAPTION)
+          .fontFamily('monospace')
+          .fontColor($r('app.color.muted'))
+      }
+      .width('100%')
+      TextInput({
+        placeholder: this.tr('搜索文件名'),
+        text: this.librarySearchQuery
+      })
+        .height(44)
+        .onChange((value: string): void => {
+          this.librarySearchQuery = value;
+        })
+      Row({ space: 8 }) {
+        Button(this.tr('全部'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(
+            this.libraryTypeFilter === 'all'
+              ? $r('app.color.accent_ink')
+              : $r('app.color.ink')
+          )
+          .backgroundColor(
+            this.libraryTypeFilter === 'all'
+              ? $r('app.color.accent')
+              : $r('app.color.paper_2')
+          )
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.libraryTypeFilter = 'all';
+          })
+        Button(this.tr('照片'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(
+            this.libraryTypeFilter === 'photo'
+              ? $r('app.color.accent_ink')
+              : $r('app.color.ink')
+          )
+          .backgroundColor(
+            this.libraryTypeFilter === 'photo'
+              ? $r('app.color.accent')
+              : $r('app.color.paper_2')
+          )
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.libraryTypeFilter = 'photo';
+          })
+        Button(this.tr('视频'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(
+            this.libraryTypeFilter === 'video'
+              ? $r('app.color.accent_ink')
+              : $r('app.color.ink')
+          )
+          .backgroundColor(
+            this.libraryTypeFilter === 'video'
+              ? $r('app.color.accent')
+              : $r('app.color.paper_2')
+          )
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.libraryTypeFilter = 'video';
+          })
+      }
+      .width('100%')
+      Row({ space: 8 }) {
+        Button(this.tr('最近'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(
+            this.librarySortOrder === 'recent'
+              ? $r('app.color.accent_ink')
+              : $r('app.color.ink')
+          )
+          .backgroundColor(
+            this.librarySortOrder === 'recent'
+              ? $r('app.color.accent')
+              : $r('app.color.paper_2')
+          )
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.librarySortOrder = 'recent';
+          })
+        Button(this.tr('名称'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor(
+            this.librarySortOrder === 'name'
+              ? $r('app.color.accent_ink')
+              : $r('app.color.ink')
+          )
+          .backgroundColor(
+            this.librarySortOrder === 'name'
+              ? $r('app.color.accent')
+              : $r('app.color.paper_2')
+          )
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.librarySortOrder = 'name';
+          })
+      }
+      .width('100%')
+      if (this.photos.length === 0) {
+        Column({ space: 8 }) {
+          Text(this.tr('还没有文件'))
+            .fontSize(LIBRARY_FS_HEAD)
+            .fontWeight(FontWeight.Bold)
+          Text(this.tr('拍摄新照片、从相机下载，或从系统相册导入。'))
+            .fontSize(TS_BODY)
+            .fontColor($r('app.color.muted'))
+        }
+        .width('100%')
+        .height(120)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor($r('app.color.surface'))
+        .border({
+          width: 1,
+          color: $r('app.color.rule'),
+          radius: RADIUS_14
+        })
+      } else if (this.allFilesFiltered().length === 0) {
+        Text(this.tr('没有匹配的文件'))
+          .fontSize(TS_BODY)
+          .fontColor($r('app.color.muted'))
+          .width('100%')
+          .height(44)
+      } else {
+        List({ space: 8 }) {
+          ForEach(
+            this.allFilesFiltered(),
+            (item: PhotoItem) => {
+              ListItem() {
+                this.AllFilesRow(item)
+              }
+            },
+            (item: PhotoItem): string => item.path
+          )
+        }
+        .width('100%')
+        .height(Math.min(520, Math.max(132, this.allFilesFiltered().length * 132)))
+      }
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private AllFilesRow(item: PhotoItem) {
+    Column({ space: 8 }) {
+      Row({ space: 12 }) {
+        if (item.isVideo) {
+          Stack({ alignContent: Alignment.Center }) {
+            Text('▶')
+              .fontSize(20) // ▶ 播放图标，图标豁免族（不受 TS/LIBRARY_FS 约束）
+              .fontColor(Color.White)
+          }
+          .width(68)
+          .height(50)
+          .backgroundColor($r('app.color.graphite'))
+          .borderRadius(RADIUS_6)
+        } else {
+          Image(`file://${item.path}`)
+            .width(68)
+            .height(50)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(RADIUS_6)
+        }
+        Column({ space: 4 }) {
+          Text(item.name)
+            .fontSize(LIBRARY_FS_TITLE)
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.ink'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(item.detail)
+            .fontSize(LIBRARY_FS_TINY)
+            .fontFamily('monospace')
+            .fontColor($r('app.color.muted'))
+          Text(this.branchLabelForPhoto(item.path))
+            .fontSize(LIBRARY_FS_TINY)
+            .fontColor($r('app.color.accent'))
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      Row({ space: 6 }) {
+        Button(this.tr('预览'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.previewPhoto(item);
+          })
+        Button(this.tr('下载'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.accent_ink'))
+          .backgroundColor($r('app.color.accent'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.downloadPhotoToLocal(item);
+          })
+        Button(this.tr('分享'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.ink'))
+          .backgroundColor($r('app.color.paper_2'))
+          .borderRadius(RADIUS_6)
+          .onClick((): void => {
+            this.sharePhoto(item);
+          })
+        Button(this.tr('删除'), { type: ButtonType.Normal })
+          .height(44)
+          .layoutWeight(1)
+          .fontColor($r('app.color.error'))
+          .backgroundColor($r('app.color.surface'))
+          .border({
+            width: 1,
+            color: $r('app.color.error'),
+            radius: RADIUS_6
+          })
+          .onClick((): void => {
+            this.confirmDeletePhoto(item);
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor($r('app.color.surface'))
+    .border({
+      width: 1,
+      color: $r('app.color.rule'),
+      radius: RADIUS_8
+    })
+    .gesture(
+      TapGesture({ count: 2 })
+        .onAction((): void => {
+          this.openLargePhoto(item);
+        })
+    )
   }
 
   @Builder
@@ -13220,6 +13478,42 @@ struct Index {
     );
   }
 
+  private allFilesFiltered(): Array<PhotoItem> {
+    const query: string = this.librarySearchQuery.trim().toLowerCase();
+    const filtered: Array<PhotoItem> = this.photos.filter(
+      (item: PhotoItem): boolean => {
+        if (this.libraryTypeFilter === 'photo' && item.isVideo) {
+          return false;
+        }
+        if (this.libraryTypeFilter === 'video' && !item.isVideo) {
+          return false;
+        }
+        if (query.length > 0 && !item.name.toLowerCase().includes(query)) {
+          return false;
+        }
+        return true;
+      }
+    );
+    if (this.librarySortOrder === 'name') {
+      return filtered.sort(
+        (left: PhotoItem, right: PhotoItem): number =>
+          left.name.localeCompare(right.name)
+      );
+    }
+    // recent：PhotoLibrary.list() 已按 modifiedAt 新→旧排序
+    return filtered;
+  }
+
+  private branchLabelForPhoto(path: string): string {
+    const branchId: string = this.branchIdForPhoto(path);
+    if (branchId.length === 0) {
+      return this.tr('未分类');
+    }
+    const branch: LibraryBranch | undefined =
+      this.findLibraryBranch(this.userLibraryBranches, branchId);
+    return branch === undefined ? this.tr('未分类') : branch.name;
+  }
+
   private assignPhotoToBranch(path: string, branchId: string): void {
     if (path.length === 0) {
       return;
@@ -15815,6 +16109,25 @@ struct Index {
       }
     } finally {
       this.localExportBusy = false;
+    }
+  }
+
+  private async confirmDeletePhoto(item: PhotoItem): Promise<void> {
+    try {
+      const result = await promptAction.showDialog({
+        title: this.tr('删除文件？'),
+        message: this.tr('将永久删除所选文件，此操作无法撤销。'),
+        buttons: [
+          { text: this.tr('取消'), color: MUTED_INK },
+          { text: this.tr('删除'), color: UI_VIDEO }
+        ]
+      });
+      if (result.index !== 1) {
+        return;
+      }
+      this.deletePhoto(item);
+    } catch (error) {
+      this.showError((error as Error).message);
     }
   }
 

@@ -1038,7 +1038,7 @@ private struct SideNavigation: View {
             VStack(spacing: SpaceToken.s8) {
                 Image(systemName: section.icon)
                     .font(.system(size: 20, weight: active ? .semibold : .medium)) // 导航图标尺寸，图标豁免族
-                RuntimeLocalizedText(section.rawValue)
+                RuntimeLocalizedText(section.displayTitle)
                     .font(.caption.weight(active ? .semibold : .medium))
             }
             .foregroundStyle(active ? accent : IPalette.muted)
@@ -1076,12 +1076,12 @@ private struct BottomNavigation: View {
     var body: some View {
         HStack(spacing: SpaceToken.s4) {
             // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
-            // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
+            // 拍照/视频/编辑/文件；我的设备与设置收入拍照页右上角 ⋯ 气泡。
             // iOS 宽屏 SideNavigation 的「我的设备」保留。
             navTab(.capture, title: "拍照")
             navTab(.monitor, title: "视频")
             navTab(.editor, title: "编辑")
-            navTab(.library, title: "分支")
+            navTab(.library, title: "文件")
         }
         .padding(.horizontal, SpaceToken.s8)
         .padding(.top, SpaceToken.s8)
@@ -9087,9 +9087,23 @@ private struct LibraryBranchFileRow: View {
     }
 }
 
+private enum LibraryFileFilter: String, CaseIterable, Identifiable {
+    case all = "全部"
+    case photos = "照片"
+    case videos = "视频"
+
+    var id: String { rawValue }
+}
+
+private enum LibraryFileSort: String, CaseIterable, Identifiable {
+    case recent = "最近"
+    case name = "名称"
+
+    var id: String { rawValue }
+}
+
 private struct LibraryPage: View {
     @EnvironmentObject private var model: AppModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.locale) private var locale
     @StateObject private var branchStore = LibraryBranchStore()
     @State private var showingCloudImporter = false
@@ -9099,7 +9113,12 @@ private struct LibraryPage: View {
     @State private var branchParentID: UUID?
     @State private var branchParentName = "帧澈 ZENCHE 文件库"
     @State private var branchPendingDeletion: UserLibraryBranch?
-    @State private var mobileBranchDrawerExpanded = false
+    @State private var projectCategoriesExpanded = false
+    @State private var moreToolsExpanded = false
+    @State private var allFilesQuery = ""
+    @State private var allFilesFilter: LibraryFileFilter = .all
+    @State private var allFilesSort: LibraryFileSort = .recent
+    @State private var itemPendingDeletion: LibraryItem?
     @State private var previewItem: LibraryItem?
     @State private var localExportRequest: LocalFileExportRequest?
     @State private var localExportResult: String?
@@ -9130,7 +9149,7 @@ private struct LibraryPage: View {
             VStack(alignment: .leading, spacing: SpaceToken.s16) {
                 HStack {
                     PageTitle(
-                        title: "分支文件库",
+                        title: "文件库",
                         subtitle: "\(model.library.items.count) 个本地文件 · 拖动整理，不改动原文件"
                     )
                     Spacer()
@@ -9146,20 +9165,10 @@ private struct LibraryPage: View {
                         Label("链接网盘", systemImage: "externaldrive.connected.to.line.below")
                     }
                     .buttonStyle(.bordered)
-                    Button {
-                        showingTimelapseComposer = true
-                    } label: {
-                        Label("合成延时视频", systemImage: "film.stack")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button {
-                        showingFocusStackComposer = true
-                    } label: {
-                        Label("焦点合成", systemImage: "camera.aperture")
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
 
+                allFilesSection
+                moreToolsSection
                 branchWorkspace
                 cameraStorageWorkspace
                 DisclosureGroup(isExpanded: $wirelessExpanded) {
@@ -9177,6 +9186,9 @@ private struct LibraryPage: View {
                         )
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
+                        Text("来源：无线传输")
+                            .font(.caption)
+                            .foregroundStyle(IPalette.muted)
                     }
                 }
 
@@ -9207,11 +9219,16 @@ private struct LibraryPage: View {
                         .font(.caption)
                         .foregroundStyle(IPalette.muted)
                 } label: {
-                    Label(
-                        "系统相册 · \(systemAlbumItems.count)",
-                        systemImage: "photo.on.rectangle"
-                    )
-                    .font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label(
+                            "系统相册 · \(systemAlbumItems.count)",
+                            systemImage: "photo.on.rectangle"
+                        )
+                        .font(.headline)
+                        Text("来源：系统相册")
+                            .font(.caption)
+                            .foregroundStyle(IPalette.muted)
+                    }
                 }
 
             }
@@ -9297,6 +9314,30 @@ private struct LibraryPage: View {
             Text(
                 "将同时删除“\(branchPendingDeletion?.name ?? "")”下的子分支；其中的文件会回到“未分类”，原文件不受影响。"
             )
+        }
+        .confirmationDialog(
+            "删除文件？",
+            isPresented: Binding(
+                get: { itemPendingDeletion != nil },
+                set: {
+                    if !$0 {
+                        itemPendingDeletion = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("删除", role: .destructive) {
+                if let itemPendingDeletion {
+                    deleteLibraryFile(itemPendingDeletion)
+                }
+                itemPendingDeletion = nil
+            }
+            Button("取消", role: .cancel) {
+                itemPendingDeletion = nil
+            }
+        } message: {
+            Text("将从本地文件库永久删除该文件，此操作无法撤销。")
         }
         .confirmationDialog(
             "从相机永久删除？",
@@ -9494,6 +9535,9 @@ private struct LibraryPage: View {
                 Text("浏览、批量下载或从相机存储卡永久删除")
                     .font(.caption)
                     .foregroundStyle(IPalette.muted)
+                Text("来源：相机")
+                    .font(.caption)
+                    .foregroundStyle(IPalette.muted)
             }
         }
         .padding(SpaceToken.s16)
@@ -9594,76 +9638,266 @@ private struct LibraryPage: View {
         }
     }
 
-    @ViewBuilder
-    private var branchWorkspace: some View {
-        if horizontalSizeClass == .compact {
-            VStack(alignment: .leading, spacing: SpaceToken.s8) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        mobileBranchDrawerExpanded.toggle()
+    private var allFilesSection: some View {
+        VStack(alignment: .leading, spacing: SpaceToken.s12) {
+            HStack(spacing: SpaceToken.s8) {
+                Label("所有文件", systemImage: "photo.on.rectangle.angled")
+                    .font(.headline)
+                Spacer()
+                Text("\(visibleAllFiles.count) / \(model.library.items.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(IPalette.muted)
+            }
+
+            TextField("搜索文件名", text: $allFilesQuery)
+                .textFieldStyle(.roundedBorder)
+                .frame(minHeight: 44)
+
+            HStack(spacing: SpaceToken.s12) {
+                Picker("筛选", selection: $allFilesFilter) {
+                    ForEach(LibraryFileFilter.allCases) { option in
+                        RuntimeLocalizedText(option.rawValue).tag(option)
                     }
-                } label: {
-                    HStack(spacing: SpaceToken.s12) {
-                        Image(
-                            systemName: mobileBranchDrawerExpanded
-                                ? "chevron.down"
-                                : "chevron.right"
-                        )
-                        .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("分支抽屉")
-                                .font(.headline)
-                            Text(
-                                "\(branchStore.branches.count) 个根分支 · \(unclassifiedItems.count) 个未分类文件"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(IPalette.muted)
-                        }
-                        Spacer()
-                        Image(systemName: "square.stack.3d.up.fill")
+                }
+                .pickerStyle(.segmented)
+                Picker("排序", selection: $allFilesSort) {
+                    ForEach(LibraryFileSort.allCases) { option in
+                        RuntimeLocalizedText(option.rawValue).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            .frame(minHeight: 44)
+
+            if model.library.items.isEmpty {
+                ContentUnavailableView(
+                    "文件库为空",
+                    systemImage: "photo.on.rectangle",
+                    description: Text("拍摄新照片、从相机下载，或从系统相册导入。")
+                )
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 180)
+            } else if visibleAllFiles.isEmpty {
+                ContentUnavailableView(
+                    "没有匹配的文件",
+                    systemImage: "magnifyingglass",
+                    description: Text("调整搜索或筛选条件后再试。")
+                )
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 150)
+            } else {
+                LazyVStack(spacing: SpaceToken.s8) {
+                    ForEach(visibleAllFiles) { item in
+                        allFileRow(item)
+                    }
+                }
+            }
+        }
+        .padding(SpaceToken.s16)
+        .background(
+            IPalette.surface,
+            in: RoundedRectangle(cornerRadius: RadiusToken.r18)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RadiusToken.r18)
+                .stroke(IPalette.rule, lineWidth: 1)
+        }
+    }
+
+    private func allFileRow(_ item: LibraryItem) -> some View {
+        HStack(spacing: SpaceToken.s12) {
+            Group {
+                if item.isVideo {
+                    ZStack {
+                        IPalette.graphite
+                        Image(systemName: "play.fill")
+                            .foregroundStyle(.white)
+                    }
+                } else if let image = UIImage(contentsOfFile: item.url.path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ZStack {
+                        IPalette.paperSecondary
+                        Image(systemName: "photo")
                             .foregroundStyle(IPalette.cobalt)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+            }
+            .frame(width: 76, height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: RadiusToken.r7))
 
-                if mobileBranchDrawerExpanded {
-                    branchWorkspaceContent
-                        .transition(
-                            .opacity.combined(with: .move(edge: .top))
-                        )
+            VStack(alignment: .leading, spacing: SpaceToken.s4) {
+                Text(item.filename)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                HStack(spacing: SpaceToken.s4) {
+                    Image(systemName: "folder")
+                    if let category = branchName(for: item) {
+                        Text(category)
+                    } else {
+                        Text("未分类")
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(IPalette.muted)
+                .lineLimit(1)
             }
-            .padding(SpaceToken.s12)
-            .background(
-                IPalette.surface,
-                in: RoundedRectangle(cornerRadius: RadiusToken.r16)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: RadiusToken.r16)
-                    .stroke(IPalette.cobalt.opacity(0.28))
+            Spacer(minLength: 0)
+
+            Button {
+                model.library.selectedItemID = item.id
+                previewItem = item
+            } label: {
+                Image(systemName: "eye")
+                    .frame(width: 44, height: 44)
             }
-        } else {
+            .buttonStyle(.plain)
+            .accessibilityLabel("预览 \(item.filename)")
+
+            Button {
+                beginLocalExport(item)
+            } label: {
+                Image(systemName: "arrow.down.to.line")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("下载到本地 \(item.filename)")
+
+            ShareLink(item: item.url) {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("分享 \(item.filename)")
+
+            Button(role: .destructive) {
+                itemPendingDeletion = item
+            } label: {
+                Image(systemName: "trash")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("删除 \(item.filename)")
+        }
+        .padding(SpaceToken.s8)
+        .background(
+            IPalette.paperSecondary,
+            in: RoundedRectangle(cornerRadius: RadiusToken.r12)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RadiusToken.r12)
+                .stroke(IPalette.rule, lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            model.library.selectedItemID = item.id
+            previewItem = item
+        }
+    }
+
+    private var moreToolsSection: some View {
+        DisclosureGroup(isExpanded: $moreToolsExpanded) {
+            VStack(alignment: .leading, spacing: SpaceToken.s8) {
+                Button {
+                    showingTimelapseComposer = true
+                } label: {
+                    Label("合成延时视频", systemImage: "film.stack")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                Button {
+                    showingFocusStackComposer = true
+                } label: {
+                    Label("焦点合成", systemImage: "camera.aperture")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.top, SpaceToken.s12)
+        } label: {
+            Label("更多工具", systemImage: "wrench.and.screwdriver")
+                .font(.headline)
+        }
+    }
+
+    private var visibleAllFiles: [LibraryItem] {
+        var result = model.library.items
+        switch allFilesFilter {
+        case .all:
+            break
+        case .photos:
+            result = result.filter { !$0.isVideo }
+        case .videos:
+            result = result.filter(\.isVideo)
+        }
+        let query = allFilesQuery.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        if !query.isEmpty {
+            result = result.filter {
+                $0.filename.localizedCaseInsensitiveContains(query)
+            }
+        }
+        if allFilesSort == .name {
+            result = result.sorted {
+                $0.filename.localizedStandardCompare($1.filename)
+                    == .orderedAscending
+            }
+        }
+        return result
+    }
+
+    private func branchName(for item: LibraryItem) -> String? {
+        guard let branchID = branchStore.branchID(for: item.id) else {
+            return nil
+        }
+        return findBranch(branchID, in: branchStore.branches)?.name
+    }
+
+    private func findBranch(
+        _ id: UUID,
+        in nodes: [UserLibraryBranch]
+    ) -> UserLibraryBranch? {
+        for node in nodes {
+            if node.id == id { return node }
+            if let match = findBranch(id, in: node.children) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func deleteLibraryFile(_ item: LibraryItem) {
+        branchStore.assign(item.id, to: nil)
+        model.library.selectedItemID = item.id
+        model.library.deleteSelected()
+    }
+
+    @ViewBuilder
+    private var branchWorkspace: some View {
+        DisclosureGroup(isExpanded: $projectCategoriesExpanded) {
             branchWorkspaceContent
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("项目分类", systemImage: "folder")
+                    .font(.headline)
+                Text(
+                    "\(branchStore.branches.count) 个根分支 · \(unclassifiedItems.count) 个未分类文件"
+                )
+                .font(.caption)
+                .foregroundStyle(IPalette.muted)
+            }
         }
     }
 
     private var branchWorkspaceContent: some View {
         VStack(alignment: .leading, spacing: SpaceToken.s12) {
             HStack(spacing: SpaceToken.s12) {
-                Image(systemName: "point.3.connected.trianglepath.dotted")
-                    .font(.system(size: 28, weight: .semibold)) // 图标尺寸，不受 FontToken 约束（豁免族）
-                    .foregroundStyle(.white)
-                    .frame(width: 54, height: 54)
-                    .background(IPalette.cobalt, in: RoundedRectangle(cornerRadius: RadiusToken.r14))
-                VStack(alignment: .leading, spacing: SpaceToken.s4) {
-                    Text("分支工作台")
-                        .font(.title3.weight(.bold))
-                    Text("长按文件并拖到任意分支；拖回“未分类”即可移出分支。")
-                        .font(.subheadline)
-                        .foregroundStyle(IPalette.muted)
-                }
+                Text("长按文件并拖到任意分支；拖回“未分类”即可移出分支。")
+                    .font(.subheadline)
+                    .foregroundStyle(IPalette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 Button {
                     beginCreatingBranch(parent: nil)
@@ -9716,8 +9950,7 @@ private struct LibraryPage: View {
                         Label("分享", systemImage: "square.and.arrow.up")
                     }
                     Button(role: .destructive) {
-                        branchStore.assign(selected.id, to: nil)
-                        model.library.deleteSelected()
+                        itemPendingDeletion = selected
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
@@ -9776,18 +10009,7 @@ private struct LibraryPage: View {
                 unclassifiedDropTargeted = $0
             }
         }
-        .padding(SpaceToken.s16)
-        .background(IPalette.surface, in: RoundedRectangle(cornerRadius: RadiusToken.r18))
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: RadiusToken.r5)
-                .fill(IPalette.cobalt)
-                .frame(width: 4)
-                .padding(.vertical, SpaceToken.s16)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: RadiusToken.r18)
-                .stroke(IPalette.cobalt.opacity(0.22), lineWidth: 1)
-        }
+        .padding(.top, SpaceToken.s12)
     }
 
     @ViewBuilder

@@ -36,6 +36,14 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// 导航显示标题；rawValue 保持不变以兼容既有持久化与身份语义。
+    var displayTitle: String {
+        switch self {
+        case .library: return "文件"
+        default: return rawValue
+        }
+    }
+
     var icon: String {
         switch self {
         case .capture: return "camera.fill"

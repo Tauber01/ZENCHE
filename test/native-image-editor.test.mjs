@@ -22,7 +22,7 @@ test("all native targets expose image editing in primary navigation", async () =
   // v1.5.7 F6（Tauber 拍板）：Android 底栏提回编辑为一级 tab；五端统一短词。
   assert.match(android, /navButton\("拍照", "capture"\)/);
   assert.match(android, /navButton\("编辑", "editor"\)/);
-  assert.match(android, /navButton\("分支", "library"\)/);
+  assert.match(android, /navButton\("文件", "library"\)/);
   assert.match(android, /case "editor":[\s\S]*buildImageEditorView/);
   assert.match(harmony, /NavButton\('编辑', 'editor'\)/);
   assert.match(harmony, /this\.ImageEditorWorkspace\(\)/);
@@ -668,7 +668,7 @@ test("all native AI activation settings link to official redemption and show Afd
   assert.match(windows, /AiOfficialWebsite_Click/);
 });
 
-test("phone branch workspaces default to collapsible drawers", async () => {
+test("mobile project categories default to collapsed progressive disclosure", async () => {
   const [ios, android, harmony, design] = await Promise.all([
     read("native/ios/NikonLink/Views/RootView.swift"),
     read("native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java"),
@@ -676,18 +676,22 @@ test("phone branch workspaces default to collapsible drawers", async () => {
     read("design.md"),
   ]);
 
-  assert.match(ios, /mobileBranchDrawerExpanded = false/);
-  assert.match(ios, /horizontalSizeClass == \.compact/);
-  assert.match(ios, /Text\("分支抽屉"\)/);
+  // 1.5.14：分支树降级为「项目分类」，全移动端布局默认收起（不再区分
+  // phone drawer 与平板展开）；桌面端保持分支树可见。
+  assert.match(ios, /@State private var projectCategoriesExpanded = false/);
+  assert.match(ios, /DisclosureGroup\(isExpanded: \$projectCategoriesExpanded\)/);
+  assert.match(ios, /Label\("项目分类", systemImage: "folder"\)/);
 
-  assert.match(android, /buildMobileBranchDrawer/);
-  assert.match(android, /screenWidthDp < 600/);
-  assert.match(android, /disclosureStates\.get\("mobile-branch-drawer"\)/);
+  assert.match(
+    android,
+    /collapsibleGroup\(\s*"project-categories",[\s\S]{0,200}?false\)\)/,
+  );
 
-  assert.match(harmony, /mobileBranchDrawerExpanded: boolean = false/);
-  assert.match(harmony, /if \(this\.isCompact\(\)\)/);
-  assert.match(harmony, /分支抽屉/);
+  assert.match(harmony, /projectCategoriesExpanded: boolean = false/);
+  assert.match(harmony, /› \$\{|\$\{this\.projectCategoriesExpanded/);
+  assert.match(harmony, /项目分类/);
 
-  assert.match(design, /default-collapsed Branch[\s\S]*Drawer/);
-  assert.match(design, /Tablet, foldable-expanded, and desktop layouts keep the branch tree visible/);
+  assert.match(design, /All Files view/);
+  assert.match(design, /collapsed by default/);
+  assert.match(design, /Desktop layouts\s+keep the branch tree visible/);
 });

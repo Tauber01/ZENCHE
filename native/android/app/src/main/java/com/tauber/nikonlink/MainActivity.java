@@ -1349,6 +1349,10 @@ public final class MainActivity extends Activity {
     private volatile String pendingEditorScrollKey;
     private final List<LibraryBranch> userLibraryBranches = new ArrayList<>();
     private final Map<String, String> libraryFileAssignments = new HashMap<>();
+    // 1.5.14 文件库 UX 重构：「所有文件」主视图的过滤/排序状态，重建时保持。
+    private String librarySearchQuery = "";
+    private String libraryTypeFilter = "all";
+    private boolean librarySortByName;
     private final List<RememberedDevice> rememberedDevices = new ArrayList<>();
     private final Set<Long> selectedCameraStorageHandles = new LinkedHashSet<>();
     private volatile CameraStorage.Snapshot cameraStorageSnapshot =
@@ -3477,10 +3481,11 @@ public final class MainActivity extends Activity {
         navigation.setElevation(0);
         // v1.5.7（Tauber 拍板 + kimi 派工）：移动端拍照页改版后底栏 4 tab：
         // 拍照/视频/编辑/分支；我的设备与设置收入拍照页右上角 ⋯ 气泡。
+        // 1.5.14 文件库 UX 重构：底栏「分支」更名为「文件」。
         navigation.addView(navButton("拍照", "capture"));
         navigation.addView(navButton("视频", "monitor"));
         navigation.addView(navButton("编辑", "editor"));
-        navigation.addView(navButton("分支", "library"));
+        navigation.addView(navButton("文件", "library"));
         return navigation;
     }
 
@@ -6830,43 +6835,42 @@ public final class MainActivity extends Activity {
         List<MediaEntry> systemMedia =
                 hasAlbumAccess() ? systemAlbumEntries() : Collections.emptyList();
         content.addView(sectionHeader(
-                "分支文件库",
+                "文件库",
                 files.size() + " 个 帧澈 ZENCHE 文件 · "
                         + systemMedia.size() + " 个系统相册项目",
                 COBALT));
-        LinearLayout branchHero = verticalContainer();
-        branchHero.setPadding(dp(16), dp(14), dp(16), dp(14));
-        branchHero.setBackground(rounded(COBALT_SOFT, 16, COBALT));
-        branchHero.addView(text(
-                "分支工作台",
-                LIBRARY_FS_WORKBENCH,
-                Typeface.BOLD,
-                INK));
-        branchHero.addView(text(
+        // 1.5.14 文件库 UX 重构：首屏为「所有文件」主视图（搜索/筛选/排序），
+        // 分支树降级为默认收起的「项目分类」分组，不再使用 hero 大卡片与移动端抽屉。
+        content.addView(buildAllFilesView(files));
+
+        LinearLayout projectBody = verticalContainer();
+        projectBody.addView(text(
                 "长按文件并拖到任意分支；拖回“未分类”即可移出分支。",
                 LIBRARY_FS_SUB,
                 Typeface.NORMAL,
                 MUTED),
-                marginParams(-1, -2, 0, 4, 0, 0));
-        content.addView(
-                branchHero,
-                marginParams(-1, -2, 0, 0, 0, 12));
-        content.addView(
-                isPhoneLayout()
-                        ? buildMobileBranchDrawer(files)
-                        : buildBranchWorkspace(files));
+                marginParams(-1, -2, 0, 0, 0, 8));
+        projectBody.addView(buildBranchWorkspace(files));
+        content.addView(collapsibleGroup(
+                "project-categories",
+                "项目分类",
+                userLibraryBranches.size() + " 个分支",
+                projectBody,
+                false));
 
         content.addView(collapsibleGroup(
                 "wireless-transfer",
                 "无线传输",
                 (wifiConnected ? "Wi‑Fi 已连接" : "Wi‑Fi 未连接")
                         + " · "
-                        + (wirelessRequested ? wirelessStatus : "收件箱已停止"),
+                        + (wirelessRequested ? wirelessStatus : "收件箱已停止")
+                        + " · 来源：无线传输",
                 buildWirelessTransferPanel(),
                 true));
 
         content.addView(buildCameraStoragePanel());
 
+        LinearLayout toolsBody = verticalContainer();
         LinearLayout timelapseActions = new LinearLayout(this);
         timelapseActions.setOrientation(LinearLayout.HORIZONTAL);
         Button timelapseButton = nativeButton("合成延时视频", true);
@@ -6879,9 +6883,15 @@ public final class MainActivity extends Activity {
         timelapseActions.addView(
                 focusStackButton,
                 new LinearLayout.LayoutParams(0, dp(48), 1f));
-        content.addView(
+        toolsBody.addView(
                 timelapseActions,
-                marginParams(-1, dp(48), 0, 0, 0, 12));
+                marginParams(-1, dp(48), 0, 0, 0, 0));
+        content.addView(collapsibleGroup(
+                "more-tools",
+                "更多工具",
+                "合成延时视频 · 焦点合成",
+                toolsBody,
+                false));
 
         LinearLayout sourceActions = new LinearLayout(this);
         sourceActions.setOrientation(LinearLayout.HORIZONTAL);
@@ -6945,7 +6955,7 @@ public final class MainActivity extends Activity {
         content.addView(collapsibleGroup(
                 "system-album",
                 "系统相册",
-                systemMedia.size() + " 个项目",
+                systemMedia.size() + " 个项目 · 来源：系统相册",
                 systemBody,
                 true));
 
@@ -7413,7 +7423,8 @@ public final class MainActivity extends Activity {
         return collapsibleGroup(
                 "camera-internal-storage",
                 "相机机内存储",
-                snapshot.items.size() + " 个文件 · " + cameraStorageStatus,
+                snapshot.items.size() + " 个文件 · " + cameraStorageStatus
+                        + " · 来源：相机",
                 body,
                 true);
     }
@@ -7615,41 +7626,6 @@ public final class MainActivity extends Activity {
                     });
                 })
                 .show();
-    }
-
-    private boolean isPhoneLayout() {
-        return getResources().getConfiguration().screenWidthDp < 600;
-    }
-
-    private View buildMobileBranchDrawer(List<File> files) {
-        LinearLayout drawer = panel();
-        drawer.setPadding(dp(10), dp(10), dp(10), dp(10));
-        View body = buildBranchWorkspace(files);
-        boolean expanded = Boolean.TRUE.equals(
-                disclosureStates.get("mobile-branch-drawer"));
-        body.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        Button header = nativeButton("", false);
-        header.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        Runnable updateLabel = () -> header.setText(
-                (body.getVisibility() == View.VISIBLE ? "⌄  " : "›  ")
-                        + tr("分支抽屉")
-                        + " · "
-                        + userLibraryBranches.size()
-                        + " "
-                        + tr("个根分支"));
-        updateLabel.run();
-        header.setOnClickListener(view -> {
-            boolean next = body.getVisibility() != View.VISIBLE;
-            disclosureStates.put("mobile-branch-drawer", next);
-            body.setVisibility(next ? View.VISIBLE : View.GONE);
-            updateLabel.run();
-        });
-        drawer.addView(header, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(56)));
-        drawer.addView(body);
-        drawer.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 16));
-        return drawer;
     }
 
     private View buildImageEditorView() {
@@ -11781,7 +11757,19 @@ public final class MainActivity extends Activity {
         downloadParams.setMargins(0, dp(4), 0, 0);
         actions.addView(download, downloadParams);
         Button delete = nativeButton("删除", false);
-        delete.setOnClickListener(view -> new AlertDialog.Builder(this)
+        delete.setOnClickListener(view -> confirmDeleteLibraryFile(file));
+        LinearLayout.LayoutParams deleteParams =
+                new LinearLayout.LayoutParams(dp(72), dp(44));
+        deleteParams.setMargins(0, dp(4), 0, 0);
+        actions.addView(delete, deleteParams);
+        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(188)));
+        return row;
+    }
+
+    /** 1.5.14 文件库 UX 重构：photoRow 与「所有文件」行共用的删除确认，
+     *  保持同一「删除照片？」文案；仅删本地文件并清理分支指派，不移动物理文件。 */
+    private void confirmDeleteLibraryFile(File file) {
+        new AlertDialog.Builder(this)
                 .setTitle(tr("删除照片？"))
                 .setMessage(file.getName())
                 .setNegativeButton(tr("取消"), null)
@@ -11795,13 +11783,244 @@ public final class MainActivity extends Activity {
                     updateFileCount();
                     showSection("library");
                 })
-                .show());
+                .show();
+    }
+
+    /** 1.5.14 文件库 UX 重构：「所有文件」主视图。列出全部本地文件
+     *  （不论是否已归类），支持名称搜索、全部/照片/视频筛选与最近/名称
+     *  排序；过滤与排序状态存于字段，页面重建后保持。 */
+    private View buildAllFilesView(List<File> files) {
+        LinearLayout panel = panel();
+        panel.addView(text("所有文件", TS_TITLE, Typeface.BOLD, INK));
+        panel.addView(
+                text(
+                        files.size() + " 个文件",
+                        TS_CAPTION,
+                        Typeface.NORMAL,
+                        MUTED),
+                marginParams(-1, -2, 0, 2, 0, 10));
+
+        LinearLayout results = verticalContainer();
+
+        EditText search = new EditText(this);
+        search.setSingleLine(true);
+        search.setHint(tr("搜索文件名"));
+        search.setText(librarySearchQuery);
+        search.setTextSize(TS_BODY);
+        search.setTextColor(INK);
+        search.setHintTextColor(MUTED);
+        search.setPadding(dp(12), 0, dp(12), 0);
+        search.setBackground(rounded(SURFACE, 12, RULE_STRONG));
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(
+                    CharSequence value, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(
+                    CharSequence value, int start, int before, int count) {
+                librarySearchQuery = value.toString();
+                refreshLibraryFileRows(results, files);
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {}
+        });
+        panel.addView(search, marginParams(-1, dp(44), 0, 0, 0, 8));
+
+        String[] filterLabels = {"全部", "照片", "视频"};
+        String[] filterValues = {"all", "photo", "video"};
+        Button[] filterButtons = new Button[filterLabels.length];
+        LinearLayout filterRow = new LinearLayout(this);
+        filterRow.setOrientation(LinearLayout.HORIZONTAL);
+        for (int index = 0; index < filterLabels.length; index++) {
+            final String value = filterValues[index];
+            Button button = nativeButton(filterLabels[index], false);
+            button.setOnClickListener(view -> {
+                libraryTypeFilter = value;
+                for (int i = 0; i < filterButtons.length; i++) {
+                    styleLibraryToggle(
+                            filterButtons[i],
+                            filterValues[i].equals(libraryTypeFilter));
+                }
+                refreshLibraryFileRows(results, files);
+            });
+            filterButtons[index] = button;
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(0, dp(44), 1f);
+            if (index > 0) params.setMargins(dp(8), 0, 0, 0);
+            filterRow.addView(button, params);
+        }
+        for (int i = 0; i < filterButtons.length; i++) {
+            styleLibraryToggle(
+                    filterButtons[i],
+                    filterValues[i].equals(libraryTypeFilter));
+        }
+        panel.addView(filterRow, marginParams(-1, dp(44), 0, 0, 0, 8));
+
+        Button recentSort = nativeButton("最近", false);
+        Button nameSort = nativeButton("名称", false);
+        Runnable restyleSort = () -> {
+            styleLibraryToggle(recentSort, !librarySortByName);
+            styleLibraryToggle(nameSort, librarySortByName);
+        };
+        recentSort.setOnClickListener(view -> {
+            librarySortByName = false;
+            restyleSort.run();
+            refreshLibraryFileRows(results, files);
+        });
+        nameSort.setOnClickListener(view -> {
+            librarySortByName = true;
+            restyleSort.run();
+            refreshLibraryFileRows(results, files);
+        });
+        restyleSort.run();
+        LinearLayout sortRow = new LinearLayout(this);
+        sortRow.setOrientation(LinearLayout.HORIZONTAL);
+        sortRow.addView(
+                recentSort,
+                new LinearLayout.LayoutParams(0, dp(44), 1f));
+        LinearLayout.LayoutParams nameParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        nameParams.setMargins(dp(8), 0, 0, 0);
+        sortRow.addView(nameSort, nameParams);
+        panel.addView(sortRow, marginParams(-1, dp(44), 0, 0, 0, 12));
+
+        refreshLibraryFileRows(results, files);
+        panel.addView(results);
+        return panel;
+    }
+
+    private void refreshLibraryFileRows(LinearLayout results, List<File> files) {
+        results.removeAllViews();
+        String query = librarySearchQuery.trim().toLowerCase(Locale.ROOT);
+        List<File> visible = new ArrayList<>();
+        for (File file : files) {
+            if ("photo".equals(libraryTypeFilter) && isVideoFile(file)) continue;
+            if ("video".equals(libraryTypeFilter) && !isVideoFile(file)) continue;
+            if (!query.isEmpty()
+                    && !file.getName()
+                            .toLowerCase(Locale.ROOT)
+                            .contains(query)) {
+                continue;
+            }
+            visible.add(file);
+        }
+        if (librarySortByName) {
+            visible.sort((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(
+                    left.getName(),
+                    right.getName()));
+        }
+        if (visible.isEmpty()) {
+            TextView empty = text(
+                    files.isEmpty()
+                            ? "还没有文件\n拍摄新照片、从相机下载，或从系统相册导入。"
+                            : "暂无匹配的文件",
+                    LIBRARY_FS_TITLE,
+                    Typeface.NORMAL,
+                    MUTED);
+            empty.setGravity(Gravity.CENTER);
+            results.addView(empty, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(120)));
+            return;
+        }
+        for (File file : visible) {
+            results.addView(allFilesRow(file));
+        }
+    }
+
+    /** 「所有文件」行：缩略图 + 文件名 + 分类来源标签（分支名或「未分类」）
+     *  + 下载/分享/删除；双击预览，showLargePhoto 内部对视频转
+     *  showLargeLocalVideo 播放。 */
+    private View allFilesRow(File file) {
+        LinearLayout row = verticalContainer();
+        row.setPadding(dp(10), dp(10), dp(10), dp(10));
+        row.setBackground(rounded(SURFACE, 12, RULE));
+        row.setLayoutParams(marginParams(-1, -2, 0, 0, 0, 10));
+        row.setContentDescription("双击查看 " + file.getName() + " 大图");
+        GestureDetector doubleTap = new GestureDetector(
+                this,
+                new GestureDetector.SimpleOnGestureListener() {
+                    @Override
+                    public boolean onDown(MotionEvent event) {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onDoubleTap(MotionEvent event) {
+                        showLargePhoto(file);
+                        return true;
+                    }
+                });
+        row.setOnTouchListener((view, event) -> doubleTap.onTouchEvent(event));
+
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.HORIZONTAL);
+        main.setGravity(Gravity.CENTER_VERTICAL);
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = 4;
+        ImageView thumbnail = new ImageView(this);
+        thumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        if (isVideoFile(file)) {
+            thumbnail.setImageResource(android.R.drawable.ic_media_play);
+        } else {
+            thumbnail.setImageBitmap(
+                    BitmapFactory.decodeFile(file.getAbsolutePath(), options));
+        }
+        thumbnail.setBackgroundColor(GRAPHITE);
+        main.addView(thumbnail, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        LinearLayout details = verticalContainer();
+        details.setPadding(dp(12), 0, 0, 0);
+        details.addView(text(file.getName(), LIBRARY_FS_SUB, Typeface.BOLD, INK));
+        details.addView(text(
+                humanSize(file.length()) + " · " + new SimpleDateFormat(
+                        "MM-dd HH:mm",
+                        Locale.CHINA).format(new Date(file.lastModified())),
+                TS_CAPTION,
+                Typeface.NORMAL,
+                MUTED));
+        LibraryBranch branch = findLibraryBranch(
+                libraryFileAssignments.get(file.getAbsolutePath()));
+        details.addView(text(
+                branch != null ? "▱  " + branch.name : "未分类",
+                TS_CAPTION,
+                Typeface.NORMAL,
+                COBALT));
+        main.addView(details, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f));
+        row.addView(main);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button download = nativeButton("下载", false);
+        download.setContentDescription(tr("下载到本地"));
+        download.setOnClickListener(view -> downloadPhotoToLocal(file));
+        actions.addView(download, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        Button share = nativeButton("分享", false);
+        share.setOnClickListener(view -> sharePhoto(file));
+        LinearLayout.LayoutParams shareParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        shareParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(share, shareParams);
+        Button delete = nativeButton("删除", false);
+        delete.setOnClickListener(view -> confirmDeleteLibraryFile(file));
         LinearLayout.LayoutParams deleteParams =
-                new LinearLayout.LayoutParams(dp(72), dp(44));
-        deleteParams.setMargins(0, dp(4), 0, 0);
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        deleteParams.setMargins(dp(8), 0, 0, 0);
         actions.addView(delete, deleteParams);
-        row.addView(actions, new LinearLayout.LayoutParams(dp(72), dp(188)));
+        row.addView(actions, marginParams(-1, dp(44), 0, 8, 0, 0));
         return row;
+    }
+
+    private void styleLibraryToggle(Button button, boolean active) {
+        button.setTextColor(active ? Color.WHITE : INK);
+        button.setBackground(
+                rounded(active ? COBALT : SURFACE, 12, active ? 0 : RULE_STRONG));
     }
 
     private void startLibraryFileDrag(View source, File file) {

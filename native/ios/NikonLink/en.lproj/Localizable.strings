@@ -995,7 +995,6 @@
 "所选保存位置不可写" = "The selected save location is not writable";
 "该文件已位于所选位置" = "The file is already in the selected location";
 "所选保存位置无效" = "The selected save location is invalid";
-
 // ── Desktop media import ──
 "导入照片与视频" = "Import Photos and Videos";
 "选择要导入的照片或视频" = "Choose Photos or Videos to Import";
@@ -1012,3 +1011,23 @@
 "准备导入…" = "Preparing import…";
 "已有导入任务正在进行。" = "An import is already in progress.";
 "导入期间不能切换拍摄会话。" = "The capture session cannot be changed during import.";
+
+// ── Simple file library ──
+"所有文件" = "All Files";
+"搜索文件名" = "Search filenames";
+"筛选" = "Filter";
+"排序" = "Sort";
+"最近" = "Recent";
+"名称" = "Name";
+"未分类" = "Uncategorized";
+"项目分类" = "Project Categories";
+"更多工具" = "More Tools";
+"来源：相机" = "Source: Camera";
+"来源：系统相册" = "Source: System Photo Library";
+"来源：无线传输" = "Source: Wireless Transfer";
+"文件库为空" = "Library is Empty";
+"拍摄新照片、从相机下载，或从系统相册导入。" = "Shoot new photos, download from your camera, or import from the system photo library.";
+"没有匹配的文件" = "No Matching Files";
+"调整搜索或筛选条件后再试。" = "Adjust your search or filters and try again.";
+"删除文件？" = "Delete File?";
+"将从本地文件库永久删除该文件，此操作无法撤销。" = "The file will be permanently deleted from the local library. This cannot be undone.";

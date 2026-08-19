@@ -273,14 +273,15 @@ rather than exposing one undifferentiated list of camera properties:
   branches. A branch may contain child branches at any depth and persists across
   launches. Creating a branch never moves, duplicates, or mutates the underlying
   media file; unassigned media remains under a clearly labelled Unclassified node.
-- Branch organization is a primary workspace, not a secondary subsection of
-  transfer settings. Its primary-navigation label is Branch or Branch Library,
-  the branch workbench appears before system albums and wireless-transfer
-  sources, and the workbench uses the photo accent for a clear visual anchor.
-- Phone layouts present the branch workbench as a default-collapsed Branch
-  Drawer so the file page opens at a practical density. The full drawer header
-  is the disclosure target and shows root-branch and unclassified counts.
-  Tablet, foldable-expanded, and desktop layouts keep the branch tree visible.
+- On mobile the library page leads with an All Files view listing every local
+  file regardless of branch assignment, with filename search, an
+  All/Photos/Videos type filter, and Recent/Name sorting. Its
+  primary-navigation label is Files; desktop platforms keep the branch library
+  as the primary workspace.
+- Branch organization continues on mobile as a Project Categories section that
+  is collapsed by default so the file page opens at a practical density. The
+  disclosure header shows root-branch and unclassified counts. Desktop layouts
+  keep the branch tree visible.
 - Local library files can be dragged between branches or back to Unclassified.
   Desktop platforms start dragging directly; touch platforms use the native
   press-and-hold drag gesture. Valid targets gain a cobalt border/background,
