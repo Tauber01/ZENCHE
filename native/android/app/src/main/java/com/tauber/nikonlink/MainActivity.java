@@ -11543,14 +11543,19 @@ public final class MainActivity extends Activity {
         android.content.SharedPreferences preferences =
                 getSharedPreferences("nikon-link", MODE_PRIVATE);
         String serialized = preferences.getString(LIBRARY_BRANCHES_KEY, "[]");
+        boolean branchesParsed = false;
         try {
             JSONArray array = new JSONArray(serialized);
             for (int index = 0; index < array.length(); index++) {
                 userLibraryBranches.add(
                         LibraryBranch.fromJson(array.getJSONObject(index)));
             }
+            branchesParsed = true;
         } catch (Exception ignored) {
             userLibraryBranches.clear();
+        }
+        if (!branchesParsed) {
+            return;
         }
         try {
             JSONObject assignments = new JSONObject(

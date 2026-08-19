@@ -267,6 +267,10 @@ test("all-files lists are bounded and source groups start collapsed", async () =
   assert.match(harmony, /libraryVisibleLimit: number = 12/);
   assert.match(harmony, /items\.slice\(0, this\.libraryVisibleLimit\)/);
   assert.match(harmony, /this\.libraryVisibleLimit \+= 12/);
+  assert.ok(
+    (harmony.match(/this\.libraryVisibleLimit = 12;/g) ?? []).length >= 5,
+    "Harmony search, filter, and sort changes must reset pagination",
+  );
   assert.match(harmony, /Math\.min\(\s*520,\s*Math\.max\(192,/);
 });
 
@@ -324,6 +328,17 @@ test("dangling project assignments are pruned and count as unclassified", async 
   assert.match(ios, /allBranchIDs\(in: branches\)\.contains\(branchID\)/);
   assert.match(android, /if \(path\.isEmpty\(\) \|\| findLibraryBranch\(branchId\) == null\)/);
   assert.match(android, /if \(prunedAssignments\) \{\s*saveLibraryFileAssignments\(\)/);
+  const androidLoad = android.slice(
+    android.indexOf("private void loadLibraryBranches"),
+    android.indexOf("private void saveLibraryBranches"),
+  );
+  assert.match(androidLoad, /boolean branchesParsed = false/);
+  assert.match(androidLoad, /branchesParsed = true/);
+  assert.ok(
+    androidLoad.indexOf("if (!branchesParsed)") <
+      androidLoad.indexOf("JSONObject assignments"),
+    "corrupt branch data must not overwrite persisted assignments",
+  );
   assert.match(harmony, /parsedAssignments\.filter\([\s\S]{0,360}this\.findLibraryBranch\([\s\S]{0,120}assignment\.branchId/);
   assert.match(harmony, /if \(this\.libraryFileAssignments\.length !== parsedAssignments\.length\)/);
   assert.match(harmony, /private branchIdForPhoto\(path: string\): string/);
@@ -406,6 +421,10 @@ test("new navigation and library strings exist in zh/en/ja runtime tables", asyn
   assert.match(
     harmonyLoc,
     /new TranslationEntry\('导出副本', 'Export Copy', 'コピーを書き出す'\)/
+  );
+  assert.match(
+    harmonyLoc,
+    /new TranslationEntry\('显示更多', 'Show more', 'さらに表示'\)/
   );
 });
 
