@@ -1103,24 +1103,24 @@ final class Localization {
         add("准备 AI 本地副本失败：",
                 "Could not prepare the AI result for local saving: ",
                 "AI 結果のローカルコピーを準備できません：");
-        add("• 修复 Wi‑Fi/PTP‑IP 与桌面 USB 连接不上、连接中断：命令、事件、心跳和重连按会话隔离，失败可取消、停止重连或直接重试。\n"
-                        + "• 新增 Sony ZV‑E10、A6100/A6100A、A6400/A6400A、A6600 识别与兼容配置；完整遥控能力仍需对应真机验证。\n"
-                        + "• macOS 与 Windows 新增一键导入照片和视频，支持多选、取消、流式写入、RAW+JPEG 配对、双备份与校验清单。\n"
-                        + "• 五端文件库改为“所有文件”优先，可搜索、筛选、排序；项目分类与来源工具默认收起，归类不移动原文件。\n"
-                        + "• 桌面删除改用系统废纸篓/回收站，并同步正确历史会话的备份、校验清单与共享 XMP。\n"
-                        + "• 1.5.14 已通过 GitHub 与官网发布；安装包签名和实机验证边界请查看发布说明。",
-                "• Fixed Wi‑Fi/PTP-IP and desktop USB connection failures and interruptions. Commands, events, probes, and reconnects are isolated by session; you can cancel, stop reconnecting, or retry directly.\n"
-                        + "• Added identification and compatibility profiles for Sony ZV-E10, A6100/A6100A, A6400/A6400A, and A6600; complete remote control still requires matching-camera validation.\n"
-                        + "• macOS and Windows add one-click multi-file photo/video import with cancellation, streaming I/O, RAW+JPEG pairing, dual backup, and checksum manifests.\n"
-                        + "• All five libraries now lead with All Files and provide search, filtering, and sorting. Project categories and secondary sources/tools start collapsed; categorizing never moves originals.\n"
-                        + "• Desktop deletion now uses the OS Trash/Recycle Bin and reconciles the correct historical session, backup, checksum manifest, and shared XMP.\n"
-                        + "• 1.5.14 is published through GitHub and the official website; see the release notes for package signing and hardware-validation limits.",
-                "• Wi‑Fi／PTP-IP とデスクトップ USB の接続失敗・切断を修正しました。コマンド、イベント、プローブ、再接続をセッション単位で分離し、キャンセル、再接続停止、直接再試行に対応します。\n"
-                        + "• Sony ZV-E10、A6100/A6100A、A6400/A6400A、A6600 の識別・互換プロファイルを追加しました。完全なリモート制御は各実機での検証が必要です。\n"
-                        + "• macOS／Windows に写真・動画のワンクリック複数読み込みを追加し、キャンセル、ストリーミング I/O、RAW+JPEG ペア、二重バックアップ、チェックサムマニフェストに対応しました。\n"
-                        + "• 5 プラットフォームのファイル画面は「すべてのファイル」を先頭にし、検索、絞り込み、並び替えを提供します。プロジェクト分類と追加ソース／ツールは既定で折りたたみ、分類しても元ファイルは移動しません。\n"
-                        + "• デスクトップの削除は OS のゴミ箱を使い、正しい過去セッション、バックアップ、チェックサムマニフェスト、共有 XMP を同期します。\n"
-                        + "• 1.5.14 は GitHub と公式サイトで公開済みです。パッケージの署名と実機検証範囲はリリースノートを参照してください。");
+        add("• Android 与 HarmonyOS 将 PTP/IP 命令/事件双通道绑定到实际相机 Wi‑Fi 网络，避免相机热点无互联网、蜂窝仍为默认路由时走错出口。\n"
+                        + "• Apple 连接层允许 Wi‑Fi 重关联期间的 waiting 在既有 deadline 内恢复；iOS 回到前台时立即补一次 Probe。\n"
+                        + "• HarmonyOS 以真实 Probe 作为连接就绪屏障，并不再把 event reader 空闲超时误判为断线。\n"
+                        + "• Windows 增加接口地址变化即时探测、分阶段连接预算、心跳重入保护和完整会话就绪门禁。\n"
+                        + "• Android、Apple、Windows 已新增伪相机故障注入回归；真实 Nikon/Sony/Canon 相机和网络切换仍需对应设备验证。\n"
+                        + "• 1.5.15 安装包签名状态与实机验证边界请查看对应版本发布说明。",
+                "• Android and HarmonyOS bind PTP/IP command and event channels to the actual camera Wi-Fi network, preventing a no-internet camera hotspot from being bypassed while cellular remains the default route.\n"
+                        + "• The Apple connection layer allows waiting during Wi-Fi reassociation to recover within the existing deadline; iOS probes immediately after returning to the foreground.\n"
+                        + "• HarmonyOS uses a real Probe as the ready barrier and no longer treats an idle event-reader timeout as a disconnect.\n"
+                        + "• Windows adds immediate probing after interface-address changes, staged connection budgets, heartbeat re-entry protection, and complete-session readiness gating.\n"
+                        + "• Android, Apple, and Windows now include fake-camera fault-injection regressions; real Nikon/Sony/Canon cameras and network transitions still require matching-device validation.\n"
+                        + "• See the matching 1.5.15 release notes for package signing and hardware-validation limits.",
+                "• Android と HarmonyOS は PTP/IP のコマンド／イベント両チャネルを実際のカメラ Wi‑Fi ネットワークへバインドし、インターネット接続のないカメラ AP とモバイル回線が併存しても誤った既定経路を使いません。\n"
+                        + "• Apple 共通接続層は Wi‑Fi 再接続中の waiting を既存の期限内で復旧可能として扱い、iOS はフォアグラウンド復帰直後に Probe を実行します。\n"
+                        + "• HarmonyOS は実際の Probe を接続準備完了の境界とし、イベント reader の受信アイドルタイムアウトを切断と誤認しません。\n"
+                        + "• Windows はインターフェースのアドレス変化後の即時 Probe、段階別接続時間枠、心拍の重複防止、完全なセッション準備完了ゲートを追加しました。\n"
+                        + "• Android、Apple、Windows に偽カメラの障害注入回帰を追加しました。Nikon／Sony／Canon 実機とネットワーク切り替えは各機器での検証が必要です。\n"
+                        + "• 1.5.15 パッケージの署名状態と実機検証範囲は、対応するリリースノートを参照してください。");
     }
 
     private Localization() {}

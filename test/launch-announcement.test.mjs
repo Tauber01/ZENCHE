@@ -22,10 +22,10 @@ const fastFeedbackMessage =
 const officialQqGroup = "官方 QQ 群：165315727";
 const afdianUrl = "https://www.ifdian.net/a/Tauber";
 const announcementHighlights = [
-  "Sony ZV‑E10",
-  "一键导入照片和视频",
-  "五端文件库改为“所有文件”优先",
-  "1.5.14 已通过 GitHub 与官网发布",
+  "绑定到实际相机 Wi‑Fi 网络",
+  "回到前台时立即补一次 Probe",
+  "接口地址变化即时探测",
+  "1.5.15 安装包签名状态",
 ];
 
 test("all native targets show the launch announcement and scam warning", async () => {
@@ -62,7 +62,7 @@ test("all native targets persist announcement dismissal by app version", async (
   }
 });
 
-test("all native targets describe the complete 1.5.14 release", async () => {
+test("all native targets describe the complete 1.5.15 Wi-Fi stability update", async () => {
   for (const [platform, paths] of Object.entries(targets)) {
     const source = (
       await Promise.all(paths.map((path) => readFile(path, "utf8")))

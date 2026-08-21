@@ -1112,7 +1112,7 @@ struct LaunchAnnouncementSheet: View {
                         icon: "sparkles.rectangle.stack.fill",
                         color: SettingsPalette.cobalt
                     ) {
-                        RuntimeLocalizedText("• 修复 Wi‑Fi/PTP‑IP 与桌面 USB 连接不上、连接中断：命令、事件、心跳和重连按会话隔离，失败可取消、停止重连或直接重试。\n• 新增 Sony ZV‑E10、A6100/A6100A、A6400/A6400A、A6600 识别与兼容配置；完整遥控能力仍需对应真机验证。\n• macOS 与 Windows 新增一键导入照片和视频，支持多选、取消、流式写入、RAW+JPEG 配对、双备份与校验清单。\n• 五端文件库改为“所有文件”优先，可搜索、筛选、排序；项目分类与来源工具默认收起，归类不移动原文件。\n• 桌面删除改用系统废纸篓/回收站，并同步正确历史会话的备份、校验清单与共享 XMP。\n• 1.5.14 已通过 GitHub 与官网发布；安装包签名和实机验证边界请查看发布说明。")
+                        RuntimeLocalizedText("• Android 与 HarmonyOS 将 PTP/IP 命令/事件双通道绑定到实际相机 Wi‑Fi 网络，避免相机热点无互联网、蜂窝仍为默认路由时走错出口。\n• Apple 连接层允许 Wi‑Fi 重关联期间的 waiting 在既有 deadline 内恢复；iOS 回到前台时立即补一次 Probe。\n• HarmonyOS 以真实 Probe 作为连接就绪屏障，并不再把 event reader 空闲超时误判为断线。\n• Windows 增加接口地址变化即时探测、分阶段连接预算、心跳重入保护和完整会话就绪门禁。\n• Android、Apple、Windows 已新增伪相机故障注入回归；真实 Nikon/Sony/Canon 相机和网络切换仍需对应设备验证。\n• 1.5.15 安装包签名状态与实机验证边界请查看对应版本发布说明。")
                             .font(.system(size: TypeScale.body))
                             .lineSpacing(5)
                     }

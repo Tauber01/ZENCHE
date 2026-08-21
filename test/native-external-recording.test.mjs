@@ -85,7 +85,7 @@ test('every Motion-JPEG target indexes AVI files as videos in its local library'
   }
 });
 
-test('version 1.5.14 launch announcements describe the durable published release', async () => {
+test('version 1.5.15 launch announcements describe durable Wi-Fi stability facts', async () => {
   const announcements = await Promise.all([
     read('native/ios/NikonLink/Views/RootView.swift'),
     read('native/android/app/src/main/java/com/tauber/nikonlink/MainActivity.java'),
@@ -95,17 +95,17 @@ test('version 1.5.14 launch announcements describe the durable published release
   ]);
 
   for (const announcement of announcements) {
-    assert.match(announcement, /修复 Wi‑Fi\/PTP‑IP 与桌面 USB 连接不上、连接中断/);
-    assert.match(announcement, /Sony ZV‑E10/);
-    assert.match(announcement, /一键导入照片和视频/);
-    assert.match(announcement, /五端文件库改为“所有文件”优先/);
-    assert.match(announcement, /系统废纸篓\/回收站/);
-    assert.match(announcement, /1\.5\.14 已通过 GitHub 与官网发布/);
-    assert.match(announcement, /安装包签名和实机验证边界请查看发布说明/);
-    assert.doesNotMatch(announcement, /本地候选版本，尚未发布/);
+    assert.match(announcement, /绑定到实际相机 Wi‑Fi 网络/);
+    assert.match(announcement, /Wi‑Fi 重关联期间的 waiting/);
+    assert.match(announcement, /回到前台时立即补一次 Probe/);
+    assert.match(announcement, /真实 Probe 作为连接就绪屏障/);
+    assert.match(announcement, /接口地址变化即时探测/);
+    assert.match(announcement, /伪相机故障注入回归/);
+    assert.match(announcement, /1\.5\.15 安装包签名状态与实机验证边界/);
+    assert.doesNotMatch(announcement, /1\.5\.14 已通过 GitHub 与官网发布/);
   }
 
-  assert.match(announcements[1], /tr\("• 修复 Wi‑Fi\/PTP‑IP 与桌面 USB/);
+  assert.match(announcements[1], /tr\("• Android 与 HarmonyOS 将 PTP\/IP/);
 
   const englishAnnouncements = await Promise.all([
     read('native/ios/NikonLink/en.lproj/Localizable.strings'),
@@ -121,21 +121,23 @@ test('version 1.5.14 launch announcements describe the durable published release
   ]);
 
   for (const announcement of englishAnnouncements) {
-    assert.match(announcement, /Fixed Wi‑Fi\/PTP-IP and desktop USB connection failures and interruptions/);
-    assert.match(announcement, /Sony ZV-E10/);
-    assert.match(announcement, /one-click multi-file photo\/video import/);
-    assert.match(announcement, /All five libraries now lead with All Files/);
-    assert.match(announcement, /OS Trash\/Recycle Bin/);
-    assert.match(announcement, /1\.5\.14 is published through GitHub and the official website/);
-    assert.doesNotMatch(announcement, /local candidate and has not been released/);
+    assert.match(announcement, /bind PTP\/IP command and event channels to the actual camera Wi-Fi network/);
+    assert.match(announcement, /waiting during Wi-Fi reassociation/);
+    assert.match(announcement, /probes immediately after returning to the foreground/);
+    assert.match(announcement, /real Probe as the ready barrier/);
+    assert.match(announcement, /interface-address changes/);
+    assert.match(announcement, /fake-camera fault-injection regressions/);
+    assert.match(announcement, /1\.5\.15 release notes for package signing/);
+    assert.doesNotMatch(announcement, /1\.5\.14 is published through GitHub and the official website/);
   }
   for (const announcement of japaneseAnnouncements) {
-    assert.match(announcement, /Wi‑Fi／PTP-IP とデスクトップ USB の接続失敗・切断を修正しました/);
-    assert.match(announcement, /Sony ZV-E10/);
-    assert.match(announcement, /写真・動画のワンクリック複数読み込み/);
-    assert.match(announcement, /5 プラットフォームのファイル画面は「すべてのファイル」を先頭/);
-    assert.match(announcement, /OS のゴミ箱/);
-    assert.match(announcement, /1\.5\.14 は GitHub と公式サイトで公開済みです/);
-    assert.doesNotMatch(announcement, /未公開のローカル候補/);
+    assert.match(announcement, /実際のカメラ Wi‑Fi ネットワークへバインド/);
+    assert.match(announcement, /Wi‑Fi 再接続中の waiting/);
+    assert.match(announcement, /フォアグラウンド復帰直後に Probe/);
+    assert.match(announcement, /実際の Probe を接続準備完了の境界/);
+    assert.match(announcement, /インターフェースのアドレス変化後の即時 Probe/);
+    assert.match(announcement, /偽カメラの障害注入回帰/);
+    assert.match(announcement, /1\.5\.15 パッケージの署名状態/);
+    assert.doesNotMatch(announcement, /1\.5\.14 は GitHub と公式サイトで公開済みです/);
   }
 });
