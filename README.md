@@ -28,19 +28,27 @@ PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，�
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
 - GitHub 公开稳定版：**v1.5.14**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
-- 当前源码版本：**1.5.14 / build 41**
+- 当前源码版本：**1.5.15 / build 42（本地候选，尚未发布）**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**50 款 Nikon / Sony / Canon 相机**（20 Nikon、16 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
 - 安装包：[GitHub 公开稳定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
-- 官网兑换：[http://zenche.top/](http://zenche.top/)
+- 官网兑换：[https://zenche.top/](https://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
 
 > [!IMPORTANT]
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
+
+### v1.5.15 本地候选
+
+- Android 与 HarmonyOS 会把 PTP/IP 命令、事件双通道绑定到实际相机 Wi‑Fi 网络，避免相机热点无互联网、蜂窝或其他网络仍是默认路由时走错出口；网络丢失与恢复回调只作用于当前会话拥有的网络。
+- Apple 共享连接层把短暂的 `NWConnection.waiting` 视为可恢复路径变化，并在应用回到前台时立即补一次 Probe；HarmonyOS 在发布“已连接”前等待真实 Probe 往返，并不再把事件 reader 的空闲接收超时误判为断线。
+- Windows 会在接口地址变化时立即探测，分开握手与会话恢复预算，阻止心跳重入，并以完整会话所有权统一门禁拍摄、取景、参数与存储操作。
+- 官网源码补齐 self-canonical、绝对 Open Graph/Twitter 图片、SoftwareApplication 结构化数据以及真实 `robots.txt` / `sitemap.xml`，并同步到当前已发布的 1.5.14 下载与 50 款相机档案事实；该 SEO 候选尚未部署生产。
+- 本候选尚未推送、打标签、创建 GitHub Release 或切换官网生产。真实 Nikon/Sony/Canon Wi‑Fi 相机、移动端前后台/网络切换与 Windows 实机仍需对应设备验证。
 
 ### v1.5.14 GitHub 与官网更新
 
@@ -440,12 +448,12 @@ XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
 - GitHub public stable release: **v1.5.14** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14))
-- Source version: **1.5.14 / build 41**
+- Source version: **1.5.15 / build 42 (local candidate, not published)**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **50 Nikon / Sony / Canon cameras** (20 Nikon, 16 Sony, 14 Canon)
 - Downloads: [GitHub public stable release v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
-- Official website: [zenche.top](http://zenche.top/)
+- Official website: [zenche.top](https://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
 - Hardware validation: [Camera test checklist](docs/CAMERA_TEST_CHECKLIST.md)
@@ -455,6 +463,14 @@ in a local library for review and export.
 > against their respective release notes and SHA-256 manifests.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
+
+### v1.5.15 local candidate
+
+- Android and HarmonyOS bind both PTP/IP command and event channels to the camera's actual Wi-Fi network, preventing a no-internet camera hotspot from being bypassed when cellular or another network remains the default route. Loss and recovery callbacks are scoped to the network owned by the current session.
+- The shared Apple connection layer treats a temporary `NWConnection.waiting` state as a recoverable path change and probes immediately after the app returns to the foreground. HarmonyOS waits for a real Probe round trip before publishing ready and no longer treats an idle event-reader receive timeout as a disconnect.
+- Windows probes immediately after interface-address changes, separates handshake and session-restoration budgets, prevents overlapping heartbeat probes, and gates capture, live view, parameters, and storage on complete session ownership.
+- The website source now includes a self-canonical URL, absolute Open Graph/Twitter images, SoftwareApplication structured data, and real `robots.txt` / `sitemap.xml` files. Its facts match the currently published 1.5.14 downloads and 50 camera profiles; this SEO candidate has not been deployed to production.
+- This candidate has not been pushed, tagged, published as a GitHub Release, or deployed to the production website. Real Nikon/Sony/Canon Wi-Fi cameras, mobile foreground/network transitions, and a Windows host still require hands-on validation.
 
 ### GitHub and official-site update in v1.5.14
 
@@ -807,12 +823,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
 - GitHub 公開安定版：**v1.5.14**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
-- 現在のソースバージョン：**1.5.14 / build 41**
+- 現在のソースバージョン：**1.5.15 / build 42（ローカル候補、未公開）**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 50 機種**（Nikon 20、Sony 16、Canon 14）
 - ダウンロード：[GitHub 公開安定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
-- 公式サイト：[zenche.top](http://zenche.top/)
+- 公式サイト：[zenche.top](https://zenche.top/)
 - Afdian 引き換えコード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
 - 実機検証：[カメラ実機テストチェックリスト](docs/CAMERA_TEST_CHECKLIST.md)
@@ -821,6 +837,14 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > GitHub 公開安定版と公式サイトの自動更新版は、それぞれのリリースノートと
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
+
+### v1.5.15 ローカル候補
+
+- Android と HarmonyOS は PTP/IP のコマンド／イベント両チャネルを実際のカメラ Wi-Fi ネットワークへバインドします。インターネット接続のないカメラ AP とモバイル回線などが併存しても誤った既定経路を使わず、切断／復旧コールバックも現在のセッションが所有するネットワークだけを対象にします。
+- Apple 共通接続層は一時的な `NWConnection.waiting` を復旧可能な経路変化として扱い、アプリがフォアグラウンドへ戻ると直ちに Probe を実行します。HarmonyOS は実際の Probe 往復が完了してから接続済み状態を公開し、イベント reader の受信アイドルタイムアウトを切断と誤認しません。
+- Windows はインターフェースのアドレス変化後に直ちに Probe を実行し、ハンドシェイクとセッション復旧の時間枠を分離します。心拍 Probe の重複を防ぎ、撮影、ライブビュー、パラメーター、ストレージ操作を完全なセッション所有権で統一して制御します。
+- 公式サイトのソースに self-canonical、絶対 URL の Open Graph／Twitter 画像、SoftwareApplication 構造化データ、実体のある `robots.txt`／`sitemap.xml` を追加しました。公開済み 1.5.14 のダウンロードと 50 機種プロファイルの事実へ同期していますが、この SEO 候補は本番へ未展開です。
+- この候補は push、タグ作成、GitHub Release 公開、公式サイト本番切り替えを行っていません。Nikon／Sony／Canon の実機 Wi-Fi、モバイル端末の前後台／ネットワーク切り替え、Windows 実機での検証が引き続き必要です。
 
 ### v1.5.14 GitHub／公式サイト更新
 

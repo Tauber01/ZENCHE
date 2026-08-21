@@ -3,7 +3,7 @@
 > 快照时间：2026-08-20（Asia/Shanghai）
 > 当前公开版本：1.5.14 / build 41；最终实现提交 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`，注释标签 `v1.5.14` 解引用到发布提交 `17e87ce6c39aad07f712cd0605efe90899e6e72c`
 > 公开状态：v1.5.14 已于 `2026-08-19T19:58:12Z` 发布为 GitHub Latest；官网自托管更新已同步切换到 1.5.14 / build 41
-> 当前源码：1.5.14 / build 41，连接可靠性、Sony 旧机型兼容、桌面一键导入与五端文件库简化已封板、打包、公开并完成生产回验，见 §12.65
+> 当前源码：1.5.15 / build 42 本地候选，官网 SEO 与相机 Wi-Fi 精确路由/恢复加固正在封板；公开 GitHub 与官网更新仍为 1.5.14 / build 41，见 §12.66
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1301,3 +1301,47 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   `/opt/1panel/www/sites/zenche-top/index/downloads/`，回滚备份为
   `/opt/zenche-update-backups/20260819T200402Z-v1514`。
 - **剩余实机边界**：真实 Sony/Nikon/Canon 相机、可信签名、公证、Windows 实机安装/驱动/SmartScreen 与移动端设备安装仍是不可由自动化替代的边界。
+
+## 12.66 v1.5.15 官网 SEO 与相机 Wi-Fi 稳定性候选（2026-08-22，GPT5.6 + kimi + Kimi k3）
+
+- **授权与工作现场**：Tauber 在 Buzz 线程 `c0593c4b…e7ec` 要求优化官网 SEO，并重点
+  加固相机连接尤其 Wi-Fi。正式基线为 `origin/main @ c8e67a21d636aee3e60b79a0ad3907d52df8cd01`
+  （已发布 1.5.14 / build 41）；本轮集成工作树为
+  `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.15-integration`，目标源码版本
+  `1.5.15 / build 42`。生产官网 Vue 源此前只存在于历史分支，本轮先在
+  `/Users/tauber/.buzz/REPOS/ZENCHE-wt-1.5.12-website` 完成 SEO，再把完整
+  `website-vue/` 恢复到当前候选。未使用本地错误回退到 1.5.9 的旧 `main` 指针。
+- **SEO 候选**：补 self-canonical、绝对 OG/Twitter 图片、SoftwareApplication JSON-LD
+  （中英双语、当前公开 1.5.14 下载与发布 URL、50 款机型档案及真机验证边界）、真实
+  `public/robots.txt` 和只列根 URL 的 `public/sitemap.xml`；不把同一 SPA shell 的
+  `/redeem` 放入 sitemap 形成 canonical 冲突，也不虚构独立语言 URL。网站下载事实同步
+  1.5.14 六包与 Sony 16/总档案 50。SEO 源提交 `4a91dae7fcc25ea2991294e9a1409d446e3aa296`，
+  候选恢复提交 `18317b82fdb9dbfe24fa7384084b87e1e5131e19`，双语声明修正提交
+  `22caf08ef5733bbb6a0b845389f386f42ccb6481`；全新 `npm ci` 后三项源码测试、
+  vue-tsc/Vite production build 与 dist robots/sitemap 非 HTML/逐字节一致检查均通过。
+- **Android 路由**：生产 `PtpIpCamera` 注入 `SocketFactory`，command/event socket 从
+  当前相机 Wi-Fi `Network.getSocketFactory()` 创建；`getAllNetworks()` 在异步 callback
+  前同步种子化候选，优先无互联网的相机 AP，session 固化实际 Network，`onLost` 只对
+  所有者网络生效。真实 Java 生产类 + loopback responder 覆盖握手/OpenSession/Probe、
+  Probe 丢包超时、event FIN 与双 socket 工厂注入。
+- **Apple 与 HarmonyOS**：Apple 共享 Swift 不再把 `.waiting` 当 `.failed`，终局仍由
+  12 秒握手 deadline 或取消裁决；iOS 回前台立即做 idle-safe Probe。HarmonyOS 用 API 12
+  的 `getAllNetsSync/getNetCapabilitiesSync/getConnectionPropertiesSync` 解析相机 Wi-Fi，
+  同一 `NetHandle.bindSocket()` 贯穿 command/event，按 netId 过滤回调；ready 前等待真实
+  Probe，event reader 空闲超时继续读取，回前台立即心跳。Apple 真实 Swift 生产层的
+  connect/capture、丢 Probe 自动重连、event FIN 与 silent-handshake 四场景通过；HarmonyOS
+  六项强化契约与 API 12 Release HAP 编译通过。
+- **Windows 恢复**：增加 `NetworkAddressChanged`，事件风暴合并后只做即时 Probe；心跳以
+  Interlocked 阻止重入。12 秒只覆盖 TCP/PTP-IP 握手，握手成功后重置 30 秒恢复预算；
+  `IsWifiCameraReady` 同时要求完整 session generation，统一门禁拍摄、取景、录像、参数与
+  存储。dotnet 直接编译生产 `PtpIpCamera.cs` 的五个 loopback 场景覆盖完整连接/Probe、
+  Probe 超时、event FIN、调用方取消静默握手与过期代际不拆活会话。
+- **已完成专项验证**：独立复跑 Android/Apple/Wi-Fi 组合 16/16，通过时间敏感的 Apple
+  自动重连与 12 秒 deadline；HarmonyOS/Windows 组合 12/12。早期 Apple harness 曾因先
+  `removeFirst` 再解析当前包导致 3 项失败，修正为切出 packet 后再移除并解析，最终全绿；
+  失败历史没有被隐去。完整测试、五端最终构建、六包/侧车和精确集成提交将在本节继续
+  以最终 HEAD 证据收口。
+- **授权与生产边界**：本轮没有 push、标签、GitHub Release、正式更新源切换或官网生产
+  部署授权；公开 GitHub 与官网更新仍是 1.5.14 / build 41。结构化数据、loopback 相机、
+  编译和候选包不能代替真实 Nikon/Sony/Canon 相机 AP、移动端前后台/路由切换、Windows
+  实机网卡/驱动/安装/SmartScreen 或可信签名、公证验证。

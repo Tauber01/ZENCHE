@@ -12,7 +12,8 @@ created: 2026-08-06
 > 本文档供 iOS/iPadOS、Android、HarmonyOS、macOS、Windows 共同维护。
 >
 > B2/E3/E4 已完成五端双通道 TCP、心跳、自动重连与原生 UI 接线；1.5.14 进一步
-> 勘正 event Probe、完整事务 gate、会话代际与流式长度校验。Canon/PTP-IP 以及
+> 勘正 event Probe、完整事务 gate、会话代际与流式长度校验；1.5.15 候选补齐
+> 相机 Wi-Fi 精确路由、网络重关联/前台恢复与半开通道故障注入。Canon/PTP-IP 以及
 > Nikon/Sony/Canon 的跨端互操作仍统一标记 `TBC-awaiting-hardware`。
 
 ## 1. 连接与通道
@@ -154,7 +155,7 @@ created: 2026-08-06
 - 用于：EVFMode(0xD1b1)、EVFOutputDevice(0xD1b0)、EVFRecordStatus(0xD1b8)、
   Canon Log(0xD176)、以及 EVF/Movie 态属性写（TBC-awaiting-hardware）。
 
-## 9. 心跳保活与事务串行（1.5.14 修正）
+## 9. 心跳、网络路由与事务串行（1.5.14—1.5.15 修正）
 
 - 每 5s 在 **event 通道**发送空 payload 的 ProbeRequest(type 13)，由常驻 event
   reader 接收 ProbeResponse(type 14)；单次超时 3s。相机主动发 type 13 时客户端
@@ -186,6 +187,27 @@ created: 2026-08-06
 - Android 的 NetworkCallback 需要 `ACCESS_NETWORK_STATE`；HarmonyOS NetConnection
   需要 `GET_NETWORK_INFO`。监听必须限定 Wi-Fi bearer/当前相机网络并绑定回调代际，旧
   `onLost/netLost` 不得误杀新连接。缺少权限时初连可能成功，但断网即时重连不会工作。
+- 相机 AP 常不提供互联网，蜂窝或其他网络可能继续充当系统默认路由。Android 必须在
+  初连/重连排队前同步枚举当前 Wi-Fi `Network`，并让 command/event socket 都由该
+  `Network.getSocketFactory()` 创建；异步 `onAvailable` 只负责刷新候选，不能作为首次
+  connect 前已经发生的假设。`onLost` 只对本次会话实际绑定的 Network 生效。
+- HarmonyOS 必须用 `getAllNetsSync()` 枚举网络，分别通过 `NetCapabilities.bearerTypes`
+  确认 Wi-Fi、通过 `ConnectionProperties.linkAddresses` 与相机 IPv4 子网匹配，再于
+  `TCPSocket.connect()` 之前调用同一 `NetHandle.bindSocket()` 绑定 command/event。
+  已解析相机网络时，`netLost`/`netAvailable` 按 `netId` 过滤；重关联后重新解析新 handle。
+- Apple 的 `NWConnection.waiting` 表示等待路径变化，不能和 `.failed` 合并为立即失败；
+  仍由既有 12 秒握手 deadline 与任务取消裁决终局。iOS/iPadOS 与 macOS 共用该连接层；
+  移动端回到前台时对仍显示 ready 的会话立即补一次互斥 Probe。
+- HarmonyOS 在发布 ready 前必须等待真实 Probe 往返，event reader 的无包接收超时只
+  表示本轮空闲并继续读取，真正 FIN/传输错误才退休会话；回到前台同样立即补一次心跳。
+- Windows 同时监听 `NetworkAvailabilityChanged` 与 `NetworkAddressChanged`；后者只触发
+  合并后的即时 Probe，不直接拆除会话。心跳 tick 必须有 in-flight 门禁。12 秒预算只
+  覆盖 TCP/PTP-IP 握手，握手成功后重置恢复预算，避免厂商识别、取景、参数和最终 Probe
+  共享一个即将耗尽的 token；UI 操作必须同时满足传输连接和已发布会话所有权。
+- 自动化至少包含真实生产传输层驱动的本地伪相机场景：完整握手/操作、丢 Probe、event
+  FIN、哑握手 deadline/调用方取消、Android SocketFactory 双通道注入和 Windows 过期
+  session generation。静态契约与 loopback responder 不能替代真实相机 Wi-Fi 切换、
+  移动端前后台和 Windows 网络接口/驱动验收。
 
 ## 10. 参考实现落点
 

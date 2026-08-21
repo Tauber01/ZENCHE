@@ -358,6 +358,34 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
   于 `2026-08-19T19:58:12Z` 公开为 Latest。Actions run `32295909168` 在原子公开前核对
   12 个固定名称资产与六份侧车；GitHub 端六包字节数和摘要与本地一致。
 
+### 5.3 相机 Wi-Fi 精确路由与恢复加固（1.5.15 候选）
+
+- **路由所有权**：相机 AP 没有互联网时，系统默认网络可能仍是蜂窝、以太网或其他
+  Wi-Fi。Android 在异步 `NetworkCallback` 前用 `getAllNetworks()` 同步种子化相机
+  Wi-Fi 候选，并让 command/event socket 都从同一 `Network.getSocketFactory()` 创建；
+  `onLost` 只作用于当前会话绑定的 Network。HarmonyOS 分别读取
+  `NetCapabilities.bearerTypes` 和 `ConnectionProperties.linkAddresses`，按相机 IPv4
+  子网选择 `NetHandle`，再于 connect 前把两条 `TCPSocket` 绑定到同一 handle；重关联
+  后按新 `netId` 重新解析，旧 `netLost/netAvailable` 不能拆除或唤醒新会话。
+- **恢复语义**：Apple `.waiting` 代表等待网络路径变化，不和 `.failed` 合并；既有 12 秒
+  握手 deadline 与取消仍裁决最终失败。iOS/iPadOS 回到前台时立即补一次互斥 Probe；
+  macOS 共享同一 PTP/IP 连接层。HarmonyOS 连接发布前等待真实 Probe 往返，event reader
+  的空闲接收超时继续循环，真正 FIN/传输错误才退休会话；EntryAbility 前台回调触发即时
+  心跳。Windows 的 `NetworkAddressChanged` 只调度合并后的即时 Probe，心跳用 in-flight
+  门禁防重入，12 秒仅覆盖握手，握手后的厂商/取景/参数/Probe 使用重置后的恢复预算。
+- **就绪边界**：Windows 的快门、取景、录像、参数和相机存储同时要求 transport 已连接、
+  当前连接/重连/取消流程结束且已发布会话 generation 为正。HarmonyOS 只有在双通道、
+  初始化事务、参数刷新和真实 Probe 全部完成并再次复核 attempt 后才发布 ready。
+- **可执行验证**：Android 以 javac 编译生产 `PtpIpCamera.java`，Apple 以 swiftc 编译共享
+  `RemoteCaptureServices.swift`，Windows 以 dotnet 编译生产 `PtpIpCamera.cs`，三者均由
+  loopback 伪相机驱动完整握手/操作、丢 Probe、event FIN 与取消/代际等故障。HarmonyOS
+  由 SDK 12 `assembleHap` 和静态契约锁定 `NetHandle`、ready Probe、超时与前台恢复。
+  loopback 和构建不能代替真实相机 AP、移动端网络切换/前后台、Windows 网卡事件与驱动。
+- **官网同仓边界**：`website-vue/` 保留当前公开 1.5.14 的下载事实，与 1.5.15 原生候选
+  解耦。self-canonical、绝对社交图片、SoftwareApplication JSON-LD、真实 robots/sitemap
+  通过源码与 dist 双重测试；客户端中英切换使用同一 URL，不虚构独立 hreflang URL，
+  sitemap 只列根 URL，避免 `/redeem` 与根 canonical 冲突。源码完成不等于生产已部署。
+
 ## 6. 本地工作流与图像处理
 
 ### 6.1 拍摄会话

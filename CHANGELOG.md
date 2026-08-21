@@ -1,5 +1,62 @@
 # Changelog
 
+## [1.5.15] - 2026-08-22
+
+### Added
+
+- Added executable local fake-camera behavior harnesses for the Android, Apple,
+  and Windows production PTP/IP transports. The scenarios cover a complete
+  handshake and operation, dropped probes, a half-closed event channel,
+  handshake cancellation/deadline behavior, socket-factory injection, and
+  stale-session ownership.
+- Added HarmonyOS stability contracts for the real pre-ready Probe barrier,
+  exact `NetHandle` propagation, network callback filtering, event-reader idle
+  timeouts, and foreground recovery.
+- Restored the production Vue website source under `website-vue/` and added
+  deterministic SEO source/build checks for canonical metadata, structured
+  data, `robots.txt`, `sitemap.xml`, and the published download facts.
+
+### Changed
+
+- Android now creates both PTP/IP sockets from the selected Wi-Fi
+  `Network.getSocketFactory()` when a camera network is available. Initial
+  selection is synchronously seeded before the asynchronous network callback,
+  and network-loss handling is scoped to the network owned by the session.
+- HarmonyOS resolves the camera Wi-Fi `NetHandle`, binds both TCP channels
+  before connect, filters `netLost`/`netAvailable` by `netId`, waits for a real
+  Probe before publishing ready, and probes immediately after returning to the
+  foreground.
+- Apple treats `NWConnection.waiting` as a recoverable path transition whose
+  final result is decided by the existing connection deadline or cancellation,
+  and immediately probes a displayed-ready session after foreground resume.
+- Windows listens for interface address changes as well as aggregate network
+  availability, performs an immediate coalesced probe, prevents overlapping
+  heartbeat probes, separates handshake and restoration time budgets, and
+  applies complete-session readiness gating to camera operations.
+- Updated source metadata to `1.5.15 / build 42`. The public GitHub release and
+  official update feed remain on `1.5.14 / build 41` unless separately
+  authorized and published.
+
+### Fixed
+
+- Prevented camera PTP/IP traffic from silently following a cellular or other
+  default route while the device is joined to a no-internet camera Wi-Fi.
+- Prevented temporary Apple Wi-Fi reassociation, HarmonyOS event-reader idle
+  timeouts, unrelated network callbacks, and overlapping Windows heartbeat
+  ticks from causing false disconnects or half-ready user operations.
+- Added a self-canonical URL, absolute social-preview images,
+  SoftwareApplication JSON-LD, and actual crawlable `robots.txt` / `sitemap.xml`
+  files to the website source. Download metadata remains aligned with the
+  published 1.5.14 packages, and the sitemap does not advertise `/redeem` with
+  a conflicting root canonical.
+
+### Validation status
+
+- Local candidate only: no push, tag, GitHub Release, official update switch,
+  or production website deployment has been performed. Exact full-suite,
+  native build, package, checksum, signing, and remaining hardware evidence is
+  recorded in `docs/releases/v1.5.15.md`.
+
 ## [1.5.14] - 2026-08-20
 
 ### Added
