@@ -38,6 +38,7 @@ test('homepage exposes one aligned canonical and factual software metadata', asy
   )
   assert.equal(application.offers?.price, '0')
   assert.equal(application.offers?.priceCurrency, 'USD')
+  assert.deepEqual(application.inLanguage, ['zh-CN', 'en'])
   assert.match(application.description, /50 款/)
   assert.match(application.description, /实机验证持续进行中/)
 })
