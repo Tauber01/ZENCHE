@@ -3,7 +3,7 @@
 > 快照时间：2026-08-20（Asia/Shanghai）
 > 当前公开版本：1.5.14 / build 41；最终实现提交 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`，注释标签 `v1.5.14` 解引用到发布提交 `17e87ce6c39aad07f712cd0605efe90899e6e72c`
 > 公开状态：v1.5.14 已于 `2026-08-19T19:58:12Z` 发布为 GitHub Latest；官网自托管更新已同步切换到 1.5.14 / build 41
-> 当前源码：1.5.15 / build 42 本地候选，官网 SEO 与相机 Wi-Fi 精确路由/恢复加固正在封板；公开 GitHub 与官网更新仍为 1.5.14 / build 41，见 §12.66
+> 当前源码：1.5.15 / build 42 本地候选，官网 SEO、相机 Wi-Fi 精确路由/恢复加固与六包已封板；公开 GitHub 与官网更新仍为 1.5.14 / build 41，见 §12.66
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1339,8 +1339,23 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **已完成专项验证**：独立复跑 Android/Apple/Wi-Fi 组合 16/16，通过时间敏感的 Apple
   自动重连与 12 秒 deadline；HarmonyOS/Windows 组合 12/12。早期 Apple harness 曾因先
   `removeFirst` 再解析当前包导致 3 项失败，修正为切出 packet 后再移除并解析，最终全绿；
-  失败历史没有被隐去。完整测试、五端最终构建、六包/侧车和精确集成提交将在本节继续
-  以最终 HEAD 证据收口。
+  失败历史没有被隐去。精确实现与打包基线为
+  `94b3042b1f988f638ae0ba714c6d88c56b4da763`；测试前后 HEAD 相同，完整 `node --test`
+  共 655 项：654 通过、0 失败、1 项仅因当前不是 Windows 主机而按设计跳过。五端
+  1.5.15 中英日启动公告同步描述长期有效的 Wi-Fi 改动、签名与真机边界，公告专项
+  10/10 及 Apple 三份 `.strings` lint 通过。
+- **最终构建与候选包**：Android `assembleDebug`、iOS generic/device Release unsigned、
+  HarmonyOS API 12 Release `assembleHap`、macOS arm64 app/DMG、Windows x64 `.NET 8`
+  Release publish/NSIS/ZIP 均成功。六份侧车 6/6 `shasum -a 256 -c` 为 `OK`；
+  APK/IPA/HAP/Windows ZIP 压缩结构、DMG、macOS 深度严格签名、版本/构建号、目标架构与
+  Nikon/Sony/libusb 运行库已回验。Android 为 v2 Debug 证书且 SHA-256 连续为
+  `45499c18366356314c10ad8a98939908e47855fb6ba7fc21fe8a809549c7df3c`；iOS/HarmonyOS
+  未签名，macOS 为 ad-hoc 且未公证，Windows Setup/主程序 Security Directory 均为 0。
+  Windows 两包由 macOS 交叉构建，真实 Windows 主机构建、启动、网卡、驱动、安装与
+  SmartScreen 门禁仍未完成。六包精确字节数和摘要见 `docs/releases/v1.5.15.md`。
+- **SEO 最终复验**：实现基线的 `npm run verify:seo` 完成 3/3 源码测试、vue-tsc、Vite
+  production build 与 dist canonical/JSON-LD/robots/sitemap 校验；仅保留 Vite 既有大
+  chunk 非阻断警告。源码和构建通过不代表生产已部署。
 - **授权与生产边界**：本轮没有 push、标签、GitHub Release、正式更新源切换或官网生产
   部署授权；公开 GitHub 与官网更新仍是 1.5.14 / build 41。结构化数据、loopback 相机、
   编译和候选包不能代替真实 Nikon/Sony/Canon 相机 AP、移动端前后台/路由切换、Windows

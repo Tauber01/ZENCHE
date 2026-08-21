@@ -32,7 +32,10 @@ Probe；HarmonyOS 以真实 Probe 作为 ready 屏障并容忍 event reader 空�
 与 Windows 均新增直接驱动生产 PTP/IP 传输的本地伪相机故障注入，HarmonyOS 由 API 12
 构建与强化契约覆盖。生产 Vue 官网源码现纳入仓库，补齐 canonical、社交元数据、
 SoftwareApplication JSON-LD、真实 robots/sitemap 和发布事实校验；SEO 候选未部署。
-本候选未推送、未打标签、未创建 Release、未切换官网更新清单，公开稳定版仍为 1.5.14。
+实现与打包基线 `94b3042b1f988f638ae0ba714c6d88c56b4da763` 的完整测试为
+654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个本地候选包、六份侧车、版本、
+容器、架构和适用签名边界均已回验，详见 `docs/releases/v1.5.15.md`。本候选未推送、
+未打标签、未创建 Release、未切换官网更新清单，SEO 也未部署，公开稳定版仍为 1.5.14。
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
 

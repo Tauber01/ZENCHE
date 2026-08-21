@@ -48,6 +48,7 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 - Apple 共享连接层把短暂的 `NWConnection.waiting` 视为可恢复路径变化，并在应用回到前台时立即补一次 Probe；HarmonyOS 在发布“已连接”前等待真实 Probe 往返，并不再把事件 reader 的空闲接收超时误判为断线。
 - Windows 会在接口地址变化时立即探测，分开握手与会话恢复预算，阻止心跳重入，并以完整会话所有权统一门禁拍摄、取景、参数与存储操作。
 - 官网源码补齐 self-canonical、绝对 Open Graph/Twitter 图片、SoftwareApplication 结构化数据以及真实 `robots.txt` / `sitemap.xml`，并同步到当前已发布的 1.5.14 下载与 50 款相机档案事实；该 SEO 候选尚未部署生产。
+- 精确实现提交的完整测试为 654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个本地候选包、逐包 SHA-256、签名属性与真机边界见 [1.5.15 候选说明](docs/releases/v1.5.15.md)。
 - 本候选尚未推送、打标签、创建 GitHub Release 或切换官网生产。真实 Nikon/Sony/Canon Wi‑Fi 相机、移动端前后台/网络切换与 Windows 实机仍需对应设备验证。
 
 ### v1.5.14 GitHub 与官网更新
@@ -470,6 +471,7 @@ in a local library for review and export.
 - The shared Apple connection layer treats a temporary `NWConnection.waiting` state as a recoverable path change and probes immediately after the app returns to the foreground. HarmonyOS waits for a real Probe round trip before publishing ready and no longer treats an idle event-reader receive timeout as a disconnect.
 - Windows probes immediately after interface-address changes, separates handshake and session-restoration budgets, prevents overlapping heartbeat probes, and gates capture, live view, parameters, and storage on complete session ownership.
 - The website source now includes a self-canonical URL, absolute Open Graph/Twitter images, SoftwareApplication structured data, and real `robots.txt` / `sitemap.xml` files. Its facts match the currently published 1.5.14 downloads and 50 camera profiles; this SEO candidate has not been deployed to production.
+- The exact implementation commit passes 654 tests with zero failures and one Windows-host-only skip. See the [1.5.15 candidate notes](docs/releases/v1.5.15.md) for the six local packages, per-file SHA-256, signing properties, and hardware boundaries.
 - This candidate has not been pushed, tagged, published as a GitHub Release, or deployed to the production website. Real Nikon/Sony/Canon Wi-Fi cameras, mobile foreground/network transitions, and a Windows host still require hands-on validation.
 
 ### GitHub and official-site update in v1.5.14
@@ -844,6 +846,7 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 - Apple 共通接続層は一時的な `NWConnection.waiting` を復旧可能な経路変化として扱い、アプリがフォアグラウンドへ戻ると直ちに Probe を実行します。HarmonyOS は実際の Probe 往復が完了してから接続済み状態を公開し、イベント reader の受信アイドルタイムアウトを切断と誤認しません。
 - Windows はインターフェースのアドレス変化後に直ちに Probe を実行し、ハンドシェイクとセッション復旧の時間枠を分離します。心拍 Probe の重複を防ぎ、撮影、ライブビュー、パラメーター、ストレージ操作を完全なセッション所有権で統一して制御します。
 - 公式サイトのソースに self-canonical、絶対 URL の Open Graph／Twitter 画像、SoftwareApplication 構造化データ、実体のある `robots.txt`／`sitemap.xml` を追加しました。公開済み 1.5.14 のダウンロードと 50 機種プロファイルの事実へ同期していますが、この SEO 候補は本番へ未展開です。
+- 正確な実装コミットの全テストは 654 件成功、失敗 0 件、Windows 実機専用のスキップ 1 件です。6 つのローカル候補パッケージ、各 SHA-256、署名属性、実機境界は [1.5.15 候補ノート](docs/releases/v1.5.15.md)を参照してください。
 - この候補は push、タグ作成、GitHub Release 公開、公式サイト本番切り替えを行っていません。Nikon／Sony／Canon の実機 Wi-Fi、モバイル端末の前後台／ネットワーク切り替え、Windows 実機での検証が引き続き必要です。
 
 ### v1.5.14 GitHub／公式サイト更新
