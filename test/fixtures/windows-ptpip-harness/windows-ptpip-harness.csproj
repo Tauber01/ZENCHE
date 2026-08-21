@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- 开发机可能只装更新的运行时（如 .NET 10），允许向前滚动。 -->
+    <RollForward>LatestMajor</RollForward>
+    <AssemblyName>windows-ptpip-harness</AssemblyName>
+    <RootNamespace>Zenche.Testing.PtpIpHarness</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 直接编译生产传输层源码（纯 BCL 依赖，无需 EnableWindowsTargeting）。 -->
+    <Compile Include="../../../native/windows/Services/PtpIpCamera.cs" />
+    <Compile Include="../../../native/windows/Models/CameraStorageItem.cs" />
+  </ItemGroup>
+</Project>

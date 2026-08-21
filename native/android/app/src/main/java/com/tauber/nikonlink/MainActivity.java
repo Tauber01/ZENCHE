@@ -1512,6 +1512,11 @@ public final class MainActivity extends Activity {
     private Button wifiLiveViewButton;
     private Button wifiRecordButton;
     private ConnectivityManager.NetworkCallback wifiNetworkCallback;
+    // 最近 onAvailable 上报的 Wi‑Fi 网络，作为相机候选网络（可能是无互联网的
+    // 非默认路由网络）；null 表示暂无缓存。
+    private volatile Network cameraWifiNetwork;
+    // 当前 PTP/IP 会话实际绑定的 Wi‑Fi 网络；null 表示走系统默认路由。
+    private volatile Network wifiSessionNetwork;
     private final Runnable wifiHeartbeatRunnable = new Runnable() {
         @Override public void run() {
             if (!wifiConnected || wifiReconnecting || wifiManualDisconnect) return;
@@ -14838,8 +14843,16 @@ public final class MainActivity extends Activity {
         wifiConnecting = true;
         final long connectionGeneration = ++wifiConnectionGeneration;
         updateConnectionUi();
+        // 先注册 Wi‑Fi 监听以缓存相机候选网络：相机 Wi‑Fi 无互联网时通常不是
+        // 系统默认网络，连接时需要把 socket 绑定到该网络。
+        registerWifiNetworkCallback();
         cameraExecutor.submit(() -> {
             try {
+                final Network sessionNetwork = cameraWifiNetwork;
+                wifiSessionNetwork = sessionNetwork;
+                wifiCamera.setSocketFactory(sessionNetwork != null
+                        ? sessionNetwork.getSocketFactory()
+                        : null);
                 String name = wifiCamera.connect(host, port);
                 if (!wifiConnectAttemptActive(connectionGeneration, false)) {
                     wifiCamera.close();
@@ -15043,6 +15056,8 @@ public final class MainActivity extends Activity {
         mainHandler.removeCallbacks(wifiHeartbeatRunnable);
         mainHandler.removeCallbacks(wifiReconnectRunnable);
         unregisterWifiNetworkCallback();
+        cameraWifiNetwork = null;
+        wifiSessionNetwork = null;
         // 手动断开优先立即退休 transport；录像/取景随 PTP/IP 会话关闭。
         // 不能把停止命令排在 abort 后伪装成已成功发送。
         if (wifiLiveView || wifiMovieRecording || liveViewEnabled) {
@@ -15098,8 +15113,14 @@ public final class MainActivity extends Activity {
             wifiConnecting = true;
             final long connectionGeneration = ++wifiConnectionGeneration;
             updateConnectionUi();
+            registerWifiNetworkCallback();
             cameraExecutor.submit(() -> {
                 try {
+                    final Network sessionNetwork = cameraWifiNetwork;
+                    wifiSessionNetwork = sessionNetwork;
+                    wifiCamera.setSocketFactory(sessionNetwork != null
+                            ? sessionNetwork.getSocketFactory()
+                            : null);
                     String name = wifiCamera.connect(
                             wifiCameraHost, wifiCameraPort);
                     if (!wifiConnectAttemptActive(connectionGeneration, true)) {
@@ -15191,6 +15212,8 @@ public final class MainActivity extends Activity {
         wifiReconnectAttempt = 0;
         mainHandler.removeCallbacks(wifiHeartbeatRunnable);
         unregisterWifiNetworkCallback();
+        // 绑定网络随会话作废；候选缓存保留，供紧接的自动重连复用。
+        wifiSessionNetwork = null;
         // E4 1.5.9：链路离线即停 Wi‑Fi 取景/录像并清控制状态
         // （重连成功后再恢复，对齐 Windows AttemptWifiReconnectAsync）。
         if (wifiLiveView || wifiMovieRecording || liveViewEnabled) {
@@ -15228,30 +15251,40 @@ public final class MainActivity extends Activity {
         mainHandler.postDelayed(wifiReconnectRunnable, delay);
     }
 
-    /** ConnectivityManager.NetworkCallback：Wi-Fi 网络丢失即判链路不可用。 */
+    /** ConnectivityManager.NetworkCallback：监听全部 Wi‑Fi 网络并缓存相机候选
+     *  网络；当前会话绑定的网络丢失即判链路不可用。 */
     private void registerWifiNetworkCallback() {
         if (wifiNetworkCallback != null) return;
         ConnectivityManager manager = (ConnectivityManager)
                 getSystemService(Context.CONNECTIVITY_SERVICE);
         if (manager == null) return;
         final long callbackGeneration = wifiConnectionGeneration;
-        final Network activeNetwork = manager.getActiveNetwork();
-        final NetworkCapabilities activeCapabilities = activeNetwork == null
-                ? null
-                : manager.getNetworkCapabilities(activeNetwork);
-        if (activeCapabilities == null
-                || !activeCapabilities.hasTransport(
-                        NetworkCapabilities.TRANSPORT_WIFI)) {
-            // 无法把当前 PTP/IP socket 可靠归属到某一 Wi‑Fi Network 时，不
-            // 监听“任意 Wi‑Fi 丢失”；否则无关网络离线会误断仍健康的相机会话。
-            // 这种少见的非默认相机 Wi‑Fi 场景由 event probe 心跳判活。
-            return;
-        }
-        final Network cameraNetwork = activeNetwork;
+        // 同步种子化现有 Wi‑Fi 候选网络：onAvailable 是异步回调，不能假设它
+        // 先于 cameraExecutor 里的 connect 执行；首次连接大概率尚未收到回调。
+        seedCameraWifiNetwork(manager);
         wifiNetworkCallback = new ConnectivityManager.NetworkCallback() {
-            @Override public void onLost(Network network) {
-                if (!cameraNetwork.equals(network)) return;
+            @Override public void onAvailable(Network network) {
                 mainHandler.post(() -> {
+                    if (wifiNetworkCallback == this
+                            && callbackGeneration == wifiConnectionGeneration) {
+                        // 缓存最近可用的 Wi‑Fi 网络作为相机候选网络；无互联网的
+                        // 相机 Wi‑Fi 也会上报（请求未声明 NET_CAPABILITY_INTERNET）。
+                        cameraWifiNetwork = network;
+                    }
+                });
+            }
+
+            @Override public void onLost(Network network) {
+                mainHandler.post(() -> {
+                    // 只响应当前会话实际绑定的网络丢失；未显式绑定时（默认路由）
+                    // 退回候选相机网络比对，无关网络离线不影响健康会话。
+                    Network boundNetwork = wifiSessionNetwork != null
+                            ? wifiSessionNetwork
+                            : cameraWifiNetwork;
+                    if (cameraWifiNetwork != null && cameraWifiNetwork.equals(network)) {
+                        cameraWifiNetwork = null;
+                    }
+                    if (boundNetwork == null || !boundNetwork.equals(network)) return;
                     if (wifiNetworkCallback == this
                             && callbackGeneration == wifiConnectionGeneration
                             && wifiConnected
@@ -15270,6 +15303,33 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) {
             wifiNetworkCallback = null;
         }
+    }
+
+    /** 用 getAllNetworks() 同步枚举现有 Wi‑Fi 网络填充候选缓存；优先无互联网
+     *  的 Wi‑Fi（相机 AP 典型形态），否则取任一 Wi‑Fi。onAvailable 随后会按
+     *  实际回调刷新该缓存。 */
+    private void seedCameraWifiNetwork(ConnectivityManager manager) {
+        Network fallback = null;
+        try {
+            for (Network network : manager.getAllNetworks()) {
+                NetworkCapabilities capabilities =
+                        manager.getNetworkCapabilities(network);
+                if (capabilities == null
+                        || !capabilities.hasTransport(
+                                NetworkCapabilities.TRANSPORT_WIFI)) {
+                    continue;
+                }
+                if (!capabilities.hasCapability(
+                        NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    cameraWifiNetwork = network;
+                    return;
+                }
+                fallback = network;
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+        if (fallback != null) cameraWifiNetwork = fallback;
     }
 
     private void unregisterWifiNetworkCallback() {

@@ -873,6 +873,12 @@ public partial class MainWindow : Window
     private bool _wifiCancellationPending;
     private int _wifiMissedHeartbeats;
     private int _wifiReconnectAttempt;
+    // 心跳重入保护：上一拍探测未结束时跳过新 tick，避免叠加探测在
+    // _probeGate 上排队耗尽自身 3s 超时被误计为漏拍。
+    private int _wifiHeartbeatProbeInFlight;
+    // NetworkAddressChanged 事件成批到达，按时间窗合并为一次即时探测。
+    private const long WifiAddressChangeProbeCoalesceMs = 3000;
+    private long _wifiAddressChangeProbeAt;
     private string _wifiHost = "192.168.1.1";
     private int _wifiPort = 15740;
     private TextBox? _wifiHostBox;
@@ -2162,7 +2168,7 @@ public partial class MainWindow : Window
         };
         wifiLiveView.Click += async (_, _) =>
         {
-            if (!_wifiCamera.IsConnected)
+            if (!IsWifiCameraReady())
             {
                 return;
             }
@@ -2390,6 +2396,10 @@ public partial class MainWindow : Window
         _lastConnectionError = null;
         var connectionAttempt = BeginWifiConnectionAttempt();
         long? ownedSessionGeneration = null;
+        // 12s 预算只覆盖 TCP 连接 + PTP/IP 握手（该阶段没有传输层 deadline）；
+        // 握手成功后重置为 30s，供厂商识别 / 取景恢复 / 参数读取 / 探测使用，
+        // 避免任一慢但健康的阶段烧光整段共享预算导致误判“连接超时”。
+        var handshakeCompleted = false;
         var cancellation = new CancellationTokenSource(
             TimeSpan.FromSeconds(12));
         _wifiConnectCts = cancellation;
@@ -2407,6 +2417,8 @@ public partial class MainWindow : Window
                 connectionAttempt,
                 reconnecting: false,
                 cancellation.Token);
+            handshakeCompleted = true;
+            cancellation.CancelAfter(TimeSpan.FromSeconds(30));
             // E3 1.5.9：识别厂商；尼康/佳能自动恢复实时取景与参数。
             await _wifiCamera.DetectVendorAsync(cancellation.Token);
             EnsureWifiConnectionAttemptCurrent(
@@ -2475,7 +2487,14 @@ public partial class MainWindow : Window
             {
                 return;
             }
-            _wifiLastConnectionError = "Wi‑Fi 相机连接超时";
+            _diagnostics.Warning(
+                "wifi-camera",
+                handshakeCompleted
+                    ? "PTP/IP 连接初始化阶段超时（握手已完成）"
+                    : "PTP/IP 握手超时");
+            _wifiLastConnectionError = handshakeCompleted
+                ? "无法建立 Wi‑Fi/PTP‑IP 连接"
+                : "Wi‑Fi 相机连接超时";
             _lastConnectionError = _wifiLastConnectionError;
             _wifiConnecting = false;
             _wifiCancellationPending = false;
@@ -2685,11 +2704,17 @@ public partial class MainWindow : Window
         IsWifiConnectionGenerationCurrent(connectionGeneration) &&
         _wifiReconnecting == reconnecting;
 
+    /// <summary>
+    /// 操作级就绪门控：除传输已连接外，还要求不在连接/重连/取消流程中，
+    /// 且会话所有权已发布——重连恢复窗口（TCP 已通、厂商/参数尚未恢复）
+    /// 内 IsConnected 已为 true，但会话仍半初始化，用户操作必须被挡在门外。
+    /// </summary>
     private bool IsWifiCameraReady() =>
         _wifiCamera.IsConnected &&
         !_wifiConnecting &&
         !_wifiReconnecting &&
-        !_wifiCancellationPending;
+        !_wifiCancellationPending &&
+        Volatile.Read(ref _wifiOwnedSessionGeneration) > 0;
 
     private bool IsPublishedWifiSessionCurrent(
         long connectionGeneration,
@@ -2736,6 +2761,12 @@ public partial class MainWindow : Window
             .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
         System.Net.NetworkInformation.NetworkChange
             .NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
+        // NetworkAvailabilityChanged 是整机聚合：切走相机 Wi‑Fi 而以太网仍在时
+        // 不会触发；NetworkAddressChanged 在接口地址变化时必触发，补上这个盲区。
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAddressChanged -= OnNetworkAddressChanged;
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAddressChanged += OnNetworkAddressChanged;
     }
 
     private void StopWifiMonitoring()
@@ -2745,6 +2776,8 @@ public partial class MainWindow : Window
         _wifiReconnectCts = null;
         System.Net.NetworkInformation.NetworkChange
             .NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+        System.Net.NetworkInformation.NetworkChange
+            .NetworkAddressChanged -= OnNetworkAddressChanged;
     }
 
     private async Task CleanupFailedWifiConnectionAsync(
@@ -3057,7 +3090,7 @@ public partial class MainWindow : Window
 
     private async Task StepWifiIsoAsync(int direction)
     {
-        if (!_wifiCamera.IsConnected) return;
+        if (!IsWifiCameraReady()) return;
         var values = new[] { 64, 80, 100, 125, 160, 200, 250, 320, 400, 500,
             640, 800, 1000, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400,
             8000, 10000, 12800, 16000, 20000, 25600, 32000, 40000, 51200,
@@ -3079,7 +3112,7 @@ public partial class MainWindow : Window
 
     private async Task StepWifiApertureAsync(int direction)
     {
-        if (!_wifiCamera.IsConnected) return;
+        if (!IsWifiCameraReady()) return;
         var values = new[] { 1.4, 1.6, 1.8, 2.0, 2.2, 2.5, 2.8, 3.2, 3.5,
             4.0, 4.5, 5.0, 5.6, 6.3, 7.1, 8.0, 9.0, 10.0, 11.0, 13.0, 14.0,
             16.0, 18.0, 20.0, 22.0 };
@@ -3101,7 +3134,7 @@ public partial class MainWindow : Window
 
     private async Task StepWifiShutterAsync(int direction)
     {
-        if (!_wifiCamera.IsConnected) return;
+        if (!IsWifiCameraReady()) return;
         // E3 遗留缺陷修复（pro 已裁定属实）：旧实现用降序分母 +
         // Array.FindIndex(1.0/d <= seconds) 恒命中首档 d=8000，无法步进。
         // 现改为升序秒值阶梯 + firstAtLeast，与 E4 Android/Harmony 同构。
@@ -3145,7 +3178,7 @@ public partial class MainWindow : Window
     /// <summary>Wi‑Fi 录像开关（Nikon 0x920a/0x920b；Canon EVFRecordStatus，TBC）。</summary>
     private async Task ToggleWifiMovieRecordingAsync()
     {
-        if (!_wifiCamera.IsConnected)
+        if (!IsWifiCameraReady())
         {
             return;
         }
@@ -3182,48 +3215,61 @@ public partial class MainWindow : Window
 
     private async void WifiHeartbeatTimer_Tick(object? sender, EventArgs e)
     {
-        var connectionGeneration = Volatile.Read(
-            ref _wifiConnectionGeneration);
-        var sessionGeneration = Volatile.Read(
-            ref _wifiOwnedSessionGeneration);
-        if (!_wifiCamera.IsConnected ||
-            !IsPublishedWifiSessionCurrent(
-                connectionGeneration,
-                sessionGeneration))
+        // 重入保护：上一拍探测未结束时跳过本次 tick，避免叠加 tick 在
+        // _probeGate 上排队、耗尽自身 3s 探测超时被误计为一次漏拍。
+        if (Interlocked.Exchange(ref _wifiHeartbeatProbeInFlight, 1) != 0)
         {
             return;
         }
-        bool alive;
         try
         {
-            await _wifiCamera.ProbeAsync();
-            alive = true;
-        }
-        catch
-        {
-            alive = false;
-        }
-        if (!_wifiCamera.IsConnected ||
-            !IsPublishedWifiSessionCurrent(
-                connectionGeneration,
-                sessionGeneration))
-        {
-            return;
-        }
-        if (alive)
-        {
-            _wifiMissedHeartbeats = 0;
-        }
-        else
-        {
-            _wifiMissedHeartbeats++;
-            if (_wifiMissedHeartbeats >= 3)
+            var connectionGeneration = Volatile.Read(
+                ref _wifiConnectionGeneration);
+            var sessionGeneration = Volatile.Read(
+                ref _wifiOwnedSessionGeneration);
+            if (!_wifiCamera.IsConnected ||
+                !IsPublishedWifiSessionCurrent(
+                    connectionGeneration,
+                    sessionGeneration))
+            {
+                return;
+            }
+            bool alive;
+            try
+            {
+                await _wifiCamera.ProbeAsync();
+                alive = true;
+            }
+            catch
+            {
+                alive = false;
+            }
+            if (!_wifiCamera.IsConnected ||
+                !IsPublishedWifiSessionCurrent(
+                    connectionGeneration,
+                    sessionGeneration))
+            {
+                return;
+            }
+            if (alive)
             {
                 _wifiMissedHeartbeats = 0;
-                await EnterWifiReconnectingAsync(
-                    connectionGeneration,
-                    sessionGeneration);
             }
+            else
+            {
+                _wifiMissedHeartbeats++;
+                if (_wifiMissedHeartbeats >= 3)
+                {
+                    _wifiMissedHeartbeats = 0;
+                    await EnterWifiReconnectingAsync(
+                        connectionGeneration,
+                        sessionGeneration);
+                }
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _wifiHeartbeatProbeInFlight, 0);
         }
     }
 
@@ -3363,10 +3409,13 @@ public partial class MainWindow : Window
         UpdateEnabledState();
         UpdateLiveViewState();
         long? ownedSessionGeneration = null;
+        var handshakeCompleted = false;
         try
         {
             using var attemptTimeout =
                 CancellationTokenSource.CreateLinkedTokenSource(token);
+            // 与首次连接一致：12s 预算只覆盖 TCP 连接 + 握手，握手成功后
+            // 重置为 30s 供厂商识别 / 取景恢复 / 参数读取 / 探测使用。
             attemptTimeout.CancelAfter(TimeSpan.FromSeconds(12));
             var attemptToken = attemptTimeout.Token;
             var connection = await _wifiCamera.ConnectWithOwnershipAsync(
@@ -3378,6 +3427,8 @@ public partial class MainWindow : Window
                 connectionGeneration,
                 reconnecting: true,
                 attemptToken);
+            handshakeCompleted = true;
+            attemptTimeout.CancelAfter(TimeSpan.FromSeconds(30));
             // E3 1.5.9：重连成功后恢复厂商识别、取景与参数（对齐 iOS 重连路径）。
             await _wifiCamera.DetectVendorAsync(attemptToken);
             EnsureWifiConnectionAttemptCurrent(
@@ -3439,9 +3490,12 @@ public partial class MainWindow : Window
             _diagnostics.Warning(
                 "wifi-camera",
                 $"PTP/IP 自动重连失败：{error.Message}");
-            _wifiLastConnectionError = error is OperationCanceledException
-                ? "Wi‑Fi 相机重连超时"
-                : "无法恢复 Wi‑Fi/PTP‑IP 连接";
+            // 区分超时阶段：握手超时保留“重连超时”，握手后的恢复阶段超时
+            // 归为“无法恢复连接”（详细原因见上方诊断日志）。
+            _wifiLastConnectionError =
+                error is OperationCanceledException && !handshakeCompleted
+                    ? "Wi‑Fi 相机重连超时"
+                    : "无法恢复 Wi‑Fi/PTP‑IP 连接";
             _lastConnectionError = _wifiLastConnectionError;
             ScheduleWifiReconnect();
         }
@@ -3463,6 +3517,30 @@ public partial class MainWindow : Window
                 _ = EnterWifiReconnectingAsync();
             }
         });
+    }
+
+    /// <summary>
+    /// NetworkAddressChanged：相机 Wi‑Fi 接口掉线（即便以太网仍在线）也会触发。
+    /// 不直接拆会话——合并事件风暴后复用心跳 tick 做一次即时探测，探测失败
+    /// 走既有漏拍计数 / EnterWifiReconnectingAsync 重连路径。
+    /// </summary>
+    private void OnNetworkAddressChanged(object? sender, EventArgs e)
+    {
+        if (!_wifiCamera.IsConnected || _wifiManualDisconnect)
+        {
+            return;
+        }
+        var now = Environment.TickCount64;
+        var last = Interlocked.Read(ref _wifiAddressChangeProbeAt);
+        if (now - last < WifiAddressChangeProbeCoalesceMs ||
+            Interlocked.CompareExchange(
+                ref _wifiAddressChangeProbeAt, now, last) != last)
+        {
+            // 时间窗内已合并过一次（或并发事件已认领本次窗口），跳过。
+            return;
+        }
+        // tick 内部自带会话发布 / 手动断连 / 重连中门控与重入保护。
+        Dispatcher.Invoke(() => WifiHeartbeatTimer_Tick(this, EventArgs.Empty));
     }
 
     private FrameworkElement BuildCaptureAssistSettingsPanel()
@@ -4173,11 +4251,11 @@ public partial class MainWindow : Window
     {
         if (_operationInProgress ||
             (!_camera.IsConnected && !_localCamera.IsConnected &&
-             !_wifiCamera.IsConnected))
+             !IsWifiCameraReady()))
         {
             return;
         }
-        if (_wifiCamera.IsConnected && !_camera.IsConnected && !_localCamera.IsConnected)
+        if (IsWifiCameraReady() && !_camera.IsConnected && !_localCamera.IsConnected)
         {
             if (_wifiCamera.IsLiveView)
             {
@@ -5043,7 +5121,7 @@ public partial class MainWindow : Window
             });
             return;
         }
-        if (!_camera.IsConnected && _wifiCamera.IsConnected)
+        if (!_camera.IsConnected && IsWifiCameraReady())
         {
             if (_videoMode)
             {
@@ -10044,7 +10122,7 @@ public partial class MainWindow : Window
         RoutedEventArgs e)
     {
         if (_cameraStorageBusy) return;
-        if (!_camera.IsConnected && !_wifiCamera.IsConnected)
+        if (!_camera.IsConnected && !IsWifiCameraReady())
         {
             CameraStorageStatusText.Text = AppLocalization.T(
                 "请先连接 USB/PTP 或 Wi‑Fi/PTP‑IP 相机");
@@ -10286,7 +10364,7 @@ public partial class MainWindow : Window
     {
         _cameraStorageBusy = busy;
         RefreshCameraStorageButton.IsEnabled =
-            !busy && (_camera.IsConnected || _wifiCamera.IsConnected);
+            !busy && (_camera.IsConnected || IsWifiCameraReady());
         SelectAllCameraStorageButton.IsEnabled =
             !busy && _cameraStorageRows.Count > 0;
         if (!string.IsNullOrWhiteSpace(status))

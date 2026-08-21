@@ -1612,6 +1612,15 @@ private actor PTPIPSession {
         )
     }
 
+    /// 前台恢复用的轻量探测：已有心跳在飞时直接放弃（返回 false），
+    /// 说明链路保活仍在运行，无需也不应并发第二次 Probe。
+    /// beginProbe 前无 await，check-then-act 在 actor 内原子完成。
+    func probeIfIdle(timeoutMilliseconds: UInt64 = 3000) async throws -> Bool {
+        if probeInProgress { return false }
+        try await probe(timeoutMilliseconds: timeoutMilliseconds)
+        return true
+    }
+
     private func beginProbe() throws -> (
         command: NWConnection,
         event: NWConnection,
@@ -2284,7 +2293,14 @@ private actor PTPIPSession {
                     switch state {
                     case .ready:
                         box.resume()
-                    case .failed(let error), .waiting(let error):
+                    // .waiting 是"等待网络路径变化"（Wi‑Fi 重关联/暂时无路由），
+                    // Apple 官方语义为可恢复，不等于 failed。此处不判失败，
+                    // 交给会话级 12 秒握手 deadline（expireConnectionAttempt）
+                    // 与任务取消（onCancel → connection.cancel）裁决终局；
+                    // 若在 deadline 前恢复为 .ready 则正常继续。
+                    case .waiting:
+                        break
+                    case .failed(let error):
                         box.resume(
                             throwing: PTPIPError.connectionFailed(
                                 error.localizedDescription
@@ -2791,6 +2807,32 @@ final class WifiCameraService: ObservableObject {
                             return
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// 前后台恢复（1.5.15 稳定性批）：回前台时若仍显示已连接，立即做一次
+    /// event 通道 Probe，不等下一个 5s 心跳周期——后台期间 iOS 会挂起
+    /// 定时器与 NWConnection 回调，死链可能潜伏到最坏 ~24s 后才被发现。
+    /// 心跳在飞时 probeIfIdle 自动放弃；探测失败直接走既有离线重连。
+    func resumeAfterForeground() {
+        guard state == .ready,
+              !manualDisconnect,
+              let sessionAttempt = activeSessionAttempt else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.withSessionOwnership(sessionAttempt) {
+                do {
+                    _ = try await self.session.probeIfIdle(
+                        timeoutMilliseconds: Self.probeTimeoutMilliseconds
+                    )
+                } catch {
+                    guard !Task.isCancelled,
+                          self.isCurrentSessionAttempt(sessionAttempt),
+                          !self.manualDisconnect else { return }
+                    self.missedHeartbeats = 0
+                    self.enterReconnecting()
                 }
             }
         }

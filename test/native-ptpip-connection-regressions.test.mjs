@@ -489,7 +489,7 @@ test('Harmony connect generations invalidate stale handshakes and close local ch
     'native/harmony/entry/src/main/ets/camera/PtpIpCamera.ets');
   const connect = blockStartingAt(
     harmony,
-    'async connect(host: string, port: number): Promise<string>',
+    'netHandle?: connection.NetHandle\n  ): Promise<string>',
   );
   const disconnect = blockStartingAt(harmony, 'async disconnect(): Promise<void>');
   const cleanup = blockStartingAt(harmony, 'private async cleanupConnectAttempt(');
@@ -525,7 +525,7 @@ test('Harmony disconnect aborts pending handshakes and remote command closure po
   const channel = blockStartingAt(harmony, 'class PtpIpChannel');
   const connect = blockStartingAt(
     harmony,
-    'async connect(host: string, port: number): Promise<string>',
+    'netHandle?: connection.NetHandle\n  ): Promise<string>',
   );
   const close = blockStartingAt(harmony, 'private async closePublishedConnection(');
   const markFailed = blockStartingAt(

@@ -82,21 +82,23 @@ test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () =
   assert.match(activity, /wifiReconnecting/);
   assert.match(activity, /wifiManualDisconnect/);
 
-  // NetworkCallback 网络监听
+  // NetworkCallback 网络监听（NetworkRequest 覆盖无互联网的相机 Wi‑Fi）
   assert.match(activity, /ConnectivityManager\.NetworkCallback/);
   assert.match(activity, /registerNetworkCallback/);
   assert.match(activity, /addTransportType\(NetworkCapabilities\.TRANSPORT_WIFI\)/);
   assert.match(activity, /callbackGeneration = wifiConnectionGeneration/);
-  assert.match(activity, /activeNetwork = manager\.getActiveNetwork\(\)/);
+  // 不再读取系统默认网络来决定是否监听（非默认相机 Wi‑Fi 也必须覆盖）
+  assert.doesNotMatch(activity, /getActiveNetwork\(\)/);
+  // onAvailable 缓存相机候选网络；连接时注入其 SocketFactory 绑定 socket
+  assert.match(activity, /onAvailable\(Network network\)/);
+  assert.match(activity, /cameraWifiNetwork = network/);
+  assert.match(activity, /sessionNetwork\.getSocketFactory\(\)/);
+  assert.match(activity, /wifiCamera\.setSocketFactory\(/);
+  // onLost 只响应当前会话实际绑定的网络丢失
+  assert.match(activity, /onLost\(Network network\)/);
   assert.match(
     activity,
-    /activeCapabilities[\s\S]{0,160}hasTransport\([\s\S]{0,80}NetworkCapabilities\.TRANSPORT_WIFI/
-  );
-  assert.match(activity, /final Network cameraNetwork = activeNetwork/);
-  assert.match(activity, /if \(!cameraNetwork\.equals\(network\)\) return/);
-  assert.match(
-    activity,
-    /无法把当前 PTP\/IP socket 可靠归属[\s\S]{0,260}return;/,
+    /Network boundNetwork = wifiSessionNetwork[\s\S]{0,400}if \(boundNetwork == null \|\| !boundNetwork\.equals\(network\)\) return;/,
   );
   assert.match(activity, /wifiNetworkCallback == this/);
   assert.match(activity, /heartbeatGeneration != wifiConnectionGeneration/);
@@ -104,6 +106,11 @@ test('Android exposes probe, heartbeat, backoff and NetworkCallback', async () =
     activity,
     /enterWifiReconnecting\(\)[\s\S]{0,300}wifiConnected = false[\s\S]{0,180}unregisterWifiNetworkCallback\(\)/,
   );
+
+  // 传输层 socket 工厂注入（默认工厂 + open() 双通道都走工厂）
+  assert.match(transport, /import javax\.net\.SocketFactory;/);
+  assert.match(transport, /void setSocketFactory\(SocketFactory factory\)/);
+  assert.match(transport, /Socket socket = socketFactory\.createSocket\(\)/);
 
   // UI 呈现：重连中
   assert.match(activity, /正在自动重连|正在重连 Wi‑Fi 相机/);

@@ -823,6 +823,7 @@ struct RootView: View {
                 DiagnosticLogger.shared.info("app", "应用进入前台")
                 model.camera.refreshDevices()
                 model.camera.resume()
+                model.wifiCamera.resumeAfterForeground()
             } else {
                 DiagnosticLogger.shared.info("app", "应用离开前台")
                 model.camera.suspend()

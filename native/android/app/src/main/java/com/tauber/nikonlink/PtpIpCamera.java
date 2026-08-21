@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Locale;
+import javax.net.SocketFactory;
 
 final class PtpIpCamera implements Closeable {
     private static final int PACKET_INIT_COMMAND_REQUEST = 1;
@@ -63,6 +64,9 @@ final class PtpIpCamera implements Closeable {
     private volatile Socket eventSocket;
     private volatile Socket connectingCommandSocket;
     private volatile Socket connectingEventSocket;
+    // 默认走系统路由；MainActivity 在相机 Wi‑Fi 非默认网络时注入
+    // Network.getSocketFactory()，把 PTP/IP socket 绑定到相机所在 Wi‑Fi。
+    private volatile SocketFactory socketFactory = SocketFactory.getDefault();
     private final Object transportLock = new Object();
     private long transportGeneration;
     private InputStream commandInput;
@@ -81,6 +85,11 @@ final class PtpIpCamera implements Closeable {
     private CameraVendor vendor = CameraVendor.UNKNOWN;
     private boolean liveView;
     private boolean movieRecording;
+
+    /** 注入 socket 工厂（传 null 恢复默认路由）；须在 connect() 前调用。 */
+    synchronized void setSocketFactory(SocketFactory factory) {
+        socketFactory = factory != null ? factory : SocketFactory.getDefault();
+    }
 
     synchronized String connect(String host, int port) throws Exception {
         close();
@@ -948,7 +957,7 @@ final class PtpIpCamera implements Closeable {
             int port,
             long generation,
             boolean commandChannel) throws IOException {
-        Socket socket = new Socket();
+        Socket socket = socketFactory.createSocket();
         synchronized (transportLock) {
             ensureTransportGenerationLocked(generation);
             if (commandChannel) connectingCommandSocket = socket;

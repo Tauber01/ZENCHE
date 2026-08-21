@@ -1,4 +1,4 @@
-import { socket } from '@kit.NetworkKit';
+import { connection, socket } from '@kit.NetworkKit';
 import { BusinessError } from '@kit.BasicServicesKit';
 import {
   CameraStorageItem,
@@ -18,6 +18,13 @@ class PtpIpPacket {
     this.type = type;
     this.data = data;
   }
+}
+
+/**
+ * PtpIpChannel.receive 在限定时间内未收到完整 PTP/IP 包时抛出；
+ * 事件 reader 据此区分“空转超时”（继续等）与真正的通道关闭/错误。
+ */
+class PtpIpReceiveTimeoutError extends Error {
 }
 
 class PtpIpResponseError extends Error {
@@ -54,8 +61,18 @@ class PtpIpChannel {
     this.failureHandler = handler;
   }
 
-  async connect(host: string, port: number): Promise<void> {
+  async connect(
+    host: string,
+    port: number,
+    netHandle?: connection.NetHandle
+  ): Promise<void> {
     this.closed = false;
+    if (netHandle !== undefined) {
+      // 相机 Wi-Fi 常无互联网：蜂窝为默认网络时把 socket 显式绑定到相机
+      // 网络（bindSocket 是 NetHandle 的方法，入参为 TCPSocket），避免
+      // PTP/IP 流量走错出口。
+      await netHandle.bindSocket(this.tcp);
+    }
     await this.tcp.connect({
       address: {
         address: host,
@@ -92,7 +109,7 @@ class PtpIpChannel {
       }
       await delay(10);
     }
-    throw new Error('相机未在限定时间内返回 PTP/IP 响应');
+    throw new PtpIpReceiveTimeoutError('相机未在限定时间内返回 PTP/IP 响应');
   }
 
   async close(): Promise<void> {
@@ -213,23 +230,48 @@ export class PtpIpCamera {
   private probeResponseSequence: number = 0;
   private probeInProgress: boolean = false;
   private commandChannelFailure?: Error;
+  // 本次会话 socket 绑定到的相机 Wi-Fi NetHandle（未绑定时为 undefined）。
+  private boundNetHandle?: connection.NetHandle;
   private transaction: number = 1;
   private nameValue: string = 'PTP/IP Camera';
   private vendorValue: CameraVendor = CameraVendor.UNKNOWN;
   private liveViewValue: boolean = false;
   private movieRecordingValue: boolean = false;
 
+  /** 本次会话实际绑定的相机 Wi-Fi NetHandle（未绑定时为 undefined）。 */
+  get netHandle(): connection.NetHandle | undefined {
+    return this.boundNetHandle;
+  }
+
   get isConnected(): boolean {
     return this.command !== undefined && this.commandChannelFailure === undefined;
   }
 
-  /** 在 UI 发布“已连接”前确认命令通道未被初始化事务毒化。 */
-  assertHealthy(): void {
+  /**
+   * 在 UI 发布“已连接”前确认命令通道未被初始化事务毒化，并以一次真实的
+   * Probe（type 13/14）往返作为健康屏障；探测后再次校验命令通道，防止
+   * 探测期间通道被关闭却仍发布为已连接。前置字段检查保持同步快速失败。
+   */
+  async assertHealthy(): Promise<void> {
     if (this.command === undefined) {
       throw new Error('请先连接 Wi‑Fi 相机');
     }
-    if (this.commandChannelFailure !== undefined) {
-      throw this.commandChannelFailure;
+    // ArkTS 不允许 throw 类型为 Error | undefined 的字段；先取本地常量再抛。
+    const failure: Error | undefined = this.commandChannelFailure;
+    if (failure !== undefined) {
+      throw failure;
+    }
+    // 心跳可能已在飞（连接后的参数刷新路径也会调用本方法）：probe 拒绝
+    // 并发探测，而在飞的探测本身就是存活裁决，直接复用而不重复发 Probe。
+    if (!this.probeInProgress) {
+      await this.probe(3000);
+    }
+    if (this.command === undefined) {
+      throw new Error('请先连接 Wi‑Fi 相机');
+    }
+    const postProbeFailure: Error | undefined = this.commandChannelFailure;
+    if (postProbeFailure !== undefined) {
+      throw postProbeFailure;
     }
   }
 
@@ -264,7 +306,11 @@ export class PtpIpCamera {
     return this.movieRecordingValue;
   }
 
-  async connect(host: string, port: number): Promise<string> {
+  async connect(
+    host: string,
+    port: number,
+    netHandle?: connection.NetHandle
+  ): Promise<string> {
     const generation: number = ++this.connectionGeneration;
     await this.closePublishedConnection();
     this.ensureConnectionGeneration(generation);
@@ -278,7 +324,7 @@ export class PtpIpCamera {
     this.pendingCommand = command;
     let event: PtpIpChannel | undefined;
     try {
-      await command.connect(host.trim(), port);
+      await command.connect(host.trim(), port, netHandle);
       this.ensureConnectionGeneration(generation);
       const initialization: Array<number> = [];
       for (let index: number = 0; index < 16; index++) {
@@ -301,7 +347,7 @@ export class PtpIpCamera {
 
       event = new PtpIpChannel();
       this.pendingEvent = event;
-      await event.connect(host.trim(), port);
+      await event.connect(host.trim(), port, netHandle);
       this.ensureConnectionGeneration(generation);
       const eventInitialization: Uint8Array = new Uint8Array(4);
       writeU32(eventInitialization, 0, connectionNumber);
@@ -319,6 +365,7 @@ export class PtpIpCamera {
       this.pendingEvent = undefined;
       this.command = command;
       this.event = event;
+      this.boundNetHandle = netHandle;
       this.startEventReader(event);
       const response: number = await this.sendCommand(0x1002, 0, [1]);
       if (response !== 0x2001) {
@@ -451,6 +498,7 @@ export class PtpIpCamera {
     this.liveViewValue = false;
     this.movieRecordingValue = false;
     this.commandChannelFailure = undefined;
+    this.boundNetHandle = undefined;
     const closes: Array<Promise<void>> = [];
     if (pendingCommand !== undefined) {
       closes.push(pendingCommand.close());
@@ -495,6 +543,7 @@ export class PtpIpCamera {
       this.liveViewValue = false;
       this.movieRecordingValue = false;
       this.commandChannelFailure = undefined;
+      this.boundNetHandle = undefined;
     }
     try {
       await command.close();
@@ -1214,6 +1263,13 @@ export class PtpIpCamera {
       } catch (error) {
         if (generation !== this.eventGeneration || this.event !== event) {
           return;
+        }
+        // PtpIpChannel.receive 的空转超时（PtpIpReceiveTimeoutError，
+        // “相机未在限定时间内返回 PTP/IP 响应”）不代表链路死亡：心跳探测
+        // 暂停而 reader 仍在运行时也会触发。记录后继续循环，存活裁决仍归
+        // 心跳 probe；只有真正的关闭/错误才断开会话。
+        if (error instanceof PtpIpReceiveTimeoutError) {
+          continue;
         }
         await this.disconnect();
         return;

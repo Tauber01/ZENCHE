@@ -1030,6 +1030,13 @@ struct Index {
   private sourceSwitchGeneration: number = 0;
   private wifiSourceGeneration: number = 0;
   private wifiNetConnection?: connection.NetConnection;
+  // 相机 Wi-Fi 网络的 NetHandle 缓存：netId 用于过滤 netLost/netAvailable
+  // 回调（跨重关联 handle 会变，重连前重新解析）。
+  private wifiCameraNetHandle?: connection.NetHandle;
+  private wifiCameraNetId: number = 0;
+  // 前台恢复时间戳（EntryAbility.onForeground 写入）：变化时立刻补一次心跳。
+  @StorageLink('zencheForegroundAt') @Watch('onForegroundReturn')
+  private foregroundAt: number = 0;
   private static readonly WIFI_HEARTBEAT_INTERVAL_MS: number = 5000;
   private static readonly WIFI_OFFLINE_THRESHOLD: number = 3;
   private static readonly WIFI_RECONNECT_BACKOFF_MS: Array<number> =
@@ -11658,9 +11665,15 @@ struct Index {
         await this.discardCancelledWifiConnection(camera, attempt);
         return;
       }
+      // 相机 Wi-Fi 通常无互联网：先解析其 NetHandle，connect 时把 PTP/IP
+      // socket 绑定到该网络，避免蜂窝为默认网络时流量走错出口；解析不到
+      // 则按未绑定旧行为继续。
+      const netHandle: connection.NetHandle | undefined =
+        this.resolveWifiCameraNetHandle(this.wifiHost.trim());
       const name: string = await camera.connect(
         this.wifiHost.trim(),
-        port
+        port,
+        netHandle
       );
       if (!this.isCurrentWifiAttempt(attempt, camera) ||
         this.wifiManualDisconnect || !this.wifiConnecting ||
@@ -11668,6 +11681,7 @@ struct Index {
         await this.discardCancelledWifiConnection(camera, attempt);
         return;
       }
+      this.cacheWifiCameraNetHandle(camera);
       // E4 1.5.9：识别厂商（GetDeviceInfo 0x1001 + 名称启发式）；尼康/佳能
       // 自动开实时取景并拉帧，刷新参数（镜像 Windows E3 连接路径与 Android
       // E4 同构；Android/Harmony 不做 autoStartLiveViewOnConnect 门控）。
@@ -11699,7 +11713,7 @@ struct Index {
         return;
       }
       await this.refreshWifiParametersFor(camera, attempt);
-      camera.assertHealthy();
+      await camera.assertHealthy();
       if (!this.isCurrentWifiAttempt(attempt, camera) ||
         this.wifiManualDisconnect || !this.wifiConnecting ||
         this.wifiReconnecting) {
@@ -11785,6 +11799,7 @@ struct Index {
     this.stopWifiHeartbeat();
     this.stopWifiReconnect();
     this.unregisterWifiNetConnection();
+    this.clearWifiCameraNetHandle();
     // 先发布 attempt 失效并直接关闭捕获实例的 TCP；失联时若先等待
     // EndLiveView，源切换会被命令超时拖住，旧回调也可能碰到新实例。
     if (this.wifiLiveView || this.wifiMovieRecording || this.liveView) {
@@ -11885,7 +11900,7 @@ struct Index {
         `读取 Wi‑Fi 快门失败：${(error as Error).message}`
       );
     }
-    camera.assertHealthy();
+    await camera.assertHealthy();
     if (!this.isCurrentWifiAttempt(attempt, camera)) return;
     this.wifiParameterReadout = this.wifiParameterReadoutText();
   }
@@ -12086,6 +12101,9 @@ struct Index {
     this.wifiReconnectAttempt = 0;
     this.stopWifiHeartbeat();
     this.unregisterWifiNetConnection();
+    // 进入重连即作废旧 handle：重关联后 netId 会变；netAvailable 在
+    // “未知 handle”下退回旧行为（任何 Wi-Fi 恢复都提前唤醒退避）。
+    this.clearWifiCameraNetHandle();
     // E4 1.5.9：链路离线即停 Wi‑Fi 取景/录像并清控制状态
     // （重连成功后再恢复，镜像 Android enterWifiReconnecting 与 Windows
     // AttemptWifiReconnectAsync 的清理路径）。
@@ -12175,9 +12193,13 @@ struct Index {
         await this.discardCancelledWifiConnection(camera, attempt);
         return;
       }
+      // 重连需重新解析 NetHandle：跨重关联 handle/netId 会变。
+      const netHandle: connection.NetHandle | undefined =
+        this.resolveWifiCameraNetHandle(this.wifiHost.trim());
       const name: string = await camera.connect(
         this.wifiHost.trim(),
-        Number(this.wifiPort)
+        Number(this.wifiPort),
+        netHandle
       );
       if (!this.isCurrentWifiAttempt(attempt, camera) ||
         !this.wifiReconnecting || this.wifiManualDisconnect ||
@@ -12185,6 +12207,7 @@ struct Index {
         await this.discardCancelledWifiConnection(camera, attempt);
         return;
       }
+      this.cacheWifiCameraNetHandle(camera);
       // E4 1.5.9：重连成功后恢复厂商识别、自动取景与参数刷新
       // （对齐 Windows AttemptWifiReconnectAsync 与 Android 重连路径）。
       const detectedVendor: CameraVendor = await camera.detectVendor();
@@ -12215,7 +12238,7 @@ struct Index {
         return;
       }
       await this.refreshWifiParametersFor(camera, attempt);
-      camera.assertHealthy();
+      await camera.assertHealthy();
       if (!this.isCurrentWifiAttempt(attempt, camera) ||
         !this.wifiReconnecting || this.wifiManualDisconnect ||
         !this.wifiConnecting) {
@@ -12275,20 +12298,25 @@ struct Index {
       const netConnection: connection.NetConnection =
         connection.createNetConnection(specifier);
       this.wifiNetConnection = netConnection;
-      netConnection.on('netLost', (): void => {
+      netConnection.on('netLost', (netHandle: connection.NetHandle): void => {
+        // 只有丢失的网络确为相机 Wi-Fi（netId 匹配）才进入重连；
+        // 从未解析到相机 handle 时退回旧行为，避免未知 handle 永不重连。
         if (this.wifiNetConnection === netConnection &&
           this.isCurrentWifiAttempt(attempt, camera) &&
-          this.wifiConnected && !this.wifiManualDisconnect) {
+          this.wifiConnected && !this.wifiManualDisconnect &&
+          this.matchesCameraNetHandle(netHandle)) {
           this.enterWifiReconnecting();
         }
       });
       netConnection.on(
         'netAvailable',
         (netHandle: connection.NetHandle): void => {
+          // 同理：只有相机网络恢复（或尚未解析到相机 handle）才提前唤醒退避。
           if (this.wifiNetConnection === netConnection &&
             this.wifiSourceGeneration === sourceGeneration &&
             this.sourceSwitchGeneration === sourceGeneration &&
-            this.wifiReconnecting && !this.wifiManualDisconnect) {
+            this.wifiReconnecting && !this.wifiManualDisconnect &&
+            this.matchesCameraNetHandle(netHandle)) {
             this.wakeWifiReconnect();
           }
         }
@@ -12322,6 +12350,132 @@ struct Index {
       } catch (error) {
       }
     }
+  }
+
+  /** 缓存本次会话实际使用的相机 Wi-Fi NetHandle（含 netId 快照）。 */
+  private cacheWifiCameraNetHandle(camera: PtpIpCamera): void {
+    this.wifiCameraNetHandle = camera.netHandle;
+    this.wifiCameraNetId = camera.netHandle !== undefined
+      ? camera.netHandle.netId
+      : 0;
+  }
+
+  private clearWifiCameraNetHandle(): void {
+    this.wifiCameraNetHandle = undefined;
+    this.wifiCameraNetId = 0;
+  }
+
+  /**
+   * 回调 handle 是否属于相机 Wi-Fi：已解析到相机网络时按 netId 比较；
+   * 从未解析成功（或回调未携带 handle）时不过滤，保持旧行为，避免
+   * “未知 handle 即永不重连”。
+   */
+  private matchesCameraNetHandle(netHandle?: connection.NetHandle): boolean {
+    if (netHandle === undefined || this.wifiCameraNetId === 0) {
+      return true;
+    }
+    return netHandle.netId === this.wifiCameraNetId;
+  }
+
+  /**
+   * 解析相机 Wi-Fi 的 NetHandle：遍历 getAllNetsSync()，取 bearerTypes 含
+   * Wi-Fi（getNetCapabilitiesSync）且连接属性的 linkAddresses 中有与
+   * wifiHost 同 IPv4 子网（按 prefixLength 掩码比较）的 handle。注意
+   * linkAddresses 在 ConnectionProperties（getConnectionPropertiesSync）
+   * 上，不在 NetCapabilities 上。子网判不出来（非 IPv4 或地址未暴露）时，
+   * 若全局只有一个 Wi-Fi handle 则退回该唯一 handle。解析不到返回
+   * undefined，调用方按“未知 handle”保留旧行为（socket 不绑定、回调
+   * 不过滤）。
+   */
+  private resolveWifiCameraNetHandle(
+    host: string
+  ): connection.NetHandle | undefined {
+    try {
+      const handles: Array<connection.NetHandle> = connection.getAllNetsSync();
+      let soleWifiHandle: connection.NetHandle | undefined;
+      let wifiHandleCount: number = 0;
+      for (const handle of handles) {
+        let capabilities: connection.NetCapabilities | undefined;
+        let properties: connection.ConnectionProperties | undefined;
+        try {
+          capabilities = connection.getNetCapabilitiesSync(handle);
+          properties = connection.getConnectionPropertiesSync(handle);
+        } catch (error) {
+          continue;
+        }
+        if (capabilities === undefined || properties === undefined ||
+          !capabilities.bearerTypes.includes(
+            connection.NetBearType.BEARER_WIFI
+          )) {
+          continue;
+        }
+        wifiHandleCount++;
+        soleWifiHandle = handle;
+        for (const link of properties.linkAddresses) {
+          if (Index.sameIpv4Subnet(link.address.address, link.prefixLength,
+            host)) {
+            return handle;
+          }
+        }
+      }
+      // 子网匹配不可用时，唯一 Wi-Fi handle 即视为相机网络。
+      return wifiHandleCount === 1 ? soleWifiHandle : undefined;
+    } catch (error) {
+      return undefined;
+    }
+  }
+
+  /** IPv4 点分串转数值；非 IPv4 返回 undefined。 */
+  private static ipv4ToInt(address: string): number | undefined {
+    const parts: Array<string> = address.split('.');
+    if (parts.length !== 4) {
+      return undefined;
+    }
+    let value: number = 0;
+    for (const part of parts) {
+      if (!/^\d{1,3}$/.test(part)) {
+        return undefined;
+      }
+      const octet: number = Number(part);
+      if (octet > 255) {
+        return undefined;
+      }
+      value = value * 256 + octet;
+    }
+    return value;
+  }
+
+  /** 按 prefixLength 掩码比较两个 IPv4 地址是否同子网。 */
+  private static sameIpv4Subnet(
+    linkAddress: string,
+    prefixLength: number,
+    host: string
+  ): boolean {
+    const linkValue: number | undefined = Index.ipv4ToInt(linkAddress);
+    const hostValue: number | undefined = Index.ipv4ToInt(host);
+    if (linkValue === undefined || hostValue === undefined) {
+      return false;
+    }
+    if (prefixLength <= 0) {
+      return true;
+    }
+    if (prefixLength >= 32) {
+      return linkValue === hostValue;
+    }
+    const divisor: number = Math.pow(2, 32 - prefixLength);
+    return Math.floor(linkValue / divisor) === Math.floor(hostValue / divisor);
+  }
+
+  /**
+   * 前台恢复（EntryAbility.onForeground 写入 zencheForegroundAt）：已连接且
+   * 非手动断连时立刻补一次心跳 tick（复用现有 tick，幂等且内部自带
+   * attempt/连接态守卫），尽快发现后台期间死掉的会话。
+   */
+  private onForegroundReturn(): void {
+    if (!this.wifiConnected || this.wifiManualDisconnect) {
+      return;
+    }
+    this.wifiHeartbeatTick(this.wifiAttemptGeneration, this.wifiCamera);
   }
 
   private async persistWifiConnectionSettings(): Promise<void> {
