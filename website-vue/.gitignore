@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+.npm-cache
+*.local
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+*.log
+
+# 后端私有数据与密钥
+server/data/
+server/*.pem

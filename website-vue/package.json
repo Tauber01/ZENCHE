@@ -1,0 +1,31 @@
+{
+  "name": "zenche-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "帧澈 ZENCHE — 跨平台相机控制与影像传输工具官网",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node --test test/seo.test.mjs",
+    "verify:seo": "npm test && npm run build && node scripts/verify-seo-dist.mjs"
+  },
+  "dependencies": {
+    "@types/three": "^0.169.0",
+    "gsap": "^3.12.5",
+    "three": "^0.169.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}

@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * ZENCHE 主题系统 —— 浅色为默认，深色通过 .dark 类切换
+ * 所有颜色走 CSS 变量，组件用语义类（c-text / c-text-2 / surface 等），
+ * 实现「一套类名，两套主题」。
+ */
+
+:root {
+  color-scheme: light;
+  --c-bg: #eef2f8;
+  --c-bg-grad: radial-gradient(circle at 50% 0%, rgba(47, 128, 255, 0.12), transparent 60%);
+  --c-grid: rgba(47, 128, 255, 0.06);
+  --c-surface: rgba(255, 255, 255, 0.72);
+  --c-surface-2: rgba(255, 255, 255, 0.9);
+  --c-border: rgba(15, 23, 42, 0.08);
+  --c-border-strong: rgba(15, 23, 42, 0.14);
+  --c-text: #0b1220;
+  --c-text-2: #334155;
+  --c-text-3: #64748b;
+  --c-text-4: #94a3b8;
+  --c-text-inv: #ffffff;
+  --c-glow: rgba(47, 128, 255, 0.14);
+  --c-shadow: 0 20px 60px -20px rgba(15, 23, 42, 0.18);
+  --c-grad-text: linear-gradient(90deg, #0b1220, #1e293b, #475569);
+  --c-grad-lens: linear-gradient(90deg, #1a5fd6, #2f80ff, #5b9bff);
+}
+
+.dark {
+  color-scheme: dark;
+  --c-bg: #05070d;
+  --c-bg-grad: radial-gradient(circle at 50% 0%, rgba(47, 128, 255, 0.18), transparent 60%);
+  --c-grid: rgba(47, 128, 255, 0.05);
+  --c-surface: rgba(255, 255, 255, 0.03);
+  --c-surface-2: rgba(255, 255, 255, 0.06);
+  --c-border: rgba(255, 255, 255, 0.08);
+  --c-border-strong: rgba(255, 255, 255, 0.12);
+  --c-text: #e2e8f0;
+  --c-text-2: #cbd5e1;
+  --c-text-3: #94a3b8;
+  --c-text-4: #64748b;
+  --c-text-inv: #ffffff;
+  --c-glow: rgba(47, 128, 255, 0.18);
+  --c-shadow: 0 20px 60px -20px rgba(47, 128, 255, 0.35);
+  --c-grad-text: linear-gradient(90deg, #ffffff, #f1f5f9, #94a3b8);
+  --c-grad-lens: linear-gradient(90deg, #7ab0ff, #2f80ff, #1a5fd6);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: Inter, 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(47, 128, 255, 0.3);
+  color: #fff;
+}
+
+@layer components {
+  /* 玻璃拟态卡片 —— 跟随主题变量 */
+  .glass {
+    background: var(--c-surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--c-border);
+    border-radius: 1rem;
+  }
+  .glass-strong {
+    background: var(--c-surface-2);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--c-border-strong);
+    border-radius: 1rem;
+  }
+  .glass-hover {
+    transition: all 0.5s ease;
+  }
+  .glass-hover:hover {
+    background: var(--c-surface-2);
+    border-color: rgba(47, 128, 255, 0.35);
+    transform: translateY(-4px);
+  }
+
+  /* 语义文字色 */
+  .c-text { color: var(--c-text); }
+  .c-text-2 { color: var(--c-text-2); }
+  .c-text-3 { color: var(--c-text-3); }
+  .c-text-4 { color: var(--c-text-4); }
+  .c-text-inv { color: var(--c-text-inv); }
+
+  /* 渐变文字 */
+  .text-gradient {
+    background: var(--c-grad-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .text-gradient-lens {
+    background: var(--c-grad-lens);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* 按钮：蓝底白字，两色主题通用 */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.75rem;
+    border-radius: 9999px;
+    background: #2f80ff;
+    color: #ffffff;
+    font-weight: 500;
+    box-shadow: 0 8px 30px rgba(47, 128, 255, 0.35);
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    background: #5b9bff;
+    box-shadow: 0 12px 40px rgba(47, 128, 255, 0.5);
+    transform: translateY(-2px);
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.75rem;
+    border-radius: 9999px;
+    background: var(--c-surface);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--c-border-strong);
+    color: var(--c-text);
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  .btn-ghost:hover {
+    border-color: rgba(47, 128, 255, 0.4);
+    color: var(--c-text);
+    transform: translateY(-2px);
+  }
+
+  .section-pad {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  @media (min-width: 768px) {
+    .section-pad { padding-left: 2.5rem; padding-right: 2.5rem; }
+  }
+  @media (min-width: 1024px) {
+    .section-pad { padding-left: 4rem; padding-right: 4rem; }
+  }
+  @media (min-width: 1280px) {
+    .section-pad { padding-left: 6rem; padding-right: 6rem; }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    will-change: opacity, transform;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb {
+  background: rgba(47, 128, 255, 0.25);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(47, 128, 255, 0.45); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+}

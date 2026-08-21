@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05070d" />
+    <link rel="canonical" href="https://zenche.top/" />
+
+    <!-- Primary Meta Tags -->
+    <title>帧澈 ZENCHE — 跨平台相机控制与影像传输工具</title>
+    <meta name="title" content="帧澈 ZENCHE — 跨平台相机控制与影像传输工具" />
+    <meta
+      name="description"
+      content="ZENCHE 是一套本地优先的原生相机工作流工具。在系统能力允许时，通过 USB/PTP 或 Wi‑Fi PTP/IP 连接相机，并通过 FTP、HTTP 或 WebDAV 接收影像。Capture · Connect · Flow"
+    />
+    <meta name="keywords" content="ZENCHE,帧澈,相机控制,Nikon,Sony,Canon,PTP,FTP,WebDAV,RAW,摄影工作流,实时取景,直方图" />
+    <meta name="author" content="ZENCHE" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://zenche.top/" />
+    <meta property="og:title" content="帧澈 ZENCHE — 跨平台相机控制与影像传输工具" />
+    <meta
+      property="og:description"
+      content="本地优先的专业相机工作流。连接相机，也连接完整工作流。Capture · Connect · Flow"
+    />
+    <meta property="og:image" content="https://zenche.top/favicon.png" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="ZENCHE" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="帧澈 ZENCHE — 跨平台相机控制与影像传输工具" />
+    <meta
+      name="twitter:description"
+      content="本地优先的专业相机工作流。连接相机，也连接完整工作流。Capture · Connect · Flow"
+    />
+    <meta name="twitter:image" content="https://zenche.top/favicon.png" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "帧澈 ZENCHE",
+        "alternateName": "ZENCHE",
+        "url": "https://zenche.top/",
+        "applicationCategory": "PhotographyApplication",
+        "operatingSystem": "macOS, Windows, Android, HarmonyOS, iOS, iPadOS",
+        "softwareVersion": "1.5.14",
+        "downloadUrl": "https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14",
+        "description": "跨平台相机控制与影像传输工具。本地优先的原生相机工作流，内置 50 款 Nikon / Sony / Canon 机型档案（设备识别与参数范围，实机验证持续进行中）。Capture · Connect · Flow",
+        "inLanguage": "zh-CN",
+        "author": {
+          "@type": "Person",
+          "name": "Tauber",
+          "url": "https://github.com/Tauber01"
+        },
+        "sameAs": ["https://github.com/Tauber01/ZENCHE"],
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+  </head>
+  <body>
+    <script>
+      // 主题初始化（避免刷新闪烁）：默认浅色，localStorage 记忆用户选择
+      (function () {
+        try {
+          var saved = localStorage.getItem('zenche-theme');
+          if (saved === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <!-- 访问统计 Umami -->
+    <script
+      defer
+      src="https://umami.xn--n6qv0quslfsn.top/script.js"
+      data-website-id="8907c3a8-671a-4b45-8ae8-ef1f3ebb124e"
+    ></script>
+  </body>
+</html>
