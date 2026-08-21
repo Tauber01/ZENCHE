@@ -17376,9 +17376,9 @@ public final class MainActivity extends Activity {
             String version = getPackageManager()
                     .getPackageInfo(getPackageName(), 0)
                     .versionName;
-            return version == null || version.isEmpty() ? "1.5.14" : version;
+            return version == null || version.isEmpty() ? "1.5.15" : version;
         } catch (Exception error) {
-            return "1.5.14";
+            return "1.5.15";
         }
     }
 

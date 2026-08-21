@@ -715,7 +715,7 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 // 与 AppScope/app.json5 的 versionName 同步；发布构建以该清单为版本源。
-const CURRENT_VERSION: string = '1.5.14';
+const CURRENT_VERSION: string = '1.5.15';
 const MIRROR_CHYAN_RESOURCE_ID: string = 'ZENCHE';
 const MIRROR_CHYAN_API: string =
   `https://mirrorchyan.com/api/resources/${MIRROR_CHYAN_RESOURCE_ID}/latest`;
