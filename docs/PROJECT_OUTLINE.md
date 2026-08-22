@@ -14,28 +14,25 @@
 - 产品描述：跨平台相机控制与影像传输工具
 - 英文品牌语：Capture · Connect · Flow
 - 标准标语：连接相机，也连接完整工作流
-- 当前源码版本：1.5.15（本地候选：官网 SEO 与相机 Wi-Fi 精确路由/恢复加固）
+- 当前源码版本：1.5.15（GitHub 稳定版：官网 SEO 与相机 Wi-Fi 精确路由/恢复加固）
 - 当前原生构建号：42
-- 发布状态：[GitHub Release v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)
-  已于 `2026-08-19T19:58:12Z` 发布为 Latest，非草稿、非预发布；注释标签对象
-  `fea9c2a8774c5b96d409940fb7b55e2f5e907c22` 解引用到发布提交
-  `17e87ce6c39aad07f712cd0605efe90899e6e72c`。Release ID `373311624`，包含六个五端安装包与
-  六份 SHA-256 侧车；发布 run `32295909168` 公开前完成全资产侧车验证并原子切换，
-  GitHub 端名称、字节数和六包摘要 12/12 一致。官网自托管更新已同步切换到
-  `1.5.14 / build 41`，双 API 五端响应与六包公网 SHA-256 均已回验。
+- 发布状态：[GitHub Release v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)
+  作为 Latest、非草稿、非预发布稳定版提供六个五端安装包与六份同名 SHA-256 侧车；
+  固定资产发布工作流在公开前下载并验证全部侧车，再原子切换 Release。官网自托管
+  更新仍保持 `1.5.14 / build 41`，SEO 源码也尚未部署生产。
 
-1.5.15 / build 42 是尚未公开的本地候选。Android 与 HarmonyOS 将 PTP/IP command/
+1.5.15 / build 42 是当前 GitHub 稳定版。Android 与 HarmonyOS 将 PTP/IP command/
 event 双通道绑定到实际相机 Wi-Fi 网络并按会话网络过滤丢失/恢复回调；Apple 允许
 `NWConnection.waiting` 在既有 deadline 内随 Wi-Fi 重关联恢复，并在回到前台时立即
 Probe；HarmonyOS 以真实 Probe 作为 ready 屏障并容忍 event reader 空闲超时；Windows
 补充接口地址变化探测、心跳互斥、分阶段连接预算和完整会话所有权门禁。Android、Apple
 与 Windows 均新增直接驱动生产 PTP/IP 传输的本地伪相机故障注入，HarmonyOS 由 API 12
 构建与强化契约覆盖。生产 Vue 官网源码现纳入仓库，补齐 canonical、社交元数据、
-SoftwareApplication JSON-LD、真实 robots/sitemap 和发布事实校验；SEO 候选未部署。
+SoftwareApplication JSON-LD、真实 robots/sitemap 和发布事实校验；SEO 源码未部署。
 实现与打包基线 `94b3042b1f988f638ae0ba714c6d88c56b4da763` 的完整测试为
-654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个本地候选包、六份侧车、版本、
-容器、架构和适用签名边界均已回验，详见 `docs/releases/v1.5.15.md`。本候选未推送、
-未打标签、未创建 Release、未切换官网更新清单，SEO 也未部署，公开稳定版仍为 1.5.14。
+654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个 GitHub 包、六份侧车、版本、
+容器、架构和适用签名边界均已回验，详见 `docs/releases/v1.5.15.md`。本次只发布
+GitHub `main`、注释标签和 Release；官网更新清单仍为 1.5.14，SEO 也未部署。
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
 

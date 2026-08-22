@@ -33,9 +33,9 @@
   availability, performs an immediate coalesced probe, prevents overlapping
   heartbeat probes, separates handshake and restoration time budgets, and
   applies complete-session readiness gating to camera operations.
-- Updated source metadata to `1.5.15 / build 42`. The public GitHub release and
-  official update feed remain on `1.5.14 / build 41` unless separately
-  authorized and published.
+- Published source metadata and six platform packages as GitHub stable
+  `1.5.15 / build 42`. The official website update feed remains on
+  `1.5.14 / build 41` and was not switched by this release.
 
 ### Fixed
 
@@ -52,10 +52,11 @@
 
 ### Validation status
 
-- Local candidate only: no push, tag, GitHub Release, official update switch,
-  or production website deployment has been performed. Exact full-suite,
-  native build, package, checksum, signing, and remaining hardware evidence is
-  recorded in `docs/releases/v1.5.15.md`.
+- Published as GitHub stable `v1.5.15` with the fixed six packages and six
+  matching SHA-256 sidecars. No official update-feed switch or production
+  website deployment was performed. Exact full-suite, native build, package,
+  checksum, signing, and remaining hardware evidence is recorded in
+  `docs/releases/v1.5.15.md`.
 
 ## [1.5.14] - 2026-08-20
 

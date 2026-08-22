@@ -358,7 +358,7 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
   于 `2026-08-19T19:58:12Z` 公开为 Latest。Actions run `32295909168` 在原子公开前核对
   12 个固定名称资产与六份侧车；GitHub 端六包字节数和摘要与本地一致。
 
-### 5.3 相机 Wi-Fi 精确路由与恢复加固（1.5.15 候选）
+### 5.3 相机 Wi-Fi 精确路由与恢复加固（1.5.15）
 
 - **路由所有权**：相机 AP 没有互联网时，系统默认网络可能仍是蜂窝、以太网或其他
   Wi-Fi。Android 在异步 `NetworkCallback` 前用 `getAllNetworks()` 同步种子化相机
@@ -385,11 +385,14 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
   解耦。self-canonical、绝对社交图片、SoftwareApplication JSON-LD、真实 robots/sitemap
   通过源码与 dist 双重测试；客户端中英切换使用同一 URL，不虚构独立 hreflang URL，
   sitemap 只列根 URL，避免 `/redeem` 与根 canonical 冲突。源码完成不等于生产已部署。
-- **候选门禁**：实现与打包基线 `94b3042b1f988f638ae0ba714c6d88c56b4da763`
+- **发布门禁**：实现与打包基线 `94b3042b1f988f638ae0ba714c6d88c56b4da763`
   的完整自动化为 654 通过、0 失败、1 项 Windows 主机专属用例跳过；Android、iOS、
   HarmonyOS、macOS 与 Windows 交叉构建均成功，六包和侧车已完成容器、版本、架构与
   适用签名验证。Windows 交叉构建不能替代真实 Windows 主机执行
   `scripts/build-windows.ps1`，逐包事实与硬件边界见 `docs/releases/v1.5.15.md`。
+- **GitHub 发布边界**：`v1.5.15` 只把 `main`、注释标签、六个固定安装包和六份同名
+  SHA-256 侧车发布到 GitHub。工作流必须在 Draft 状态下载并验证 12 个资产后再原子
+  公开为 Latest；官网更新清单和 SEO 生产部署保持 1.5.14，不因 GitHub Latest 自动切换。
 
 ## 6. 本地工作流与图像处理
 

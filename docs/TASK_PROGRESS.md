@@ -1,9 +1,9 @@
 # 帧澈 ZENCHE 任务进度
 
 > 快照时间：2026-08-20（Asia/Shanghai）
-> 当前公开版本：1.5.14 / build 41；最终实现提交 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`，注释标签 `v1.5.14` 解引用到发布提交 `17e87ce6c39aad07f712cd0605efe90899e6e72c`
-> 公开状态：v1.5.14 已于 `2026-08-19T19:58:12Z` 发布为 GitHub Latest；官网自托管更新已同步切换到 1.5.14 / build 41
-> 当前源码：1.5.15 / build 42 本地候选，官网 SEO、相机 Wi-Fi 精确路由/恢复加固与六包已封板；公开 GitHub 与官网更新仍为 1.5.14 / build 41，见 §12.66
+> 当前公开版本：GitHub `1.5.15 / build 42`；官网自托管更新 `1.5.14 / build 41`
+> 公开状态：v1.5.15 已作为 GitHub Latest 发布；官网正式更新清单和 SEO 生产部署未切换
+> 当前源码：1.5.15 / build 42，官网 SEO、相机 Wi-Fi 精确路由/恢复加固与六包已封板并完成 GitHub 发布，见 §12.66
 > 维护规则：每次完成实质性功能、验证、打包或发布工作后更新本文件；每次向 GitHub 上传源码、标签、Release 或附件后，还必须同步更新 `docs/PROJECT_OUTLINE.md`、`docs/TECHNICAL_APPROACH.md` 和本文件。不要只写“完成”，必须附版本、提交/标签、Release 链接、产物与 SHA-256、验证证据、签名状态、阻塞和下一步，作为项目长期记忆。
 
 ## 1. 状态图例
@@ -1302,7 +1302,7 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   `/opt/zenche-update-backups/20260819T200402Z-v1514`。
 - **剩余实机边界**：真实 Sony/Nikon/Canon 相机、可信签名、公证、Windows 实机安装/驱动/SmartScreen 与移动端设备安装仍是不可由自动化替代的边界。
 
-## 12.66 v1.5.15 官网 SEO 与相机 Wi-Fi 稳定性候选（2026-08-22，GPT5.6 + kimi + Kimi k3）
+## 12.66 v1.5.15 官网 SEO、相机 Wi-Fi 稳定性与 GitHub 发布（2026-08-22，GPT5.6 + kimi + Kimi k3）
 
 - **授权与工作现场**：Tauber 在 Buzz 线程 `c0593c4b…e7ec` 要求优化官网 SEO，并重点
   加固相机连接尤其 Wi-Fi。正式基线为 `origin/main @ c8e67a21d636aee3e60b79a0ad3907d52df8cd01`
@@ -1356,7 +1356,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
 - **SEO 最终复验**：实现基线的 `npm run verify:seo` 完成 3/3 源码测试、vue-tsc、Vite
   production build 与 dist canonical/JSON-LD/robots/sitemap 校验；仅保留 Vite 既有大
   chunk 非阻断警告。源码和构建通过不代表生产已部署。
-- **授权与生产边界**：本轮没有 push、标签、GitHub Release、正式更新源切换或官网生产
-  部署授权；公开 GitHub 与官网更新仍是 1.5.14 / build 41。结构化数据、loopback 相机、
+- **GitHub 发布与生产边界**：Tauber 于 2026-08-22 在同一 Buzz 线程明确要求“上线到
+  GitHub”。`main`、注释标签 `v1.5.15`、六个固定安装包和六份同名 SHA-256 侧车按
+  Draft 校验后原子发布为 GitHub Latest。该授权不包含正式更新源切换或官网生产部署；
+  官网更新与下载仍是 1.5.14 / build 41，SEO 源码也未部署。结构化数据、loopback 相机、
   编译和候选包不能代替真实 Nikon/Sony/Canon 相机 AP、移动端前后台/路由切换、Windows
   实机网卡/驱动/安装/SmartScreen 或可信签名、公证验证。

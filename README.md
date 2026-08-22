@@ -27,13 +27,13 @@
 PTP/IP 连接相机，支持 BLE 遥控快门与拍摄位置 XMP GPS 标记，并可通过 FTP、
 HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、导入与分享。
 
-- GitHub 公开稳定版：**v1.5.14**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
-- 当前源码版本：**1.5.15 / build 42（本地候选，尚未发布）**
+- GitHub 公开稳定版：**v1.5.15**（[发布说明与下载](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)）
+- 当前源码版本：**1.5.15 / build 42**
 - 原生目标：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 界面语言：**简体中文 · English · 日本語**（可在齿轮设置中即时切换）
 - 相机档案：**50 款 Nikon / Sony / Canon 相机**（20 Nikon、16 Sony、14 Canon）
 - 项目仓库：[github.com/Tauber01/ZENCHE](https://github.com/Tauber01/ZENCHE)
-- 安装包：[GitHub 公开稳定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
+- 安装包：[GitHub 公开稳定版 v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15) · [全部版本](https://github.com/Tauber01/ZENCHE/releases)
 - 官网兑换：[https://zenche.top/](https://zenche.top/)
 - 爱发电购买兑换码：[https://www.ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 官方 QQ 群：**165315727**
@@ -42,14 +42,14 @@ HTTP 或 WebDAV 接收影像，再在同一个应用里完成预览、管理、�
 > GitHub 公开稳定版与官网自动更新版分别按各自发布说明和 SHA-256 清单核验。项目仍在扩大实机验证范围；
 > 重要拍摄请始终保留机内存储卡，不要把任何联机应用当作唯一备份。
 
-### v1.5.15 本地候选
+### v1.5.15 GitHub 发布
 
 - Android 与 HarmonyOS 会把 PTP/IP 命令、事件双通道绑定到实际相机 Wi‑Fi 网络，避免相机热点无互联网、蜂窝或其他网络仍是默认路由时走错出口；网络丢失与恢复回调只作用于当前会话拥有的网络。
 - Apple 共享连接层把短暂的 `NWConnection.waiting` 视为可恢复路径变化，并在应用回到前台时立即补一次 Probe；HarmonyOS 在发布“已连接”前等待真实 Probe 往返，并不再把事件 reader 的空闲接收超时误判为断线。
 - Windows 会在接口地址变化时立即探测，分开握手与会话恢复预算，阻止心跳重入，并以完整会话所有权统一门禁拍摄、取景、参数与存储操作。
 - 官网源码补齐 self-canonical、绝对 Open Graph/Twitter 图片、SoftwareApplication 结构化数据以及真实 `robots.txt` / `sitemap.xml`，并同步到当前已发布的 1.5.14 下载与 50 款相机档案事实；该 SEO 候选尚未部署生产。
-- 精确实现提交的完整测试为 654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个本地候选包、逐包 SHA-256、签名属性与真机边界见 [1.5.15 候选说明](docs/releases/v1.5.15.md)。
-- 本候选尚未推送、打标签、创建 GitHub Release 或切换官网生产。真实 Nikon/Sony/Canon Wi‑Fi 相机、移动端前后台/网络切换与 Windows 实机仍需对应设备验证。
+- 精确实现提交的完整测试为 654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个 GitHub 安装包、逐包 SHA-256、签名属性与真机边界见 [1.5.15 发布说明](docs/releases/v1.5.15.md)。
+- `1.5.15 / build 42` 作为 GitHub 稳定版发布；官网正式更新源仍为 `1.5.14 / build 41`，SEO 源码也尚未部署生产。真实 Nikon/Sony/Canon Wi‑Fi 相机、移动端前后台/网络切换与 Windows 实机仍需对应设备验证。
 
 ### v1.5.14 GitHub 与官网更新
 
@@ -232,17 +232,17 @@ USB 主机组合均已完成实机验证。请使用
 
 ## 下载与安装
 
-前往 [GitHub 公开稳定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)
+前往 [GitHub 公开稳定版 v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)
 下载安装包及同名 `.sha256` 校验文件。交付文件命名如下：
 
 | 平台 | 文件 | 安装说明 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
-| Android | `ZENCHE-1.5.13-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
-| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
-| Windows x64 便携版 | `ZENCHE-1.5.13-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
-| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
-| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | 验证产物；必须重新签名，不能直接安装 |
+| macOS Apple Silicon | `ZENCHE-1.5.15-macOS-arm64.dmg` | 拖入 Applications；社区构建为 ad-hoc 签名，未公证 |
+| Android | `ZENCHE-1.5.15-android.apk` | 允许侧载后安装；当前使用调试证书签名 |
+| Windows x64 | `ZENCHE-1.5.15-Windows-x64-Setup.exe` | 推荐安装程序；当前未使用商业代码签名证书 |
+| Windows x64 便携版 | `ZENCHE-1.5.15-Windows-x64.zip` | 完整解压后运行，不要单独移动 `libusb-1.0.dll` |
+| HarmonyOS | `ZENCHE-1.5.15-HarmonyOS.hap` | 真机安装前需要有效的开发者签名与 Profile |
+| iOS / iPadOS | `ZENCHE-1.5.15-ios-unsigned.ipa` | 验证产物；必须重新签名，不能直接安装 |
 
 Windows 相机接口可能需要切换为 WinUSB。操作前请阅读
 [Windows 构建与 USB 驱动](docs/WINDOWS_BUILD.md)，避免影响 NX Tether、
@@ -253,13 +253,13 @@ Camera Control Pro 或系统照片导入。HarmonyOS 与 iOS 的签名说明分�
 校验下载文件：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.15-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.15-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自动更新与 Mirror酱
@@ -448,12 +448,12 @@ it or through Wi‑Fi PTP/IP, supports a BLE shutter remote and capture-location
 XMP GPS tagging, receives images through FTP/HTTP/WebDAV, and keeps the files
 in a local library for review and export.
 
-- GitHub public stable release: **v1.5.14** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14))
-- Source version: **1.5.15 / build 42 (local candidate, not published)**
+- GitHub public stable release: **v1.5.15** ([release notes and downloads](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15))
+- Source version: **1.5.15 / build 42**
 - Native targets: **macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - Interface languages: **Simplified Chinese · English · Japanese** (switch instantly from the gear settings)
 - Camera profiles: **50 Nikon / Sony / Canon cameras** (20 Nikon, 16 Sony, 14 Canon)
-- Downloads: [GitHub public stable release v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
+- Downloads: [GitHub public stable release v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15) · [all releases](https://github.com/Tauber01/ZENCHE/releases)
 - Official website: [zenche.top](https://zenche.top/)
 - Afdian redemption-code purchase: [ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - Official QQ group: **165315727**
@@ -465,14 +465,14 @@ in a local library for review and export.
 > Hardware validation is still expanding. Always keep the camera memory card
 > as an independent copy during important work.
 
-### v1.5.15 local candidate
+### v1.5.15 GitHub release
 
 - Android and HarmonyOS bind both PTP/IP command and event channels to the camera's actual Wi-Fi network, preventing a no-internet camera hotspot from being bypassed when cellular or another network remains the default route. Loss and recovery callbacks are scoped to the network owned by the current session.
 - The shared Apple connection layer treats a temporary `NWConnection.waiting` state as a recoverable path change and probes immediately after the app returns to the foreground. HarmonyOS waits for a real Probe round trip before publishing ready and no longer treats an idle event-reader receive timeout as a disconnect.
 - Windows probes immediately after interface-address changes, separates handshake and session-restoration budgets, prevents overlapping heartbeat probes, and gates capture, live view, parameters, and storage on complete session ownership.
 - The website source now includes a self-canonical URL, absolute Open Graph/Twitter images, SoftwareApplication structured data, and real `robots.txt` / `sitemap.xml` files. Its facts match the currently published 1.5.14 downloads and 50 camera profiles; this SEO candidate has not been deployed to production.
-- The exact implementation commit passes 654 tests with zero failures and one Windows-host-only skip. See the [1.5.15 candidate notes](docs/releases/v1.5.15.md) for the six local packages, per-file SHA-256, signing properties, and hardware boundaries.
-- This candidate has not been pushed, tagged, published as a GitHub Release, or deployed to the production website. Real Nikon/Sony/Canon Wi-Fi cameras, mobile foreground/network transitions, and a Windows host still require hands-on validation.
+- The exact implementation commit passes 654 tests with zero failures and one Windows-host-only skip. See the [1.5.15 release notes](docs/releases/v1.5.15.md) for the six GitHub packages, per-file SHA-256, signing properties, and hardware boundaries.
+- `1.5.15 / build 42` is published as the GitHub stable release. The official website update feed remains on `1.5.14 / build 41`, and the SEO source has not been deployed to production. Real Nikon/Sony/Canon Wi-Fi cameras, mobile foreground/network transitions, and a Windows host still require hands-on validation.
 
 ### GitHub and official-site update in v1.5.14
 
@@ -656,12 +656,12 @@ The delivery names are:
 
 | Platform | File | Installation note |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
-| Android | `ZENCHE-1.5.13-android.apk` | Sideloading required; currently signed with a debug certificate |
-| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
-| Windows x64 portable | `ZENCHE-1.5.13-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
-| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
-| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | Validation artifact; it must be signed before installation |
+| macOS Apple Silicon | `ZENCHE-1.5.15-macOS-arm64.dmg` | Drag to Applications; community build is ad-hoc signed and not notarized |
+| Android | `ZENCHE-1.5.15-android.apk` | Sideloading required; currently signed with a debug certificate |
+| Windows x64 | `ZENCHE-1.5.15-Windows-x64-Setup.exe` | Recommended installer; no commercial code-signing certificate |
+| Windows x64 portable | `ZENCHE-1.5.15-Windows-x64.zip` | Extract completely; keep `libusb-1.0.dll` beside the executable |
+| HarmonyOS | `ZENCHE-1.5.15-HarmonyOS.hap` | A valid developer signature and Profile are required for device installation |
+| iOS / iPadOS | `ZENCHE-1.5.15-ios-unsigned.ipa` | Validation artifact; it must be signed before installation |
 
 Windows may require binding the camera PTP interface to WinUSB. Read
 [Windows build and USB driver](docs/WINDOWS_BUILD.md) first, because changing
@@ -672,13 +672,13 @@ import. See [HarmonyOS build and deployment](docs/HARMONY_BUILD.md) and
 Verify downloaded files against their matching sidecars, for example:
 
 ```sh
-shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.15-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell:
 
 ```powershell
-Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.15-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### Automatic updates and MirrorChyan
@@ -824,12 +824,12 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 リモートシャッターと撮影位置の XMP GPS 記録にも対応します。FTP、HTTP、WebDAV
 で画像を受信し、同じアプリ内でプレビュー、管理、読み込み、共有まで行えます。
 
-- GitHub 公開安定版：**v1.5.14**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)）
-- 現在のソースバージョン：**1.5.15 / build 42（ローカル候補、未公開）**
+- GitHub 公開安定版：**v1.5.15**（[リリースノートとダウンロード](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)）
+- 現在のソースバージョン：**1.5.15 / build 42**
 - ネイティブ対象：**macOS · Windows · Android · HarmonyOS · iOS / iPadOS**
 - 表示言語：**簡体字中国語 · English · 日本語**（歯車の設定から即時切り替え）
 - カメラプロファイル：**Nikon / Sony / Canon の 50 機種**（Nikon 20、Sony 16、Canon 14）
-- ダウンロード：[GitHub 公開安定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
+- ダウンロード：[GitHub 公開安定版 v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15) · [すべてのリリース](https://github.com/Tauber01/ZENCHE/releases)
 - 公式サイト：[zenche.top](https://zenche.top/)
 - Afdian 引き換えコード購入：[ifdian.net/a/Tauber](https://www.ifdian.net/a/Tauber)
 - 公式 QQ グループ：**165315727**
@@ -840,14 +840,14 @@ OS が許可する環境では USB/PTP、または Wi‑Fi PTP/IP でカメラ�
 > SHA-256 一覧で確認してください。現在も実機検証範囲を拡大中です。重要な撮影ではカメラ内の
 > メモリーカードを必ず独立したコピーとして残してください。
 
-### v1.5.15 ローカル候補
+### v1.5.15 GitHub リリース
 
 - Android と HarmonyOS は PTP/IP のコマンド／イベント両チャネルを実際のカメラ Wi-Fi ネットワークへバインドします。インターネット接続のないカメラ AP とモバイル回線などが併存しても誤った既定経路を使わず、切断／復旧コールバックも現在のセッションが所有するネットワークだけを対象にします。
 - Apple 共通接続層は一時的な `NWConnection.waiting` を復旧可能な経路変化として扱い、アプリがフォアグラウンドへ戻ると直ちに Probe を実行します。HarmonyOS は実際の Probe 往復が完了してから接続済み状態を公開し、イベント reader の受信アイドルタイムアウトを切断と誤認しません。
 - Windows はインターフェースのアドレス変化後に直ちに Probe を実行し、ハンドシェイクとセッション復旧の時間枠を分離します。心拍 Probe の重複を防ぎ、撮影、ライブビュー、パラメーター、ストレージ操作を完全なセッション所有権で統一して制御します。
 - 公式サイトのソースに self-canonical、絶対 URL の Open Graph／Twitter 画像、SoftwareApplication 構造化データ、実体のある `robots.txt`／`sitemap.xml` を追加しました。公開済み 1.5.14 のダウンロードと 50 機種プロファイルの事実へ同期していますが、この SEO 候補は本番へ未展開です。
-- 正確な実装コミットの全テストは 654 件成功、失敗 0 件、Windows 実機専用のスキップ 1 件です。6 つのローカル候補パッケージ、各 SHA-256、署名属性、実機境界は [1.5.15 候補ノート](docs/releases/v1.5.15.md)を参照してください。
-- この候補は push、タグ作成、GitHub Release 公開、公式サイト本番切り替えを行っていません。Nikon／Sony／Canon の実機 Wi-Fi、モバイル端末の前後台／ネットワーク切り替え、Windows 実機での検証が引き続き必要です。
+- 正確な実装コミットの全テストは 654 件成功、失敗 0 件、Windows 実機専用のスキップ 1 件です。6 つの GitHub パッケージ、各 SHA-256、署名属性、実機境界は [1.5.15 リリースノート](docs/releases/v1.5.15.md)を参照してください。
+- `1.5.15 / build 42` は GitHub 安定版として公開されます。公式サイトの更新フィードは `1.5.14 / build 41` のままで、SEO ソースも本番へ未展開です。Nikon／Sony／Canon の実機 Wi-Fi、モバイル端末の前後台／ネットワーク切り替え、Windows 実機での検証が引き続き必要です。
 
 ### v1.5.14 GitHub／公式サイト更新
 
@@ -1021,18 +1021,18 @@ USB Vendor ID は Nikon が `0x04b0`、Sony が `0x054c`、Canon が `0x04a9` �
 
 ### ダウンロードとインストール
 
-[GitHub 公開安定版 v1.5.14](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14) から
+[GitHub 公開安定版 v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15) から
 パッケージと同名の `.sha256` ファイルをダウンロードしてください。配布ファイル名は
 次のとおりです。
 
 | プラットフォーム | ファイル | インストール上の注意 |
 | --- | --- | --- |
-| macOS Apple Silicon | `ZENCHE-1.5.13-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
-| Android | `ZENCHE-1.5.13-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
-| Windows x64 | `ZENCHE-1.5.13-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
-| Windows x64 ポータブル | `ZENCHE-1.5.13-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
-| HarmonyOS | `ZENCHE-1.5.13-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
-| iOS / iPadOS | `ZENCHE-1.5.13-ios-unsigned.ipa` | 検証用。インストール前に署名が必要 |
+| macOS Apple Silicon | `ZENCHE-1.5.15-macOS-arm64.dmg` | Applications へドラッグ。コミュニティ版は ad-hoc 署名で未公証 |
+| Android | `ZENCHE-1.5.15-android.apk` | サイドロードが必要。現在はデバッグ証明書で署名 |
+| Windows x64 | `ZENCHE-1.5.15-Windows-x64-Setup.exe` | 推奨インストーラー。商用コード署名証明書は未使用 |
+| Windows x64 ポータブル | `ZENCHE-1.5.15-Windows-x64.zip` | 完全に展開し、`libusb-1.0.dll` を実行ファイルと同じ場所に保持 |
+| HarmonyOS | `ZENCHE-1.5.15-HarmonyOS.hap` | 実機インストールには有効な開発者署名と Profile が必要 |
+| iOS / iPadOS | `ZENCHE-1.5.15-ios-unsigned.ipa` | 検証用。インストール前に署名が必要 |
 
 Windows ではカメラの PTP インターフェースを WinUSB に割り当てる必要がある場合が
 あります。NX Tether、Camera Control Pro、システムの写真読み込みへ影響する可能性
@@ -1044,13 +1044,13 @@ Windows ではカメラの PTP インターフェースを WinUSB に割り当�
 ダウンロードしたファイルは、同名のサイドカーで確認してください。例：
 
 ```sh
-shasum -a 256 -c ZENCHE-1.5.13-macOS-arm64.dmg.sha256
+shasum -a 256 -c ZENCHE-1.5.15-macOS-arm64.dmg.sha256
 ```
 
 Windows PowerShell：
 
 ```powershell
-Get-FileHash .\ZENCHE-1.5.13-Windows-x64-Setup.exe -Algorithm SHA256
+Get-FileHash .\ZENCHE-1.5.15-Windows-x64-Setup.exe -Algorithm SHA256
 ```
 
 ### 自動更新と MirrorChyan
