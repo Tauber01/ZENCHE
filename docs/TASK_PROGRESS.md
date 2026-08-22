@@ -1,6 +1,6 @@
 # 帧澈 ZENCHE 任务进度
 
-> 快照时间：2026-08-20（Asia/Shanghai）
+> 快照时间：2026-08-22（Asia/Shanghai）
 > 当前公开版本：GitHub `1.5.15 / build 42`；官网自托管更新 `1.5.14 / build 41`
 > 公开状态：v1.5.15 已作为 GitHub Latest 发布；官网正式更新清单和 SEO 生产部署未切换
 > 当前源码：1.5.15 / build 42，官网 SEO、相机 Wi-Fi 精确路由/恢复加固与六包已封板并完成 GitHub 发布，见 §12.66
@@ -19,9 +19,9 @@
 ## 2. 当前结论
 
 - 五个原生目标均已建立，产品功能不依赖顶层 Web/PWA。
-- 当前 GitHub 公开稳定版为 [**1.5.14 / build 41**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.14)，
-  官网自托管更新同步提供该版本。本版修复 PTP/IP 假断线、跨事务串读、取消/重连旧会话复活与桌面外部命令挂死，
-  新增 Sony ZV-E10 及同代机型识别/兼容配置、macOS/Windows 照片视频一键导入，并简化五端文件库。
+- 当前 GitHub 公开稳定版为 [**1.5.15 / build 42**](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)；
+  官网自托管更新仍为 **1.5.14 / build 41**。1.5.15 加固相机 Wi-Fi 精确路由、PTP/IP
+  断链检出与前台恢复，并把官网 SEO 源码纳入仓库；SEO 与 1.5.15 官网下载尚未部署生产。
 - Windows 启动空引用修复 `970f8e08edce2529750d5b29fe3aaccd53da61ac` 已随 v1.5.12 发布：三条 XAML 默认选择事件在访问后置控件前受 `_initializing` 门禁保护，专项 3/3、基线反证 3/3 按预期失败、独立复审 P0/P1/P2=0。冻结实现与打包源码基线 `025517c179003db1790a3a5c1ffd0560ce55d39e` 的完整 `npm test` 518/518 通过。六个 1.5.12 包、侧车及聚合包已完成本地重建与校验；Windows 包由 macOS 交叉构建且无 Authenticode，仍需真实 Windows 冷启动、参数交互与安装链验收；详见 §12.60、§12.61 与 `docs/releases/v1.5.12.md`。
 - 1.5.13 / build 40 的“下载到本地”发布实现冻结于 `a89e2f89416e6a70564258d9f421d58d6cdc75cd`：exact HEAD 与标签提交 `c8fc8139e01bb2fd9b12b338c7e81a89702e3e98` 的完整 `npm test` 均为 532/532；Android Debug、iOS unsigned、HarmonyOS unsigned、macOS arm64 ad-hoc、Windows x64 Setup/ZIP 六包及六份侧车均从最终实现重建并回验。聚合包含 13 项、275,166,398 字节，SHA-256 `e6304e72477e9f8c64cff7b1d68ec36750eb928fb8b02faf33bfa3f576c10266`。Release 共 14 个资产，线上名称、字节数、GitHub SHA-256 摘要和回下载字节均与本地一致，14/14 零差异；逐包表和签名边界见 `docs/releases/v1.5.13.md`。
 - 1.5.14 / build 41 最终实现为 `5e8b7f1e81c91d99848c619ba583784f5a20cb57`：完整自动化
@@ -33,8 +33,9 @@
 - v1.5.3 发布门禁曾完成 `npm test` 256/256 与五端构建；W14 打包源码已完成完整 `npm test` 483/483、W14 专项 12/12 和五端构建，六个交付文件的 SHA-256、容器版本和结构均已回验。最终视觉/交互与三语内容审查均为 PASS，生产更新切换和公网逐端回归已完成。
 - W14 已完成本地冻结与五端候选包：拍照页实时监看开关和 iOS / iPadOS 的 Mac 相机桥接已实现。Sony 由 Mac 端 Sony Camera Remote SDK 驱动；Nikon 为明确标注的 PTP 兼容路径。Sony 与 Nikon 的公开桌面 Remote SDK 均未提供可直接嵌入 iOS 的版本；真机联调和正式签名发布验收仍待完成。
 - 新增 **AI 修图与生图**：基于 nano-banana 模型的五端 AI 工具、12 个快捷预设、激活码授权（设备绑定、每码 100 次、服务器端计数）。
-- v1.5.0、v1.5.3、v1.5.11、v1.5.12 与 v1.5.13 已作为历史 GitHub Release 保留；
-  v1.5.14 为当前 GitHub Latest 与官网生产更新。旧版使用版本化文件名继续保留，不被新版覆盖，以便回滚。
+- v1.5.0、v1.5.3、v1.5.11、v1.5.12、v1.5.13 与 v1.5.14 已作为历史 GitHub Release
+  保留；v1.5.15 为当前 GitHub Latest，官网生产更新仍为 v1.5.14。旧版使用版本化文件名
+  继续保留，不被新版覆盖，以便回滚。
 - 既有设备激活链路已完成验签、计数与上游转发验证；W13 有效激活码的账号绑定和真实 AI 生成尚未执行。
 - 最大未闭环风险仍是跨 50 款注册机型的系统实机矩阵、生产签名、公证与商店级分发；注册表与静态测试不等同于硬件实机验收。Windows 包在 macOS 交叉构建，尚未完成真实 Windows 安装/驱动/SmartScreen 验收。
 - 本次恢复从历史提交 `a4a26a6` / `4a094e8`（AI 激活码系统）与 `8b6f556` / `3081f71`（Sony/Canon 适配）增量合并，保留当前编辑器、Nikon EXPEED 5/6/7、Android 状态栏与 Web/PWA 工作区。
@@ -1362,3 +1363,9 @@ CI 当前自动构建 iOS unsigned、Android 和 macOS；Windows 有独立手动
   官网更新与下载仍是 1.5.14 / build 41，SEO 源码也未部署。结构化数据、loopback 相机、
   编译和候选包不能代替真实 Nikon/Sony/Canon 相机 AP、移动端前后台/路由切换、Windows
   实机网卡/驱动/安装/SmartScreen 或可信签名、公证验证。
+- **GitHub 发布实证**：发布提交 `a99a0d215c41eb7429ebaf899e66e976a063e038`
+  已推送；注释标签对象 `3a191f935d289613f41eb70560e9f1e6b7b3c0cb` 解引用到同一提交。
+  Release ID `374895369` 于 `2026-08-22T10:12:17Z` 公开为非草稿、非预发布的 Latest，
+  [发布工作流 run 32566987111](https://github.com/Tauber01/ZENCHE/actions/runs/32566987111)
+  成功。GitHub API 对六包与六侧车进行名称、字节数、`uploaded` 状态和 SHA-256 digest
+  逐项比对，12/12 与本地一致、零差异；远端 `main` 与标签解引用值也在推送后独立核验。

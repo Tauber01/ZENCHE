@@ -1,7 +1,7 @@
 # 帧澈 ZENCHE 实现技术路径
 
 > 文档状态：工程实施基线
-> 最近核对：2026-08-20（Asia/Shanghai）
+> 最近核对：2026-08-22（Asia/Shanghai）
 > 前置阅读：`AGENTS.md`、`docs/PROJECT_OUTLINE.md`、`docs/TASK_PROGRESS.md`
 > 注：`AGENTS.md` 于 2026-08-03 由项目负责人提供权威版并恢复纳入仓库版本控制，此前远端历史曾删除该文件。
 
@@ -393,6 +393,12 @@ v1.4.1 的发布事实、构建产物、校验和及签名状态以 `docs/releas
 - **GitHub 发布边界**：`v1.5.15` 只把 `main`、注释标签、六个固定安装包和六份同名
   SHA-256 侧车发布到 GitHub。工作流必须在 Draft 状态下载并验证 12 个资产后再原子
   公开为 Latest；官网更新清单和 SEO 生产部署保持 1.5.14，不因 GitHub Latest 自动切换。
+- **GitHub 发布证据**：发布提交 `a99a0d215c41eb7429ebaf899e66e976a063e038`
+  已推送，注释标签对象 `3a191f935d289613f41eb70560e9f1e6b7b3c0cb` 解引用到该提交。
+  Release ID `374895369` 于 `2026-08-22T10:12:17Z` 公开为非草稿、非预发布的 Latest；
+  [Release 工作流 run 32566987111](https://github.com/Tauber01/ZENCHE/actions/runs/32566987111)
+  成功。GitHub API 回验 12 个资产均为 `uploaded`，名称、字节数和 SHA-256 digest 与本地
+  12/12 一致；此线上校验不扩大签名、主机或实机验证结论。
 
 ## 6. 本地工作流与图像处理
 

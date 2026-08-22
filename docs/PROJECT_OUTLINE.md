@@ -18,7 +18,9 @@
 - 当前原生构建号：42
 - 发布状态：[GitHub Release v1.5.15](https://github.com/Tauber01/ZENCHE/releases/tag/v1.5.15)
   作为 Latest、非草稿、非预发布稳定版提供六个五端安装包与六份同名 SHA-256 侧车；
-  固定资产发布工作流在公开前下载并验证全部侧车，再原子切换 Release。官网自托管
+  Release ID `374895369` 于 `2026-08-22T10:12:17Z` 公开，固定资产发布工作流
+  [`32566987111`](https://github.com/Tauber01/ZENCHE/actions/runs/32566987111) 在公开前
+  下载并验证全部侧车，再原子切换 Release。官网自托管
   更新仍保持 `1.5.14 / build 41`，SEO 源码也尚未部署生产。
 
 1.5.15 / build 42 是当前 GitHub 稳定版。Android 与 HarmonyOS 将 PTP/IP command/
@@ -31,8 +33,11 @@ Probe；HarmonyOS 以真实 Probe 作为 ready 屏障并容忍 event reader 空�
 SoftwareApplication JSON-LD、真实 robots/sitemap 和发布事实校验；SEO 源码未部署。
 实现与打包基线 `94b3042b1f988f638ae0ba714c6d88c56b4da763` 的完整测试为
 654 通过、0 失败、1 项 Windows 主机专属用例跳过；六个 GitHub 包、六份侧车、版本、
-容器、架构和适用签名边界均已回验，详见 `docs/releases/v1.5.15.md`。本次只发布
-GitHub `main`、注释标签和 Release；官网更新清单仍为 1.5.14，SEO 也未部署。
+容器、架构和适用签名边界均已回验。发布提交为
+`a99a0d215c41eb7429ebaf899e66e976a063e038`，注释标签对象
+`3a191f935d289613f41eb70560e9f1e6b7b3c0cb` 解引用到该提交；GitHub 12/12 线上资产的
+名称、字节数、状态和摘要均与本地一致，详见 `docs/releases/v1.5.15.md`。本次只发布
+GitHub 源码、标签和 Release；官网更新清单仍为 1.5.14，SEO 也未部署。
 
 1.5.13 为五端文件库、支持应用内预览的页面、AI 与专业显影工作区增加“下载到本地”入口。操作始终创建副本，AI/专业显影直达流程会先产生新的 ZENCHE 文件库项目；移动端使用系统文档保存器，桌面端在后台复制并以稳定文件身份阻止别名路径覆盖源文件。五端文件库统一识别 JPG/JPEG、HEIF/HEIC、PNG、TIF/TIFF、NEF/NRW、ARW、CR2/CR3、MOV/MP4/M4V 与 AVI。旧候选包内的“尚未发布”瞬时公告已改为长期有效的 GitHub Release、官网 1.5.10、签名与实机边界；最终包内产品名称统一为“专业显影 / Pro Develop / プロ現像”，三语正向与反向契约阻止通用术语回归。逐包字节数和 SHA-256 见 `docs/releases/v1.5.13.md`。
 
